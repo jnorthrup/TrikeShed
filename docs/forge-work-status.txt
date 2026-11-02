@@ -6,7 +6,7 @@ Verified delivered slices
 - Release upload workflow PR1073 transports the exact verified asset bytes and checks all seven remote SHA256 digests before publication. Successful run: https://github.com/jnorthrup/TrikeShed/actions/runs/41518868433 . Compiled binaries are absent from branch history; temporary unreferenced GitData transport objects may remain until GitHub garbage collection.
 - Primary project corpus: bounded, revision-checked read adapter and direct-text consumed-source identity are integrated. Primary automatic intake remains separately gated. A complete manual primary-curation/browser walkthrough is still open.
 - Passage navigation: retained document/proposal identity and exact source checks were verified against a real mounted secondary corpus. The complete project-wide document/curator/wiki/zoomable-blackboard path remains open.
-- Conditional reasoning: explicit positive/negative premise arrays drive four-state applicability; unverified language remains candidate text. Missing premises do not fire unless norms. The source-scoped query pilot remains a deliberately limited reviewed ground fragment, not full NAL induction or quantified legal reasoning.
+- Conditional reasoning: explicit positive/negative premise arrays drive four-state applicability; unverified language remains candidate text. Norms with an unless condition stay pending when its premise is missing. The source-scoped query pilot remains a deliberately limited reviewed ground fragment, not full NAL induction or quantified legal reasoning.
 
 Open implementation tracks
 - Forge/LCNC: integrate a shared project/document/section/passage selection across all views; finish visual SQL/SPARQL execution and evidence navigation for the declared supported query subset and dataset.
