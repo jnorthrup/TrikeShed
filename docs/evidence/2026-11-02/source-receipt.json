@@ -11,9 +11,10 @@
   },
   "files": {
     "curator-result.json": "4df272cfc29a88ca48b959a237dce3a49bec90590c1c4a02630dae47722c07a2",
-    "verification-v37.json": "a60451fb862b1f1999809d641e245d83747aca7d317ebd7322764dd9e55135f8",
-    "verification-v35.json": "55a53e4de251528af5611921a6061352b7093fe505e438db95ca4fed887e0eee",
     "curator-retained-unreviewed.png": "766992fa94247f8b66d31c11920ce284d9b820792b281c94b6ee66a2376b4b95",
-    "curator-stale-refused-other-selected.png": "1d2e354ac0095aa9f7a9f18c8ecd54e9fd047e9af0b611c0e0a5cf2e673a490c"
+    "curator-stale-refused-other-selected.png": "1d2e354ac0095aa9f7a9f18c8ecd54e9fd047e9af0b611c0e0a5cf2e673a490c",
+    "hermes-inferred-turn.json": "b62d141dd5b18ef3aeede722578d2c32c160e2b7f1e14ab4c50ba8672f449c34",
+    "verification-v35.json": "55a53e4de251528af5611921a6061352b7093fe505e438db95ca4fed887e0eee",
+    "verification-v37.json": "a60451fb862b1f1999809d641e245d83747aca7d317ebd7322764dd9e55135f8"
   }
 }
