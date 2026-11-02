@@ -125,10 +125,11 @@ class SctpTcb(val table: SctpTcbTable) {
     var reasm = NO_DATA
     var reasmLength = 0
     var reasmPpid: Ppid = 0
-    var oooTsn = IntArray(0)
-    var oooFlags = IntArray(0)
-    var oooPpid = IntArray(0)
-    var oooData = arrayOfNulls<ByteArray>(0)
+    /** Empty until a chunk arrives ahead of order; the empty arrays are shared, so an association that never holds one allocates none. */
+    var oooTsn = NO_INTS
+    var oooFlags = NO_INTS
+    var oooPpid = NO_INTS
+    var oooData = NO_MESSAGES
     var oooCount = 0
 
     /** In the table's dirty list for the next [SctpTcbTable.flush]. */
@@ -156,6 +157,8 @@ class SctpTcb(val table: SctpTcbTable) {
 
     companion object {
         val NO_DATA = ByteArray(0)
+        val NO_INTS = IntArray(0)
+        val NO_MESSAGES = arrayOfNulls<ByteArray>(0)
         /** [qMiss]: the third miss indication came; the chunk goes again at the next flush. */
         const val MARKED = 3
         /** [qMiss]: fast retransmitted; it takes no more miss indications (only T3 sends it again). */
@@ -165,6 +168,49 @@ class SctpTcb(val table: SctpTcbTable) {
         const val SEND_COOKIE_ACK = 4
         const val SEND_COOKIE_ECHO = 8
         const val SEND_SHUTDOWN_COMPLETE = 16
+    }
+}
+
+/**
+ * Message arrays kept for reuse. A response is copied into one at [SctpTcbTable.send] and goes back when its last chunk is
+ * acknowledged, so a steady stream of requests allocates none. Sizes are powers of two from 256 bytes to 64 KB, each
+ * in a stack of at most [DEPTH] arrays; a larger message, or an array that finds its stack full, is left to the collector.
+ * A leased array is at least as long as asked: callers keep the length they asked for.
+ */
+class MessagePool {
+    val stacks = Array(CLASSES) { arrayOfNulls<ByteArray>(DEPTH) }
+    val counts = IntArray(CLASSES)
+
+    fun lease(minimum: Int): ByteArray {
+        if (minimum > MAX) return ByteArray(minimum)
+        var c = 0
+        while ((MIN shl c) < minimum) c++
+        val n = counts[c]
+        if (n == 0) return ByteArray(MIN shl c)
+        counts[c] = n - 1
+        val array = stacks[c][n - 1]!!
+        stacks[c][n - 1] = null
+        return array
+    }
+
+    /** [array] is no longer read by anyone. One that [lease] did not hand out (its size is not a class) is ignored. */
+    fun release(array: ByteArray) {
+        val size = array.size
+        if (size < MIN || size > MAX || size and (size - 1) != 0) return
+        val c = size.countTrailingZeroBits() - SHIFT
+        val n = counts[c]
+        if (n < DEPTH) {
+            stacks[c][n] = array
+            counts[c] = n + 1
+        }
+    }
+
+    companion object {
+        const val SHIFT = 8
+        const val MIN = 1 shl SHIFT
+        const val MAX = 1 shl 16
+        const val CLASSES = 9
+        const val DEPTH = 256
     }
 }
 
@@ -254,6 +300,9 @@ class SctpTcbTable(
     val random: Random = Random.Default,
 ) {
     val tags = TagTable()
+    val pool = MessagePool()
+    /** [writeSack]'s gap blocks: start and end pairs, at most [MAX_GAP_BLOCKS] of them. */
+    val sackGaps = IntArray(2 * MAX_GAP_BLOCKS)
     val writer = SctpPacketWriter(ByteArray(mtu))
     var dirty = arrayOfNulls<SctpTcb>(256)
     var dirtyCount = 0
@@ -339,10 +388,19 @@ class SctpTcbTable(
      * the windows allow. [bytes] is copied: the caller may reuse it.
      */
     fun send(t: SctpTcb, ppid: Ppid, bytes: ByteArray, offset: Int, length: Int) {
+        val msg = pool.lease(length)
+        bytes.copyInto(msg, 0, offset, offset + length)
+        sendLeased(t, ppid, msg, length)
+    }
+
+    /**
+     * [send] of the first [length] bytes of [msg], which the table takes: [msg] comes from [pool] ([MessagePool.lease])
+     * and goes back to it once acknowledged, so the caller neither reads nor writes it again.
+     */
+    fun sendLeased(t: SctpTcb, ppid: Ppid, msg: ByteArray, length: Int) {
         check(t.state == SctpState.ESTABLISHED || t.state == SctpState.COOKIE_ECHOED || t.state == SctpState.COOKIE_WAIT) {
             "send on ${t.state}"
         }
-        val msg = bytes.copyOfRange(offset, offset + length)
         var at = 0
         do {
             val n = minOf(maxData, length - at)
@@ -591,6 +649,9 @@ class SctpTcbTable(
             while (t.head < t.tail && tsnDistance(t.qTsn[t.head and mask], cum) <= 0) {
                 val i = t.head and mask
                 if (!t.qGapAcked[i] && t.head < t.sent) { acked += t.qLen[i]; newest = t.qTsn[i]; fresh = true }
+                // The chunk that ends its message: every chunk of it is behind the head now, so the array is free.
+                val done = t.qMsg[i]
+                if (done != null && t.qFlags[i] and DataFlags.E != 0) pool.release(done)
                 t.qMsg[i] = null
                 t.head++
             }
@@ -794,9 +855,9 @@ class SctpTcbTable(
     /** SACK for [t]'s cumulative TSN, with gap blocks over the chunks held ahead of order. */
     fun writeSack(t: SctpTcb) {
         var blocks = 0
-        val gaps = IntArray(2 * minOf(t.oooCount, 64))
+        val gaps = sackGaps
         var i = 0
-        while (i < t.oooCount && blocks < 64) {
+        while (i < t.oooCount && blocks < MAX_GAP_BLOCKS) {
             val start = tsnDistance(t.oooTsn[i], t.cumTsn)
             var end = start
             while (i + 1 < t.oooCount && t.oooTsn[i + 1] == t.oooTsn[i] + 1) { i++; end++ }
@@ -861,6 +922,8 @@ class SctpTcbTable(
     companion object {
         /** Consecutive PTOs that make persistent congestion (RFC 9002 §7.6, kPersistentCongestionThreshold). */
         const val PERSISTENT_PTOS = 3
+        /** Gap blocks in one SACK. */
+        const val MAX_GAP_BLOCKS = 64
         /** Cookie fields: local tag, peer tag, local TSN, peer TSN, peer a_rwnd, peer port + 2 spare, creation time (8, owner's clock). */
         const val COOKIE_FIELDS = 32
         /** HMAC-SHA256 truncated to 128 bits. */

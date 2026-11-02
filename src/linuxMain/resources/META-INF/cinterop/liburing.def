@@ -85,6 +85,35 @@ static inline int k_io_uring_submit_reap(struct io_uring *ring, unsigned n, int 
     }
     return foreign;
 }
+/* The datagram wheel (DatagramWheel.linux.kt): one SENDMSG (send != 0) or RECVMSG SQE over a prepared msghdr, its
+   user_data the window index. 0, or -EBUSY when the submission queue is full. */
+static inline int k_wheel_prep(struct io_uring *ring, int send, int fd, void *msg, unsigned flags, unsigned long long window) {
+    struct io_uring_sqe *sqe = io_uring_get_sqe(ring);
+    if (!sqe) return -EBUSY;
+    if (send) io_uring_prep_sendmsg(sqe, fd, (const struct msghdr *)msg, flags);
+    else io_uring_prep_recvmsg(sqe, fd, (struct msghdr *)msg, flags);
+    sqe->user_data = window;
+    return 0;
+}
+/* Takes up to max ready CQEs off the CQ without a system call: their user_data and res, in order. Returns how many. */
+static inline int k_wheel_reap(struct io_uring *ring, unsigned long long *window, int *res, int max) {
+    unsigned head, n = 0;
+    struct io_uring_cqe *cqe;
+    io_uring_for_each_cqe(ring, head, cqe) {
+        if (n == (unsigned)max) break;
+        window[n] = cqe->user_data;
+        res[n] = cqe->res;
+        n++;
+    }
+    io_uring_cq_advance(ring, n);
+    return (int)n;
+}
+/* One enter: submits every prepared SQE and, when min > 0, waits for min CQEs. The count submitted, or -errno. */
+static inline int k_wheel_enter(struct io_uring *ring, unsigned min) {
+    int rc;
+    do { rc = io_uring_submit_and_wait(ring, min); } while (rc == -EINTR);
+    return rc;
+}
 /* io_uring retries a READ or WRITE of an O_NONBLOCK file that supports NOWAIT (a socket, a pipe, a terminal) by polling
    it until it is ready, where read(2) and write(2) answer EAGAIN. At the stream position (offset -1) of such a
    descriptor, RWF_NOWAIT (Linux 4.14) gives the SQE that answer; a regular file or block device keeps its blocking

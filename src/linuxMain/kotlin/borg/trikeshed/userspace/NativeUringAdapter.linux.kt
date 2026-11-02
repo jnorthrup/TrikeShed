@@ -94,8 +94,8 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
     /**
      * A datagram window's msghdr: one iovec over the payload from the window's start, and msg_name over its last
      * [UringOp.DATAGRAM_ADDRESS] bytes, which hold a send's destination or take a receive's sender (the kernel writes
-     * only the family's length, as the emulation does). Records are made once, recycled through [messages], and freed
-     * with the ring.
+     * only the address's length, as the emulation does; [nameReceived] clears the rest of an AF_UNIX slot). Records are
+     * made once, recycled through [messages], and freed with the ring.
      */
     fun message(window: Long, len: Int, receive: Boolean): CPointer<platform.posix.msghdr> {
         val m = if (messages.isEmpty()) nativeHeap.alloc<platform.posix.msghdr>().also {
@@ -110,11 +110,43 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
         h.msg_iov!!.pointed.iov_base = window.toCPointer<ByteVar>()
         h.msg_iov!!.pointed.iov_len = payload.toULong()
         h.msg_name = name.toCPointer<ByteVar>()
-        // A receive offers the whole slot (its bytes are a previous datagram's); a send names its family's length.
-        h.msg_namelen = (if (!receive && (name.toCPointer<ByteVar>()!!.pointed.value.toInt() and 255) == 2) 16
-            else UringOp.DATAGRAM_ADDRESS).toUInt()
+        // A receive offers the whole slot (its bytes are a previous datagram's); a send names its address's length.
+        h.msg_namelen = (if (receive) UringOp.DATAGRAM_ADDRESS else nameLength(name.toCPointer<ByteVar>()!!)).toUInt()
         h.msg_flags = 0
         return m
+    }
+
+    /**
+     * The length of the address a send names in its window's slot: 16 for AF_INET; for AF_UNIX the family and the name
+     * through its last non-zero byte (the slot is zero-padded, and an abstract name's length is part of the name); the
+     * whole slot otherwise, an AF_INET6 sockaddr.
+     */
+    fun nameLength(slot: CPointer<ByteVar>): Int = when (slot[0].toInt() and 255) {
+        2 -> 16
+        1 -> {
+            var n = UringOp.DATAGRAM_ADDRESS
+            while (n > 2 && slot[n - 1].toInt() == 0) n--
+            n
+        }
+        else -> UringOp.DATAGRAM_ADDRESS
+    }
+
+    /**
+     * A receive's sender name as the window's slot holds it. The kernel wrote [platform.posix.msghdr.msg_namelen] bytes
+     * of it and left the rest as the previous datagram's. For AF_UNIX the rest is zeroed, so a name reads through its
+     * last non-zero byte and compares as the whole slot. A sender that never bound has no name: the whole slot is
+     * zeroed, family too. A name longer than the slot is refused (-ENAMETOOLONG): cut short, it would be another socket's.
+     */
+    fun nameReceived(message: CPointer<platform.posix.msghdr>, res: Int): Int {
+        if (res < 0) return res
+        val h = message.pointed
+        val slot = h.msg_name!!.reinterpret<ByteVar>()
+        val got = h.msg_namelen.toInt()
+        if (got != 0 && (slot[0].toInt() and 255) != 1) return res
+        if (got > UringOp.DATAGRAM_ADDRESS) return -platform.posix.ENAMETOOLONG
+        var i = got
+        while (i < UringOp.DATAGRAM_ADDRESS) slot[i++] = 0
+        return res
     }
 
     actual fun isPending(userData: Long): Boolean = requests.values.any { it.submission.userData == userData }
@@ -202,10 +234,12 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
                 }
                 // The cancellation CQE never releases this borrow. Only this
                 // original request's terminal CQE proves the kernel is finished.
+                val message = request.message
+                val res = if (message != null && request.submission.opcode == UringOp.RECVMSG) nameReceived(message, completion.res) else completion.res
                 request.pinned?.unpin()
-                request.message?.let { messages.add(it) }
+                message?.let { messages.add(it) }
                 if (cancelled.isNotEmpty()) cancelled.remove(completion.userData)
-                completed.add(UringCompletion(request.submission.userData, completion.res, completion.flags))
+                completed.add(UringCompletion(request.submission.userData, res, completion.flags))
             }
             // Report malformed CQEs after examining this CQ batch. Keep every
             // valid terminal result available to the caller's cleanup reaper.

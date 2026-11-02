@@ -143,6 +143,42 @@ class SctpTcbTableTest {
         assertEquals(0, link.server.count)
     }
 
+    /** The array a message was copied into goes back to the pool when its last chunk is acknowledged, not before. */
+    @Test
+    fun anAcknowledgedMessageGoesBackToThePoolAndIsLeasedAgain() {
+        val link = Link()
+        val t = link.connect()
+        link.pump()
+        val pooled = link.client.pool.counts.sum()
+        val body = ((0 until 5_000).toSeries() α { 'a' + it % 26 }).view.joinToString("")
+        val bytes = body.encodeToByteArray()
+        link.client.send(t, 0x48545831, bytes, 0, bytes.size)
+        // Queued, not yet acknowledged: the 8 KB array is in use, none of that class is waiting.
+        assertEquals(pooled, link.client.pool.counts.sum())
+        link.client.flush(link.now)
+        link.pump()
+        assertEquals(_l["echo:$body"], link.clientGot)
+        // The 5,000 bytes took an 8,192-byte array, which came back with the SACK of the fourth chunk.
+        assertEquals(pooled + 1, link.client.pool.counts.sum())
+        val again = link.client.pool.lease(5_000)
+        assertEquals(8_192, again.size)
+        assertEquals(pooled, link.client.pool.counts.sum())
+    }
+
+    /** A message that is lost and sent again reaches the peer whole: the pool never takes an array a chunk still reads. */
+    @Test
+    fun aLostMessageSentAgainIsNotOverwrittenByTheNextOnes() {
+        val link = Link(lose = { it % 4 == 3 })
+        val t = link.connect()
+        link.pump()
+        for (i in (1..40).toSeries().view) {
+            link.send(t, "m$i".padEnd(900, '.'))
+            if (i % 5 == 0) link.pump()
+        }
+        link.pump()
+        assertEquals(((1..40).toSeries() α { "echo:m$it".padEnd(905, '.') }).view.map { it }, link.clientGot)
+    }
+
     @Test
     fun aCorruptPacketIsDropped() {
         val link = Link()

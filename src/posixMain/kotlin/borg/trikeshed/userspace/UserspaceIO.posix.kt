@@ -493,7 +493,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             2 -> if (size != 16) return -22
             10 -> if (size != 28) return -22
             1 -> {
-                if (size !in 3..110) return -22
+                // Linux binds the family alone as a name of its own (autobind); Darwin has no such name.
+                if (size < (if (linux) 2 else 3) || size > 110) return -22
                 if (!linux) {
                     if (bytes[2] == 0.toByte()) return -95 // Darwin has no abstract UNIX namespace.
                     val end = (2 until size).firstOrNull { bytes[it] == 0.toByte() } ?: size
@@ -510,7 +511,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         return bytes.usePinned { action(it.addressOf(0).reinterpret(), size) }
     }
 
-    /** SENDMSG over a datagram window: sendto(2) of the payload to the Linux sockaddr in the window's last bytes. */
+    /**
+     * SENDMSG over a datagram window: sendto(2) of the payload to the Linux sockaddr in the window's last bytes. An
+     * AF_UNIX address is the family and the name through its last non-zero byte; Darwin has no abstract names.
+     */
     private fun datagramSend(sub: UringSubmission): Int {
         val buffer = sub.buffer!!
         val bytes = buffer.array()
@@ -518,7 +522,11 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         val n = sub.len - UringOp.DATAGRAM_ADDRESS
         val slot = start + n
         val family = (bytes[slot].toInt() and 255) or ((bytes[slot + 1].toInt() and 255) shl 8)
-        val size = when (family) { 2 -> 16; 10 -> 28; else -> return -97 }
+        val size = when (family) { 2 -> 16; 10 -> 28; 1 -> unixAddressLength(bytes, slot); else -> return -97 }
+        if (family == 1) {
+            if (size <= 2) return -22
+            if (!linux && bytes[slot + 2] == 0.toByte()) return -95
+        }
         val address = bytes.copyOfRange(slot, slot + size)
         if (!linux) {
             address[0] = size.toByte()
@@ -532,7 +540,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         }
     }
 
-    /** RECVMSG over a datagram window: recvfrom(2) into its start, the sender as a Linux sockaddr into its last bytes. */
+    /**
+     * RECVMSG over a datagram window: recvfrom(2) into its start, the sender as a Linux sockaddr into its last bytes. An
+     * AF_UNIX sender's name is zero-padded to the slot's end; one that never bound leaves the whole slot zero.
+     */
     private fun datagramReceive(sub: UringSubmission): Int = memScoped {
         val buffer = sub.buffer!!
         val bytes = buffer.array()
@@ -545,12 +556,22 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
                 storage.reinterpret(), length.ptr).toInt()
         }
         if (got < 0) return@memScoped posixCompletion(got)
+        val slot = start + n
+        val named = length.value.toInt()
         // Darwin leads with sa_len and an 8-bit family; Linux with a 16-bit family. Port and address follow alike.
-        val host = if (linux) (storage[0].toInt() and 255) or ((storage[1].toInt() and 255) shl 8) else storage[1].toInt() and 255
+        val host = if (named == 0) 0 else if (linux) (storage[0].toInt() and 255) or ((storage[1].toInt() and 255) shl 8) else storage[1].toInt() and 255
+        if (named == 0 || host == AF_UNIX) {
+            if (named > UringOp.DATAGRAM_ADDRESS) return@memScoped -36
+            // A sender that never bound has no name (Darwin: an empty path): its slot reads as zero, not as the previous datagram's.
+            val unnamed = named <= 2 || !linux && storage[2].toInt() == 0
+            var i = 0
+            while (i < UringOp.DATAGRAM_ADDRESS) { bytes[slot + i] = if (unnamed || i >= named) 0 else storage[i]; i++ }
+            if (!unnamed) { bytes[slot] = 1; bytes[slot + 1] = 0 }
+            return@memScoped got
+        }
         val family = when (host) { AF_INET -> 2; AF_INET6 -> 10; else -> return@memScoped -97 }
         val size = if (family == 2) 16 else 28
         // Only the family's length is written: bytes past it keep a previous datagram's and are never read.
-        val slot = start + n
         bytes[slot] = family.toByte()
         bytes[slot + 1] = 0
         for (i in 2 until size) bytes[slot + i] = storage[i]
@@ -741,6 +762,13 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         fun hostFamily(family: Int): Int? = when (family) { 2 -> AF_INET; 10 -> AF_INET6; 1 -> AF_UNIX; else -> null }
         val positioned = UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
     }
+}
+
+/** The length of the AF_UNIX address in the datagram slot at [slot]: the family and the name through its last non-zero byte. */
+internal fun unixAddressLength(bytes: ByteArray, slot: Int): Int {
+    var n = UringOp.DATAGRAM_ADDRESS
+    while (n > 2 && bytes[slot + n - 1] == 0.toByte()) n--
+    return n
 }
 
 /** The submission's NUL-separated paths, each without a NUL of its own. */
