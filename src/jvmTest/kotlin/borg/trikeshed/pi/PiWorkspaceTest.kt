@@ -18,7 +18,11 @@ class PiWorkspaceTest {
             assertFails { workspace.dispatch("edit", edit) }
             assertFails { workspace.dispatch("read", _m["path" j "../agent.ts"]) }
             assertFails { workspace.dispatch("read", _m["path" j "secret.ts"]) }
+            workspace.dispatch("read", _m["path" j "agent.ts"])
+            Files.writeString(source, "// external change\nconst label = 'Graal Pi';\n")
+            assertFails { workspace.dispatch("edit", _m["path" j "agent.ts", "oldText" j "'Graal Pi'", "newText" j "'Pi'"]) }
             Files.writeString(source, "Pi Pi")
+            workspace.dispatch("read", _m["path" j "agent.ts"])
             assertFails { workspace.dispatch("edit", _m["path" j "agent.ts", "oldText" j "Pi", "newText" j "x"]) }
             assertEquals("Pi Pi", Files.readString(source))
         } finally { root.toFile().deleteRecursively() }
