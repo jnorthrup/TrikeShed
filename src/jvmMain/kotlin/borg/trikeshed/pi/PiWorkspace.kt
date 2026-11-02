@@ -11,6 +11,7 @@ import java.nio.file.attribute.BasicFileAttributeView
 /** Host grant: existing, explicitly named TS/JS sources only. No directory listing or shell. */
 class PiWorkspace(root: Path, val paths: Set<String>) {
     val root: Path = root.toRealPath()
+    val snapshots = mutableMapOf<String, String>()
     init {
         require(paths.isNotEmpty() && paths.size <= 16)
         paths.forEach { path ->
@@ -63,7 +64,11 @@ class PiWorkspace(root: Path, val paths: Set<String>) {
                 while (channel.read(buffer) > 0) { require(buffer.position() <= BYTES) { "source exceeds byte budget" } }
                 buffer.flip()
                 val before = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).decode(buffer).toString()
-                if (tool == "read") return jsonOf(_m["path" j path, "content" j before])
+                if (tool == "read") {
+                    snapshots[path] = before
+                    return jsonOf(_m["path" j path, "content" j before])
+                }
+                require(snapshots[path] == before) { "edit conflict: read current source before editing" }
                 val old = args["oldText"] as String
                 val replacement = args["newText"] as String
                 val index = before.indexOf(old)
@@ -75,6 +80,7 @@ class PiWorkspace(root: Path, val paths: Set<String>) {
                 while (bytes.hasRemaining()) channel.write(bytes)
                 channel.truncate(channel.position())
                 (channel as? FileChannel)?.force(true)
+                snapshots[path] = after
                 return jsonOf(_m["path" j path, "changed" j true, "diff" j "--- $path\n+++ $path\n-${old.replace("\n", "\n-")}\n+${replacement.replace("\n", "\n+")}"])
             }
         } finally { opened.asReversed().forEach { it.close() } }
