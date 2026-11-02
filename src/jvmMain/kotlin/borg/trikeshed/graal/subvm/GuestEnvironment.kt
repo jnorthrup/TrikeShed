@@ -47,6 +47,7 @@ object GuestEnvironment {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         "PROXY", "TLS",
 =======
         "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "PROXY",
@@ -57,6 +58,9 @@ object GuestEnvironment {
 =======
         "PROXY", "HTTP_PROXY", "HTTPS_PROXY", "SSL_CERT", "TLS_CERT",
 >>>>>>> origin/sentinel/block-proxy-cert-env-16986303036899655400
+=======
+        "PROXY",
+>>>>>>> origin/sentinel/block-proxy-env-vars-13539097597184062788
     )
 
     enum class Disposition { READY, BLOCKED, DEFERRED }
