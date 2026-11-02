@@ -332,7 +332,8 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
      * `constellation.ask`: the norms a SUMO class holds in a constellation: stated of it, or stated of
      * an ancestor and deduced down is-a, revised with its own evidence. Publishes only unconditional
      * `normHeld` assertions because the global KIF store has no place for this query's premises.
-     * Negative premises are caller-supplied, not verified.
+     * Only explicit caller-supplied premise arrays affect applicability; neither sign is verified.
+     * The legacy `facts` text is parsed for inspection only and no longer activates a condition.
      */
     private val ask = LcncNodeRunner { node, inputs ->
         val name = node.params["constellation"]?.takeIf { it.isNotBlank() } ?: error("constellation.ask: name the constellation")
@@ -342,19 +343,20 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val id = sumo.classId(cls)?.value ?: SumoCorpus.nounClassId(cls.lowercase()).takeIf { it >= 0 }
             ?: error("constellation.ask: '$cls' is neither a SUMO class nor a mapped noun")
         val c = constellation(name)
-        // The join: facts read by the same parser as the norms, in premise form.
+        // Legacy text is an unverified candidate source, never a premise in this query.
         val factText = ((inputs["facts"] ?: inputs["facts?"])?.toString() ?: node.params["facts"]).orEmpty()
-        val facts = if (factText.isBlank()) emptySet() else NormClauses.applicabilityFacts(CoreNlpRuntime().use { it.analyze(factText) })
-        val negativeInput = inputs["negativeFacts"] ?: inputs["negativeFacts?"]
-        val negativeFacts = if (negativeInput == null) emptySet() else {
-            val values = negativeInput as? List<*> ?: error("constellation.ask: negativeFacts must be an array of exact premise strings")
+        val candidates = if (factText.isBlank()) emptySet() else NormClauses.facts(CoreNlpRuntime().use { it.analyze(factText) })
+        fun premises(key: String): Set<String> {
+            val input = inputs[key] ?: inputs["$key?"] ?: return emptySet()
+            val values = input as? List<*> ?: error("constellation.ask: $key must be an array of exact premise strings")
             require(values.size <= 256 && values.all { it is String && it.isNotBlank() && it.length <= 8192 }) {
-                "constellation.ask: negativeFacts must contain at most 256 nonblank premise strings"
+                "constellation.ask: $key must contain at most 256 nonblank premise strings"
             }
-            values.map { it as String }.toSet()
+            return values.map { it as String }.toSet()
         }
-        // Legacy book facts have no provenance or polarity guarantees and cannot establish applicability.
-        val fired = c.fire(SumoCorpus.closure(id), facts, negativeFacts)
+        val positiveFacts = premises("positiveFacts")
+        val negativeFacts = premises("negativeFacts")
+        val fired = c.fire(SumoCorpus.closure(id), positiveFacts, negativeFacts)
         val held = c.heldEligible(id, SumoCorpus.closure(id), fired.fires).sortedByDescending { Nal.truthOf(it.belief).confidence }
         fun addresses(ids: RoaringSeries) = ids.toIntArray().map { "constellation/$name/norm/${c.statements[it].id}" }
         fun q(s: String) = "\"" + s.replace("\"", "\\\"") + "\""
@@ -370,9 +372,11 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                 "direct" to h.direct?.let { Nal.truthOf(it).let { d -> "%.2f/%.2f".format(d.frequency, d.confidence) } },
                 "norms" to h.statements.map { "constellation/$name/norm/${c.statements[it].id}" })
         }
-        mapOf("class" to className, "held" to rows, "count" to rows.size, "facts" to facts.toList(),
-            "factsSource" to "caller-text-heuristic-unverified", "withheldLegacyFacts" to c.facts.toList(),
-            "negativeFacts" to negativeFacts.toList(), "negativeFactsSource" to "caller-provided-unverified",
+        mapOf("class" to className, "held" to rows, "count" to rows.size, "facts" to positiveFacts.toList(),
+            "positiveFacts" to positiveFacts.toList(), "factsSource" to "caller-assumed-unverified",
+            "positiveFactsSource" to "caller-assumed-unverified", "parsedCandidates" to candidates.toList(),
+            "withheldReason" to "parsed-and-legacy-facts-are-unverified", "withheldLegacyFacts" to c.facts.toList(),
+            "negativeFacts" to negativeFacts.toList(), "negativeFactsSource" to "caller-assumed-unverified",
             "fires" to addresses(fired.fires), "pending" to fired.pending.mapValues { addresses(it.value) },
             "blocked" to fired.blocked.mapValues { addresses(it.value) }, "conflicted" to fired.conflicted.mapValues { addresses(it.value) })
     }
@@ -1548,12 +1552,12 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
 
     /**
      * Jev over the corpus a question reaches, preprocessed by the constellation's NARS state. The question
-     * is parsed by CoreNLP: its nouns resolve to SUMO classes, its premise-form facts join the working memory.
+     * is parsed by CoreNLP: its nouns resolve to SUMO classes; premise-form text remains a candidate.
      * Code scoops the candidates: the open page, the sections of every member book sharing the most rare
      * lemmas with the question, and the norms its classes hold (stated, or deduced down is-a and revised)
      * with their NAL truth and opponents. One Jev request then answers, in parallel over that state: which
-     * passage answers, whether any does, which norms bear, and which open premises the question establishes;
-     * the premises it establishes join the facts and the rete fires again.
+     * passage answers, whether any does, which norms bear, and which open premises the question suggests.
+     * Neither parsed text nor model suggestions activate conditioned norms in this interface.
      */
     suspend fun oracle(key: String, bookName: String, k: Int, ask: String): Map<String, Any?> {
         requireDecisionAccess()
@@ -1601,7 +1605,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val normState = norms.mapIndexed { i, id -> val s = c.statements[id]; val t = c.truth(id)
             nid(i) to mapOf("norm" to s.sentence, "frequency" to t.frequency, "confidence" to t.confidence,
                 "books" to c.booksStating(id).map { c.books[it].name }, "opposedBy" to c.opponents(id).map { c.statements[it].sentence }) }.toMap()
-        val premises = norms.mapNotNull { c.statements[it].premise }.filter { askable(it) && it !in c.facts && it !in stated }.distinct().take(PREMISES_ASKED)
+        val premises = norms.mapNotNull { c.statements[it].premise }.filter { askable(it) }.distinct().take(PREMISES_ASKED)
         val questions = LinkedHashMap<String, Map<String, Any?>>()
         questions["where"] = Jev.choice("Which passage in `passages` answers `question`? Choose none when no passage answers it.",
             passages.keys.associateWith { null } + ("none" to "No passage answers the question"))
@@ -1617,14 +1621,15 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val ranked = passages.entries.sortedByDescending { (p[it.key] as? Number)?.toDouble() ?: 0.0 }
             .map { (id, v) -> v + mapOf("id" to id, "p" to ((p[id] as? Number)?.toDouble() ?: 0.0)) }
         val established = premises.filterIndexed { i, _ -> Jev.noulOf(answers, "premise_$i") >= HOLDS }
-        // Neither legacy stored facts nor model suggestions are verified applicability evidence.
-        val fired = c.fire(mask, stated)
+        // This interface has no explicit premise arrays. Parsed text and model suggestions do not fire conditions.
+        val fired = c.fire(mask, emptySet())
         return mapOf(
             "question" to ask, "constellation" to name, "model" to reply["model"], "usage" to reply["usage"], "asked" to reply["asked"],
             "exists" to Jev.noulOf(answers, "exists"), "choice" to where?.get("choice"), "confidence" to where?.get("confidence"),
             "passages" to ranked.take(RANKED),
-            "classes" to classes.map { sumo.className(SumoClassId(it)) }, "facts" to stated.toList(),
-            "factsSource" to "caller-text-heuristic-unverified", "withheldLegacyFacts" to c.facts.toList(),
+            "classes" to classes.map { sumo.className(SumoClassId(it)) }, "facts" to emptyList<String>(),
+            "factsSource" to "no-explicit-assumptions", "parsedCandidates" to stated.toList(),
+            "withheldReason" to "parsed-and-legacy-facts-and-model-suggestions-are-unverified", "withheldLegacyFacts" to c.facts.toList(),
             "modelSuggestedFacts" to established,
             "norms" to norms.mapIndexed { i, id -> normEntry(c, id) + mapOf("sentence" to c.statements[id].sentence, "bears" to Jev.noulOf(answers, "bears_${nid(i)}")) }
                 .sortedByDescending { it["bears"] as Double },

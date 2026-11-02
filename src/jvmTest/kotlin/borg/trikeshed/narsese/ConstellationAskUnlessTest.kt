@@ -22,9 +22,9 @@ class ConstellationAskUnlessTest {
         val bookDir = directory.resolve("constellations/books")
         Files.createDirectories(bookDir)
         val premise = "rent be due"
-        fun book(name: String, facts: List<String>) {
+        fun book(name: String, facts: List<String>, condition: String = "unless") {
             val statement = _m["bearer" j "tenant", "modality" j "may", "action" j "occupy",
-                "object" j "home", "condition" j "unless $premise", "bearerClass" j classId]
+                "object" j "home", "condition" j "$condition $premise", "bearerClass" j classId]
             val data = _m["name" j name, "work" j "synthetic", "date" j "2026",
                 "headings" j _l["fixture"], "statements" j _l[statement], "support" j _l[_l[0]],
                 "facts" j facts, "sections" j _l["urn:sha256:synthetic"]]
@@ -33,6 +33,7 @@ class ConstellationAskUnlessTest {
         }
         book("unknown", emptyList())
         book("positive", _l[premise])
+        book("if", emptyList(), "if")
         val bank = KifKnowledgeBase()
         val nodes = ConstellationNodes(directory.toFile(), ConfixBlackboard.empty(), bank = bank, scope = this)
         val runners = mutableMapOf<String, LcncNodeRunner>()
@@ -49,7 +50,7 @@ class ConstellationAskUnlessTest {
             val refuted = ask("unknown", _m["negativeFacts" j _l[premise]])
             assertEquals(1, (refuted["fires"] as List<*>).size)
             assertEquals(1, (refuted["held"] as List<*>).size)
-            assertEquals("caller-provided-unverified", refuted["negativeFactsSource"])
+            assertEquals("caller-assumed-unverified", refuted["negativeFactsSource"])
             assertTrue((refuted["pending"] as Map<*, *>).isEmpty())
             assertEquals(0, bank.size(), "Query-specific premises must not persist a global normHeld fact")
 
@@ -60,6 +61,7 @@ class ConstellationAskUnlessTest {
             assertTrue((positive["blocked"] as Map<*, *>).isEmpty())
             assertTrue((positive["facts"] as List<*>).isEmpty())
             assertTrue(premise in (positive["withheldLegacyFacts"] as List<*>))
+            assertEquals("parsed-and-legacy-facts-are-unverified", positive["withheldReason"])
             assertEquals(0, bank.size())
 
             val explicitRefutation = ask("positive", _m["negativeFacts" j _l[premise]])
@@ -68,11 +70,35 @@ class ConstellationAskUnlessTest {
             assertTrue((explicitRefutation["conflicted"] as Map<*, *>).isEmpty())
             assertTrue(premise in (explicitRefutation["withheldLegacyFacts"] as List<*>))
             assertEquals(0, bank.size())
+
+            val explicitPositive = ask("unknown", _m["positiveFacts" j _l[premise]])
+            assertEquals(_l[premise], explicitPositive["facts"])
+            assertEquals(_l[premise], explicitPositive["positiveFacts"])
+            assertEquals("caller-assumed-unverified", explicitPositive["positiveFactsSource"])
+            assertTrue(premise in (explicitPositive["blocked"] as Map<*, *>))
+            assertTrue((explicitPositive["fires"] as List<*>).isEmpty())
+
+            val affirmativeIf = ask("if", _m["positiveFacts" j _l[premise]])
+            assertEquals(1, (affirmativeIf["fires"] as List<*>).size)
+            assertEquals(1, (affirmativeIf["held"] as List<*>).size)
+            assertTrue((affirmativeIf["pending"] as Map<*, *>).isEmpty())
+
+            val refutedIf = ask("if", _m["negativeFacts" j _l[premise]])
+            assertTrue(premise in (refutedIf["blocked"] as Map<*, *>))
+            assertTrue((refutedIf["fires"] as List<*>).isEmpty())
+            assertTrue((refutedIf["held"] as List<*>).isEmpty())
+
+            val conflict = ask("unknown", _m["positiveFacts" j _l[premise], "negativeFacts" j _l[premise]])
+            assertTrue(premise in (conflict["conflicted"] as Map<*, *>))
+            assertTrue((conflict["fires"] as List<*>).isEmpty())
+            assertTrue((conflict["held"] as List<*>).isEmpty())
+            assertEquals(0, bank.size(), "Conditioned assumptions must not publish global held facts")
             assertFails { ask("unknown", _m["negativeFacts" j premise]) }
+            assertFails { ask("unknown", _m["positiveFacts" j premise]) }
         } finally { nodes.drain() }
     }
 
-    @Test fun negatedCallerTextDoesNotBecomeAPositivePremise() = runBlocking {
+    @Test fun naturalLanguageFactsRemainCandidatesRatherThanPremises() = runBlocking {
         val classId = requireNotNull(SumoCorpus.classifier.classId("Human")).value
         val bookDir = directory.resolve("constellations/books")
         Files.createDirectories(bookDir)
@@ -89,25 +115,21 @@ class ConstellationAskUnlessTest {
         val runners = mutableMapOf<String, LcncNodeRunner>()
         nodes.register(runners)
         try {
-            // This exercises the real CoreNLP → applicabilityFacts → constellation.ask path.
-            val result = runners.getValue(ConstellationNodes.ASK).run(
-                LcncNode("ask", ConstellationNodes.ASK, params = _m["constellation" j "negated", "class" j "Human"]),
-                _m["facts" j "Rent is not due."])
-            assertTrue((result["facts"] as List<*>).isEmpty())
-            assertTrue((result["fires"] as List<*>).isEmpty())
-            assertTrue((result["held"] as List<*>).isEmpty())
-            assertTrue(premise in (result["pending"] as Map<*, *>))
-            assertTrue((result["blocked"] as Map<*, *>).isEmpty())
-            assertEquals(0, bank.size())
-
-            val positive = runners.getValue(ConstellationNodes.ASK).run(
-                LcncNode("ask", ConstellationNodes.ASK, params = _m["constellation" j "negated", "class" j "Human"]),
-                _m["facts" j "Rent is due."])
-            assertTrue(premise in (positive["facts"] as List<*>))
-            assertTrue(premise in (positive["blocked"] as Map<*, *>))
-            assertTrue((positive["fires"] as List<*>).isEmpty())
-            assertTrue((positive["held"] as List<*>).isEmpty())
-            assertEquals(0, bank.size())
+            // Exercise the real CoreNLP → candidate parsing → constellation.ask path.
+            for (text in _l["Rent is not due.", "Rent is due except today.", "Rent is due."]) {
+                val result = runners.getValue(ConstellationNodes.ASK).run(
+                    LcncNode("ask", ConstellationNodes.ASK, params = _m["constellation" j "negated", "class" j "Human"]),
+                    _m["facts" j text])
+                assertTrue((result["facts"] as List<*>).isEmpty(), text)
+                assertTrue((result["positiveFacts"] as List<*>).isEmpty(), text)
+                assertTrue((result["fires"] as List<*>).isEmpty(), text)
+                assertTrue((result["held"] as List<*>).isEmpty(), text)
+                assertTrue(premise in (result["pending"] as Map<*, *>), text)
+                assertTrue((result["blocked"] as Map<*, *>).isEmpty(), text)
+                assertEquals("parsed-and-legacy-facts-are-unverified", result["withheldReason"])
+                if (text == "Rent is due.") assertTrue(premise in (result["parsedCandidates"] as List<*>))
+                assertEquals(0, bank.size())
+            }
         } finally { nodes.drain() }
     }
 
