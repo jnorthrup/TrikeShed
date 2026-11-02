@@ -5,7 +5,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 import kotlinx.cinterop.*
 import platform.posix.*
 
-class PosixChannelOperations : ChannelOperations {
+open class PosixChannelOperations : ChannelOperations {
     override fun openChannel(entries: Int): ChannelOperations.ChannelHandle = PosixChannelHandle(entries)
 
     /** The descriptor is borrowed; prepClose explicitly closes it. */

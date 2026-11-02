@@ -48,6 +48,40 @@ fun sockaddrUnix(path: String): ByteArray {
     }
 }
 
+/**
+ * The sun_path bytes of an AF_UNIX socket name. A leading 0 byte is the abstract namespace (no file); no bytes is no
+ * name, which bind answers with a name of its own (Linux's autobind). A datagram window carries a name in its address
+ * slot, padded with zeros, so a name has at most [UNIX_NAME_MAX] bytes and never ends in a 0 byte.
+ */
+typealias UnixName = ByteArray
+
+/** The most bytes of a [UnixName] a datagram window's address slot holds: the slot less its 2-byte family. */
+const val UNIX_NAME_MAX: Int = 26
+
+/** A [UnixName] from text: a leading '@' is the abstract namespace's 0 byte (as ss(8) prints it), the rest UTF-8. Null when it does not fit the slot. */
+fun unixNameOrNull(text: String): UnixName? {
+    val name = text.encodeToByteArray()
+    if (name.isNotEmpty() && name[0] == '@'.code.toByte()) name[0] = 0
+    return name.takeIf { it.size <= UNIX_NAME_MAX && (it.isEmpty() || it[it.size - 1] != 0.toByte()) }
+}
+
+/** [unixNameOrNull], or an IllegalArgumentException for a name that does not fit. */
+fun unixName(text: String): UnixName = requireNotNull(unixNameOrNull(text)) {
+    "a unix socket name has at most $UNIX_NAME_MAX bytes and does not end in a 0 byte, which the address slot pads with: $text"
+}
+
+/** struct sockaddr_un as BIND and CONNECT take it, to the name's exact length: the family, then [name]. */
+fun sockaddrUnixName(name: UnixName): ByteArray = ByteArray(2 + name.size).also {
+    it[0] = SocketDomain.AF_UNIX.posix.toByte()
+    name.copyInto(it, 2)
+}
+
+/** The address slot ending a datagram window, for [name]: the family, the name, zeros to the slot's end. */
+fun unixSlot(name: UnixName): ByteArray = ByteArray(2 + UNIX_NAME_MAX).also {
+    it[0] = SocketDomain.AF_UNIX.posix.toByte()
+    name.copyInto(it, 2)
+}
+
 /** Address family from encoded sockaddr bytes (little-endian u16). */
 fun sockaddrFamily(bytes: ByteArray): Int =
     bytes.let {

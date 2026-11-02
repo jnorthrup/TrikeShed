@@ -89,7 +89,8 @@ interface ChannelOperations : CoroutineContext.Element {
         /**
          * One datagram: [datagram]'s window holds the payload, then the destination as a Linux sockaddr in its last
          * UringOp.DATAGRAM_ADDRESS bytes. The completion counts payload bytes; the window's position does not move.
-         * [flags]: 0, or UringOp.MSG_DONTWAIT to complete at once (-11 without send space) instead of waiting.
+         * [flags]: 0, or UringOp.MSG_DONTWAIT to complete at once (-11 without send space, or to an AF_UNIX peer whose
+         * queue is full) instead of waiting.
          */
         fun sendmsg(fd: Int, datagram: ByteBuffer, userData: Long = 0L, flags: Int = 0): Int = -1
         /**
@@ -106,6 +107,16 @@ interface ChannelOperations : CoroutineContext.Element {
         fun close() {}
         fun submit(): Int
         fun wait(minComplete: Int = 1): List<ChannelResult>
+        /**
+         * [wait] without a list: up to [userData].size completions, the userData and the result of each, into the
+         * caller's arrays, and their count. A handle with no use for a list per wait overrides this.
+         */
+        fun waitInto(minComplete: Int, userData: LongArray, res: IntArray): Int {
+            val done = wait(minComplete)
+            check(done.size <= userData.size && done.size <= res.size) { "${done.size} completions for ${userData.size} slots" }
+            for (i in 0 until done.size) { userData[i] = done[i].userData; res[i] = done[i].res }
+            return done.size
+        }
     }
 }
 

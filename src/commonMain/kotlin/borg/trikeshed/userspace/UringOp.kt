@@ -33,9 +33,18 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
      * destination as a Linux sockaddr (sockaddr.kt framing, as BIND and CONNECT take it). The payload starts the window
      * so a packet codec reads and writes it in place. Without a buffer, [addr] is a native msghdr (kernel rings only).
      * The result counts payload bytes; the window's position does not move.
+     *
+     * AF_UNIX: the slot holds the family (1) and the name (sun_path, at most 26 bytes, see UnixName), zero-padded to the
+     * slot's end. A send's address is the family and the name through its last non-zero byte, so a name does not end in
+     * a zero byte (an abstract name's length is part of the name).
      */
     SENDMSG(9, "sendmsg — datagram/send buffer vector"),
-    /** With a buffer window, one datagram: the payload from the window's start, the sender's Linux sockaddr into its last [DATAGRAM_ADDRESS] bytes. */
+    /**
+     * With a buffer window, one datagram: the payload from the window's start, the sender's Linux sockaddr into its last
+     * [DATAGRAM_ADDRESS] bytes. AF_UNIX: the sender's name, zero-padded to the slot's end, so a name compares as the
+     * whole slot; a sender that never bound has no name and leaves the whole slot zero; a name longer than the slot
+     * completes -ENAMETOOLONG (-36).
+     */
     RECVMSG(10, "recvmsg — datagram/recv buffer vector"),
     TIMEOUT(11, "completion timeout — __kernel_timespec"),
     TIMEOUT_REMOVE(12, "cancel pending timeout"),
@@ -132,7 +141,7 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         const val LOCK_NB: Int = 4
         /** sizeof(struct statx). */
         const val STATX_SIZE: Int = 256
-        /** The address slot ending a SENDMSG/RECVMSG window: sizeof(struct sockaddr_in6), which holds a sockaddr_in too. */
+        /** The address slot ending a SENDMSG/RECVMSG window: sizeof(struct sockaddr_in6), which holds a sockaddr_in too, and a sockaddr_un named by up to 26 bytes. */
         const val DATAGRAM_ADDRESS: Int = 28
         /**
          * SENDMSG/RECVMSG operationFlags (Linux msg flags): the request completes at once, with -EAGAIN (-11) when the

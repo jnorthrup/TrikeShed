@@ -136,6 +136,17 @@ fun CharSeries.endpoint(): Endpoint? {
     return address j port
 }
 
+/** unixHost = 'unix:' name      (an AF_UNIX socket name as [unixName] reads it; the rest of the text) */
+fun CharSeries.unixHost(): UnixName? {
+    val start = pos
+    for (c in "unix:") if (!consume(c)) { pos = start; return null }
+    val text = StringBuilder()
+    while (hasRemaining) text.append(get)
+    val name = unixNameOrNull(text.toString())?.takeIf { it.isNotEmpty() }
+    if (name == null) pos = start
+    return name
+}
+
 /** SCTP endpoint (RFC 9260): every transport address of a multihomed association shares one port. */
 typealias SctpEndpoint = Join<Series<Inet>, Port>
 
