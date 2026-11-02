@@ -24,6 +24,7 @@ class CouchAttachmentGateway(
     private val couchStore: CouchStore,
     private val casStore: CasStore
 ) {
+    internal fun uses(store: CouchStore): Boolean = couchStore === store
 
     /** [source]: the file [bytes] were read from; the CAS then names it in place rather than copying it. */
     fun putAttachment(ref: OroborosAttachmentRef, bytes: ByteArray, source: String? = null) {
