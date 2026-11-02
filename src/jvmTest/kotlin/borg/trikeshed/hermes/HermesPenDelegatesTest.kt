@@ -95,7 +95,7 @@ class HermesPenDelegatesTest {
                     import trikeshed_modelmux as transport
                     catalog = transport._call('mux_catalog')
                     assert catalog['defaultModel'] == 'fixture'
-                    assert catalog['models'] == [{'id': 'fixture', 'capabilities': ['chat', 'tools']}]
+                    assert catalog['models'] == [{'id': 'fixture', 'capabilities': ['chat', 'tools'], 'contextWindow': None}]
                     client = transport.ModelMuxClient(api_key='not-authority', base_url='https://not-a-destination.invalid')
                     assert client.api_key is None
                     reply = client.chat.completions.create(model='fixture', messages=[{'role':'user','content':'first'}],
