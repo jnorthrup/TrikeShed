@@ -1,0 +1,48 @@
+Hermes contained donor turn — verified fixture checkpoint, 2026-11-02
+
+Donor fork pin: bec8f70c124be62703d37095621535c0a46ed6bf
+Guard commit: f2d525696f4e9635995935ec6bea7dde11afc179
+Fork PRs: https://github.com/jnorthrup/hermes-trikeshed-graalpy/pull/1
+          https://github.com/jnorthrup/hermes-trikeshed-graalpy/pull/2
+
+The actual AIAgent constructor and run_conversation completed a host-context turn:
+ModelMux fixture completion -> actual host recall -> ModelMux fixture completion.
+The second request contained the genuine host breadcrumb result. Final response
+was “Hermes recalled HOST violet turbine.” completed=true, failed=false, api_calls=2.
+Final phase-v17 elapsed 1,924,762,843 ns within the existing 45,000 ms turn bound.
+Fixture card context window 131072 and token usage are declared synthetic data;
+no live provider inference or billing was exercised.
+
+Three demonstrated blockers were fixed separately:
+* Official pinned pure Snowball wheel was missing from the guest module mount.
+* Non-delegating rounds imported the optional delegation backend and native SQLite.
+  Count actual delegates before importing; nonzero delegation caps are preserved.
+* Generic sequential tool workers and activity heartbeats require guest threads.
+  Only registered handlers with a finite host-owned declaration execute inline,
+  retaining the donor middleware, guardrail, dispatch, commit and projection path.
+
+TrikeShed declares that path only for generation-owned breadcrumb handlers. A
+bounded host delegate and coroutine deadlines enforce the configured host bound
+(default 30 seconds). Expired work is cancelled, the generation remains usable,
+and admitted work is drained. A handler declaration alone grants no pen authority;
+JSON tool arguments cannot set it. Foreign-session crossings still refuse before
+provider access. Unmarked tools retain the donor worker path. Native SQLite,
+guest threads, subprocesses and unrestricted I/O remain denied.
+
+Verification used immutable external classpath snapshots, a frozen source overlay,
+and the actual pinned pure wheels; no live build classes or Gradle invocation.
+Actual GraalPy behavior tests passed: zero-delegate import refusal (red on base),
+nonzero cap/order/identity, missing/invalid host declarations, middleware retained
+with guest thread creation forbidden, and unmarked handler worker dispatch.
+Standalone compiled Kotlin deadline cancellation/generation reuse and existing
+session isolation regressions passed. Full canonical Gradle/fork pytest suites
+were not run in this checkpoint; host pytest environment was absent.
+
+Artifacts: /workspace/library-files/hermes-recall-proof/phase-v17/summary.json,
+result.log, callbacks.json, request-1.json, request-2.json, pen-receipts.json,
+regression.log, host-source/, HermesPhasedProbe.kt and execution.json.
+Earlier failures retained in phase-v9 (Snowball), v11 (SQLite import origin),
+v12/v13 (thread refusal); v15 proves the zero-delegate regression red on base.
+
+Console fresh per-start/reset generation wiring and a real-model turn remain open.
+This proof exercises an explicitly constructed host generation, not the console UI.
