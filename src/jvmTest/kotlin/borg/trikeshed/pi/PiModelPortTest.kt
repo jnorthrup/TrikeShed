@@ -85,6 +85,29 @@ class PiModelPortTest {
         } finally { generation.drain() }
     }
 
+    @Test fun restrictedGuestCanOnlyEditExplicitSourceGrant() = runBlocking {
+        val root = java.nio.file.Files.createTempDirectory("pi-guest-source")
+        val source = root.resolve("agent.ts")
+        java.nio.file.Files.writeString(source, "const title = 'Pi';\n")
+        val breadcrumbs = BreadcrumbElement()
+        breadcrumbs.transact("pi-source") { }
+        val generation = BreadcrumbGeneration(this, "pi-source")
+        try {
+            PiModelPort("fixture", generation, breadcrumbs, PiWorkspace(root, _s["agent.ts"])).use { port ->
+                suspend fun tool(name: String, args: Map<String, String>): String = withContext(Dispatchers.IO) {
+                    val json = borg.trikeshed.parse.jsonOf(args)
+                    port.guest.eval("host.call('pi_workspace', " + Teleported.Str(name).canonical() + ", " + Teleported.Str(json).canonical() + ")").canonical()
+                }
+                assertTrue(tool("read", _m["path" j "agent.ts"]).contains("const title"))
+                assertTrue(tool("edit", _m["path" j "agent.ts", "oldText" j "'Pi'", "newText" j "'Graal Pi'"]).contains("diff"))
+                assertEquals("const title = 'Graal Pi';\n", java.nio.file.Files.readString(source))
+                assertTrue(tool("read", _m["path" j "../secret.ts"]).contains("workspace-refused"))
+                assertTrue(tool("write", _m["path" j "agent.ts"]).contains("bad-args"))
+                assertEquals(Teleported.Bool(true), port.guest.eval("typeof require === 'undefined' && typeof process === 'undefined'"))
+            }
+        } finally { generation.drain(); root.toFile().deleteRecursively() }
+    }
+
     @Test fun depthAdmissionIgnoresQuotedBracesAndRejectsNestingBeforeReification() {
         assertTrue(piJsonDepthAllowed("{\"content\":\"" + "[".repeat(10_000) + "\"}"))
         assertTrue(piJsonDepthAllowed("{\"content\":\"a\\\"[b\"}"))
