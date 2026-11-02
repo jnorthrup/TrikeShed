@@ -190,7 +190,7 @@ class DocumentReviewWire private constructor(
         ctx.blackboard.put("lcnc/readiness/document.reviewDecision", mapOf(
             "available" to principals.isNotEmpty(), "reason" to if (principals.isEmpty()) "No analyst principal is configured" else null,
             "prerequisites" to listOf("authenticated analyst session")), "documents")
-        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-plan"))
+        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-plan", "/horn-input"))
             ctx.routes.claim("document-review", "/api/documents/review$suffix", route = ::route)
     }
 
@@ -207,10 +207,11 @@ class DocumentReviewWire private constructor(
     private suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): WireHttpResponse {
         val endpoint = path.substringBefore('?')
         val actor = principal(text)
+        val reasoningInput = endpoint.endsWith("/taxonomy-plan") || endpoint.endsWith("/horn-input")
         if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release") ||
-                endpoint.endsWith("/assess") || endpoint.endsWith("/assessment") || endpoint.endsWith("/taxonomy-plan")) && actor == null)
+                endpoint.endsWith("/assess") || endpoint.endsWith("/assessment") || reasoningInput) && actor == null)
             return json(mapOf("error" to "authenticated_reviewer_required"), 401)
-        if (endpoint.endsWith("/taxonomy-plan") && method != "POST")
+        if (reasoningInput && method != "POST")
             return json(mapOf("error" to "method_not_allowed"), 405)
         return try {
             requests.call {
@@ -222,10 +223,17 @@ class DocumentReviewWire private constructor(
                     }
                     method == "POST" -> {
                         val body = text.substringAfter("\r\n\r\n", text)
-                        val input = if (endpoint.endsWith("/taxonomy-plan")) taxonomyRequest(body) else request(body)
+                        val input = if (reasoningInput) taxonomyRequest(body) else request(body)
                         fun cid(key: String) = ContentId(input[key] as? String ?: error("$key required"))
                         fun revision() = revision(input["expectedRevision"])
                         json(when {
+                            endpoint.endsWith("/horn-input") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
+                                val goal = input["goal"] as? String ?: error("Review observation goal must be text")
+                                val report = ReviewedHornPlan.report(review, ctx.casStore, cid("snapshotCid"), revision(), goal)
+                                require(jsonOf(report).encodeToByteArray().size <= 1048576) { "Horn input report exceeds 1MiB" }
+                                report
+                            }
                             endpoint.endsWith("/taxonomy-plan") -> withContext(checkNotNull(actor)) {
                                 fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
                                 val goal = input["goal"] as? Map<*, *> ?: error("Taxonomy goal required")
