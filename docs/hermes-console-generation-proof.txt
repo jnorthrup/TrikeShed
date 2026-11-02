@@ -1,0 +1,40 @@
+Hermes console generation checkpoint — 2026-11-02
+
+Each successful open constructs a new immutable resource holder: pen, restricted
+port, optional worker, host-effect actor and output/import/worker callback fence.
+Retirement refuses callbacks, closes effect admission, drains admitted work,
+closes guest resources and joins its owning job before replacement. A closed
+worker or port is never reopened. Factory failure also retires its owner.
+Lifecycle and input operations acquire the lifecycle lock before the console
+state lock; callbacks enter only the state lock and are fenced by generation.
+Receipt numbering remains shared by this console across fresh pens, preventing
+replacement from overwriting its earlier pen receipts. Retired callbacks cannot
+sample the next command's attribution.
+
+Breadcrumb opt-in is a host constructor boolean, false by default. Effect
+ownership is independent of retained-session binding: disabled memory still
+allows owned model completions and creates no implicit retained context. The
+host generates opaque session identities; no client-chosen context is accepted.
+Ordinary close/open starts a fresh host context. Explicit reset(true) retains
+the host context while replacing every runtime object; reset(false) rotates it.
+
+Verification: standalone immutable source overlay compiled against frozen
+classpath snapshots, no Gradle or live build classes. External artifacts:
+/workspace/library-files/hermes-console-generation-proof/v6/compile.log
+/workspace/library-files/hermes-console-generation-proof/v6/result.log
+/workspace/library-files/hermes-console-generation-proof/v6/summary.json
+
+Passed actual generation constructor/finite fake-port tests for drain ordering,
+refused post-retirement work, late callbacks during drain and after replacement,
+resource closure and joined parent ownership, plus constructor failure cleanup.
+Actual GraalPy console tests passed model completions with memory disabled across
+two opens, preserved distinct receipt paths, opt-in recall, explicit resume and
+fresh reset isolation, and failed provider initialization followed by a fresh-port
+retry. The enabled recall test seeds genuine retained evidence from the HOST;
+context binding alone observes model input and does not automatically admit or
+project transcript tool results. Automatic transcript capture is not claimed.
+
+This is a lifecycle/host-bridge proof with synthetic ModelMux transport, not a
+full donor console/browser or native-worker run. Donor/provider metadata alignment
+is a separate patch; phase-v18 established the earlier donor fallback256000 vs
+host-card131072 boundary in hermes-contained-turn-proof.txt.

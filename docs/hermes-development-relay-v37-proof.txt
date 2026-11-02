@@ -1,0 +1,38 @@
+Hermes inferred relay on the exact v37 host — 2026-11-02
+
+PASS on source 942afa63182ecb5e1bb4bd36365c30917da2e77e.
+Frozen main.jar SHA256:
+64fcf3a8e9dcc779cf69447d3c674d4fa50209baeb63d235c9fc60045747043c
+Donor pin: bec8f70c124be62703d37095621535c0a46ed6bf.
+
+The standalone harness compiled directly against that successful v37 main JAR
+and 117 immutable dependency JARs. It compiled no replacement host classes;
+there were no old v17 host classes or source overlays on the runtime classpath.
+The source manifest records exact Git-blob SHA256 values for the v37 Hermes
+pen, provider, port, breadcrumb adapter, console generation and console source.
+The verified summary also records the loaded host JAR's class-byte hashes.
+
+Actual AIAgent.run_conversation completed in 16.224111152 seconds within the
+unchanged 45-second bound: two newly inferred Sol6.1 manual development relay
+completions, with a genuine generation-owned host recall between them. The
+first model request contained only the new retained item's actual reference
+and CID, not its source text. The model chose recall, received the actual
+“HOST cobalt orchard” result and then reported exact source range [0, 19)
+in UTF-16 code units, 19 selected characters and zero omitted. The foreign
+context crossing refused; neither model request included its private evidence.
+Donor completed=true, failed=false, api_calls=2.
+
+The provider metadata hook and actual donor compressor both read the declared
+development context bound 131072. Actual Sol6.1 capacity was not measured.
+This was a manual development collaboration relay, not an unattended provider
+API, billing measurement, native CLI/full-console run or network-isolation
+proof. No provider token usage or cost was invented.
+
+Artifacts: /workspace/library-files/hermes-development-relay-proof/run-v2/
+verified-summary-sanitized.json is suitable for repository evidence: public
+source/JAR/class/request/response hashes, synthetic retained text and numeric
+results only; no request headers, credential values or private source content.
+Full local requests/responses, inference SHA256/UTC receipts, execution.json,
+source-manifest.json, result.log and read-only verify.py remain alongside it.
+The verifier passed. Donor.close and host service shutdown passed; the probe
+exited 0, the relay agent completed, and no owned probe/broker poller remained.

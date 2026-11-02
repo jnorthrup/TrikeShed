@@ -54,6 +54,7 @@ fun Panels.installVisualQuery() {
     }
     option("", "Choose a dataset")
     option("quad-store", "Quad store")
+    option("rete-projection", "Live Rete field projection (raw)")
     option("quad-store+rete", "Quad store and live Rete facts")
     label.appendChild(select); dialog.appendChild(label)
     val candidateLabel = document.createElement("label").asDynamic()
@@ -105,6 +106,7 @@ fun Panels.installVisualQuery() {
                         else {
                             result.textContent = "Dataset: " + str(payload.dataset) + "\n\n" + str(payload.query) + "\n\n" +
                             str(JSON.stringify(payload.results, null, 2)) +
+                            "\n\nSource scope (not review authority):\n" + str(JSON.stringify(payload.source, null, 2)) +
                             (if (payload.candidateContext == null) "" else "\n\nCandidate context (not query witnesses):\n" +
                                 str(JSON.stringify(payload.candidateContext, null, 2))) +
                             "\n\nResults are for the canvas snapshot taken when Query was pressed."

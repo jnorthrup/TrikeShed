@@ -1,0 +1,93 @@
+Build iteration review — 2026-11-02 UTC
+Read-only audit during v37. No Gradle commands or repository changes performed.
+
+Finding
+Kotlin incrementality is already requested. v36/v37 do not contain compiler
+incremental-rebuild explanations, so their exact rebuild cause is not established.
+Do not diagnose disabled compiler incrementality from duration, the warning count,
+or the fact that compileKotlinJvm/compileTestKotlinJvm executed.
+
+Evidence inspected
+* /workspace/TrikeShed/gradle.properties: kotlin.incremental=true (line19),
+  org.gradle.caching=true (16), org.gradle.configuration-cache=true (17),
+  org.gradle.parallel=true (18), compiler.execution.strategy=in-process (13).
+  Gradle heap6g with TieredStopAtLevel=1; separate Kotlin daemon options6g are
+  present but not the selected strategy. No change proposed to these heap limits.
+* run-build-v36.sh and run-build-v37.sh explicitly pass --no-daemon and
+  --no-configuration-cache, overriding configuration-cache=true. Both logs say a
+  single-use Gradle daemon is forked and stopped. Neither script passes clean,
+  --rerun-tasks, --no-build-cache, or an incremental=false override.
+* activate.sh selects GraalVM25 and persistent GRADLE_USER_HOME; it does not
+  disable Kotlin incrementality or task/build caching. resolve-jvm.init.gradle
+  registers a dependency-resolution task, not a compile-task override.
+* build/kotlin/{compileKotlinJvm,compileTestKotlinJvm}/cacheable/caches-jvm exists.
+  This is evidence of cache state, not proof a particular invocation reused it.
+* build-v34.log:62 and build-v35.log:97 show compileKotlinJvm UP-TO-DATE;
+  compileTestKotlinJvm still executes. Task-level reuse is working for unchanged
+  main inputs. v36 executes main/test; v37 executes main (audit in progress).
+* generateForgeAssets is UP-TO-DATE in v36/v37. Its declared inputs/outputs in
+  build.gradle.kts:1123-1127 are not evidence of a forced generation every build.
+* jvmTest has explicit broad boundary-source inputs (build.gradle.kts:750-757),
+  so source edits outside one filtered test intentionally invalidate test execution.
+  --tests filters execution, not the compileTestKotlinJvm source set. Narrowing
+  --tests alone cannot avoid compiling changed commonTest/jvmTest sources.
+* jvmTest only forces fresh/noncached results when TRIKESHED_CURATION_PROFILE
+  is set (build.gradle.kts:747-749). btrfsStorageCheck has unconditional
+  outputs.upToDateWhen(false), but it is not a requested v36/v37 task.
+
+Important Kotlin2.4.21 distinction
+Inspected the actual cached kotlin-gradle-plugin2.4.21 and
+kotlin-build-tools-impl2.4.21 bytecode with javap; no Gradle execution.
+PropertiesProvider.getRunKotlinCompilerViaBuildToolsApi defaults to true.
+JvmCompilationOperationImpl provides compileIncrementallyInProcess and constructs
+IncrementalJvmCompilerRunner/IncrementalFirJvmCompilerRunner. Thus in-process
+execution alone is not proof that this version disables incremental compilation.
+There is also a LEGACY GradleKotlinCompilerWork.compileInProcess path containing
+"in-process execution strategy is non-incremental" and cleanOutputsAndLocalState.
+The current logs do not identify the selected path; do not substitute that legacy
+message for evidence about v36/v37. No runViaBuildToolsApi override was found in
+project Gradle declarations, current run scripts, or the inspected cloud init file.
+
+Configuration-cache reports: actual causes
+The existing jvmTest reports under build/reports/configuration-cache show
+DefaultProvider/classpathSnapshot serialization headlines, but their nested error
+is TypedResolveException with uncached dependencies in OFFLINE mode:
+* 8janquaebt4qt50q6lhn81nfg/aiwtklwinab1jz1d0508lqz5c: jvmCompileClasspath,
+  desktop-jvm1.12.2 and other locked artifacts missing from cache.
+* 17v3m4qg6c5u13f6bnac7etlx/9194ylzamyv6qbaqs15pzyxls: same root cause.
+* 6m3ry0dqylv14mdkeetyhm0pp/4jx3prz1324ea9uxib2pqrfeq: jvmTestCompileClasspath,
+  junit-vintage-engine5.14.4 absent offline.
+These reports do not establish a current configuration-cache incompatibility.
+Two compileKotlinJs reports have zero problems. A different report for explicitly
+running cloudResolveJvmDependencies identifies its Groovy doLast/rootProject
+capture as incompatible; v36/v37 do not request that resolving task.
+
+Safe next steps after the frozen build (proposals, not implemented)
+1. Preserve checks, targets, dependencies, test source sets and the current edit
+   set. On the next already-needed build add --info and
+   -Pkotlin.build.report.output=file -Pkotlin.build.report.verbose=true.
+   Inspect reported compiler mode, modified sources, classpath changes and any
+   nonincremental reasons. Keep build reports beside that run's evidence.
+2. Keep kotlin.incremental=true and build caching enabled. Do not delete .gradle
+   or build/kotlin between iterations; do not add --rerun-tasks or clean to a
+   short iteration. Existing logs do not establish that cache deletion occurred.
+3. Trial reusable Gradle daemon by dropping --no-daemon (or using --daemon),
+   with the same project and JVM settings. This removes the confirmed per-run
+   single-use JVM lifecycle; no speedup has been measured or promised.
+4. Trial --configuration-cache after dependencies have resolved, keeping strict
+   failure behavior. The historical JVM reports were offline cache misses, so
+   they are not grounds for permanently disabling it. Do not use
+   configuration-cache-problems=warn to hide a new real incompatibility.
+5. Keep the current in-process strategy for the first diagnostic build. A switch
+   to -Pkotlin.compiler.execution.strategy=daemon is a separate optional trial,
+   not an established incrementality fix, and adds a separate configured6g JVM;
+   assess memory budget before adopting it.
+6. Merge small compatible source slices together before the next root validation
+   when they affect the same compilation. Re-run relevant checks on the resulting
+   root tree. Existing frozen isolated compiler proofs can shorten feedback but
+   do not substitute for the requested root multiplatform validation.
+
+No benchmark is inferred from these logs. Precise6-8minute/4minute compiler costs
+were supplied in the task context, not independently reconstructed by this audit.
+No dependency downgrade, platform deletion, debt exclusion, or test pruning is
+proposed. Current user changes and source sets were left untouched.

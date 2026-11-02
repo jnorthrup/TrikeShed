@@ -5,6 +5,11 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class FinanceKifPresetExecutionTest {
+    // Use the production display sink; any accidental model dependency must fail.
+    private fun displayRegistry(): Map<String, LcncNodeRunner> =
+        TribunalNodes.registry(TribunalDialog { _, _, _ -> error("deterministic preset called a model") })
+            .filterKeys { it == "display" }
+
     @Test fun financePresetReadsCurrentDocumentsAndConservesExactReviewTotals(): Unit = runTest {
         val corpus = InMemoryProjectCorpus()
         val header = "id,account,reference,currency,date,amount\n"
@@ -16,8 +21,10 @@ class FinanceKifPresetExecutionTest {
         val program = original.copy(nodes = original.nodes α { node ->
             if (node.type == ProjectNodes.READ) node.copy(params = node.params + _m["project" j "pilot"]) else node
         })
-        val runner = LcncRunner(PureNodes.registry { 0L } + ProjectNodes.registry(corpus) + FinanceNodes.registry(corpus))
-        val first = assertIs<Map<*, *>>(runner.runAll(program).getValue("compare")["report"])
+        val runner = LcncRunner(PureNodes.registry { 0L } + ProjectNodes.registry(corpus) + FinanceNodes.registry(corpus) + displayRegistry())
+        val firstRun = runner.runAll(program)
+        val first = assertIs<Map<*, *>>(firstRun.getValue("compare")["report"])
+        assertEquals(first, firstRun.getValue("result")["x"])
         assertEquals("as-of-read-candidates-only", first["status"])
         val totals = assertIs<Map<*, *>>(first["bankTotals"])
         assertEquals("60", totals["inputMinorUnits"])
@@ -34,7 +41,9 @@ class FinanceKifPresetExecutionTest {
 
     @Test fun formulaPresetRunsTheSharedInspectionRunnerWithoutAnAssertionService(): Unit = runTest {
         val program = LcncProgramConfix.fromJson("preset-kif-structure", LcncPresets.all().getValue("preset-kif-structure"))
-        val output = LcncRunner(PureNodes.registry { 0L }).runAll(program).getValue("inspect")
+        val result = LcncRunner(PureNodes.registry { 0L } + displayRegistry()).runAll(program)
+        val output = result.getValue("inspect")
+        assertEquals(output["formula"], result.getValue("result")["x"])
         assertEquals("syntax-only-unreviewed", output["status"])
         val formula = assertIs<Map<*, *>>(output["formula"])
         assertEquals("forall", formula["kind"])

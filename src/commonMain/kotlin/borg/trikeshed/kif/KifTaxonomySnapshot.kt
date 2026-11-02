@@ -64,7 +64,7 @@ data class KifExplanation(
 class KifTaxonomySnapshot private constructor(
     val revision: Long,
     val assertions: List<KifActivationAssertion>,
-    private val limits: KifActivationLimits,
+    internal val limits: KifActivationLimits,
 ) {
     private data class Edge(val from: String, val to: String, val assertion: String)
     private val subclasses = mutableMapOf<String, MutableList<Edge>>()
@@ -91,6 +91,10 @@ class KifTaxonomySnapshot private constructor(
 
     /** Source records referenced by proof assertion IDs; never use classifier-local integer IDs. */
     fun assertion(id: String): KifActivationAssertion? = assertions.firstOrNull { it.source.id == id }
+
+    /** Source-backed review/export plan; this does not invoke a native evaluator. */
+    fun activationPlan(predicate: String, subject: String, obj: String): KifActivationPlan =
+        KifActivationPlan.create(this, predicate, subject, obj)
 
     fun explain(predicate: String, subject: String, obj: String): KifExplanation {
         require(subject.length in 1..1024 && obj.length in 1..1024) { "Taxonomy query term exceeds bound" }
@@ -170,7 +174,8 @@ class KifTaxonomySnapshot private constructor(
                     p.arguments.size != 2 || p.arguments.any { it !is KifTerm.Constant } -> "Taxonomy requires two ground constants"
                     else -> null
                 }
-                KifActivationAssertion(source, ContentId.of(decoded.syntax.toKifString().encodeToByteArray()), decoded, exclusion)
+                KifActivationAssertion(source, ContentId.of(decoded.syntax.toKifString()
+                    .encodeToByteArray(throwOnInvalidSequence = true)), decoded, exclusion)
             }
             return KifTaxonomySnapshot(revision, entries.toList(), limits)
         }

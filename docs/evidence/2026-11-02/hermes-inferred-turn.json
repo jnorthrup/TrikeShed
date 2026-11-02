@@ -1,0 +1,59 @@
+{
+  "status": "PASS",
+  "manualDevelopmentRelay": true,
+  "relayModel": "Sol6.1 development collaboration agent",
+  "providerApi": false,
+  "usageOrBillingReported": false,
+  "nativeCLI": false,
+  "fullConsoleRun": false,
+  "networkIsolationProof": false,
+  "sourceCommit": "942afa63182ecb5e1bb4bd36365c30917da2e77e",
+  "mainJarSha256": "64fcf3a8e9dcc779cf69447d3c674d4fa50209baeb63d235c9fc60045747043c",
+  "noHostClassOrSourceOverlay": true,
+  "frozenDependencyJars": 117,
+  "fullTurnLimitMillis": 45000,
+  "turnElapsedNanos": 16224111152,
+  "inferredCompletions": 2,
+  "actualHostRecall": true,
+  "hostEvidence": "HOST cobalt orchard",
+  "hostEvidenceCid": "sha256:0d2f37fa309c76d5ad0d081f8ae4f904adfd3dc2f1ed3c19e2009332b5ef025c",
+  "genuineRef": "aa1c",
+  "foreignContextRefused": true,
+  "sourceHiddenBeforeRecall": true,
+  "declaredDevelopmentContextBound": 131072,
+  "actualModelCapacity": "unknown; not measured by this proof",
+  "donorPin": "bec8f70c124be62703d37095621535c0a46ed6bf",
+  "cleanup": {
+    "probeExitCode": 0,
+    "donorClosePassed": true,
+    "hostServicesClosed": true,
+    "relayAgentCompleted": true,
+    "ownedProcessesRemaining": 0
+  },
+  "hostSourceSha256": {
+    "src/jvmMain/kotlin/borg/trikeshed/hermes/HermesPenDelegates.kt": "63983d385691366529664dd6e3bd8a697d7c5447352872c287095c881977916a",
+    "src/jvmMain/kotlin/borg/trikeshed/hermes/HermesModelProvider.kt": "cb666e79e29d0af3268a1ddb7410f358bc5eb2fe96aa08ec581f290686ba695f",
+    "src/jvmMain/kotlin/borg/trikeshed/hermes/HermesPythonPort.kt": "236579d8d043dfc0741e742cfa19c39bb06d9e70df0c69cbac082a7bbf7542bc",
+    "src/jvmMain/kotlin/borg/trikeshed/hermes/HermesBreadcrumbTools.kt": "964c955207307d2708931432569adf9bb66f9c39f021eca66f3e0d350decc4c4",
+    "src/jvmMain/kotlin/borg/trikeshed/hermes/HermesConsoleGeneration.kt": "0b2b828e3a395659ca159d784f6bf24d2e67e6cd7b7e472a1035cccd3dac766b",
+    "src/jvmMain/kotlin/borg/trikeshed/hermes/HermesVmConsole.kt": "fe9ba5aa553299e9439066b0ce6c6daa0cdf10f947ff0b3a88aaab8133b0b5a9"
+  },
+  "hostClassSha256": {
+    "borg/trikeshed/hermes/HermesPen.class": "2a88f849f49fa2bd0c8f801bcd6b3c4e6545ef5a6df1705a23fa7362ac873945",
+    "borg/trikeshed/hermes/HermesModelProvider.class": "551866ef24043cbfac57dec1111e9dd5b4dce02ccacaea2876f66c833f2f9bda",
+    "borg/trikeshed/hermes/HermesPythonPort.class": "719d6f2c206aa0275689af3f3cb7c18b44b2173038b51b910403adc6480dd50a",
+    "borg/trikeshed/hermes/HermesConsoleGeneration.class": "ea236cb2ef1f1974fb07305ac82089f3394108d196094e8d1b4a1913d066dfc9",
+    "borg/trikeshed/hermes/HermesVmConsole.class": "48d30109dc0f4e48128afb86fdf8207fe398f553fc4f21cd738724cba8029057"
+  },
+  "filesSha256": {
+    "HermesPhasedProbe.kt": "ff3ecb286fb7f607392e29940d769cd0e9f25b49f6b78a40fc8a8239204a1061",
+    "result.log": "b735a4ca0b9471ee96a187f1d3493e93850598792b2053baaf3c5e161b0fa864",
+    "requests/001.json": "a986ccc19ae379852c69671a41a76979d5d528349aafc916557b294d98f7552b",
+    "requests/002.json": "bac7c3f0bde2230f48be271cf4ae029af696467e0a5e95734653e684420c374c",
+    "responses/001.json": "b901471e3081a9cec4e0ffa214b11080f62564b79c4d17c0adcd4dd9e4194db7",
+    "responses/002.json": "68035cfa9790935602b73c6b0ecbbf12ec0f5b4f47faedb2ff90a8f9edc41d64",
+    "pen-receipts.json": "496c64872c00072d5c94c42b6f11c651329daf86d825d05f2310d57464a278c1",
+    "execution.json": "ed6d9f7dcb8e4686c6cf3e0bc7a18548975a9d440edcb64b1b645b174b976dcd",
+    "source-manifest.json": "a07c3179f4753a0a216d54823e6b51dbc3f35201bf92921e7e0cbd5ade34535d"
+  }
+}
