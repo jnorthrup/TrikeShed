@@ -109,6 +109,14 @@ function stream(model, context, options) {
 }
 let agent;
 let result;
+globalThis.piRuntimeInfo = function() {
+  return JSON.stringify({
+    runtime: 'GraalJS', transport: 'ModelMux', initialized: !!agent,
+    model: agent?.state.model?.id ?? null,
+    tools: agent ? agent.state.tools.map(tool => tool.name) : [],
+    buffered: true,
+  });
+};
 globalThis.piInit = function(modelId, definitionsJson) {
   if (agent) throw Error('Pi is already initialized');
   const tools = JSON.parse(definitionsJson).map(definition => ({
