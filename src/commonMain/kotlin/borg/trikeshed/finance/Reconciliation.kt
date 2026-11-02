@@ -3,12 +3,12 @@ package borg.trikeshed.finance
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 
-enum class SourceRole { BANK, APPROVED_EXPENDITURE }
+enum class SourceRole { BANK, EXPENDITURE }
 data class ReconcileSource(val role: SourceRole, val sourceCid: ContentId, val revision: String, val parserIdentity: String) {
-    init { require(revision.isNotBlank() && parserIdentity.isNotBlank()) }
+    init { require(revision.isNotBlank() && parserIdentity.isNotBlank() && revision.length <= 512 && parserIdentity.length <= 512) }
 }
-data class ReconcilePolicy(val identity: String, val includeDate: Boolean) {
-    init { require(identity.isNotBlank()) }
+data class ReconcilePolicy(val identity: String, val includeDate: Boolean, val accountScope: String) {
+    init { require(identity.isNotBlank() && identity.length <= 512 && accountScope.isNotBlank() && accountScope.length <= 512) }
 }
 /** Raw CSV cells and logical record ordinal; source bytes remain owned by the caller's source store. */
 data class FinanceRow(val id: String, val account: String, val reference: String, val currency: String,
@@ -34,11 +34,18 @@ fun reconciliationDate(text: String): Boolean {
     return day in 1..days
 }
 
-/** Review-only one-to-one exact matching. Every input row appears once, including rejected evidence. */
+const val RECONCILE_ROWS = 4096
+const val RECONCILE_RAW_CHARS = 65_536
+
+/** Review-only exact candidates, not authorization or proof of source authenticity.
+ * Every admitted row appears once. Source retention/authentication belongs to the host.
+ * At JSON boundaries encode Long units/totals as decimal STRINGS, never JS Number.
+ */
 fun reconcile(bankSource: ReconcileSource, approvedSource: ReconcileSource,
     bankRows: Series<FinanceRow>, approvedRows: Series<FinanceRow>, currency: CurrencyScale,
     policy: ReconcilePolicy): ReconcileReport {
-    require(bankSource.role == SourceRole.BANK && approvedSource.role == SourceRole.APPROVED_EXPENDITURE)
+    require(bankSource.role == SourceRole.BANK && approvedSource.role == SourceRole.EXPENDITURE)
+    require(bankRows.size in 0..RECONCILE_ROWS && approvedRows.size in 0..RECONCILE_ROWS) { "row count limit" }
     val issues = mutableListOf<String>()
     val replay = bankSource.sourceCid == approvedSource.sourceCid
     if (replay) issues.add("same-source replay is not independent evidence")
@@ -51,6 +58,8 @@ fun reconcile(bankSource: ReconcileSource, approvedSource: ReconcileSource,
                 replay -> "same-source replay"
                 row.sourceCid != source.sourceCid -> "source CID mismatch"
                 row.rowOrdinal < 1 -> "invalid row ordinal"
+                row.rawRow.length > RECONCILE_RAW_CHARS || row.id.length > 512 || row.account.length > 512 || row.reference.length > 512 || row.date.length > 32 -> "row field limit"
+                row.account != policy.accountScope -> "account outside declared scope"
                 row.id.isBlank() || row.account.isBlank() || row.reference.isBlank() || row.rawRow.isEmpty() -> "missing required evidence"
                 units == null -> "invalid currency or decimal amount"
                 policy.includeDate && !reconciliationDate(row.date) -> "invalid required date"

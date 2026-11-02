@@ -7,8 +7,8 @@ import kotlin.test.*
 class ReconciliationTest {
     val usd = CurrencyScale("USD", 2)
     val bank = ReconcileSource(SourceRole.BANK, ContentId.of("bank".encodeToByteArray()), "bank-v1", "canonical-csv-v1")
-    val approved = ReconcileSource(SourceRole.APPROVED_EXPENDITURE, ContentId.of("approved".encodeToByteArray()), "approved-v1", "canonical-csv-v1")
-    val policy = ReconcilePolicy("account-reference-currency-signed-date-v1", true)
+    val approved = ReconcileSource(SourceRole.EXPENDITURE, ContentId.of("approved".encodeToByteArray()), "approved-v1", "canonical-csv-v1")
+    val policy = ReconcilePolicy("account-reference-currency-signed-date-v1", true, "cash")
     fun row(source: ReconcileSource, id: String = "1", ordinal: Int = 1, amount: String = "0.10", reference: String = "r", date: String = "2026-11-02", code: String = "USD") =
         FinanceRow(id, "cash", reference, code, date, amount, source.sourceCid, ordinal, "$id,cash,$reference,$code,$date,$amount")
 
@@ -20,6 +20,8 @@ class ReconciliationTest {
         assertEquals(Long.MIN_VALUE, parseMinorUnits("-92233720368547758.08", usd))
         assertEquals(Long.MAX_VALUE, parseMinorUnits("92233720368547758.07", usd))
         assertEquals("-92233720368547758.08", renderMinorUnits(Long.MIN_VALUE, usd))
+        assertEquals("92233720368547758.07", renderMinorUnits(Long.MAX_VALUE, usd))
+        for (units in s_[Long.MIN_VALUE, Long.MAX_VALUE, 0L, -1L, 1L].view) assertEquals(units, parseMinorUnits(renderMinorUnits(units, usd), usd))
         for (text in s_["", "1.001", "+1.00", "01.00", "1.", ".10", " 1.00", "1e2", "1,00", "NaN", "92233720368547758.08", "-92233720368547758.09"].view) assertFails { parseMinorUnits(text, usd) }
         assertFails { addMinorUnits(Long.MAX_VALUE, 1L) }
         assertFails { addMinorUnits(Long.MIN_VALUE, -1L) }
@@ -65,6 +67,10 @@ class ReconciliationTest {
         assertNull(overflow.bankTotals.input)
         assertFalse(overflow.bankTotals.conserved)
         assertEquals(2, overflow.entries.size)
+        val underflow = reconcile(bank, approved, s_[row(bank, amount = "-92233720368547758.08"), row(bank, "2", 2, "-0.01", "other")], s_[], usd, policy)
+        assertFalse(underflow.complete)
+        assertNull(underflow.bankTotals.input)
+        assertFalse(underflow.bankTotals.conserved)
     }
 
     @Test fun referencesDatesAndSourceVersionsRemainAuthoritative(): Unit {
@@ -72,7 +78,7 @@ class ReconciliationTest {
         assertTrue(differentReference.entries.view.all { it.disposition == ReconcileDisposition.UNMATCHED })
         val differentDate = reconcile(bank, approved, s_[row(bank)], s_[row(approved, date = "2026-11-03")], usd, policy)
         assertTrue(differentDate.entries.view.all { it.disposition == ReconcileDisposition.UNMATCHED })
-        val withoutDate = reconcile(bank, approved, s_[row(bank)], s_[row(approved, date = "2026-11-03")], usd, ReconcilePolicy("no-date-v1", false))
+        val withoutDate = reconcile(bank, approved, s_[row(bank)], s_[row(approved, date = "2026-11-03")], usd, ReconcilePolicy("no-date-v1", false, "cash"))
         assertTrue(withoutDate.entries.view.all { it.disposition == ReconcileDisposition.EXACT })
         val badDate = reconcile(bank, approved, s_[row(bank, date = "2026-02-30")], s_[], usd, policy)
         assertFalse(badDate.complete)
@@ -81,8 +87,15 @@ class ReconciliationTest {
         assertFalse(replay.complete)
         assertTrue(replay.entries.view.all { it.disposition == ReconcileDisposition.INVALID })
         assertTrue(replay.issues.view.any { it.contains("replay") })
-        assertFails { ReconcilePolicy("", true) }
+        assertFails { ReconcilePolicy("", true, "cash") }
         assertFails { bank.copy(revision = "") }
         assertFails { bank.copy(parserIdentity = "") }
+        assertFails { policy.copy(accountScope = "") }
+        val account = reconcile(bank, approved, s_[row(bank).copy(account = "other")], s_[], usd, policy)
+        assertEquals(ReconcileDisposition.INVALID, account.entries[0].disposition)
+        val oversized = reconcile(bank, approved, s_[row(bank).copy(rawRow = "x".repeat(RECONCILE_RAW_CHARS + 1))], s_[], usd, policy)
+        assertFalse(oversized.complete)
+        val tooMany = (RECONCILE_ROWS + 1) j { _: Int -> row(bank) }
+        assertFails { reconcile(bank, approved, tooMany, s_[], usd, policy) }
     }
 }
