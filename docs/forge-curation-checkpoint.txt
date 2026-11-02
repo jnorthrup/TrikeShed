@@ -17,11 +17,23 @@ Verified: pages development webpack build; Pi UI browser proof with mocked
 host; document review/focus browser proofs with mocked backend. Earlier selected
 JVM runs passed 151 and 48 checks before the latest Pi/profile changes.
 
-Pending: coordinated JVM v11 compile/tests, actual Pi API/runtime browser
-round-trip with fixture provider, real document review route browser proof,
-and visual SPARQL browser proof. v9/v10 failed the daemon startup method's JVM
-size limit. Substantial startup extraction passed a standalone diagnostic;
-the full build remains authoritative.
+Full JVM main compilation passed in v11. Test compilation then found a missing
+assertion import, fixed in 6f8f4e4e5; the coordinated v12 checks are running.
+Earlier v9/v10 builds failed the startup method's JVM size limit; substantive
+startup extraction resolved it under the full compiler.
+
+Actual Pi page/API/runtime loopback proof passed against frozen v11 main
+classes and assets from checkpoint a0e85f878: real PiWire, Graal JS child,
+ModelMux, fixture HTX provider, and file-backed breadcrumb store. Browser and
+server both exited zero; two provider fixture calls; retained final assistant
+and tool evidence restored from disk. Hermes standalone tab navigation passed;
+the fixture deliberately did not run Hermes. No real external model or physical
+air-gap claim. Cloud artifacts: pi-loopback-proof/run-v11-kwaWVn under the
+library-files directory, with commands, hashes, screenshots and restored state.
+
+Master 35886891f was merged without conflicts in 1127a5f83 and pushed. The
+loopback proof precedes that integration; merged-runtime checks remain pending.
+Also pending: real document review route and visual SPARQL browser proofs.
 
 Limits: Pi integrates agent-core, not the Node coding CLI/extensions. It uses
 buffered completions and explicit breadcrumb tools, without automatic context
