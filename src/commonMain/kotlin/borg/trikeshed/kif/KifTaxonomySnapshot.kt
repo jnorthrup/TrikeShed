@@ -49,6 +49,9 @@ data class KifExplanation(
     val proofs: List<KifTaxonomyProof>,
     val steps: Int,
     val truncated: Boolean,
+    /** Positive derivability only; no negative inference or consistency judgment. */
+    val semantics: String = "positive-ground-taxonomy-support/v1",
+    val excludedAssertionIds: List<String> = emptyList(),
 )
 
 /**
@@ -92,7 +95,8 @@ class KifTaxonomySnapshot private constructor(
     fun explain(predicate: String, subject: String, obj: String): KifExplanation {
         require(subject.length in 1..1024 && obj.length in 1..1024) { "Taxonomy query term exceeds bound" }
         if (predicate != "subclass" && predicate != "instance")
-            return KifExplanation(revision, KifExplanationStatus.UNSUPPORTED, emptyList(), 0, false)
+            return KifExplanation(revision, KifExplanationStatus.UNSUPPORTED, emptyList(), 0, false,
+                excludedAssertionIds = assertions.filter { it.exclusion != null }.map { it.source.id })
         data class Path(val term: String, val visited: Set<String>, val assertions: List<String>)
         val proofs = mutableListOf<KifTaxonomyProof>()
         var steps = 0
@@ -145,7 +149,8 @@ class KifTaxonomySnapshot private constructor(
             proofs.isNotEmpty() -> KifExplanationStatus.SUPPORTED
             truncated -> KifExplanationStatus.BOUNDED
             else -> KifExplanationStatus.UNKNOWN
-        }, proofs.toList(), steps, truncated)
+        }, proofs.toList(), steps, truncated,
+            excludedAssertionIds = assertions.filter { it.exclusion != null }.map { it.source.id })
     }
 
     companion object {
