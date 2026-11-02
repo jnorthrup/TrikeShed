@@ -44,7 +44,11 @@ object GuestEnvironment {
         "DYLD_", "PYTHONPATH", "PYTHONHOME", "NODE_OPTIONS",
         "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "BASH_FUNC",
         "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND",
+<<<<<<< HEAD
         "PROXY", "TLS",
+=======
+        "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "PROXY",
+>>>>>>> origin/jules-sentinel-block-proxy-env-vars-9535613507496158128
     )
 
     enum class Disposition { READY, BLOCKED, DEFERRED }
