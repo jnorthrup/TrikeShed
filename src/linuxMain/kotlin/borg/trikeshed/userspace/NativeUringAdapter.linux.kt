@@ -17,7 +17,9 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
         else -> ring.open(entries, SETUP_SUBMIT_ALL).let { if (it.isFailure && ring.setupErrno == 22) ring.open(entries, 0) else it }
             .mapCatching { ring.probeExecution().getOrThrow() }
     }
-    private val requests = mutableMapOf<Long, Pair<UringSubmission, Pinned<ByteArray>?>>()
+    private val requests = mutableMapOf<Long, Admitted>()
+    /** Free datagram msghdr records (see [message]). */
+    val messages = ArrayList<CPointer<platform.posix.msghdr>>()
     private val cancellations = mutableMapOf<Long, Long>()
     private val cancelled = mutableSetOf<Long>()
     private var nextUserData = 0L
@@ -66,24 +68,56 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
             val start = if (copied) 0 else
                 (buffer?.arrayOffset() ?: 0) + (buffer?.position() ?: 0)
             val pinned = bytes?.takeIf { it.isNotEmpty() }?.pin()
+            var message: CPointer<platform.posix.msghdr>? = null
             val prepared = try {
                 val address = if (pinned != null && start < bytes!!.size)
                     pinned.addressOf(start).rawValue.toLong() else submission.addr
-                ring.prepSubmission(submission, address, token)
+                // A datagram window goes to the kernel as a msghdr over it; a caller's own msghdr (no window) as given.
+                if (buffer != null && submission.opcode of datagramOps)
+                    message = message(address, submission.len, submission.opcode == UringOp.RECVMSG)
+                ring.prepSubmission(submission, message?.rawValue?.toLong() ?: address, token)
             } catch (failure: Throwable) {
                 pinned?.unpin()
+                message?.let { messages.add(it) }
                 throw failure
             }
             if (prepared.isFailure) {
                 pinned?.unpin()
+                message?.let { messages.add(it) }
                 prepared.getOrThrow()
             }
-            requests[token] = submission to pinned
+            requests[token] = Admitted(submission, pinned, message)
         }
         enter()
     }
 
-    actual fun isPending(userData: Long): Boolean = requests.values.any { it.first.userData == userData }
+    /**
+     * A datagram window's msghdr: one iovec over the payload from the window's start, and msg_name over its last
+     * [UringOp.DATAGRAM_ADDRESS] bytes, which hold a send's destination or take a receive's sender (the kernel writes
+     * only the family's length, as the emulation does). Records are made once, recycled through [messages], and freed
+     * with the ring.
+     */
+    fun message(window: Long, len: Int, receive: Boolean): CPointer<platform.posix.msghdr> {
+        val m = if (messages.isEmpty()) nativeHeap.alloc<platform.posix.msghdr>().also {
+            it.msg_iov = nativeHeap.alloc<platform.posix.iovec>().ptr
+            it.msg_iovlen = 1u
+            it.msg_control = null
+            it.msg_controllen = 0u
+        }.ptr else messages.removeAt(messages.size - 1)
+        val payload = len - UringOp.DATAGRAM_ADDRESS
+        val name = window + payload
+        val h = m.pointed
+        h.msg_iov!!.pointed.iov_base = window.toCPointer<ByteVar>()
+        h.msg_iov!!.pointed.iov_len = payload.toULong()
+        h.msg_name = name.toCPointer<ByteVar>()
+        // A receive offers the whole slot (its bytes are a previous datagram's); a send names its family's length.
+        h.msg_namelen = (if (!receive && (name.toCPointer<ByteVar>()!!.pointed.value.toInt() and 255) == 2) 16
+            else UringOp.DATAGRAM_ADDRESS).toUInt()
+        h.msg_flags = 0
+        return m
+    }
+
+    actual fun isPending(userData: Long): Boolean = requests.values.any { it.submission.userData == userData }
 
     actual fun awaitCompletion(timeoutMicros: Long) {
         if (opened.isFailure || requests.isEmpty() || transportFailure != null) return
@@ -102,7 +136,9 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
             try {
                 while (prepared < count) {
                     val submission = submissions[prepared]
-                    if (capabilities and submission.opcode.mask == 0L || submission.opcode of pathOps) break
+                    // Path copies and datagram msghdrs live in [requests]; a batch carries neither.
+                    if (capabilities and submission.opcode.mask == 0L || submission.opcode of pathOps ||
+                        submission.opcode of datagramOps) break
                     val buffer = submission.buffer
                     val bytes = buffer?.array()
                     val start = if (buffer == null) 0 else buffer.arrayOffset() + buffer.position()
@@ -166,9 +202,10 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
                 }
                 // The cancellation CQE never releases this borrow. Only this
                 // original request's terminal CQE proves the kernel is finished.
-                request.second?.unpin()
+                request.pinned?.unpin()
+                request.message?.let { messages.add(it) }
                 if (cancelled.isNotEmpty()) cancelled.remove(completion.userData)
-                completed.add(UringCompletion(request.first.userData, completion.res, completion.flags))
+                completed.add(UringCompletion(request.submission.userData, completion.res, completion.flags))
             }
             // Report malformed CQEs after examining this CQ batch. Keep every
             // valid terminal result available to the caller's cleanup reaper.
@@ -181,7 +218,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
         if (opened.isFailure) return
         enter()
         for ((target, request) in requests) {
-            if (userData != null && request.first.userData !in userData) continue
+            if (userData != null && request.submission.userData !in userData) continue
             if (target in cancelled) continue
             if (ring.submissionSpace == 0) enter()
             check(ring.submissionSpace > 0) { "io_uring cancellation queue full" }
@@ -202,7 +239,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
         else -platform.posix.posix_fadvise(fd, offset, length.toLong(), advice)
 
     actual fun unregisterBuffers(): Result<Unit> = if (requests.values.any {
-        it.first.opcode == UringOp.READ_FIXED || it.first.opcode == UringOp.WRITE_FIXED
+        it.submission.opcode == UringOp.READ_FIXED || it.submission.opcode == UringOp.WRITE_FIXED
     }) Result.failure(IllegalStateException("fixed buffer requests are still in flight"))
     else ring.unregisterBuffers()
 
@@ -210,6 +247,11 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
         check(requests.isEmpty()) { "io_uring requests must settle before closing their ring" }
         batchResults?.let { nativeHeap.free(it) }
         batchResults = null
+        for (m in messages) {
+            nativeHeap.free(m.pointed.msg_iov!!.pointed)
+            nativeHeap.free(m.pointed)
+        }
+        messages.clear()
         ring.close().getOrThrow()
         cancellations.clear()
         cancelled.clear()
@@ -219,12 +261,21 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
         /** The most SQEs [executeBatch] takes. */
         const val BATCH_LIMIT = 64
         val pathOps = UringOp.caps(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
+        val datagramOps = UringOp.caps(UringOp.SENDMSG, UringOp.RECVMSG)
         // POLL_REMOVE and URING_CMD stay with the common backend: it holds the requests a removal names, and the
         // probe reports URING_CMD without its socket commands.
         val encoded = setOf(UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
             UringOp.SEND, UringOp.RECV, UringOp.CLOSE, UringOp.FSYNC, UringOp.FTRUNCATE,
             UringOp.READ_FIXED, UringOp.WRITE_FIXED, UringOp.FADVISE, UringOp.MADVISE,
             UringOp.STATX, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT, UringOp.SOCKET, UringOp.BIND,
-            UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN, UringOp.POLL_ADD)
+            UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN, UringOp.POLL_ADD,
+            UringOp.SENDMSG, UringOp.RECVMSG)
     }
 }
+
+/** A request the kernel holds: its submission, the pinned window it reads or writes, and a datagram's msghdr. */
+internal class Admitted(
+    val submission: UringSubmission,
+    val pinned: Pinned<ByteArray>?,
+    val message: CPointer<platform.posix.msghdr>?,
+)

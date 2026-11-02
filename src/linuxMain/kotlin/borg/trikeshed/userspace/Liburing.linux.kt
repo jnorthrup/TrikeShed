@@ -381,6 +381,9 @@ internal class LinuxLiburingFacade : LiburingFacade {
             UringOp.MADVISE -> zlinux_uring.io_uring_prep_madvise(sqe, ptr, sub.len.toUInt(), sub.operationFlags)
             UringOp.SEND -> zlinux_uring.io_uring_prep_send(sqe, sub.fd, ptr, sub.len.toULong(), 0)
             UringOp.RECV -> zlinux_uring.io_uring_prep_recv(sqe, sub.fd, ptr, sub.len.toULong(), 0)
+            // [address] is a msghdr; operationFlags are its msg flags (UringOp.MSG_DONTWAIT completes without a poll).
+            UringOp.SENDMSG -> k_io_uring_prep_sendmsg(sqe, sub.fd, address.toCPointer<COpaque>(), sub.operationFlags.toUInt())
+            UringOp.RECVMSG -> k_io_uring_prep_recvmsg(sqe, sub.fd, address.toCPointer<COpaque>(), sub.operationFlags.toUInt())
             UringOp.CLOSE -> io_uring_prep_close(sqe, sub.fd)
             UringOp.FSYNC -> io_uring_prep_fsync(sqe, sub.fd, sub.operationFlags.toUInt())
             UringOp.FTRUNCATE -> io_uring_prep_ftruncate(sqe, sub.fd, sub.offset)

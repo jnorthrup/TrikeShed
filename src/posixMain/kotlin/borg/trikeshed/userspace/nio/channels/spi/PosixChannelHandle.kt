@@ -84,17 +84,20 @@ internal class PosixChannelHandle(
     override fun prepClose(fd: Int, userData: Long): Int =
         enqueue(UringSubmission(UringOp.CLOSE, fd, 0, 0, 0), userData)
 
+    override fun prepSetsockopt(fd: Int, level: Int, optname: Int, value: ByteArray, userData: Long): Int =
+        enqueue(UringOp.Companion.Submissions.setsockopt(fd, level, optname, value, 0), userData)
+
     override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
         enqueue(UringSubmission(UringOp.SENDMSG, fd, msgHdrPtr, 0, 0), userData)
 
     override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
         enqueue(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0), userData)
 
-    override fun sendmsg(fd: Int, datagram: ByteBuffer, userData: Long): Int =
-        enqueue(UringSubmission(UringOp.SENDMSG, fd, 0, datagram.remaining(), -1, buffer = datagram), userData)
+    override fun sendmsg(fd: Int, datagram: ByteBuffer, userData: Long, flags: Int): Int =
+        enqueue(UringSubmission(UringOp.SENDMSG, fd, 0, datagram.remaining(), -1, buffer = datagram, operationFlags = flags), userData)
 
-    override fun recvmsg(fd: Int, datagram: ByteBuffer, userData: Long): Int =
-        enqueue(UringSubmission(UringOp.RECVMSG, fd, 0, datagram.remaining(), -1, buffer = datagram), userData)
+    override fun recvmsg(fd: Int, datagram: ByteBuffer, userData: Long, flags: Int): Int =
+        enqueue(UringSubmission(UringOp.RECVMSG, fd, 0, datagram.remaining(), -1, buffer = datagram, operationFlags = flags), userData)
 
     override fun prepCancel(target: Long, userData: Long): Int = synchronized(lock) {
         val token = requests.entries.firstOrNull { it.value.b == target }?.key ?: return@synchronized -2

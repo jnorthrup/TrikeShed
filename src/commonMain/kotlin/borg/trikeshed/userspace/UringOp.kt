@@ -134,11 +134,20 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         const val STATX_SIZE: Int = 256
         /** The address slot ending a SENDMSG/RECVMSG window: sizeof(struct sockaddr_in6), which holds a sockaddr_in too. */
         const val DATAGRAM_ADDRESS: Int = 28
+        /**
+         * SENDMSG/RECVMSG operationFlags (Linux msg flags): the request completes at once, with -EAGAIN (-11) when the
+         * socket has no datagram (or no send space), and never waits in the ring. A kernel ring arms no poll for it, so
+         * several such receives on one socket do not all wake for each datagram, and none takes a datagram later.
+         */
+        const val MSG_DONTWAIT: Int = 0x40
         // Linux poll, socket-option and socket-command values, translated by each backend like the O_* flags.
         const val POLLIN: Int = 0x1
         const val POLLOUT: Int = 0x4
         const val SOL_SOCKET: Int = 1
         const val SO_REUSEADDR: Int = 2
+        /** Socket buffer sizes, an int in native order; a host may cap or refuse a value above its maximum. */
+        const val SO_SNDBUF: Int = 7
+        const val SO_RCVBUF: Int = 8
         /** IPPROTO_TCP and TCP_NODELAY are the same numbers on Linux and Darwin. */
         const val IPPROTO_TCP: Int = 6
         const val TCP_NODELAY: Int = 1
