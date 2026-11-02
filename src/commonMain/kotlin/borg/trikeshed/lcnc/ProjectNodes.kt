@@ -276,7 +276,7 @@ object ProjectNodes {
                 ?: throw IllegalArgumentException("project.extract: no document wired and no id named")
             val maxChars = node.params["maxChars"]?.toIntOrNull()?.coerceAtLeast(1) ?: Int.MAX_VALUE / 4
             val twin = service.value.extract(project, id, maxChars)
-            if (twin != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id$EXTRACT_SUFFIX", twin.cid, twin.seq, twin.rev)
+            if (twin != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "${twin.project}/${twin.id}", twin.cid, twin.seq, twin.rev)
             if (twin == null) mapOf("found" to false)
             else mapOf("text" to twin.text, "cid" to twin.cid, "found" to true,
                 "originalCid" to twin.originalCid, "originalRev" to twin.originalRev,

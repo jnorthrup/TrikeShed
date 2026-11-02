@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -82,12 +83,22 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun extractReadsTheMinedTwinOrSaysNotFound(): Unit = runBlocking {
+    fun extractReadsTheMinedTwinOrOriginalAndRecordsItsActualIdentity(): Unit = runBlocking {
         val extract = ProjectNodes.registry(corpus()).getValue(ProjectNodes.EXTRACT)
-        val found = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "a.md")), emptyMap())
-        assertEquals(true, found["found"]); assertEquals("mined alpha", found["text"])
-        val missing = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "sub/b.md")), emptyMap())
-        assertEquals(false, missing["found"]); assertNull(missing["text"])
+        val ledger = LcncConsumedLedger()
+        withContext(ledger) {
+            val found = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "a.md")), emptyMap())
+            assertEquals(true, found["found"]); assertEquals("mined alpha", found["text"])
+            val direct = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "sub/b.md")), emptyMap())
+            assertEquals(true, direct["found"]); assertEquals("beta", direct["text"])
+            assertEquals(direct["cid"], direct["originalCid"])
+            assertEquals("sub/b.md", (direct["extraction"] as Map<*, *>)["id"])
+            val missing = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "missing.md")), emptyMap())
+            assertEquals(false, missing["found"]); assertNull(missing["text"])
+            val binary = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "c.pdf")), emptyMap())
+            assertEquals(false, binary["found"]); assertNull(binary["text"])
+        }
+        assertEquals(listOf("notes/a.md.extract.md", "notes/sub/b.md"), ledger.entries().map { it.id })
     }
 
     @Test
