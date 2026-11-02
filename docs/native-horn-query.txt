@@ -1,0 +1,66 @@
+Bounded native review-observation query — 2026-11-02
+
+POST /api/documents/review/horn-query is an authenticated, non-consuming read
+with the same snapshotCid/expectedRevision/goal fields as /horn-input. Only
+containsMandatorySelection and needsMapping are accepted. Neither endpoint
+asserts world facts, grants a sink permit or spends a review release.
+/horn-input remains NOT_EXECUTED preparation. /horn-query defaults to
+UNAVAILABLE because DocumentReviewWire.open has no native capability unless
+trusted bootstrap code supplies NativeHornQuery(NativeHornProfile(...)).
+No daemon environment/UI configuration loader is added in this slice.
+
+The trusted constructor supplies a canonical native executable and its SHA256,
+canonical run.nix and datalog directory, curated process environment and a
+wall limit up to45 seconds. The adapter SHA256 is fixed to
+e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c;
+datalog.nix is fixed to
+9953ebeb4c4792817f49ff00ff16a4fb82945ff44b2778eecb7f3651e4e7fdd7.
+The solver source revision is1e2fb138d562769d21e7f3e6cfdade9129705ec4.
+The validated native source is1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba;
+its development executable SHA256 is
+97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5.
+An operator must provision and trust the executable's shared libraries/runtime
+and immutable profile files. Their complete dependency authenticity, memory
+limits and network/OS isolation are not established by this runner.
+
+The host generates reviewed observation JSON, caps actual encoded input at4MiB,
+checks inputCID, and writes it in an exclusive host-created temporary directory.
+It directly invokes the fixed native instantiate CLI with --argstr path values;
+there is no POSIX shell, request expression interpolation, client-selected path,
+command, profile, timeout or import. Actual pinned mlnix --argstr support was
+verified. Executable/adapter/datalog hashes and input bytes are checked before
+and after execution; profile filesystem immutability remains an operator duty.
+
+Existing ProcessCaptureChannel and JvmProcessProtocolPipes own the finite CLI.
+A new opt-in failOnOverflow policy revokes and joins on the first output above
+the cap; existing callers retain head-and-drain behavior by default. Native
+queries cap merged stdout+stderr at1MiB. Diagnostics contaminating JSON cause
+refusal. Wall timeout and caller cancellation revoke and join the child and
+pipe stages. The platform also revokes observed descendants; this is not a
+sandbox/process-group containment claim. Existing wire admission drains its
+accepted requests on retirement; client disconnect does not discard an accepted
+request, which still has the finite host deadline.
+
+Only exit0, untruncated strict JSON with matching schema/frame/input/query/pins
+and retained proof-source references can be returned. Authenticated reviewed
+read, exact quotations, source/ontology/current revision and inputCID are
+rechecked after execution. Stale state, parse/process/pin/timeout/overflow errors
+are refusal/errors, never logical UNKNOWN. Successful no-proof is UNKNOWN in
+the positive Horn fragment. World obligation applicability is always host-set
+UNKNOWN, including a SUPPORTED review-metadata observation.
+
+Standalone verification (no Gradle/live build directory): immutable main.jar
+from forge-source-context-proof/snapshot source636a4c4bd72c7036b1381a4c76b07e9be0e422da,
+with exact changed sources plus current SumoNixBridge/ReviewedHornPlan compiled
+as an external overlay and explicit friend jar access. Evidence and source
+hashes: /workspace/library-files/native-horn-query-proof/.
+- Actual native positive/no-proof queries over retained approved Book data;
+  authoritative current-source withdrawal at the post-execution read refuses.
+- Actual authenticated HTTP route in configured and unconfigured hosts;
+  missing auth, client-selected extra fields and GET refuse; review WAL unchanged.
+- Actual finite JVM children demonstrate stdout/stderr overflow, wall timeout
+  and caller cancellation kill+join (PID no longer alive), plus compatibility
+  of the existing non-strict head-and-drain mode.
+- Incorrect executable pin refuses. Native integration tests explicitly require
+  trikeshed.native.* operator system properties and otherwise visibly skip;
+  ordinary route/default and finite process tests require no native SDK.

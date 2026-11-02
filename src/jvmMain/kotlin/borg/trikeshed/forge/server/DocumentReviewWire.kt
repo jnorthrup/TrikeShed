@@ -17,6 +17,7 @@ class DocumentReviewWire private constructor(
     val review: CurationReview,
     private val principals: Map<String, ReviewPrincipal>,
     private val corpus: ProjectCorpus,
+    private val nativeHorn: NativeHornQuery?,
 ) {
     companion object {
         fun revision(value: Any?): Long {
@@ -102,7 +103,7 @@ class DocumentReviewWire private constructor(
                 })
             }
         }
-        suspend fun open(ctx: ModuleContext, corpus: ProjectCorpus, books: ConstellationNodes): DocumentReviewWire =
+        suspend fun open(ctx: ModuleContext, corpus: ProjectCorpus, books: ConstellationNodes, nativeHorn: NativeHornQuery? = null): DocumentReviewWire =
             withContext(fileIoContext) {
                 val files = checkNotNull(ctx.scope.coroutineContext[FileOperations])
                 val path = files.resolvePath(ctx.stateDir.absolutePath, "documents")
@@ -144,7 +145,7 @@ class DocumentReviewWire private constructor(
                     }, clock = ctx.clock, conditionPolicy = ConditionReviewPolicy.STRICT_BOOK)
                 try {
                     review.open(CoroutineScope(ctx.scope.coroutineContext + fileIoContext))
-                    DocumentReviewWire(ctx, log, review, principals, corpus).also {
+                    DocumentReviewWire(ctx, log, review, principals, corpus, nativeHorn).also {
                         it.attach()
                         books.reviewRelease = review::consume
                         ctx.documentReview = review
@@ -190,7 +191,7 @@ class DocumentReviewWire private constructor(
         ctx.blackboard.put("lcnc/readiness/document.reviewDecision", mapOf(
             "available" to principals.isNotEmpty(), "reason" to if (principals.isEmpty()) "No analyst principal is configured" else null,
             "prerequisites" to listOf("authenticated analyst session")), "documents")
-        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-plan", "/horn-input"))
+        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-plan", "/horn-input", "/horn-query"))
             ctx.routes.claim("document-review", "/api/documents/review$suffix", route = ::route)
     }
 
@@ -207,7 +208,7 @@ class DocumentReviewWire private constructor(
     private suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): WireHttpResponse {
         val endpoint = path.substringBefore('?')
         val actor = principal(text)
-        val reasoningInput = endpoint.endsWith("/taxonomy-plan") || endpoint.endsWith("/horn-input")
+        val reasoningInput = endpoint.endsWith("/taxonomy-plan") || endpoint.endsWith("/horn-input") || endpoint.endsWith("/horn-query")
         if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release") ||
                 endpoint.endsWith("/assess") || endpoint.endsWith("/assessment") || reasoningInput) && actor == null)
             return json(mapOf("error" to "authenticated_reviewer_required"), 401)
@@ -227,6 +228,14 @@ class DocumentReviewWire private constructor(
                         fun cid(key: String) = ContentId(input[key] as? String ?: error("$key required"))
                         fun revision() = revision(input["expectedRevision"])
                         json(when {
+                            endpoint.endsWith("/horn-query") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
+                                val goal = input["goal"] as? String ?: error("Review observation goal must be text")
+                                require(goal in setOf("containsMandatorySelection", "needsMapping")) { "Unsupported review observation goal" }
+                                nativeHorn?.report(review, ctx.casStore, cid("snapshotCid"), revision(), goal)
+                                    ?: mapOf("status" to "UNAVAILABLE", "reason" to "native-profile-unconfigured",
+                                        "worldObligationApplicability" to "UNKNOWN", "authority" to "reviewed-read-only-not-a-sink-permit")
+                            }
                             endpoint.endsWith("/horn-input") -> withContext(checkNotNull(actor)) {
                                 fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
                                 val goal = input["goal"] as? String ?: error("Review observation goal must be text")

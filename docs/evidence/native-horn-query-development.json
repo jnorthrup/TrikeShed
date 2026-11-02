@@ -1,0 +1,39 @@
+{
+  "kind": "native-horn-query-development-verification/1",
+  "baseSource": "87cc755b5",
+  "immutableDependencySource": "636a4c4bd72c7036b1381a4c76b07e9be0e422da",
+  "immutableMainJarSha256": "dfdf093b348bae72f5b2a3a43a1a94c79adcc07e58720d9232fa84ec24628084",
+  "method": "standalone Kotlin compile and direct test-method assertion runner; no Gradle or live build output",
+  "sourceSha256": {
+    "src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/ProcessCaptureChannel.kt": "ee151e458bb92de3560a1fad068292033becb91f0ccca2f4b081be0e9e136ad2",
+    "src/commonMain/kotlin/borg/trikeshed/kif/SumoNixBridge.kt": "7aa74317b51d15c702ce7dbf5abb927a429f9c96f047219ebc66ea6d22799ac2",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedHornPlan.kt": "1ea1a9c74100eeac23171bf24758e07290e42196e3f1862331b9fc405dfb4be0",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt": "1d2435dfd05c04d92f32e088d3051748b6736f8079d0a294cd0b9652e75a6934",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/RouteManifest.kt": "1ddaeebceae815b4e6fca75b54a67880adf2a12327ebbb51ce0bbd711a2445c2",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt": "daea2375117765455ccde6b2c1e4fab6440acfd6bf486d3ff85d85f94d291676",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt": "66a6f5411f5bc084440beb839dde89da6d33479b026b8ededf201d8d36739b0a",
+    "src/jvmTest/kotlin/borg/trikeshed/userspace/nio/process/ProcessCaptureBoundedTest.kt": "75aa6afbec23771771a8fce2388d5c95f90ba4c917a81363f250298fb5e062e9",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/ReviewedTaxonomyWireTest.kt": "598fc90fc5850fc021c6759d771f4ea837b73bb40fae6b440d650e87902b5c04"
+  },
+  "checks": [
+    "BACKCOMPAT_CAPTURE_PASS",
+    "STDOUT_STDERR_OVERFLOW_JOIN_PASS",
+    "WALL_KILL_JOIN_PASS",
+    "CANCEL_KILL_JOIN_PASS",
+    "ACTUAL_NATIVE_REVIEW_POSITIVE_UNKNOWN_STALE_PASS",
+    "BINARY_PIN_REFUSAL_PASS",
+    "ACTUAL_AUTH_ROUTE_UNCONFIGURED_REFUSAL_PASS",
+    "ACTUAL_AUTH_ROUTE_NATIVE_QUERY_PASS"
+  ],
+  "nativeSource": "1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba",
+  "binarySha256": "97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5",
+  "adapterSha256": "e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c",
+  "outputLimitBytes": 1048576,
+  "inputLimitBytes": 4194304,
+  "wallLimitMillis": 45000,
+  "osSandboxClaim": false,
+  "memoryBoundClaim": false,
+  "networkIsolationClaim": false,
+  "bootstrap": "trusted constructor injection only; ordinary startup remains unconfigured",
+  "resultLogSha256": "ef92e72645b89f0d003952eba54f7dc11030c6eddcb70ea0e0f01db883d191fe"
+}
