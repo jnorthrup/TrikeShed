@@ -25,6 +25,7 @@ let
     if p ? asserted then {
       inherit (p) fact;
       asserted = true;
+      witnessMode = "any-one-asserted-source";
       sources = map (entry: entry.source) (builtins.filter (entry: show entry.fact == p.fact) data.provenance.facts);
     } else {
       inherit (p) fact rule;
