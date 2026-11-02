@@ -6,7 +6,7 @@ import borg.trikeshed.parse.*
 import borg.trikeshed.userspace.nio.channels.spi.JvmProcessProtocolPipes
 import borg.trikeshed.userspace.nio.process.ProcessCaptureChannel
 import kotlinx.coroutines.*
-import java.nio.file.Files
+import borg.trikeshed.userspace.nio.file.spi.*
 import java.nio.file.Path
 import java.security.MessageDigest
 import kotlin.coroutines.coroutineContext
@@ -20,30 +20,56 @@ class NativeHornProfile(
     environment: Map<String, String> = emptyMap(),
     val timeoutMillis: Long = 45_000,
 ) {
-    val binary: Path = binary.toRealPath()
-    val adapter: Path = adapter.toRealPath()
-    val datalogDirectory: Path = datalogDirectory.toRealPath()
+    val binary: Path = absolute(binary)
+    val adapter: Path = absolute(adapter)
+    val datalogDirectory: Path = absolute(datalogDirectory)
     val environment: Map<String, String> = environment.toMap()
     init {
         require(binarySha256.matches(Regex("[0-9a-f]{64}")))
         require(timeoutMillis in 1..45_000)
     }
-    internal fun check() {
-        require(Files.isExecutable(binary) && sha256(binary) == binarySha256) { "Native executable pin differs" }
-        require(sha256(adapter) == ADAPTER_SHA256) { "Native adapter pin differs" }
-        require(sha256(datalogDirectory.resolve("datalog.nix")) == DATALOG_SHA256) { "Native datalog pin differs" }
+    internal data class Resolved(val binary: String, val adapter: String, val datalog: String)
+    internal fun check(files: FileOperations): Resolved {
+        val paths = Resolved(files.canonicalPath(binary.toString()), files.canonicalPath(adapter.toString()),
+            files.canonicalPath(datalogDirectory.toString()))
+        require(sha256(files, paths.binary, 256 * 1024 * 1024) == binarySha256) { "Native executable pin differs" }
+        require(sha256(files, paths.adapter, 16 * 1024) == ADAPTER_SHA256) { "Native adapter pin differs" }
+        require(sha256(files, files.resolvePath(paths.datalog, "datalog.nix"), 1024 * 1024) == DATALOG_SHA256) { "Native datalog pin differs" }
+        return paths
     }
     companion object {
         const val ADAPTER_SHA256 = "e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c"
         const val DATALOG_SHA256 = "9953ebeb4c4792817f49ff00ff16a4fb82945ff44b2778eecb7f3651e4e7fdd7"
-        internal fun sha256(path: Path): String {
-            val digest = MessageDigest.getInstance("SHA-256")
-            Files.newInputStream(path).use { input ->
-                val bytes = ByteArray(8192)
-                while (true) { val count = input.read(bytes); if (count < 0) break; digest.update(bytes, 0, count) }
-            }
-            return digest.digest().joinToString("") { "%02x".format(it) }
+        private fun absolute(path: Path): Path {
+            require(path.isAbsolute) { "Native profile paths must be absolute" }
+            return path.normalize()
         }
+
+        /** Pure, strict bootstrap parser. The caller owns config selection/read via FileOperations. */
+        fun parse(text: String): NativeHornProfile {
+            require(text.encodeToByteArray(throwOnInvalidSequence = true).size <= 16 * 1024) { "Native profile exceeds 16KiB" }
+            val value = DocumentResult.parse(text)
+            val required = _s["binary", "binarySha256", "adapter", "datalogDirectory"]
+            require(required.all { it in value } && value.keys.all { it in required || it == "timeoutMillis" }) { "Unexpected or missing native profile fields" }
+            fun path(key: String) = Path.of(value[key] as? String ?: error("Native profile $key must be text"))
+            val timeout = if ("timeoutMillis" in value) {
+                val n = (value["timeoutMillis"] as? Number)?.toDouble() ?: error("Native profile timeout must be numeric")
+                require(n.isFinite() && n >= 1 && n <= 45_000 && n % 1 == 0.0) { "Native profile timeout out of bounds" }
+                n.toLong()
+            } else 45_000L
+            return NativeHornProfile(path("binary"), value["binarySha256"] as? String ?: error("Native binary hash required"),
+                path("adapter"), path("datalogDirectory"), timeoutMillis = timeout)
+        }
+
+        internal fun boundedRead(files: FileOperations, path: String, limit: Int): ByteArray {
+            val fd = files.open(path)
+            val size = try { files.size(fd) } finally { files.close(fd) }
+            require(size in 0..limit.toLong()) { "Native profile file size limit" }
+            return files.readAllBytes(path).also { require(it.size.toLong() == size && it.size <= limit) { "Native profile file changed or exceeds limit" } }
+        }
+        internal fun sha256(files: FileOperations, path: String, limit: Int): String =
+            MessageDigest.getInstance("SHA-256").digest(boundedRead(files, path, limit)).joinToString("") { "%02x".format(it) }
+
     }
 }
 
@@ -72,18 +98,20 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
         require(ContentId.of(input).value == report["inputCid"]) { "Native input identity differs" }
         val data = reifyMap(input.decodeToString(throwOnInvalidSequence = true))
         require(data["scope"] == "review-record-observations") { "Native query only accepts reviewed observations" }
-        val directory = withContext(Dispatchers.IO) { Files.createTempDirectory("trikeshed-horn-") }
-        val path = directory.resolve("input.json")
+        val files = coroutineContext[FileOperations] ?: error("Native query unavailable: FileOperations capability missing")
+        val directory = withContext(NonCancellable + fileIoContext) { files.createTempDir("trikeshed-horn-") }
+        val path = files.resolvePath(directory, "input.json")
         try {
-            withContext(Dispatchers.IO) {
-                profile.check()
-                Files.write(path, input)
-                require(ContentId.of(Files.readAllBytes(path)).value == report["inputCid"])
+            val resolved = withContext(fileIoContext) {
+                val checked = profile.check(files)
+                files.write(path, input)
+                require(ContentId.of(NativeHornProfile.boundedRead(files, path, INPUT_LIMIT)).value == report["inputCid"])
+                checked
             }
             val pipes = JvmProcessProtocolPipes.open(
-                command = { _, _ -> _l[profile.binary.toString(), "instantiate", "--eval", "--strict", "--json",
-                    "--readonly-mode", profile.adapter.toString(), "--argstr", "sumoNix", profile.datalogDirectory.toString(),
-                    "--argstr", "input", path.toString()] },
+                command = { _, _ -> _l[resolved.binary, "instantiate", "--eval", "--strict", "--json",
+                    "--readonly-mode", resolved.adapter, "--argstr", "sumoNix", resolved.datalog,
+                    "--argstr", "input", path] },
                 environment = profile.environment, mergeError = true)
             // stderr shares this same finite cap. Diagnostics that make stdout non-JSON cause refusal.
             val captured = ProcessCaptureChannel(coroutineContext, pipes, maxBytes = OUTPUT_LIMIT,
@@ -101,13 +129,13 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
             require(result["status"] in _s["SUPPORTED", "UNKNOWN"]) { "Native result status differs" }
             require((result["status"] == "UNKNOWN") == (result["proof"] == null)) { "Native proof status differs" }
             checkProof(result["proof"], data)
-            withContext(Dispatchers.IO) {
-                profile.check()
-                require(ContentId.of(Files.readAllBytes(path)).value == report["inputCid"]) { "Native input changed" }
+            withContext(fileIoContext) {
+                require(profile.check(files) == resolved) { "Native profile canonical paths changed" }
+                require(ContentId.of(NativeHornProfile.boundedRead(files, path, INPUT_LIMIT)).value == report["inputCid"]) { "Native input changed" }
             }
             return result
         } finally {
-            withContext(NonCancellable + Dispatchers.IO) { Files.deleteIfExists(path); Files.deleteIfExists(directory) }
+            withContext(NonCancellable + fileIoContext) { files.deleteRecursively(directory) }
         }
     }
 
@@ -150,6 +178,7 @@ private object DocumentResult {
         fun unique(value: Any?): Boolean = when (value) {
             is Map<*, *> -> { val keys = HashSet<Any?>(); value.entries.all { it.key is String && keys.add(it.key) && unique(it.value) } }
             is List<*> -> value.all(::unique)
+            is String -> { value.encodeToByteArray(throwOnInvalidSequence = true); true }
             else -> true
         }
         require(unique(result)) { "Native JSON duplicate fields" }
