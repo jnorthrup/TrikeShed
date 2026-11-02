@@ -2,6 +2,7 @@ package borg.trikeshed.docs
 
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.lib.*
 
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -77,6 +78,7 @@ object DocumentSurfacePage {
     private var curationBusy = false
 
     suspend fun mount() {
+        borg.trikeshed.web.AppNav.mount()
         val root = document.getElementById(DocumentSurface.ROOT_ID) as HTMLElement
         root.innerHTML = DocumentSurface.layout()
         root.addEventListener("click", { e -> onClick(e) })
@@ -119,7 +121,9 @@ object DocumentSurfacePage {
     private fun clearPassage() {
         passageView = null
         val url = URL(window.location.href)
-        if (!url.searchParams.has("passageReceipt") && !url.searchParams.has("passageProposal")) return
+        val contextPresent = SourceSelection.keys.view.any { url.searchParams.has(it) }
+        if (!url.searchParams.has("passageReceipt") && !url.searchParams.has("passageProposal") && !contextPresent) return
+        for (key in SourceSelection.keys.view) url.searchParams.delete(key)
         url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
         window.history.replaceState(window.history.asDynamic().state, "", url.pathname + url.search + url.hash)
         window.dispatchEvent(Event("hashchange"))
@@ -330,6 +334,13 @@ object DocumentSurfacePage {
         blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
         runStates.clear()
         passageView = DocumentSurface.passageHtml(current, selected)
+        if (selected != null && selected.source.project == p && selected.source.id == id) {
+            val url = URL(window.location.href)
+            for ((key, values) in SourceSelection.queryValues(SourceSelection.from(selected).query()))
+                url.searchParams.set(key, values.single())
+            window.history.replaceState(window.history.asDynamic().state, "", url.pathname + url.search + url.hash)
+            window.dispatchEvent(Event("hashchange"))
+        }
         render(keepLocation = true)
         if (blocks.none { it is RunBlock.Spec }) return
         refreshBlocks()

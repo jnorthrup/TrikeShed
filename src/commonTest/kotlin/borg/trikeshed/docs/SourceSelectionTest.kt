@@ -11,6 +11,13 @@ class SourceSelectionTest {
 
     @Test fun boundedNavigationPreservesExactIdentitiesAndRejectsAmbiguity() {
         assertEquals(selected, SourceSelection.parse(SourceSelection.queryValues(selected.query())))
+        assertTrue(selected.documentsHref().contains("sourceReceipt="))
+        assertTrue(selected.documentsHref().contains("passageReceipt="))
+        assertEquals(selected.documentsHref(), selected.applicationHref("documents"))
+        assertEquals(selected.href("panels"), selected.applicationHref("panels"))
+        assertEquals(selected.href("panels"), selected.applicationHref("board"))
+        assertNull(selected.applicationHref("pi"))
+        assertNull(selected.applicationHref("hermes"))
         assertTrue(selected.documentsHref().contains("#Dept%20%2B%20legal/notes%2Fa%20%26%20duty.md"))
         for (bad in s_[selected.query() + "&sourceProposal=3", selected.query().replace("sourceProposal=2", "sourceProposal=02"),
             selected.query().replace("sourceProject=Dept%20%2B%20legal", "sourceProject=%C3%28"),

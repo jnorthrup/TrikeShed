@@ -403,9 +403,8 @@ object DocumentSurface {
                     .append(esc(p.predicate!!)).append("</span> ").append(esc(p.obj!!)).append("</div>")
                 if (!p.quote.isNullOrBlank()) append("<blockquote class=\"ds-curate-quote\">“").append(esc(p.quote)).append("”</blockquote>")
                 val passage = passage(result, p, validText)
-                if (passage != null) append("<p><a data-passage-receipt=\"").append(esc(passage.receiptCid)).append("\" href=\"/documents?passageReceipt=")
-                    .append(WikiSurface.encode(passage.receiptCid)).append("&amp;passageProposal=").append(passage.ordinal)
-                    .append('#').append(WikiSurface.encode(passage.source.project)).append('/').append(WikiSurface.encode(passage.source.id))
+                if (passage != null) append("<p><a data-passage-receipt=\"").append(esc(passage.receiptCid)).append("\" href=\"")
+                    .append(esc(SourceSelection.from(passage).documentsHref()))
                     .append("\">Show passage in project document</a></p>")
                 append("<div class=\"ds-curate-status\">")
                     .append(when {

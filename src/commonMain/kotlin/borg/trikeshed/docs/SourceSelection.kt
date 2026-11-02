@@ -6,10 +6,16 @@ import borg.trikeshed.wiki.WikiSurface
 /** A navigation reference. Only retained receipt and current source reads establish its evidence. */
 data class SourceSelection(val receiptCid: String, val proposal: Int, val project: String, val document: String) {
     fun query(): String = "sourceReceipt=${WikiSurface.encode(receiptCid)}&sourceProposal=$proposal&sourceProject=${WikiSurface.encode(project)}&sourceDocument=${WikiSurface.encode(document)}"
-    fun documentsHref(): String = "/documents?passageReceipt=${WikiSurface.encode(receiptCid)}&passageProposal=$proposal#${WikiSurface.encode(project)}/${WikiSurface.encode(document)}"
+    fun documentsHref(): String = "/documents?${query()}&passageReceipt=${WikiSurface.encode(receiptCid)}&passageProposal=$proposal#${WikiSurface.encode(project)}/${WikiSurface.encode(document)}"
     fun href(surface: String): String {
         require(surface in _s["wiki", "curator", "panels"])
         return "/$surface?${query()}"
+    }
+    fun applicationHref(destination: String): String? = when (destination) {
+        "documents" -> documentsHref()
+        "board" -> href("panels")
+        "wiki", "curator", "panels" -> href(destination)
+        else -> null
     }
     fun matches(passage: DocumentPassage): Boolean = passage.receiptCid == receiptCid && passage.ordinal == proposal &&
         passage.source.project == project && passage.source.id == document
