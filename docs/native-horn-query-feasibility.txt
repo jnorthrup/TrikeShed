@@ -1,0 +1,36 @@
+Native reviewed-Horn host query feasibility — read-only assessment, 2026-11-02
+
+Conclusion: a small typed JVM stitch is feasible using existing NIO/CCEK ownership; no new worker protocol or generic execution framework is needed. Native execution remains absent from the current reviewed-Horn artifact API. No production code changed in this assessment.
+
+Existing seams
+- ReviewedHornPlan.report authenticates reviewedRead, bounds/identity-checks selected CAS text, checks exact quotations, exports host-generated input, and repeats reviewedRead before returning. ReviewedHornPlan artifacts explicitly remain NOT_EXECUTED; worldObligationApplicability is UNKNOWN.
+- CurationReview.reviewedRead requires ReviewPrincipal, current strict-book approval lineage, current source/ontology, and strict assessment. Its readCid commits snapshot/approval/decision/revision/source/curation receipt/ontology/assessment identities. Reuse this operation before and after native work; never hold the review actor across process I/O.
+- SumoNixBridge bounds sources to128 and total source text to1,048,576 characters, individual text65,536 characters, and final UTF-8 JSON to4MiB. The source bound is characters, not1MiB UTF-8. A query runner must additionally cap its actual encoded input bytes explicitly.
+- JvmProcessProtocolPipes.open with protocolTimeoutMillis=null supports ordinary CLI stdin/stdout without framed/socket protocol. It clears the child environment and accepts a trusted argv lambda. No shell is necessary.
+- ProcessCaptureChannel already owns writer/reader/collector/exit under a supervisor, bounded chunks and retained bytes, and wall timeout. await cancellation explicitly revokes; cleanup joins process stages and owner before return.
+- JvmProcessProtocolPipes.revoke performs noncancellable process/observed-descendant destruction and bounded joins. This is process lifecycle control, not an OS sandbox or process-group containment guarantee.
+- Existing JvmAgentRunner uses these plain finite-process pipes and ProcessCaptureChannel, demonstrating this is an existing seam. The typed query should use the low-level seam directly, never expose the generic agent runner/model command surface.
+
+Small required slice
+1. Operator-only immutable profile: canonical executable plus expected hash, immutable runtime library bundle/profile identity, adapter path/hash and pinned datalog path/hash, curated environment, wall/output/input limits. Unconfigured means UNAVAILABLE. No request JSON chooses executable, Nix expression, imports, flags, working directory, or profile paths; no automatic fallback.
+2. A typed reviewed-Horn query owner admits a bounded number of requests under its CCEK lifetime. Accept only snapshot/revision and an enumerated reviewed observation goal. Generate input from authenticated host state and write an exclusive owner-controlled immutable input file, checking byte hash against inputCid. Invoke the fixed adapter with fixed trusted arguments and the host-created input filename; remove owned temporary artifacts after joined completion. Do not interpolate caller values into Nix code.
+3. Add an opt-in strict-overflow mode to ProcessCaptureChannel, preserving current drain-and-count behavior for existing callers. At the first byte above the configured cap, revoke and join, return a distinct output-limit failure, and never parse truncated bytes. Existing capture merges stderr/stdout: either conservatively reject any non-JSON merged output, or add separately capped stderr collection if diagnostics must coexist with valid stdout. Do not inherit an unbounded stderr stream.
+4. Accept output only after exit0, no timeout/cancellation/overflow, strict UTF-8 and exactly one bounded JSON value. Check expected schema/scope/pins/query/frame against host-held identities; attach inputCid from the bytes the host actually supplied. Native output does not grant review authority. Validate proof references against retained source sidecar before presentation.
+5. Re-run authenticated reviewedRead and regenerate/compare inputCid/frame/readCid/decision/source identities after execution, before releasing a result. Any mismatch is STALE/REFUSED; process/pin/parse failures are errors or unavailable, never a logical UNKNOWN. Successful no-positive-proof remains UNKNOWN. Metadata-only review observation results retain worldObligationApplicability=UNKNOWN and cannot admit world facts, authorize sinks, release receipts, or mutate the ledger.
+6. Admission stops on owner close; cancellation revokes active children and joins before profile/session replacement. No request can reuse a retired process or result callback in a new owner.
+
+Meaningful verification before enabling
+- Actual configured native fixture through this typed host seam, positive and no-proof cases matching official Nix oracle.
+- Finite fixture child that overproduces, and one that blocks; assert cap/wall/caller cancellation all return only after PID death and pipe-stage join. Include stderr pressure and observed-descendant cleanup. Do not claim arbitrary hostile descendant containment.
+- Profile/hash mismatch, missing profile, invalid JSON/nonzero exit, byte limit, source/review mutation during the process, input-file identity mismatch, and owner replacement all refuse publication. Check no review ledger writes.
+- Readiness reports configuration/pins/binary availability separately from actual successful query execution. SDK packaging and deployment distribution are a separate task; this development SDK is not a production release artifact.
+
+Source paths inspected (under /workspace/TrikeShed)
+src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedHornPlan.kt
+src/commonMain/kotlin/borg/trikeshed/lcnc/CurationReview.kt
+src/commonMain/kotlin/borg/trikeshed/kif/SumoNixBridge.kt
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/channels/spi/ProcessOperations.kt
+src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/ProcessCaptureChannel.kt
+src/jvmMain/kotlin/borg/trikeshed/userspace/nio/channels/spi/JvmProcessProtocolPipes.kt
+
+Native build/proof evidence is separate: verified-summary-sanitized.json, native-fixture-results.json, native-solver-results.json and logs in this directory. No Gradle, production source edits, new OS isolation claims, or installs were performed for this assessment.

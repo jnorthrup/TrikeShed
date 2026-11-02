@@ -1,0 +1,284 @@
+{
+  "status": "PASS",
+  "checkedUtc": "2026-11-02T23:04:17.386521+00:00",
+  "mlirNixRevision": "1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba",
+  "sumoNixRevision": "1e2fb138d562769d21e7f3e6cfdade9129705ec4",
+  "llvmMlirVersion": "22.1.8",
+  "compiler": "GCC14.2.0 C++20",
+  "compilerJobs": 2,
+  "nativeBuildSeconds": 94.43266191199655,
+  "officialPackageCount": 32,
+  "officialPackageDownloadBytes": 216643120,
+  "signedRepositoryMetadataVerified": true,
+  "llvmPublicKeyFingerprint": "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421",
+  "workspaceLocalExtract": true,
+  "hostInstalledOrReplaced": false,
+  "upstreamTrackedSourceChanges": false,
+  "sdkRelocation": "One LLVMExports.cmake absolute libz3 path relocated to matching local SDK library; binary bytes unchanged",
+  "nativeBinarySha256": {
+    "mlnix": "97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5",
+    "mlnix-opt": "317af11429f66562789f3bcc8a138b02df89b4756918d9a83b00c7bbb25c6e54"
+  },
+  "nativeUpstreamKifTests": {
+    "passed": 2,
+    "failed": 0
+  },
+  "nativeFullMlirTests": {
+    "passed": 21,
+    "failed": 0,
+    "featureGatedRunLinesSkipped": 4,
+    "skippedFeature": "cse-dynamic-ops unavailable in LLVM22"
+  },
+  "generatedNativeFixtureCount": 8,
+  "nativeSolverOracleComparisons": 14,
+  "nativeParseLowerEvalFixtures": [
+    {
+      "fixture": "scenario-supported",
+      "status": "PASS",
+      "facts": 14,
+      "rules": 4,
+      "seconds": 0.06390182899485808,
+      "inputMlirSha256": "52b316e5c48c2454401f6c813a60926977b9dd0a3493f2952529da13977c9af7",
+      "expectedJsonSha256": "d7e70b0791abcba69622b7bb45049e9de28c2348410bdedef1039f14713ef3b1",
+      "actualJsonSha256": "f4f276284c0e92b8a3b8fc19b397d91f82fc75ec246cc421776386adf83eb9a2"
+    },
+    {
+      "fixture": "scenario-unknown",
+      "status": "PASS",
+      "facts": 14,
+      "rules": 4,
+      "seconds": 0.06494694499997422,
+      "inputMlirSha256": "52b316e5c48c2454401f6c813a60926977b9dd0a3493f2952529da13977c9af7",
+      "expectedJsonSha256": "c19d07265fcc1252c061173617afcba2d1d5b1e257c813691a1790e633c7d575",
+      "actualJsonSha256": "f4f276284c0e92b8a3b8fc19b397d91f82fc75ec246cc421776386adf83eb9a2"
+    },
+    {
+      "fixture": "first-proof",
+      "status": "PASS",
+      "facts": 2,
+      "rules": 2,
+      "seconds": 0.0641483649960719,
+      "inputMlirSha256": "991f0bc28c86446f6feeaf3b8a11800e992fd5272afc17461f84a04cb6cc4989",
+      "expectedJsonSha256": "40f0dbb4f67f0ae13484d520f3c0b64635c452382c62a5c4984caa47fefbd4f1",
+      "actualJsonSha256": "3251d32f7eb3f8918a39b0158bb40cddfdb90a830b464d2f45188330338afd72"
+    },
+    {
+      "fixture": "removed-one",
+      "status": "PASS",
+      "facts": 1,
+      "rules": 2,
+      "seconds": 0.06463807600084692,
+      "inputMlirSha256": "f859470c34ee3b40461c2b414f516e3926546276d1592583a8331f7a91db34c2",
+      "expectedJsonSha256": "861f54f33d5d385835351e5e62144840cc7c37d2e9517a64931e94415076df39",
+      "actualJsonSha256": "256dfd1ad2a9dc73af709d80e65f78fd412ffdb593713266ebf7247d0b6e5364"
+    },
+    {
+      "fixture": "removed-last",
+      "status": "PASS",
+      "facts": 0,
+      "rules": 2,
+      "seconds": 0.07009042201389093,
+      "inputMlirSha256": "818933b743c25c6ffc7aa7147a51dcb01ede233243af1363186ff2a9a8fd8b84",
+      "expectedJsonSha256": "29b4c623b0fa6692e90e7ae75a4b5be0d0d5c0f4569613552ed303ef93ebcae8",
+      "actualJsonSha256": "38a284579acb929810b0022f8430ac94c388c59e3fe6c3be3f09837c499b78cc"
+    },
+    {
+      "fixture": "review-mandatory",
+      "status": "PASS",
+      "facts": 10,
+      "rules": 2,
+      "seconds": 0.06407635699724779,
+      "inputMlirSha256": "1dd5992b5b2b948955a30ef48def66e3181a305d71cb337dbc4f070d9393f2a6",
+      "expectedJsonSha256": "7fed828f96d033b4332ba3d52e422e5a9a59b87fdcfc0a273bc13da86609005e",
+      "actualJsonSha256": "77fc4c8a2877108599003bf0e993246bf40356814c15932b409e1877533886f3"
+    },
+    {
+      "fixture": "review-mapping",
+      "status": "PASS",
+      "facts": 10,
+      "rules": 2,
+      "seconds": 0.06423465599073097,
+      "inputMlirSha256": "1dd5992b5b2b948955a30ef48def66e3181a305d71cb337dbc4f070d9393f2a6",
+      "expectedJsonSha256": "da48dd429abb99d9ee4884619cc5a432f16347c1aee9e507bc3a0f76c9e1cb52",
+      "actualJsonSha256": "77fc4c8a2877108599003bf0e993246bf40356814c15932b409e1877533886f3"
+    },
+    {
+      "fixture": "unicode",
+      "status": "PASS",
+      "facts": 1,
+      "rules": 0,
+      "seconds": 0.06402738699398469,
+      "inputMlirSha256": "5d607b44539729a3bee99781520d2f342eb1f70a2c035cf9cee8fdc26a94266c",
+      "expectedJsonSha256": "196df736c7a466557e4edc1ef45b84cc1d3d613fa6b063118658f90f8afdebd7",
+      "actualJsonSha256": "5dedac2b930ac0fdbf97a023ac56517de0e399fa40fd920fa623ae0cad3b9e18"
+    }
+  ],
+  "nativeSolverCases": [
+    {
+      "fixture": "scenario-supported",
+      "phase": "original-export",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.06781080500513781,
+      "inputSha256": "d7e70b0791abcba69622b7bb45049e9de28c2348410bdedef1039f14713ef3b1",
+      "outputSha256": "a967c0b415d78f712cf5026367e6d75ee99ac796771389c02e5c1c2209685290",
+      "exitCode": 0
+    },
+    {
+      "fixture": "scenario-supported",
+      "phase": "native-lowered-roundtrip",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.0531689049967099,
+      "inputSha256": "e2a121a408fa93ba0ed0aa2afb255015aa10575ce5916464aa00b0c54cc7e50a",
+      "outputSha256": "268d14f1b559d8716cb9925cad3e19778cea445bdaf178f25a31a22bd6618ccb",
+      "exitCode": 0
+    },
+    {
+      "fixture": "scenario-unknown",
+      "phase": "original-export",
+      "status": "UNKNOWN",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.05449881299864501,
+      "inputSha256": "c19d07265fcc1252c061173617afcba2d1d5b1e257c813691a1790e633c7d575",
+      "outputSha256": "30755b09543cebebbb47338b0040654e8e6e561d26c6a4ab561eaf1a21e37ce2",
+      "exitCode": 0
+    },
+    {
+      "fixture": "scenario-unknown",
+      "phase": "native-lowered-roundtrip",
+      "status": "UNKNOWN",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.058369249003590085,
+      "inputSha256": "1b27ada7ce5dc0dfec66838bc04859d793942f8ed3f1d4e664b834de1898ef8a",
+      "outputSha256": "0edcb47efc106b26d1dc96c0beb2e2f79d82af68477a3b2a122ce1eb85720f8f",
+      "exitCode": 0
+    },
+    {
+      "fixture": "first-proof",
+      "phase": "original-export",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.051312963012605906,
+      "inputSha256": "40f0dbb4f67f0ae13484d520f3c0b64635c452382c62a5c4984caa47fefbd4f1",
+      "outputSha256": "905153890321534699c4db8e7461d3d109929cc7968c44cfc7b14e04695b8024",
+      "exitCode": 0
+    },
+    {
+      "fixture": "first-proof",
+      "phase": "native-lowered-roundtrip",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.04957660999207292,
+      "inputSha256": "b5b4d8ecb508016209b7e20ddbf71a0fb2d5bd815d468081d4554c2fb221849c",
+      "outputSha256": "dbf986de4caab78978cd892a9cf9ab0305ede4c0eac9ccf1f52ad386bad786b6",
+      "exitCode": 0
+    },
+    {
+      "fixture": "removed-one",
+      "phase": "original-export",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.0493466940097278,
+      "inputSha256": "861f54f33d5d385835351e5e62144840cc7c37d2e9517a64931e94415076df39",
+      "outputSha256": "4c627d84bdeca44dce5fd93460aa1d973bd57085400e6dc84756d6613fcfba65",
+      "exitCode": 0
+    },
+    {
+      "fixture": "removed-one",
+      "phase": "native-lowered-roundtrip",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.047792935991310515,
+      "inputSha256": "f91c9f1847a99cff4cec69a094d588b6f4b822008a1aa1af4c43dd9a0928867a",
+      "outputSha256": "083633fb2c68998029f1e4f33cfb73020f3b8d1178ac973c091bb59160098168",
+      "exitCode": 0
+    },
+    {
+      "fixture": "removed-last",
+      "phase": "original-export",
+      "status": "UNKNOWN",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.04837721399962902,
+      "inputSha256": "29b4c623b0fa6692e90e7ae75a4b5be0d0d5c0f4569613552ed303ef93ebcae8",
+      "outputSha256": "91753c816b3fae230ed04212e39df55f619ce597894d35a359581c2aaa90a2d8",
+      "exitCode": 0
+    },
+    {
+      "fixture": "removed-last",
+      "phase": "native-lowered-roundtrip",
+      "status": "UNKNOWN",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.05101775600633118,
+      "inputSha256": "3dfe35a2d67f626ba0c449deecb45df34f4bd03fecf1079cc9212e4ce1eb066f",
+      "outputSha256": "5f238b6afd1296efb1442fe40d33ca46ea8110c600ed04f8972472249ec89c31",
+      "exitCode": 0
+    },
+    {
+      "fixture": "review-mandatory",
+      "phase": "original-export",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.04897029499989003,
+      "inputSha256": "7fed828f96d033b4332ba3d52e422e5a9a59b87fdcfc0a273bc13da86609005e",
+      "outputSha256": "db7193350f2e392d76583f7aec29975c26a87f311cab06e6684ef5f7550f2f9c",
+      "exitCode": 0
+    },
+    {
+      "fixture": "review-mandatory",
+      "phase": "native-lowered-roundtrip",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.04913098800170701,
+      "inputSha256": "0021016f51662edafc0987e3405a4adb5584d3f52243cfcc03fc9a1373ecc6e5",
+      "outputSha256": "cc8c6d546fbc9693ae620eaf777f3d976e7650b25434c57005fe92a5f697ccfe",
+      "exitCode": 0
+    },
+    {
+      "fixture": "review-mapping",
+      "phase": "original-export",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.05312855000374839,
+      "inputSha256": "da48dd429abb99d9ee4884619cc5a432f16347c1aee9e507bc3a0f76c9e1cb52",
+      "outputSha256": "6f7be9143d7cdcbb14cb036c7232fdbb48b99a424729d06d2c5d89ad35b3abae",
+      "exitCode": 0
+    },
+    {
+      "fixture": "review-mapping",
+      "phase": "native-lowered-roundtrip",
+      "status": "SUPPORTED",
+      "exactOfficialNixJsonMatch": true,
+      "seconds": 0.04775044599955436,
+      "inputSha256": "7ccd182b45f7f540c7b69f7cac5fd1cacf63ddde9b52cbbb1f994f3316851e97",
+      "outputSha256": "c96433311d96d6b9bd5e124803451216f7e56113e78359a93e30ff081018db5b",
+      "exitCode": 0
+    }
+  ],
+  "ontology": null,
+  "semantics": "positive-scalar-Horn first-proof; UNKNOWN is absence of proof, not refutation",
+  "adapterSha256": "e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c",
+  "nativeProcessBounds": {
+    "wallSeconds": 45,
+    "addressSpaceBytes": 8589934592,
+    "OSIsolationClaim": false
+  },
+  "proofScope": "Actual registered KIF/SUMO parse/verifiers/lowering/run-mlir plus fixed adapter evaluation on native mlnix; not full SUMO, general logic, model/ontology downloads or production runner integration",
+  "artifactSha256": {
+    "build-settings.json": "244580e3abd616988cd23c706dbd012043100b11d2feb2a65fae53d1aba222ad",
+    "build-result.json": "c4c63a5d90cde8e9b7fa20add7847d2aff863c9a8c494220942646601133b39e",
+    "sdk-package-manifest.json": "931b4b7287b811dacba7a5b41015f1841adbf50cfd6366283b7a21babf1e82cf",
+    "sdk-relocations.json": "78d506cddb830eef05e522786434dbdf6d7c2e99695945b9a872856aeb1fbacb",
+    "native-versions.json": "6541f5792ad78a46a2321cf1687bdd75cdafd7b19d4393334677c79ac818f376",
+    "native-fixture-results.json": "8ce262a6de99bbe42a59ce9b8c55bce45aa75a98f1422803a9c3ef701e714165",
+    "native-solver-results.json": "5b2a653f8a2735c9083d9ff734f0599daacd3a42330ceff61c9e819a417afa4f",
+    "upstream-kif-tests.log": "93e33486d7a4aa6ee27558243a81cee54b32eca380112ce5420148ce5227d42d",
+    "upstream-all-mlir-tests.log": "bf86d0378a89dae4a8ae9b7822cdbb11f200f90282d6adce25d281f6e55a878c",
+    "source/tools/mlnix-opt.cpp": "a86d9937d34007bce012cdb2bf5c8bb5ba68677b44080d79f8c38d3460e3a17f",
+    "source/lib/Dialect/KifDialect.cpp": "635915d52e9df4033c53a443f28fd8b3ed1e64d469a598b7bb69eb21efcbfc25",
+    "source/lib/Dialect/SumoDialect.cpp": "93a6a85bfcf8d76bfe216509961d98aa608cb53650609ee0b8ef9cf049bd971c"
+  },
+  "bridgeSourceCommit": "71f525d797b68567187a0a38617dc134b1381e33",
+  "assertedLeafWitnessMode": "any-one-asserted-source",
+  "assertedLeavesVerified": 24
+}

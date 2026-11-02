@@ -52,3 +52,9 @@ retains parsed/lowered MLIR and actual JSON; solver-results/ retains native and
 official oracle outputs. provision.py, build.py, validate.py and solve.py retain
 the concrete method; build settings, signed metadata, packages and SDK relocation
 manifests retain provenance. The actual compiled tools are under build/bin/.
+
+Tracked sanitized evidence: docs/evidence/native-kif-validation-20261102.json.
+Final bridge source71f525d797b68567187a0a38617dc134b1381e33; adapter SHA256
+e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c.
+All14 comparisons were rerun after the asserted-source witnessMode annotation.
+Read-only next-slice assessment: docs/native-horn-query-feasibility.txt.
