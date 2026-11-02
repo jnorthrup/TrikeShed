@@ -2,6 +2,9 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.platform.HostSystem
 import borg.trikeshed.module.ModuleContext
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.job.fileIoContext
+import kotlinx.coroutines.withContext
 
 /**
  * JVM wiring for the daemon's LCNC store legos (PromptNodes/PromptStore/
@@ -11,6 +14,31 @@ import borg.trikeshed.module.ModuleContext
  * Called from the daemon with resolved jvm values.
  */
 object OroborosLcncWiring {
+    /** Only the operator's startup environment selects native code; request bodies cannot. */
+    suspend fun documentReview(
+        context: ModuleContext,
+        corpus: ProjectCorpus,
+        books: borg.trikeshed.narsese.ConstellationNodes,
+    ): borg.trikeshed.forge.server.DocumentReviewWire {
+        val files = checkNotNull(context.scope.coroutineContext[FileOperations])
+        val native = nativeHorn(files, HostSystem.getenv("TRIKESHED_NATIVE_HORN_PROFILE"))
+        return borg.trikeshed.forge.server.DocumentReviewWire.open(context, corpus, books, native)
+    }
+
+    internal suspend fun nativeHorn(files: FileOperations, config: String?): NativeHornQuery? {
+        if (config == null) return null
+        require(config.isNotBlank() && java.nio.file.Path.of(config).isAbsolute) {
+            "TRIKESHED_NATIVE_HORN_PROFILE requires an absolute operator configuration path"
+        }
+        return withContext(fileIoContext) {
+            val path = files.canonicalPath(config)
+            val bytes = NativeHornProfile.boundedRead(files, path, 16 * 1024)
+            val profile = NativeHornProfile.parse(bytes.decodeToString(throwOnInvalidSequence = true))
+            profile.check(files)
+            NativeHornQuery(profile)
+        }
+    }
+
     suspend fun lcncStores(
         moduleContext: ModuleContext,
         promptStore: borg.trikeshed.lcnc.PromptStore,

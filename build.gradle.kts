@@ -730,6 +730,18 @@ tasks.withType<Test>().configureEach {
 }
 
 tasks.named<Test>("jvmTest") {
+    // Native integration is explicit; SDK paths and content pins are test inputs, never credentials.
+    val nativeTest = listOf("mlnix", "mlnix.sha256", "adapter", "datalog").associateWith { field ->
+        val name = "trikeshed.native.$field"
+        providers.gradleProperty(name).orElse(providers.systemProperty(name)).orNull
+    }
+    nativeTest.forEach { (field, value) -> if (value != null) systemProperty("trikeshed.native.$field", value) }
+    for (field in listOf("mlnix", "adapter")) nativeTest[field]?.let { path ->
+        inputs.file(path).withPropertyName("native.$field").withPathSensitivity(PathSensitivity.NONE)
+    }
+    nativeTest["datalog"]?.let { path ->
+        inputs.file("$path/datalog.nix").withPropertyName("native.datalog").withPathSensitivity(PathSensitivity.NONE)
+    }
     // The manual-browser tests (any *_UI=1 gate) serve the compiled bundles from the classpath; no other test
     // reads one, so only an opted-in run depends on the JS build. -PkotlinJsBundles forces it.
     val serveBundles = System.getenv().any { (name, value) -> name.endsWith("_UI") && value == "1" } ||
