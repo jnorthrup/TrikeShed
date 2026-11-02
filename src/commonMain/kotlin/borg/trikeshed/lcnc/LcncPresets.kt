@@ -47,6 +47,20 @@ object LcncPresets {
     /** The offered prefabs, described for the person adopting them. */
     fun catalog(): List<LcncPresetInfo> = listOf(
         LcncPresetInfo(
+            "preset-finance-reconcile", "Compare financial records",
+            does = "Compares signed amounts in two project documents and flags exact or uncertain counterparts.",
+            needs = "A mounted project with bank and expenditure tables, a declared account, currency and decimal precision.",
+            see = "Exact totals, review candidates and the original cells supporting each result.",
+            tweakFirst = "The mounted project on each document reader, then the account identifier.",
+        ),
+        LcncPresetInfo(
+            "preset-kif-structure", "Inspect formula structure",
+            does = "Shows the nesting and variable scope of a symbolic expression without asserting it as a fact.",
+            needs = "Nothing; a sample expression is included.",
+            see = "A structured expression, bound variables and any constructs without an execution backend.",
+            tweakFirst = "The expression text.",
+        ),
+        LcncPresetInfo(
             "preset-sparql-quad", "Explore quads with SPARQL",
             does = "Draws a read-only graph pattern for subjects, predicates and objects.",
             needs = "A selected local query dataset; an empty dataset returns no rows.",
@@ -391,6 +405,8 @@ object LcncPresets {
 
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
+        "preset-finance-reconcile" to financeReconcile(),
+        "preset-kif-structure" to kifStructure(),
         "preset-sparql-quad" to LcncProgramConfix.toJson(LcncProgram("sparql-quad", _l[
             LcncNode("select", SparqlGraph.SELECT, x = 560.0, y = 160.0),
             LcncNode("subject", SparqlGraph.VARIABLE, _m["name" j "?subject", "ord" j "0"], x = 40.0, y = 40.0),
@@ -440,6 +456,33 @@ object LcncPresets {
     // CouncilProgram.build(DEFAULT_3x5) verbatim — byte-identical to what
     // the pure council.convene node emits for an empty config
     // (CouncilPresetIdentityTest pins the identity in both directions).
+    private fun financeReconcile(): String = LcncProgramConfix.toJson(LcncProgram(
+        name = "preset-finance-reconcile",
+        nodes = s_[
+            LcncNode("instructions", "note", _m["text" j
+                "Choose the same mounted project on both readers. Files require id, account, reference, currency, date and amount columns. Amounts are signed decimal strings; no sign conversion or currency exchange is performed. Results are candidates for review."], x = 40.0, y = 40.0),
+            LcncNode("bank", ProjectNodes.READ, _m["project" j "", "id" j "bank.csv", "maxChars" j "1048576"], x = 40.0, y = 260.0),
+            LcncNode("expenditure", ProjectNodes.READ, _m["project" j "", "id" j "expenditure.csv", "maxChars" j "1048576"], x = 400.0, y = 260.0),
+            LcncNode("compare", FinanceNodes.RECONCILE, _m["currency" j "USD", "scale" j "2", "accountScope" j "operating",
+                "includeDate" j "true", "policyId" j "finance.exact.v1"], x = 780.0, y = 260.0),
+            LcncNode("result", "display", x = 1160.0, y = 260.0),
+        ],
+        wires = s_[LcncWire("bank", "doc", "compare", "bank"), LcncWire("expenditure", "doc", "compare", "expenditure"),
+            LcncWire("compare", "report", "result", "x")],
+        view = LcncView(x = 20.0, y = 20.0, zoom = 0.8), seq = 6,
+    ))
+
+    private fun kifStructure(): String = LcncProgramConfix.toJson(LcncProgram(
+        name = "preset-kif-structure",
+        nodes = s_[
+            LcncNode("expression", "text.value", _m["value" j "(forall (?x) (=> (instance ?x Human) (instance ?x Mammal)))"], x = 40.0, y = 80.0),
+            LcncNode("inspect", KifNodes.INSPECT, x = 430.0, y = 80.0),
+            LcncNode("result", "display", x = 830.0, y = 80.0),
+        ],
+        wires = s_[LcncWire("expression", "value", "inspect", "text?"), LcncWire("inspect", "formula", "result", "x")],
+        view = LcncView(x = 20.0, y = 20.0, zoom = 1.0), seq = 4,
+    ))
+
     private fun council(): String =
         LcncProgramConfix.toJson(CouncilProgram.build(CouncilConfig.DEFAULT_3x5))
 

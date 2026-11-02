@@ -25,6 +25,7 @@ object OroborosLcncWiring {
             HostSystem.err("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${'$'}{promptStore.list().size} on the board")
         }
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.FinanceNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { borg.trikeshed.platform.HostSystem.currentTimeMillis() })
     }
 }

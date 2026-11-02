@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
+
 /** Port contract shared by every LCNC surface. Browser code may render this value,
  *  but it must never invent compatibility rules. */
 data class LcncPortContract(
@@ -435,6 +437,23 @@ object LcncContracts {
                 "id" to LcncPortContract.LcncParamSpec(ph = "the document's path in it, when no document is wired"),
                 "maxChars" to LcncPortContract.LcncParamSpec(v = "65536"),
             )),
+        LcncPortContract(FinanceNodes.RECONCILE, "exact financial reconciliation candidates",
+            _l["bank", "expenditure"], _l["report", "rows", "complete", "status"],
+            inputKinds = _m["bank" j ProjectDoc.KIND, "expenditure" j ProjectDoc.KIND],
+            outputKinds = _m["report" j "json", "rows" j "json", "complete" j "json", "status" j "text"],
+            params = _m[
+                "currency" j LcncPortContract.LcncParamSpec(v = "USD", ph = "declared currency code"),
+                "scale" j LcncPortContract.LcncParamSpec(v = "2", ph = "decimal places, without rounding"),
+                "accountScope" j LcncPortContract.LcncParamSpec(ph = "exact account identifier in both files"),
+                "includeDate" j LcncPortContract.LcncParamSpec(v = "true", opts = _l["true", "false"]),
+                "policyId" j LcncPortContract.LcncParamSpec(v = "finance.exact.v1"),
+            ]),
+        LcncPortContract(KifNodes.INSPECT, "KIF syntax and variable scope",
+            _l["text?"], _l["formula", "text", "sourceCid", "canonical", "freeVariables", "unsupportedForms", "status"],
+            inputKinds = _m["text" j "text"],
+            outputKinds = _m["formula" j "json", "text" j "text", "sourceCid" j "id", "canonical" j "text",
+                "freeVariables" j "json", "unsupportedForms" j "json", "status" j "text"],
+            params = _m["kif" j LcncPortContract.LcncParamSpec(ta = true, ph = "one KIF formula; inspection does not assert a fact")]),
         LcncPortContract(ProjectNodes.NOTES, "a document's curation notes: `key: value` conventions (work, edition, date, …) and prose the reading is held to",
             listOf("doc?", "project?", "id?"), listOf("text", "cid", "found", "conventions", "prose"),
             inputKinds = mapOf("doc" to ProjectDoc.KIND, "project" to "id", "id" to "id"),

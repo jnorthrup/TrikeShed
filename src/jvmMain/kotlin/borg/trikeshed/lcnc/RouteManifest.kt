@@ -70,6 +70,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/snapshots/{cid}", "one snapshot's canonical bytes, cid-verified"),
             RouteEntry("GET", "/api/projects/{name}/docs", "a mounted project's document listing (prefix, glob, limit)"),
             RouteEntry("GET", "/api/projects/{name}/docs/{id}", "one project document: text, cid, rev, seq, and the miner's extract twin"),
+            RouteEntry("POST", "/api/projects/{name}/docs/{id}/retain-source", "retain a selected primary TXT/MD source revision for review; requires exact cid/rev/seq"),
             RouteEntry("PUT", "/api/projects/{name}/notes/{id}", "curation notes beside a document (`key: value` conventions + prose), read by project.notes and book.curate"),
             RouteEntry("GET", "/api/projects/{name}/recognize/{id}", "what one document is before ingest: bytes, type, text layer or OCR, pages, sampled columns per page, ingested yet"),
             RouteEntry("POST", "/api/projects/{name}/ingest/{id}", "ingest one document by hand: its text lands as the extract twin (text layer in column order, else OCR)"),
