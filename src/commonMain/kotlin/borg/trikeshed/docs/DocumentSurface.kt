@@ -20,7 +20,8 @@ import borg.trikeshed.wiki.WikiSurface
  */
 data class ProjectRow(val name: String, val kind: String, val docs: Int, val path: String)
 
-data class DocRow(val id: String, val cid: String, val rev: String, val seq: Long, val length: Long, val contentType: String)
+data class DocRow(val id: String, val cid: String, val rev: String, val seq: Long, val length: Long, val contentType: String,
+    val contentStatus: String? = null)
 
 data class DocRevision(val project: String, val id: String, val cid: String, val rev: String, val seq: Long)
 
@@ -154,12 +155,14 @@ object DocumentSurface {
                 seq = (m["seq"] as? Number)?.toLong() ?: -1L,
                 length = (m["length"] as? Number)?.toLong() ?: 0L,
                 contentType = m["contentType"]?.toString().orEmpty(),
+                contentStatus = m["contentStatus"] as? String,
             )
         }
     }
 
     fun document(json: Any?): DocView? {
         val m = json as? Map<*, *> ?: return null
+        if (m["error"] != null) return null
         val id = m["id"]?.toString() ?: return null
         return DocView(
             project = m["project"]?.toString().orEmpty(),
@@ -176,6 +179,15 @@ object DocumentSurface {
             extractionRevision = revision(m["extractionRevision"]),
         )
     }
+
+    fun documentError(json: Any?): String? {
+        val error = (json as? Map<*, *>)?.get("error") as? String ?: return null
+        return if (error == "source_unavailable_or_changed")
+            "Document unavailable or changed; its listed metadata has not been verified."
+        else "Document unavailable: $error"
+    }
+
+    fun documentErrorHtml(error: String): String = "<p class=\"ds-empty\">" + esc(error) + "</p>"
 
     // ── curation: /api/documents and /api/documents/curate ─────────────────
 
@@ -548,7 +560,9 @@ object DocumentSurface {
             append("<li><a class=\"ds-page").append(if (d.id == selectedId) " ds-selected" else "").append('"')
             if (d.id == selectedId) append(" aria-current=\"true\"")
             append(" href=\"#").append(esc(project)).append('/').append(esc(d.id))
-            append("\" data-doc=\"").append(esc(d.id)).append("\" title=\"").append(esc(d.cid)).append("\">")
+            append("\" data-doc=\"").append(esc(d.id)).append("\" title=\"")
+            if (d.contentStatus == "unchecked-metadata") append("Unchecked metadata: ")
+            append(esc(d.cid)).append("\">")
             append("<span class=\"ds-ico\">").append(if (isMarkdownName(d.id)) "▤" else "▢").append("</span>")
             append("<span class=\"ds-name\">").append(esc(d.id)).append("</span></a></li>")
         }
@@ -609,6 +623,8 @@ object DocumentSurface {
         append("<div class=\"ds-page ds-page-wide\"><h1 class=\"ds-title\">").append(esc(project)).append("</h1>")
         append("<p class=\"ds-sub\">").append(rows.size).append(if (rows.size == 1) " page" else " pages")
         append(" · <a href=\"").append(DIGEST_HREF).append("\">Digest this workspace in the harness</a></p>")
+        if (rows.any { it.contentStatus == "unchecked-metadata" })
+            append("<p class=\"ds-sub\">Some listed CIDs are unchecked metadata; opening a document verifies its bytes when available.</p>")
         if (rows.isEmpty()) { append("<p class=\"ds-empty\">No pages yet.</p></div>"); return@buildString }
         append("<table class=\"ds-table\"><thead><tr>")
         for (c in DocColumn.entries) {
@@ -628,7 +644,9 @@ object DocumentSurface {
             append("<td class=\"ds-dim\">").append(esc(d.contentType)).append("</td>")
             append("<td class=\"ds-num\">").append(bytes(d.length)).append("</td>")
             append("<td class=\"ds-num\">").append(d.seq).append("</td>")
-            append("<td class=\"ds-cid\" title=\"").append(esc(d.cid)).append("\">").append(esc(shortCid(d.cid))).append("</td>")
+            append("<td class=\"ds-cid\" title=\"").append(esc(d.cid)).append("\">").append(esc(shortCid(d.cid)))
+            if (d.contentStatus == "unchecked-metadata") append(" <span class=\"ds-dim\">(unchecked metadata)</span>")
+            append("</td>")
             append("</tr>")
         }
         append("</tbody></table></div>")
