@@ -80,6 +80,7 @@ class CurationReviewedReadTest {
                 val facts = input["facts"] as List<*>
                 assertFalse(facts.any { (it as List<*>).first() == "subclass" }, "Norm content is never asserted as world taxonomy")
                 assertTrue(facts.any { (it as List<*>).first() == "selectionModality" })
+                assertTrue(facts.any { (it as List<*>).first() == "selectionOntologyMapping" })
                 assertEquals(before, f.log.frames.size, "Export must not consume or append review authority")
             }
             read(approved)
