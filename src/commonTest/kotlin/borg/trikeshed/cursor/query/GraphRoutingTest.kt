@@ -45,4 +45,36 @@ class GraphRoutingTest {
         assertEquals(4, routed.size)
         assertEquals(rows(boxed.facet(stage)), rows(routed))
     }
+
+    @Test fun anExplicitDatasetMakesItsUnspecifiedGraphSetEmpty() {
+        val quads = QuadStore()
+            .add("<urn:s1>", "<urn:p>", "<urn:o1>", "<urn:g1>")
+            .add("<urn:s2>", "<urn:p>", "<urn:o2>", "<urn:g2>")
+        val routed = quads.scan()
+        val boxed: Cursor = routed.size j { i: Int -> routed[i] }
+
+        fun check(query: String, expected: List<List<String>>, defaults: List<String> = emptyList(), named: List<String> = emptyList()) {
+            val parsed = SparqlQuery.parse(query, defaults, named)
+            assertEquals(expected, rows(parsed.plan(routed)), "routed: $query")
+            assertEquals(expected, rows(parsed.plan(boxed)), "boxed: $query")
+        }
+
+        // No dataset specification keeps this engine's union and all-named defaults.
+        check("SELECT ?s WHERE { ?s <urn:p> ?o }", _l[_l["<urn:s1>"], _l["<urn:s2>"]])
+        check("SELECT ?g WHERE { GRAPH ?g { ?s <urn:p> ?o } }", _l[_l["<urn:g1>"], _l["<urn:g2>"]])
+
+        // Either FROM form supplies the whole dataset, including an empty opposite side.
+        check("SELECT ?s FROM NAMED <urn:g1> WHERE { ?s <urn:p> ?o }", emptyList())
+        check("SELECT ?g FROM NAMED <urn:g1> WHERE { GRAPH ?g { ?s <urn:p> ?o } }", _l[_l["<urn:g1>"]])
+        check("SELECT ?s FROM <urn:g1> WHERE { ?s <urn:p> ?o }", _l[_l["<urn:s1>"]])
+        check("SELECT ?g FROM <urn:g1> WHERE { GRAPH ?g { ?s <urn:p> ?o } }", emptyList())
+        check("SELECT ?s FROM <urn:g1> FROM NAMED <urn:g2> WHERE { ?s <urn:p> ?o }", _l[_l["<urn:s1>"]])
+        check("SELECT ?g FROM <urn:g1> FROM NAMED <urn:g2> WHERE { GRAPH ?g { ?s <urn:p> ?o } }", _l[_l["<urn:g2>"]])
+
+        // A protocol dataset replaces both sides of any dataset specified in the query.
+        check("SELECT ?s FROM <urn:g1> WHERE { ?s <urn:p> ?o }", emptyList(), named = _l["urn:g2"])
+        check("SELECT ?g FROM <urn:g1> WHERE { GRAPH ?g { ?s <urn:p> ?o } }", _l[_l["<urn:g2>"]], named = _l["urn:g2"])
+        check("SELECT ?s FROM NAMED <urn:g2> WHERE { ?s <urn:p> ?o }", _l[_l["<urn:s1>"]], defaults = _l["urn:g1"])
+        check("SELECT ?g FROM NAMED <urn:g2> WHERE { GRAPH ?g { ?s <urn:p> ?o } }", emptyList(), defaults = _l["urn:g1"])
+    }
 }

@@ -2,6 +2,7 @@ package borg.trikeshed.hermes
 
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.parse.confix.*
 
 import borg.trikeshed.cursor.BudgetCoord
@@ -24,7 +25,9 @@ import borg.trikeshed.narsese.TermIdentity
 import borg.trikeshed.ontology.zipper.PlaneAdapters
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import borg.trikeshed.agent.modelmux.*
 import borg.trikeshed.agent.modelmux.acp.*
@@ -49,12 +52,13 @@ import kotlin.time.TimeSource
  *     not a claim that the consumer has processed or persisted the belief.
  *     Guest self-assertions are CLAMPED to unit evidence.
  *
- * Verbs (≤8, admission per verb):
+ * Verbs (admission per verb):
  *  - mux_catalog : current model ids/capabilities/default, never credentials or endpoints.
  *  - mux_converse : ModelMux.chat — NEVER a KeyMux+Htx bypass; lease-gated,
  *                   typed refusal {verdict:"lease-exhausted"|"no-mux"}.
  *  - mux_completion : complete JSON conversation through ModelMux.completion;
  *                     JSON text crosses without traversing arbitrary guest objects.
+ *  - mux_breadcrumb : dispatch a bounded breadcrumb tool within a retained session.
  *  - bag_recall   : hamming recall around a goal coordinate.
  *  - bag_assert   : mint a belief (evidence clamped to 1 unit, OBSERVATION receipt).
  *  - crumb_walk   : skill backchain; returns picks WITH their crumb trails.
@@ -77,6 +81,10 @@ class HermesPen(
     private val modelMuxProvider: suspend () -> ModelMux? = { modelMux },
     /** Host-owned command identity; the guest cannot supply receipt attribution. */
     private val contextId: () -> String? = { null },
+    /** Host-owned breadcrumb session for this pen; null disables session access. */
+    private val breadcrumbSession: () -> String? = { null },
+    /** When supplied, the immutable generation owns and drains model and breadcrumb crossings. */
+    private val breadcrumbGeneration: BreadcrumbGeneration? = null,
 ) {
     companion object {
         const val MODEL_WALL_MILLIS = 300_000L
@@ -88,7 +96,8 @@ class HermesPen(
     fun install(guest: GuestIsolate, sockets: PythonSocketProvider? = null) {
         guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
         guest.delegate("mux_converse", MODEL_WALL_MILLIS) { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { muxConverse(args, cause) } } }
-        guest.delegate("mux_completion", MODEL_WALL_MILLIS) { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { muxCompletion(args, cause) } } }
+        guest.delegate("mux_completion", MODEL_WALL_MILLIS) { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { admitted { muxCompletion(args, cause) } } } }
+        guest.delegate("mux_breadcrumb") { args -> receipted("mux_breadcrumb", args) { runBlocking(muxContext) { admitted { muxBreadcrumb(args) } } } }
         guest.delegate("bag_recall") { args -> receipted("bag_recall", args) { bagRecall(args) } }
         guest.delegate("bag_assert") { args -> receipted("bag_assert", args) { bagAssert(args) } }
         guest.delegate("crumb_walk") { args -> receipted("crumb_walk", args) { crumbWalk(args) } }
@@ -168,6 +177,12 @@ class HermesPen(
 
     private fun str(args: List<Teleported>, i: Int): String? = (args.getOrNull(i) as? Teleported.Str)?.v
 
+    private suspend fun <T> admitted(operation: suspend () -> T): T = breadcrumbGeneration?.execute {
+        withContext(muxContext.minusKey(Job)) { operation() }
+    } ?: operation()
+
+    private fun boundBreadcrumbSession(): String? = breadcrumbGeneration?.session ?: breadcrumbSession()
+
     // ── verbs ─────────────────────────────────────────────────────────
 
     private suspend fun muxCatalog(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
@@ -206,12 +221,29 @@ class HermesPen(
             if (value.length > 128) return refusal("bad-args", "mux_completion session exceeds 128 characters")
             value.takeIf { it.isNotBlank() }
         } else null
+        val request = try {
+            require(reifyStrict(json) is Map<*, *>) { "completion must be a JSON object" }
+            confixDoc(json).also { doc ->
+                BreadcrumbModelHost.objectProjection(doc, requireNotNull(doc.root), emptyMap())
+            }
+        } catch (_: Exception) { return refusal("bad-args", "completion must be a JSON object without duplicate fields") }
+        val contextField = request.getAt("breadcrumb_context")
+        val requestedContext = if (contextField != null) {
+            (request.value("breadcrumb_context") as? String)?.takeIf { it.isNotBlank() && it.length <= 128 }
+                ?: return refusal("bad-args", "breadcrumb context must be a nonempty session")
+        } else null
+        if (session != null || requestedContext != null) {
+            val bound = boundBreadcrumbSession()?.takeIf { it.isNotBlank() && it.length <= 128 }
+                ?: return refusal("no-context", "no breadcrumb session bound to this pen")
+            if (session != null && session != bound || requestedContext != null && requestedContext != bound)
+                return refusal("forbidden", "breadcrumb session is not bound to this pen")
+            if (muxContext[BreadcrumbElement] == null) return refusal("no-breadcrumbs")
+        }
         val admittedTimeout = timeout.coerceAtMost(MODEL_WALL_MILLIS - 5_000L)
         val started = TimeSource.Monotonic.markNow()
         return withTimeout(admittedTimeout) {
             val mux = modelMuxProvider() ?: return@withTimeout refusal("no-mux", "model plane not leased to this pen")
             val remaining = (admittedTimeout - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L)
-            val request = confixDoc(json)
             val breadcrumbs = muxContext[BreadcrumbElement]
             val result = if (breadcrumbs != null && (session != null || request.getAt("breadcrumb_context") != null))
                 BreadcrumbModelHost(mux, breadcrumbs).completion(modelId, request,
@@ -222,6 +254,36 @@ class HermesPen(
                 onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
             )
         }
+    }
+
+    /** Guest session names are checked against the pen's host-owned session binding. */
+    private suspend fun muxBreadcrumb(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
+        if (args.size != 3) return refusal("bad-args", "mux_breadcrumb(session, tool, argumentsJson)")
+        val session = str(args, 0)?.takeIf { it.isNotBlank() && it.length <= 128 }
+            ?: return refusal("bad-args", "breadcrumb session required")
+        val bound = boundBreadcrumbSession()?.takeIf { it.isNotBlank() && it.length <= 128 }
+            ?: return refusal("no-context", "no breadcrumb session bound to this pen")
+        if (session != bound) return refusal("forbidden", "breadcrumb session is not bound to this pen")
+        val tool = str(args, 1)?.takeIf { it in BREADCRUMB_TOOLS_NAMES }
+            ?: return refusal("bad-args", "unknown breadcrumb tool")
+        val json = str(args, 2) ?: return refusal("bad-args", "breadcrumb arguments required")
+        if (json.length > 4096) return refusal("bad-args", "breadcrumb arguments too large")
+        val parsed = try { reifyStrict(json) as? Map<*, *> } catch (_: Exception) { null }
+            ?: return refusal("bad-args", "breadcrumb arguments must be a JSON object")
+        if (parsed.keys.any { it !is String } || parsed.values.any { it !is String && it !is Number })
+            return refusal("bad-args", "breadcrumb arguments must be scalar")
+        val contexts = muxContext[BreadcrumbElement] ?: return refusal("no-breadcrumbs")
+        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
+        return try {
+            contexts.transact(session, create = false) { memory ->
+                val ceiling = memory.submission?.model?.let(mux::contextWindow)?.takeIf { it > 0 } ?: 2048
+                val budget = BreadcrumbBudget(ceiling, currentTokens = memory.lastTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
+                val result = BreadcrumbToolDispatcher(memory, budget).dispatch(tool,
+                    parsed.entries.associate { it.key.toString() to it.value.toString() })!!
+                if (result.length > budget.chars) refusal("context-budget", "breadcrumb result exceeds remaining context")
+                else true j mapOf("verdict" to "ok", "content" to result)
+            }
+        } catch (_: BreadcrumbContextNotFoundException) { refusal("no-context", "breadcrumb session not found") }
     }
 
     private fun bagRecall(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {

@@ -19,7 +19,10 @@ import java.io.File
 object DescribePresetCli {
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        val name = args.getOrNull(1) ?: "preset-describe"
+        val legacy = "--legacy-promote" in args
+        val positional = args.filterNot { it == "--legacy-promote" }
+        require(positional.isNotEmpty()) { "Usage: DescribePresetCli [--legacy-promote] <profile> [preset] [forge-home]" }
+        val name = positional.getOrNull(1) ?: "preset-describe"
         val program = LcncProgramConfix.fromJson(name, LcncPresets.all().getValue(name))
         val violations = LcncTypeCheck.check(program)
         println("[check] ${violations.size} violations" + violations.joinToString("") { "\n  $it" })
@@ -31,19 +34,19 @@ object DescribePresetCli {
         runners[borg.trikeshed.lcnc.LcncContracts.WIKI_PROPOSE] = LcncNodeRunner { _, inputs ->
             mapOf("report" to mapOf("dialog" to "none (describePreset)", "summaryChars" to ((inputs["summary"] ?: inputs["summary?"]) as? String)?.length))
         }
-        runners[SkillCurateNode.TYPE] = SkillCurateNode.runner(File(args[0])) { bank.assertKif(it) }
-        runners[SkillOverlapNode.TYPE] = SkillOverlapNode.runner(File(args[0])) { bank.assertKif(it) }
-        runners[NormClausesNode.TYPE] = NormClausesNode.runner { bank.assertKif(it) }
+        runners[SkillCurateNode.TYPE] = SkillCurateNode.runner(File(positional[0])) { bank.assertKif(it) }
+        runners[SkillOverlapNode.TYPE] = SkillOverlapNode.runner(File(positional[0])) { bank.assertKif(it) }
+        runners[NormClausesNode.TYPE] = if (legacy) NormClausesNode.legacyRunner({ bank.assertKif(it) }) else NormClausesNode.runner()
         // args[2]: a forge home whose wiki `wiki.read` reads; constellations always go to a fresh scratch dir.
         val state = File(System.getProperty("java.io.tmpdir"), "describe-preset").apply { deleteRecursively(); mkdirs() }
-        args.getOrNull(2)?.let { home -> File(home, "wiki").takeIf { it.isDirectory }?.copyRecursively(File(state, "wiki")) }
+        positional.getOrNull(2)?.let { home -> File(home, "wiki").takeIf { it.isDirectory }?.copyRecursively(File(state, "wiki")) }
         ConstellationNodes(state,
             borg.trikeshed.graal.ConfixBlackboard.empty(), bank).register(runners)
         val board = borg.trikeshed.kanban.BoardStoreElement(null, borg.trikeshed.job.CasStore.inMemory(), clock = { System.currentTimeMillis() })
         board.open()
         runners.putAll(borg.trikeshed.lcnc.LcncKanbanExperience(board).registry())
         ClassRuleLane().use { lane ->
-            runners[NlRulesNode.TYPE] = NlRulesNode.runner(lane) { bank.assertKif(it) }
+            runners[NlRulesNode.TYPE] = if (legacy) NlRulesNode.legacyRunner(lane) { bank.assertKif(it) } else NlRulesNode.runner(lane)
             val out = kotlinx.coroutines.withContext(board) { LcncRunner(runners).runAll(program) }
             for ((id, o) in out) println("[$id] " + o.entries.joinToString { (k, v) -> "$k=${v.toString().take(900)}" })
         }

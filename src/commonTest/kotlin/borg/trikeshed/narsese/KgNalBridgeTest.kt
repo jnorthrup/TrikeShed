@@ -23,7 +23,7 @@ class KgNalBridgeTest {
     }
 
     @Test
-    fun causalPredicatesBecomeImplicationWithCausality() {
+    fun temporalPredicatesAreNotPromotedToCausalImplications() {
         val turtle = """
             ex:smoking ex:causes ex:cancer .
             ex:lightning ex:precedes ex:thunder .
@@ -32,13 +32,12 @@ class KgNalBridgeTest {
         val mapped = KgNalBridge.bridge(turtle)
         assertEquals(3, mapped.size)
         assertEquals(NalCopula.IMPLICATION, mapped[0].copula)
-        assertEquals(NalCopula.PREDICTIVE_IMPLICATION, mapped[1].copula)
-        assertEquals(NalCopula.CONCURRENT_IMPLICATION, mapped[2].copula)
-        assertTrue(mapped.all { it.relation == RelationKind.CAUSALITY })
-        // temporal copulas carry temporal signals into the belief
-        val predictive = mapped[1].signal(sourceCid = "sha256:" + "0".repeat(64))
-        assertTrue(predictive.temporal != null, "=/> must carry a temporal signal")
-        assertEquals(TemporalGrade.RELATIVE, predictive.temporal!!.grade)
+        assertEquals(RelationKind.CAUSALITY, mapped[0].relation)
+        for (temporal in mapped.drop(1)) {
+            assertEquals(NalCopula.PRODUCT, temporal.copula)
+            assertEquals(RelationKind.MATCH, temporal.relation)
+            assertTrue(temporal.triplet.predicate in temporal.gloss())
+        }
     }
 
     @Test
@@ -63,7 +62,7 @@ class KgNalBridgeTest {
         assertEquals(NalCopula.INHERITANCE, mapped[0].copula)
         assertEquals(NalCopula.INHERITANCE, mapped[1].copula)
         assertEquals(NalCopula.IMPLICATION, mapped[2].copula)
-        assertEquals(RelationKind.CAUSALITY, mapped[2].relation)
+        assertEquals(RelationKind.MATCH, mapped[2].relation)
         assertEquals(NalCopula.SIMILARITY, mapped[3].copula)
         // nested antecedent survives as its own term text
         assertEquals("(instance ?x Bird)", mapped[2].triplet.subject)

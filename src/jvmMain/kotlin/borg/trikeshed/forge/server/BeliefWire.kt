@@ -14,9 +14,8 @@ import borg.trikeshed.narsese.ingestKg
 import borg.trikeshed.narsese.CuratorImpulseElement
 import borg.trikeshed.narsese.CuratorImpulseKind
 import borg.trikeshed.narsese.Nal
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.narsese.beliefDiagnostics
+import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.ReplayScenario
 import borg.trikeshed.narsese.ReplayTurn
 import borg.trikeshed.narsese.TurnReviewElement
@@ -53,6 +52,7 @@ class BeliefWire(
         return when {
             method == "GET" && p == "/api/beliefs" -> {
                 val top = bag.recallTop(64)
+                val diagnostic = beliefDiagnostics(bag.snapshot().values)
                 val rows = (0 until top.size).map { i ->
                     val (signal, budget) = top[i]
                     mapOf(
@@ -68,7 +68,19 @@ class BeliefWire(
                         "provenanceCid" to signal.provenanceCid,
                     )
                 }
-                json(mapOf("size" to bag.size, "capacity" to bag.capacity, "beliefs" to rows))
+                json(_m["size" j bag.size, "capacity" j bag.capacity, "beliefs" j rows,
+                    "diagnostics" j _m[
+                        "scope" j "non-atomic sampled entries; sampled separately from size and top beliefs",
+                        "snapshotEntries" j diagnostic.snapshotEntries,
+                        "coordinates" j diagnostic.coordinates,
+                        "relations" j diagnostic.relations.mapKeys { it.key.name },
+                        "positiveOnly" j diagnostic.positiveOnly,
+                        "negativeOnly" j diagnostic.negativeOnly,
+                        "mixed" j diagnostic.mixed,
+                        "noEvidence" j diagnostic.noEvidence,
+                        "confidence" j diagnostic.confidence?.let { _m["min" j it.min, "median" j it.median, "max" j it.max] },
+                        "derivations" j null,
+                    ]])
             }
 
             method == "GET" && p == "/api/beliefs/render" -> {

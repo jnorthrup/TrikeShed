@@ -41,21 +41,32 @@ object AppNav {
         fun destinationHref(d: AppDestination): String {
             if (d.id == "board") return d.href
             val saved: dynamic = views[d.id]
+            var href = d.href
             if (jsTypeOf(saved) == "string") {
                 try {
                     val url = URL(saved as String, window.location.origin)
                     if (url.origin == window.location.origin && !url.searchParams.has("example") && AppDestinations.accepts(d, url.pathname)) {
-                        return url.pathname + url.search + url.hash
+                        href = url.pathname + url.search + url.hash
                     }
                 } catch (_: Throwable) {
                 }
             }
-            return d.href
+            if (d.id == "pi" || d.id == "hermes") {
+                val project = if (current.id == "documents") try {
+                    val raw = window.location.hash.removePrefix("#").substringBefore('/')
+                    (js("decodeURIComponent")(raw) as String).takeIf { it.isNotBlank() && it != "curation" }
+                } catch (_: Throwable) { null } else URLSearchParams(window.location.search).get("project")?.takeIf { it.isNotBlank() }
+                if (project != null) {
+                    val url = URL(href, window.location.origin)
+                    url.searchParams.set("project", project)
+                    href = url.pathname + url.search + url.hash
+                }
+            }
+            return href
         }
 
         remember()
         window.addEventListener("pagehide", { remember() })
-        window.addEventListener("hashchange", { remember() })
         window.addEventListener("beforeunload", { event: Event ->
             val harness: dynamic = window.asDynamic().Harness
             if (jsTypeOf(harness) != "undefined" && (harness.dirty == true || (harness.drafts?.size ?: 0) as Int > 0)) {
@@ -70,7 +81,7 @@ object AppNav {
         val brand = document.createElement("a") as HTMLAnchorElement
         brand.className = "application-brand"
         brand.href = destinationHref(AppDestinations.all[0])
-        brand.textContent = "TrikeShed"
+        brand.textContent = "Forge"
         val active = document.createElement("span") as HTMLElement
         active.className = "application-current"
         active.textContent = current.label
@@ -87,6 +98,16 @@ object AppNav {
         button.append(icon)
         val links = document.createElement("div") as HTMLElement
         links.id = "application-links"
+        val primary = document.createElement("div") as HTMLElement
+        primary.id = "application-primary"
+        primary.setAttribute("aria-label", "Workspace")
+        for (d in AppDestinations.primary) {
+            val link = document.createElement("a") as HTMLAnchorElement
+            link.href = destinationHref(d)
+            link.textContent = d.label
+            if (d.id == current.id) link.setAttribute("aria-current", "page")
+            primary.append(link)
+        }
         for (d in AppDestinations.all) {
             val link = document.createElement("a") as HTMLAnchorElement
             link.href = destinationHref(d)
@@ -112,16 +133,21 @@ object AppNav {
         })
         document.addEventListener("pointerdown", { e: Event -> if (!nav.contains(e.target as? Node)) close(false) })
         nav.addEventListener("focusout", { e: Event -> if (!nav.contains((e as FocusEvent).relatedTarget as? Node)) close(false) })
-        nav.append(brand, active, button, links)
+        nav.append(brand, primary, active, button, links)
         document.body!!.prepend(nav)
         callIcons()
         val once: dynamic = js("({once: true})")
         document.addEventListener("DOMContentLoaded", { callIcons() }, once)
-        window.addEventListener("pageshow", {
-            remember()
+        fun refreshLinks() {
             brand.href = destinationHref(AppDestinations.all[0])
             val children = links.children
             for (index in 0 until children.length) (children.item(index) as HTMLAnchorElement).href = destinationHref(AppDestinations.all[index])
+            val primaryChildren = primary.children
+            for (index in 0 until primaryChildren.length) (primaryChildren.item(index) as HTMLAnchorElement).href = destinationHref(AppDestinations.primary[index])
+        }
+        window.addEventListener("hashchange", { remember(); refreshLinks() })
+        window.addEventListener("pageshow", {
+            remember(); refreshLinks()
             close(false)
         })
     }

@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -72,6 +73,27 @@ class TurnReviewElementTest {
         val belief = bag.snapshot().values.single()
         assertEquals(0L, belief.evidence.positive)
         assertEquals(Nal.UNIT, belief.evidence.negative, "failed turn = negative observation")
+        review.drain()
+        bag.drain()
+    }
+
+    @Test
+    fun failedTurnDoesNotInducePositiveAssociationFromSuccessfulCalls() = runBlocking {
+        val bag = BeliefBagElement(capacity = 16)
+        bag.open()
+        val review = TurnReviewElement(bag)
+        review.open()
+        val landed = review.reviewTurn(
+            _l[
+                TurnReviewElement.TurnFact("read", true, "task", "source"),
+                TurnReviewElement.TurnFact("write", true, "task", "result"),
+            ],
+            turnSucceeded = false,
+        )
+        bag.settle()
+        assertEquals(2, landed.size)
+        assertTrue(bag.snapshot().values.all { it.relation != RelationKind.ATTRACTION })
+        assertTrue(bag.snapshot().values.all { it.evidence.positive == 0L })
         review.drain()
         bag.drain()
     }

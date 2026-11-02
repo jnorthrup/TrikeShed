@@ -89,7 +89,7 @@ class ProductionDoctrineTest {
     fun bridgeProducesRulesOnlyThroughExplicitSources() {
         val kifRules = KgNalBridge.bridgeToRules("(=> fire smoke)")
         assertEquals(1, kifRules.size)
-        assertEquals(NalCopula.IMPLICATION, kifRules[0].copula)
+        assertEquals(NalCopula.PRODUCT, kifRules[0].copula, "logical implication must not enter the causal rete")
 
         val sumo = KgNalBridge.emitSumoSpine()
         assertTrue(sumo.size > 0)

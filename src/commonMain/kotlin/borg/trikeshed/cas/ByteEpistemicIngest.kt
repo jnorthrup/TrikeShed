@@ -69,7 +69,7 @@ data class ByteChunk(
     val codeRing8: Int get() = (code ushr 8) and 0xFF
 }
 
-/** A link between two byte chunks: CAUSALITY (adjacent in sequence) or ATTRACTION (schema similarity). */
+/** A structural adjacency or a schema-similarity proposal between byte chunks. */
 data class ByteLink(
     val kind: RelationKind,
     val fromChunk: Int,
@@ -182,9 +182,9 @@ object ByteEpistemicIngest {
     private fun relateChunks(chunks: Series<ByteChunk>): Series<ByteLink> {
         if (chunks.size < 2) return emptySeriesOf()
         val links = ArrayList<ByteLink>()
-        // Causal: adjacent chunks in sequence
+        // Sequence order is structural adjacency, not evidence of causation.
         for (i in 0 until chunks.size - 1) {
-            links += ByteLink(RelationKind.CAUSALITY, i, i + 1, 1.0)
+            links += ByteLink(RelationKind.NEIGHBOR_NEXT, i, i + 1, 1.0)
         }
         // Attraction: schema similarity (O(n^2) but n is chunk count, typically small)
         for (i in 0 until chunks.size) {
@@ -212,20 +212,19 @@ object ByteEpistemicIngest {
         chunks: Series<ByteChunk>,
         provenance: ContentId,
     ): Series<SemanticSignal> {
-        if (links.size == 0) return emptySeriesOf()
-        return links.size j { li ->
-            val link = links[li]
+        // The NARS relation vocabulary has no structural-neighbor relation.
+        // Keep adjacency in links; do not mint it as a belief signal.
+        val similarities = links.view.filter { it.kind == RelationKind.ATTRACTION }
+        if (similarities.isEmpty()) return emptySeriesOf()
+        return similarities.size j { li ->
+            val link = similarities[li]
             val from = chunks[link.fromChunk]
             val to = chunks[link.toChunk]
             val positive = (link.weight.coerceIn(0.0, 1.0) * 1000.0).toLong().coerceAtLeast(1L)
             SemanticSignal(
-                angular = byteAngular(from, to, link.kind),
+                angular = byteAngular(from, to, SemanticRelationKind.ATTRACTION),
                 evidence = EvidenceCoord(positive, 1000L - positive),
-                relation = when (link.kind) {
-                    RelationKind.ATTRACTION -> SemanticRelationKind.ATTRACTION
-                    RelationKind.CAUSALITY -> SemanticRelationKind.CAUSALITY
-                    else -> error("byte ingest emitted non-epistemic link ${link.kind}")
-                },
+                relation = SemanticRelationKind.ATTRACTION,
                 subjectCid = from.cid.hex,
                 objectCid = to.cid.hex,
                 provenanceCid = provenance.hex,
@@ -267,9 +266,9 @@ object ByteEpistemicIngest {
      * COORDINATE the bag keys on. Shape-key simhashes make same-schema links share
      * high bits, so near-identical structures land within small hamming distance.
      */
-    private fun byteAngular(from: ByteChunk, to: ByteChunk, kind: RelationKind): Long =
+    private fun byteAngular(from: ByteChunk, to: ByteChunk, kind: SemanticRelationKind): Long =
         borg.trikeshed.narsese.AngularCodec.encode(
-            relation = SemanticRelationKind.entries[kind.ordinal.coerceIn(0, SemanticRelationKind.entries.size - 1)],
+            relation = kind,
             taxonomyKey = null,
             subjectTerm = from.structuralKey,
             objectTerm = to.structuralKey,

@@ -106,6 +106,8 @@ object RouteManifest {
         "SparqlWire" to listOf(
             RouteEntry("GET", "/sparql", "SPARQL 1.1 protocol: query, default-graph-uri, named-graph-uri; format or Accept picks results JSON, CSV or TSV"),
             RouteEntry("POST", "/sparql", "SPARQL 1.1 protocol by form or application/sparql-query; SPARQL Update INSERT DATA and DELETE DATA by update or application/sparql-update"),
+            RouteEntry("POST", "/sparql/visual", "Read-only LCNC SPARQL syntax graph over the explicitly selected quad-store or quad-store+rete dataset"),
+            RouteEntry("POST", "/sql/visual", "Read-only limited LCNC SQL syntax graph over the quad store"),
             RouteEntry("POST", "/db/{db}/tx/commit", "Neo4j HTTP API: Cypher MATCH statements over the quad store, answered in the results, data, row shape"),
         ),
         "ModuleWire" to listOf(

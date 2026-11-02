@@ -281,12 +281,15 @@ class SparqlParser(val src: String) {
                 else -> fail("unexpected ${peek()} after the WHERE clause")
             }
         }
-        // A protocol dataset replaces the query's own, whole (SPARQL 1.1 Protocol 2.1.4); the query's missing FROM is Virtuoso's union.
+        // A protocol dataset replaces the query's own, whole (SPARQL 1.1 Protocol 2.1.4).
+        // No dataset clauses use the engine's union/all-named default. Once either FROM
+        // form is present, an absent side is an empty graph set, not that default.
         val protocol = defaultGraphUris.isNotEmpty() || namedGraphUris.isNotEmpty()
+        val queryDataset = from.isNotEmpty() || named.isNotEmpty()
         val graphStage = QueryK.Graph(
             patterns.toSeries(),
-            if (protocol) defaultGraphUris.map { "<$it>" } else from.ifEmpty { null },
-            if (protocol) namedGraphUris.map { "<$it>" } else named.ifEmpty { null },
+            if (protocol) defaultGraphUris.map { "<$it>" } else if (queryDataset) from else null,
+            if (protocol) namedGraphUris.map { "<$it>" } else if (queryDataset) named else null,
         )
         val bound = graphStage.variables()
         if (star && (groupBy.isNotEmpty() || items.any { it.aggregated })) fail("SELECT * with GROUP BY or an aggregate is not supported; name the variables")

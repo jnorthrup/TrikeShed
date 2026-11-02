@@ -455,30 +455,41 @@ fun Series<Char>.parseIsoDateTime(): kotlinx.datetime.LocalDateTime {
 }
 
 fun Series<Char>.encodeToByteArray(): ByteArray {
-//encode unicode chars to bytes using UTF-8
+    // Encode a valid UTF-16 pair as one UTF-8 scalar. Preserve the existing
+    // three-byte treatment of an isolated surrogate for callers of this low-level API.
+    val count = size
+    val r = ByteArray(count * 3)
     var x = 0
-    val r = ByteArray(size * 3) //trim after
-    var spill = 0 //spill cost of unicode encodings
-    while (x < size) {
-        val c = this[x].code
-        when {
-            c < 0x80 -> r[x + spill] = c.toByte()
-            c < 0x800 -> {
-                r[x + spill] = (0xC0 or (c shr 6)).toByte()
-                r[x + spill + 1] = (0x80 or (c and 0x3F)).toByte()
-                spill++
+    var out = 0
+    var pending: Int? = null
+    while (x < count || pending != null) {
+        var c = pending?.also { pending = null } ?: this[x++].code
+        if (c in 0xD800..0xDBFF && x < count) {
+            val next = this[x++].code
+            if (next in 0xDC00..0xDFFF) {
+                c = 0x10000 + ((c - 0xD800) shl 10) + (next - 0xDC00)
+                r[out++] = (0xF0 or (c shr 18)).toByte()
+                r[out++] = (0x80 or ((c shr 12) and 0x3F)).toByte()
+                r[out++] = (0x80 or ((c shr 6) and 0x3F)).toByte()
+                r[out++] = (0x80 or (c and 0x3F)).toByte()
+                continue
             }
-
+            pending = next
+        }
+        when {
+            c < 0x80 -> r[out++] = c.toByte()
+            c < 0x800 -> {
+                r[out++] = (0xC0 or (c shr 6)).toByte()
+                r[out++] = (0x80 or (c and 0x3F)).toByte()
+            }
             else -> {
-                r[x + spill] = (0xE0 or (c shr 12)).toByte()
-                r[x + spill + 1] = (0x80 or ((c shr 6) and 0x3F)).toByte()
-                r[x + spill + 2] = (0x80 or (c and 0x3F)).toByte()
-                spill += 2
+                r[out++] = (0xE0 or (c shr 12)).toByte()
+                r[out++] = (0x80 or ((c shr 6) and 0x3F)).toByte()
+                r[out++] = (0x80 or (c and 0x3F)).toByte()
             }
         }
-        x++
     }
-    return r.sliceArray(0..(x + spill - 1))
+    return r.copyOf(out)
 }
 
 //opposite method to build a charSeries from byte[]

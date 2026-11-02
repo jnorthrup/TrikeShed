@@ -42,6 +42,8 @@ class RouteManifestParityTest {
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/VmWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/AgentWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/PatchWire.kt",
+        // The reel endpoints PatchWire delegates to when that service is mounted.
+        "src/jvmMain/kotlin/borg/trikeshed/forge/server/BreadcrumbReelService.kt",
         // The mux session routes PatchWire delegates to (Route enum paths are literals too).
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/LcncRdfWire.kt",

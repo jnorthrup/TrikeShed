@@ -164,12 +164,12 @@ object ContentEpistemicIngest {
 
     fun relate(regions: Series<EpistemicRegion>, attractionThreshold: Double = 0.68): Series<EpistemicLink> {
         val links = ArrayList<EpistemicLink>()
-        // Ordered regions in one source carry direct causality.
+        // Adjacency records document order; it does not assert a causal relation.
         for (i in 0 until regions.size - 1) {
             val left = regions[i]
             val right = regions[i + 1]
             if (left.coordinate.spineCid == right.coordinate.spineCid) {
-                links += EpistemicLink(RelationKind.CAUSALITY, left.coordinate, right.coordinate, 1.0)
+                links += EpistemicLink(RelationKind.NEIGHBOR_NEXT, left.coordinate, right.coordinate, 1.0)
             }
         }
         // Schema/content similarity is attraction evidence, not causality.
@@ -220,21 +220,18 @@ object ContentEpistemicIngest {
     ): Series<SemanticSignal> {
         val byCoordinate = linkedMapOf<EpistemicRegionCoordinate, EpistemicRegion>()
         for (region in regions.view) byCoordinate[region.coordinate] = region
-        // indexed projection, not α-inlining: the JVM verified an inlined lambda
-        // calling a private member of this object as bad invokespecial (Kotlin 2.x)
-        return links.size j { i: Int ->
-            val link = links[i]
+        // Structural order remains in links; only similarity suggestions enter the belief lane.
+        // Indexed projection avoids a Kotlin/JVM verifier issue with an inlined private call.
+        val suggestions = links.view.filter { it.kind == RelationKind.ATTRACTION }.toList()
+        return suggestions.size j { i: Int ->
+            val link = suggestions[i]
             val from = byCoordinate.getValue(link.from)
             val to = byCoordinate.getValue(link.to)
             val positive = (link.weight.coerceIn(0.0, 1.0) * 1000.0).toLong().coerceAtLeast(1L)
             SemanticSignal(
-                angular = angular(from, to, link.kind),
+                angular = angular(from, to, SemanticRelationKind.ATTRACTION),
                 evidence = EvidenceCoord(positive, 1000L - positive),
-                relation = when (link.kind) {
-                    RelationKind.ATTRACTION -> SemanticRelationKind.ATTRACTION
-                    RelationKind.CAUSALITY -> SemanticRelationKind.CAUSALITY
-                    else -> error("epistemic ingest emitted non-epistemic link ${link.kind}")
-                },
+                relation = SemanticRelationKind.ATTRACTION,
                 subjectCid = from.regionCid.hex,
                 objectCid = to.regionCid.hex,
                 provenanceCid = provenance.hex,
@@ -249,9 +246,9 @@ object ContentEpistemicIngest {
      * anti-pattern: avalanche destroys locality, so `recallNear` over those keys was
      * exact-match-or-noise. FNV keeps its IDENTITY job; this is the COORDINATE.
      */
-    private fun angular(from: EpistemicRegion, to: EpistemicRegion, kind: RelationKind): Long =
+    private fun angular(from: EpistemicRegion, to: EpistemicRegion, kind: SemanticRelationKind): Long =
         borg.trikeshed.narsese.AngularCodec.encode(
-            relation = SemanticRelationKind.entries[kind.ordinal.coerceIn(0, SemanticRelationKind.entries.size - 1)],
+            relation = kind,
             taxonomyKey = null,
             subjectTerm = from.schema.structuralKey,
             objectTerm = to.schema.structuralKey,

@@ -11,6 +11,16 @@ import kotlin.test.assertTrue
 /** The page model: the routes' JSON in, escaped HTML with selection state out. */
 class DocumentSurfaceTest {
 
+    @Test
+    fun fragmentSplitsEncodedProjectAndDocumentBeforeDecoding() {
+        assertEquals(Pair("dept%2Fresearch", "contracts%2Fbuyer.md"),
+            DocumentSurface.fragmentParts("#dept%2Fresearch/contracts%2Fbuyer.md"))
+        assertEquals(Pair("genesis-notes", "nested/digest.md"),
+            DocumentSurface.fragmentParts("#genesis-notes/nested/digest.md"))
+        assertEquals(Pair("curation", "sha256%3Aabc"), DocumentSurface.fragmentParts("#curation/sha256%3Aabc"))
+        assertEquals(Pair("", ""), DocumentSurface.fragmentParts(""))
+    }
+
     private val projectsJson = """{"scopes":[{"name":"genesis-notes","path":"/x/files/genesis-notes","kind":"assets","prefix":"genesis-notes/","paths":3,"minted":2,"docs":3},{"name":"trikeshed","kind":"git","docs":0}]}"""
     private val docsJson = """{"project":"genesis-notes","docs":[{"project":"genesis-notes","id":"a.md","cid":"sha256:59204cb01ed1947253923d","rev":"1-sha256:8fc0","seq":0,"length":73,"contentType":"text/markdown"},{"id":"c.txt","cid":"sha256:abc","rev":"1-x","seq":2,"length":13,"contentType":"text/plain"}],"count":2}"""
 
@@ -86,6 +96,37 @@ class DocumentSurfaceTest {
         val plain = DocumentSurface.documentHtml(txt)
         assertTrue(plain.contains("<pre>&lt;b&gt;not markup&lt;/b&gt;</pre>"), plain)
         assertTrue(plain.contains("<section class=\"ds-extract\"><h2>Extract (the miner's twin)</h2><h2>mined</h2>\n<p>twin</p>\n</section>"), plain)
+    }
+
+    @Test
+    fun sourceAndDisplayedExtractionAreLabeledSeparately() {
+        val view = DocumentSurface.document(reify("""{
+            "project":"p", "id":"agreement.pdf", "cid":"extract", "rev":"2-twin", "seq":2,
+            "contentType":"application/pdf", "text":"text once", "extract":"text once",
+            "sourceRevision":{"project":"p","id":"agreement.pdf","cid":"source<&","rev":"1-source","seq":1},
+            "displayTextRevision":{"project":"p","id":"agreement.pdf.extract.md","cid":"extract","rev":"2-twin","seq":2},
+            "extractionRevision":{"project":"p","id":"agreement.pdf.extract.md","cid":"extract","rev":"2-twin","seq":2}
+        }"""))!!
+        val html = DocumentSurface.documentHtml(view)
+        assertTrue(html.contains("Source document: agreement.pdf"), html)
+        assertTrue(html.contains("Displayed text: agreement.pdf.extract.md"), html)
+        assertTrue(html.contains("source&lt;&amp;"), html)
+        assertTrue(html.contains("not verified against this source"), html)
+        assertTrue(html.contains("Text may be a preview"), html)
+        assertEquals(1, Regex("text once").findAll(html).count(), html)
+
+        val malformed = DocumentSurface.document(reify("""{"id":"doc", "cid":"legacy", "text":"body", "sourceRevision":null,
+            "displayTextRevision":{"id":"missing fields"}}"""))!!
+        val unavailable = DocumentSurface.documentHtml(malformed)
+        assertTrue(unavailable.contains("Source document: unavailable"), unavailable)
+        assertTrue(unavailable.contains("Displayed text: unavailable"), unavailable)
+        assertFalse(unavailable.contains("legacy"), unavailable)
+
+        val separate = view.copy(displayTextRevision = view.sourceRevision, text = "source text")
+        val separateHtml = DocumentSurface.documentHtml(separate)
+        assertTrue(separateHtml.contains("Extracted text: agreement.pdf.extract.md"), separateHtml)
+        assertTrue(separateHtml.contains("source text"), separateHtml)
+        assertTrue(separateHtml.contains("text once"), separateHtml)
     }
 
     /**

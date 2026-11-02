@@ -8,7 +8,8 @@ body[data-app-page]{padding-top:var(--application-nav-height);box-sizing:border-
 #application-nav a:focus:not(:focus-visible),#application-menu:focus:not(:focus-visible){outline:none}
 #application-nav .application-brand{padding:0;color:#f1f4f4;font-weight:700;font-size:15px}
 #application-links{display:flex;align-self:stretch;gap:3px;min-width:0}
-#application-links a[aria-current=page]{border-bottom-color:#72d8c9;color:#b0f1e7;background:#243734;font-weight:600}
+#application-links a[aria-current=page],#application-primary a[aria-current=page]{border-bottom-color:#72d8c9;color:#b0f1e7;background:#243734;font-weight:600}
+#application-primary{display:none}
 #application-nav .application-current,#application-menu{display:none}
 body[data-app-page=board] #bar,body[data-app-page=panels] #bar{top:var(--application-nav-height);overflow-x:auto;white-space:nowrap}
 body[data-app-page=board] #bar>* ,body[data-app-page=panels] #bar>*{flex-shrink:0}
@@ -26,8 +27,9 @@ body[data-app-page=futon] th{top:var(--application-nav-height)}
 body[data-app-page=hermes]>header{flex-wrap:wrap}
 @media(max-width:600px){body[data-app-page=board] #activity{top:auto}}
 @media(max-width:960px){
-  #application-nav{gap:14px;padding:0 12px}
-  #application-nav .application-current{display:block;margin-left:auto;color:#b0f1e7;font-size:12px}
+  #application-nav{gap:8px;padding:0 10px}
+  #application-primary{display:flex;align-self:stretch;flex:1;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+  #application-primary a{padding:0 8px}
   #application-menu{display:flex;align-items:center;justify-content:center;width:32px;height:32px;min-height:32px;padding:6px;background:none;border:1px solid #566165;border-radius:4px;color:#e5eeee;cursor:pointer}
   #application-menu svg{width:18px;height:18px;transform:rotate(90deg)}
   #application-nav.menu-open #application-menu svg{transform:rotate(-90deg)}

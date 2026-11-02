@@ -145,12 +145,12 @@ class StatefulNarsContextTest {
             val cas = CasStore.inMemory()
             val writes = mutableListOf<ContentId>()
             var target = replacement
-            val admit = RuleNodes.ruleAdmitRunner(original) { rule ->
+            val admit = RuleNodes.ruleAdmitRunner(original, policy = RuleNodes.AdmissionPolicy.TRUSTED_HOST_LEGACY) { rule ->
                 assertTrue((0 until target.rules.size).any { target.rules[it].ruleCid == rule.ruleCid })
                 writes.add(cas.put(rule.ruleCid.value.encodeToByteArray()))
                 error("ledger failure after recording must not undo live admission")
             }
-            val fromKg = RuleNodes.rulesFromKgRunner(original)
+            val fromKg = RuleNodes.rulesFromKgRunner(original, policy = RuleNodes.KgAdmissionPolicy.TRUSTED_HOST_LEGACY)
             required(admit, CausalityReteElement.Key)
             required(fromKg, CausalityReteElement.Key)
             val rule = node("nal.rule.admit", mapOf("antecedent" to "fire", "consequent" to "smoke"))
@@ -161,11 +161,12 @@ class StatefulNarsContextTest {
                 assertEquals(0, admit.run(rule, emptyMap())["admitted"])
                 assertEquals(2, writes.size, "duplicate offers still reach the durability callback")
                 val bridged = fromKg.run(node("nal.rules.fromKg"), mapOf("kgText" to "(=> heat expansion)\n(precedes rain flood)"))
-                assertEquals(1, bridged["admitted"])
-                assertEquals(1, bridged["rejectedTemporal"])
+                assertEquals(0, bridged["admitted"])
+                assertEquals(0, bridged["rejectedTemporal"])
+                assertEquals(2, bridged["rejectedNonEternal"])
             }
             assertEquals(0, original.rules.size)
-            assertEquals(2, replacement.rules.size)
+            assertEquals(1, replacement.rules.size)
             target = original
             assertEquals(1, admit.run(rule, emptyMap())["admitted"])
             assertEquals(3, writes.size)

@@ -131,6 +131,15 @@ class HijackBeliefBag(
         return levelOffset[level] + (if (m < 0) m + b else m) * beta
     }
 
+    /** Search the full probe path before choosing a vacancy or a victim. */
+    private fun findIndex(angular: Long): Int {
+        for (level in 0 until levels) {
+            val start = bucketStart(angular, level)
+            for (i in start until start + beta) if (slots[i]?.angular == angular) return i
+        }
+        return -1
+    }
+
     fun get(angular: Long): Slot? = readFence {
         for (level in 0 until levels) {
             val start = bucketStart(angular, level)
@@ -165,6 +174,19 @@ class HijackBeliefBag(
      * lose descends. Rejection is the bottom of the funnel.
      */
     fun put(incoming: Slot, merge: (Slot, Slot) -> Slot): Put {
+        // A vacancy in an early bucket does not imply absence from deeper levels.
+        for (level in 0 until levels) {
+            val start = bucketStart(incoming.angular, level)
+            for (i in start until start + beta) {
+                val existing = slots[i]
+                if (existing != null && existing.angular == incoming.angular) {
+                    val next = merge(existing, incoming)
+                    setSlot(i, next)
+                    publish()
+                    return Put.Placed(next, merged = true, level = level)
+                }
+            }
+        }
         for (level in 0 until levels) {
             val start = bucketStart(incoming.angular, level)
             var freeIndex = -1
@@ -216,6 +238,7 @@ class HijackBeliefBag(
             for (i in start until start + beta) {
                 if (slots[i] == null) {
                     setSlot(i, victim)
+                    sizeV++
                     publish()
                     return true
                 }
@@ -291,6 +314,9 @@ class HijackBeliefBag(
      * no roulette. Returns any displaced slot.
      */
     fun place(slot: Slot): Slot? {
+        // WAL replay must replace an existing coordinate even if an earlier cell is free.
+        val found = findIndex(slot.angular)
+        if (found >= 0) { setSlot(found, slot); publish(); return null }
         for (level in 0 until levels) {
             val start = bucketStart(slot.angular, level)
             for (i in start until start + beta) {

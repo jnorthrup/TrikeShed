@@ -86,6 +86,7 @@ private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.
  *   --hermes-root <path>    Hermes Python source checkout
  *   --hermes-sleeve <path>  GraalPy-safe overlay root
  *   --hermes-console        eagerly boot the xterm-256color Hermes VM panel
+ *   --hermes-native-worker  opt into the OWN-trust native Hermes worker (not a sandbox)
  * Positional args (must come last):
  *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
  *   repoDir                 default = cwd
@@ -199,6 +200,8 @@ object OroborosDaemon {
         val airgap: Boolean = Airgap.configured(),
         /** The pg wire listener's port: --pg-port N; 0 binds an ephemeral port. */
         val pgPort: Int = DEFAULT_PG_PORT,
+        /** Native worker has host filesystem, subprocess and network capabilities. */
+        val hermesNativeWorker: Boolean = false,
     )
 
     @Volatile
@@ -217,6 +220,7 @@ object OroborosDaemon {
         var hermesRoot: String? = null
         var hermesSleeve: String? = null
         var hermesConsole = false
+        var hermesNativeWorker = false
         val positional = mutableListOf<String>()
         val projects = mutableListOf<String>()
         val modules = mutableListOf<String>()
@@ -263,22 +267,40 @@ object OroborosDaemon {
                 hermesConsole = true
                 i + 1
             },
+            ForgeCliArgs.Flag(name = "--hermes-native-worker") { _, i ->
+                hermesNativeWorker = true
+                i + 1
+            },
         )
 
         when (val r = ForgeCliArgs.parse(args.toList(), flags)) {
-            is ForgeCliArgs.Result.Parsed -> positional.addAll(r.remaining)
+            is ForgeCliArgs.Result.Parsed -> {
+                require("--document-feed" !in r.remaining) {
+                    "--document-feed is not supported; document intake is configured through project curation"
+                }
+                positional.addAll(r.remaining)
+            }
             ForgeCliArgs.Result.Help -> { usage(); exitProcess(0) }
             is ForgeCliArgs.Result.Error -> die(r.message)
         }
         val agentsResolved = agents
             ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
             ?: borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap, pgPort)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap, pgPort, hermesNativeWorker)
+    }
+
+    /** The native worker is OWN-trust, and cannot uphold the daemon's airgap setting. */
+    internal fun nativeHermesWorker(config: DaemonConfig): Boolean {
+        require(!(config.hermesNativeWorker && (config.airgap || Airgap.configured()))) {
+            "--hermes-native-worker cannot be used while airgap is enabled"
+        }
+        return config.hermesNativeWorker
     }
 
     @JvmStatic
     fun main(args: Array<String>) {
         val config = parseConfig(args)
+        nativeHermesWorker(config)
         if (config.airgap) {
             // Pin the process before child initialization, including scopes that drop the context.
             System.setProperty(Airgap.PROPERTY, "true")
@@ -1008,6 +1030,7 @@ object OroborosDaemon {
         )
         val hermesWire = hermesWire(config, home, repoDir, forgeHome, daemonBlackboard,
             htxElement, muxReactor, wireScope, vmWorldStore, fileOps, breadcrumbContexts)
+        val piWire = piWire(config, htxElement, muxReactor, wireScope, breadcrumbContexts)
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
         val projectDbRegistry = borg.trikeshed.forge.server.ProjectDbRegistry(COUCH_DB_NAME)
         // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
@@ -1645,113 +1668,12 @@ object OroborosDaemon {
         )
         // Belief bag, freeze/thaw and belief-field nodes retain the shared bank, rete and model context.
         registerBeliefNodes(moduleContext, hermesMemoryFiles, brainClient, kifBank)
-        val constellationNodes = borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank, causalityRete)
-        val documentReviewWire = borg.trikeshed.forge.server.DocumentReviewWire.open(moduleContext, projectCorpus, constellationNodes)
-        val curationIntake = borg.trikeshed.forge.server.CurationIntake.install(
-            constellationNodes,
-            moduleContext, projectCorpus, projectScopes, wireScope,
-        )
-        // ── Rule admission: the seam that ends the live rete's dead spin —
-        // the daemon boots causalityRete over ZERO rules; these admit law.
-        causalityRete?.let { liveRete ->
-            // …and law that is only in memory is not law after a restart. Each admitted rule is
-            // filed under its own ruleCid in the `rete-rule/` couch plane, which the boot thaw
-            // below re-admits — the rules counterpart of the `kif-ledger/` axiom plane.
-            moduleContext.lcncRunners["nal.rule.admit"] = borg.trikeshed.narsese.RuleNodes.ruleAdmitRunner(
-                liveRete,
-                review = documentReviewWire.review::consume,
-                ledger = { r ->
-                    runCatching {
-                        couchDb.put(
-                            "rete-rule/${r.ruleCid.hex}",
-                            mapOf(
-                                "antecedent" to r.antecedent,
-                                "consequent" to r.consequent,
-                                "copula" to r.copula.name,
-                                "evidence" to r.evidence.packed.toString(),
-                                "provenanceCid" to (r.provenanceCid ?: ""),
-                                "atMs" to HostSystem.currentTimeMillis(),
-                            ),
-                            null,
-                        )
-                    }.onFailure { HostSystem.err("[OROBOROS] rete-rule ledger write failed (non-fatal): ${it.message}") }
-                    // Same reason as the axiom ledger: couch cannot find its own documents after
-                    // a restart, so the durable record of admitted law is the file.
-                    runCatching { borg.trikeshed.narsese.NarsDurableLedger.appendRule(forgeHome, r) }
-                        .onFailure { HostSystem.err("[OROBOROS] rete-rule file ledger write failed (non-fatal): ${it.message}") }
-                },
-            )
-            moduleContext.lcncRunners["nal.rules.fromKg"] = borg.trikeshed.narsese.RuleNodes.rulesFromKgRunner(liveRete)
-        }
-        // Bag-off honesty: these contracts ship unconditionally, so with the
-        // bag flagged off the canvas still gets a value naming the flag — not
-        // a 404. KanbanModule's own bag-gated pair is stubbed here too (its
-        // attach only registers them when ctx.beliefBag is live).
-        if (beliefBag == null) {
-            val bagGated = listOf(
-                "read.construct", "nal.mint", "nal.decay", "nal.recall", "skill.decay",
-                "nal.attend", "nal.reinforce", "nal.rule.admit", "nal.rules.fromKg",
-                "beliefs.introspect", "beliefs.resonate", "beliefs.review", "nars.seat",
-                "state.freeze", "state.thaw", "kanban.attention", "kanban.drift", "kanban.review",
-            )
-            val bagOff = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
-                mapOf("error" to "belief bag disabled (--belief-bag)")
-            }
-            for (type in bagGated) moduleContext.lcncRunners[type] = bagOff
-        }
-        // ── Legal domain nodes: legal.ingest, legal.evidence ────────────
-        moduleContext.lcncRunners["legal.ingest"] = borg.trikeshed.narsese.LegalNodes.ingestRunner(
-            curate = { moduleContext.lcncRunners[borg.trikeshed.lcnc.DocumentCurationLegos.CURATE] },
-            cas = casStore,
-        )
-        // Historical KIF and prior rulings remain readable. New curation publishes
-        // through DocumentCurationWire's retained tuple plane, not a second KIF sink.
-        moduleContext.lcncRunners["legal.evidence"] = borg.trikeshed.narsese.LegalNodes.evidenceRunner(kifBank)
-        // ── Tribunal: the LCNC preset that argues, rebuts, and rules through
-        //    REAL hermes-env model dialogs. The node family (mux.chat /
-        //    tribunal.record / display) is registered in-process, and each seat's
-        //    model call routes through BrainClient — KeyMux harness lane
-        //    ($HERMES_HOME/.env, auth.json credential pool) → ModelMux →
-        //    HtxReactor, so the tribunal's token spend lands on the daemon's
-        //    quota/lease receipts exactly like every other model traffic.
-        //    The instance opens on the first tribunal.record, not at boot.
-        //    Prose retention and lifecycle are separate from KG belief intake.
-        val tribunalHolder = borg.trikeshed.lcnc.TribunalInstanceHolder()
-        val tribunalLock = kotlinx.coroutines.sync.Mutex()
-        moduleContext.lcncRunners.putAll(
-            borg.trikeshed.lcnc.TribunalNodes.registry(
-                dialog = borg.trikeshed.lcnc.modelMuxDialog(
-                    brain = brainClient,
-                    muxContext = htxElement + muxReactor,
-                ),
-                record = borg.trikeshed.lcnc.tribunalRecord(casStore) { verdictCid ->
-                    val t = tribunalLock.withLock {
-                        tribunalHolder.instance ?: borg.trikeshed.lcnc.TribunalInstance.open(
-                            scope = moduleScope,
-                            plan = borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
-                            presetDocument = borg.trikeshed.lcnc.LcncPresets.all().getValue("preset-tribunal"),
-                        ).also { tribunal ->
-                            try {
-                                tribunal.awaitRootSeeds()
-                            } catch (failure: Throwable) {
-                                withContext(NonCancellable) {
-                                    try { tribunal.nexus.drain() }
-                                    catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
-                                }
-                                throw failure
-                            }
-                            tribunalHolder.instance = tribunal
-                        }
-                    }
-                    t.record(verdictCid)
-                },
-            ),
-        )
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.KgNodes.registry { text ->
-            checkNotNull(beliefBag) { "kg.ingest: belief bag is disabled" }.ingestKg(text) { angular, expression ->
-                hermesMemoryFiles?.gloss(angular, expression)
-            }
-        })
+        val language = registerCorpusLanguage(moduleContext, kifBank, causalityRete, projectCorpus,
+            projectScopes, wireScope, couchDb, forgeHome, beliefBag, brainClient, htxElement + muxReactor,
+            casStore, moduleScope, hermesMemoryFiles)
+        val documentReviewWire = language.review
+        val curationIntake = language.intake
+        val tribunalHolder = language.tribunal
         // ── BrainClient decomposition as LCNC: credential.enter → prompt.chat →
         //    result.confirm. CouchKeyStore backs the credential persistence;
         //    the chatFn uses the daemon's HTX client (200/non-200 patchpoints).
@@ -2073,78 +1995,10 @@ object OroborosDaemon {
             mapOf("port" to "8888", "atMs" to HostSystem.currentTimeMillis().toString()),
             "oroboros",
         )
-        // The canvas as RDF, joined with what watches it: productions (Rete),
-        // causal rules (CausalityRete), and KIF facts (curator bank).
-        val rdfWire = borg.trikeshed.forge.server.LcncRdfWire(
-            productions = { reteProductions.all() },
-            causalRules = { causalityRete?.rules?.let { r -> (0 until r.size).map { r[it] } }.orEmpty() },
-            facts = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
-        )
-        // The fact plane itself, read-only: /api/rete/facts, /api/facts/rdf, /api/rete/productions.
-        val reteWire = borg.trikeshed.forge.server.ReteWire(rete, kifTee, causalityRete, borg.trikeshed.ontology.SumoCorpus.pinned)
-        // The polyglot agent sleeves and the red cards their unresolved traps generate (/api/sleeves).
-        val sleeveWire = borg.trikeshed.forge.server.SleeveWire()
-        // The hover blip: one LCNC node read across panels + KIF + productions + graal (/api/lcnc/blip).
-        val blipWire = borg.trikeshed.forge.server.LcncBlipWire(
-            network = rete,
-            kif = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
-            productions = { reteProductions.all() },
-        )
-        // Virtuoso's quad store: SPARQL Update fills it, /sparql and SPASQL read it beside the fact plane's triples.
-        val quadStore = borg.trikeshed.rdf.QuadStore()
-        val sparqlWire = borg.trikeshed.forge.server.SparqlWire(
-            borg.trikeshed.rdf.SparqlSurface(quadStore),
-            borg.trikeshed.rdf.CypherSurface(quadStore),
-            live = {
-                borg.trikeshed.rdf.QuadStore().load(borg.trikeshed.rdf.RdfGraph(
-                    rete.snapshot().view.flatMap { borg.trikeshed.dag.PlaneFacts.toTriples(it).view },
-                )).scan()
-            },
-        )
-        // Supabase's data API over SQL tables kept in the primary Couch (/rest/v1/*, /pg/query), plus DB.DBA.RDF_QUAD,
-        // the breadcrumbs of every session and, when the belief bag runs, its beliefs; the pg wire reads the same catalog.
-        val postgrestWire = borg.trikeshed.forge.server.PostgrestWire(couchDb) {
-            quadStore.tables() +
-                borg.trikeshed.cursor.query.CursorTable("breadcrumbs") { breadcrumbContexts.table } +
-                listOfNotNull(beliefBag?.let { bag -> borg.trikeshed.cursor.query.CursorTable("nars_beliefs") { bag.cursor() } })
-        }
-        val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
-            graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
-            patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
-            reteWire::route, blipWire::route, agentWire::route, sleeveWire::route, postgrestWire::route, sparqlWire::route,
-        )
-        // ── the surface family: node types the canvas could only reach by fetch ──
-        // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /
-        // board.view moved to KanbanModule: units over BoardStoreElement, not a self-fetch)
-        // as contracts plus small JS wrappers, so a headless run (webhook delivery,
-        // /api/lcnc/run, a scheduled program) threw LcncUnknownNodeType — preset-hermes
-        // could not run outside a browser tab. These dispatch to the daemon's OWN
-        // handlers in process: one author, no second implementation to drift.
-        moduleContext.lcncRunners.putAll(
-            borg.trikeshed.lcnc.SurfaceNodes.registry { method, path, body ->
-                val text = buildString {
-                    append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-                    append("Content-Type: application/json\r\n\r\n")
-                    if (body != null) append(jsonOf(body))
-                }
-                val claimed = moduleRoutes.match(path)?.route
-                val response = claimed?.invoke(method, path, text, null)
-                    ?: extraRouteList.firstNotNullOfOrNull { it(method, path, text, null) }
-                response?.body?.let { runCatching { reify(it) }.getOrDefault(it) }
-            },
-        )
-        val kanbanServer = JvmKanbanServer(
-            extraRoutes = extraRouteList,
-            rawRoutes = listOfNotNull(graalWire::ingestRoute, couchWire::route, projectDbWire::route, casReflinkWire?.let { it::route }, wikiReadWire::route),
-            streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
-                    borg.trikeshed.forge.server.GraalWire.STREAMING +
-                    borg.trikeshed.forge.server.VmWire.STREAMING +
-                    borg.trikeshed.forge.server.HermesConsoleWire.STREAMING +
-                    borg.trikeshed.forge.server.BlackboardWire.STREAMING,
-            maxRequestBatch = 4096,
-            stateDir = jfile(forgeHome),
-            moduleRoutes = moduleRoutes,
-        )
+        val (postgrestWire, kanbanServer) = registerWireSurfaces(moduleContext, moduleRoutes, forgeHome,
+            reteProductions, rete, kifTee, causalityRete, curatorImpulse, couchDb, breadcrumbContexts, beliefBag,
+            graalWire, vmWire, piWire, hermesWire, beliefWire, patchWire, moduleWire, webhookWire,
+            blackboardWire, agentWire, couchWire, projectDbWire, casReflinkWire, wikiReadWire)
         // Published programs (AutoTools notion, Cut 0): every head the ledger names is re-filed as
         // its `panels/<name>` attachment and republished as `lcnc/program/<name>` at the same
         // programCid. PLACED HERE, after the last `moduleContext.lcncRunners.putAll(...)` above and
@@ -2555,6 +2409,8 @@ object OroborosDaemon {
                 // Network requests own admitted remote invocations; settle them while HTX and
                 // the local module/store dependencies are still live. Outer close also covers startup failure.
                 lcncIpnsNode.drain()
+                // Independent Pi sessions settle before their shared model/breadcrumb services close.
+                drainPi(piWire)
                 // Finish accepted guest turns while their blackboard/model/store dependencies are live.
                 runCatching { hermesWire.drain() }.onFailure {
                     HostSystem.err("[OROBOROS] Hermes drain failed: ${it.message}")
@@ -2605,6 +2461,247 @@ object OroborosDaemon {
                 try { nioSupervisor.close() } catch (_: Exception) {}
             }
         }
+    }
+
+    private data class LanguageRegistration(
+        val review: borg.trikeshed.forge.server.DocumentReviewWire,
+        val intake: borg.trikeshed.forge.server.CurationIntake,
+        val tribunal: borg.trikeshed.lcnc.TribunalInstanceHolder,
+    )
+
+    /** One ordered registration slice; keep its direct bytecode out of the daemon's JVM-limited boot method. */
+    private suspend fun registerCorpusLanguage(
+        moduleContext: borg.trikeshed.module.ModuleContext,
+        kifBank: borg.trikeshed.kif.KifKnowledgeBase,
+        causalityRete: borg.trikeshed.narsese.CausalityReteElement?,
+        projectCorpus: borg.trikeshed.forge.server.JvmProjectCorpus,
+        projectScopes: borg.trikeshed.forge.server.ProjectScopes,
+        wireScope: CoroutineScope,
+        couchDb: borg.trikeshed.couch.Couch,
+        forgeHome: File,
+        beliefBag: borg.trikeshed.narsese.BeliefBagElement?,
+        brainClient: borg.trikeshed.modelmux.BrainClient,
+        muxContext: kotlin.coroutines.CoroutineContext,
+        casStore: borg.trikeshed.job.CasStore,
+        moduleScope: CoroutineScope,
+        hermesMemoryFiles: borg.trikeshed.memory.HermesMemoryFiles?,
+    ): LanguageRegistration {
+        val constellationNodes = borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank, causalityRete)
+        val documentReviewWire = borg.trikeshed.forge.server.DocumentReviewWire.open(moduleContext, projectCorpus, constellationNodes)
+        val curationIntake = borg.trikeshed.forge.server.CurationIntake.install(
+            constellationNodes,
+            moduleContext, projectCorpus, projectScopes, wireScope,
+        )
+        // ── Rule admission: the seam that ends the live rete's dead spin —
+        // the daemon boots causalityRete over ZERO rules; these admit law.
+        causalityRete?.let { liveRete ->
+            // …and law that is only in memory is not law after a restart. Each admitted rule is
+            // filed under its own ruleCid in the `rete-rule/` couch plane, which the boot thaw
+            // below re-admits — the rules counterpart of the `kif-ledger/` axiom plane.
+            moduleContext.lcncRunners["nal.rule.admit"] = borg.trikeshed.narsese.RuleNodes.ruleAdmitRunner(
+                liveRete,
+                review = documentReviewWire.review::consume,
+                ledger = { r ->
+                    runCatching {
+                        couchDb.put(
+                            "rete-rule/${r.ruleCid.hex}",
+                            mapOf(
+                                "antecedent" to r.antecedent,
+                                "consequent" to r.consequent,
+                                "copula" to r.copula.name,
+                                "evidence" to r.evidence.packed.toString(),
+                                "provenanceCid" to (r.provenanceCid ?: ""),
+                                "atMs" to HostSystem.currentTimeMillis(),
+                            ),
+                            null,
+                        )
+                    }.onFailure { HostSystem.err("[OROBOROS] rete-rule ledger write failed (non-fatal): ${it.message}") }
+                    // Same reason as the axiom ledger: couch cannot find its own documents after
+                    // a restart, so the durable record of admitted law is the file.
+                    runCatching { borg.trikeshed.narsese.NarsDurableLedger.appendRule(forgeHome, r) }
+                        .onFailure { HostSystem.err("[OROBOROS] rete-rule file ledger write failed (non-fatal): ${it.message}") }
+                },
+            )
+            moduleContext.lcncRunners["nal.rules.fromKg"] = borg.trikeshed.narsese.RuleNodes.rulesFromKgRunner(liveRete)
+        }
+        // Bag-off honesty: these contracts ship unconditionally, so with the
+        // bag flagged off the canvas still gets a value naming the flag — not
+        // a 404. KanbanModule's own bag-gated pair is stubbed here too (its
+        // attach only registers them when ctx.beliefBag is live).
+        if (beliefBag == null) {
+            val bagGated = listOf(
+                "read.construct", "nal.mint", "nal.decay", "nal.recall", "skill.decay",
+                "nal.attend", "nal.reinforce", "nal.rule.admit", "nal.rules.fromKg",
+                "beliefs.introspect", "beliefs.resonate", "beliefs.review", "nars.seat",
+                "state.freeze", "state.thaw", "kanban.attention", "kanban.drift", "kanban.review",
+            )
+            val bagOff = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
+                mapOf("error" to "belief bag disabled (--belief-bag)")
+            }
+            for (type in bagGated) moduleContext.lcncRunners[type] = bagOff
+        }
+        // ── Legal domain nodes: legal.ingest, legal.evidence ────────────
+        moduleContext.lcncRunners["legal.ingest"] = borg.trikeshed.narsese.LegalNodes.ingestRunner(
+            curate = { moduleContext.lcncRunners[borg.trikeshed.lcnc.DocumentCurationLegos.CURATE] },
+            cas = casStore,
+        )
+        // Historical KIF and prior rulings remain readable. New curation publishes
+        // through DocumentCurationWire's retained tuple plane, not a second KIF sink.
+        moduleContext.lcncRunners["legal.evidence"] = borg.trikeshed.narsese.LegalNodes.evidenceRunner(kifBank)
+        // ── Tribunal: the LCNC preset that argues, rebuts, and rules through
+        //    REAL hermes-env model dialogs. The node family (mux.chat /
+        //    tribunal.record / display) is registered in-process, and each seat's
+        //    model call routes through BrainClient — KeyMux harness lane
+        //    ($HERMES_HOME/.env, auth.json credential pool) → ModelMux →
+        //    HtxReactor, so the tribunal's token spend lands on the daemon's
+        //    quota/lease receipts exactly like every other model traffic.
+        //    The instance opens on the first tribunal.record, not at boot.
+        //    Prose retention and lifecycle are separate from KG belief intake.
+        val tribunalHolder = borg.trikeshed.lcnc.TribunalInstanceHolder()
+        val tribunalLock = kotlinx.coroutines.sync.Mutex()
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.TribunalNodes.registry(
+                dialog = borg.trikeshed.lcnc.modelMuxDialog(
+                    brain = brainClient,
+                    muxContext = muxContext,
+                ),
+                record = borg.trikeshed.lcnc.tribunalRecord(casStore) { verdictCid ->
+                    val t = tribunalLock.withLock {
+                        tribunalHolder.instance ?: borg.trikeshed.lcnc.TribunalInstance.open(
+                            scope = moduleScope,
+                            plan = borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
+                            presetDocument = borg.trikeshed.lcnc.LcncPresets.all().getValue("preset-tribunal"),
+                        ).also { tribunal ->
+                            try {
+                                tribunal.awaitRootSeeds()
+                            } catch (failure: Throwable) {
+                                withContext(NonCancellable) {
+                                    try { tribunal.nexus.drain() }
+                                    catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+                                }
+                                throw failure
+                            }
+                            tribunalHolder.instance = tribunal
+                        }
+                    }
+                    t.record(verdictCid)
+                },
+            ),
+        )
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.KgNodes.registry { text ->
+            checkNotNull(beliefBag) { "kg.ingest: belief bag is disabled" }.ingestKg(text) { angular, expression ->
+                hermesMemoryFiles?.gloss(angular, expression)
+            }
+        })
+        return LanguageRegistration(documentReviewWire, curationIntake, tribunalHolder)
+    }
+
+    private data class WireSurfaces(
+        val postgrest: borg.trikeshed.forge.server.PostgrestWire,
+        val server: JvmKanbanServer,
+    )
+
+    /** Preserve route order and one quad-store identity while keeping assembly out of mainImpl. */
+    private fun registerWireSurfaces(
+        moduleContext: borg.trikeshed.module.ModuleContext,
+        moduleRoutes: borg.trikeshed.module.ModuleRouteRegistry,
+        forgeHome: File,
+        reteProductions: borg.trikeshed.dag.ReteProductionRegistry,
+        rete: borg.trikeshed.dag.ReteNetwork,
+        kifTee: borg.trikeshed.dag.KifTee,
+        causalityRete: borg.trikeshed.narsese.CausalityReteElement?,
+        curatorImpulse: borg.trikeshed.narsese.CuratorImpulseElement?,
+        couchDb: borg.trikeshed.couch.Couch,
+        breadcrumbContexts: borg.trikeshed.agent.modelmux.BreadcrumbElement,
+        beliefBag: borg.trikeshed.narsese.BeliefBagElement?,
+        graalWire: borg.trikeshed.forge.server.GraalWire,
+        vmWire: borg.trikeshed.forge.server.VmWire,
+        piWire: borg.trikeshed.forge.server.PiWire,
+        hermesWire: borg.trikeshed.forge.server.HermesConsoleWire,
+        beliefWire: borg.trikeshed.forge.server.BeliefWire?,
+        patchWire: borg.trikeshed.forge.server.PatchWire,
+        moduleWire: borg.trikeshed.forge.server.ModuleWire,
+        webhookWire: borg.trikeshed.forge.server.WebhookWire,
+        blackboardWire: borg.trikeshed.forge.server.BlackboardWire,
+        agentWire: borg.trikeshed.forge.server.AgentWire,
+        couchWire: borg.trikeshed.forge.server.CouchWire,
+        projectDbWire: borg.trikeshed.forge.server.ProjectDbWire,
+        casReflinkWire: borg.trikeshed.forge.server.CasReflinkWire?,
+        wikiReadWire: borg.trikeshed.forge.server.WikiReadWire,
+    ): WireSurfaces {
+        // The canvas as RDF, joined with what watches it: productions (Rete),
+        // causal rules (CausalityRete), and KIF facts (curator bank).
+        val rdfWire = borg.trikeshed.forge.server.LcncRdfWire(
+            productions = { reteProductions.all() },
+            causalRules = { causalityRete?.rules?.let { r -> (0 until r.size).map { r[it] } }.orEmpty() },
+            facts = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
+        )
+        // The fact plane itself, read-only: /api/rete/facts, /api/facts/rdf, /api/rete/productions.
+        val reteWire = borg.trikeshed.forge.server.ReteWire(rete, kifTee, causalityRete, borg.trikeshed.ontology.SumoCorpus.pinned)
+        // The polyglot agent sleeves and the red cards their unresolved traps generate (/api/sleeves).
+        val sleeveWire = borg.trikeshed.forge.server.SleeveWire()
+        // The hover blip: one LCNC node read across panels + KIF + productions + graal (/api/lcnc/blip).
+        val blipWire = borg.trikeshed.forge.server.LcncBlipWire(
+            network = rete,
+            kif = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
+            productions = { reteProductions.all() },
+        )
+        // Virtuoso's quad store: SPARQL Update fills it, /sparql and SPASQL read it beside the fact plane's triples.
+        val quadStore = borg.trikeshed.rdf.QuadStore()
+        val sparqlWire = borg.trikeshed.forge.server.SparqlWire(
+            borg.trikeshed.rdf.SparqlSurface(quadStore),
+            borg.trikeshed.rdf.CypherSurface(quadStore),
+            live = {
+                borg.trikeshed.rdf.QuadStore().load(borg.trikeshed.rdf.RdfGraph(
+                    rete.snapshot().view.flatMap { borg.trikeshed.dag.PlaneFacts.toTriples(it).view },
+                )).scan()
+            },
+        )
+        // Supabase's data API over SQL tables kept in the primary Couch (/rest/v1/*, /pg/query), plus DB.DBA.RDF_QUAD,
+        // the breadcrumbs of every session and, when the belief bag runs, its beliefs; the pg wire reads the same catalog.
+        val postgrestWire = borg.trikeshed.forge.server.PostgrestWire(couchDb) {
+            quadStore.tables() +
+                borg.trikeshed.cursor.query.CursorTable("breadcrumbs") { breadcrumbContexts.table } +
+                listOfNotNull(beliefBag?.let { bag -> borg.trikeshed.cursor.query.CursorTable("nars_beliefs") { bag.cursor() } })
+        }
+        val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
+            graalWire::route, vmWire::route, piWire::route, hermesWire::route, beliefWire?.let { it::route },
+            patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
+            reteWire::route, blipWire::route, agentWire::route, sleeveWire::route, postgrestWire::route, sparqlWire::route,
+        )
+        // ── the surface family: node types the canvas could only reach by fetch ──
+        // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /
+        // board.view moved to KanbanModule: units over BoardStoreElement, not a self-fetch)
+        // as contracts plus small JS wrappers, so a headless run (webhook delivery,
+        // /api/lcnc/run, a scheduled program) threw LcncUnknownNodeType — preset-hermes
+        // could not run outside a browser tab. These dispatch to the daemon's OWN
+        // handlers in process: one author, no second implementation to drift.
+        moduleContext.lcncRunners.putAll(
+            borg.trikeshed.lcnc.SurfaceNodes.registry { method, path, body ->
+                val text = buildString {
+                    append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
+                    append("Content-Type: application/json\r\n\r\n")
+                    if (body != null) append(jsonOf(body))
+                }
+                val claimed = moduleRoutes.match(path)?.route
+                val response = claimed?.invoke(method, path, text, null)
+                    ?: extraRouteList.firstNotNullOfOrNull { it(method, path, text, null) }
+                response?.body?.let { runCatching { reify(it) }.getOrDefault(it) }
+            },
+        )
+        val kanbanServer = JvmKanbanServer(
+            extraRoutes = extraRouteList,
+            rawRoutes = listOfNotNull(graalWire::ingestRoute, couchWire::route, projectDbWire::route, casReflinkWire?.let { it::route }, wikiReadWire::route),
+            streamingPaths = borg.trikeshed.forge.server.CouchWire.streamingPaths(COUCH_DB_NAME) +
+                    borg.trikeshed.forge.server.GraalWire.STREAMING +
+                    borg.trikeshed.forge.server.VmWire.STREAMING +
+                    borg.trikeshed.forge.server.HermesConsoleWire.STREAMING +
+                    borg.trikeshed.forge.server.BlackboardWire.STREAMING,
+            maxRequestBatch = 4096,
+            stateDir = jfile(forgeHome),
+            moduleRoutes = moduleRoutes,
+        )
+        return WireSurfaces(postgrestWire, kanbanServer)
     }
 
     /** Per-case commands and snapshot receipts share the daemon's existing storage owners. */
@@ -2760,6 +2857,25 @@ object OroborosDaemon {
         return memoryStore
     }
 
+    /** Pi boot remains independent of the Hermes VM and outside the size-limited daemon boot method. */
+    private fun piWire(
+        config: DaemonConfig,
+        htxElement: HtxElement,
+        muxReactor: MuxReactorElement,
+        scope: CoroutineScope,
+        breadcrumbContexts: borg.trikeshed.agent.modelmux.BreadcrumbElement,
+    ): borg.trikeshed.forge.server.PiWire = borg.trikeshed.forge.server.PiWire(
+        scope, htxElement + muxReactor + (scope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
+        breadcrumbContexts, { muxReactor.modelMux() },
+        HostSystem.getProperty(borg.trikeshed.forge.server.PiWire.TOKEN_PROPERTY)?.trim()?.takeIf { it.isNotEmpty() },
+    )
+
+    private suspend fun drainPi(wire: borg.trikeshed.forge.server.PiWire) {
+        runCatching { wire.drain() }.onFailure {
+            HostSystem.err("[OROBOROS] Pi drain failed: ${it.message}")
+        }
+    }
+
     private suspend fun hermesWire(
         config: DaemonConfig,
         home: String,
@@ -2816,7 +2932,7 @@ object OroborosDaemon {
         muxContext = htxElement + muxReactor + breadcrumbContexts + (socketScope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
         socketScope = socketScope,
         world = world,
-        workerConfiguration = borg.trikeshed.graal.subvm.PythonWorker(
+        workerConfiguration = if (nativeHermesWorker(config)) borg.trikeshed.graal.subvm.PythonWorker(
             timeoutMillis = 900_000,
             workingDirectory = repoDir.absolutePath,
             pythonPath = listOf(
@@ -2838,7 +2954,7 @@ object OroborosDaemon {
                 "TERM" to "xterm-256color",
                 "COLUMNS" to "100", "LINES" to "32",
             ),
-        ),
+        ) else null,
         panelId = panelId,
         )
     }
@@ -2929,8 +3045,9 @@ object OroborosDaemon {
     private fun usage() {
         HostSystem.err(
             """usage: OroborosDaemon [--once | --watch] [--airgap] [--interval-ms N] [--max-slots N] [--kanban-port N] [--pg-port N]
-              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [forgeHome] [repoDir]
+              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [--hermes-native-worker] [forgeHome] [repoDir]
               --airgap: disable remote Jev/LLM calls; keep local BERT
+              --hermes-native-worker: enable OWN-trust native Hermes worker (not a sandbox; incompatible with --airgap)
               env: JULES_API_KEY (required)
                    HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)
                    TRIKESHED_AIRGAP (or JVM property trikeshed.airgap) also enables airgap;

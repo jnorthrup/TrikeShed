@@ -44,7 +44,7 @@ class ReteRuleDurabilityTest {
         bag.open()
         val rete = CausalityReteElement(bag, emptyList<EternalRule>().toSeries())
         rete.open()
-        val runner = RuleNodes.ruleAdmitRunner(rete, ledger = { ledger.add(it) })
+        val runner = RuleNodes.ruleAdmitRunner(rete, policy = RuleNodes.AdmissionPolicy.TRUSTED_HOST_LEGACY, ledger = { ledger.add(it) })
         runner.run(LcncNode(id = "n", type = "nal.rule.admit"), mapOf("rules" to rules)) as Map<*, *>
     }
 

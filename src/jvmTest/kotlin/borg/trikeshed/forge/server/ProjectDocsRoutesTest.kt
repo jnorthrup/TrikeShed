@@ -13,6 +13,9 @@ import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.agent.keymux.KeyMux
 import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.lcnc.InMemoryProjectCorpus
+import borg.trikeshed.lcnc.ProjectCorpus
+import borg.trikeshed.lcnc.ProjectNodes
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test
@@ -30,10 +33,10 @@ class ProjectDocsRoutesTest {
         val registry = ProjectDbRegistry("trikeshed")
         val home = File(System.getProperty("java.io.tmpdir"), "docs-routes-${System.nanoTime()}").apply { mkdirs() }
         val scopes = ProjectScopes(JvmFileOperations(), gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, couch))), cas, null, projectDbs = registry, ledgerFile = File(home, "mount-ledger.tsv"), filesRoot = File(home, "files"))
-        fun wire(withCorpus: Boolean = true): PatchWire {
+        fun wire(withCorpus: Boolean = true, projectCorpus: ProjectCorpus? = null): PatchWire {
             val keyMux = KeyMux {}
             val brain = BrainClient(apiKey = "test-key", keyMux = keyMux, modelMux = ModelMux(keyMux) {})
-            return PatchWire(brain, scopes, attachments = gateway, corpus = if (withCorpus) JvmProjectCorpus(registry, scopes) else null)
+            return PatchWire(brain, scopes, attachments = gateway, corpus = if (withCorpus) projectCorpus ?: JvmProjectCorpus(registry, scopes) else null)
         }
         fun folder(): File {
             val dir = File(home, "notes-${System.nanoTime()}").apply { mkdirs() }
@@ -42,6 +45,45 @@ class ProjectDocsRoutesTest {
             File(dir, "c.pdf").writeBytes(byteArrayOf(0x25, 0x50, 0x44, 0x46, 0x2D, 1, 2, 3))
             return dir
         }
+    }
+
+    @Test
+    fun sourceAndDisplayedTextRevisionsAreDistinctAndLegacyFieldsRemain(): Unit = runBlocking {
+        val corpus = InMemoryProjectCorpus()
+        val sourceCid = corpus.put("p", "agreement.pdf", byteArrayOf(0x25, 0x50, 0x44, 0x46), "application/pdf")
+        val twinId = "agreement.pdf" + ProjectNodes.EXTRACT_SUFFIX
+        val extractCid = corpus.put("p", twinId, "extracted text".encodeToByteArray(), "text/markdown")
+        val wire = Rig().wire(projectCorpus = corpus)
+        suspend fun read() = json(get(wire, "/api/projects/p/docs/agreement.pdf"))
+        var result = read()
+        var source = result["sourceRevision"] as Map<*, *>
+        var displayed = result["displayTextRevision"] as Map<*, *>
+        assertEquals(sourceCid, source["cid"])
+        assertEquals("agreement.pdf", source["id"])
+        assertEquals(extractCid, displayed["cid"])
+        assertEquals(twinId, displayed["id"])
+        assertEquals(displayed, result["extractionRevision"])
+        assertEquals(extractCid, result["cid"], "legacy cid still identifies the returned text")
+        assertEquals("application/pdf", result["contentType"])
+        assertEquals("extracted text", result["text"])
+        assertEquals("extracted text", result["extract"])
+
+        val revisedSourceCid = corpus.put("p", "agreement.pdf", "%PDF changed".encodeToByteArray(), "application/pdf")
+        result = read()
+        source = result["sourceRevision"] as Map<*, *>
+        displayed = result["displayTextRevision"] as Map<*, *>
+        assertEquals(revisedSourceCid, source["cid"])
+        assertEquals(extractCid, displayed["cid"], "the twin is not asserted to match the revised source")
+        val revisedExtractCid = corpus.put("p", twinId, "updated extraction".encodeToByteArray(), "text/markdown")
+        result = read()
+        assertEquals(revisedSourceCid, (result["sourceRevision"] as Map<*, *>)["cid"])
+        assertEquals(revisedExtractCid, (result["displayTextRevision"] as Map<*, *>)["cid"])
+
+        corpus.put("p", "note.md", "# source".encodeToByteArray(), "text/markdown")
+        val textResult = json(get(wire, "/api/projects/p/docs/note.md"))
+        assertEquals("note.md", (textResult["sourceRevision"] as Map<*, *>)["id"])
+        assertEquals((textResult["sourceRevision"] as Map<*, *>)["cid"], (textResult["displayTextRevision"] as Map<*, *>)["cid"])
+        assertNull(textResult["extractionRevision"])
     }
 
     private suspend fun get(wire: PatchWire, path: String) = wire.route("GET", path, "GET $path HTTP/1.1\r\n\r\n", null)!!
@@ -71,6 +113,8 @@ class ProjectDocsRoutesTest {
         assertEquals("a.md", doc["id"]); assertEquals("# Alpha\n\nthe first note", doc["text"])
         assertEquals(docs[0]["cid"], doc["cid"]); assertEquals("text/markdown", doc["contentType"])
         assertTrue((doc["seq"] as Number).toLong() >= 0)
+        assertEquals(docs[0]["cid"], (doc["sourceRevision"] as Map<*, *>)["cid"])
+        assertEquals(doc["cid"], (doc["displayTextRevision"] as Map<*, *>)["cid"])
         assertNull(doc["extract"], "no twin was mined")
 
         val encoded = get(wire, "/api/projects/${scope.name}/docs/b%2Emd")
@@ -85,5 +129,22 @@ class ProjectDocsRoutesTest {
         assertEquals(0, (json(get(wire, "/api/projects/nosuch/docs"))["count"] as Number).toInt())
 
         assertEquals(503, get(rig.wire(withCorpus = false), "/api/projects/${scope.name}/docs").status, "unwired corpus says so")
+    }
+
+    @Test
+    fun selectedTextIngestUsesReviewHookWithoutAProviderOrMiner(): Unit = runBlocking {
+        val rig = Rig()
+        val scope = rig.scopes.mount(rig.folder().absolutePath)
+        val calls = mutableListOf<Pair<String, String>>()
+        val wire = rig.wire()
+        val path = "/api/projects/${scope.name}/ingest/a%2Emd"
+        suspend fun post() = wire.route("POST", path, "POST $path HTTP/1.1\r\n\r\n{}", null)!!
+        assertEquals(400, post().status, "a missing review hook must not report a queued document")
+        rig.scopes.onTextForReview = { selected -> calls.add(selected.project to selected.id) }
+        val result = post()
+        assertEquals(202, result.status, result.body)
+        assertEquals(listOf(scope.name to "a.md"), calls)
+        assertEquals("queued", json(result)["verdict"])
+        assertNull(json(result)["decisionProvider"])
     }
 }

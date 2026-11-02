@@ -100,6 +100,12 @@ class KgBeliefIntakeTest {
             assertEquals(httpBag.signalOf(angular), nodeBag.signalOf(angular))
             assertEquals(httpBag.budgetOf(angular), nodeBag.budgetOf(angular))
             assertEquals(httpBag.glossOf(angular), nodeBag.glossOf(angular))
+            val listing = wire.route("GET", "/api/beliefs", "", null)!!
+            val diagnostics = (reify(listing.body) as Map<*, *>)["diagnostics"] as Map<*, *>
+            assertEquals("non-atomic sampled entries; sampled separately from size and top beliefs", diagnostics["scope"])
+            assertEquals(1, (diagnostics["snapshotEntries"] as Number).toInt())
+            assertEquals(1, ((diagnostics["relations"] as Map<*, *>)["CAUSALITY"] as Number).toInt())
+            assertNull(diagnostics["derivations"], "resident signals do not establish a derivation history")
             assertEquals(400, wire.route("POST", "/api/beliefs/kg", " ", null)!!.status)
         } finally { httpBag.drain(); nodeBag.drain() }
     }

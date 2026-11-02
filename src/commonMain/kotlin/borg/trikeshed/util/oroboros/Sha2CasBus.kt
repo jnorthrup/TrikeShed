@@ -3,8 +3,11 @@ package borg.trikeshed.util.oroboros
 import borg.trikeshed.cas.CasReplicationElement
 import borg.trikeshed.cas.CasPaths
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.BoundedCasReader
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.file.spi.BoundedFileReader
+import borg.trikeshed.userspace.nio.file.spi.BoundedReadLimitException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
 
@@ -14,7 +17,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 class FileCasStore(
     private val fileOps: FileOperations,
     private val casRoot: String
-) : CasStore() {
+) : CasStore(), BoundedCasReader {
 
     override val durability get() = fileOps.durability
 
@@ -57,6 +60,24 @@ class FileCasStore(
         if (actualCid != cid) {
             throw IllegalStateException("digest mismatch: stored blob does not match CID $cid")
         }
+        return bytes
+    }
+
+    override fun getBounded(cid: ContentId, maxBytes: Int): ByteArray? {
+        require(maxBytes >= 0 && maxBytes < Int.MAX_VALUE) { "Invalid CAS read limit" }
+        // Never fall back to readAllBytes: an implementation must explicitly enforce the
+        // bound on the opened file, including when the file changes during the read.
+        val reader = fileOps as? BoundedFileReader
+            ?: throw UnsupportedOperationException("Bounded file reads are unavailable")
+        val shardedPath = getShardedPath(cid)
+        val path = if (fileOps.exists(shardedPath)) shardedPath
+            else fileOps.resolvePath(casRoot, CasPaths.legacyBlob(cid))
+        if (!fileOps.exists(path)) return null
+        val bytes = reader.readBounded(path, maxBytes)
+        // The backing implementation is trusted to bound allocation, but a broken
+        // implementation must not be able to return an oversized successful read.
+        if (bytes.size > maxBytes) throw BoundedReadLimitException(maxBytes)
+        check(ContentId.of(bytes) == cid) { "digest mismatch: stored blob does not match CID $cid" }
         return bytes
     }
 }

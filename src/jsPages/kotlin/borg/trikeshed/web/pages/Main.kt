@@ -14,6 +14,11 @@ fun main() {
         "kanban" -> { chrome(); KanbanPage.mount() }
         "futon" -> { chrome(); FutonPage.mount() }
         "wiki" -> chrome()
+        "pi" -> {
+            chrome()
+            PiPage.mount()
+            window.asDynamic().closePi = { PiPage.close() }
+        }
         "hermes" -> {
             chrome()
             HermesTerminalPage.mount()

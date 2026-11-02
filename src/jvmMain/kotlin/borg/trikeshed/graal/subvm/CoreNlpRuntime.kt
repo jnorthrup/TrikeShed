@@ -18,29 +18,39 @@ import borg.trikeshed.parse.reifyMap
  * a string and the document comes back in [NlpWire]'s positional shape. A text parsed before is answered
  * from a bounded cache, so curation passes that re-read the same sections cost no parse.
  */
-class CoreNlpRuntime : NlpReader, AutoCloseable {
+class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoCloseable {
+    /** Host selection only. NO_KBP omits typed entity-slot extraction; it is not semantically equivalent or time bounded. */
+    enum class Profile(val id: String) {
+        FULL("full-v1"), NO_KBP("no-kbp-v1");
+
+        val configuration: Map<String, String> get() = when (this) {
+            FULL -> CONFIGURATION
+            NO_KBP -> CONFIGURATION + ("annotators" j "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie").pair
+        }
+    }
+
     private var closed = false
 
-    init { synchronized(ownership) { owners++ } }
+    init { synchronized(ownership) { state(profile).owners++ } }
 
     override suspend fun read(text: String): NlpDocument = analyze(text)
 
-    /** Shared lanes stay live while a reader owns them; the final reader releases both isolates and cache. */
+    /** A profile's lanes stay live while it has an owner; its final reader releases its isolates and cache. */
     override fun close() = synchronized(this) {
         if (!closed) {
             closed = true
-            release()
+            release(profile)
         }
     }
 
     fun analyze(text: String): NlpDocument = synchronized(this) {
         check(!closed) { "CoreNLP reader is closed" }
-        Companion.analyze(text)
+        Companion.analyze(profile, text)
     }
 
     companion object {
         const val MODULE = "corenlp"
-        /** Conservative retained-heap estimate, including text, tokens, dependencies and extracted relations. */
+        /** Per-profile retained-heap estimate, including text, tokens, dependencies and extracted relations. */
         const val CACHED_BYTES = 64L shl 20
 
         /**
@@ -54,8 +64,15 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
         val CONFIGURATION = mapOf("annotators" to "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp", "threads" to "1", "kbp.maxlen" to "100")
 
         private val ownership = Any()
-        private var owners = 0
-        private val parsed = NlpParseCache(CACHED_BYTES)
+        /** Separate profile ownership prevents cross-profile pipeline and text-cache reuse. */
+        private class ProfileState {
+            var owners = 0
+            val parsed = NlpParseCache(CACHED_BYTES)
+            val books = Lane()
+            val asks = Lane()
+        }
+        private val states = Profile.entries.associateWith { ProfileState() }
+        private fun state(profile: Profile) = states.getValue(profile)
 
         /**
          * The most text one parse takes. CoreNLP's per-document annotators (the entity matcher above all)
@@ -69,29 +86,29 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
 
         /** One isolate and the parses it serializes. */
         private class Lane { var guest: Guest? = null }
-        private val books = Lane()
-        private val asks = Lane()
-
-        private fun release() = synchronized(ownership) {
-            check(owners > 0)
-            owners--
-            if (owners == 0) {
-                synchronized(books) { books.guest?.isolate?.close(); books.guest = null }
-                synchronized(asks) { asks.guest?.isolate?.close(); asks.guest = null }
-                synchronized(parsed) { parsed.clear() }
+        private fun release(profile: Profile) = synchronized(ownership) {
+            val state = state(profile)
+            check(state.owners > 0)
+            state.owners--
+            if (state.owners == 0) {
+                for (lane in s_[state.books, state.asks].view)
+                    synchronized(lane) { lane.guest?.isolate?.close(); lane.guest = null }
+                synchronized(state.parsed) { state.parsed.clear() }
             }
         }
 
-        private fun analyze(text: String): NlpDocument {
+        private fun analyze(profile: Profile, text: String): NlpDocument {
+            val state = state(profile)
+            val parsed = state.parsed
             synchronized(parsed) { parsed[text] }?.let { return it }
-            val lane = if (text.length <= ASK_CHARS) asks else books
+            val lane = if (text.length <= ASK_CHARS) state.asks else state.books
             val doc = synchronized(lane) {
                 val loader = GuestModules.loaderFor(MODULE)
                     ?: error("CoreNLP module is not installed; run ./gradlew -p utils/subvm installCorenlp")
                 val g = lane.guest?.takeIf { it.loader === loader && it.isolate.isAlive } ?: run {
                     lane.guest?.isolate?.close()
                     lane.guest = null
-                    Guest(loader).also { lane.guest = it }
+                    Guest(loader, profile).also { lane.guest = it }
                 }
                 val cased = sentenceCase(text)
                 if (cased.length <= PARSE_CHARS) g.analyze(cased) else stitch(cased, pieces(cased).map { r -> r.first to g.analyze(cased.substring(r.first, r.last + 1)) })
@@ -156,12 +173,12 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
     }
 
     /** The isolate and what the host reports of it: the processor class and the jar it resolved from. */
-    private class Guest(val loader: ClassLoader) {
+    private class Guest(val loader: ClassLoader, val profile: Profile) {
         private val pipelineClass = loader.loadClass("edu.stanford.nlp.pipeline.StanfordCoreNLP")
         val isolate = InProcessIsolate("corenlp", borg.trikeshed.pointcut.VmFacet.JVM, Budget(statements = 0, wallMillis = 0), guestModule = MODULE)
 
         init {
-            try { withLoader { isolate.eval(SCRIPT.replace("\$CONFIGURATION", jsonOf(CONFIGURATION)), "corenlp.js") } }
+            try { withLoader { isolate.eval(SCRIPT.replace("\$CONFIGURATION", jsonOf(profile.configuration)), "corenlp.js") } }
             catch (failure: Throwable) { isolate.close(); throw failure }
         }
 
@@ -194,7 +211,7 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
             processor = pipelineClass.name,
             implementation = CoreNlpRuntime::class.java.name,
             runtime = runtime(MODULE),
-            configuration = CONFIGURATION.toSortedMap(),
+            configuration = profile.configuration.toSortedMap(),
         )
 
         private fun runtime(module: String): Map<String, String> {
@@ -205,6 +222,7 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
             val pkg = pipelineClass.`package`
             return buildMap {
                 put("module", manifest.module)
+                put("profile", profile.id)
                 manifest.parent?.let { put("parent", it) }
                 if (manifest.declared.isNotEmpty()) put("declared", manifest.declared.joinToString(","))
                 manifestText?.let { put("manifestCid", ContentId.of(it.encodeToByteArray()).value) }

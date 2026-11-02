@@ -54,6 +54,7 @@ class Panels : PatchSurface {
 
     val history by lazy { PanelsHistory(this) }
     val facets by lazy { PanelsFacets(this) }
+    val reviewFocus by lazy { PanelsReviewFocus(this) }
     val cases by lazy { PanelsCases(this) }
     val workgroups by lazy { PanelsWorkgroups(this) }
     val debugger by lazy { PanelsDebug(this) }

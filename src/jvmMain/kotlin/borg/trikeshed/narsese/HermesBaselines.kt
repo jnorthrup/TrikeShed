@@ -10,7 +10,6 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import kotlinx.coroutines.delay
 
 /**
  * I3/I4/I5 producers — the two lanes [HermesBaselineScoring] was waiting for, plus
@@ -99,17 +98,6 @@ object HermesBaselines {
     private fun scenarioCid(scenario: ReplayScenario): ContentId =
         ContentId.of("scenario:${scenario.scenarioId}".encodeToByteArray())
 
-    /** Wait until the bag's intake channel has drained (stable belief count, bounded). */
-    private suspend fun settle(bag: BeliefBagElement) {
-        var last = -1
-        repeat(25) {
-            val now = bag.recallNear(0L, 64).size
-            if (now == last) return
-            last = now
-            delay(20)
-        }
-    }
-
     /**
      * I3 v1: the curation-recording replayer. Each scenario runs through a fresh
      * element; replayed = recorded only when the executed lane lands it.
@@ -165,7 +153,8 @@ object HermesBaselines {
                 train.size j { i -> train[i].second },
             )
         }
-        settle(bag)
+        // The teaching call sends work, but channel admission alone is not processing.
+        bag.awaitProcessed()
 
         val out = ArrayList<HermesBaselineScoring.NarsOutcome>()
         for ((impulse, scenario) in holdout) {

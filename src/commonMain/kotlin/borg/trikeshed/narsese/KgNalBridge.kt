@@ -21,9 +21,9 @@ import borg.trikeshed.ontology.SumoOntology
  *   rdf:type / a / instance(-of)      → INHERITANCE  (s --> C)
  *   rdfs:subClassOf / subclass        → INHERITANCE  (A --> B)
  *   owl:sameAs / equivalent / KIF <=> → SIMILARITY   (a <-> b)
- *   causes / leadsTo / KIF =>         → IMPLICATION  (A ==> C)   [CAUSALITY]
- *   precedes / before / then          → PREDICTIVE   (A =/> C)   [CAUSALITY + temporal]
- *   during / while / concurrent       → CONCURRENT   (A =|> C)   [CAUSALITY + temporal]
+ *   causes / leadsTo                  → IMPLICATION  (A ==> C)   [CAUSALITY]
+ *   implies / entails / KIF =>        → IMPLICATION  (A ==> C)   [MATCH]
+ *   before / during / predicts       → PRODUCT-framed inheritance, preserving the predicate
  *   anything else                     → PRODUCT-framed inheritance ((s×o) --> p)
  *
  * Parsers are deliberately minimal (statement-level Turtle with prefix/;/,
@@ -108,8 +108,10 @@ object KgNalBridge {
 
     /**
      * Bridge pre-LLM RDF triples to EternalRules. Each triple's predicate
-     * is mapped to a NalCopula via [mapPredicate], and the triple becomes
-     * an eternal truth admitted into the rete.
+     * is mapped to a NalCopula via [mapPredicate]. The rete currently labels
+     * every firing causal and its rule type does not preserve the relation.
+     * Until it does, logical implications cannot safely enter that rete: keep
+     * them non-eternal here, while [map] retains their implication semantics.
      */
     fun tripletsToEternalRules(
         triplets: List<KgTriplet>,
@@ -147,16 +149,16 @@ object KgNalBridge {
             "type", "a", "instance", "instance-of", "isa", "is-a" -> NalCopula.INHERITANCE j RelationKind.MATCH
             "subclassof", "subclass", "subclass-of", "subpropertyof" -> NalCopula.INHERITANCE j RelationKind.MATCH
             "sameas", "same-as", "equivalent", "equivalentclass", "equal", "<=>" -> NalCopula.SIMILARITY j RelationKind.MATCH
-            "causes", "cause", "caused", "leadsto", "leads-to", "results-in", "implies", "entails", "=>" ->
+            "causes", "cause", "caused", "leadsto", "leads-to", "results-in" ->
                 NalCopula.IMPLICATION j RelationKind.CAUSALITY
-            "precedes", "before", "then", "next", "predicts" ->
-                NalCopula.PREDICTIVE_IMPLICATION j RelationKind.CAUSALITY
-            "during", "while", "concurrent", "concurrent-with", "simultaneous" ->
-                NalCopula.CONCURRENT_IMPLICATION j RelationKind.CAUSALITY
+            "implies", "entails", "=>" -> NalCopula.IMPLICATION j RelationKind.MATCH
             "contradicts", "disjointwith", "disjoint-with", "not" -> NalCopula.SIMILARITY j RelationKind.CONTRADICTION
             else -> NalCopula.PRODUCT j RelationKind.MATCH
         }
     }
+
+    internal fun causalRuleCopula(copula: NalCopula, relation: RelationKind): NalCopula =
+        if (copula == NalCopula.IMPLICATION && relation != RelationKind.CAUSALITY) NalCopula.PRODUCT else copula
 
     fun map(triplet: KgTriplet): NalMapped {
         val (copula, relation) = mapPredicate(triplet.predicate)

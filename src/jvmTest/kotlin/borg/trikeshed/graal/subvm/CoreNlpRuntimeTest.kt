@@ -8,11 +8,59 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotSame
+import borg.trikeshed.job.CanonicalCbor
+import borg.trikeshed.narsese.DocumentCuratorCodec
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class CoreNlpRuntimeTest {
+    @Test
+    fun profilesKeepFullDefaultAndSelectOnlyTheKbpAnnotator() {
+        CoreNlpRuntime().use { assertEquals(CoreNlpRuntime.Profile.FULL, it.profile) }
+        val full = CoreNlpRuntime.Profile.FULL.configuration
+        val reduced = CoreNlpRuntime.Profile.NO_KBP.configuration
+        assertEquals("tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp", full["annotators"])
+        assertEquals("100", full["kbp.maxlen"])
+        assertEquals("1", full["threads"])
+        assertEquals(full - "annotators", reduced - "annotators")
+        assertEquals("tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie", reduced["annotators"])
+        assertFalse(CoreNlpRuntime.Profile.FULL.id == CoreNlpRuntime.Profile.NO_KBP.id)
+    }
+
+    @Test
+    fun profileCachesAndLifecycleStaySeparateAndReceiptsRetainProvenance() {
+        val text = "Acme must pay Beta."
+        val full = CoreNlpRuntime()
+        try {
+            CoreNlpRuntime(CoreNlpRuntime.Profile.NO_KBP).use { reduced ->
+                val complete = full.analyze(text)
+                val partial = reduced.analyze(text)
+                assertNotSame(complete, partial)
+                assertSame(complete, full.analyze(text))
+                assertSame(partial, reduced.analyze(text))
+                assertEquals("full-v1", complete.metadata?.runtime?.get("profile"))
+                assertEquals("no-kbp-v1", partial.metadata?.runtime?.get("profile"))
+                assertEquals(CoreNlpRuntime.Profile.NO_KBP.configuration, partial.metadata?.configuration)
+                assertTrue(partial.metadata?.runtime?.get("manifestCid")?.startsWith("sha256:") == true)
+                for (sentence in partial.sentences.view) {
+                    assertTrue(sentence.kbp.isEmpty())
+                    for (token in sentence.tokens.view)
+                        assertEquals(token.word, text.substring(token.begin, token.end))
+                    assertTrue(sentence.dependencies.size > 0)
+                }
+                val receipt = CanonicalCbor.decodeMap(CanonicalCbor.encodeMap(DocumentCuratorCodec.nlp(partial)))
+                val metadata = receipt["metadata"] as Map<*, *>
+                assertEquals(partial.metadata?.configuration, metadata["configuration"])
+                assertEquals(partial.metadata?.runtime, metadata["runtime"])
+                full.close()
+                assertSame(partial, reduced.analyze(text))
+                assertEquals("Beta", reduced.analyze("Beta must pay Acme.").sentences[0].tokens[0].word)
+            }
+        } finally { full.close() }
+    }
+
     @Test
     fun parseCacheAccountsReplacementsAndEvictsUntilWithinBudget() {
         fun document(text: String) = NlpDocument(text, emptySeriesOf())

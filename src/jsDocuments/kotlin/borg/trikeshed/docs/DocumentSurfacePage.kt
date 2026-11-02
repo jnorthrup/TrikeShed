@@ -81,26 +81,28 @@ object DocumentSurfacePage {
         // render: nothing is open yet, so that render writes `window.location.hash = ""` and would
         // erase the very link it is about to be asked to follow (a cold load of
         // /documents#genesis-notes/digest.md landed on "Pick a document").
-        val hash = decode(window.location.hash.removePrefix("#"))
+        val (head, tail) = DocumentSurface.fragmentParts(window.location.hash)
+        val projectOrCuration = decode(head)
+        val selectedId = decode(tail)
         render()
-        if (hash == DocumentSurface.CURATION_HASH || hash.startsWith("${DocumentSurface.CURATION_HASH}/")) {
-            val cid = hash.substringAfter('/', "")
-            openCuration(cid.ifEmpty { null })
-        } else if (hash.isNotEmpty()) {
-            openProject(hash.substringBefore('/'))
-            val id = hash.substringAfter('/', "")
-            if (id.isNotEmpty()) openDoc(id)
+        if (projectOrCuration == DocumentSurface.CURATION_HASH) {
+            openCuration(selectedId.ifEmpty { null })
+        } else if (projectOrCuration.isNotEmpty()) {
+            openProject(projectOrCuration)
+            if (selectedId.isNotEmpty()) openDoc(selectedId)
         }
         js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { documentSurface: true })")
     }
 
     private fun onClick(e: Event) {
         val target = (e.target as? Element)
-            ?.closest("[data-project],[data-doc],[data-run-build],[data-run-rebuild],[data-view],[data-sort],[data-curate],[data-curate-open]")
+            ?.closest("[data-project],[data-doc],[data-source-project],[data-run-build],[data-run-rebuild],[data-view],[data-sort],[data-curate],[data-curate-open]")
             ?: return
         e.preventDefault()
         val p = target.getAttribute("data-project")
         val d = target.getAttribute("data-doc")
+        val sourceProject = target.getAttribute("data-source-project")
+        val sourceDocument = target.getAttribute("data-source-document")
         val build = target.getAttribute("data-run-build")
         val rebuild = target.getAttribute("data-run-rebuild")
         val wantView = target.getAttribute("data-view")
@@ -123,6 +125,7 @@ object DocumentSurfacePage {
         if (curateOpen != null) { MainScope().launch { openCuration(curateOpen) }; return }
         MainScope().launch {
             when {
+                sourceProject != null && sourceDocument != null -> { openProject(sourceProject); view = SurfaceView.PAGE; openDoc(sourceDocument) }
                 p != null -> openProject(p)
                 // Opening a page from the table is how a reader leaves the table: the row they
                 // picked is the page they meant, so the view follows the gesture.
