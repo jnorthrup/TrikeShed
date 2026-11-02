@@ -16,6 +16,7 @@
 # declared	pygments==2.21.0
 # declared	rich==14.3.3
 # declared	wcwidth==0.8.2
+# declared	snowballstemmer==3.1.1
 file	size	sha256
 anyio-4.14.2-py3-none-any.whl	125813	9f505dda5ac9f0c8309b5e8bd445a8c2bf7246f3ce950121e45ea15bc41d1494
 certifi-2026.5.20-py3-none-any.whl	134134	3c52e209ba0a4ad7aebe60436a4ab349c39e1e602e8c134221e546902ad25897
@@ -34,3 +35,4 @@ rich-14.3.3-py3-none-any.whl	310458	793431c1f8619afa7d3b52b2cdec859562b950ea0d4b
 ruamel.yaml-0.18.16-py3-none-any.whl	119858	048f26d64245bae57a4f9ef6feb5b552a386830ef7a826f235ffb804c59efbba
 urllib3-2.7.0-py3-none-any.whl	131087	9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897
 wcwidth-0.8.2-py3-none-any.whl	323166	d63947694a0539a1d51e01eda7caf800c291020e6cdd7e28ad7b14dd33ad4f85
+snowballstemmer-3.1.1-py3-none-any.whl	104164	7e207fa178741da09cdee59d3ecec3827ad5f92b1fc5c9ff3755b639f71f5752
