@@ -3,7 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.userspace.nio.file.spi.*
-import borg.trikeshed.job.fileIoContext
+import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlin.test.*

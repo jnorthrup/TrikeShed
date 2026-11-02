@@ -3,7 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.platform.HostSystem
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
-import borg.trikeshed.job.fileIoContext
+import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.withContext
 
 /**
