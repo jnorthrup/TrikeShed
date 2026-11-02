@@ -17,9 +17,9 @@ enum class ReconcileDisposition { EXACT, UNMATCHED, AMBIGUOUS, DUPLICATE, INVALI
 data class ReconcileEntry(val role: SourceRole, val row: FinanceRow, val units: Long?,
     val disposition: ReconcileDisposition, val reason: String, val counterpartOrdinal: Int? = null)
 data class ReconcileTotals(val input: Long?, val matched: Long?, val review: Long?, val conserved: Boolean)
-data class ReconcileReport(val bankSource: ReconcileSource, val approvedSource: ReconcileSource,
+data class ReconcileReport(val bankSource: ReconcileSource, val expenditureSource: ReconcileSource,
     val policy: ReconcilePolicy, val currency: CurrencyScale, val entries: Series<ReconcileEntry>,
-    val bankTotals: ReconcileTotals, val approvedTotals: ReconcileTotals, val complete: Boolean,
+    val bankTotals: ReconcileTotals, val expenditureTotals: ReconcileTotals, val complete: Boolean,
     val issues: Series<String>, val signConvention: String = "Signed source movements; no debit/credit conversion or posting")
 
 data class ReconcileKey(val account: String, val reference: String, val currency: String, val units: Long, val date: String?)
@@ -41,13 +41,13 @@ const val RECONCILE_RAW_CHARS = 65_536
  * Every admitted row appears once. Source retention/authentication belongs to the host.
  * At JSON boundaries encode Long units/totals as decimal STRINGS, never JS Number.
  */
-fun reconcile(bankSource: ReconcileSource, approvedSource: ReconcileSource,
-    bankRows: Series<FinanceRow>, approvedRows: Series<FinanceRow>, currency: CurrencyScale,
+fun reconcile(bankSource: ReconcileSource, expenditureSource: ReconcileSource,
+    bankRows: Series<FinanceRow>, expenditureRows: Series<FinanceRow>, currency: CurrencyScale,
     policy: ReconcilePolicy): ReconcileReport {
-    require(bankSource.role == SourceRole.BANK && approvedSource.role == SourceRole.EXPENDITURE)
-    require(bankRows.size in 0..RECONCILE_ROWS && approvedRows.size in 0..RECONCILE_ROWS) { "row count limit" }
+    require(bankSource.role == SourceRole.BANK && expenditureSource.role == SourceRole.EXPENDITURE)
+    require(bankRows.size in 0..RECONCILE_ROWS && expenditureRows.size in 0..RECONCILE_ROWS) { "row count limit" }
     val issues = mutableListOf<String>()
-    val replay = bankSource.sourceCid == approvedSource.sourceCid
+    val replay = bankSource.sourceCid == expenditureSource.sourceCid
     if (replay) issues.add("same-source replay is not independent evidence")
     fun admit(rows: Series<FinanceRow>, source: ReconcileSource): MutableList<ReconcileEntry> {
         val duplicateIds = rows.view.groupingBy { it.id }.eachCount().filterValues { it > 1 }.keys
@@ -72,22 +72,22 @@ fun reconcile(bankSource: ReconcileSource, approvedSource: ReconcileSource,
         }.toMutableList()
     }
     val bank = admit(bankRows, bankSource)
-    val approved = admit(approvedRows, approvedSource)
+    val expenditure = admit(expenditureRows, expenditureSource)
     fun key(entry: ReconcileEntry) = ReconcileKey(entry.row.account, entry.row.reference, entry.row.currency,
         requireNotNull(entry.units), if (policy.includeDate) entry.row.date else null)
     // Duplicate rows remain in candidate cardinality so they cannot make another row appear unique.
     fun candidates(entries: List<ReconcileEntry>) = entries.withIndex().filter { it.value.disposition != ReconcileDisposition.INVALID }.groupBy { key(it.value) }
     val a = candidates(bank)
-    val b = candidates(approved)
+    val b = candidates(expenditure)
     for (matchKey in a.keys + b.keys) {
         val left = a[matchKey].orEmpty()
         val right = b[matchKey].orEmpty()
         if (left.size == 1 && right.size == 1 && left[0].value.disposition != ReconcileDisposition.DUPLICATE && right[0].value.disposition != ReconcileDisposition.DUPLICATE) {
             bank[left[0].index] = left[0].value.copy(disposition = ReconcileDisposition.EXACT, reason = "unique exact policy match", counterpartOrdinal = right[0].value.row.rowOrdinal)
-            approved[right[0].index] = right[0].value.copy(disposition = ReconcileDisposition.EXACT, reason = "unique exact policy match", counterpartOrdinal = left[0].value.row.rowOrdinal)
+            expenditure[right[0].index] = right[0].value.copy(disposition = ReconcileDisposition.EXACT, reason = "unique exact policy match", counterpartOrdinal = left[0].value.row.rowOrdinal)
         } else if (left.isNotEmpty() && right.isNotEmpty()) {
             for (entry in left) if (entry.value.disposition != ReconcileDisposition.DUPLICATE) bank[entry.index] = entry.value.copy(disposition = ReconcileDisposition.AMBIGUOUS, reason = "multiple or duplicate candidates")
-            for (entry in right) if (entry.value.disposition != ReconcileDisposition.DUPLICATE) approved[entry.index] = entry.value.copy(disposition = ReconcileDisposition.AMBIGUOUS, reason = "multiple or duplicate candidates")
+            for (entry in right) if (entry.value.disposition != ReconcileDisposition.DUPLICATE) expenditure[entry.index] = entry.value.copy(disposition = ReconcileDisposition.AMBIGUOUS, reason = "multiple or duplicate candidates")
         }
     }
     fun totals(entries: List<ReconcileEntry>): ReconcileTotals {
@@ -100,8 +100,8 @@ fun reconcile(bankSource: ReconcileSource, approvedSource: ReconcileSource,
         return ReconcileTotals(input, matched, review, conserved)
     }
     val bankTotals = totals(bank)
-    val approvedTotals = totals(approved)
-    val entries = (bank + approved).toSeries()
+    val expenditureTotals = totals(expenditure)
+    val entries = (bank + expenditure).toSeries()
     val complete = issues.isEmpty() && entries.view.none { it.disposition == ReconcileDisposition.INVALID }
-    return ReconcileReport(bankSource, approvedSource, policy, currency, entries, bankTotals, approvedTotals, complete, issues.toSeries())
+    return ReconcileReport(bankSource, expenditureSource, policy, currency, entries, bankTotals, expenditureTotals, complete, issues.toSeries())
 }
