@@ -1,0 +1,118 @@
+Bounded native review-observation query — 2026-11-02
+
+POST /api/documents/review/horn-query is an authenticated, non-consuming read
+with the same snapshotCid/expectedRevision/goal fields as /horn-input. Only
+containsMandatorySelection and needsMapping are accepted. Neither endpoint
+asserts world facts, grants a sink permit or spends a review release.
+/horn-input remains NOT_EXECUTED preparation. /horn-query defaults to
+UNAVAILABLE because DocumentReviewWire.open has no native capability unless
+trusted bootstrap code supplies NativeHornQuery(NativeHornProfile(...)).
+NativeHornProfile.parse(text) is a pure strict16KiB operator-JSON factory.
+Its exact required fields are binary, binarySha256, adapter, datalogDirectory;
+optional timeoutMillis is integral1..45000. Relative paths, duplicate/unknown
+fields and environment/argv/code fields refuse. It reads no ambient environment.
+OroborosLcncWiring.documentReview uses host FileOperations to load the optional
+TRIKESHED_NATIVE_HORN_PROFILE absolute operator JSON path, bounded to16KiB.
+Unset leaves /horn-query UNAVAILABLE. An invalid explicit profile fails startup.
+HTTP cannot select this profile. JSON accepts no environment/code/argv fields.
+
+The trusted constructor supplies a canonical native executable and its SHA256,
+canonical run.nix and datalog directory, curated process environment and a
+wall limit up to45 seconds. The adapter SHA256 is fixed to
+e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c;
+datalog.nix is fixed to
+9953ebeb4c4792817f49ff00ff16a4fb82945ff44b2778eecb7f3651e4e7fdd7.
+The solver source revision is1e2fb138d562769d21e7f3e6cfdade9129705ec4.
+The validated native source is1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba;
+its development executable SHA256 is
+97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5.
+An operator must provision and trust the executable's shared libraries/runtime
+and immutable profile files. Their complete dependency authenticity, memory
+limits and network/OS isolation are not established by this runner.
+
+The host generates reviewed observation JSON, caps actual encoded input at4MiB,
+checks inputCID, and writes it in a host-created temporary directory. All
+filesystem I/O uses the explicitly installed FileOperations capability and
+fileIoContext; missing capability refuses. Profiles contain only normalized
+absolute path values until FileOperations canonical resolution during execution.
+Before reads, open/size/close rejects oversized trusted files (binary256MiB,
+adapter16KiB, datalog1MiB, input4MiB). Pre/post hashes and canonical path equality
+are checked. Size-check/read is not atomic against a hostile filesystem writer;
+operator-owned immutable SDK/profile paths remain required.
+It directly invokes the fixed native instantiate CLI with --argstr path values;
+and a fixed --store dummy://, preventing ambient/remote store selection.
+There is no POSIX shell, request expression interpolation, client-selected path,
+command, profile, timeout or import. Actual pinned mlnix --argstr support was
+verified. Executable/adapter/datalog hashes and input bytes are checked before
+and after execution; profile filesystem immutability remains an operator duty.
+
+Existing ProcessCaptureChannel and JvmProcessProtocolPipes own the finite CLI.
+A new opt-in failOnOverflow policy revokes and joins on the first output above
+the cap; existing callers retain head-and-drain behavior by default. Native
+queries cap merged stdout+stderr at1MiB. Diagnostics contaminating JSON cause
+refusal. Wall timeout and caller cancellation revoke and join the child and
+pipe stages. The platform also revokes observed descendants; this is not a
+sandbox/process-group containment claim. Existing wire admission drains its
+accepted requests on retirement; client disconnect does not discard an accepted
+request, which still has the finite host deadline.
+
+Only exit0, untruncated strict JSON with matching schema/frame/input/query/pins
+and a checked proof certificate can be returned. The private certificate checker
+parses each ground fact with KifSemantic, binds asserted witnesses to that exact
+input fact, requires the returned root to equal the query, resolves derived
+rule IDs to the exact input rule and associated sources, and verifies ordered
+premises and head under one shared variable substitution. It visits only the
+supplied certificate (depth64/nodes4096), without theorem search or a Kotlin
+replacement solver. Wrong-source/goal/rule/shared-variable certificates refuse.
+Authenticated reviewed
+read, exact quotations, source/ontology/current revision and inputCID are
+rechecked after execution. Stale state, parse/process/pin/timeout/overflow errors
+are refusal/errors, never logical UNKNOWN. Successful no-proof is UNKNOWN in
+the positive Horn fragment. World obligation applicability is always host-set
+UNKNOWN, including a SUPPORTED review-metadata observation.
+
+Standalone verification (no Gradle/live build directory): immutable main.jar
+from forge-source-context-proof/snapshot source636a4c4bd72c7036b1381a4c76b07e9be0e422da,
+with exact changed sources plus current SumoNixBridge/ReviewedHornPlan compiled
+as an external overlay and explicit friend jar access. Evidence and source
+hashes: /workspace/library-files/native-horn-query-proof/.
+- Actual native positive/no-proof queries over retained approved Book data;
+  authoritative current-source withdrawal at the post-execution read refuses.
+- Actual authenticated HTTP route in configured and unconfigured hosts;
+  missing auth, client-selected extra fields and GET refuse; review WAL unchanged.
+- Actual finite JVM children demonstrate stdout/stderr overflow, wall timeout
+  and caller cancellation kill+join (PID no longer alive), plus compatibility
+  of the existing non-strict head-and-drain mode.
+- Incorrect executable pin refuses. Native integration tests explicitly require
+  trikeshed.native.* operator system properties and otherwise visibly skip;
+  ordinary route/default and finite process tests require no native SDK.
+
+Startup-equivalent integration uses NativeHornProfile.parse(JSON), with no
+constructor-supplied environment. Actual native execution also succeeded with
+the complete process environment cleared and --store dummy:// (exit0, empty
+stderr). No libraryDirectories/environment field was needed in operator JSON.
+This development binary embeds RUNPATH to the extracted SDK directories
+/workspace/library-files/mlnix-native-validation/sdk/usr/lib/x86_64-linux-gnu
+and /workspace/library-files/mlnix-native-validation/sdk/usr/lib/llvm-22/lib.
+Those operator-provisioned libraries must remain available; this is not a
+relocatable release packaging or dependency authentication claim.
+
+Exact integrated-artifact follow-up
+Coordinated v42 source 6246c3085daae5ce74890d4291a6d49a3b01e439 passed all
+50 selected JUnit checks, with actual native integration configured and zero
+failures/errors/skips. Documents, Pages and Spacegraph development bundles
+were built/reused by that same coordinated task graph. Frozen main.jar SHA256
+1f2ab5525bd001159f4b2bfe366333e40ef9eb1b543e47b5451ef430527104c1.
+The final incremental rerun followed earlier full compilation; it is not a
+clean-build timing measurement.
+
+An external localhost HTTP transport exercised the public
+OroborosLcncWiring.documentReview bootstrap using its actual environment-selected
+operator profile and only this frozen main JAR plus immutable dependencies. No
+production class overlay or friend access was used. Configured: SUPPORTED and
+no-proof UNKNOWN; unset: UNAVAILABLE; invalid explicit JSON: startup refused
+before ready. Actual authenticated Book review, current-source replacement,
+401/405/409 request refusals and unchanged WAL were verified. All fixture JVMs
+were joined and no exact native executable process remained. This is not a
+full daemon-listener, browser query UI or OS containment claim. Sanitized receipt:
+docs/evidence/2026-11-02/native-horn-bootstrap-v42.json.

@@ -1,0 +1,4 @@
+# Source references; no corpus or Git LFS download is required by run.nix.
+sumo-nix https://github.com/jnorthrup/sumo-nix 1e2fb138d562769d21e7f3e6cfdade9129705ec4
+mlir-nix https://github.com/jnorthrup/mlir-nix 1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba
+sha256 datalog.nix 9953ebeb4c4792817f49ff00ff16a4fb82945ff44b2778eecb7f3651e4e7fdd7

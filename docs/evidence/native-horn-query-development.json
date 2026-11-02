@@ -1,0 +1,60 @@
+{
+  "kind": "native-horn-query-development-verification/1",
+  "baseSource": "87cc755b5",
+  "immutableDependencySource": "636a4c4bd72c7036b1381a4c76b07e9be0e422da",
+  "immutableMainJarSha256": "dfdf093b348bae72f5b2a3a43a1a94c79adcc07e58720d9232fa84ec24628084",
+  "method": "standalone Kotlin compile and direct test-method assertion runner; no Gradle or live build output",
+  "sourceSha256": {
+    "src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/ProcessCaptureChannel.kt": "ee151e458bb92de3560a1fad068292033becb91f0ccca2f4b081be0e9e136ad2",
+    "src/commonMain/kotlin/borg/trikeshed/kif/SumoNixBridge.kt": "7aa74317b51d15c702ce7dbf5abb927a429f9c96f047219ebc66ea6d22799ac2",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedHornPlan.kt": "1ea1a9c74100eeac23171bf24758e07290e42196e3f1862331b9fc405dfb4be0",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt": "a556e2f8cb53cc5dd78f2e5b453380bd4bbea044054c44926e691d25f3b93cea",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/RouteManifest.kt": "1ddaeebceae815b4e6fca75b54a67880adf2a12327ebbb51ce0bbd711a2445c2",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt": "daea2375117765455ccde6b2c1e4fab6440acfd6bf486d3ff85d85f94d291676",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornCertificateTest.kt": "b4bee8e439eba1ac1a6a317e57c7760d5b474b36e1732bb3c56e90ae1cebaa2e",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornProfileTest.kt": "f7bb880a314de3e74d1e4fd056098ba2225057d21a8cadbd60ddfa9b140454c9",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt": "f5cb7f7077e6f1911521fd6591b9004447e435f41e9314f513a8ab82ba4814af",
+    "src/jvmTest/kotlin/borg/trikeshed/userspace/nio/process/ProcessCaptureBoundedTest.kt": "e05b15fc77b6b3f729a13695618b12d42e8878758c1afc08f809d1f669bf64a2",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/ReviewedTaxonomyWireTest.kt": "598fc90fc5850fc021c6759d771f4ea837b73bb40fae6b440d650e87902b5c04"
+  },
+  "checks": [
+    "STRICT_OPERATOR_PROFILE_PASS",
+    "MISSING_FILE_CAPABILITY_REFUSAL_PASS",
+    "SIZE_GATE_BEFORE_FILE_READ_PASS",
+    "CERTIFICATE_BINDINGS_TAMPER_REFUSAL_PASS",
+    "BACKCOMPAT_CAPTURE_PASS",
+    "STDOUT_STDERR_OVERFLOW_JOIN_PASS",
+    "WALL_KILL_JOIN_PASS",
+    "CANCEL_KILL_JOIN_PASS",
+    "ACTUAL_NATIVE_REVIEW_POSITIVE_UNKNOWN_STALE_PASS",
+    "BINARY_PIN_REFUSAL_PASS",
+    "ACTUAL_AUTH_ROUTE_UNCONFIGURED_REFUSAL_PASS",
+    "ACTUAL_AUTH_ROUTE_NATIVE_QUERY_PASS"
+  ],
+  "nativeSource": "1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba",
+  "binarySha256": "97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5",
+  "adapterSha256": "e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c",
+  "outputLimitBytes": 1048576,
+  "inputLimitBytes": 4194304,
+  "wallLimitMillis": 45000,
+  "osSandboxClaim": false,
+  "memoryBoundClaim": false,
+  "networkIsolationClaim": false,
+  "bootstrap": "trusted constructor injection only; ordinary startup remains unconfigured",
+  "resultLogSha256": "a68983356d2bef9e6a56deed36639de991a34cbdeda358ef716be9b0c1df50ba",
+  "filesystem": "explicit context FileOperations; fileIoContext; canonical paths + size-gated reads + pre/postdigests",
+  "operatorProfileParser": "pure exact JSON <=16KiB; four required fields and optional integer timeoutMillis",
+  "certificate": "bounded supplied-tree verification: exact leaf fact/witness, rule ID+source, ordered premises/shared substitution/head, root=query; no theorem search",
+  "actualIntegrationProfile": "NativeHornProfile.parse(JSON), environment empty; fixed argv --store dummy://",
+  "clearedEnvironmentNativeProbe": {
+    "exit": 0,
+    "stderrEmpty": true,
+    "environment": {},
+    "fixedStore": "dummy://",
+    "probeSha256": "c78c671d6e2313b823ea8a40225f65a847571fa69980d9e557231d9d05978e44"
+  },
+  "developmentSdkRunpath": [
+    "/workspace/library-files/mlnix-native-validation/sdk/usr/lib/x86_64-linux-gnu",
+    "/workspace/library-files/mlnix-native-validation/sdk/usr/lib/llvm-22/lib"
+  ]
+}

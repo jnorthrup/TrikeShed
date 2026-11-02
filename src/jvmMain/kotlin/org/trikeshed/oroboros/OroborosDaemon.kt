@@ -2497,7 +2497,7 @@ object OroborosDaemon {
         hermesMemoryFiles: borg.trikeshed.memory.HermesMemoryFiles?,
     ): LanguageRegistration {
         val constellationNodes = borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank, causalityRete)
-        val documentReviewWire = borg.trikeshed.forge.server.DocumentReviewWire.open(moduleContext, projectCorpus, constellationNodes)
+        val documentReviewWire = borg.trikeshed.lcnc.OroborosLcncWiring.documentReview(moduleContext, projectCorpus, constellationNodes)
         val curationIntake = borg.trikeshed.forge.server.CurationIntake.install(
             constellationNodes,
             moduleContext, projectCorpus, projectScopes, wireScope,

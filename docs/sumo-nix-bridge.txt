@@ -1,0 +1,145 @@
+SUMO-Nix bridge: positive Horn inputs and reified review observations
+2026-11-02
+
+Pinned executable source interfaces
+sumo-nix: https://github.com/jnorthrup/sumo-nix/tree/1e2fb138d562769d21e7f3e6cfdade9129705ec4
+mlir-nix: https://github.com/jnorthrup/mlir-nix/tree/1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba
+utils/sumo-nix/upstream.pins records these revisions and the SHA-256 of the exact
+datalog.nix imported by run.nix. The host supplies a source checkout path; the
+adapter verifies that module's hash before import. No ontology corpus, Git LFS,
+IPFS or Nix package fetch is used. No upstream implementation is copied here.
+
+Unlike the earlier mlir-nix 7edfaba audit, revision 1547e4a contains real registered
+TableGen/C++ kif and sumo dialects. Kif.td/KifDialect.cpp define atom, var, list,
+theory, fact and rule operations and the kif-to-nix pass. Sumo.td/SumoDialect.cpp
+define subclass, instance, domain, range and holds, with sumo-to-kif lowering.
+NixPrimDialects.cpp registers these dialects; NixDialect.cpp registers their passes.
+The resulting Nix expression returns {facts,rules} for sumo-nix/datalog.nix.
+test/mlir/kif.mlir covers roundtrip/CSE/lowering/JSON evaluation; kif-invalid.mlir
+checks variable naming and parent placement. These are upstream fixtures, not
+locally executed native tests. The C ABI is still parse/verify/print only.
+
+The native dialect is an S-expression term graph, not scoped full first-order
+logic: its variable verifier checks a leading ? and a nonempty name. It does
+not verify lexical binders, Horn safety or proof soundness. The host decoder
+and fragment admission below retain responsibility for the exported subset.
+
+Actual integration
+SumoNixBridge.compile(revision, hostSources, groundQuery, scope) emits:
+- JSON schema sumo-nix-positive-horn/1 with ordered facts/rules/query, source
+  sidecars, exclusions, pinned revisions, immutable frame ID and NOT_EXECUTED.
+- Real current kif.theory/kif.atom/kif.var/kif.list/kif.rule operations plus
+  sumo.subclass/instance/holds operations for admitted ground facts.
+  MLIR strings escape UTF-8 bytes, not Kotlin UTF-16 code units. Provenance is
+  a separate sidecar because the upstream lowering discards source attributes.
+
+Admission accepts approved host source records containing scalar ground
+relational facts, or positive Horn rules with scalar relational premises,
+optional conjunction and a range-restricted relational consequent. Free rule
+variables remain variables; quoted literal spellings remain scalar constants.
+Quoted syntax, functions, equality, NAF, exists, quantifiers, modality, compound
+consequents and non-ground facts/queries do not execute. Unsupported source
+forms remain explicitly excluded with source text/CID/revision/review. Invalid
+Unicode fails strict encoding. A guest-provided APPROVED enum is not authority;
+the host owns KifSourceAssertion admission. This does not replace reviewedRead.
+
+Input limits: 128 source records, 64 Ki UTF-16 characters per source, 1 Mi total
+source characters, 16 scalar arguments and 16 premises, and 4 Mi export bytes.
+These are admission/export limits, not an inference work budget.
+
+To execute JSON with the REAL pinned Nix solver:
+  nix-instantiate --eval --strict --json utils/sumo-nix/run.nix \
+    --arg sumoNix /path/to/pinned/sumo-nix --arg input /path/to/export.json
+For mlnix use its eval CLI for the same Nix entry expression. To use MLIR first:
+  mlnix-opt theory.mlir --sumo-to-kif --kif-to-nix > lowered.mlir
+  mlnix run-mlir lowered.mlir --json
+The MLIR result is the ordered facts/rules input; retain the host provenance,
+query and scope sidecar when passing it to the Nix adapter. No C evaluation ABI
+is assumed. Native validation is tracked separately from Nix solver execution.
+
+run.nix independently checks positive scalar Horn shape/range restriction and
+the pinned module hash, then imports datalog.nix with ontology=null. It returns
+SUPPORTED with an attributed proof tree, or UNKNOWN with null proof; source
+exclusions and scope remain visible. Asserted proof leaves map to every matching
+host source record, and positional predicate#N rule IDs map to exact ordered
+source rules. The adapter does not authenticate an arbitrary input file: callers
+must bind it to the host inputCid/frameId. UNKNOWN is no derivation in this
+declared positive fragment, not refutation or a verdict on excluded formulas.
+
+Upstream retains ONLY THE FIRST derivation per fact, without substitutions or
+all alternative rule supports. Source alternatives for identical asserted facts
+are preserved by our sidecar; they do not turn upstream's proof into an exhaustive
+proof DAG. Asserted leaves explicitly carry witnessMode=any-one-asserted-source:
+their source records are alternative witnesses, not joint premises or independent
+votes. Derived from nodes are joint rule premises; the returned derived proof
+still covers only the first derivation, not every rule/path. A fresh input frame recomputes after retraction; no mutable thunk
+invalidation or NAL evidence update is promised. ontology=null avoids implicit
+class ancestry whose support steps upstream omits from its proof. All logical
+class propagation must be explicit input rules/facts for this first bridge.
+
+Upstream fixpoint evaluation has no max-rounds/max-facts budget. A host runner
+must enforce process deadline, memory and output limits. Timeout, exception or
+truncated output is no result, NEVER UNKNOWN. The static entry point is a pure
+execution adapter, not a production process supervisor or an authenticated sink.
+
+Review record consumer
+ReviewedHornPlan.report(review,cas,snapshotCid,revision,goal) obtains the current
+authenticated CurationReviewedRead, verifies retained source bytes/CIDs and exact
+quotation spans, and rechecks the review lineage after export. It appends nothing
+and consumes no approval/release permit. At most 12 selected observations are
+exported per request. The caller receives artifacts with status NOT_EXECUTED.
+
+Its scope is review-record-observations. Reified predicates describe selected
+record fields (subject, predicate, object, modality, polarity, condition, kind,
+retained ontology mapping, world-mapping status) and membership in that reviewed record. All field values become
+opaque CID terms; a lexical sidecar retains their exact values and source quote
+original/text CIDs and offsets. Even a source value beginning ? cannot become a
+rule variable. Recompute lexical token CIDs when verifying that sidecar.
+
+Two host rules ask containsMandatorySelection or needsMapping. These classify
+the presence of a 'must' selection and missing world-assertion mapping in the
+record. They never assert the selected original relation, determine obligation
+applicability, establish a legal duty or grant host authority. MUST/MAY/MUST_NOT/
+PRESUMED remain modalities about curated content, not world taxonomy assertions.
+worldObligationApplicability remains UNKNOWN. The existing taxonomy-plan endpoint
+retains its zero-eligible-world-assertion behavior. ReviewedHornPlan is the common
+consumer API; HTTP binding and a supervised native runner are separate host work.
+
+Validation
+Cached Kotlin 2.4.21/JVM 25 compilation against the immutable v38 main.jar passed.
+JUnit discovered and passed 19 tests (14 existing KIF tests, three new fragment/
+provenance/assembly tests, and two authenticated retained-review tests extended
+to exercise this consumer). No Gradle files or central worktree were edited.
+Artifacts/logs: /workspace/library-files/sumo-bridge-proof.
+Seven real Kotlin-exported fixtures, including authenticated retained-review
+exports with exact source spans and no WAL writes, are under:
+/workspace/library-files/sumo-nix-proof/source/bridge-fixtures.
+Actual native validation subsequently built unmodified mlir-nix revision 1547e4a
+with the official LLVM/MLIR 22.1.8 SDK and GCC 14. All eight Kotlin-generated
+MLIR exports passed registered-dialect parsing, sumo-to-kif and kif-to-nix
+lowering and mlnix run-mlir evaluation, with facts/rules exactly matching the
+JSON sidecars. This includes non-BMP text, escaped quotes/backslashes and a quoted
+?notVariable scalar. Both upstream KIF positive/negative fixtures passed.
+The full upstream MLIR suite passed 21 cases with zero failures and four explicit
+LLVM-version feature skips. No upstream source patch was used.
+
+The native mlnix evaluator also executed the adapter on seven original JSON
+exports and on seven native run-mlir facts/rules results rejoined with unchanged
+sidecars/queries. All fourteen complete solver outputs exactly matched official
+Nix 2.35.4 execution. These are separate checks of registered MLIR interchange
+and actual Horn reasoning, not a Kotlin replacement solver.
+Native evidence: /workspace/library-files/mlnix-native-validation/native-fixture-results.json
+                 /workspace/library-files/mlnix-native-validation/native-solver-results.json
+
+Actual Nix 2.35.4 execution of all seven exported fixtures passed: the OpenSSL
+scenario derives its nginx policy violation and leaves hello UNKNOWN; duplicate
+source supports retain both source IDs in the first proof, removal of one keeps
+the other and removal of the last returns UNKNOWN. Both authenticated review
+record queries derive their metadata classifications. Every result's inputCid
+matches the exact Kotlin-exported JSON bytes. Edited NAF and non-range-restricted
+inputs are refused by the static Nix adapter. Review sidecar checks recover exact
+quotes and source/ontology CIDs and confirm no original world relation is asserted.
+The offline test namespace used a 45-second process deadline and 8-GiB address
+space cap. This test launcher is not a deployed production process supervisor.
+Results: /workspace/library-files/sumo-nix-proof/bridge-results.json
+         /workspace/library-files/sumo-nix-proof/bridge-review-sidecar-checks.json

@@ -1,0 +1,22 @@
+Readable rendering of the ACTUAL native proof; raw certificate: classification.result.stdout
+Scope: fictional filing A source assumptions. No legal applicability or world truth finding.
+SUPPORTED: (instance [Exhibit A @ fictional-filing-A] ContentBearingObject)
+
+(instance [Exhibit A @ fictional-filing-A] ContentBearingObject) — by instance#1; all following premise proofs required
+  rule source: host-rule:instance-subclass/v1
+  (instance [Exhibit A @ fictional-filing-A] Text) — by instance#1; all following premise proofs required
+    rule source: host-rule:instance-subclass/v1
+    (instance [Exhibit A @ fictional-filing-A] Certificate) — asserted; ANY ONE of these source witnesses suffices:
+      filing-A:certificate-claim-1
+        "Exhibit A is a certificate."
+      filing-A:certificate-claim-2
+        "The index also calls Exhibit A a certificate."
+    (subclass Certificate Text) — asserted; ANY ONE of these source witnesses suffices:
+      sumo:Certificate-Text
+        "(subclass Certificate Text)"
+  (subclass Text ContentBearingObject) — asserted; ANY ONE of these source witnesses suffices:
+    sumo:Text-ContentBearingObject
+      "(subclass Text ContentBearingObject)"
+
+Duplicate quoted assertions are alternative witnesses, not independent votes.
+This is the first returned derivation, not an exhaustive alternative-proof DAG.

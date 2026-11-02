@@ -22,7 +22,13 @@ import kotlin.test.*
 class ReviewedTaxonomyWireTest {
     @org.junit.jupiter.api.io.TempDir lateinit var directory: Path
 
-    @Test fun authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit(): Unit = runBlocking {
+    @Test fun authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit() = exercise(null)
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "trikeshed.native.mlnix", matches = ".+")
+    fun configuredNativeEndpointRunsActualReviewedQuery() = exercise(NativeHornQuery(NativeHornQueryTest().profile()))
+
+    private fun exercise(native: NativeHornQuery?): Unit = runBlocking {
         assertFailsWith<IllegalArgumentException> {
             DocumentReviewWire.taxonomyRequest("[".repeat(17) + "0" + "]".repeat(17))
         }
@@ -52,7 +58,7 @@ class ReviewedTaxonomyWireTest {
         val books = ConstellationNodes(directory.toFile(), ctx.blackboard, scope = scope, cas = cas)
         var wire: DocumentReviewWire? = null
         try {
-            wire = DocumentReviewWire.open(ctx, InMemoryProjectCorpus(), books)
+            wire = DocumentReviewWire.open(ctx, InMemoryProjectCorpus(), books, native)
             suspend fun request(suffix: String, body: Map<String, Any?>, auth: String? = token, status: Int = 200): Map<String, Any?> {
                 val path = "/api/documents/review/$suffix"
                 val message = "POST $path HTTP/1.1\r\n" + (auth?.let { "Authorization: Bearer $it\r\n" } ?: "") + "\r\n" + jsonOf(body)
@@ -95,6 +101,31 @@ class ReviewedTaxonomyWireTest {
             assertEquals("presumed", (row["value"] as Map<*, *>)["modality"])
             assertEquals(text, (row["quotation"] as Map<*, *>)["quote"])
             assertTrue((row["exclusionReasons"] as List<*>).isNotEmpty())
+            val hornRequest = mapOf("snapshotCid" to snapshotCid.value, "expectedRevision" to approved["revision"],
+                "goal" to "needsMapping")
+            request("horn-input", hornRequest, auth = null, status = 401)
+            request("horn-input", hornRequest + ("review" to "approved"), status = 409)
+            request("horn-input", hornRequest + ("goal" to "applyObligation"), status = 409)
+            request("horn-query", hornRequest, auth = null, status = 401)
+            request("horn-query", hornRequest + ("binary" to "/client/path"), status = 409)
+            val unavailable = request("horn-query", hornRequest)
+            assertEquals(if (native == null) "UNAVAILABLE" else "SUPPORTED", unavailable["status"])
+            assertEquals("UNKNOWN", unavailable["worldObligationApplicability"])
+            val queryPath = "/api/documents/review/horn-query"
+            assertEquals(405, assertNotNull(ctx.routes.match(queryPath)?.route("GET", queryPath,
+                "GET $queryPath HTTP/1.1\r\nAuthorization: Bearer $token\r\n\r\n", null)).status)
+            val horn = request("horn-input", hornRequest)
+            assertEquals("NOT_EXECUTED", horn["status"])
+            assertEquals("review-record-observations", horn["scope"])
+            assertEquals("UNKNOWN", horn["worldObligationApplicability"])
+            assertEquals(walSize, Files.size(wal), "Preparing native input must not spend a permit or append an event")
+            val inputJson = horn["inputJson"] as String
+            assertEquals(ContentId.of(inputJson.encodeToByteArray()).value, horn["inputCid"])
+            val nativeInput = reifyMap(inputJson)
+            assertTrue((nativeInput["facts"] as List<*>).all { (it as List<*>).first() !in setOf("subclass", "instance") })
+            val hornPath = "/api/documents/review/horn-input"
+            assertEquals(405, assertNotNull(ctx.routes.match(hornPath)?.route("GET", hornPath,
+                "GET $hornPath HTTP/1.1\r\nAuthorization: Bearer $token\r\n\r\n", null)).status)
             assertNull(ctx.beliefBag)
             assertFalse(first.keys.any { it in setOf("releaseCid", "admissionCid") })
             val release = request("release", mapOf("snapshotCid" to snapshotCid.value,
@@ -108,6 +139,7 @@ class ReviewedTaxonomyWireTest {
             request("taxonomy-plan", goal(revision(state)))
             Files.writeString(sourceMarker, cas.put("changed".encodeToByteArray()).value)
             request("taxonomy-plan", goal(revision(state)), status = 409)
+            request("horn-input", hornRequest + ("expectedRevision" to revision(state)), status = 409)
         } finally {
             withContext(NonCancellable) {
                 try { wire?.drain() } finally {

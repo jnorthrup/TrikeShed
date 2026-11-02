@@ -23,6 +23,9 @@ body[data-app-page=graal] #hud>*{flex-shrink:0}
 body[data-app-page=graal] #river,body[data-app-page=graal] .panel{top:calc(var(--application-nav-height) + 78px);max-height:calc(100dvh - var(--application-nav-height) - 112px)}
 body[data-app-page=mux]>.sidebar{top:var(--application-nav-height)}
 body[data-app-page=documents] #document-surface{height:calc(100dvh - var(--application-nav-height))}
+.document-source-context a,aside[aria-label="Selected source context"] a,body[data-app-page=documents] [data-source-context] a{color:#91dcd2;text-underline-offset:2px}
+.document-source-context a:hover,aside[aria-label="Selected source context"] a:hover,body[data-app-page=documents] [data-source-context] a:hover{color:#c3f5ee}
+.document-source-context a:focus-visible,aside[aria-label="Selected source context"] a:focus-visible,body[data-app-page=documents] [data-source-context] a:focus-visible{outline:2px solid #91dcd2;outline-offset:3px}
 body[data-app-page=futon] th{top:var(--application-nav-height)}
 body[data-app-page=hermes]>header{flex-wrap:wrap}
 @media(max-width:600px){body[data-app-page=board] #activity{top:auto}}

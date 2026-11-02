@@ -1,0 +1,268 @@
+{
+  "result": "PASS",
+  "scope": "Synthetic retained unreviewed document proposal; actual Documents/WikiReadWire/Curator/zoomable blackboard bundles and production receipt/project routes. No model, approval or program execution.",
+  "meta": {
+    "project": "primary reference",
+    "id": "notes/law + duty.md",
+    "otherId": "other.txt",
+    "selected": {
+      "project": "primary reference",
+      "id": "notes/law + duty.md",
+      "cid": "sha256:42a5a63cf92eb01e44cd63ba93495149890bb35abbbbb3c54896e026f3074db9",
+      "rev": "1-sha256:d6b5c815a2f00c99dbcb5f91b6c27690ce27b3237ae57c005a96209360a489ab",
+      "seq": 2,
+      "length": 48,
+      "contentType": "text/markdown",
+      "contentStatus": "verified-bytes"
+    },
+    "receiptCid": "sha256:7ed3e643d87ad1f77104b4dbeb56c7261339726f92c2fdfc488154766708ce87",
+    "proposal": 0,
+    "quote": "😀 duty",
+    "sourceSha256": "sha256:42a5a63cf92eb01e44cd63ba93495149890bb35abbbbb3c54896e026f3074db9",
+    "bundleSha256": "sha256:9d5b620f864332ee7bdbb6a11280a4a0a9d9f84b61057bb24089e6029b3d8800"
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/documents"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/documents/documents.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs/notes%2Flaw%20%2B%20duty.md"
+    },
+    {
+      "method": "GET",
+      "path": "/wiki"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/wiki.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/pages/pages.js"
+    },
+    {
+      "method": "GET",
+      "path": "/wiki"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/wiki.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/pages/pages.js"
+    },
+    {
+      "method": "GET",
+      "path": "/wiki"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/wiki.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/pages/pages.js"
+    },
+    {
+      "method": "GET",
+      "path": "/curator"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/spacegraph/spacegraph.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/curation/rank"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/api/lcnc/trail"
+    },
+    {
+      "method": "GET",
+      "path": "/icons/forge-icon.svg"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs"
+    },
+    {
+      "method": "GET",
+      "path": "/panels"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/allocation-inspector.css"
+    },
+    {
+      "method": "GET",
+      "path": "/patch-camera.css"
+    },
+    {
+      "method": "GET",
+      "path": "/spacegraph-shadow.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/spacegraph/spacegraph.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents"
+    },
+    {
+      "method": "GET",
+      "path": "/blackboard/facts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs/notes%2Flaw%20%2B%20duty.md"
+    },
+    {
+      "method": "GET",
+      "path": "/documents"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/documents/documents.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs/notes%2Flaw%20%2B%20duty.md"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs/other.txt"
+    },
+    {
+      "method": "GET",
+      "path": "/panels"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/allocation-inspector.css"
+    },
+    {
+      "method": "GET",
+      "path": "/patch-camera.css"
+    },
+    {
+      "method": "GET",
+      "path": "/spacegraph-shadow.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/spacegraph/spacegraph.js"
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents"
+    },
+    {
+      "method": "GET",
+      "path": "/blackboard/facts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects/primary%20reference/docs/notes%2Flaw%20%2B%20duty.md"
+    },
+    {
+      "method": "GET",
+      "path": "/panels"
+    },
+    {
+      "method": "GET",
+      "path": "/application-nav.css"
+    },
+    {
+      "method": "GET",
+      "path": "/allocation-inspector.css"
+    },
+    {
+      "method": "GET",
+      "path": "/patch-camera.css"
+    },
+    {
+      "method": "GET",
+      "path": "/spacegraph-shadow.css"
+    },
+    {
+      "method": "GET",
+      "path": "/kotlin/spacegraph/spacegraph.js"
+    },
+    {
+      "method": "GET",
+      "path": "/blackboard/facts"
+    }
+  ],
+  "writes": [],
+  "browserErrors": []
+}

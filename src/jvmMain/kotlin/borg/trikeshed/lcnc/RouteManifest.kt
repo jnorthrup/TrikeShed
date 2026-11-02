@@ -104,6 +104,8 @@ object RouteManifest {
             RouteEntry("POST", "/pg/query", "pg-meta raw SQL: SELECT, CREATE TABLE, DROP TABLE, and SPARQL … (SPASQL) over DB.DBA.RDF_QUAD"),
         ),
         "DocumentReviewWire" to listOf(
+            RouteEntry("POST", "/api/documents/review/horn-query", "bounded operator-configured native Horn query over authenticated review observations; no admission"),
+            RouteEntry("POST", "/api/documents/review/horn-input", "prepare authenticated review-record observations for the pinned Horn backend; no execution or admission"),
             RouteEntry("POST", "/api/documents/review/taxonomy-plan", "Authenticated non-consuming current STRICT_BOOK inspection with explicit taxonomy exclusions; no sink permit or norm promotion"),
         ),
         // -- SparqlWire: Virtuoso's SPARQL endpoint over the quad store --
