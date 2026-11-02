@@ -296,7 +296,9 @@ class HermesPythonPort(
             require(HermesBreadcrumbTools.MODULE !in sources && HermesBreadcrumbTools.MODULE !in this && HermesBreadcrumbTools.MODULE !in dependencySources) {
                 "Hermes breadcrumb transport module is host-owned: ${HermesBreadcrumbTools.MODULE}"
             }
-            put(HermesBreadcrumbTools.MODULE, "sleeve:${HermesBreadcrumbTools.MODULE}.py" to HermesBreadcrumbTools.source)
+            put(HermesBreadcrumbTools.MODULE, "sleeve:${HermesBreadcrumbTools.MODULE}.py" to
+                (HermesBreadcrumbTools.source + "\nHOST_TIMEOUT_SECONDS = " +
+                    if (pen.breadcrumbToolsBounded) "${pen.breadcrumbWallMillis / 1000.0}\n" else "None\n"))
             if (socketScope != null) {
                 require(PythonSocketProvider.MODULE !in sources && PythonSocketProvider.MODULE !in this && PythonSocketProvider.MODULE !in dependencySources) {
                     "Hermes socket transport module is host-owned: ${PythonSocketProvider.MODULE}"

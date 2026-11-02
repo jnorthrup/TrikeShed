@@ -15,7 +15,7 @@ import borg.trikeshed.ontology.zipper.PlaneAdapters
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.vm.Teleported
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.runBlocking
 import borg.trikeshed.agent.keymux.KeyMux
 import borg.trikeshed.agent.keymux.TestKeySource
@@ -32,6 +32,43 @@ import kotlin.test.assertFalse
  * evidence clamped, scribe confined, no delete verb.
  */
 class HermesPenDelegatesTest {
+
+    @Test
+    fun breadcrumbHostDeadlineCancelsOwnedWorkAndRefusesForeignSession() = runBlocking<Unit>(Dispatchers.IO) {
+        val owner = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val generation = BreadcrumbGeneration(owner, "bounded-host")
+        val contexts = BreadcrumbElement()
+        val entered = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val board = ConfixBlackboard.empty()
+        val pen = HermesPen(board, muxContext = contexts, breadcrumbGeneration = generation,
+            breadcrumbWallMillis = 250, modelMuxProvider = {
+                entered.complete(Unit)
+                try { awaitCancellation() } finally { cancelled.complete(Unit) }
+            })
+        try {
+            contexts.transact("bounded-host") { it.put(BreadcrumbId("proof"), "test", "owned evidence") }
+            HermesPythonPort(blackboard = board, pen = pen).use { port ->
+                port.importInVm(port.inventorySources(emptyMap()), HermesModelProvider.MODULE)
+                assertEquals(Teleported.Bool(true), port.evalInVm("""
+                    import json
+                    denied = json.loads(host.call('mux_breadcrumb', 'foreign', 'search', '{"query":"owned"}'))
+                    assert denied['verdict'] == 'forbidden'
+                    True
+                """.trimIndent()))
+                assertFalse(entered.isCompleted)
+                val outcome = runCatching {
+                    port.evalInVm("host.call('mux_breadcrumb', 'search', '{\"query\":\"owned\"}')", "bounded-breadcrumb.py")
+                }
+                assertTrue(outcome.isFailure ||
+                    (outcome.getOrNull() as? Teleported.Str)?.v?.contains("deadline-exceeded") == true)
+                withTimeout(5_000) { entered.await(); cancelled.await() }
+            }
+            assertTrue(withTimeout(5_000) { generation.execute { true } })
+            generation.drain()
+            assertTrue(cancelled.isCompleted)
+        } finally { generation.drain(); owner.cancel() }
+    }
 
     @Test
     fun providerClientPreservesTheCompletionAndBufferedToolChunks() = runBlocking {
