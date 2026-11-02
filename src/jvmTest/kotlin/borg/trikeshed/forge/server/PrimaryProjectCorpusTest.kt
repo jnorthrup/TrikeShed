@@ -77,6 +77,8 @@ class PrimaryProjectCorpusTest {
                 assertEquals("unreviewed", retained.provenance["reviewStatus"])
                 val wire = rig.wire(corpus)
                 val path = "/api/projects/${enc(binding.name)}/docs/${enc(source.name)}/retain-source"
+                val readable = json(get(wire, path.removeSuffix("/retain-source")))
+                assertEquals(true, readable["canRetainSource"])
                 suspend fun post(selection: Map<String, Any?>) = assertNotNull(wire.route("POST", path,
                     "POST $path HTTP/1.1\r\n\r\n" + borg.trikeshed.parse.jsonOf(selection), null))
                 val response = post(selected.toMap())
@@ -182,6 +184,7 @@ class PrimaryProjectCorpusTest {
             val response = get(wire, base + "/" + enc(id))
             assertEquals(200, response.status, response.body)
             val doc = json(response)
+            assertEquals(false, doc["canRetainSource"], "File CAS cannot promise owned bounded snapshots")
             assertEquals(id, doc["id"])
             assertEquals("first edition", doc["text"])
             assertEquals(first.cid, (doc["sourceRevision"] as Map<*, *>)["cid"])

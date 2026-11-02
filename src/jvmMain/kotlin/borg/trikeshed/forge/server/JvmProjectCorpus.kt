@@ -50,6 +50,12 @@ class JvmProjectCorpus(
     },
     private val primary: PrimaryProjectBinding? = null,
 ) : ProjectCorpus {
+    internal fun canRetainPrimaryText(row: ProjectDoc): Boolean {
+        val b = backing(row.project) ?: return false
+        return b.primary && b.reader is borg.trikeshed.job.PackCasStore && row.contentStatus == "verified-bytes" &&
+            row.length in 0..(4L * 1024 * 1024) && row.rev.isNotBlank() && row.seq >= 0 &&
+            row.id.substringAfterLast('.', "").lowercase() in setOf("txt", "md")
+    }
     /** Explicit TXT/MD admission names the reconciled store snapshot, never current disk bytes.
      * Pack ownership is required: generic CasStore.put does not promise REF promotion. */
     suspend fun retainPrimaryText(expected: ProjectDoc, snapshots: borg.trikeshed.job.PackCasStore): borg.trikeshed.narsese.DocumentSource =

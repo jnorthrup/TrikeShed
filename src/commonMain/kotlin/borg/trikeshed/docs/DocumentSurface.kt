@@ -25,6 +25,8 @@ data class DocRow(val id: String, val cid: String, val rev: String, val seq: Lon
 
 data class DocRevision(val project: String, val id: String, val cid: String, val rev: String, val seq: Long)
 
+data class SourceRetentionState(val revision: DocRevision, val pending: Boolean, val message: String? = null)
+
 data class DocView(
     val project: String,
     val id: String,
@@ -39,6 +41,7 @@ data class DocView(
     val sourceRevision: DocRevision? = null,
     val displayTextRevision: DocRevision? = null,
     val extractionRevision: DocRevision? = null,
+    val canRetainSource: Boolean = false,
 )
 
 /** Page reads one document; Table reads the whole project as rows. Both are the same data. */
@@ -177,6 +180,7 @@ object DocumentSurface {
             sourceRevision = revision(m["sourceRevision"]),
             displayTextRevision = revision(m["displayTextRevision"]),
             extractionRevision = revision(m["extractionRevision"]),
+            canRetainSource = m["canRetainSource"] == true,
         )
     }
 
@@ -659,11 +663,24 @@ object DocumentSurface {
      * [RunBlock.scan] hands out. An ordinal with no state renders its frame unread — the reader
      * sees the block exists before the daemon has answered, and never a lamp nobody was told.
      */
-    fun documentHtml(view: DocView?, runs: Map<Int, RunBlock.State> = emptyMap()): String {
+    fun retainableRevision(view: DocView): DocRevision? = view.sourceRevision?.takeIf {
+        view.canRetainSource && it.project == view.project && it.id == view.id &&
+            it.cid == view.cid && it.rev == view.rev && it.seq == view.seq && it.seq >= 0 && it.rev.isNotBlank() &&
+            cidPattern.matches(it.cid) && view.id.substringAfterLast('.', "").lowercase() in _s["txt", "md"]
+    }
+
+    fun documentHtml(view: DocView?, runs: Map<Int, RunBlock.State> = emptyMap(), retention: SourceRetentionState? = null): String {
         if (view == null) return "<p class=\"ds-empty\">Pick a page.</p>"
         val sb = StringBuilder()
         sb.append("<div class=\"ds-page\">")
         sb.append("<h1 class=\"ds-title\">").append(esc(view.id)).append("</h1>")
+        retainableRevision(view)?.let { revision ->
+            val state = retention?.takeIf { it.revision == revision }
+            sb.append("<button type=\"button\" data-retain-source=\"1\"")
+            if (state?.pending == true) sb.append(" disabled aria-busy=\"true\"")
+            sb.append(">Retain source for review</button>")
+            state?.message?.let { sb.append("<p role=\"status\">").append(esc(it)).append("</p>") }
+        }
         fun showRevision(label: String, revision: DocRevision?) {
             sb.append("<p class=\"ds-sub\">").append(esc(label)).append(": ")
             if (revision == null) sb.append("unavailable") else sb.append(esc(revision.id))
