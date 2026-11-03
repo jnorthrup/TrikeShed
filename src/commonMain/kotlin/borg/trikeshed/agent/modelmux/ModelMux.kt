@@ -872,7 +872,8 @@ class ModelMux internal constructor(
             action()
         }
         val binding = session.keyId?.let { "key:$it" } ?: quotaId(session)
-        return if (reactor == null) execute() else reactor.modelAdmission.run(binding, execute)
+        val endpoint = "endpoint:${session.baseUrl.trimEnd('/')}"
+        return if (reactor == null) execute() else reactor.modelAdmission.run(binding, endpoint, execute)
     }
 
     private fun requireQuota(keyId: String?) {

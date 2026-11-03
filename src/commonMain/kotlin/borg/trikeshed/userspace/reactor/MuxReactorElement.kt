@@ -37,13 +37,14 @@ class MuxReactorElement(
     private val modelMuxProvider: (suspend () -> borg.trikeshed.agent.modelmux.ModelMux)? = null,
     /** Exact key:<id> or endpoint:<URL without trailing slash> bindings assigned to physical concurrency pools. */
     pools: Map<String, borg.trikeshed.agent.modelmux.MuxPool> = emptyMap(),
+    additionalPools: Map<String, List<borg.trikeshed.agent.modelmux.MuxPool>> = emptyMap(),
 ) : CoroutineContext.Element, Drain {
     companion object Key : CoroutineContext.Key<MuxReactorElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
     val supervisor: CompletableJob = SupervisorJob(parentJob)
     internal val modelAdmission = try {
-        borg.trikeshed.agent.modelmux.MuxAdmission(supervisor, pools = pools)
+        borg.trikeshed.agent.modelmux.MuxAdmission(supervisor, pools = pools, additionalPools = additionalPools)
     } catch (failure: Throwable) {
         supervisor.cancel()
         throw failure

@@ -26,6 +26,7 @@ import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 import java.io.OutputStream
 import java.util.IdentityHashMap
+import java.util.UUID
 import java.util.concurrent.locks.ReentrantLock
 import kotlinx.coroutines.CoroutineScope
 import org.graalvm.polyglot.PolyglotException
@@ -212,11 +213,13 @@ internal class HermesCandidate(
     private var guest: (() -> Unit)?,
     private var sockets: (() -> Unit)?,
     private var services: (() -> Unit)?,
+    private var volume: (() -> Unit)? = null,
 ) : AutoCloseable {
     override fun close() {
         guest?.let { it(); guest = null }
         sockets?.let { it(); sockets = null }
         services?.let { it(); services = null }
+        volume?.let { it(); volume = null }
     }
 }
 
@@ -423,46 +426,87 @@ class HermesPythonPort(
                 files.acquireExclusiveLease(files.resolvePath(directory, "hermes-python.lock"))
             } else memoryWorkspaceLease(world)
         }
-        val importRevision = blackboard.snapshot().revision
-        val baseline = "boot-${inventory.ontology.cid.hex.take(16)}"
-        val guest = GraalBtrfsSupervisor(
-            id = "hermes-python",
-            facet = VmFacet.GRAAL_PYTHON,
-            budget = Budget(statements = 0, wallMillis = IMPORT_WALL_MILLIS, calls = 0),
-            output = output,
-            error = error,
-            world = world,
-        )
-        var services: PythonHostServices? = null
-        var sockets: PythonSocketProvider? = null
-        val result = try {
-            val hostServices = PythonHostServices(guest, world)
-            services = hostServices
-            if (pen != null && socketScope != null) sockets = PythonSocketProvider(socketScope)
-            hostServices.install()
-            val imported = importInVm(guest, inventory, entry, baseline, sockets)
-            closeIsolate()
-            imported
-        } catch (failure: Throwable) {
-            try { importFailure(entry, importRevision, failure) } catch (diagnostic: Throwable) {
-                if (diagnostic !== failure) failure.addSuppressed(diagnostic)
+        val incumbent = isolate
+        val handoff = {
+            val id = "hermes-python"
+            val branch = "$id-${UUID.randomUUID()}"
+            val stagedBaseline = "$branch-baseline"
+            fun discard() {
+                val current = world.mount(id)
+                if (current.hasSubvolume(branch)) check(current.deleteSubvolume(branch)) { "unable to discard Hermes workspace branch" }
+                if (current.hasSubvolume(stagedBaseline)) check(current.deleteSubvolume(stagedBaseline)) { "unable to discard Hermes baseline branch" }
             }
-            candidates.retire(HermesCandidate(guest::closeAndAwait, sockets?.let { it::close }, services?.let { it::close }), failure)
-            throw failure
+            val importRevision = blackboard.snapshot().revision
+            val baseline = "boot-${inventory.ontology.cid.hex.take(16)}"
+            var guest: GraalBtrfsSupervisor? = null
+            var services: PythonHostServices? = null
+            var sockets: PythonSocketProvider? = null
+            val (candidate, imported) = try {
+                val volume = world.mount(id)
+                if (!volume.hasSubvolume(id)) check(volume.createSubvolume(id))
+                check(volume.fork(id, branch)) { "unable to fork Hermes workspace" }
+                val files = world.fileOpsFor(id)
+                val manifest = files.resolvePath(files.resolvePath(world.root, "subvolumes"), "$id.manifest")
+                val before = files.readAllBytes(manifest)
+                val candidate = GraalBtrfsSupervisor(
+                    id = id,
+                    facet = VmFacet.GRAAL_PYTHON,
+                    budget = Budget(statements = 0, wallMillis = IMPORT_WALL_MILLIS, calls = 0),
+                    output = output,
+                    error = error,
+                    world = world,
+                    liveSubvolume = branch,
+                )
+                guest = candidate
+                val hostServices = PythonHostServices(candidate, world)
+                services = hostServices
+                if (pen != null && socketScope != null) sockets = PythonSocketProvider(socketScope)
+                hostServices.install()
+                val imported = importInVm(candidate, inventory, entry, baseline, stagedBaseline, sockets)
+                val staged = world.mount(id)
+                val baselineId = requireNotNull(staged.manifestId(stagedBaseline)) { "missing staged Hermes baseline" }
+                if (staged.hasSubvolume(imported.b))
+                    check(staged.manifestId(imported.b) == baselineId) { "conflicting Hermes Graal VFS baseline ${imported.b}" }
+                // Retire the incumbent while its crossing lock is still held. Its
+                // finalizers may write, so verify the full manifest afterward.
+                closeIsolate()
+                check(files.readAllBytes(manifest).contentEquals(before)) { "Hermes workspace changed during handoff" }
+                candidate.vfs.promote(id)
+                val published = world.mount(id)
+                check(published.manifestId(stagedBaseline) == baselineId) { "Hermes staged baseline changed during handoff" }
+                check(if (published.hasSubvolume(imported.b)) published.manifestId(imported.b) == baselineId
+                      else published.snapshot(stagedBaseline, imported.b)) { "unable to publish Hermes Graal VFS baseline ${imported.b}" }
+                discard()
+                isolate = candidate
+                isolateSockets = sockets
+                isolateServices = services
+                candidate j imported
+            } catch (failure: Throwable) {
+                if (guest != null && isolate === guest) {
+                    isolate = null
+                    isolateSockets = null
+                    isolateServices = null
+                }
+                try { importFailure(entry, importRevision, failure) } catch (diagnostic: Throwable) {
+                    if (diagnostic !== failure) failure.addSuppressed(diagnostic)
+                }
+                candidates.retire(HermesCandidate(guest?.let { it::closeAndAwait }, sockets?.let { it::close }, services?.let { it::close }, ::discard), failure)
+                throw failure
+            }
+            // The candidate is already committed and exposed. A subscriber failure
+            // cannot undo the handoff or retire work that may already be using it.
+            blackboard.put(
+                "hermes/python/vfs",
+                mapOf("backend" to "userspace-btrfs", "subvolume" to candidate.vfs.liveSubvolumeForTools(), "baseline" to imported.b, "generation" to candidate.vfs.generation()),
+                "graal-python",
+            )
+            imported.a
         }
-        isolate = guest
-        isolateSockets = sockets
-        isolateServices = services
-        blackboard.put(
-            "hermes/python/vfs",
-            mapOf("backend" to "userspace-btrfs", "subvolume" to guest.vfs.liveSubvolumeForTools(), "baseline" to result.b, "generation" to guest.vfs.generation()),
-            "graal-python",
-        )
-        result.a
+        if (incumbent == null) handoff() else incumbent.guest.exclusive(handoff)
     }
 
     private fun importInVm(guest: GraalBtrfsSupervisor, inventory: HermesPortInventory, entry: String, baseline: String,
-                           sockets: PythonSocketProvider?): Join<Teleported, String> {
+                           stagedBaseline: String, sockets: PythonSocketProvider?): Join<Teleported, String> {
         val files = LinkedHashMap<String, ByteArray>()
         for ((path, bytes) in inventory.dependencies?.resources.orEmpty()) files["/workspace/$path"] = bytes
         for (candidate in inventory.modules.values) {
@@ -473,8 +517,7 @@ class HermesPythonPort(
         val volume = guest.vfs.btrfsForTools()
         val manifest = requireNotNull(volume.manifestId(guest.vfs.liveSubvolumeForTools()))
         val mountedBaseline = "$baseline-${manifest.hex.take(16)}"
-        check(if (volume.hasSubvolume(mountedBaseline)) volume.manifestId(mountedBaseline) == manifest
-              else guest.snapshot(mountedBaseline)) { "unable to snapshot Hermes Graal VFS baseline $mountedBaseline" }
+        check(guest.snapshot(stagedBaseline)) { "unable to stage Hermes Graal VFS baseline $mountedBaseline" }
         // A directory with no __init__.py is a PEP 420 namespace package on a real filesystem,
         // and Hermes leans on that: `plugins/platforms`, `plugins/browser`, `scripts` and friends
         // carry no __init__.py, so they never enter the inventory and every module beneath them

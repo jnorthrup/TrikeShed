@@ -1,5 +1,5 @@
 package = borg.trikeshed.userspace.nio.posix
-headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h signal.h errno.h string.h dirent.h stdlib.h stdio.h
+headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h sys/socket.h signal.h errno.h string.h dirent.h stdlib.h stdio.h
 headers.osx = sys/random.h
 compilerOpts.linux = -D_GNU_SOURCE
 
@@ -70,6 +70,87 @@ static inline int trikeshed_spawn(pid_t *pid, const char *input,
         status = posix_spawnp(pid, argv[0], &actions, NULL, argv, environ);
     posix_spawn_file_actions_destroy(&actions);
     return status;
+}
+
+// Persistent child with nonblocking parent endpoints. The stdin socket uses
+// send without SIGPIPE so a child closing stdin cannot terminate the host.
+static inline int trikeshed_process_open(pid_t *pid, int *input, int *output, int *error,
+        char *const argv[], char *const envp[]) {
+    int fds[6] = {-1, -1, -1, -1, -1, -1};
+    int status = 0, initialized = 0, attributes_initialized = 0;
+    posix_spawn_file_actions_t actions;
+    posix_spawnattr_t attributes;
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0 || pipe(fds + 2) != 0 || pipe(fds + 4) != 0) {
+        status = errno;
+        goto cleanup;
+    }
+    for (int i = 0; i < 6; i++) {
+        if (fds[i] < 3) {
+            int replacement = fcntl(fds[i], F_DUPFD, 3);
+            if (replacement < 0) { status = errno; goto cleanup; }
+            close(fds[i]);
+            fds[i] = replacement;
+        }
+        if (fcntl(fds[i], F_SETFD, FD_CLOEXEC) != 0) { status = errno; goto cleanup; }
+    }
+    for (int i = 0; i < 6; i += 2) {
+        int flags = fcntl(fds[i], F_GETFL);
+        if (flags < 0 || fcntl(fds[i], F_SETFL, flags | O_NONBLOCK) != 0) { status = errno; goto cleanup; }
+    }
+#ifdef SO_NOSIGPIPE
+    int enabled = 1;
+    if (setsockopt(fds[0], SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof enabled) != 0) { status = errno; goto cleanup; }
+#endif
+    status = posix_spawn_file_actions_init(&actions);
+    if (status != 0) goto cleanup;
+    initialized = 1;
+    status = posix_spawnattr_init(&attributes);
+    if (status != 0) goto cleanup;
+    attributes_initialized = 1;
+#ifdef POSIX_SPAWN_CLOEXEC_DEFAULT
+    status = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_CLOEXEC_DEFAULT);
+#endif
+    if (status != 0) goto cleanup;
+    status = posix_spawn_file_actions_adddup2(&actions, fds[1], STDIN_FILENO);
+    if (status == 0) status = posix_spawn_file_actions_adddup2(&actions, fds[3], STDOUT_FILENO);
+    if (status == 0) status = posix_spawn_file_actions_adddup2(&actions, fds[5], STDERR_FILENO);
+    for (int i = 0; i < 6 && status == 0; i++) status = posix_spawn_file_actions_addclose(&actions, fds[i]);
+#ifndef POSIX_SPAWN_CLOEXEC_DEFAULT
+    if (status == 0) {
+        DIR *descriptors = opendir("/proc/self/fd");
+        if (descriptors == NULL) status = errno;
+        else {
+            struct dirent *entry;
+            while (status == 0 && (entry = readdir(descriptors)) != NULL) {
+                char *end;
+                long fd = strtol(entry->d_name, &end, 10);
+                int owned = 0;
+                for (int i = 0; i < 6; i++) if (fd == fds[i]) owned = 1;
+                if (end != entry->d_name && *end == 0 && fd > 2 && fd != dirfd(descriptors) && !owned)
+                    status = posix_spawn_file_actions_addclose(&actions, (int) fd);
+            }
+            closedir(descriptors);
+        }
+    }
+#endif
+    if (status == 0) status = posix_spawnp(pid, argv[0], &actions, &attributes, argv, envp);
+    if (status == 0) {
+        *input = fds[0]; *output = fds[2]; *error = fds[4];
+        fds[0] = fds[2] = fds[4] = -1;
+    }
+cleanup:
+    if (attributes_initialized) posix_spawnattr_destroy(&attributes);
+    if (initialized) posix_spawn_file_actions_destroy(&actions);
+    for (int i = 0; i < 6; i++) if (fds[i] >= 0) close(fds[i]);
+    return status;
+}
+
+static inline ssize_t trikeshed_process_send(int fd, const void *bytes, size_t count) {
+#ifdef MSG_NOSIGNAL
+    return send(fd, bytes, count, MSG_NOSIGNAL);
+#else
+    return send(fd, bytes, count, 0);
+#endif
 }
 
 // std::process::Command's spawn for a supervised child: stdio and environment inherited, a process group of its own

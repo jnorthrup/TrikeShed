@@ -88,6 +88,25 @@ class UserspaceBtrfs(
         return true
     }
 
+    /** A writable branch shares immutable entries until its first publication. */
+    fun fork(sourceName: String, destName: String): Boolean {
+        operational()
+        val source = subvolumes[sourceName] ?: return false
+        if (!isValidName(destName) || destName in subvolumes) return false
+        publish(destName, Subvolume(false, source.entries, source.times))
+        return true
+    }
+
+    /** Atomically replace a writable subvolume with another published tree. */
+    fun replace(sourceName: String, destName: String): Boolean {
+        operational()
+        val source = subvolumes[sourceName] ?: return false
+        val dest = subvolumes[destName] ?: return false
+        if (sourceName == destName || dest.readOnly) return false
+        publish(destName, Subvolume(false, source.entries, source.times))
+        return true
+    }
+
     fun writeFile(subvol: String, file: String, content: ByteArray): Boolean =
         writeFiles(subvol, s_[file j content])
 

@@ -110,6 +110,7 @@ class ReviewedKifWireTest {
                 assertEquals(status, response.status, response.body)
                 return reifyMap(response.body)
             }
+            exerciseWhitespace(corpus, cas, record, token, ::request)
             exercisePartitions(corpus, cas, record, native, token, ::request)
             request("snapshot", _m["kind" j "taxonomy", "receiptCid" j receipt.value, "selection" j _l[ids[0], ids[0]]], status = 409)
             request("snapshot", _m["kind" j "taxonomy", "receiptCid" j receipt.value, "selection" j _l["kif:0:20"]], status = 409)
@@ -253,6 +254,29 @@ class ReviewedKifWireTest {
         }
         val missing = focus + _m["goal" j _m["predicate" j "subclass", "subject" j "D0", "object" j "Missing"]]
         call("taxonomy-chain", missing, token, 409)
+    }
+
+    private suspend fun exerciseWhitespace(corpus: InMemoryProjectCorpus, cas: CasStore, record: DocumentCurationRecord,
+        token: String, call: suspend (String, Map<String, Any?>, String?, Int) -> Map<String, Any?>) {
+        val text = "(subclass\u000bAlpha\u00a0Beta)\r(instance item ; comment\r Alpha)\r"
+        corpus.put("test", "whitespace.kif", text.encodeToByteArray(), "text/plain")
+        val source = DocumentCurationLegos.projectSource(cas, corpus, requireNotNull(corpus.document("test", "whitespace.kif")))
+        val receipt = cas.put(DocumentCuratorCodec.encode(record.copy(source = source)))
+        val page = _m["receiptCid" j receipt.value, "offset" j 0, "limit" j 64]
+        call("taxonomy-candidates", page, null, 401)
+        val candidates = call("taxonomy-candidates", page, token, 200)
+        assertEquals(2, (candidates["total"] as Number).toInt())
+        val rows = candidates["selections"] as List<*>
+        val ids = rows.map { (it as Map<*, *>)["id"] as String }
+        assertEquals(_l["(subclass\u000bAlpha\u00a0Beta)", "(instance item ; comment\r Alpha)"],
+            rows.map { (it as Map<*, *>)["label"] })
+        val snapshot = call("snapshot", _m["kind" j "taxonomy", "receiptCid" j receipt.value, "selection" j ids], token, 200)
+        val approval = call("decision", _m["snapshotCid" j snapshot["snapshotCid"], "expectedRevision" j snapshot["revision"],
+            "action" j "approve"], token, 200)
+        val goal = _m["snapshotCid" j snapshot["snapshotCid"], "expectedRevision" j approval["revision"],
+            "goal" j _m["predicate" j "instance", "subject" j "item", "object" j "Beta"]]
+        val result = call("taxonomy-plan", goal, token, 200)
+        assertEquals("SUPPORTED", result["status"])
     }
 
     private suspend fun exercisePartitions(corpus: InMemoryProjectCorpus, cas: CasStore, record: DocumentCurationRecord,

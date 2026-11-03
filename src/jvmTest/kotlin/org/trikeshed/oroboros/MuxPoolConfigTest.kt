@@ -1,9 +1,23 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.agent.modelmux.MuxPool
+import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class MuxPoolConfigTest {
+    @Test fun daemonAcceptsSeveralPoolsForOneBinding() {
+        val config = OroborosDaemon.parseConfig(_a[
+            "--mux-pool", "account=2:key:first",
+            "--mux-pool", "device=1:key:first",
+            "--mux-pool", "device=1:key:first",
+        ])
+        assertEquals(MuxPool("account", 2), config.muxPools["key:first"])
+        assertEquals(_l[MuxPool("device", 1)], config.muxAdditionalPools["key:first"])
+        assertFailsWith<IllegalArgumentException> { OroborosDaemon.parseConfig(_a[
+            "--mux-pool", "device=1:key:first", "--mux-pool", "device=2:key:second",
+        ]) }
+    }
+
     @Test fun daemonAcceptsExplicitBindingsForOnePool() {
         val config = OroborosDaemon.parseConfig(arrayOf(
             "--mux-pool", "account=2:key:llm.first.key",

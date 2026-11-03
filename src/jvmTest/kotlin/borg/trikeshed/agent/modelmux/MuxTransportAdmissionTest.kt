@@ -5,6 +5,7 @@ import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
+import borg.trikeshed.daemon.OroborosDaemon
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.toList
@@ -18,6 +19,41 @@ import java.util.Locale
 import kotlin.test.*
 
 class MuxTransportAdmissionTest {
+    @Test fun daemonPoolConfigurationConstrainsOverlappingKeys() = runBlocking {
+        val config = OroborosDaemon.parseConfig(_a[
+            "--mux-pool", "account=1:key:llm.first.key",
+            "--mux-pool", "device=1:key:llm.first.key",
+            "--mux-pool", "device=1:key:llm.second.key",
+        ])
+        val keys = KeyMux {
+            bind("llm.first.key", TestKeySource(value = "one"))
+            bind("llm.second.key", TestKeySource(value = "two"))
+        }
+        val mux = ModelMux(keys) {
+            model("first/model", caps = _s["chat"], provider = "first", baseUrl = "https://first.invalid/v1")
+            model("second/model", caps = _s["chat"], provider = "second", baseUrl = "https://second.invalid/v1")
+        }
+        val transport = Transport()
+        val htx = openHtxElement(routeService = transport)
+        val reactor = MuxReactorElement(parentJob = coroutineContext[Job], pools = config.muxPools,
+            additionalPools = config.muxAdditionalPools)
+        try {
+            val first = async { withContext(reactor + htx) { mux.chat("first/model", s_["user" j "first"]).getOrThrow() } }
+            assertEquals(1, withTimeout(5_000) { transport.starts.receive() })
+            val second = async(start = CoroutineStart.UNDISPATCHED) { withContext(reactor + htx) {
+                mux.chat("second/model", s_["user" j "second"]).getOrThrow()
+            } }
+            assertNull(withTimeoutOrNull(150) { transport.starts.receive() })
+            transport.release.complete(Unit)
+            withTimeout(5_000) { first.await(); second.await() }
+            assertEquals(2, transport.calls.get())
+        } finally {
+            transport.release.complete(Unit)
+            reactor.close()
+            htx.close()
+        }
+    }
+
     @Test fun realHttpDateRetryAfterBlocksUntilTheReportedReset() = runBlocking {
         val owner = SupervisorJob(coroutineContext[Job])
         val network = HtxReactorElement(JvmChannelOperations(), parentJob = owner)

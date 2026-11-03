@@ -5,6 +5,56 @@ import kotlinx.coroutines.*
 import kotlin.test.*
 
 class MuxAdmissionTest {
+    @Test fun poolReachedThroughKeyAndEndpointIsCountedOnce(): Unit = runBlocking {
+        val owner = MuxAdmission(coroutineContext[Job]!!, workers = 2, pools = _m[
+            "a" j MuxPool("shared", 2), "b" j MuxPool("shared", 2), "endpoint" j MuxPool("shared", 2),
+        ])
+        val firstStarted = CompletableDeferred<Unit>()
+        val secondStarted = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try {
+            val first = async { owner.run("a", "endpoint") { firstStarted.complete(Unit); release.await() } }
+            withTimeout(5_000) { firstStarted.await() }
+            val second = async { owner.run("b", "endpoint") { secondStarted.complete(Unit); release.await() } }
+            withTimeout(5_000) { secondStarted.await() }
+            release.complete(Unit)
+            withTimeout(5_000) { first.await(); second.await() }
+        } finally {
+            release.complete(Unit)
+            owner.drain()
+        }
+    }
+
+    @Test fun overlappingPoolsDoNotHoldPartialCapacityAndReleaseCancelledWaiters(): Unit = runBlocking {
+        val owner = MuxAdmission(coroutineContext[Job]!!, workers = 3, pools = _m[
+            "a" j MuxPool("x", 1), "b" j MuxPool("y", 1), "c" j MuxPool("x", 1),
+        ], additionalPools = _m["c" j _l[MuxPool("y", 1), MuxPool("x", 1)]])
+        val bStarted = CompletableDeferred<Unit>()
+        val cStarted = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try {
+            val b = async { owner.run("b") { bStarted.complete(Unit); release.await() } }
+            withTimeout(5_000) { bStarted.await() }
+            val c = async(start = CoroutineStart.UNDISPATCHED) { owner.run("c") { cStarted.complete(Unit) } }
+            assertNull(withTimeoutOrNull(150) { cStarted.await() })
+            withTimeout(5_000) { owner.run("a") { Unit } }
+            assertFalse(cStarted.isCompleted)
+            c.cancelAndJoin()
+            release.complete(Unit)
+            withTimeout(5_000) { b.await(); owner.run("c") { Unit } }
+        } finally {
+            release.complete(Unit)
+            owner.drain()
+        }
+    }
+
+    @Test fun conflictingAdditionalPoolCapacitiesAreRejected(): Unit = runBlocking {
+        assertFailsWith<IllegalArgumentException> {
+            MuxAdmission(coroutineContext[Job]!!, pools = _m["a" j MuxPool("shared", 1)],
+                additionalPools = _m["b" j _l[MuxPool("shared", 2)]])
+        }
+    }
+
     @Test fun poolRemainsHeldUntilInheritedChildrenComplete(): Unit = runBlocking {
         val owner = MuxAdmission(coroutineContext[Job]!!, workers = 2, pools = _m[
             "a" j MuxPool("shared", 1), "b" j MuxPool("shared", 1),

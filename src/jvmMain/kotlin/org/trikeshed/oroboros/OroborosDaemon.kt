@@ -210,6 +210,7 @@ object OroborosDaemon {
         /** Native worker has host filesystem, subprocess and network capabilities. */
         val hermesNativeWorker: Boolean = false,
         val muxPools: Map<String, borg.trikeshed.agent.modelmux.MuxPool> = emptyMap(),
+        val muxAdditionalPools: Map<String, List<borg.trikeshed.agent.modelmux.MuxPool>> = emptyMap(),
     )
 
     @Volatile
@@ -296,11 +297,19 @@ object OroborosDaemon {
         val agentsResolved = agents
             ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
             ?: borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap, pgPort, hermesNativeWorker, muxPools(muxPoolSpecs))
+        val pools = muxPoolGroups(muxPoolSpecs)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap, pgPort, hermesNativeWorker,
+            pools.mapValues { it.value.first() }, pools.filterValues { it.size > 1 }.mapValues { it.value.drop(1) })
     }
 
     internal fun muxPools(specs: List<String>): Map<String, borg.trikeshed.agent.modelmux.MuxPool> {
-        val bindings = mutableMapOf<String, borg.trikeshed.agent.modelmux.MuxPool>()
+        val groups = muxPoolGroups(specs)
+        require(groups.values.all { it.size == 1 }) { "Conflicting pools for binding" }
+        return groups.mapValues { it.value.first() }
+    }
+
+    internal fun muxPoolGroups(specs: List<String>): Map<String, List<borg.trikeshed.agent.modelmux.MuxPool>> {
+        val bindings = mutableMapOf<String, MutableList<borg.trikeshed.agent.modelmux.MuxPool>>()
         val capacities = mutableMapOf<String, Int>()
         for (spec in specs) {
             val equal = spec.indexOf('=')
@@ -317,8 +326,8 @@ object OroborosDaemon {
             val priorCapacity = capacities.put(id, capacity)
             require(priorCapacity == null || priorCapacity == capacity) { "Conflicting capacities for pool $id" }
             val pool = borg.trikeshed.agent.modelmux.MuxPool(id, capacity)
-            val prior = bindings.put(binding, pool)
-            require(prior == null || prior == pool) { "Conflicting pools for binding $binding" }
+            val assigned = bindings.getOrPut(binding) { mutableListOf() }
+            if (pool !in assigned) assigned.add(pool)
         }
         return bindings
     }
@@ -835,6 +844,7 @@ object OroborosDaemon {
             keyMux = keyMux,
             modelMuxProvider = { operatorMux.await().invoke() },
             pools = config.muxPools,
+            additionalPools = config.muxAdditionalPools,
         )
         muxReactor.open()
         // ── CCEK binding: the single control plane for assemblies ────

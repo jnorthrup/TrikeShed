@@ -1,5 +1,7 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.userspace.nio.channels.spi.ProcessEnvironment
+
 /**
  * The environment a guest — in-process or a real child process — is allowed to see, and the
  * toxic-pattern backstop that keeps it a whitelist instead of a leak surface.
@@ -26,26 +28,9 @@ object GuestEnvironment {
      * at (its own table is over 100k keys). At two fixed entries there is nothing to amortize, and
      * — as of this writing — its `get()` carries a benchmark-fidelity "arbitrage breaker" (a random
      * 50-200 iteration dead loop, every call) that would make guest-spawn's env lookup slower, not
-     * faster. Extend this map, not `System.getenv()`.
+     * faster. Extend [ProcessEnvironment], not `System.getenv()`.
      */
-    private val FIXED: Map<String, String> = mapOf(
-        // A well-behaved CLI checks TERM (or isatty()) before deciding whether ANSI SGR/256-color
-        // is safe to emit; leaving it unset reads as "no color support" and guests downgrade
-        // silently even though this project's own VT parser (XtermTerminal.sgr) handles it fine.
-        "TERM" to "xterm-256color",
-        "LANG" to "C.UTF-8",
-    )
-
-    /** Name fragments that mark a host var as secret-shaped; matched case-insensitively. */
-    private val TOXIC_FRAGMENTS = listOf(
-        "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH",
-        "PRIVATE", "APIKEY", "ACCESS", "SESSION", "COOKIE", "CERT",
-        "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "LD_PROFILE", "GLIBC_TUNABLES",
-        "DYLD_", "PYTHONPATH", "PYTHONHOME", "NODE_OPTIONS",
-        "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "BASH_FUNC",
-        "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND",
-        "PROXY", "TLS",
-    )
+    private val FIXED: Map<String, String> = ProcessEnvironment.curated()
 
     enum class Disposition { READY, BLOCKED, DEFERRED }
 
@@ -56,7 +41,7 @@ object GuestEnvironment {
      */
     fun deliberate(name: String): Disposition = when {
         name in FIXED -> Disposition.READY
-        TOXIC_FRAGMENTS.any { name.uppercase().contains(it) } -> Disposition.BLOCKED
+        ProcessEnvironment.blocked(name) -> Disposition.BLOCKED
         else -> Disposition.DEFERRED
     }
 

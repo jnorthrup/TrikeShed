@@ -353,7 +353,16 @@ class InProcessIsolate(
 
     /** Check before acquiring an outer owner lock that may itself be waiting for this crossing. */
     internal fun requireOutsideCrossing() {
-        check(!lock.isHeldByCurrentThread) { "Cannot await isolate retirement from its own crossing" }
+        check(!lock.isHeldByCurrentThread || executionBudget == null) { "Cannot await isolate retirement from its own crossing" }
+    }
+
+    /** Exclude crossings while a host handoff prepares and publishes the replacement. */
+    internal fun <T> exclusive(block: () -> T): T {
+        requireOutsideCrossing()
+        return lock.withLock {
+            check(alive) { "isolate $id is closed" }
+            block()
+        }
     }
 
     override fun close() {

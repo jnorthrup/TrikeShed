@@ -51,7 +51,7 @@ sealed class KifExpr {
             return out
         }
 
-        private fun isDelimiter(c: Char): Boolean = when (c) { ' ', '\n', '\r', '\t', '(', ')', '"', ';' -> true; else -> false }
+        private fun isDelimiter(c: Char): Boolean = c.isWhitespace() || when (c) { '(', ')', '"', ';' -> true; else -> false }
 
         private fun tokenize(s: String, strict: Boolean = false): List<String> {
             val out = mutableListOf<String>()
@@ -75,8 +75,9 @@ sealed class KifExpr {
                         require(!strict || closed) { "Unterminated KIF string at character $start" }
                         out.add(sb.toString())
                     }
-                    ';' -> { while (i < s.length && s[i] != '\n') i++ } // comment to EOL
+                    ';' -> { while (i < s.length && s[i] != '\n' && s[i] != '\r') i++ } // comment to EOL
                     else -> {
+                        if (c.isWhitespace()) { i++; continue }
                         val sb = StringBuilder()
                         while (i < s.length && !isDelimiter(s[i])) { sb.append(s[i]); i++ }
                         if (sb.isNotEmpty()) out.add(sb.toString())

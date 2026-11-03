@@ -42,7 +42,7 @@ import java.lang.ref.WeakReference
 class TrikeShedGraalVfs(
     private val fileOps: FileOperations = InMemoryFileOperations(cwd = VIRTUAL_ROOT),
     private val btrfsRoot: String = "/trikeshed-graal-btrfs",
-    private val liveSubvolume: String = "live",
+    private var liveSubvolume: String = "live",
     private val instanceId: String = "global",
     cas: CasStore? = null,
 ) : GraalFileSystem {
@@ -96,6 +96,12 @@ class TrikeShedGraalVfs(
     }
 
     fun snapshot(name: String): Boolean = synchronized(fileLock) { btrfs.snapshot(liveSubvolume, name) }
+
+    /** Publish the isolated tree under its canonical name before accepting guest work. */
+    fun promote(name: String) = synchronized(fileLock) {
+        check(btrfs.replace(liveSubvolume, name)) { "unable to publish guest subvolume $name" }
+        liveSubvolume = name
+    }
 
     fun fetchSnapshot(name: String, path: String): ByteArray? =
         synchronized(fileLock) { btrfs.fetchFile(name, relativeOf(parsePath(path))) }
@@ -442,6 +448,7 @@ class GraalBtrfsSupervisor(
     output: OutputStream? = null,
     error: OutputStream? = output,
     world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
+    liveSubvolume: String = world.subvolumeFor(id),
     onRootReturn: (RootObservation) -> Unit = {},
 ) : GuestIsolate {
     val vfs = TrikeShedGraalVfs(
@@ -449,7 +456,7 @@ class GraalBtrfsSupervisor(
         btrfsRoot = world.root,
         // One subvolume per guest: on a shared file root the guests would otherwise all be "live"
         // and see each other's files. The isolation this class advertises is the subvolume.
-        liveSubvolume = world.subvolumeFor(id),
+        liveSubvolume = liveSubvolume,
         instanceId = id,
         cas = world.cas,
     )

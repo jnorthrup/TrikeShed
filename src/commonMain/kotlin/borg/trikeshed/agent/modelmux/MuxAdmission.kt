@@ -18,9 +18,11 @@ internal class MuxAdmission(
     workers: Int = 8,
     capacity: Int = 64,
     pools: Map<String, MuxPool> = emptyMap(),
+    additionalPools: Map<String, List<MuxPool>> = emptyMap(),
 ) : Drain {
     private class Work(
         val binding: String,
+        val endpoint: String?,
         val context: CoroutineContext,
         val caller: Job?,
         val action: suspend () -> Any?,
@@ -29,23 +31,30 @@ internal class MuxAdmission(
     )
     private class Gate(val permit: Semaphore = Semaphore(1), var count: Int = 0)
 
-    private val poolByBinding = pools.toMap()
-    private val poolPermits: Map<String, Semaphore> = run {
+    private val poolLimits = mutableMapOf<String, Int>()
+    private val poolByBinding: Map<String, Set<String>> = run {
         require(workers > 0 && capacity > 0 && capacity <= Int.MAX_VALUE - workers)
-        val limits = mutableMapOf<String, Int>()
-        for ((binding, pool) in poolByBinding) {
+        val bindings = mutableMapOf<String, MutableSet<String>>()
+        fun add(binding: String, pool: MuxPool) {
             require(binding.isNotBlank() && pool.id.isNotBlank() && pool.capacity > 0)
-            val previous = limits.put(pool.id, pool.capacity)
+            val previous = poolLimits.put(pool.id, pool.capacity)
             require(previous == null || previous == pool.capacity) { "Conflicting capacities for pool ${pool.id}" }
+            bindings.getOrPut(binding) { mutableSetOf() }.add(pool.id)
         }
-        limits.mapValues { Semaphore(it.value) }
+        for ((binding, pool) in pools) add(binding, pool)
+        for ((binding, assigned) in additionalPools) for (pool in assigned) add(binding, pool)
+        bindings
     }
     private val supervisor = SupervisorJob(parent)
     private val scope = CoroutineScope(Dispatchers.Default + supervisor)
     // Bound both queued calls and the coroutines waiting for a binding. A binding
     // waiter must not occupy one of the independently shared transport permits.
     private val slots = Semaphore(capacity + workers)
-    private val transports = Semaphore(workers)
+    private val transportLimit = workers
+    private val capacityMutex = Mutex()
+    private val poolCounts = mutableMapOf<String, Int>()
+    private var transportCount = 0
+    private var capacityChanged = CompletableDeferred<Unit>()
     private val input = Channel.buffered<Work>(capacity) { work ->
         work.result.cancel(CancellationException("Model admission stopped"))
         slots.release()
@@ -66,14 +75,14 @@ internal class MuxAdmission(
                                     val parent = SupervisorJob(work.caller)
                                     val action = CoroutineScope(work.context.minusKey(Job) + parent).async {
                                         gate.permit.withPermit {
-                                            val transport: suspend () -> Any? = { transports.withPermit {
+                                            val pools = (poolByBinding[work.binding].orEmpty() +
+                                                work.endpoint?.let { poolByBinding[it].orEmpty() }.orEmpty())
+                                            withCapacity(pools) {
                                                 work.caller?.ensureActive()
                                                 if (!work.started.complete(Unit)) throw CancellationException("Model admission revoked")
                                                 work.caller?.ensureActive()
-                                                work.action()
-                                            } }
-                                            val pool = poolByBinding[work.binding]?.let { poolPermits.getValue(it.id) }
-                                            if (pool == null) transport() else pool.withPermit { transport() }
+                                                coroutineScope { work.action() }
+                                            }
                                         }
                                     }
                                     // Join cleanup before releasing the binding, even for an
@@ -118,14 +127,44 @@ internal class MuxAdmission(
         } }
     }
 
+    private suspend fun <T> withCapacity(pools: Set<String>, action: suspend () -> T): T {
+        while (true) {
+            val changed = capacityMutex.withLock {
+                if (transportCount < transportLimit && pools.all { (poolCounts[it] ?: 0) < poolLimits.getValue(it) }) {
+                    transportCount++
+                    for (pool in pools) poolCounts[pool] = (poolCounts[pool] ?: 0) + 1
+                    null
+                } else capacityChanged
+            }
+            if (changed == null) break
+            changed.await()
+        }
+        try {
+            return action()
+        } finally {
+            withContext(NonCancellable) {
+                capacityMutex.withLock {
+                    transportCount--
+                    for (pool in pools) {
+                        val count = poolCounts.getValue(pool) - 1
+                        if (count == 0) poolCounts.remove(pool) else poolCounts[pool] = count
+                    }
+                    val changed = capacityChanged
+                    capacityChanged = CompletableDeferred()
+                    changed.complete(Unit)
+                }
+            }
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
-    suspend fun <T> run(binding: String, action: suspend () -> T): T {
+    suspend fun <T> run(binding: String, endpoint: String? = null, action: suspend () -> T): T {
         val context = currentCoroutineContext()
         context.ensureActive()
         check(slots.tryAcquire()) { "Model admission queue full" }
         val result = CompletableDeferred<Result<Any?>>()
         val started = CompletableDeferred<Unit>()
-        val sent = input.kChannel.trySend(Work(binding, context, context[Job], action, result, started))
+        val sent = input.kChannel.trySend(Work(binding, endpoint, context, context[Job], action, result, started))
         if (!sent.isSuccess) slots.release()
         check(sent.isSuccess) { if (sent.isClosed) "Model admission closed" else "Model admission queue full" }
         try {
