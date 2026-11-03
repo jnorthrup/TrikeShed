@@ -154,14 +154,24 @@ internal object DocumentsUpload {
         folder.addEventListener("change", { picked(folder) })
         document.getElementById("ds-upload-choose")!!.addEventListener("click", { files.click() })
         document.getElementById("ds-upload-choose-folder")!!.addEventListener("click", { folder.click() })
-        panel.addEventListener("dragover", { event -> event.preventDefault() })
-        panel.addEventListener("drop", { event ->
+        fun fileDrag(event: Event): Boolean {
+            val transfer = event.asDynamic().dataTransfer ?: return false
+            val types: Array<dynamic> = js("Array.from(transfer.types || [])")
+            return types.any { it == "Files" }
+        }
+        fun dragOver(event: Event) {
+            if (!fileDrag(event) || !present()) return
             event.preventDefault(); event.stopPropagation()
-            if (pending || !present()) return@addEventListener
             panel.asDynamic().open = true
-            val transfer = event.asDynamic().dataTransfer ?: return@addEventListener
+        }
+        fun dropped(event: Event) {
+            if (!fileDrag(event) || !present()) return
+            event.preventDefault(); event.stopPropagation()
+            if (pending || !present()) return
+            panel.asDynamic().open = true
+            val transfer = event.asDynamic().dataTransfer ?: return
             val items: Array<dynamic> = js("Array.from(transfer.items || [])")
-            if (items.size > MAX_FILES) { message("Upload at most $MAX_FILES entries at once. Nothing was sent."); return@addEventListener }
+            if (items.size > MAX_FILES) { message("Upload at most $MAX_FILES entries at once. Nothing was sent."); return }
             val roots = items.mapNotNull { item -> if (item.webkitGetAsEntry != null) item.webkitGetAsEntry() else null }
             val fallback = transfer.files
             if (roots.isEmpty()) {
@@ -200,7 +210,11 @@ internal object DocumentsUpload {
                 } else for (root in roots) walk(root, "", 0)
                 entries j if (singleFolder) roots.first().name as String else (entries.firstOrNull()?.path?.substringBeforeLast('.') ?: "documents")
             }
-        })
+        }
+        panel.addEventListener("dragover", { event -> dragOver(event) })
+        panel.addEventListener("drop", { event -> dropped(event) })
+        window.addEventListener("dragover", { event -> dragOver(event) })
+        window.addEventListener("drop", { event -> dropped(event) })
         window.addEventListener("pagehide", { _: Event -> closed = true; abort?.abort(); owner.cancel() })
         // A cached page owns cancelled work. Rebuild its controls from the retained URL;
         // never retry an upload whose server may already have admitted some files.
