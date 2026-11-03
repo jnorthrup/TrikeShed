@@ -60,6 +60,7 @@ sealed class KifExpr {
                 when (val c = s[i]) {
                     ' ', '\n', '\r', '\t' -> i++
                     '(' , ')' -> { out.add(c.toString()); i++ }
+                    '\'' -> { out.add("'"); i++ }
                     '"' -> {
                         val start = i
                         var closed = false

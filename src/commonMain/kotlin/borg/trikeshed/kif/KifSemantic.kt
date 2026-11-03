@@ -49,15 +49,24 @@ object KifSemantic {
         var quoted = false
         var escaped = false
         var comment = false
+        var atom = false
         var quotePrefixes = 0
         var activeQuotes = 0
         val quoteCosts = mutableListOf<Int>()
         for (c in text) {
             if (!quoted && !comment) {
-                if (c == '\'') {
+                if (c == '\'' && !atom) {
                     quotePrefixes++
                     require(quotePrefixes + activeQuotes + depth <= limits.maxDepth) { "KIF quotation nesting exceeds bound" }
-                } else if (!c.isWhitespace() && c != ';' && c != '(' && c != ')') quotePrefixes = 0
+                } else if (c == '"') {
+                    atom = false
+                    quotePrefixes = 0
+                } else if (c.isWhitespace() || c == ';' || c == '(' || c == ')') {
+                    atom = false
+                } else {
+                    if (!atom) quotePrefixes = 0
+                    atom = true
+                }
             }
             when {
                 comment -> if (c == '\n' || c == '\r') comment = false

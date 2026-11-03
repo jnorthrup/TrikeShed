@@ -4,6 +4,26 @@ import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class KifSemanticTest {
+    @Test fun repeatedQuotationPreservesNestedSyntaxAndDoesNotCaptureVariables() {
+        val text = "(p ''(q ?X) ''?Y can't)"
+        val decoded = KifSemantic.decode(text)
+        assertEquals(text, decoded.syntax.toKifString())
+        assertTrue(decoded.freeVariables.isEmpty())
+        val arguments = assertIs<KifFormula.Predicate>(decoded.formula).arguments
+        val first = assertIs<KifTerm.Quote>(arguments[0])
+        val nested = assertIs<KifExpr.Quoted>(first.syntax)
+        assertIs<KifExpr.ListExpr>(nested.expr)
+        val second = assertIs<KifTerm.Quote>(arguments[1])
+        assertIs<KifExpr.Var>(assertIs<KifExpr.Quoted>(second.syntax).expr)
+        assertEquals("can't", assertIs<KifTerm.Constant>(arguments[2]).token)
+        assertTrue(decoded.alphaEquivalent(KifSemantic.decode(decoded.syntax.toKifString())))
+
+        // Apostrophes inside an atom are not quote prefixes or nesting.
+        val symbol = "x" + "'".repeat(70) + "y"
+        val plain = KifSemantic.decode("(p $symbol)")
+        assertEquals(symbol, assertIs<KifTerm.Constant>(assertIs<KifFormula.Predicate>(plain.formula).arguments.single()).token)
+    }
+
     @Test fun malformedUtf16IsRejectedAndNonBmpSyntaxRoundTrips() {
         val first = "\uD800"
         val second = "\uD801"
