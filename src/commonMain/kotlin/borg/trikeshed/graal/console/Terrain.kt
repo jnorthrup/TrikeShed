@@ -71,7 +71,10 @@ object Terrain {
         val root = TerrainNode("trikeshed", null).apply { rect(0.0, 0.0, W, H) }
         val byId = HashMap<String, TerrainNode>()
         var maxSeq = 1L
-        for (row in rows) {
+        // Store and project enumerations may arrive in different orders after a restart.
+        // A stable insertion order also makes aggregate floating-point sums repeatable.
+        for (row in rows.sortedWith(compareBy<TerrainRow> { it.id }.thenBy { it.seq }.thenBy { it.gen }
+            .thenBy { it.bytes }.thenBy { it.code }.thenBy { it.bit })) {
             val parts = if (similarity)
                 listOf("code-" + ((row.code shr 8) and 0xFF).toString(16).padStart(2, '0'), "code-" + (row.code and 0xFFFF).toString(4), row.id)
             else row.id.split('/').filter { it.isNotEmpty() }
@@ -107,7 +110,7 @@ object Terrain {
     fun layout(n: TerrainNode, root: TerrainNode, shrinkTotal: Boolean = false) {
         if (n.laid) return
         n.laid = true
-        val kids = n.children.values.sortedByDescending { it.mass }
+        val kids = n.children.values.sortedWith(compareByDescending<TerrainNode> { it.mass }.thenBy { it.name })
         if (kids.isEmpty()) return
         val pad = min(n.w, n.h) * 0.015
         val title = if (n !== root) n.h * 0.07 else 0.0

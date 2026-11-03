@@ -105,6 +105,10 @@ object HermesTerminalPage {
 
     private fun snapshot(x: dynamic) {
         if (page.closing) return
+        val context = strOrEmpty(x.breadcrumbContext)
+        val link = byId("breadcrumbContext")
+        link.hidden = context.isBlank()
+        if (context.isNotBlank()) link.setAttribute("href", "/modelmux?context=" + js("encodeURIComponent")(context))
         val p: dynamic = if (truthy(x.panel)) x.panel else x
         adoptState(x)
         if (grid.adopt(p, x.sequence)) {

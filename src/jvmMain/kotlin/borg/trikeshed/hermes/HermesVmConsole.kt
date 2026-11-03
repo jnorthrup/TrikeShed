@@ -587,6 +587,7 @@ class HermesVmConsole(
             "detail" to detail,
             "boot" to boot?.toMap(),
             "model" to modelId,
+            "breadcrumbContext" to if (breadcrumbs) runtime?.session else null,
             "runtime" to if (cliRequested) "hermes-cli" else "python-diagnostic",
             // This describes the configured execution path, not an assertion of OS sandboxing.
             "runtimeTier" to if (workerConfiguration == null) "restricted-vfs" else "native-own-trust",

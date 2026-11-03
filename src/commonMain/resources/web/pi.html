@@ -13,6 +13,9 @@ main{max-width:1000px;margin:0 auto;padding:30px 24px 60px}h1{margin:0;font-size
 .controls{display:flex;flex-wrap:wrap;align-items:end;gap:12px}label{display:grid;gap:5px;color:var(--dim)}select,input,textarea,button{font:inherit;border:1px solid var(--line);border-radius:6px;background:#0d141b;color:var(--ink);padding:9px}
 select{min-width:220px}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}.primary{background:#21635a;border-color:#39877b}.status{min-height:1.5em}.transcript{white-space:pre-wrap;overflow-wrap:anywhere;min-height:100px;max-height:45vh;overflow:auto}textarea{display:block;width:100%;resize:vertical;min-height:100px;margin:8px 0}a{color:var(--accent)}
 button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#terminalPanel{background:#050607;border:1px solid #293142;min-width:0;overflow:auto;padding:10px;font:14px/1.15 ui-monospace,SFMono-Regular,Menlo,monospace}
+#screen{min-width:max-content;background:#000;color:#d8dce6;padding:5px 6px;user-select:text}.termrow{height:1.15em;white-space:pre}.cell{display:inline-block;width:.61em;height:1.15em;vertical-align:top}.cursor{outline:1px solid #f2a011;background:rgba(242,160,17,.28)}
+#pi-transcript{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 </style>
 </head>
 <body data-app-page="pi">
@@ -23,18 +26,20 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
   <section class="card" aria-label="Pi session">
     <h2>Session</h2>
     <p id="pi-status" class="status" role="status" aria-live="polite">Enter the Pi access token, then refresh models.</p>
+    <a id="pi-context" hidden>Open breadcrumbs in ModelMux</a>
     <div class="controls">
       <label>Pi access token <input id="pi-token" type="password" autocomplete="off" aria-label="Pi access token"></label>
       <label>Model <select id="pi-model" aria-label="Pi model" disabled><option value="">Choose a model</option></select></label>
+      <label>Breadcrumb context <input id="pi-breadcrumb" type="text" maxlength="128" placeholder="New context"></label>
       <button id="pi-refresh" type="button">Refresh models</button>
       <button id="pi-start" class="primary" type="button" disabled>Start Pi session</button>
       <button id="pi-close" type="button" disabled>Close session</button>
     </div>
   </section>
   <section class="card" aria-label="Pi conversation">
-    <h2>Conversation</h2>
+    <h2>Pi console</h2>
     <div id="pi-transcript" class="transcript" aria-live="polite">No messages yet.</div>
-    <form id="pi-form"><label for="pi-prompt">Message</label><textarea id="pi-prompt" placeholder="Write a message for this session"></textarea><button id="pi-send" class="primary" type="submit" disabled>Send to Pi</button></form>
+    <div id="terminalPanel"><div id="screen" role="log" aria-label="Pi xterm console"></div><span id="geometry" hidden></span><span id="revision" hidden></span><form id="pi-form"><label for="pi-prompt">&gt; Message</label><textarea id="pi-prompt" placeholder="Write a message for this session"></textarea><button id="pi-send" class="primary" type="submit" disabled>Send to Pi</button></form></div>
   </section>
 </main>
 <script src="/kotlin/pages/pages.js" defer></script>

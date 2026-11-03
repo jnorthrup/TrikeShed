@@ -2966,6 +2966,7 @@ object OroborosDaemon {
             ),
         ) else null,
         panelId = panelId,
+        breadcrumbs = true,
         )
     }
 

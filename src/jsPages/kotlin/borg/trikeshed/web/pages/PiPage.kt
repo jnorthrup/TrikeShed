@@ -1,6 +1,10 @@
 package borg.trikeshed.web.pages
 
 import borg.trikeshed.web.PanelsPage
+import borg.trikeshed.lib.*
+import borg.trikeshed.lcnc.media.toMap
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.terminal.XtermTerminal
 import kotlinx.browser.sessionStorage
 import kotlinx.browser.window
 import org.w3c.dom.HTMLButtonElement
@@ -13,6 +17,16 @@ import org.w3c.dom.url.URLSearchParams
 /** Pi is an independent host session; its token never enters storage or a Hermes route. */
 object PiPage {
     private val page = PanelsPage(::pageFailure)
+    private val terminal = XtermTerminal(100, 24)
+    private val grid = TerminalGrid(hermes = true)
+    private fun terminalWrite(text: String) {
+        terminal.feed(text.replace("\u001b", "").replace("\r\n", "\n").replace("\n", "\r\n"))
+        val screen = terminal.snapshot(0)
+        grid.columns = screen.columns; grid.rows = screen.rows; grid.revision = screen.revision
+        grid.cursor = JSON.parse<dynamic>(jsonOf(_m["row" j screen.cursor.row, "column" j screen.cursor.column, "visible" j screen.cursor.visible]))
+        grid.lines = JSON.parse<dynamic>(jsonOf(screen.lines.view.map { row -> row.view.map { it.toMap() } }))
+        grid.renderAll()
+    }
     private fun pageFailure(failure: Throwable) { if (!page.closing) status(failure.message ?: "Pi request failed") }
     private var revision = 0
     private var busy = false
@@ -24,6 +38,7 @@ object PiPage {
     private val storagePrefix = "trikeshed.pi." + project + "."
     private fun token() = byId("pi-token") as HTMLInputElement
     private fun model() = byId("pi-model") as HTMLSelectElement
+    private fun breadcrumb() = byId("pi-breadcrumb") as HTMLInputElement
     private fun prompt() = byId("pi-prompt") as HTMLTextAreaElement
     private fun button(id: String) = byId(id) as HTMLButtonElement
     private fun status(message: String) { byId("pi-status").textContent = message }
@@ -36,6 +51,7 @@ object PiPage {
         token().disabled = busy
         button("pi-refresh").disabled = busy || !hasToken
         model().disabled = busy || !verified || sessionId != null
+        breadcrumb().disabled = busy || sessionId != null
         button("pi-start").disabled = busy || !verified || sessionId != null || model().value.isBlank()
         button("pi-close").disabled = busy || !verified || sessionId == null || state == "closing"
         button("pi-send").disabled = busy || !verified || sessionId == null || state != "ready" || prompt().value.isBlank()
@@ -50,6 +66,7 @@ object PiPage {
         return value
     }
     private fun append(label: String, text: String, toolResult: String? = null) {
+        terminalWrite("$label\r\n$text\r\n\r\n")
         val out = byId("pi-transcript")
         if (out.textContent == "No messages yet.") out.textContent = ""
         val item = window.document.createElement("section")
@@ -63,6 +80,7 @@ object PiPage {
         if (result == null || turn.isBlank() || turn == lastResult || !(js("Array").isArray(result.messages) as Boolean)) return
         lastResult = turn
         byId("pi-transcript").textContent = ""
+        terminal.feed("\u001b[2J\u001b[H")
         for (message in jsArray(result.messages)) {
             val role = strOrEmpty(message?.role).ifBlank { "Pi" }
             val content = message?.content
@@ -101,6 +119,10 @@ object PiPage {
                 val value = request("/session/status?sessionId=" + js("encodeURIComponent")(id))
                 if (page.closing || ticket != revision || sessionId != id) return@submit
                 state = strOrEmpty(value.state).ifBlank { "unknown" }
+                val context = strOrEmpty(value.contextId)
+                val contextLink = byId("pi-context")
+                contextLink.hidden = context.isBlank() || value.contextRetained != true
+                if (context.isNotBlank()) contextLink.setAttribute("href", "/modelmux?context=" + js("encodeURIComponent")(context))
                 if (jsTypeOf(value.model) == "string") model().value = str(value.model)
                 if (js("Array").isArray(value.workspaceFiles) as Boolean && jsArray(value.workspaceFiles).isNotEmpty()) {
                     byId("pi-project").hidden = false
@@ -130,6 +152,8 @@ object PiPage {
         }
     }
     fun mount() {
+        terminalWrite("Pi · xterm-256color\r\n")
+        breadcrumb().value = URLSearchParams(window.location.search).get("context")?.take(128).orEmpty()
         if (project.isNotEmpty()) {
             byId("pi-project").hidden = false
             byId("pi-project").textContent = "Project navigation context: $project. It is not automatically attached to this session."
@@ -166,6 +190,7 @@ object PiPage {
                 page.submit {
                     try {
                         val body = obj(); body.model = model().value
+                        if (breadcrumb().value.isNotBlank()) body.contextId = breadcrumb().value.trim()
                         val value = request("/session/start", body)
                         if (page.closing || ticket != revision) return@submit
                         val id = strOrEmpty(value.sessionId); require(id.isNotBlank()) { "Pi did not return a session ID" }

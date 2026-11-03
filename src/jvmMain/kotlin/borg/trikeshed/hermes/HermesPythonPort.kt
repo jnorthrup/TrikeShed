@@ -481,6 +481,9 @@ class HermesPythonPort(
         // script identity even when this host imports the entry instead of executing it.
         guest.eval("import sys\nif not sys.argv:\n    sys.argv.append(${pythonString(entryPath)})\nTrue", "hermes-entry-arguments.py")
         guest.eval(IMPORTER_BOOTSTRAP, "hermes-blackboard-importer.py")
+        // Hermes' default Path.home() can resolve to the host user's home even when the
+        // guest environment is empty. Its session store must live in the guest VFS.
+        guest.eval("import os\nos.environ['HOME'] = '/workspace'\nos.environ['HERMES_HOME'] = '/workspace/.hermes'\nTrue", "hermes-guest-home.py")
         // The prelude twins the capabilities the polyglot bounds withhold, and it has to run
         // before the guest binds them: stdlib `threading` copies `_thread.start_joinable_thread`
         // into a module global at import, so a twin installed after that import is never seen.

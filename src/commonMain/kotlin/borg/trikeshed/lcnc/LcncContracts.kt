@@ -1314,13 +1314,14 @@ object LcncContracts {
         //   CouchKeyStore entry; (3) the manual url+key fields. The key field
         //   is a password input (secret: prefix).
         LcncPortContract("prompt.chat", "ask a model",
-            listOf("prompt?"), listOf("content", "model", "ok", "error", "cached", "receipt"),
-            inputKinds = mapOf("prompt" to "text"),
+            _l["prompt?", "context?"], _l["content", "model", "ok", "error", "cached", "receipt", "context"],
+            inputKinds = _m["prompt" j "text", "context" j "id"],
             // cached: the reactor answered from its cache (same question as before) —
             // the answer card says so, because a repeat that looks live is a lie.
-            outputKinds = mapOf("content" to "text", "model" to "id", "ok" to "json", "error" to "text", "cached" to "json", "receipt" to "json"),
+            outputKinds = _m["content" j "text", "model" j "id", "ok" j "json", "error" j "text", "cached" j "json", "receipt" j "json", "context" j "id"],
             params = mapOf(
                 "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "what do you want to ask?"),
+                "context" to LcncPortContract.LcncParamSpec(ph = "breadcrumb context shared with Pi, Hermes or ModelMux"),
                 // Blank default: the live list leads, and its first entry is the newest
                 // model Hermes ran here (mux cards come from Hermes first).
                 "model" to LcncPortContract.LcncParamSpec(ph = "which model answers — the list is what runs here", optsFrom = "mux.models#models[].id"),

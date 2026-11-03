@@ -16,6 +16,7 @@ import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib._m
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.htx.HtxKey
@@ -296,6 +297,8 @@ object BrainMuxNodes {
                 val startedAtMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
                 val parentAttribution = currentCoroutineContext()[MuxCallContext]
                 val frame = currentCoroutineContext()[LcncScopeFrame]
+                val contextId = ((inputs["context"] ?: inputs["context?"]) as? String)?.takeIf { it.isNotBlank() }
+                    ?: node.params["context"]?.takeIf { it.isNotBlank() } ?: node.id
                 var attributed: MuxCallRecord? = null
                 val attribution = MuxCallContext(
                     conversationId = parentAttribution?.conversationId,
@@ -313,7 +316,7 @@ object BrainMuxNodes {
                             messages = acpMessages,
                             maxTokens = maxTokens,
                             temperature = temperature,
-                            contextId = node.id,
+                            contextId = contextId,
                         ).getOrThrow())
                     }
                 } catch (t: kotlinx.coroutines.CancellationException) {
@@ -325,7 +328,7 @@ object BrainMuxNodes {
                 // The callback belongs to this invocation, including repeated node ids.
                 val cachedHitKnown: Boolean? = attributed?.cachedHit
                 val cachedHit = cachedHitKnown == true
-                val receiptOutput: Map<String, Any?> = attributed?.let { record ->
+                val receiptOutput: Map<String, Any?> = _m["context" j contextId] + (attributed?.let { record ->
                     mapOf("cachedHit" to record.cachedHit, "receipt" to linkedMapOf(
                         "id" to record.id, "conversationId" to record.conversationId, "turnId" to record.turnId,
                         "scopeCid" to frame?.chain?.cid?.value, "node" to node.id,
@@ -339,7 +342,7 @@ object BrainMuxNodes {
                         "cacheWriteTokens" to record.takeIf { it.status == "completed" }?.cacheWriteTokens,
                         "maxTokens" to maxTokens, "temperature" to temperature,
                     ))
-                } ?: emptyMap()
+                } ?: emptyMap())
                 return@LcncNodeRunner result.fold(
                     onSuccess = { response ->
                         val content = response.a
