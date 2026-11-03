@@ -19,6 +19,11 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
   font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased}
 #document-surface{display:grid;grid-template-columns:260px 1fr;height:100vh}
+.ds-upload{position:fixed;left:12px;bottom:12px;width:236px;max-height:65vh;overflow:auto;z-index:20;background:var(--side);border:1px solid var(--line);border-radius:6px;padding:8px;box-sizing:border-box;font-size:12px}
+.ds-upload summary{cursor:pointer;color:var(--accent);font-weight:600}
+.ds-upload p{margin:8px 0}.ds-upload input[type=text]{width:100%;box-sizing:border-box;background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:5px}
+.ds-upload button{margin:6px 3px 0 0;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px;cursor:pointer}
+.ds-upload[aria-busy=true]{border-color:var(--accent)}.ds-upload a{color:var(--accent)}
 
 /* sidebar */
 .ds-side{background:var(--side);border-right:1px solid var(--rule);overflow:auto;padding:10px 8px 24px}
@@ -197,6 +202,17 @@ summary:focus-visible,
 </head>
 <body data-app-page="documents">
 <div id="document-surface" class="ds"><p class="ds-loading">Loading documents…</p></div>
+<details id="ds-upload" class="ds-upload">
+<summary>Add files · curate later</summary>
+<p>Files and folders create a <strong>new project</strong>, shown in Documents. Originals go into your Forge data folder under <code>files/&lt;project&gt;/</code>. The selected document is not replaced.</p>
+<label for="ds-upload-project">New project name (optional)</label>
+<input id="ds-upload-project" type="text" maxlength="100" placeholder="Defaults to file or folder name">
+<input id="ds-upload-files" type="file" multiple hidden>
+<input id="ds-upload-folder" type="file" webkitdirectory multiple hidden>
+<button id="ds-upload-choose" type="button">Choose files</button><button id="ds-upload-choose-folder" type="button">Choose folder</button>
+<p>Or drop onto this box. Up to 1,000 files, 32 MiB each, 128 MiB total. Storage only: this upload does not call a model or approve facts. Curate later; TXT/MD source retention stays separate.</p>
+<p id="ds-upload-status" role="status" aria-live="polite"></p>
+</details>
 <script src="./kotlin/documents/documents.js" defer></script>
 </body>
 </html>

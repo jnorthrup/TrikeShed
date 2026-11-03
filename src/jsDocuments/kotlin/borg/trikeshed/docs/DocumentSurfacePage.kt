@@ -81,6 +81,7 @@ object DocumentSurfacePage {
         borg.trikeshed.web.AppNav.mount()
         val root = document.getElementById(DocumentSurface.ROOT_ID) as HTMLElement
         root.innerHTML = DocumentSurface.layout()
+        DocumentsUpload.mount()
         root.addEventListener("click", { e -> onClick(e) })
         root.addEventListener("submit", { e -> onSubmit(e) })
         root.addEventListener("input", { e -> onInput(e) })
