@@ -4,6 +4,17 @@ import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class XtermTerminalUnicodeTest {
+    @Test fun resizeDropsAWideGlyphClippedOnEitherScreen() {
+        val terminal = XtermTerminal(4, 2)
+        terminal.feed("AB界\u001b[?1049hAB界")
+        terminal.resize(3, 2)
+        assertEquals(" ", terminal.snapshot().lines[0][2].text)
+        terminal.feed("\u001b[?1049l")
+        assertEquals(" ", terminal.snapshot().lines[0][2].text)
+        terminal.resize(4, 2)
+        assertFalse(terminal.snapshot().lines[0][3].continuation)
+    }
+
     @Test fun splitSurrogateRetainsOneColoredWideGlyph() {
         val terminal = XtermTerminal(5, 2)
         terminal.feed("\u001b[38;5;196m\uD83D")

@@ -186,10 +186,16 @@ class XtermTerminal(
         val nextColumns = columns.coerceAtLeast(1)
         val nextRows = rows.coerceAtLeast(1)
         if (nextColumns == this.columns && nextRows == this.rows) return emptySeriesOf()
-        val next = blankScreen(nextColumns, nextRows)
-        val copyRows = minOf(this.rows, nextRows)
-        val copyColumns = minOf(this.columns, nextColumns)
-        for (r in 0 until copyRows) for (c in 0 until copyColumns) next[r][c] = cells[r][c]
+        val next = resizeScreen(cells, nextColumns, nextRows)
+        mainScreen = mainScreen?.let { main ->
+            main.copy(
+                cells = resizeScreen(main.cells, nextColumns, nextRows),
+                row = main.row.coerceIn(0, nextRows - 1),
+                column = main.column.coerceIn(0, nextColumns - 1),
+                scrollTop = 0,
+                scrollBottom = nextRows - 1,
+            )
+        }
         this.columns = nextColumns
         this.rows = nextRows
         cells = next
@@ -218,6 +224,7 @@ class XtermTerminal(
         scrollTop = 0; scrollBottom = rows - 1
         title = ""; applicationCursorKeys = false; originMode = false
         autoWrap = true; cursorVisible = true; wrapPending = false
+        mainScreen = null; alternateScreen = false
         parser = Parser.GROUND; csi.clear(); osc.clear(); replies.clear(); highSurrogate = null
         revision++
     }
@@ -643,6 +650,16 @@ class XtermTerminal(
 
     companion object {
         private fun blankScreen(columns: Int, rows: Int): Array<Array<VtCell>> = Array(rows) { Array(columns) { VtCell() } }
+        private fun resizeScreen(screen: Array<Array<VtCell>>, columns: Int, rows: Int): Array<Array<VtCell>> {
+            val next = blankScreen(columns, rows)
+            for (r in 0 until minOf(screen.size, rows)) {
+                val count = minOf(screen[r].size, columns)
+                for (c in 0 until count) next[r][c] = screen[r][c]
+                // Do not retain half of a wide character at the right edge.
+                if (count < screen[r].size && screen[r][count].continuation) next[r][count - 1] = VtCell()
+            }
+            return next
+        }
         private fun codePoint(s: String): Int = if (s.length == 2 && s[0].isHighSurrogate() && s[1].isLowSurrogate()) {
             0x10000 + ((s[0].code - 0xD800) shl 10) + (s[1].code - 0xDC00)
         } else s[0].code

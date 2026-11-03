@@ -4,6 +4,33 @@ import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class XtermTerminalBoundsTest {
+    @Test fun alternateScreenResizeKeepsTheSavedScreenWithinTheNewGeometry() {
+        val terminal = XtermTerminal(4, 2)
+        terminal.feed("ABCD\r\nEFGH\u001b[?1049h")
+        terminal.resize(2, 1)
+        terminal.resize(6, 3)
+        terminal.feed("\u001b[?1049l")
+        val screen = terminal.snapshot()
+        assertFalse(screen.alternateScreen)
+        assertEquals(6, screen.columns)
+        assertEquals(3, screen.rows)
+        assertEquals("A", screen.lines[0][0].text)
+        assertEquals("B", screen.lines[0][1].text)
+        assertEquals(" ", screen.lines[0][2].text)
+        assertEquals(" ", screen.lines[1][0].text)
+        terminal.feed("\u001b[3;6HZ")
+        assertEquals("Z", terminal.snapshot().lines[2][5].text)
+    }
+
+    @Test fun resetLeavesAlternateScreenAndDiscardsItsSavedScreen() {
+        val terminal = XtermTerminal(4, 2)
+        terminal.feed("old\u001b[?1049h")
+        terminal.reset()
+        assertFalse(terminal.snapshot().alternateScreen)
+        terminal.feed("new\u001b[?1049hother\u001b[?1049l")
+        assertEquals("new", terminal.plainText().substringBefore('\n'))
+    }
+
     @Test fun largeCursorMovementsStayInsideTheScreen() {
         val terminal = XtermTerminal(4, 3)
         terminal.feed("a\r\nb")
