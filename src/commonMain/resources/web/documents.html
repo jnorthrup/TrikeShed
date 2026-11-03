@@ -69,8 +69,8 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 .ds-view.ds-on{color:var(--ink);background:var(--hover);font-weight:500}
 .ds-content{overflow:auto;flex:1}
 @media(max-width:600px){
-  body[data-app-page=documents]{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
-  body[data-app-page=documents] #document-surface{height:auto;min-height:0;flex:1 1 0}
+  body[data-app-page=documents]{display:flex;flex-direction:column;height:100dvh;overflow-x:hidden;overflow-y:auto}
+  body[data-app-page=documents] #document-surface{height:auto;min-height:160px;flex:1 1 0}
   .ds-upload{position:static;flex:none;width:auto;max-height:35dvh;margin:6px 8px 8px}
   #document-surface{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
   .ds-side{max-height:25dvh;box-sizing:border-box;border-right:0;border-bottom:1px solid var(--rule)}
