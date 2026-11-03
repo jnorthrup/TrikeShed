@@ -85,7 +85,11 @@ class JevaInference(
     // Key tokens are included in the retained payload accounting; Series closure identity is not a cache key.
     val options = JevaCache<List<Int>, Join<Int, JevaOptionMemory>>(4096, 128L * 1024 * 1024) { it.a * 4L + it.b.nbytes }
 
-    fun infer(state: String, questions: JevaQuestions): Map<String, Any?> {
+    fun infer(state: String, questions: JevaQuestions): Map<String, Any?> =
+        Jeva.answers(inferRaw(state, questions), questions)
+
+    /** Raw distribution for the process boundary; validation remains with the caller. */
+    internal fun inferRaw(state: String, questions: JevaQuestions): Map<String, Any?> {
         check(!closed) { "Jeva inference is closed" }
         val answers = LinkedHashMap<String, Any?>()
         var requested = 0L; var encodedState = 0L; var encodedOptions = 0L; var cachedOptions = 0L
@@ -133,10 +137,10 @@ class JevaInference(
                 "null_probability" to pNull, "noul" to if (question.type == "noul") q[1] else null)
             check()
         }
-        return Jeva.answers(mapOf("model" to identity, "answers" to answers, "usage" to mapOf(
+        return mapOf("model" to identity, "answers" to answers, "usage" to mapOf(
             "input_tokens" to encodedState + encodedOptions, "requested_input_tokens" to requested,
             "encoded_state_tokens" to encodedState, "encoded_option_tokens" to encodedOptions,
-            "cached_option_tokens" to cachedOptions, "truncated_tokens" to 0L, "output_tokens" to 0L)), questions)
+            "cached_option_tokens" to cachedOptions, "truncated_tokens" to 0L, "output_tokens" to 0L))
     }
 
     fun close() {

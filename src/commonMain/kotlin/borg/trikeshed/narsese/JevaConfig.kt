@@ -19,10 +19,17 @@ data class JevaConfig(
     val timeoutMs: Long = 600_000,
     val env: Map<String, String> = emptyMap(),
     val runtime: JevaRuntime = JevaRuntime.KOTLIN,
+    /** Explicit local worker executable; its process owns native inference and its deadline. */
+    val worker: String? = null,
+    val mlxMaxTokens: Int? = null,
+    val mlxCheckpointLimitBytes: Long? = null,
 ) {
     init {
         require(python.isNotBlank() && model.isNotBlank() && device.isNotBlank())
         require(maxStateLength > 0 && maxOptionLength > 0 && timeoutMs > 0)
+        require(worker == null || (worker.isNotBlank() && runtime == JevaRuntime.KOTLIN))
+        require(mlxMaxTokens == null || mlxMaxTokens > 0)
+        require(mlxCheckpointLimitBytes == null || mlxCheckpointLimitBytes >= 0)
     }
 
     fun fields(): Map<String, Any?> = mapOf(
@@ -33,7 +40,9 @@ data class JevaConfig(
         "truncation" to "error",
         "env" to env,
         "runtime" to runtime.name.lowercase(),
-    )
+    ) + (worker?.let { mapOf("worker" to it) } ?: emptyMap()) +
+        (mlxMaxTokens?.let { mapOf("mlx_max_tokens" to it) } ?: emptyMap()) +
+        (mlxCheckpointLimitBytes?.let { mapOf("mlx_checkpoint_limit_bytes" to it) } ?: emptyMap())
 
     /** Diagnostic only; identifiers are never downloaded or silently resolved as remote models. */
     fun layoutError(detail: String): String =
@@ -53,7 +62,11 @@ data class JevaConfig(
                 source = value("source"), device = value("device") ?: "cpu", revision = value("revision"),
                 env = listOf("GRAAL_PYTHON_VM_ARGS", "PYTORCH_MPS_HIGH_WATERMARK_RATIO", "PYTORCH_MPS_LOW_WATERMARK_RATIO")
                     .mapNotNull { name -> environment(name)?.takeIf { it.isNotBlank() }?.let { name to it } }.toMap(),
-                runtime = value("runtime")?.let { JevaRuntime.valueOf(it.uppercase()) } ?: JevaRuntime.KOTLIN)
+                runtime = value("runtime")?.let { JevaRuntime.valueOf(it.uppercase()) } ?: JevaRuntime.KOTLIN,
+                worker = value("worker"),
+                mlxMaxTokens = environment("TRIKESHED_MLX_MAX_TOKENS")?.let { requireNotNull(it.toIntOrNull()) { "Invalid MLX max tokens" } },
+                mlxCheckpointLimitBytes = environment("TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES")?.let { requireNotNull(it.toLongOrNull()) { "Invalid MLX checkpoint limit" } },
+                timeoutMs = value("timeout_ms")?.let { requireNotNull(it.toLongOrNull()) { "Invalid Jeva timeout_ms" } } ?: 600_000)
         }
     }
 }

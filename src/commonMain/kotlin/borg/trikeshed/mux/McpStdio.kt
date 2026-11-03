@@ -167,7 +167,7 @@ object McpStdio {
                         host.diagnose("mcp-stdio: select TRIKESHED_JEVA_RUNTIME=kotlin explicitly for unqualified Kotlin MLX oversight")
                         error("explicit Kotlin runtime selection required")
                     }
-                    if (nio.service<EncoderOperations>() == null) {
+                    if (config.worker == null && nio.service<EncoderOperations>() == null) {
                         host.diagnose("mcp-stdio: Kotlin MLX oversight requires the macOS native EncoderOperations provider")
                         error("MLX encoder provider unavailable")
                     }

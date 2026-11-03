@@ -38,6 +38,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
     val completion = CompletableDeferred<Result<Unit>>()
     var process: ProcessLineChannel? = null
         private set
+    private var workerMetadata: Map<String, Any?>? = null
     var nio: NioSupervisor? = null
         private set
     var inference: JevaInference? = null
@@ -73,7 +74,8 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
                 }
                 result.exceptionOrNull()?.let {
                     if (it is JevaDeadline.Expired) expiration = it
-                    metadata = metadata + mapOf("available" to false, "error" to (it.message ?: it.toString()))
+                    metadata = metadata + mapOf("available" to false, "error" to (it.message ?: it.toString())) +
+                        if (config.worker != null) mapOf("loaded" to false) else emptyMap()
                 }
                 // Availability is data; inference errors remain failures and cannot become evidence.
                 work.reply.complete(if (work.operation == Operation.STATUS && result.isFailure) Result.success(metadata) else result)
@@ -96,10 +98,20 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
     private suspend fun closeRuntime() {
         var failure: Throwable? = null
         try { inference?.close(); inference = null } catch (error: Throwable) { failure = error }
-        try { process?.drain(); process = null } catch (error: Throwable) {
+        try { process?.let { closeProcess(it) } } catch (error: Throwable) {
             if (failure == null) failure = error else failure.addSuppressed(error)
         }
         failure?.let { throw it }
+    }
+
+    /** A protocol failure is not proof that the child pipes have been released. */
+    private suspend fun closeProcess(channel: ProcessLineChannel) {
+        try { channel.drain() } finally {
+            if (channel.pipeCompletion.isCompleted && process === channel) {
+                process = null
+                workerMetadata = null
+            }
+        }
     }
 
     /** Registered upstream lanes retain future inference admission until their accepted effects have settled. */
@@ -116,8 +128,11 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
     }
 
     suspend fun channel(): ProcessLineChannel {
-        check(config.runtime == JevaRuntime.PYTHON) { "Kotlin Jeva does not launch a Python process" }
-        process?.let { return it }
+        check(config.runtime == JevaRuntime.PYTHON || config.worker != null) { "No Jeva process is configured" }
+        process?.let { existing ->
+            if (!existing.protocolCompletion.isCompleted && (config.worker == null || workerMetadata != null)) return existing
+            closeProcess(existing)
+        }
         val context = currentCoroutineContext()
         val ops = context[ProcessOperations] ?: context[NioSupervisor]?.service<ProcessOperations>()
             ?: nio?.service<ProcessOperations>() ?: run {
@@ -126,21 +141,48 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
             owned.open()
             requireNotNull(owned.service<ProcessOperations>()) { "Jeva requires local ProcessOperations" }
         }
-        return ProcessLineChannel.open(CoroutineScope(context + ops), config.python,
+        val executable = config.worker ?: config.python
+        val arguments = if (config.worker != null) emptyList() else
             listOf("-u", "-c", JevaProcess.program, jsonOf(config.fields() +
-                ("worker_sha256" to ContentId.of(JevaProcess.program.encodeToByteArray()).hex))),
+                ("worker_sha256" to ContentId.of(JevaProcess.program.encodeToByteArray()).hex)))
+        val opened = ProcessLineChannel.open(CoroutineScope(context + ops), executable, arguments,
             env = config.env + mapOf("HF_HUB_OFFLINE" to "1", "TRANSFORMERS_OFFLINE" to "1", "HF_HUB_DISABLE_TELEMETRY" to "1"),
-            capacity = 1, frameBytes = 8_388_608, timeoutMs = config.timeoutMs).also { process = it }
+            capacity = 1, frameBytes = 8_388_608, timeoutMs = config.timeoutMs)
+        process = opened
+        try {
+            if (config.worker != null) {
+                val init = mapOf("op" to "init", "config" to mapOf(
+                    "model" to config.model, "device" to config.device, "revision" to config.revision,
+                    "max_state_length" to config.maxStateLength, "max_option_length" to config.maxOptionLength,
+                    "timeout_ms" to config.timeoutMs, "mlx_max_tokens" to config.mlxMaxTokens,
+                    "mlx_checkpoint_limit_bytes" to config.mlxCheckpointLimitBytes))
+                val reply = decode(opened.exchange(jsonOf(init)))
+                reply["error"]?.let { error("Jeva worker initialization failed: $it") }
+                check(reply["available"] == true) { "Jeva worker did not load the model" }
+                check(reply["loaded"] == true && reply["runtime"] == "kotlin" && reply["device"] == config.device) {
+                    "Jeva worker returned inconsistent runtime status"
+                }
+                Jeva.text(reply["model_identity"], "model identity")
+                workerMetadata = reply.entries.associate { (key, value) -> Jeva.text(key, "status field") to value }
+            }
+            return opened
+        } catch (failure: Throwable) {
+            try { closeProcess(opened) } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+            throw failure
+        }
     }
 
     fun decode(line: String): Map<*, *> = requireNotNull(reifyStrict(line) as? Map<*, *>) { "Jeva returned no JSON object" }
 
     suspend fun exchange(request: String): Map<*, *> {
         val channel = channel()
-        return try { decode(channel.exchange(request)) }
+        return try {
+            val reply = decode(channel.exchange(request))
+            if (config.worker != null) reply["error"]?.let { error("Jeva worker failed: $it") }
+            reply
+        }
         catch (failure: Throwable) {
-            process = null
-            try { channel.drain() } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+            try { closeProcess(channel) } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
             throw failure
         }
     }
@@ -149,7 +191,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
     suspend fun infer(work: Work, model: String): Map<String, Any?> {
         val state = requireNotNull(reifyMap(requireNotNull(work.request))["state"] as? String) { "Jeva request has no state" }
         val questions = requireNotNull(work.questions)
-        if (config.runtime == JevaRuntime.KOTLIN) return withContext(Dispatchers.Default + fileIoContext) {
+        if (config.runtime == JevaRuntime.KOTLIN && config.worker == null) return withContext(Dispatchers.Default + fileIoContext) {
             requireNotNull(inference).infer(state, questions).also {
                 check(it["model"] == model) { "Jeva model identity changed while answering" }
             }
@@ -158,26 +200,48 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
         val usage = LinkedHashMap<String, Long>()
         for ((id, question) in questions) {
             val selected = mapOf(id to question)
-            val reply = Jeva.answers(exchange(Jeva.body(state, selected)), selected)
-            check(reply["model"] == model) { "Jeva model identity changed while answering" }
-            answers[id] = requireNotNull((reply["answers"] as Map<*, *>)[id])
-            val measured = reply["usage"]
-            require(measured == null || measured is Map<*, *>) { "Jeva returned invalid usage" }
-            for ((key, value) in (measured as? Map<*, *>).orEmpty()) {
-                val name = Jeva.text(key, "usage field")
-                val count = requireNotNull((value as? Number)?.toDouble()?.takeIf {
-                    it.isFinite() && it >= 0.0 && it % 1.0 == 0.0 && it < Long.MAX_VALUE.toDouble()
-                }) { "Invalid Jeva integer usage '$name'" }.toLong()
-                val prior = usage[name] ?: 0L
-                require(count <= Long.MAX_VALUE - prior) { "Jeva usage overflow '$name'" }
-                usage[name] = prior + count
+            try {
+                val reply = Jeva.answers(exchange(Jeva.body(state, selected)), selected)
+                check(reply["model"] == model) { "Jeva model identity changed while answering" }
+                answers[id] = requireNotNull((reply["answers"] as Map<*, *>)[id])
+                val measured = reply["usage"]
+                require(measured == null || measured is Map<*, *>) { "Jeva returned invalid usage" }
+                for ((key, value) in (measured as? Map<*, *>).orEmpty()) {
+                    val name = Jeva.text(key, "usage field")
+                    val count = requireNotNull((value as? Number)?.toDouble()?.takeIf {
+                        it.isFinite() && it >= 0.0 && it % 1.0 == 0.0 && it < Long.MAX_VALUE.toDouble()
+                    }) { "Invalid Jeva integer usage '$name'" }.toLong()
+                    val prior = usage[name] ?: 0L
+                    require(count <= Long.MAX_VALUE - prior) { "Jeva usage overflow '$name'" }
+                    usage[name] = prior + count
+                }
+            } catch (failure: Throwable) {
+                if (config.worker != null) try { process?.let { closeProcess(it) } }
+                catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+                throw failure
             }
         }
         return mapOf("model" to model, "answers" to answers, "usage" to usage)
     }
 
     suspend fun status(): Map<String, Any?> {
-        if (expiration != null || released || metadata["available"] == true) return metadata
+        if (expiration != null || released) return metadata
+        // A failed previously resolved worker stays unavailable until inference explicitly reloads it.
+        if (config.worker != null && metadata["available"] != true && metadata["model_identity"] != null) return metadata
+        if (metadata["available"] == true) {
+            if (config.worker != null) try {
+                val reply = exchange("{\"op\":\"status\"}")
+                check(reply["available"] == true && reply["loaded"] == true && reply["runtime"] == "kotlin" &&
+                    reply["device"] == config.device && reply["model_identity"] == metadata["model_identity"]) {
+                    "Jeva worker status or model identity changed"
+                }
+            } catch (failure: Throwable) {
+                try { process?.let { closeProcess(it) } }
+                catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+                throw failure
+            }
+            return metadata
+        }
         return resolve()
     }
 
@@ -191,7 +255,10 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
         // Request failures do not revoke a resolved runtime; a failed load or changed identity does.
         resolvedMetadata = null
         val fields: Map<String, Any?>
-        if (config.runtime == JevaRuntime.KOTLIN) {
+        if (config.worker != null) {
+            channel()
+            fields = requireNotNull(workerMetadata) { "Jeva worker returned no status" }
+        } else if (config.runtime == JevaRuntime.KOTLIN) {
             val runtime = inference ?: run {
                 val context = currentCoroutineContext()
                 val files = context[FileOperations] ?: context[NioSupervisor]?.service<FileOperations>()
@@ -281,6 +348,12 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
         cancellation.cancelAndJoin()
         supervisor.complete()
         supervisor.join()
-        completion.await().getOrThrow()
+        val result = completion.await()
+        try { process?.let { closeProcess(it) } } catch (cleanup: Throwable) {
+            val failure = result.exceptionOrNull()
+            if (failure == null) throw cleanup
+            if (cleanup !== failure) failure.addSuppressed(cleanup)
+        }
+        result.getOrThrow()
     }
 }

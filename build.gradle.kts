@@ -233,6 +233,9 @@ kotlin {
                 executable("mcpStdio") {
                     entryPoint = "borg.trikeshed.mux.mcpStdioMain"
                 }
+                executable("jevaWorker") {
+                    entryPoint = "borg.trikeshed.narsese.jevaWorkerMain"
+                }
                 // Kotlin/Native host of the mlnix dialects: parses, verifies and prints a module through mlir-nix's C surface.
                 // ./gradlew linkMlirMainReleaseExecutableMacos → build/bin/macos/mlirMainReleaseExecutable/mlirMain.kexe
                 if (mlirNixLib.exists()) executable("mlirMain") {

@@ -3,6 +3,8 @@ package borg.trikeshed.userspace.nio.process
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.nio.channels.spi.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 /** Bounded UTF-8 line exchanges with one owned child; one response per admitted request. */
@@ -31,6 +33,11 @@ class ProcessLineChannel private constructor(
     private val supervisor = SupervisorJob(parent.coroutineContext[Job])
     private val scope = CoroutineScope(parent.coroutineContext + this + supervisor)
     private val completion = CompletableDeferred<Result<Unit>>()
+    internal val protocolCompletion: Deferred<Result<Unit>> get() = completion
+    /** Completes only after the owned pipes have actually closed, even if the protocol failed. */
+    private val closed = CompletableDeferred<Unit>()
+    internal val pipeCompletion: Deferred<Unit> get() = closed
+    private val closeMutex = Mutex()
     private val stderr = ByteArray(8_192)
     private var stderrSize = 0
     private var stderrPosition = 0
@@ -77,7 +84,7 @@ class ProcessLineChannel private constructor(
         } finally {
             input.close()
             withContext(NonCancellable) {
-                try { pipes.close() } catch (cleanup: Throwable) {
+                try { closePipes() } catch (cleanup: Throwable) {
                     if (failure == null) failure = cleanup else failure.addSuppressed(cleanup)
                 }
             }
@@ -106,7 +113,19 @@ class ProcessLineChannel private constructor(
         input.close()
         worker.join()
         supervisor.join()
-        completion.await().getOrThrow()
+        val result = completion.await()
+        if (!closed.isCompleted) {
+            try { closePipes() } catch (cleanup: Throwable) {
+                val prior = result.exceptionOrNull()
+                if (prior == null) throw cleanup
+                if (prior !== cleanup) prior.addSuppressed(cleanup)
+            }
+        }
+        result.getOrThrow()
+    }
+
+    private suspend fun closePipes() = closeMutex.withLock {
+        if (!closed.isCompleted) { pipes.close(); closed.complete(Unit) }
     }
 
     /** Valid after completion: stderr is consumed concurrently, but retained in a fixed-size tail. */

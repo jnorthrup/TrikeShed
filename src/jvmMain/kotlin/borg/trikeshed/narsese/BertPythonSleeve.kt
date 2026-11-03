@@ -75,7 +75,15 @@ class BertPythonSleeve private constructor(
             }.toSeries()
             val encoded = runBlocking { encoder().encode(tokens) }
             check(encoded.size == tokens.size) { "BERT encoder omitted targets" }
-            Teleported.Str(jsonOf(encoded.view.map { vector ->
+            // The Python sleeve returns vectors by position. Validate each backend
+            // target before its identity is lost at that boundary, and capture the
+            // values once rather than exposing a lazy oracle or mutable array.
+            val retained = Array(tokens.size) { i ->
+                val vector = encoded[i]
+                check(vector.token == tokens[i]) { "BERT encoder returned a different target at index $i" }
+                vector.copy(values = vector.values?.copyOf())
+            }
+            Teleported.Str(jsonOf(retained.map { vector ->
                 mapOf("span" to vector.span.name, "values" to vector.values?.toList())
             }))
         }

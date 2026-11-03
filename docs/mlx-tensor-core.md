@@ -260,6 +260,33 @@ without truncation. When unset, there is no additional token limit. This is an o
 memory estimate or watchdog, and it does not establish safety for any particular length on a loaded host. Planned
 tensor dimensions are also checked against the shared Int-indexed tensor contract before MLX execution.
 
+### Isolated native worker
+
+The Kotlin MLX lane can be run in an explicitly selected child process:
+
+```sh
+./gradlew linkJevaWorkerReleaseExecutableMacos
+export TRIKESHED_JEVA_DEVICE=mlx
+export TRIKESHED_JEVA_RUNTIME=kotlin
+export TRIKESHED_JEVA_WORKER="$PWD/build/bin/macos/jevaWorkerReleaseExecutable/jevaWorker.kexe"
+# Set TRIKESHED_JEVA_MODEL to the local checkpoint and, optionally:
+# export TRIKESHED_JEVA_TIMEOUT_MS=600000
+# export TRIKESHED_MLX_MAX_TOKENS=<positive limit>
+# export TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES=<nonnegative limit>
+```
+
+The parent sends bounded line-framed requests to the worker. Model load and each question have a configured
+exchange deadline (600,000 ms by default); a timed-out, failed or malformed exchange retires the child before a
+new one is admitted. Ordinary worker errors are reported and end that worker; fatal native failures end the worker
+process. The caller still validates every returned distribution and checks the resolved model identity. The
+checkpoint-byte and token admission settings above are passed explicitly to the child.
+
+This is process and elapsed-time isolation, not a host-memory watchdog or a hard memory ceiling. It does not sample
+memory pressure or protect against a host stall before the timer can run, and termination/reaping can itself be
+delayed by the operating system. It owns the direct child, not an arbitrary process tree. Configuring the worker does
+not establish real-checkpoint parity, resource safety or the drain acceptance below; the in-process Kotlin and Python
+paths remain available under their existing selection rules.
+
 Verified (sampler at 0.5 s: swap in use, vm_stat, per-process RSS; watchdog on swap growth, compressor growth,
 swap-outs and reclaimable memory; the sampler is `monitor.py` in the Hermes scratch directory, not in this repo):
 
