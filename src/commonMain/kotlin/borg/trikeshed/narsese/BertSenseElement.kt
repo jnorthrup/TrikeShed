@@ -168,8 +168,8 @@ class BertSenseElement(
         check(model.model == resolved) { "BERT model identity changed during reading" }
         val index = BertSenseIndex(resolved, evidence.map {
             val vector = checkNotNull(encoded[it.token])
-            // Neighbor receipts escape this lane; do not expose cached mutable arrays.
-            BertSenseEvidence(it.source, it.sense, vector.copy(values = vector.values?.copyOf()), it.table)
+            // The index captures evidence and copies coordinates for each returned receipt.
+            BertSenseEvidence(it.source, it.sense, vector, it.table)
         }.toSeries())
         val results = Array(read.queries.size) { i ->
             val q = read.queries[i]

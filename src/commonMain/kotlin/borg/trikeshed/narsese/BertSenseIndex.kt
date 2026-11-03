@@ -10,13 +10,15 @@ enum class BertSenseStatus { Supported, NoVector, InsufficientEvidence, Disagree
 data class BertSense(val sense: String?, val status: BertSenseStatus, val neighbors: Series<BertSenseNeighbor>)
 
 /** Same-lemma seven-neighbour propagation recovered from bert_vs_caps.py; all seven must agree. */
-class BertSenseIndex(val model: String, private val evidence: Series<BertSenseEvidence>) {
-    private val vectors = Array(evidence.size) { i -> coordinates(evidence[i].vector)?.let(::normalize) }
-    private val independent = BooleanArray(evidence.size)
+class BertSenseIndex(val model: String, evidence: Series<BertSenseEvidence>) {
+    // The input Series can be a mutable oracle; freeze labels and their coordinates together.
+    private val evidence = Array(evidence.size) { i -> retain(evidence[i]) }.toSeries()
+    private val vectors = Array(this.evidence.size) { i -> coordinates(this.evidence[i].vector)?.let(::normalize) }
+    private val independent = BooleanArray(this.evidence.size)
     init {
         require(model.isNotBlank())
-        require(evidence.view.all { it.source.isNotBlank() && it.sense.isNotBlank() })
-        require(evidence.view.map { it.source to it.vector.token.lemma }.distinct().size == evidence.size) {
+        require(this.evidence.view.all { it.source.isNotBlank() && it.sense.isNotBlank() })
+        require(this.evidence.view.map { it.source to it.vector.token.lemma }.distinct().size == this.evidence.size) {
             "A source may supply only one independent label for a lemma"
         }
         val dimensions = vectors.filterNotNull().map { it.size }.distinct()
@@ -25,13 +27,13 @@ class BertSenseIndex(val model: String, private val evidence: Series<BertSenseEv
         // independent votes. Conflicting labels or vectors invalidate that context.
         val contexts = mutableMapOf<BertToken, Int>()
         val conflicts = mutableSetOf<BertToken>()
-        for (i in 0 until evidence.size) {
-            val row = evidence[i]
+        for (i in 0 until this.evidence.size) {
+            val row = this.evidence[i]
             val token = row.vector.token
             val previous = contexts[token]
             if (previous == null) contexts[token] = i
             else {
-                val prior = evidence[previous]
+                val prior = this.evidence[previous]
                 val left = prior.vector.values
                 val right = row.vector.values
                 if (prior.sense != row.sense || prior.vector.span != row.vector.span ||
@@ -82,7 +84,7 @@ class BertSenseIndex(val model: String, private val evidence: Series<BertSenseEv
             }
         }
         // A receipt retains seven neighbors, not the whole index and its vector matrix.
-        val neighbors = Array(count) { i -> BertSenseNeighbor(evidence[selected[i]], scores[i]) }.toSeries()
+        val neighbors = Array(count) { i -> BertSenseNeighbor(retain(evidence[selected[i]]), scores[i]) }.toSeries()
         if (count < 7) return BertSense(null, BertSenseStatus.InsufficientEvidence, neighbors)
         val sense = neighbors[0].evidence.sense
         if (neighbors.view.any { it.evidence.sense != sense }) return BertSense(null, BertSenseStatus.Disagreement, neighbors)
@@ -98,4 +100,7 @@ class BertSenseIndex(val model: String, private val evidence: Series<BertSenseEv
 
     private fun coordinates(vector: BertVector): Series<Float>? =
         if (vector.span.resolved) vector.coordinates else null
+
+    private fun retain(row: BertSenseEvidence): BertSenseEvidence =
+        row.copy(vector = row.vector.copy(values = row.vector.values?.copyOf()))
 }
