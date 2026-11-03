@@ -7,12 +7,15 @@ import borg.trikeshed.parse.reifyStrict
 class JevaTokenizer internal constructor(
     val vocabulary: Map<String, Int>,
     merges: Series<Twin<String>>,
-    val special: Map<String, Int>,
+    special: Map<String, Int>,
     val ranks: HashMap<String, Int>,
 ) {
     constructor(vocabulary: Map<String, Int>, merges: Series<Twin<String>>, special: Map<String, Int> = emptyMap()) :
         this(vocabulary, merges, special, HashMap())
 
+    private val added = special.toMap()
+    /** A caller can inspect the table without changing the matcher's retained keys. */
+    val special: Map<String, Int> get() = added.toMap()
     val bytes = CharArray(256)
 
     init {
@@ -26,7 +29,16 @@ class JevaTokenizer internal constructor(
             require(pair.a in vocabulary && pair.b in vocabulary && pair.a + pair.b in vocabulary) { "Invalid Jeva BPE merge" }
             require(ranks.put(pair.a + '\u0000' + pair.b, i) == null) { "Duplicate Jeva BPE merge" }
         }
-        require(special.keys.none { it.isEmpty() } && special.values.all { it >= 0 })
+        require(added.values.all { it >= 0 })
+        for (token in added.keys) {
+            require(token.isNotEmpty()) { "Empty Jeva added token" }
+            var at = 0
+            try {
+                while (at < token.length) at += BertWordPiece.scalarWidth(BertWordPiece.scalar(token, at))
+            } catch (failure: IllegalArgumentException) {
+                throw IllegalArgumentException("Invalid UTF-16 Jeva added token", failure)
+            }
+        }
     }
 
     fun encode(text: String, maxLength: Int = 9000, check: () -> Unit = {}): Series<Int> {
@@ -35,26 +47,15 @@ class JevaTokenizer internal constructor(
         val result = ArrayList<Int>()
         val alphabet = Array(bytes.size) { bytes[it].toString() }
         fun plain(value: String) {
-            for (piece in split(normalize(value, check), check).view) {
+            pieces(normalize(value, check), check) { piece ->
                 check()
                 merge(piece, alphabet, result, maxLength, check)
             }
         }
-        var at = 0
-        var from = 0
-        var budget = 0
-        while (at < text.length) {
-            if (budget <= 0) { check(); budget = 4096 }
-            val prior = at
-            val added = special.keys.asSequence().filter { text.startsWith(it, at) }.maxByOrNull { it.length }
-            if (added != null) {
-                plain(text.substring(from, at)); result.add(special.getValue(added))
-                require(result.size <= maxLength) { "Jeva input exceeds $maxLength tokens; truncation is disabled" }
-                at += added.length; from = at
-            } else at += BertWordPiece.scalarWidth(BertWordPiece.scalar(text, at))
-            budget -= at - prior
+        segments(text, added, check, ::plain) { id ->
+            result.add(id)
+            require(result.size <= maxLength) { "Jeva input exceeds $maxLength tokens; truncation is disabled" }
         }
-        plain(text.substring(from))
         check()
         return result.toIntArray().toSeries()
     }
@@ -176,6 +177,28 @@ class JevaTokenizer internal constructor(
 
     companion object {
         const val PATTERN = "(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\\r\\n\\p{L}\\p{N}]?[\\p{L}\\p{M}]+|\\p{N}| ?[^\\s\\p{L}\\p{M}\\p{N}]+[\\r\\n]*|\\s*[\\r\\n]+|\\s+(?!\\S)|\\s+"
+
+        /** Split around added-token matches without changing their priority or scalar boundaries. */
+        internal fun segments(text: String, special: Map<String, Int>, check: () -> Unit,
+                              plain: (String) -> Unit, token: (Int) -> Unit) {
+            var at = 0
+            var from = 0
+            var budget = 0
+            while (at < text.length) {
+                if (budget <= 0) { check(); budget = 4096 }
+                val prior = at
+                val added = special.keys.asSequence().filter { text.startsWith(it, at) }.maxByOrNull { it.length }
+                if (added != null) {
+                    plain(text.substring(from, at))
+                    token(special.getValue(added))
+                    at += added.length
+                    from = at
+                } else at += BertWordPiece.scalarWidth(BertWordPiece.scalar(text, at))
+                budget -= at - prior
+            }
+            plain(text.substring(from))
+        }
+
         fun parse(json: String, check: () -> Unit = {}): JevaTokenizer {
             check()
             val root = requireNotNull(reifyStrict(json) as? Map<*, *>) { "Invalid Jeva tokenizer" }
@@ -356,73 +379,88 @@ class JevaTokenizer internal constructor(
         /** The pinned regex expressed over Unicode scalars so JS/native/JVM split identically. */
         fun split(text: String, check: () -> Unit = {}): Series<String> {
             check()
-            val bounds = scalarBounds(text, check)
-            val cp = scalars(text, bounds, check)
-            val result = ArrayList<String>(); var at = 0
-            while (at < cp.size) {
+            val result = ArrayList<String>()
+            pieces(text, check) { result.add(it) }
+            return result.toTypedArray().toSeries()
+        }
+
+        /** Consume each piece before scanning the next, so callers can stop on admission limits. */
+        private fun pieces(text: String, check: () -> Unit, consume: (String) -> Unit) {
+            var budget = 0
+            fun scalar(index: Int): Int {
+                if (budget <= 0) { check(); budget = 4096 }
+                val value = BertWordPiece.scalar(text, index)
+                budget -= BertWordPiece.scalarWidth(value)
+                return value
+            }
+            fun after(index: Int, value: Int) = index + BertWordPiece.scalarWidth(value)
+            var at = 0
+            while (at < text.length) {
                 check()
                 val start = at
-                val contraction = if (cp[at] == 39) listOf("s", "t", "re", "ve", "m", "ll", "d").firstOrNull {
-                    text.regionMatches(bounds[at] + 1, it, 0, it.length, ignoreCase = true)
+                val first = scalar(at)
+                val contraction = if (first == 39) _l["s", "t", "re", "ve", "m", "ll", "d"].firstOrNull {
+                    text.regionMatches(at + 1, it, 0, it.length, ignoreCase = true)
                 } else null
                 if (contraction != null) at += contraction.length + 1
                 else {
                     var word = at
-                    if (cp[word] != 13 && cp[word] != 10 && !letter(cp[word]) && !number(cp[word])) word++
-                    if (word < cp.size && (letter(cp[word]) || mark(cp[word]))) {
-                        at = word + 1; while (at < cp.size && (letter(cp[at]) || mark(cp[at]))) {
-                            if (at and 4095 == 0) check(); at++
+                    if (first != 13 && first != 10 && !letter(first) && !number(first)) word = after(word, first)
+                    val wordValue = if (word < text.length) scalar(word) else null
+                    if (wordValue != null && (letter(wordValue) || mark(wordValue))) {
+                        at = after(word, wordValue)
+                        while (at < text.length) {
+                            val value = scalar(at)
+                            if (!letter(value) && !mark(value)) break
+                            at = after(at, value)
                         }
-                    } else if (letter(cp[at]) || mark(cp[at])) {
-                        at++; while (at < cp.size && (letter(cp[at]) || mark(cp[at]))) {
-                            if (at and 4095 == 0) check(); at++
+                    } else if (letter(first) || mark(first)) {
+                        at = after(at, first)
+                        while (at < text.length) {
+                            val value = scalar(at)
+                            if (!letter(value) && !mark(value)) break
+                            at = after(at, value)
                         }
-                    } else if (number(cp[at])) at++
+                    } else if (number(first)) at = after(at, first)
                     else {
-                        var symbol = at + if (cp[at] == 32) 1 else 0
-                        if (symbol < cp.size && !space(cp[symbol]) && !letter(cp[symbol]) && !mark(cp[symbol]) && !number(cp[symbol])) {
-                            at = symbol + 1
-                            while (at < cp.size && !space(cp[at]) && !letter(cp[at]) && !mark(cp[at]) && !number(cp[at])) {
-                                if (at and 4095 == 0) check(); at++
+                        val symbol = if (first == 32) after(at, first) else at
+                        val symbolValue = if (symbol < text.length) scalar(symbol) else null
+                        if (symbolValue != null && !space(symbolValue) && !letter(symbolValue) && !mark(symbolValue) && !number(symbolValue)) {
+                            at = after(symbol, symbolValue)
+                            while (at < text.length) {
+                                val value = scalar(at)
+                                if (space(value) || letter(value) || mark(value) || number(value)) break
+                                at = after(at, value)
                             }
-                            while (at < cp.size && (cp[at] == 13 || cp[at] == 10)) {
-                                if (at and 4095 == 0) check(); at++
+                            while (at < text.length) {
+                                val value = scalar(at)
+                                if (value != 13 && value != 10) break
+                                at = after(at, value)
                             }
                         } else {
-                            var end = at; var newline = -1
-                            while (end < cp.size && space(cp[end])) {
-                                if (end and 4095 == 0) check()
-                                if (cp[end] == 13 || cp[end] == 10) newline = end; end++
+                            var end = at
+                            var last = at
+                            var count = 0
+                            var newline = -1
+                            while (end < text.length) {
+                                val value = scalar(end)
+                                if (!space(value)) break
+                                last = end
+                                end = after(end, value)
+                                count++
+                                if (value == 13 || value == 10) newline = end
                             }
-                            at = when { newline >= 0 -> newline + 1; end == cp.size -> end; end - start > 1 -> end - 1; else -> maxOf(end, start + 1) }
+                            at = when {
+                                newline >= 0 -> newline
+                                end == text.length -> end
+                                count > 1 -> last
+                                else -> maxOf(end, after(start, first))
+                            }
                         }
                     }
                 }
-                result.add(text.substring(bounds[start], bounds[at]))
+                consume(text.substring(start, at))
             }
-            return result.toTypedArray().toSeries()
         }
-
-        internal fun scalarBounds(text: String, check: () -> Unit): IntArray {
-            val bounds = IntArray(text.length + 1)
-            var at = 0
-            var count = 0
-            var budget = 0
-            while (at < text.length) {
-                if (budget <= 0) { check(); budget = 4096 }
-                bounds[count++] = at
-                val width = BertWordPiece.scalarWidth(BertWordPiece.scalar(text, at))
-                at += width
-                budget -= width
-            }
-            bounds[count] = at
-            return bounds.copyOf(count + 1)
-        }
-
-        internal fun scalars(text: String, bounds: IntArray, check: () -> Unit): IntArray =
-            IntArray(bounds.size - 1) {
-                if (it and 4095 == 0) check()
-                BertWordPiece.scalar(text, bounds[it])
-            }
     }
 }

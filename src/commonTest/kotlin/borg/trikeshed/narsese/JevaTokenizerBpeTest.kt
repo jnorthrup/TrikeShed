@@ -53,6 +53,30 @@ class JevaTokenizerBpeTest {
         assertFailsWith<IllegalArgumentException> { missing.encode("1") }
     }
 
+    @Test fun tokenLimitStopsBeforeMaterializingEverySplitPiece() {
+        val tokenizer = tokenizer()
+        var polls = 0
+        val failure = assertFailsWith<IllegalArgumentException> {
+            tokenizer.encode("1".repeat(20_000), maxLength = 1) {
+                check(++polls <= 1000) { "split continued beyond the token limit" }
+            }
+        }
+        assertContains(failure.message.orEmpty(), "exceeds 1 tokens")
+    }
+
+    @Test fun publicSplitMatchesReferenceBoundaries() {
+        val cases = _l[
+            "a  b\n c" j _l["a", " ", " b", "\n", " c"],
+            "\t \n\r  x" j _l["\t \n\r", " ", " x"],
+            "🚀中文 123, hi!" j _l["🚀中文", " ", "1", "2", "3", ",", " hi", "!"],
+            "I'VE we're" j _l["I", "'VE", " we", "'re"],
+            "abc   " j _l["abc", "   "],
+            " !?\n\n a" j _l[" !?\n\n", " a"],
+            "a\u0301🙂b" j _l["a\u0301", "🙂b"],
+        ]
+        for (case in cases) assertEquals(case.b, JevaTokenizer.split(case.a).view.toList(), case.a)
+    }
+
     @Test fun longUnbrokenInputPreservesAllMergedPairs() {
         val length = 16_384
         val tokenizer = tokenizer("a" j "a")
