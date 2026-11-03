@@ -343,8 +343,15 @@ Gaps found against the strategy, each open unless stated:
 6. The Python MLX path was never measured under the same sampler, so "no worse than Python" is unproven.
 7. The identity includes the backbone block-content manifest. Device admission uses a separate `JevaDeadline` with
    the configured timeout: bounded file reads, chunked head/tokenizer hashing, parsing, block-manifest construction,
-   and each weight materialization check it cooperatively. A single blocked I/O call or MLX evaluation cannot be
-   preempted by those checks, so this is not a hard wall-clock guarantee.
+   and each weight materialization check it cooperatively. Tokenization polls across scalar scans, normalization,
+   and merge work; individual built-in string operations, UTF-8 conversions, bulk allocations and copies, a scan
+   of a large special-token map, blocked I/O calls and MLX evaluations cannot be preempted by those checks, so this
+   is not a hard wall-clock guarantee. The heap bounds pair-lookups, not total memory: near the text-length limit,
+   multibyte input can produce millions of byte-symbol nodes, and their arrays, heap and growth copies can retain
+   hundreds of MiB. This is a capacity estimate, not a measured peak. The splitter materializes pre-tokenized pieces
+   before the output token limit is enforced. Added-token keys are not validated for well-formed UTF-16, and
+   special-token matching happens before advancing to the next scalar; a key can split a supplementary input scalar
+   or consume an isolated surrogate.
 8. The sampler's abort is not a safety property of the product, and MLX's settings do not impose a hard host-memory
    ceiling. The provider coordinates its own live sessions, but cannot prevent another MLX caller from changing them.
 9. The linked Homebrew mlx-c 0.6.0_4 header exposes `mlx_get_memory_limit` but no cache or wired limit getters. Its

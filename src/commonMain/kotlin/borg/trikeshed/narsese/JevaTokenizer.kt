@@ -42,14 +42,17 @@ class JevaTokenizer internal constructor(
         }
         var at = 0
         var from = 0
+        var budget = 0
         while (at < text.length) {
-            if (at and 4095 == 0) check()
+            if (budget <= 0) { check(); budget = 4096 }
+            val prior = at
             val added = special.keys.asSequence().filter { text.startsWith(it, at) }.maxByOrNull { it.length }
             if (added != null) {
                 plain(text.substring(from, at)); result.add(special.getValue(added))
                 require(result.size <= maxLength) { "Jeva input exceeds $maxLength tokens; truncation is disabled" }
                 at += added.length; from = at
             } else at += BertWordPiece.scalarWidth(BertWordPiece.scalar(text, at))
+            budget -= at - prior
         }
         plain(text.substring(from))
         check()
@@ -235,32 +238,102 @@ class JevaTokenizer internal constructor(
 
         fun normalize(text: String, check: () -> Unit = {}): String {
             check()
-            if (text.all { it.code < 128 }) return text
+            if (ascii(text, check)) return text
+            return normalizeNonAscii(text, combiningClasses, check)
+        }
+
+        internal fun normalize(text: String, classes: Map<Int, Int>, check: () -> Unit = {}): String {
+            check()
+            if (ascii(text, check)) return text
+            return normalizeNonAscii(text, classes, check)
+        }
+
+        private fun ascii(text: String, check: () -> Unit): Boolean {
+            for (i in text.indices) {
+                if (i and 4095 == 0) check()
+                if (text[i].code >= 128) return false
+            }
+            return true
+        }
+
+        private fun normalizeNonAscii(text: String, classes: Map<Int, Int>, check: () -> Unit): String {
+            fun combining(cp: Int) = classes[cp] ?: 0
             val buffer = ArrayList<Int>()
             var at = 0
+            var budget = 0
             while (at < text.length) {
-                if (at and 4095 == 0) check()
+                if (budget <= 0) { check(); budget = 4096 }
+                val prior = at
                 val cp = BertWordPiece.scalar(text, at); at += BertWordPiece.scalarWidth(cp)
                 if (cp in 0xac00..0xd7a3) {
                     val s = cp - 0xac00; buffer.add(0x1100 + s / 588); buffer.add(0x1161 + s % 588 / 28)
                     if (s % 28 != 0) buffer.add(0x11a7 + s % 28)
                 } else decompositions[cp]?.let { buffer.addAll(it.asIterable()) } ?: buffer.add(cp)
+                budget -= at - prior
             }
-            for (i in 1 until buffer.size) {
-                if (i and 4095 == 0) check()
-                val cc = combiningClass(buffer[i])
-                if (cc == 0) continue
-                var j = i
-                while (j > 0 && combiningClass(buffer[j - 1]) > cc) {
-                    if (j and 4095 == 0) check()
-                    val prior = buffer[j - 1]; buffer[j - 1] = buffer[j]; buffer[j] = prior; j--
+            // Canonical order is a stable sort within each run of non-starters.
+            // Bounded insertion is cheap for short runs; counting keeps long
+            // disordered runs linear rather than repeatedly shifting every mark.
+            var start = 0
+            var scratch = IntArray(0)
+            var counts: IntArray? = null
+            while (start < buffer.size) {
+                if (start and 4095 == 0) check()
+                if (combining(buffer[start]) == 0) start++
+                val from = start
+                var last = 0
+                var disordered = false
+                while (start < buffer.size) {
+                    if (start and 4095 == 0) check()
+                    val cc = combining(buffer[start])
+                    if (cc == 0) break
+                    if (cc < last) disordered = true
+                    last = cc
+                    start++
+                }
+                val length = start - from
+                if (!disordered) continue
+                if (length <= 32) {
+                    for (i in from + 1 until start) {
+                        val value = buffer[i]
+                        val cc = combining(value)
+                        var j = i
+                        while (j > from && combining(buffer[j - 1]) > cc) {
+                            buffer[j] = buffer[j - 1]
+                            j--
+                        }
+                        buffer[j] = value
+                    }
+                } else {
+                    val offsets = counts ?: IntArray(256).also { counts = it }
+                    offsets.fill(0)
+                    for (i in from until start) {
+                        if (i and 4095 == 0) check()
+                        offsets[combining(buffer[i])]++
+                    }
+                    var total = 0
+                    for (i in offsets.indices) {
+                        val count = offsets[i]
+                        offsets[i] = total
+                        total += count
+                    }
+                    if (scratch.size < length) scratch = IntArray(length)
+                    for (i in from until start) {
+                        if (i and 4095 == 0) check()
+                        val cp = buffer[i]
+                        scratch[offsets[combining(cp)]++] = cp
+                    }
+                    for (i in 0 until length) {
+                        if (i and 4095 == 0) check()
+                        buffer[from + i] = scratch[i]
+                    }
                 }
             }
             if (buffer.isEmpty()) return ""
-            var starter = 0; var used = 1; var previous = combiningClass(buffer[0])
+            var starter = 0; var used = 1; var previous = combining(buffer[0])
             for (i in 1 until buffer.size) {
                 if (i and 4095 == 0) check()
-                val cp = buffer[i]; val cc = combiningClass(cp); val a = buffer[starter]
+                val cp = buffer[i]; val cc = combining(cp); val a = buffer[starter]
                 val combined = when {
                     a in 0x1100..0x1112 && cp in 0x1161..0x1175 -> 0xac00 + ((a - 0x1100) * 21 + cp - 0x1161) * 28
                     a in 0xac00..0xd7a3 && (a - 0xac00) % 28 == 0 && cp in 0x11a8..0x11c2 -> a + cp - 0x11a7
@@ -269,14 +342,22 @@ class JevaTokenizer internal constructor(
                 if (combined >= 0 && (previous == 0 || previous < cc)) buffer[starter] = combined
                 else { if (cc == 0) starter = used; buffer[used++] = cp; previous = cc }
             }
-            return buildString { for (i in 0 until used) append(BertWordPiece.scalarString(buffer[i])) }
+            return normalizedText(buffer, used, check)
         }
+
+        internal fun normalizedText(buffer: List<Int>, used: Int, check: () -> Unit): String =
+            buildString {
+                for (i in 0 until used) {
+                    if (i and 4095 == 0) check()
+                    append(BertWordPiece.scalarString(buffer[i]))
+                }
+            }
 
         /** The pinned regex expressed over Unicode scalars so JS/native/JVM split identically. */
         fun split(text: String, check: () -> Unit = {}): Series<String> {
             check()
-            val bounds = BertWordPiece.scalarBounds(text)
-            val cp = IntArray(bounds.size - 1) { BertWordPiece.scalar(text, bounds[it]) }
+            val bounds = scalarBounds(text, check)
+            val cp = scalars(text, bounds, check)
             val result = ArrayList<String>(); var at = 0
             while (at < cp.size) {
                 check()
@@ -321,5 +402,27 @@ class JevaTokenizer internal constructor(
             }
             return result.toTypedArray().toSeries()
         }
+
+        internal fun scalarBounds(text: String, check: () -> Unit): IntArray {
+            val bounds = IntArray(text.length + 1)
+            var at = 0
+            var count = 0
+            var budget = 0
+            while (at < text.length) {
+                if (budget <= 0) { check(); budget = 4096 }
+                bounds[count++] = at
+                val width = BertWordPiece.scalarWidth(BertWordPiece.scalar(text, at))
+                at += width
+                budget -= width
+            }
+            bounds[count] = at
+            return bounds.copyOf(count + 1)
+        }
+
+        internal fun scalars(text: String, bounds: IntArray, check: () -> Unit): IntArray =
+            IntArray(bounds.size - 1) {
+                if (it and 4095 == 0) check()
+                BertWordPiece.scalar(text, bounds[it])
+            }
     }
 }

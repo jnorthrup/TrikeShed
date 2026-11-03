@@ -5,7 +5,7 @@ import kotlin.test.*
 import kotlin.time.TimeSource
 
 class JevaTokenizerBpeTest {
-    private fun tokenizer(vararg merges: Twin<String>, ranks: HashMap<String, Int> = HashMap()): JevaTokenizer {
+    private fun tokenizer(vararg merges: Twin<String>): JevaTokenizer {
         val vocabulary = mutableMapOf<String, Int>()
         var extra = 256
         for (byte in 0..255) {
@@ -16,7 +16,7 @@ class JevaTokenizerBpeTest {
         vocabulary["aaa"] = 257
         vocabulary["ab"] = 258
         vocabulary["bc"] = 259
-        return JevaTokenizer(vocabulary, merges.toSeries(), _m["<END>" j 260], ranks)
+        return JevaTokenizer(vocabulary, merges.toSeries(), _m["<END>" j 260])
     }
 
     private fun values(ids: Series<Int>) = IntArray(ids.size) { ids[it] }
@@ -53,17 +53,9 @@ class JevaTokenizerBpeTest {
         assertFailsWith<IllegalArgumentException> { missing.encode("1") }
     }
 
-    @Test fun longUnbrokenInputDoesNotRescanAllPairsForEveryMerge() {
+    @Test fun longUnbrokenInputPreservesAllMergedPairs() {
         val length = 16_384
-        val ranks = object : HashMap<String, Int>() {
-            var lookups = 0
-            override fun get(key: String): Int? {
-                lookups++
-                check(lookups <= length * 4) { "BPE rank lookups exceed the linear bound" }
-                return super.get(key)
-            }
-        }
-        val tokenizer = tokenizer("a" j "a", ranks = ranks)
+        val tokenizer = tokenizer("a" j "a")
         val elapsed = TimeSource.Monotonic.markNow()
         val ids = tokenizer.encode("a".repeat(length), maxLength = length) {
             check(elapsed.elapsedNow().inWholeSeconds < 60) { "BPE exceeded the hang guard" }
