@@ -39,7 +39,7 @@ class ManualProjectUploadTest {
         }
     }
 
-    private fun batch(rows: List<Pair<String, ByteArray>>): ByteArray = ByteArrayOutputStream().also { out ->
+    private fun batch(rows: List<Join<String, ByteArray>>): ByteArray = ByteArrayOutputStream().also { out ->
         for ((name, bytes) in rows) {
             val path = name.encodeToByteArray()
             for (i in 3 downTo 0) out.write(path.size ushr (i * 8))
@@ -51,16 +51,16 @@ class ManualProjectUploadTest {
 
     @Test fun binaryBatchSurvivesRestartAsManualAndGuardCorruptionBlocksIntake(): Unit = runBlocking {
         val first = Rig(directory)
-        val bytes = byteArrayOf(0x25, 0x50, 0x44, 0x46, 0, 0xff.toByte(), 0x0a)
+        val bytes = _a[0x25.toByte(), 0x50.toByte(), 0x44.toByte(), 0x46.toByte(), 0.toByte(), 0xff.toByte(), 0x0a.toByte()]
         try {
             val begun = first.request("/_project/manual-docs/begin?intake=manual")
             assertEquals("manual", begun["intake"])
             assertEquals(CurationIntake.Mode.Manual, first.scopes.intakeMode("manual-docs"))
-            val stored = first.request("/_project/manual-docs/putBatch?intake=manual", batch(listOf("one.pdf" to bytes, "two.pdf" to (bytes + 1))))
+            val stored = first.request("/_project/manual-docs/putBatch?intake=manual", batch(_l["one.pdf" j bytes, "two.pdf" j (bytes + 1)]))
             assertEquals(2, (stored["stored"] as Number).toInt())
             assertEquals(0, (stored["failed"] as Number).toInt())
             val pdb = assertNotNull(first.registry.get("manual-docs"))
-            for ((id, raw) in listOf("one.pdf" to bytes, "two.pdf" to (bytes + 1))) {
+            for ((id, raw) in _l["one.pdf" j bytes, "two.pdf" j (bytes + 1)]) {
                 val attachment = assertNotNull(pdb.gateway.getAttachmentRef(id))
                 assertEquals(ContentId.of(raw), attachment.contentId)
                 assertContentEquals(raw, first.cas.get(attachment.contentId))
@@ -71,7 +71,7 @@ class ManualProjectUploadTest {
             assertNull(first.registry.get("unknown"))
             first.request("/_project/legacy/begin")
             first.request("/_project/legacy/put?intake=manual&path=no.pdf", bytes, 409)
-            first.request("/_project/legacy/putBatch?intake=manual", batch(listOf("no.pdf" to bytes)), 409)
+            first.request("/_project/legacy/putBatch?intake=manual", batch(_l["no.pdf" j bytes]), 409)
             assertNull(first.registry.get("legacy")?.gateway?.getAttachmentRef("no.pdf"))
         } finally { first.scopes.drain() }
 
@@ -83,8 +83,8 @@ class ManualProjectUploadTest {
                     extracts.incrementAndGet(); error("Manual originals must not be extracted on resume")
                 }
             }
-            val intake = CurationIntake(counted, { mapOf(ConstellationNodes.CURATE to LcncNodeRunner { _, _ ->
-                models.incrementAndGet(); error("Manual originals must not invoke curation/model") }) }, { null }, this,
+            val intake = CurationIntake(counted, { _m[ConstellationNodes.CURATE j LcncNodeRunner { _, _ ->
+                models.incrementAndGet(); error("Manual originals must not invoke curation/model") }] }, { null }, this,
                 settled = {}, mode = { project, _ -> restarted.scopes.intakeMode(project) })
             try {
                 restarted.scopes.onDocument = { p, id, provider -> intake.offer(p, id, provider) }
@@ -107,27 +107,27 @@ class ManualProjectUploadTest {
         val text = "Synthetic retained source."
         val cid = ContentId.of(text.encodeToByteArray())
         val ontology = ContentId.of("synthetic ontology".encodeToByteArray())
-        for (policy in listOf(CurationIntake.Mode.Manual, CurationIntake.Mode.ReviewRequired(ontology), CurationIntake.Mode.Blocked("bad guard"))) {
+        for (policy in _l[CurationIntake.Mode.Manual, CurationIntake.Mode.ReviewRequired(ontology), CurationIntake.Mode.Blocked("bad guard")]) {
             val extracts = AtomicInteger(); val curates = AtomicInteger(); val joins = AtomicInteger()
             val source = DocumentSource(cid, cid, text, "selected.pdf", "text/plain", "synthetic")
             val corpus = object : ProjectCorpus {
-                override suspend fun projects() = listOf(ProjectRef("project", "assets", "@upload", 1))
+                override suspend fun projects() = _l[ProjectRef("project", "assets", "@upload", 1)]
                 override suspend fun docs(project: String, prefix: String, glob: String, limit: Int) =
-                    listOf(ProjectDoc(project, "selected.pdf", cid.value, "1", 1, text.length.toLong(), "application/pdf"))
+                    _l[ProjectDoc(project, "selected.pdf", cid.value, "1", 1, text.length.toLong(), "application/pdf")]
                 override suspend fun read(project: String, id: String, maxChars: Int): ProjectText? = null
                 override suspend fun extract(project: String, id: String, maxChars: Int): ProjectText {
                     extracts.incrementAndGet(); return ProjectText(project, id, cid.value, "1", 1, text)
                 }
             }
-            val runners = mapOf(
-                ConstellationNodes.CURATE to LcncNodeRunner { node, _ ->
+            val runners = _m[
+                ConstellationNodes.CURATE j LcncNodeRunner { node, _ ->
                     curates.incrementAndGet()
-                    if (policy is CurationIntake.Mode.ReviewRequired) mapOf("book" to ConstellationNodes.curationBookName(node.params.getValue("book"), ontology),
-                        "curationReceiptCid" to cid.value, "ontologyCid" to ontology.value, "reviewStatus" to "unreviewed")
-                    else mapOf("book" to "selected.pdf")
+                    if (policy is CurationIntake.Mode.ReviewRequired) _m["book" j ConstellationNodes.curationBookName(node.params.getValue("book"), ontology),
+                        "curationReceiptCid" j cid.value, "ontologyCid" j ontology.value, "reviewStatus" j "unreviewed"]
+                    else _m["book" j "selected.pdf"]
                 },
-                ConstellationNodes.JOIN to LcncNodeRunner { _, _ -> joins.incrementAndGet(); emptyMap() },
-            )
+                ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> joins.incrementAndGet(); emptyMap() },
+            ]
             val intake = CurationIntake(corpus, { runners }, { null }, this, settled = {},
                 mode = { _, _ -> policy }, retainedSource = { _, _ -> source })
             try {
