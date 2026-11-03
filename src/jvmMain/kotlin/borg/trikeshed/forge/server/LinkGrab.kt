@@ -14,7 +14,11 @@ import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
@@ -33,19 +37,40 @@ class LinkGrab(
     private val corpus: ProjectCorpus,
     private val scopes: ProjectScopes,
     private val context: CoroutineContext,
+    private val admit: ((String, String, DecisionProvider?) -> Unit)? = null,
 ) {
     /** Per group, the works it holds: canonical addresses ([work]) and content digests, read once from its notes. */
     private class Held(val works: MutableSet<String>, val digests: MutableSet<String>)
-    private val held = ConcurrentHashMap<String, Held>()
+    private val held = ConcurrentHashMap<String, CompletableDeferred<Held>>()
 
-    private suspend fun held(project: String): Held = held[project] ?: run {
-        val h = Held(ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet())
-        for (d in corpus.docs(project, limit = Int.MAX_VALUE)) {
-            val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: continue
-            listOfNotNull(n["url"], n["requested"]).forEach { h.works.add(work(it)) }
-            n["sha256"]?.let { h.digests.add(it) }
+    private suspend fun held(project: String): Held {
+        while (true) {
+            val created = CompletableDeferred<Held>()
+            val existing = held.putIfAbsent(project, created)
+            if (existing != null) {
+                try { return existing.await() }
+                catch (cancelled: CancellationException) {
+                    if (!currentCoroutineContext().isActive) throw cancelled
+                    // The initial scanner was cancelled; a live caller can retry.
+                    continue
+                }
+            }
+            try {
+                val h = Held(ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet())
+                for (d in corpus.docs(project, limit = Int.MAX_VALUE)) {
+                    currentCoroutineContext().ensureActive()
+                    val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: continue
+                    listOfNotNull(n["url"], n["requested"]).forEach { h.works.add(work(it)) }
+                    n["sha256"]?.let { h.digests.add(it) }
+                }
+                created.complete(h)
+                return h
+            } catch (failure: Throwable) {
+                held.remove(project, created)
+                created.completeExceptionally(failure)
+                throw failure
+            }
         }
-        held.putIfAbsent(project, h) ?: h
     }
 
     suspend fun grab(project: String, id: String, provider: DecisionProvider?) {
@@ -65,7 +90,10 @@ class LinkGrab(
             val href = l["href"].toString().substringBefore('#')
             if (!h.works.add(work(href))) { echoes++; continue }
             runCatching { if (land(project, href, l["anchor"]?.toString().orEmpty(), citing, "$project/$id", depth + 1, asOf, provider, h)) landed++ else echoes++ }
-                .onFailure { System.err.println("[GRAB] $href: ${it.message ?: it}") }
+                .onFailure {
+                    if (it is CancellationException && !currentCoroutineContext().isActive) throw it
+                    System.err.println("[GRAB] $href: ${it.message ?: it}")
+                }
         }
         System.err.println("[GRAB] $project/$id: ${links.size} referenced, $landed landed, $echoes held already (depth ${depth + 1})")
     }
@@ -110,7 +138,11 @@ class LinkGrab(
         val stem = name(host(href) ?: return false) + "/" + stem(href)
         if (listOf("html", "pdf").any { corpus.read(project, "$stem.$it${ProjectNodes.NOTES_SUFFIX}", 16) != null }) return false
         val (bytes, type, at) = runCatching { fetch(href) }.getOrElse { refused ->
-            runCatching { fetch("$WAYBACK/${asOf ?: "2"}id_/$href") }.getOrElse { throw refused }
+            if (refused is CancellationException && !currentCoroutineContext().isActive) throw refused
+            runCatching { fetch("$WAYBACK/${asOf ?: "2"}id_/$href") }.getOrElse { archived ->
+                if (archived is CancellationException && !currentCoroutineContext().isActive) throw archived
+                throw refused
+            }
         }
         val archived = at.startsWith(WAYBACK)
         val ext = when {
@@ -136,7 +168,7 @@ class LinkGrab(
             append("depth: ").append(depth).append('\n')
         }
         scopes.uploadPut(project, doc + ProjectNodes.NOTES_SUFFIX, twin.encodeToByteArray(), provider)
-        scopes.uploadPut(project, doc, bytes, provider)
+        scopes.uploadPut(project, doc, bytes, provider, admit = admit)
         return true
     }
 

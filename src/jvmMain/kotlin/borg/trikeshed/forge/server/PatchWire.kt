@@ -254,7 +254,8 @@ class ProjectScopes(
     /** One uploaded file into an upload-kind project db; manifest line makes it boot-durable. */
     fun uploadPut(name: String, relPath: String, bytes: ByteArray,
                   decisionProvider: DecisionProvider? = decisionProvider(name, relPath.trim('/')),
-                  manualIntake: Boolean = false): borg.trikeshed.job.ContentId {
+                  manualIntake: Boolean = false,
+                  admit: ((String, String, DecisionProvider?) -> Unit)? = null): borg.trikeshed.job.ContentId {
         val rel = relPath.trim('/')
         require(rel.isNotBlank() && !rel.split('/').any { it == ".." }) { "bad path '$relPath'" }
         val cid = synchronized(sourceWrites) {
@@ -297,7 +298,7 @@ class ProjectScopes(
             // Keep source publication and its synchronous intake admission ordered
             // against removal of the same document.
             if (!manualIntake && !borg.trikeshed.lcnc.ProjectNodes.twin(rel))
-                onDocument?.invoke(name, rel, decisionProvider)
+                (admit ?: onDocument)?.invoke(name, rel, decisionProvider)
             cid
         }
         return cid
