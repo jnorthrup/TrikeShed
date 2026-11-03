@@ -440,7 +440,7 @@ object DocumentSurfacePage {
             DocumentSurface.CONTENT_ID,
             if (view == SurfaceView.TABLE) DocumentSurface.tableHtml(project, docs, column, ascending, doc?.id)
             else (passageView ?: "") + (docError?.let { error -> DocumentSurface.documentErrorHtml(
-                if (pdfSelection != null && error == "Document unavailable: not_text") "PDF retained. Text preview unavailable." else error
+                if (pdfSelection != null && error == "Document unavailable: not_text") "PDF selected. Text preview unavailable." else error
             ) } ?: DocumentSurface.documentHtml(doc, runStates.toMap(),
                 doc?.let(DocumentSurface::retainableRevision)?.let { selected ->
                     if (selected in retainingSources) SourceRetentionState(selected, true, "Retaining source…")
