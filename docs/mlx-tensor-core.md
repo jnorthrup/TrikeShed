@@ -273,16 +273,23 @@ export TRIKESHED_JEVA_WORKER="$PWD/build/bin/macos/jevaWorkerReleaseExecutable/j
 # export TRIKESHED_JEVA_TIMEOUT_MS=600000
 # export TRIKESHED_MLX_MAX_TOKENS=<positive limit>
 # export TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES=<nonnegative limit>
+# export TRIKESHED_MLX_MAX_FOOTPRINT_BYTES=<positive limit>
 ```
 
 The parent sends bounded line-framed requests to the worker. Model load and each question have a configured
 exchange deadline (600,000 ms by default); a timed-out, failed or malformed exchange retires the child before a
 new one is admitted. Ordinary worker errors are reported and end that worker; fatal native failures end the worker
 process. The caller still validates every returned distribution and checks the resolved model identity. The
-checkpoint-byte and token admission settings above are passed explicitly to the child.
+checkpoint-byte, token admission and optional physical-footprint settings above are passed explicitly to the child.
+When a footprint limit is configured, the worker samples Darwin `TASK_VM_INFO.phys_footprint` before loading and
+every 50 ms on an independently scheduled job. It terminates itself if that process measurement exceeds the limit
+or cannot be sampled. A configured footprint limit requires the isolated `device=mlx` worker; it is rejected for
+the in-process lane. The parent recognizes a fixed watchdog marker, rather than exposing arbitrary worker stderr;
+the marker is best effort so a full stderr pipe cannot delay termination.
 
 This is process and elapsed-time isolation, not a host-memory watchdog or a hard memory ceiling. It does not sample
-memory pressure or protect against a host stall before the timer can run, and termination/reaping can itself be
+host memory pressure or protect against a host stall before a timer or sampler can run. The optional sampled footprint
+limit is not a bound on all GPU/driver allocations, other processes, or host memory. Termination/reaping can itself be
 delayed by the operating system. It owns the direct child, not an arbitrary process tree. Configuring the worker does
 not establish real-checkpoint parity, resource safety or the drain acceptance below; the in-process Kotlin and Python
 paths remain available under their existing selection rules.

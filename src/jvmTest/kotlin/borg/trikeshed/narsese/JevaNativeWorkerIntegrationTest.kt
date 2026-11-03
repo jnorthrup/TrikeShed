@@ -44,5 +44,14 @@ class JevaNativeWorkerIntegrationTest {
             assertContains(failure.message.orEmpty(), "token count exceeds configured MLX limit 1")
             assertNull(limited.process, "the worker must be reaped after the inference error")
         } finally { limited.drain() }
+
+        val bounded = JevaElement(CoroutineScope(coroutineContext + JvmProcessOperations()), config.copy(mlxMaxFootprintBytes = 1))
+        try {
+            val status = withTimeout(20_000) { bounded.availability() }
+            assertEquals(false, status["available"])
+            assertEquals(false, status["loaded"])
+            assertContains(status["error"].toString(), "physical footprint")
+            assertNull(bounded.process, "the footprint-revoked worker must be reaped")
+        } finally { bounded.drain() }
     }
 }

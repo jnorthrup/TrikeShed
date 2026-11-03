@@ -81,30 +81,30 @@ class NativeHornProfile(
 /** One finite capture per admitted review request; its owning wire drains requests before retirement. */
 class NativeHornQuery(private val profile: NativeHornProfile) {
     suspend fun report(review: CurationReview, cas: CasStore, snapshot: ContentId, revision: Long,
-                       goal: String): Map<String, Any?> {
+                       goal: String): Map<String, Any?> = withTimeoutOrNull(profile.timeoutMillis) {
         val before = ReviewedHornPlan.report(review, cas, snapshot, revision, goal)
         val result = execute(before)
         // Rechecks current source/ontology/review lineage and exact quotation CAS identities after execution.
         val after = ReviewedHornPlan.report(review, cas, snapshot, revision, goal)
         for (key in s_["readCid", "decisionCid", "approvalCid", "inputCid", "frameId"].view)
             require(before[key] == after[key]) { "Reviewed material changed during native query" }
-        return result + _m["snapshotCid" j before["snapshotCid"], "readCid" j before["readCid"],
+        result + _m["snapshotCid" j before["snapshotCid"], "readCid" j before["readCid"],
             "decisionCid" j before["decisionCid"], "approvalCid" j before["approvalCid"],
             "worldObligationApplicability" j "UNKNOWN", "authority" j "reviewed-read-only-not-a-sink-permit",
             "nativeBinarySha256" j profile.binarySha256, "nativeAdapterSha256" j NativeHornProfile.ADAPTER_SHA256,
             "wallLimitMillis" j profile.timeoutMillis, "outputLimitBytes" j OUTPUT_LIMIT,
             "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
-    }
+    } ?: error("Native observation query exceeded its overall wall limit")
 
     /** Native positive taxonomy proof over the exact current, separately approved KIF selection. */
     suspend fun taxonomy(review: CurationReview, cas: CasStore, snapshot: ContentId, revision: Long,
-                         predicate: String, subject: String, obj: String): Map<String, Any?> {
+                         predicate: String, subject: String, obj: String): Map<String, Any?> = withTimeoutOrNull(profile.timeoutMillis) {
         val before = ReviewedKifHornPlan.report(review, cas, snapshot, revision, predicate, subject, obj)
         val result = execute(before, "host-explicit-assertions")
         val after = ReviewedKifHornPlan.report(review, cas, snapshot, revision, predicate, subject, obj)
         for (key in s_["readCid", "decisionCid", "approvalCid", "inputCid", "frameId"].view)
             require(before[key] == after[key]) { "Reviewed KIF changed during native query" }
-        return result + _m[
+        result + _m[
             "kind" j "reviewed-kif-native-result/1", "coverage" j "positive-reviewed-selected-snapshot",
             "snapshotCid" j before["snapshotCid"], "readCid" j before["readCid"],
             "decisionCid" j before["decisionCid"], "approvalCid" j before["approvalCid"],
@@ -114,17 +114,17 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
             "authority" j "reviewed-read-only-not-a-sink-permit", "nativeBinarySha256" j profile.binarySha256,
             "nativeAdapterSha256" j NativeHornProfile.ADAPTER_SHA256, "wallLimitMillis" j profile.timeoutMillis,
             "outputLimitBytes" j OUTPUT_LIMIT, "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
-    }
+    } ?: error("Native taxonomy query exceeded its overall wall limit")
 
     /** Each input remains an independently approved head; the union grants no sink authority. */
     suspend fun taxonomyUnion(review: CurationReview, cas: CasStore, references: List<CurationTaxonomyRef>,
-                              predicate: String, subject: String, obj: String): Map<String, Any?> {
+                              predicate: String, subject: String, obj: String): Map<String, Any?> = withTimeoutOrNull(profile.timeoutMillis) {
         val before = ReviewedKifUnion.report(review, cas, references, predicate, subject, obj)
         val result = execute(before, "host-explicit-assertions")
         val after = ReviewedKifUnion.report(review, cas, references, predicate, subject, obj)
         for (key in s_["reads", "inputCid", "frameId"].view)
             require(before[key] == after[key]) { "Reviewed KIF changed during native query" }
-        return result + _m["kind" j "reviewed-kif-union-result/1",
+        result + _m["kind" j "reviewed-kif-union-result/1",
             "coverage" j (if (before["projection"] == "complete-selection") "positive-reviewed-selected-snapshots" else "positive-reviewed-candidate-slice"),
             "reads" j before["reads"], "asOf" j after["asOf"], "policy" j before["policy"],
             "sourceEvidence" j before["sourceEvidence"], "hostRules" j before["hostRules"],
@@ -133,7 +133,7 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
             "authority" j "reviewed-read-only-not-a-sink-permit", "nativeBinarySha256" j profile.binarySha256,
             "nativeAdapterSha256" j NativeHornProfile.ADAPTER_SHA256, "wallLimitMillis" j profile.timeoutMillis,
             "outputLimitBytes" j OUTPUT_LIMIT, "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
-    }
+    } ?: error("Native union query exceeded its overall wall limit")
 
     /** Compose native-checked proofs of original reviewed facts using the fixed host taxonomy rules. */
     suspend fun taxonomyChain(review: CurationReview, cas: CasStore, references: List<CurationTaxonomyRef>,

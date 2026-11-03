@@ -23,6 +23,8 @@ data class JevaConfig(
     val worker: String? = null,
     val mlxMaxTokens: Int? = null,
     val mlxCheckpointLimitBytes: Long? = null,
+    /** Optional sampled physical-footprint limit for the isolated macOS worker. */
+    val mlxMaxFootprintBytes: Long? = null,
 ) {
     init {
         require(python.isNotBlank() && model.isNotBlank() && device.isNotBlank())
@@ -30,6 +32,7 @@ data class JevaConfig(
         require(worker == null || (worker.isNotBlank() && runtime == JevaRuntime.KOTLIN))
         require(mlxMaxTokens == null || mlxMaxTokens > 0)
         require(mlxCheckpointLimitBytes == null || mlxCheckpointLimitBytes >= 0)
+        require(mlxMaxFootprintBytes == null || mlxMaxFootprintBytes in 1..9_007_199_254_740_991L)
     }
 
     fun fields(): Map<String, Any?> = mapOf(
@@ -42,7 +45,8 @@ data class JevaConfig(
         "runtime" to runtime.name.lowercase(),
     ) + (worker?.let { mapOf("worker" to it) } ?: emptyMap()) +
         (mlxMaxTokens?.let { mapOf("mlx_max_tokens" to it) } ?: emptyMap()) +
-        (mlxCheckpointLimitBytes?.let { mapOf("mlx_checkpoint_limit_bytes" to it) } ?: emptyMap())
+        (mlxCheckpointLimitBytes?.let { mapOf("mlx_checkpoint_limit_bytes" to it) } ?: emptyMap()) +
+        (mlxMaxFootprintBytes?.let { mapOf("mlx_max_footprint_bytes" to it) } ?: emptyMap())
 
     /** Diagnostic only; identifiers are never downloaded or silently resolved as remote models. */
     fun layoutError(detail: String): String =
@@ -66,6 +70,7 @@ data class JevaConfig(
                 worker = value("worker"),
                 mlxMaxTokens = environment("TRIKESHED_MLX_MAX_TOKENS")?.let { requireNotNull(it.toIntOrNull()) { "Invalid MLX max tokens" } },
                 mlxCheckpointLimitBytes = environment("TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES")?.let { requireNotNull(it.toLongOrNull()) { "Invalid MLX checkpoint limit" } },
+                mlxMaxFootprintBytes = environment("TRIKESHED_MLX_MAX_FOOTPRINT_BYTES")?.let { requireNotNull(it.toLongOrNull()) { "Invalid MLX physical footprint limit" } },
                 timeoutMs = value("timeout_ms")?.let { requireNotNull(it.toLongOrNull()) { "Invalid Jeva timeout_ms" } } ?: 600_000)
         }
     }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.*
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import java.lang.System
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
 
 /** Optional real native integration; configured explicitly by an operator in development/CI. */
@@ -17,9 +18,13 @@ import kotlin.test.*
 class NativeHornQueryTest {
     private class Store : CasStore(), BoundedCasReader {
         private val blobs = mutableMapOf<ContentId, ByteArray>()
+        var afterRead: ((ContentId) -> Unit)? = null
         override fun put(bytes: ByteArray): ContentId = ContentId.of(bytes).also { blobs[it] = bytes.copyOf() }
         override fun get(cid: ContentId): ByteArray? = blobs[cid]?.copyOf()
-        override fun getBounded(cid: ContentId, maxBytes: Int): ByteArray? = get(cid)?.also { require(it.size <= maxBytes) }
+        override fun getBounded(cid: ContentId, maxBytes: Int): ByteArray? = get(cid)?.also {
+            require(it.size <= maxBytes)
+            afterRead?.invoke(cid)
+        }
     }
     private class Log : DurableAppendLog {
         val frames = mutableListOf<Pair<Long, ByteArray>>()
@@ -69,6 +74,50 @@ class NativeHornQueryTest {
         "datalogDirectory" j System.getProperty("trikeshed.native.datalog")])).also {
             assertTrue(it.environment.isEmpty(), "Parsed operator profile must work without constructor-only environment")
         }
+
+    @Test fun observationWallLimitIncludesReviewedSourcePreparation(): Unit = runBlocking {
+        val f = Fixture(); f.review.open(this)
+        try {
+            val approved = f.approve()
+            val reads = AtomicInteger()
+            f.cas.afterRead = { if (it == f.textCid) { reads.incrementAndGet(); Thread.sleep(600) } }
+            val limited = NativeHornProfile(Path.of("/unavailable/mlnix"), "0".repeat(64),
+                Path.of("/unavailable/adapter"), Path.of("/unavailable/datalog"), timeoutMillis = 250)
+            val failure = assertFailsWith<IllegalStateException> {
+                withContext(Dispatchers.Default + f.actor) {
+                    NativeHornQuery(limited).report(f.review, f.cas, f.cid(approved, "snapshotCid"),
+                        f.revision(approved), "needsMapping")
+                }
+            }
+            assertContains(failure.message.orEmpty(), "overall wall limit")
+            assertEquals(1, reads.get())
+        } finally { f.review.drain() }
+    }
+
+    @Test fun observationWallLimitIncludesPostQueryRecheck(): Unit = runBlocking(JvmFileOperations()) {
+        val f = Fixture(); f.review.open(this)
+        try {
+            val approved = f.approve()
+            val good = profile()
+            val limited = NativeHornProfile(good.binary, good.binarySha256, good.adapter,
+                good.datalogDirectory, good.environment, timeoutMillis = 5_000)
+            val reads = AtomicInteger()
+            f.cas.afterRead = {
+                if (it == f.textCid && reads.incrementAndGet() == 2) Thread.sleep(5_500)
+            }
+            val before = f.log.frames.size
+            val failure = assertFailsWith<IllegalStateException> {
+                withContext(Dispatchers.Default + f.actor) {
+                    NativeHornQuery(limited).report(f.review, f.cas, f.cid(approved, "snapshotCid"),
+                        f.revision(approved), "needsMapping")
+                }
+            }
+            assertContains(failure.message.orEmpty(), "overall wall limit")
+            // The second source read happens only after the real pinned solver returns.
+            assertEquals(2, reads.get(), "The query must reach its post-solver source recheck")
+            assertEquals(before, f.log.frames.size, "A timed-out recheck cannot append or spend authority")
+        } finally { f.review.drain() }
+    }
 
     @Test fun realNativeReviewQueryAndNoProofKeepWorldUnknown(): Unit = runBlocking(JvmFileOperations()) {
         val f = Fixture(); f.review.open(this)

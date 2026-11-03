@@ -7,6 +7,11 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
+/** The child closed stdout before answering an admitted exchange. */
+internal class ProcessStdoutClosed : IllegalArgumentException("Process stdout closed before its response")
+/** The child's stdin failed while writing an admitted exchange. */
+internal class ProcessStdinFailed(cause: Throwable) : IllegalStateException("Process stdin failed before its response", cause)
+
 /** Bounded UTF-8 line exchanges with one owned child; one response per admitted request. */
 class ProcessLineChannel private constructor(
     parent: CoroutineScope,
@@ -14,16 +19,18 @@ class ProcessLineChannel private constructor(
     capacity: Int,
     private val frameBytes: Int,
     private val timeoutMs: Long,
+    private val collectStderrOnFailure: Boolean,
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ProcessLineChannel> {
         suspend fun open(scope: CoroutineScope, command: String, args: List<String> = emptyList(),
                          env: Map<String, String> = emptyMap(), capacity: Int = 8,
-                         frameBytes: Int = 1_048_576, timeoutMs: Long = 120_000): ProcessLineChannel {
+                         frameBytes: Int = 1_048_576, timeoutMs: Long = 120_000,
+                         collectStderrOnFailure: Boolean = false): ProcessLineChannel {
             require(capacity > 0 && frameBytes > 0 && timeoutMs > 0)
             scope.coroutineContext.ensureActive()
             val ops = requireNotNull(scope.coroutineContext[ProcessOperations]) { "Missing ProcessOperations" }
             val pipes = ops.open(command, args, env)
-            return try { ProcessLineChannel(scope, pipes, capacity, frameBytes, timeoutMs) }
+            return try { ProcessLineChannel(scope, pipes, capacity, frameBytes, timeoutMs, collectStderrOnFailure) }
             catch (failure: Throwable) { pipes.close(); throw failure }
         }
     }
@@ -65,8 +72,23 @@ class ProcessLineChannel private constructor(
                 for (request in input.kChannel) {
                     active = request
                     val response = withTimeout(timeoutMs) {
-                        pipes.write(request.bytes)
-                        requireNotNull(readLine()) { "Process stdout closed before its response" }
+                        try { pipes.write(request.bytes) }
+                        catch (cancelled: CancellationException) { throw cancelled }
+                        catch (failure: Exception) {
+                            if (!collectStderrOnFailure) throw failure
+                            // A peer can revoke itself before consuming the request. Give
+                            // its already-emitted stderr a bounded chance to be collected.
+                            withTimeoutOrNull(minOf(timeoutMs, 250L)) { errors.join() }
+                            throw ProcessStdinFailed(failure)
+                        }
+                        val line = readLine()
+                        if (line == null) {
+                            // A child may close stdout while retaining stderr; never wait for
+                            // that stream beyond this short, bounded diagnostic opportunity.
+                            if (collectStderrOnFailure) withTimeoutOrNull(minOf(timeoutMs, 250L)) { errors.join() }
+                            throw ProcessStdoutClosed()
+                        }
+                        line
                     }
                     request.reply.complete(response)
                     active = null
@@ -132,6 +154,9 @@ class ProcessLineChannel private constructor(
     private fun errorText(): String = ByteArray(stderrSize) {
         stderr[(stderrPosition - stderrSize + it + stderr.size) % stderr.size]
     }.decodeToString()
+
+    /** Read only after drain joined the worker and stderr reader. Never return the captured text. */
+    internal fun stderrLine(marker: String): Boolean = errorText().lineSequence().any { it == marker }
 
     private suspend fun readLine(): String? {
         var bytes = ByteArray(minOf(frameBytes, 4_096))

@@ -2,3 +2,16 @@ package = mlxc
 headers = mlx/c/mlx.h
 compilerOpts = -I/opt/homebrew/include
 linkerOpts = -L/opt/homebrew/lib -lmlxc -rpath /opt/homebrew/lib
+---
+#include <mach/mach.h>
+#include <stdint.h>
+
+/* task_vm_info is a sampled per-process footprint, not a host or GPU limit. */
+static inline int trikeshed_mlx_footprint(uint64_t *bytes) {
+    task_vm_info_data_t info;
+    mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+    kern_return_t result = task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&info, &count);
+    if (result == KERN_SUCCESS && count < TASK_VM_INFO_REV1_COUNT) return KERN_FAILURE;
+    if (result == KERN_SUCCESS) *bytes = info.phys_footprint;
+    return result;
+}

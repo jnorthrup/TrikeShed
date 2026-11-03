@@ -6,6 +6,8 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.nio.channels.spi.*
 import borg.trikeshed.userspace.nio.process.ProcessLineChannel
+import borg.trikeshed.userspace.nio.process.ProcessStdinFailed
+import borg.trikeshed.userspace.nio.process.ProcessStdoutClosed
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
@@ -18,6 +20,11 @@ import kotlin.coroutines.CoroutineContext
 
 /** One bounded inference lane owns the mapped Kotlin model or explicit Python compatibility runtime. */
 class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(), capacity: Int = 4) : CoroutineContext.Element {
+    init {
+        require(config.mlxMaxFootprintBytes == null || (config.worker != null && config.device == "mlx")) {
+            "MLX physical footprint limit requires an isolated MLX worker"
+        }
+    }
     companion object Key : CoroutineContext.Key<JevaElement>
     override val key: CoroutineContext.Key<JevaElement> get() = Key
     val supervisor = SupervisorJob(parent.coroutineContext[Job])
@@ -114,6 +121,18 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
         }
     }
 
+    private suspend fun failProcess(channel: ProcessLineChannel, failure: Throwable): Nothing {
+        try { closeProcess(channel) } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+        val transport = failure is ProcessStdoutClosed || failure is ProcessStdinFailed
+        if (config.mlxMaxFootprintBytes != null && transport && channel.stderrLine(JevaWorker.FOOTPRINT_MARKER)) {
+            throw IllegalStateException("Jeva worker physical footprint exceeded the configured limit", failure)
+        }
+        if (config.mlxMaxFootprintBytes != null && transport && channel.stderrLine(JevaWorker.FOOTPRINT_SAMPLE_MARKER)) {
+            throw IllegalStateException("Jeva worker physical footprint monitoring failed", failure)
+        }
+        throw failure
+    }
+
     /** Registered upstream lanes retain future inference admission until their accepted effects have settled. */
     fun retain(curator: CurationElement) = synchronizedLock(dependentsLock) {
         if (admission.isActive && supervisor.isActive && curator !in dependents) {
@@ -147,7 +166,8 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
                 ("worker_sha256" to ContentId.of(JevaProcess.program.encodeToByteArray()).hex)))
         val opened = ProcessLineChannel.open(CoroutineScope(context + ops), executable, arguments,
             env = config.env + mapOf("HF_HUB_OFFLINE" to "1", "TRANSFORMERS_OFFLINE" to "1", "HF_HUB_DISABLE_TELEMETRY" to "1"),
-            capacity = 1, frameBytes = 8_388_608, timeoutMs = config.timeoutMs)
+            capacity = 1, frameBytes = 8_388_608, timeoutMs = config.timeoutMs,
+            collectStderrOnFailure = config.mlxMaxFootprintBytes != null)
         process = opened
         try {
             if (config.worker != null) {
@@ -155,7 +175,8 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
                     "model" to config.model, "device" to config.device, "revision" to config.revision,
                     "max_state_length" to config.maxStateLength, "max_option_length" to config.maxOptionLength,
                     "timeout_ms" to config.timeoutMs, "mlx_max_tokens" to config.mlxMaxTokens,
-                    "mlx_checkpoint_limit_bytes" to config.mlxCheckpointLimitBytes))
+                    "mlx_checkpoint_limit_bytes" to config.mlxCheckpointLimitBytes,
+                    "mlx_max_footprint_bytes" to config.mlxMaxFootprintBytes))
                 val reply = decode(opened.exchange(jsonOf(init)))
                 reply["error"]?.let { error("Jeva worker initialization failed: $it") }
                 check(reply["available"] == true) { "Jeva worker did not load the model" }
@@ -167,8 +188,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
             }
             return opened
         } catch (failure: Throwable) {
-            try { closeProcess(opened) } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
-            throw failure
+            failProcess(opened, failure)
         }
     }
 
@@ -182,8 +202,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
             reply
         }
         catch (failure: Throwable) {
-            try { closeProcess(channel) } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
-            throw failure
+            failProcess(channel, failure)
         }
     }
 

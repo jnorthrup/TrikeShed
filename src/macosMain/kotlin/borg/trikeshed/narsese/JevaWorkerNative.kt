@@ -7,8 +7,8 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.userspace.nio.platform.spi.*
 import kotlinx.cinterop.*
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
+import mlxc.trikeshed_mlx_footprint
 import platform.posix.*
 
 /** The caller owns this process and can terminate it even while a native MLX call is blocked. */
@@ -34,8 +34,38 @@ fun jevaWorkerMain(args: Array<String>) {
             offset += count.toInt()
         }
     }
+    val limitMarker = (JevaWorker.FOOTPRINT_MARKER + "\n").encodeToByteArray()
+    val sampleMarker = (JevaWorker.FOOTPRINT_SAMPLE_MARKER + "\n").encodeToByteArray()
+    fun terminate(bytes: ByteArray): Nothing {
+        // The diagnostic is best effort: a full stderr pipe must never block revocation.
+        val flags = fcntl(STDERR_FILENO, F_GETFL)
+        if (flags >= 0 && fcntl(STDERR_FILENO, F_SETFL, flags or O_NONBLOCK) == 0) {
+            bytes.usePinned { write(STDERR_FILENO, it.addressOf(0), bytes.size.convert()) }
+        }
+        kill(getpid(), SIGKILL)
+        _exit(137)
+        error("Worker termination unexpectedly returned")
+    }
+    fun enforceFootprint(limit: Long) {
+        try {
+            memScoped {
+                val bytes = alloc<ULongVar>()
+                if (trikeshed_mlx_footprint(bytes.ptr) != 0) terminate(sampleMarker)
+                if (bytes.value > limit.toULong()) terminate(limitMarker)
+            }
+        } catch (_: Throwable) { terminate(sampleMarker) }
+    }
+    val monitorOwner = SupervisorJob()
+    val monitorScope = CoroutineScope(monitorOwner + Dispatchers.Default)
     val worker = JevaWorker { config ->
         require(config.device == "mlx") { "The native Jeva worker requires device=mlx" }
+        config.mlxMaxFootprintBytes?.let { limit ->
+            // Check before model loading, then keep sampling while native calls run.
+            enforceFootprint(limit)
+            monitorScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                monitorFootprint(monitorOwner, { enforceFootprint(limit) }, { terminate(sampleMarker) })
+            }
+        }
         val defaults = MlxMatrixOperations()
         val matrices = MlxMatrixOperations(checkpointLimitBytes = config.mlxCheckpointLimitBytes ?: defaults.checkpointLimitBytes,
             maxTokens = config.mlxMaxTokens)
@@ -59,5 +89,8 @@ fun jevaWorkerMain(args: Array<String>) {
                 }
             }
         }
-    } finally { worker.close(); close(protocol) }
+    } finally {
+        runBlocking { monitorOwner.cancelAndJoin() }
+        try { worker.close() } finally { close(protocol) }
+    }
 }

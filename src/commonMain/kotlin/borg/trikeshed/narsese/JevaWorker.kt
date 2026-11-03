@@ -2,9 +2,25 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+
+/** A sampler is owned by the worker job and runs independently of inference. */
+internal suspend fun monitorFootprint(owner: Job, sample: () -> Unit, revoke: () -> Unit) {
+    try {
+        while (true) { delay(50); sample() }
+    } finally {
+        // A sampler that stops before its owner has shut down cannot protect inference.
+        if (owner.isActive) revoke()
+    }
+}
 
 /** The child owns exactly one inference instance; the caller validates every returned distribution. */
 internal class JevaWorker(private val load: suspend (JevaConfig) -> JevaInference) {
+    companion object {
+        const val FOOTPRINT_MARKER = "TRIKESHED_MLX_FOOTPRINT_LIMIT"
+        const val FOOTPRINT_SAMPLE_MARKER = "TRIKESHED_MLX_FOOTPRINT_SAMPLE_FAILED"
+    }
     private var inference: JevaInference? = null
 
     suspend fun exchange(line: String): String {
@@ -15,12 +31,20 @@ internal class JevaWorker(private val load: suspend (JevaConfig) -> JevaInferenc
                 val fields = requireNotNull(request["config"] as? Map<*, *>) { "Missing Jeva worker configuration" }
                 fun positive(name: String): Int = requireNotNull((fields[name] as? Number)?.toInt()?.takeIf { it > 0 }) { "Invalid $name" }
                 val timeout = requireNotNull((fields["timeout_ms"] as? Number)?.toLong()?.takeIf { it > 0 }) { "Invalid timeout_ms" }
+                val footprint = fields["mlx_max_footprint_bytes"]?.let { raw ->
+                    val number = requireNotNull((raw as? Number)?.toDouble()) { "Invalid mlx_max_footprint_bytes" }
+                    require(number.isFinite() && number >= 1.0 && number <= 9_007_199_254_740_991.0 && number % 1.0 == 0.0) {
+                        "Invalid mlx_max_footprint_bytes"
+                    }
+                    number.toLong()
+                }
                 val config = JevaConfig(model = Jeva.text(fields["model"], "model"),
                     device = Jeva.text(fields["device"], "device"), revision = fields["revision"] as? String,
                     maxStateLength = positive("max_state_length"), maxOptionLength = positive("max_option_length"),
                     timeoutMs = timeout, runtime = JevaRuntime.KOTLIN,
                     mlxMaxTokens = (fields["mlx_max_tokens"] as? Number)?.toInt(),
-                    mlxCheckpointLimitBytes = (fields["mlx_checkpoint_limit_bytes"] as? Number)?.toLong())
+                    mlxCheckpointLimitBytes = (fields["mlx_checkpoint_limit_bytes"] as? Number)?.toLong(),
+                    mlxMaxFootprintBytes = footprint)
                 load(config).also { inference = it }
                 status()
             }

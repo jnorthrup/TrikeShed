@@ -5,6 +5,8 @@ import borg.trikeshed.kif.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.DocumentQuotationCheck
 import borg.trikeshed.parse.reifyMap
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** Host-authenticated KIF facts and fixed taxonomy rules for the pinned native solver. */
 object ReviewedKifHornPlan {
@@ -22,6 +24,9 @@ object ReviewedKifHornPlan {
     /** The returned export is not a permit and has not yet been executed. */
     suspend fun report(review: CurationReview, cas: CasStore, snapshotCid: ContentId, revision: Long,
                        predicate: String, subject: String, obj: String): Map<String, Any?> {
+        val context = currentCoroutineContext()
+        fun check() = context.ensureActive()
+        check()
         require(predicate in _s["subclass", "instance"]) { "Goal must be subclass or instance" }
         fun constant(value: String): Boolean {
             if (value.length !in 1..256) return false
@@ -30,6 +35,7 @@ object ReviewedKifHornPlan {
         }
         require(constant(subject) && constant(obj)) { "Goal requires two exact ground KIF constants" }
         val read = review.taxonomyRead(snapshotCid, revision)
+        check()
         val selections = read.candidate.selections
         require(selections.size <= MAX_SELECTIONS) { "Native KIF query supports at most $MAX_SELECTIONS reviewed assertions" }
         val reader = cas as? BoundedCasReader ?: error("Bounded CAS reads are required")
@@ -38,14 +44,17 @@ object ReviewedKifHornPlan {
         val sidecar = linkedMapOf<String, Any?>()
         val sources = mutableListOf<KifSourceAssertion>()
         for (item in selections.view) {
+            check()
             val q = item.quotation
             val source = texts.getOrPut(q.extractedTextCid) {
                 val remaining = minOf(16 * 1024 * 1024, 32 * 1024 * 1024 - bytesRead)
                 require(remaining > 0) { "Reviewed source byte limit" }
                 val bytes = requireNotNull(reader.getBounded(q.extractedTextCid, remaining)) { "Selected text is unavailable" }
+                check()
                 require(ContentId.of(bytes) == q.extractedTextCid && q.originalCid == q.extractedTextCid) { "Selected source identity differs" }
+                check()
                 bytesRead += bytes.size
-                bytes.decodeToString(throwOnInvalidSequence = true)
+                bytes.decodeToString(throwOnInvalidSequence = true).also { check() }
             }
             require(item.value["format"] == DocumentTaxonomyCandidate.POLICY &&
                 DocumentQuotationCheck.exactSpan(source, q.begin, q.end, q.quote)) { "Selected KIF evidence differs" }
@@ -58,15 +67,18 @@ object ReviewedKifHornPlan {
             sources.add(KifSourceAssertion(id, q.extractedTextCid, read.candidate.sourceRevision, KifReview.APPROVED, q.quote))
         }
         for ((index, text) in rules.withIndex()) {
+            check()
             val cid = ContentId.of(text.encodeToByteArray(throwOnInvalidSequence = true))
             sources.add(KifSourceAssertion("host-rule:${index + 1}", cid, POLICY, KifReview.APPROVED, text))
         }
         val exported = SumoNixBridge.compile(revision, sources, "($predicate $subject $obj)")
+        check()
         val input = reifyMap(exported.inputJson)
         require((input["excluded"] as? List<*>)?.isEmpty() == true &&
             (input["facts"] as? List<*>)?.size == selections.size &&
             (input["rules"] as? List<*>)?.size == rules.size) { "Reviewed KIF is outside the native fragment" }
         val checked = review.taxonomyRead(snapshotCid, revision)
+        check()
         require(checked.readCid == read.readCid && checked.decisionCid == read.decisionCid) { "Reviewed material changed during export" }
         return _m["kind" j "reviewed-kif-native-input/1", "scope" j exported.scope,
             "inputJson" j exported.inputJson, "inputCid" j exported.inputCid.value, "frameId" j exported.frameId.value,
