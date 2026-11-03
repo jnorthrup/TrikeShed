@@ -299,6 +299,7 @@ object BrainMuxNodes {
                 val frame = currentCoroutineContext()[LcncScopeFrame]
                 val contextId = ((inputs["context"] ?: inputs["context?"]) as? String)?.takeIf { it.isNotBlank() }
                     ?: node.params["context"]?.takeIf { it.isNotBlank() } ?: node.id
+                require(contextId.length <= 128) { "breadcrumb context must contain at most 128 characters" }
                 var attributed: MuxCallRecord? = null
                 val attribution = MuxCallContext(
                     conversationId = parentAttribution?.conversationId,

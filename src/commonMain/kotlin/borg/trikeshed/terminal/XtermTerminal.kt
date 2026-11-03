@@ -100,6 +100,7 @@ class XtermTerminal(
     private val csi = StringBuilder()
     private val osc = StringBuilder()
     private var parser = Parser.GROUND
+    private var highSurrogate: Char? = null
 
     init {
         require(columns > 0 && rows > 0)
@@ -118,8 +119,20 @@ class XtermTerminal(
 
     private fun feedIntoState(text: String) {
         var offset = 0
+        val high = highSurrogate
+        if (high != null && text.isNotEmpty()) {
+            highSurrogate = null
+            if (text[0].isLowSurrogate()) {
+                accept("$high${text[0]}")
+                offset = 1
+            } else accept(high.toString())
+        }
         while (offset < text.length) {
             val first = text[offset]
+            if (first.isHighSurrogate() && offset + 1 == text.length) {
+                highSurrogate = first
+                break
+            }
             val grapheme = if (first.isHighSurrogate() && offset + 1 < text.length && text[offset + 1].isLowSurrogate()) {
                 text.substring(offset, offset + 2).also { offset += 2 }
             } else {
@@ -205,7 +218,7 @@ class XtermTerminal(
         scrollTop = 0; scrollBottom = rows - 1
         title = ""; applicationCursorKeys = false; originMode = false
         autoWrap = true; cursorVisible = true; wrapPending = false
-        parser = Parser.GROUND; csi.clear(); osc.clear(); replies.clear()
+        parser = Parser.GROUND; csi.clear(); osc.clear(); replies.clear(); highSurrogate = null
         revision++
     }
 
@@ -309,16 +322,25 @@ class XtermTerminal(
     private fun executeCsi(final: Char, raw: String) {
         val private = raw.startsWith('?')
         val clean = raw.removePrefix("?").removePrefix(">")
-        val values = if (clean.isEmpty()) listOf(0) else clean.split(';').map { it.toIntOrNull() ?: 0 }
-        fun p(index: Int = 0, default: Int = 1): Int = values.getOrNull(index)?.takeIf { it != 0 } ?: default
+        fun parameter(value: String): Int {
+            var result = 0
+            for (ch in value) {
+                if (ch !in '0'..'9') return 0
+                val digit = ch - '0'
+                result = if (result > (Int.MAX_VALUE - digit) / 10) Int.MAX_VALUE else result * 10 + digit
+            }
+            return result
+        }
+        val values = if (clean.isEmpty()) listOf(0) else clean.split(';').map(::parameter)
+        fun p(index: Int = 0, default: Int = 1): Int = values.getOrNull(index)?.takeIf { it > 0 } ?: default
         wrapPending = false
         when (final) {
-            'A' -> row = (row - p()).coerceAtLeast(if (originMode) scrollTop else 0)
-            'B' -> row = (row + p()).coerceAtMost(if (originMode) scrollBottom else rows - 1)
-            'C', 'a' -> column = (column + p()).coerceAtMost(columns - 1)
-            'D' -> column = (column - p()).coerceAtLeast(0)
-            'E' -> { row = (row + p()).coerceAtMost(rows - 1); column = 0 }
-            'F' -> { row = (row - p()).coerceAtLeast(0); column = 0 }
+            'A' -> row -= minOf(p(), row - if (originMode) scrollTop else 0)
+            'B' -> row += minOf(p(), (if (originMode) scrollBottom else rows - 1) - row)
+            'C', 'a' -> column += minOf(p(), columns - 1 - column)
+            'D' -> column -= minOf(p(), column)
+            'E' -> { row += minOf(p(), rows - 1 - row); column = 0 }
+            'F' -> { row -= minOf(p(), row); column = 0 }
             'G', '`' -> column = (p() - 1).coerceIn(0, columns - 1)
             'd' -> row = absoluteRow(p())
             'H', 'f' -> { row = absoluteRow(p(0)); column = (p(1) - 1).coerceIn(0, columns - 1) }
@@ -329,8 +351,19 @@ class XtermTerminal(
             '@' -> insertCharacters(p())
             'P' -> deleteCharacters(p())
             'X' -> eraseCharacters(p())
-            'S' -> repeat(p()) { scrollUp(scrollTop, scrollBottom) }
-            'T' -> repeat(p()) { scrollDown(scrollTop, scrollBottom) }
+            'S' -> {
+                val count = p()
+                val retained = if (scrollTop == 0 && scrollBottom == rows - 1 && !alternateScreen) scrollbackLimit else 0
+                val steps = minOf(count.toLong(), scrollBottom.toLong() - scrollTop + 1 + retained).toInt()
+                repeat(steps) { scrollUp(scrollTop, scrollBottom) }
+                revision += (count - steps).toLong()
+            }
+            'T' -> {
+                val count = p()
+                val steps = minOf(count, scrollBottom - scrollTop + 1)
+                repeat(steps) { scrollDown(scrollTop, scrollBottom) }
+                revision += (count - steps).toLong()
+            }
             'm' -> sgr(values)
             'r' -> setScrollRegion(values)
             's' -> saveCursor()
@@ -423,15 +456,21 @@ class XtermTerminal(
     private fun put(g: String) {
         val cp = codePoint(g)
         if (isCombining(cp)) {
-            val targetColumn = if (column > 0) column - 1 else 0
+            var targetColumn = if (wrapPending) column else (column - 1).coerceAtLeast(0)
+            if (cells[row][targetColumn].continuation && targetColumn > 0) targetColumn--
             val old = cells[row][targetColumn]
             cells[row][targetColumn] = old.copy(text = old.text + g)
             mark(row, targetColumn)
+            revision++
             return
         }
         if (wrapPending && autoWrap) { column = 0; lineFeed() }
         wrapPending = false
         val width = if (isWide(cp)) 2 else 1
+        if (width == 2 && columns > 1 && column == columns - 1 && autoWrap) {
+            column = 0
+            lineFeed()
+        }
         clearWideAt(row, column)
         cells[row][column] = VtCell(g, style)
         mark(row, column)
@@ -494,7 +533,7 @@ class XtermTerminal(
         else -> Unit
     }
 
-    private fun eraseCharacters(count: Int) = eraseRange(row, column, minOf(columns, column + count))
+    private fun eraseCharacters(count: Int) = eraseRange(row, column, column + minOf(count, columns - column))
 
     private fun eraseRange(r: Int, start: Int, end: Int) {
         for (c in start.coerceAtLeast(0) until end.coerceAtMost(columns)) { cells[r][c] = blank(); mark(r, c) }
@@ -547,7 +586,7 @@ class XtermTerminal(
         row = savedRow.coerceIn(0, rows - 1); column = savedColumn.coerceIn(0, columns - 1); style = savedStyle; wrapPending = false
     }
     private fun absoluteRow(oneBased: Int): Int =
-        if (originMode) (scrollTop + oneBased - 1).coerceIn(scrollTop, scrollBottom) else (oneBased - 1).coerceIn(0, rows - 1)
+        if (originMode) scrollTop + minOf(oneBased - 1, scrollBottom - scrollTop) else minOf(oneBased - 1, rows - 1)
     private fun nextTab(c: Int): Int = (((c / 8) + 1) * 8).coerceAtMost(columns - 1)
     private fun cursorKey(final: Char): String = if (applicationCursorKeys) "\u001bO$final" else "\u001b[$final"
     private fun blank(): VtCell = VtCell(style = style)

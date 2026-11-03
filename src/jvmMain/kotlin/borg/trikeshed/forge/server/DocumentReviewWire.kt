@@ -2,6 +2,7 @@ package borg.trikeshed.forge.server
 
 import borg.trikeshed.job.*
 import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.narsese.*
 import borg.trikeshed.parse.*
@@ -124,15 +125,27 @@ class DocumentReviewWire private constructor(
                     resolve = { kind, cid, ids -> when (kind) {
                         "book" -> books.reviewCandidate(cid, ids)
                         "document" -> DocumentReviewCandidate.candidate(ctx.casStore, cid, ids)
+                        DocumentTaxonomyCandidate.KIND, DocumentTaxonomyCandidate.PARTITION_KIND ->
+                            DocumentTaxonomyCandidate.candidate(ctx.casStore, cid, ids, kind = kind)
                         else -> error("Unknown curation kind")
                     } },
                     current = { candidate ->
                         val source = when (candidate.kind) {
                             "book" -> books.reviewSource(candidate.curationReceiptCid)
                             "document" -> DocumentReviewCandidate.record(ctx.casStore, candidate.curationReceiptCid).source
+                            DocumentTaxonomyCandidate.KIND, DocumentTaxonomyCandidate.PARTITION_KIND ->
+                                DocumentTaxonomyCandidate.record(ctx.casStore, candidate.curationReceiptCid).source
                             else -> error("Unknown curation kind")
                         }
-                        val retained = if (candidate.kind == "book") books.reviewCurrent(candidate) else {
+                        val retained = if (candidate.kind == "book") books.reviewCurrent(candidate) else if (DocumentTaxonomyCandidate.isTaxonomy(candidate.kind)) {
+                            val ids = candidate.selections.view.map { it.id }
+                            val resolved = DocumentTaxonomyCandidate.candidate(ctx.casStore, candidate.curationReceiptCid, ids,
+                                retainPolicy = false, kind = candidate.kind)
+                            resolved.kind == candidate.kind && resolved.family == candidate.family &&
+                                resolved.curationReceiptCid == candidate.curationReceiptCid && resolved.ontologyCid == candidate.ontologyCid &&
+                                resolved.sourceRevision == candidate.sourceRevision && resolved.runReceiptCid == candidate.runReceiptCid &&
+                                resolved.selections.view.toList() == candidate.selections.view.toList()
+                        } else {
                             val record = DocumentReviewCandidate.record(ctx.casStore, candidate.curationReceiptCid)
                             candidate.sourceRevision == DocumentReviewCandidate.revision(record.source) &&
                                 candidate.ontologyCid == ContentId.of(CanonicalCbor.encodeMap(DocumentReviewCandidate.ontology(record)))
@@ -193,7 +206,7 @@ class DocumentReviewWire private constructor(
         ctx.blackboard.put("lcnc/readiness/document.reviewDecision", mapOf(
             "available" to principals.isNotEmpty(), "reason" to if (principals.isEmpty()) "No analyst principal is configured" else null,
             "prerequisites" to listOf("authenticated analyst session")), "documents")
-        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-plan", "/horn-input", "/horn-query"))
+        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-candidates", "/taxonomy-plan", "/taxonomy-query", "/taxonomy-union", "/taxonomy-chain", "/horn-input", "/horn-query"))
             ctx.routes.claim("document-review", "/api/documents/review$suffix", route = ::route)
     }
 
@@ -210,7 +223,8 @@ class DocumentReviewWire private constructor(
     private suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): WireHttpResponse {
         val endpoint = path.substringBefore('?')
         val actor = principal(text)
-        val reasoningInput = endpoint.endsWith("/taxonomy-plan") || endpoint.endsWith("/horn-input") || endpoint.endsWith("/horn-query")
+        val reasoningInput = endpoint.endsWith("/taxonomy-candidates") || endpoint.endsWith("/taxonomy-plan") || endpoint.endsWith("/taxonomy-query") || endpoint.endsWith("/taxonomy-union") || endpoint.endsWith("/taxonomy-chain") ||
+            endpoint.endsWith("/horn-input") || endpoint.endsWith("/horn-query")
         if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release") ||
                 endpoint.endsWith("/assess") || endpoint.endsWith("/assessment") || reasoningInput) && actor == null)
             return json(mapOf("error" to "authenticated_reviewer_required"), 401)
@@ -230,6 +244,69 @@ class DocumentReviewWire private constructor(
                         fun cid(key: String) = ContentId(input[key] as? String ?: error("$key required"))
                         fun revision() = revision(input["expectedRevision"])
                         json(when {
+                            endpoint.endsWith("/taxonomy-candidates") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("receiptCid", "offset", "limit"))
+                                fun pageValue(key: String): Int = revision(input[key]).let {
+                                    require(it <= Int.MAX_VALUE) { "KIF page value exceeds integer range" }; it.toInt()
+                                }
+                                val receipt = cid("receiptCid")
+                                val source = DocumentTaxonomyCandidate.record(ctx.casStore, receipt).source
+                                suspend fun current(): Boolean {
+                                    val evidenceId = source.metadata["evidenceId"]?.singleOrNull()
+                                    val evidence = evidenceId?.let { ctx.blackboard.snapshot().values["headhunter/$it"] as? Map<*, *> }
+                                    return DocumentCurationLegos.current(corpus, source) && (evidenceId == null ||
+                                        evidence?.get("cid") == source.metadata["evidenceCid"]?.singleOrNull() &&
+                                            (evidence?.get("fields") as? Map<*, *>)?.get("deleted") != true)
+                                }
+                                require(current()) { "KIF source is no longer current" }
+                                val reader = ctx.casStore as? BoundedCasReader ?: error("Bounded CAS reads are required")
+                                val original = requireNotNull(reader.getBounded(source.originalCid, 16 * 1024 * 1024)) { "Source is unavailable" }
+                                require(ContentId.of(original) == source.originalCid &&
+                                    original.contentEquals(source.text.encodeToByteArray(throwOnInvalidSequence = true))) { "Source identity differs" }
+                                val offset = pageValue("offset")
+                                val limit = pageValue("limit")
+                                require(limit in 1..64) { "KIF candidate page size must be 1 to 64" }
+                                val (rows, total) = DocumentTaxonomyCandidate.page(source, offset, limit)
+                                val report = _m["receiptCid" j receipt.value, "sourceRevision" j DocumentReviewCandidate.revision(source),
+                                    "offset" j offset, "limit" j limit, "total" j total, "selections" j rows]
+                                require(current()) { "KIF source changed while inspecting candidates" }
+                                require(jsonOf(report).encodeToByteArray().size <= 1048576) { "KIF candidate page exceeds 1MiB; request fewer rows" }
+                                report
+                            }
+                            endpoint.endsWith("/taxonomy-union") || endpoint.endsWith("/taxonomy-chain") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("references", "goal"))
+                                val refs = input["references"] as? List<*> ?: error("Review references required")
+                                require(refs.size in 1..16) { "Choose up to 16 reviewed snapshots" }
+                                val references = refs.map { value ->
+                                    val ref = value as? Map<*, *> ?: error("Review reference must be an object")
+                                    fields(ref, setOf("snapshotCid", "expectedRevision"))
+                                    CurationTaxonomyRef(ContentId(ref["snapshotCid"] as? String ?: error("snapshotCid required")),
+                                        revision(ref["expectedRevision"]))
+                                }
+                                val goal = input["goal"] as? Map<*, *> ?: error("Taxonomy goal required")
+                                fields(goal, setOf("predicate", "subject", "object"))
+                                fun term(key: String) = goal[key] as? String ?: error("Goal $key must be text")
+                                val result = (if (endpoint.endsWith("/taxonomy-chain"))
+                                    nativeHorn?.taxonomyChain(review, ctx.casStore, references, term("predicate"), term("subject"), term("object"))
+                                else nativeHorn?.taxonomyUnion(review, ctx.casStore, references,
+                                    term("predicate"), term("subject"), term("object")))
+                                    ?: _m["status" j "UNAVAILABLE", "reason" j "native-profile-unconfigured",
+                                        "authority" j "reviewed-read-only-not-a-sink-permit"]
+                                require(jsonOf(result).encodeToByteArray().size <= 1048576) { "Native taxonomy report exceeds 1MiB" }
+                                result
+                            }
+                            endpoint.endsWith("/taxonomy-query") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
+                                val goal = input["goal"] as? Map<*, *> ?: error("Taxonomy goal required")
+                                fields(goal, setOf("predicate", "subject", "object"))
+                                fun term(key: String) = goal[key] as? String ?: error("Goal $key must be text")
+                                val result = nativeHorn?.taxonomy(review, ctx.casStore, cid("snapshotCid"), revision(),
+                                    term("predicate"), term("subject"), term("object"))
+                                    ?: _m["status" j "UNAVAILABLE", "reason" j "native-profile-unconfigured",
+                                        "authority" j "reviewed-read-only-not-a-sink-permit"]
+                                require(jsonOf(result).encodeToByteArray().size <= 1048576) { "Native taxonomy report exceeds 1MiB" }
+                                result
+                            }
                             endpoint.endsWith("/horn-query") -> withContext(checkNotNull(actor)) {
                                 fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
                                 val goal = input["goal"] as? String ?: error("Review observation goal must be text")
@@ -246,12 +323,15 @@ class DocumentReviewWire private constructor(
                                 report
                             }
                             endpoint.endsWith("/taxonomy-plan") -> withContext(checkNotNull(actor)) {
-                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
+                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"), setOf("offset", "limit"))
                                 val goal = input["goal"] as? Map<*, *> ?: error("Taxonomy goal required")
                                 fields(goal, setOf("predicate", "subject", "object"))
                                 fun term(key: String) = goal[key] as? String ?: error("Goal $key must be text")
+                                fun page(key: String, default: Int): Int = if (key !in input) default else revision(input[key]).let {
+                                    require(it <= Int.MAX_VALUE) { "Taxonomy page value exceeds integer range" }; it.toInt()
+                                }
                                 val report = ReviewedTaxonomyPlan.report(review, ctx.casStore, cid("snapshotCid"), revision(),
-                                    term("predicate"), term("subject"), term("object"))
+                                    term("predicate"), term("subject"), term("object"), page("offset", 0), page("limit", 64))
                                 require(jsonOf(report).encodeToByteArray().size <= 1048576) { "Taxonomy report exceeds 1MiB" }
                                 report
                             }

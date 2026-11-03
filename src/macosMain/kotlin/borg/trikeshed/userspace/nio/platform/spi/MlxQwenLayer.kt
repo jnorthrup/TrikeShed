@@ -42,6 +42,7 @@ fun MlxMatrixSession.linearAttention(
     input: MlxTensor, qkv: MlxQuantized, gate: MlxQuantized, beta: MlxTensor, decay: MlxTensor, output: MlxQuantized,
     convolution: MlxTensor, stateA: MlxTensor, stateBias: MlxTensor, norm: MlxTensor,
     keyHeads: Int, valueHeads: Int, keyDim: Int, valueDim: Int, kernel: Int, epsilon: Float,
+    check: () -> Unit = {},
 ): MlxTensor {
     val tokens = input.a[0]
     val keyWidth = keyHeads * keyDim
@@ -56,7 +57,9 @@ fun MlxMatrixSession.linearAttention(
     val values = reshape(slice(mixed, 2, 2 * keyWidth, channels), tokens, valueHeads, valueDim)
     val retention = exp(negate(times(exp(stateA), softplus(add(dense(input, decay), stateBias)))))
     var state = zeros(valueHeads, valueDim, keyDim)
-    val rows = ArrayList<MlxTensor>(tokens)
+    var previousState = state
+    val rows = ArrayList<MlxTensor>(RECURRENCE_CHUNK)
+    val blocks = ArrayList<MlxTensor>()
     var mark = mark()
     for (t in 0 until tokens) {
         fun at(of: MlxTensor, vararg extents: Int) = reshape(slice(of, 0, t, t + 1), *extents)
@@ -68,10 +71,16 @@ fun MlxMatrixSession.linearAttention(
         rows += reshape(sum(times(state, at(queries, valueHeads, 1, keyDim)), 2), 1, valueHeads, valueDim)
         // The state is [heads, valueDim, keyDim]: every step's temporaries are megabytes, so the graph ends every few steps.
         if ((t + 1) % RECURRENCE_CHUNK == 0 || t == tokens - 1) {
-            settle(mark, state, *rows.subList(maxOf(0, rows.size - RECURRENCE_CHUNK), rows.size).toTypedArray())
+            val block = concatenate(rows, 0)
+            settle(mark, state, block)
+            blocks += block
+            rows.clear()
+            release(previousState)
+            previousState = state
+            check()
             mark = mark()
         }
     }
-    val normed = times(rmsNorm(concatenate(rows, 0), norm, epsilon), silu(gates))
+    val normed = times(rmsNorm(concatenate(blocks, 0), norm, epsilon), silu(gates))
     return linear(reshape(normed, tokens, valueWidth), output)
 }

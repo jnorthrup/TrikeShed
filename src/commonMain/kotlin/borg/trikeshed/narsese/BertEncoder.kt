@@ -6,6 +6,7 @@ import kotlin.coroutines.CoroutineContext
 /** Offsets, when supplied by the reader, are UTF-16 offsets into [sentence]. */
 data class BertToken(val lemma: String, val sentence: String, val start: Int? = null, val end: Int? = null)
 enum class BertSpan { Exact, Stem, Explicit, Missing, Ambiguous, Truncated }
+val BertSpan.resolved: Boolean get() = this == BertSpan.Exact || this == BertSpan.Stem || this == BertSpan.Explicit
 data class BertVector(val token: BertToken, val span: BertSpan, val values: FloatArray?)
 
 /** Contextual word vectors, not a truth judge or a generative document model. */

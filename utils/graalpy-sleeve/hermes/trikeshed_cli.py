@@ -6,6 +6,21 @@ There is no guest renderer application or guest worker thread on this surface.
 """
 
 import queue
+import sqlite3
+
+# The guest SQLite adapter owns an isolated VFS image and its single-writer
+# lease; it has no host file descriptors or POSIX chmod to harden.  Creating
+# the main file with os.open would bypass that adapter and fail in GraalPy.
+if getattr(sqlite3.Connection, "__trikeshed_sqlite__", False):
+    import hermes_state
+    from pathlib import PurePosixPath
+
+    def _secure_image(path, *, create_main=False):
+        parts = PurePosixPath(path).parts
+        if len(parts) < 3 or parts[:2] != ("/", "workspace") or ".." in parts:
+            raise ValueError("SQLite image must stay in the guest workspace")
+
+    hermes_state._secure_state_db_files = _secure_image
 
 LINE_MODE = True
 _cli = None

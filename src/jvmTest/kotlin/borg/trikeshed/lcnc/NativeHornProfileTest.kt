@@ -22,11 +22,24 @@ class NativeHornProfileTest {
         val memory = InMemoryFileOperations()
         memory.write("/large", ByteArray(8))
         var read = false
-        val files = object : FileOperations by memory {
-            override fun readAllBytes(filename: String): ByteArray { read = true; return memory.readAllBytes(filename) }
+        val files = object : FileOperations by memory, BoundedFileReader {
+            override fun readBounded(path: String, maxBytes: Int): ByteArray { read = true; return memory.readAllBytes(path) }
         }
         assertFailsWith<IllegalArgumentException> { NativeHornProfile.boundedRead(files, "/large", 4) }
         assertFalse(read)
+    }
+    @Test fun growthBetweenSizeAndReadRemainsBounded() {
+        val memory = InMemoryFileOperations()
+        memory.write("/profile", _a[1.toByte(), 2.toByte()])
+        val files = object : FileOperations by memory, BoundedFileReader {
+            override fun readBounded(path: String, maxBytes: Int): ByteArray {
+                memory.write(path, ByteArray(maxBytes + 1))
+                throw BoundedReadLimitException(maxBytes)
+            }
+            override fun readAllBytes(filename: String): ByteArray = error("unbounded read must not be used")
+        }
+        assertFailsWith<BoundedReadLimitException> { NativeHornProfile.boundedRead(files, "/profile", 4) }
+        assertFailsWith<UnsupportedOperationException> { NativeHornProfile.boundedRead(memory, "/profile", 4) }
     }
     @Test fun strictPureOperatorProfile() {
         val profile = NativeHornProfile.parse(jsonOf(fields()))

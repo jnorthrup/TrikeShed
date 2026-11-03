@@ -103,6 +103,12 @@ interface HtxRouteService : CoroutineContext.Element {
 
 object HtxKey : CoroutineContext.Key<HtxElement>
 
+/** Observes a submitted exchange's response before caller cancellation is propagated. */
+class HtxResponseObserver(val accept: suspend (HtxResponse) -> Unit) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<HtxResponseObserver>
+    override val key: CoroutineContext.Key<*> get() = Key
+}
+
 open class HtxElement(
     val baseUrl: String = "",
     private val routeService: HtxRouteService,

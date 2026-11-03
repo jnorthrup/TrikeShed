@@ -58,6 +58,21 @@ class CurationReviewedRead internal constructor(
     val asOf: Long,
 )
 
+/** Reviewed KIF source assertions; this is a read capability, not a release or sink permit. */
+class CurationTaxonomyRead internal constructor(
+    val candidate: CurationReviewCandidate,
+    val snapshotCid: ContentId,
+    val approvalCid: ContentId,
+    val decisionCid: ContentId,
+    val revision: Long,
+    val reviewer: String,
+    val synthetic: Boolean,
+    val readCid: ContentId,
+    val asOf: Long,
+)
+
+data class CurationTaxonomyRef(val snapshotCid: ContentId, val revision: Long)
+
 private data class CurationReviewCall(val execute: suspend () -> Unit, val reject: (Throwable) -> Unit)
 
 /** The private WAL, not an editable board card or a supplied CID, establishes review authority. */
@@ -176,6 +191,42 @@ class CurationReview(
                 "ontologyCid" to candidate.ontologyCid.value, "assessmentCid" to proof.cid.value)))
             CurationReviewedRead(candidate, snapshotCid, approval, decision, expectedRevision,
                 string(issued, "reviewer"), issued["synthetic"] == true, proof.cid, proof.checked.batch, readCid, clock())
+        }
+    }
+
+    /** Only a separately retained KIF candidate and this ledger's current authenticated approval qualify. */
+    suspend fun taxonomyRead(snapshotCid: ContentId, expectedRevision: Long): CurationTaxonomyRead =
+        taxonomyReads(_l[CurationTaxonomyRef(snapshotCid, expectedRevision)]).single()
+
+    /** Resolve all heads within one ledger turn; each remains an independent approval. */
+    suspend fun taxonomyReads(references: List<CurationTaxonomyRef>): List<CurationTaxonomyRead> {
+        currentCoroutineContext()[ReviewPrincipal] ?: error("Authenticated reviewer required")
+        require(references.isNotEmpty() && references.size <= 16 && references.map { it.snapshotCid }.distinct().size == references.size) {
+            "Choose up to 16 distinct reviewed taxonomy snapshots"
+        }
+        return submit {
+          val families = mutableSetOf<String>()
+          references.map { reference ->
+            val snapshotCid = reference.snapshotCid
+            val expectedRevision = reference.revision
+            val (candidate, head) = requireHead(snapshotCid, expectedRevision)
+            require(DocumentTaxonomyCandidate.isTaxonomy(candidate.kind) && families.add(candidate.family)) { "Distinct reviewed KIF families required" }
+            val decision = heads.getValue(candidate.family)
+            val action = string(head, "action")
+            require(action == "approve") { "The exact current taxonomy approval is required" }
+            val approval = decision
+            val issued = events[approval] ?: error("Approval was not issued by this ledger")
+            require(issued["action"] == "approve" && issued["snapshotCid"] == snapshotCid.value) { "Approval identity differs" }
+            validate(candidate)
+            require(current(candidate)) { "Curation source or ontology is no longer current" }
+            val readCid = ContentId.of(CanonicalCbor.encodeMap(_m[
+                "kind" j "curation-taxonomy-read/1", "snapshotCid" j snapshotCid.value,
+                "approvalCid" j approval.value, "decisionCid" j decision.value, "revision" j expectedRevision,
+                "sourceRevision" j candidate.sourceRevision, "curationReceiptCid" j candidate.curationReceiptCid.value,
+                "ontologyCid" j candidate.ontologyCid.value]))
+            CurationTaxonomyRead(candidate, snapshotCid, approval, decision, expectedRevision,
+                string(issued, "reviewer"), issued["synthetic"] == true, readCid, clock())
+          }
         }
     }
 
@@ -366,6 +417,7 @@ class CurationReview(
     /** Mint a single permit from the exact current approval. The sink must consume this permit. */
     suspend fun release(snapshotCid: ContentId, approvalCid: ContentId, expectedRevision: Long): Map<String, Any?> = submit {
         val (candidate, head) = requireHead(snapshotCid, expectedRevision)
+        require(!DocumentTaxonomyCandidate.isTaxonomy(candidate.kind)) { "KIF taxonomy approval grants read-only analysis, not a sink permit" }
         require(head["action"] == "approve" && heads[candidate.family] == approvalCid) { "The exact current approval is required" }
         validate(candidate)
         require(current(candidate)) { "Curation source or ontology is no longer current" }
@@ -383,6 +435,7 @@ class CurationReview(
         require(event["action"] == "release") { "A review release is required" }
         val snapshotCid = ContentId(string(event, "snapshotCid"))
         val (candidate, _) = requireHead(snapshotCid, long(event, "revision"))
+        require(!DocumentTaxonomyCandidate.isTaxonomy(candidate.kind)) { "KIF taxonomy approval grants read-only analysis, not a sink permit" }
         require(heads[candidate.family] == releaseCid) { "Review release is stale or already consumed" }
         validate(candidate)
         require(current(candidate)) { "Curation source or ontology is no longer current" }
@@ -418,6 +471,7 @@ class CurationReview(
     private fun requireHead(cid: ContentId, revision: Long): Pair<CurationReviewCandidate, Map<String, Any?>> {
         require(cid in snapshots) { "Unknown review snapshot" }
         val candidate = candidate(read(cid))
+        require(candidate.curationReceiptCid !in correctedReceipts) { "A corrected source requires a new curation receipt" }
         val head = events.getValue(heads.getValue(candidate.family))
         require(head["snapshotCid"] == cid.value && long(head, "revision") == revision) { "Review snapshot or revision changed" }
         return candidate to head
@@ -429,7 +483,7 @@ class CurationReview(
         val family = string(snapshot, "family")
         val headCid = heads.getValue(family)
         val head = events.getValue(headCid)
-        val sourceCurrent = try { candidate(snapshot).let { validate(it); current(it) } }
+        val sourceCurrent = try { candidate(snapshot).let { it.curationReceiptCid !in correctedReceipts && run { validate(it); current(it) } } }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { false }
         // Assessment status in the event records what was checked at draft time. Its present

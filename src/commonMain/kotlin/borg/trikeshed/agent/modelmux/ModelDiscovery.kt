@@ -12,6 +12,8 @@ import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CancellationException
+import borg.trikeshed.torrent.percentEncode
 
 /**
  * One discovered model as neutral facts: identity + context window + tier.
@@ -74,6 +76,7 @@ object ModelDiscovery {
             val contextWindow = (m["context_length"] as? Number)?.toInt()
                 ?: (m["context_window"] as? Number)?.toInt()
                 ?: (m["max_model_len"] as? Number)?.toInt()
+                ?: ((m["meta"] as? Map<*, *>)?.get("n_ctx") as? Number)?.toInt()
                 ?: 0
             val pricing = m["pricing"] as? Map<*, *>
             val promptPrice = pricing?.get("prompt")?.toString()?.toDoubleOrNull()
@@ -113,18 +116,45 @@ object ModelDiscovery {
         val key = if (auth == borg.trikeshed.agent.keymux.LlmAuth.NONE) null
             else keyMux?.get("llm.$provider.key") ?: keyMux?.get("llm.default.key")
         val headers = if (key != null) htxHeaders("Authorization" j "Bearer $key") else emptyHtxHeaders()
-        val req = parseHtxRequest(url = "${baseUrl.trimEnd('/')}/models", method = HtxMethod.GET).copy(headers = headers)
         return try {
-            borg.trikeshed.agent.modelmux.Airgap.requireRemote()
-            val resp = htx.request(req)
-            if (resp.status !in 200..299) {
-                Result.failure(IllegalStateException("ModelDiscovery failed with HTTP ${resp.status}"))
-            } else {
-                Result.success(parseModels(provider, resp.body.toArray().decodeToString()))
+            val endpoint = "${baseUrl.trimEnd('/')}/models"
+            var url = endpoint
+            var snapshot: String? = null
+            var atMs: Long? = null
+            val continuations = mutableSetOf<String>()
+            val models = linkedMapOf<String, DiscoveredModel>()
+            var complete = false
+            repeat(256) {
+                if (complete) return@repeat
+                Airgap.requireRemote()
+                val req = parseHtxRequest(url = url, method = HtxMethod.GET).copy(headers = headers)
+                val resp = htx.request(req)
+                check(resp.status in 200..299) { "ModelDiscovery failed with HTTP ${resp.status}" }
+                val text = resp.body.toArray().decodeToString()
+                for (model in parseModels(provider, text).view) models[model.modelId] = model
+                val root = reify(text) as? Map<*, *>
+                // The mesh's public catalog binds every continuation to one twin snapshot and observation time.
+                // Other providers keep their ordinary single-page listing protocol.
+                val paged = snapshot != null || (root != null && root["has_more"] == true && "savepoint" in root && "as_of_ms" in root)
+                if (!paged) complete = true else {
+                    requireNotNull(root) { "Model catalog page" }
+                    val point = root["savepoint"] as? String ?: error("Model catalog savepoint")
+                    val time = (root["as_of_ms"] as? Number)?.toLong()?.takeIf { it >= 0 } ?: error("Model catalog time")
+                    if (snapshot != null) check(snapshot == point && atMs == time) { "Model catalog snapshot changed" }
+                    snapshot = point; atMs = time
+                    if (root["has_more"] == false) complete = true else {
+                        check(root["has_more"] == true) { "Model catalog continuation metadata" }
+                        val after = root["after"] as? String ?: error("Model catalog continuation")
+                        check(after.length in 1..1024 && continuations.add(after)) { "Model catalog continuation did not advance" }
+                        url = "$endpoint?after=${percentEncode(after)}&savepoint=${percentEncode(point)}&as_of_ms=$time"
+                    }
+                }
             }
-        } catch (t: Throwable) {
-            Result.failure(t)
-        }
+            check(complete) { "Model catalog exceeds the discovery page bound" }
+            Result.success(models.values.toSeries())
+        } catch (cancelled: CancellationException) { throw cancelled
+        } catch (failure: Throwable) { Result.failure(failure) }
+
     }
 
     /**

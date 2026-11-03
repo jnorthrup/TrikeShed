@@ -327,7 +327,8 @@ class InProcessIsolate(
     }
 
     override fun interrupt(): Boolean {
-        if (!alive) return false
+        // Admission may already be closed while an owned crossing is still draining.
+        if (!alive && !lock.isLocked) return false
         debugger?.interrupt()
         interrupted.incrementAndGet()
         return try {
@@ -350,6 +351,11 @@ class InProcessIsolate(
 
     override val isAlive: Boolean get() = alive
 
+    /** Check before acquiring an outer owner lock that may itself be waiting for this crossing. */
+    internal fun requireOutsideCrossing() {
+        check(!lock.isHeldByCurrentThread) { "Cannot await isolate retirement from its own crossing" }
+    }
+
     override fun close() {
         alive = false
         runCatching { debugger?.close() }
@@ -357,6 +363,38 @@ class InProcessIsolate(
         runCatching { listener?.close() }
         runCatching { context.close(true) }
         runCatching { engine.close(true) }
+    }
+
+    /**
+     * A host retirement boundary, unlike the watchdog's non-waiting [close].
+     * A crossing owns the lock through its host delegates and their receipts.
+     */
+    fun quiesce(finalize: () -> Unit = {}) {
+        requireOutsideCrossing()
+        alive = false
+        // The active crossing may still need its host channels and may re-enter this
+        // isolate on its own thread. Both remain available until that crossing returns.
+        lock.withLock { finalize() }
+    }
+
+    fun closeAndAwait() {
+        quiesce()
+        lock.withLock {
+            // Do not cancel an admitted crossing. A watchdog may still interrupt a
+            // crossing whose own deadline expires while retirement is waiting.
+            var failure: Throwable? = null
+            fun closing(block: () -> Unit) {
+                try { block() } catch (problem: Throwable) {
+                    if (failure == null) failure = problem else if (failure !== problem) failure!!.addSuppressed(problem)
+                }
+            }
+            closing { debugger?.close() }
+            debugger = null
+            closing { listener?.close() }
+            closing { context.close() }
+            closing { engine.close() }
+            failure?.let { throw it }
+        }
     }
 
     /** The next receipt sequence number for this isolate. */
@@ -412,10 +450,14 @@ class InProcessIsolate(
 
     // ── guard: sequential access + stop strategy + failure taxonomy ─────
     private inline fun <T> guarded(block: () -> T): T {
-        if (!alive) throw GuestException(GuestFailure.DEAD, "isolate $id is closed")
         val depth = lock.holdCount
+        if (!alive && depth == 0) throw GuestException(GuestFailure.DEAD, "isolate $id is closed")
         return lock.withLock {
-            if (depth == 0) {
+            if (!alive && depth == 0) throw GuestException(GuestFailure.DEAD, "isolate $id is closed")
+            // A host-owned finalizer can enter under the quiescence lock, but is
+            // still a fresh crossing and needs its own watchdog and host budget.
+            val outerCrossing = depth == 0 || executionBudget == null
+            if (outerCrossing) {
                 drainGuestActions()
                 // the statement budget is PER CROSSING, not per context lifetime: a long-lived isolate
                 // would otherwise exhaust itself after budget.statements cumulative statements
@@ -433,10 +475,10 @@ class InProcessIsolate(
                 else -> 0L
             }
             val interruptedBefore = interrupted.get()
-            val crossing = if (depth == 0) ExecutionBudget(
+            val crossing = if (outerCrossing) ExecutionBudget(
                 if (bounds.stop != StopStrategy.STATEMENT_LIMIT || budget.statements <= 0) wall else 0L,
             ).also { executionBudget = it; it.start() } else null
-            val callback = if (depth > 0) executionBudget?.takeIf { it.enterGuest() } else null
+            val callback = if (!outerCrossing) executionBudget?.takeIf { it.enterGuest() } else null
             try {
                 block()
             } catch (e: PolyglotException) {

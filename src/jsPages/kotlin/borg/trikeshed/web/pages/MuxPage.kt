@@ -105,20 +105,17 @@ object MuxPage {
     }
     private fun rosterRows(): dynamic {
         if (roster == null && catalogRoster == null) return null
-        val catalog = list(catalogRoster)
-        val matched = mutableSetOf<String>()
         val rows = list(roster).map { row ->
-            val model = catalog.firstOrNull {
-                it.base == row.base && (it.model == row.model || it.wireModel == row.model)
-            }
-            if (model == null) row else {
-                matched.add(str(model.model))
-                val merged = js("Object").assign(obj(), row, model)
-                merged.envVar = row.envVar
-                merged
-            }
+            val copy = js("Object").assign(obj(), row)
+            copy.observationSource = "Endpoint roster"
+            copy
         }
-        return (rows + catalog.filter { str(it.model) !in matched }).toTypedArray()
+        val catalog = list(catalogRoster).map { row ->
+            val copy = js("Object").assign(obj(), row)
+            copy.observationSource = "Model catalog"
+            copy
+        }
+        return (rows + catalog).toTypedArray()
     }
 
     private fun credential(row: dynamic): String = if (row.auth == "none") badge("", "Not required") else
@@ -312,11 +309,10 @@ object MuxPage {
         val ss = if (sessions == null) null else list(sessions)
         val active = ss?.count { isActive(it.status) && !truthy(it.parentId) }
         val ros = rosterRows()
-        val ready = if (ros != null) list(ros).filter { it.auth != "none" && truthy(it.keyPresent) }
-            .map { str(if (truthy(it.keyId)) it.keyId else if (truthy(it.envVar)) it.envVar else it.name) }.toSet().size else null
+        val ready = if (ros != null) list(ros).count { it.auth != "none" && truthy(it.keyPresent) } else null
         val st = if (standings == null) null else list(standings)
         val rows: List<List<String>> = if (page == "keys") listOf(
-            listOf("Credentials present", count(ready), if (ros != null) list(ros).size.toString() + " roster entries" else "Waiting for credentials", "key-round"),
+            listOf("Entries with a key", count(ready), if (ros != null) list(ros).size.toString() + " observed entries; keys may repeat" else "Waiting for credentials", "key-round"),
             listOf("Observed quota pools", count(st?.size), count(st?.count { num(it.limit) > 0 }) + " with known limits", "network"),
             listOf("Exhausted pools", count(st?.count { truthy(it.exhausted) || !truthy(it.usable) }), "Provider quota windows", "clock"),
             listOf("Provider tokens", if (calls != null) count(t.input + t.output) else "--", "Retained attempts, excluding local cache", "chart-no-axes-combined"),
@@ -330,13 +326,8 @@ object MuxPage {
     }
 
     private fun catalogStanding(row: dynamic): dynamic {
-        if (row.auth == "none") return null
-        if (truthy(row.keyId)) return list(standings).firstOrNull { it.keyId == row.keyId }
-        val cs = list(calls).filter { it.model == row.model }
-        val keyIds = cs.mapNotNull { if (truthy(it.keyId)) str(it.keyId) else null }.toSet()
-        val providers = cs.map { strOrEmpty(it.provider) }.toSet()
-        val matches = list(standings).filter { (truthy(it.keyId) && str(it.keyId) in keyIds) || strOrEmpty(it.provider) in providers || it.provider == row.name || it.provider == row.model }
-        return matches.firstOrNull { truthy(it.usable) } ?: matches.firstOrNull()
+        if (row.auth == "none" || !truthy(row.keyId)) return null
+        return list(standings).firstOrNull { it.keyId == row.keyId }
     }
 
     private fun quotaCell(s: dynamic): String {
@@ -348,21 +339,20 @@ object MuxPage {
             "\"><span style=\"width:" + str(used * 100) + "%\"></span></span>"
     }
 
-    /** provider -> key -> models, as each provider's /models endpoint answered under its resolved key. */
+    /** Provider /models listings; credential identity is not bound to the request in this view. */
     private fun keyedTree(): String {
         val tree = keyedModels ?: return empty(if (errors.containsKey("Keyed models")) "Providers could not be asked" else "Asking providers for their models", "key-round")
         val providers = list(tree.providers)
-        if (providers.isEmpty()) return empty("No provider key resolves in this daemon", "key-round")
-        return "<p class=\"muted\">Listed ${esc(time(tree.atMs))}.</p>" + providers.joinToString("") { p ->
+        if (providers.isEmpty()) return empty("No provider listings available", "key-round")
+        return "<p class=\"muted\">Collection completed ${esc(time(tree.atMs))}. The credential used for each listing is not reported. A free-tier signal may come from the model name or a zero prompt price; it is not a total price.</p>" + providers.joinToString("") { p ->
             val ms = list(p.models)
             val routed = ms.count { truthy(it.inRoster) }
             "<details class=\"keyed-provider\"><summary><strong>${esc(p.provider)}</strong> <span class=\"mono\">${esc(p.base)}</span> " +
-                "<span class=\"mono\">${esc(p.key)}</span> <small>${esc(p.keySource)}</small> " +
                 (if (truthy(p.error)) badge("bad", p.error) else badge("good", "${ms.size} models · $routed in roster")) + "</summary>" +
-                (if (ms.isEmpty()) "" else "<div class=\"table-wrap\"><table><thead><tr><th>Model</th><th>Context</th><th>Tier</th><th>Routing</th></tr></thead><tbody>" +
+                (if (ms.isEmpty()) "" else "<div class=\"table-wrap\"><table><thead><tr><th>Model</th><th>Advertised context</th><th>Tier signal</th><th>Routing</th></tr></thead><tbody>" +
                     ms.joinToString("") { m ->
                         "<tr><td class=\"mono\">${esc(m.id)}</td><td class=\"mono\">${if (num(m.contextWindow) > 0) count(m.contextWindow) else "--"}</td>" +
-                            "<td>${if (truthy(m.freeTier)) badge("good", "Free") else badge("", "Paid or unquoted")}</td>" +
+                            "<td>${if (truthy(m.freeTier)) badge("", "Free-tier signal") else badge("", "No free-tier signal")}</td>" +
                             "<td>${if (truthy(m.inRoster)) badge("good", "In roster") else badge("", "Listed only")}</td></tr>"
                     } + "</tbody></table></div>") + "</details>"
         }
@@ -384,7 +374,7 @@ object MuxPage {
             val noCredential = r.auth == "none"
             val catalogued = list(models).any { it.model == r.model && it.base == r.base }
             val exhausted = s != null && !truthy(s.usable)
-            "<tr><td><strong>${esc(r.name)}</strong><small class=\"mono\">${esc(r.model)}</small></td><td>" +
+            "<tr><td><strong>${esc(r.name)}</strong><small class=\"mono\">${esc(r.model)}</small><small>${esc(r.observationSource)}</small></td><td>" +
                 credential(r) + credentialIdentity(r) + "</td><td>" +
                 badge(if (exhausted) "bad" else "", if (exhausted) "Exhausted" else if (catalogued && (present || noCredential)) "In roster" else if (catalogued) "Unbound" else "Outside model roster") + "</td><td>" + quotaCell(s) +
                 "</td><td class=\"mono\">" + (if (qv.status == "refreshing") "Refreshing" else MuxCore.duration(qv.resetMs)) + "</td><td class=\"mono\">" + count(s?.accessCount) + "</td></tr>"

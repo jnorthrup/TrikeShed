@@ -2,7 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.*
 
@@ -20,7 +20,7 @@ class FinanceNodesTest {
     private suspend fun execute(corpus: ProjectCorpus, selections: Map<String, Any?>? = null): Map<String, Any?> =
         FinanceNodes.registry(corpus).getValue(FinanceNodes.RECONCILE).run(node(), selections ?: inputs(corpus))
 
-    @Test fun originalQuotedCellsExactAmountsAndConsumedIdentitySurvive(): Unit = runBlocking {
+    @Test fun originalQuotedCellsExactAmountsAndConsumedIdentitySurvive() = runTest {
         val bank = "b,cash,\"ref,\"\"quoted\"\"\nline\",USD,2026-11-02,90071992547409.93"
         val expenditure = bank.replaceFirst("b,", "e,")
         val corpus = corpus(bank, expenditure)
@@ -48,7 +48,7 @@ class FinanceNodesTest {
         assertFalse(FinanceNodes.registry(corpus).getValue(FinanceNodes.RECONCILE).isPure)
     }
 
-    @Test fun staleAndIncompleteSelectionsCannotAuthorizeARead(): Unit = runBlocking {
+    @Test fun staleAndIncompleteSelectionsCannotAuthorizeARead() = runTest {
         val corpus = corpus()
         val selected = inputs(corpus)
         corpus.put("pilot", "bank.csv", (header + "b,cash,r,USD,2026-11-02,0.20").encodeToByteArray())
@@ -60,7 +60,7 @@ class FinanceNodesTest {
         assertFails { execute(corpus, _m["bank" j blankRevision, "expenditure" j fresh["expenditure"]]) }
     }
 
-    @Test fun invalidBytesSizeHashAndChangedReadbackAreRefused(): Unit = runBlocking {
+    @Test fun invalidBytesSizeHashAndChangedReadbackAreRefused() = runTest {
         val corpus = corpus()
         corpus.put("pilot", "bank.csv", _a[0xc3.toByte(), 0x28.toByte()])
         assertFails { execute(corpus) }
@@ -82,7 +82,7 @@ class FinanceNodesTest {
         assertFails { execute(changed) }
     }
 
-    @Test fun ambiguousAndInvalidRowsRemainReviewable(): Unit = runBlocking {
+    @Test fun ambiguousAndInvalidRowsRemainReviewable() = runTest {
         val corpus = corpus("b,cash,r,USD,2026-11-02,0.10\nb2,cash,r,USD,2026-11-02,0.10\nb3,cash,other,USD,2026-11-02,0.001")
         val output = execute(corpus)
         assertEquals(false, output["complete"])
@@ -96,7 +96,7 @@ class FinanceNodesTest {
         assertEquals("exact-v1", report["policyId"])
     }
 
-    @Test fun strictHeaderArityAndDeclaredTsvAreEnforced(): Unit = runBlocking {
+    @Test fun strictHeaderArityAndDeclaredTsvAreEnforced() = runTest {
         val bad = corpus()
         bad.put("pilot", "bank.csv", "id,id,account,reference,currency,date,amount\nb,b,cash,r,USD,2026-11-02,0.10".encodeToByteArray())
         assertFails { execute(bad) }

@@ -49,6 +49,25 @@ class ManualProjectUploadTest {
         }
     }.toByteArray()
 
+    @Test fun malformedBatchIsRejectedBeforeAnyFileIsStored(): Unit = runBlocking {
+        val rig = Rig(directory)
+        try {
+            rig.request("/_project/manual/begin?intake=manual")
+            val good = batch(_l["one.pdf" j "first".encodeToByteArray()])
+            val overflow = batch(_l["bad.pdf" j ByteArray(0)]).also { it[it.size - 5] = 1 }
+            val invalidUtf8 = batch(_l["x" j ByteArray(0)]).also { it[4] = 0xff.toByte() }
+            val oversizedPath = ByteArray(12).also { it[0] = 0x7f; it[1] = -1; it[2] = -1; it[3] = -1 }
+            for (bad in _l[good + _a[0.toByte()], good + overflow, good + invalidUtf8, good + oversizedPath]) {
+                rig.request("/_project/manual/putBatch?intake=manual", bad, 400)
+                assertNull(rig.registry.get("manual")?.gateway?.getAttachmentRef("one.pdf"))
+                assertNull(rig.registry.get("manual")?.gateway?.getAttachmentRef("bad.pdf"))
+            }
+            val stored = rig.request("/_project/manual/putBatch?intake=manual", good)
+            assertEquals(1, (stored["stored"] as Number).toInt())
+            assertEquals(0, (stored["failed"] as Number).toInt())
+        } finally { rig.scopes.drain() }
+    }
+
     @Test fun binaryBatchSurvivesRestartAsManualAndGuardCorruptionBlocksIntake(): Unit = runBlocking {
         val first = Rig(directory)
         val bytes = _a[0x25.toByte(), 0x50.toByte(), 0x44.toByte(), 0x46.toByte(), 0.toByte(), 0xff.toByte(), 0x0a.toByte()]

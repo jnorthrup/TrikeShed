@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,7 +34,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun docsFilterByPrefixAndGlobAndReportCount(): Unit = runBlocking {
+    fun docsFilterByPrefixAndGlobAndReportCount() = runTest {
         val docs = ProjectNodes.registry(corpus()).getValue(ProjectNodes.DOCS)
         val md = docs.run(LcncNode("d", ProjectNodes.DOCS, params = mapOf("project" to "notes", "glob" to "*.md")), emptyMap())
         assertEquals(3, md["count"], "a glob without a slash matches the last path segment, anywhere")
@@ -52,7 +52,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun readReturnsTextAndIdentityOrAnErrorForBinaries(): Unit = runBlocking {
+    fun readReturnsTextAndIdentityOrAnErrorForBinaries() = runTest {
         val read = ProjectNodes.registry(corpus()).getValue(ProjectNodes.READ)
         val docs = ProjectNodes.registry(corpus()).getValue(ProjectNodes.DOCS)
         val doc = ((docs.run(LcncNode("d", ProjectNodes.DOCS, params = mapOf("project" to "notes", "glob" to "a.md")), emptyMap())["docs"] as List<*>)[0]) as Map<*, *>
@@ -68,7 +68,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun readDoesNotPromoteAStaleOrForgedListingRow(): Unit = runBlocking {
+    fun readDoesNotPromoteAStaleOrForgedListingRow() = runTest {
         val source = corpus()
         val runner = ProjectNodes.registry(source).getValue(ProjectNodes.READ)
         val listed = source.docs("notes", prefix = "a.md").first { it.id == "a.md" }.toMap()
@@ -83,7 +83,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun extractReadsTheMinedTwinOrOriginalAndRecordsItsActualIdentity(): Unit = runBlocking {
+    fun extractReadsTheMinedTwinOrOriginalAndRecordsItsActualIdentity() = runTest {
         val extract = ProjectNodes.registry(corpus()).getValue(ProjectNodes.EXTRACT)
         val ledger = LcncConsumedLedger()
         withContext(ledger) {
@@ -102,7 +102,7 @@ class ProjectNodesTest {
     }
 
     @Test
-    fun listReportsTheProjectsAndTheirDocumentCounts(): Unit = runBlocking {
+    fun listReportsTheProjectsAndTheirDocumentCounts() = runTest {
         val list = ProjectNodes.registry(corpus()).getValue(ProjectNodes.LIST).run(LcncNode("l", ProjectNodes.LIST), emptyMap())
         val refs = list["projects"] as List<*>
         assertEquals(listOf("notes", "other"), refs.map { (it as Map<*, *>)["name"] })

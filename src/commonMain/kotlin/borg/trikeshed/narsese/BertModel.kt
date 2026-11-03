@@ -31,7 +31,19 @@ class BertModel(
                 }
                 currentCoroutineContext().ensureActive()
                 parent.coroutineContext.ensureActive()
-                return BertModel(parent, assets.a, assets.b, model)
+                require(model.isNotBlank()) { "BERT model name is required" }
+                // These assets are newly loaded and owned by this factory. Bind the
+                // reported identity to the values the encoder will actually use.
+                val loading = currentCoroutineContext()
+                val digest = withContext(Dispatchers.Default) {
+                    BertIdentity.digest(assets.a, assets.b) {
+                        loading.ensureActive()
+                        parent.coroutineContext.ensureActive()
+                    }
+                }
+                currentCoroutineContext().ensureActive()
+                parent.coroutineContext.ensureActive()
+                return BertModel(parent, assets.a, assets.b, "$model@${BertIdentity.VERSION}:$digest")
             } catch (failure: Throwable) {
                 retained?.close()
                 throw failure

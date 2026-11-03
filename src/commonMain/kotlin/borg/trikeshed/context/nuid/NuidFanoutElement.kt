@@ -212,7 +212,7 @@ class NuidFanoutElement(
     suspend fun register(workgroup: Workgroup, cleanup: suspend (Claim) -> Unit, execute: suspend (Claim) -> Any?) =
         registerSlot(workgroup, execute, cleanup)
 
-    private suspend fun registerSlot(workgroup: Workgroup, execute: (suspend (Claim) -> Any?)?, cleanup: suspend (Claim) -> Unit) {
+    private suspend fun registerSlot(workgroup: Workgroup, execute: (suspend (Claim) -> Any?)?, cleanup: suspend (Claim) -> Unit): WorkgroupSlot {
         val invocation = currentCoroutineContext()[NuidAuthority]?.invocation
         registryMutex.withLock {
             if (stopped.isCompleted && invocation != null && invocations[invocation.value.b.claimId] === invocation)
@@ -222,7 +222,7 @@ class NuidFanoutElement(
             val existing = workgroups.firstOrNull { it.workgroup.name == workgroup.name }
             if (existing != null) {
                 check(execute == null) { "${workgroup.name}: already registered" }
-                return
+                return existing
             }
             val slot = WorkgroupSlot(workgroup, capacity)
             if (execute != null) slot.execute(checkNotNull(executionScope), execute,
@@ -233,6 +233,7 @@ class NuidFanoutElement(
                 finished = ::finishClaim)
             workgroups.add(slot)
             registry = workgroups.toTypedArray().toSeries()
+            return slot
         }
     }
 
@@ -354,7 +355,14 @@ class NuidFanoutElement(
      * [escalationBudget] bounds the actual number of ancestor edges crossed.
      * The bounded dispatcher owns admitted requests even if a caller stops awaiting them.
      */
-    suspend fun dispatch(nuid: Nuid, payload: Any? = null, timeoutMillis: Long = 50L): DispatchResult {
+    suspend fun dispatch(nuid: Nuid, payload: Any? = null, timeoutMillis: Long = 50L): DispatchResult =
+        dispatch(nuid, payload, timeoutMillis, null)
+
+    /** Admit only to this exact live registration; a replacement with the same name is not the same target. */
+    suspend fun dispatchTo(target: WorkgroupSlot, nuid: Nuid, payload: Any? = null, timeoutMillis: Long = 50L): DispatchResult =
+        dispatch(nuid, payload, timeoutMillis, target)
+
+    private suspend fun dispatch(nuid: Nuid, payload: Any?, timeoutMillis: Long, target: WorkgroupSlot?): DispatchResult {
         require(timeoutMillis >= 0)
         val result = CompletableDeferred<DispatchResult>()
         val invocation = currentCoroutineContext()[NuidAuthority]?.invocation
@@ -365,7 +373,8 @@ class NuidFanoutElement(
             do { claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L }
             while (claimCounter in ownedClaims)
             val candidates = workgroups.filter {
-                it.workgroup.canHandle(nuid) && nuid.subnet.level - it.workgroup.scope.level <= escalationBudget
+                (target == null || it === target) && it.workgroup.canHandle(nuid) &&
+                    nuid.subnet.level - it.workgroup.scope.level <= escalationBudget
             }.sortedByDescending { it.workgroup.scope.level }
             val claim = Claim(claimCounter, nuid, payload, parent?.value)
             ownedClaims[claim.claimId] = claim

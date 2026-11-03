@@ -123,8 +123,21 @@ acceptance gate (section 6) is built to catch them.
     MLX backbone, the `head.pt` head, `backbone_mlx/tokenizer.json`, and the head's matrices on the same session.
     `MlxJevaTest` (opt-in, not skipped): the oversight pair of `JevaOversightMlxIntegrationTest` asked of that
     `JevaInference`: cargo.md p=0.1465, notes.md p=0.8379, against the Python MLX BFloat16 run's 0.1539 and 0.8356.
-    The identity covers the runtime and the config/head/tokenizer digests and the weight file's modification time, not a
-    hash of the backbone weights.
+    At that measurement the identity covered the runtime and config/head/tokenizer digests and the weight file's
+    modification time, not a hash of the backbone weights.
+    Rechecked 2026-11-03 with the installed Q4 checkpoint and the same state bytes (SHA-256
+    `786c97348665b0d8ac929207dfb9addb5e39252d42e2f58b5e79cd0829e27017`): Python MLX gave 0.1538735330 and
+    0.8355575204; native Kotlin gave 0.1464705169 and 0.8378676772. The monitored native run took 89.29 s, with
+    3,344,941,056 bytes maximum RSS and 3,630,194,816 bytes peak footprint. Its 180 s per-decision deadline did not
+    expire. This comparison covers these two questions and does not establish general numerical or model quality.
+    The task was “How is the manifest verified before blocks are cached?”; `span-0` was the cargo note
+    “Cargo note: the manifest of the container ship lists forty crates of oranges.” and `span-1` was
+    “The manifest must be verified against its sha256 before any block is cached.” Each question asked whether its
+    span was relevant, with false/true options describing whether the excerpt helps answer the task question.
+    A later run of this same pair through the content-verified reader returned the identical native probabilities.
+    Admission, including block hashing and CPU materialization of selected weights, took 16.1 s; total was 96.5 s,
+    maximum RSS 3,419,258,880 bytes and peak footprint 3,704,152,256 bytes. The comparison run above took 89.29 s,
+    with 3,344,941,056 bytes maximum RSS. These single runs are not a general performance or residency guarantee.
   - Done in the repo, the production lane: `EncoderOperations`/`EncoderSession` (common, next to `JevaEncoder`) are the
     platform's device-backbone provider, resolved by `JevaElement` from the coroutine context or the NIO services exactly
     as `MatrixOperations` is; `JevaInference.loadDevice(config, encoders)` is the device lane (backbone from the provider,
@@ -139,10 +152,10 @@ acceptance gate (section 6) is built to catch them.
     unclassified native exception (`Unknown`) after 131 s; in two later runs (alone, and together, with the failure
     printer added) it passed. The cause was not found, so a flaky failure is not ruled out.
   - Not yet done: the gated-delta kernel and profiling, the removals of section 7 (`JevaProcess`, `JevaRuntime.PYTHON`,
-    the `device == "mlx"` check in `McpStdio`), backbone-weight hashing in the identity, relocating the dylibs off
+    the `device == "mlx"` check in `McpStdio`), relocating the dylibs off
     Homebrew paths, and the other targets (which keep the Python or CPU lanes).
-- mlx-c is C with explicit `_free`; every handle is owned by exactly one session (section 5). Every call returns an int
-  status; a non-zero status throws, with the text from the mlx-c error handler.
+- mlx-c is C with explicit `_free`; the session owns its handles (section 5). Some functions return status codes;
+  the default mlx-c error handler can terminate the process before a status is returned (section 5).
 - `expect`/`actual` stays inside the userspace-nio SPI (PRELOAD): the new surface is a sibling of `MatrixOperations`,
   common interface, JVM and others `TODO()` where unbacked, macOS native actual over mlx-c. No other `expect`.
 
@@ -189,13 +202,12 @@ scalar loops in `JevaBackbone` (rope, delta recurrence, softmax rows) cannot be 
 
 ## 5. Weights and lifecycle
 
-- Loading: extend `JevaWeights` (not a second reader) with U32 and the quant triple, reading `config.json`
-  `quantization` (default plus per-path overrides) and accepting `backbone_mlx/`, `tokenizer.json` beside it, and a
-  head read. Weights reach MLX as `mlx_array_new_data_managed` over the bounded `MemoryMapping`, with the mapping's
-  close as the destructor, so file ownership stays at the NIO boundary (PRELOAD ISAM/mmap rule). **Open:** whether
-  Metal can use those pages without a copy (page alignment) and whether a 635 MB `embed_tokens` mapping fits the
-  64 MiB window policy in `JevaWeights`. If not, the window policy gets a per-tensor exception; an MLX-side
-  `mlx_load_safetensors` is the fallback and would bypass the NIO facade, which needs the owner's decision.
+- Loading: a retained userspace `FileChannel` supplies MLX's safetensors reader. A manifest hashes 1 MiB blocks;
+  every touched block is read in full and checked against it before bytes are given to MLX. A mismatch or short read
+  latches failure and zeros the callback buffer; evaluation and output check that latch. Selected weights are evaluated
+  on the CPU stream before GPU work, and the reader remains owned until MLX releases its lazy references. Identity
+  includes the ordered block manifest and the parsed backbone config; this is a block-content identity, not a standard
+  whole-file SHA-256. The prior zero-copy mapped-tensor approach remains unverified.
 - Head: a Kotlin reader for the torch zip subset the checkpoint uses (stored zip entries; pickle opcodes for an ordered
   dict, `_rebuild_tensor_v2`, persistent storage ids; F32 only; anything else is an error). The alternative, a one-time
   conversion to `head.safetensors`, requires torch once and keeps the dependency alive, so it is rejected.
@@ -222,8 +234,18 @@ alive; the delta recurrence alone keeps several `[32, 128, 128]` temporaries per
 `Unknown` failure of the `JevaElement` test is probably the same pressure; that is a hypothesis, not shown.
 
 Fixes in the repo: `MlxMatrixSession.mark()/settle()` end the graph per layer and every 8 recurrence steps, freeing
-what is not kept; `MlxMatrixOperations(memoryLimit = 8 GiB, cacheLimit = 512 MiB, wiredLimit = 4 GiB)` sets MLX's
-process-wide budget when a session opens, so an overrun fails inside MLX; `deviceMemory()` reads active, peak and cache.
+what is not kept. Each completed recurrence chunk retains one output block rather than a handle for every token;
+the retained output still grows with sequence length. After a layer's new hidden state has been evaluated, its prior
+hidden-state handle is released instead of retaining one full activation per completed layer until encode returns.
+`MlxLayerRetentionTest` evaluates 32 small synthetic layers, checks that only the current hidden-state handle remains,
+verifies the numeric result and verifies that an externally owned tensor survives. A released tensor refuses subsequent
+access, and a retained tensor rematerializes its host buffer if settlement freed that buffer. These checks do not
+serialize concurrent session use. The test does not measure full-checkpoint
+peak memory or establish a 9,000-token bound. `MlxMatrixOperations(memoryLimit = 8 GiB, cacheLimit = 512 MiB, wiredLimit = 4 GiB)` applies
+process-wide MLX settings when a session opens; `deviceMemory()` reads MLX active, peak and cache allocations.
+The memory setting is a graph-evaluation guideline, not a hard allocation limit: MLX says allocations may exceed it
+and fail only after available RAM and swap are exhausted. Cache and wired settings are likewise not host-wide memory
+admission. The process can still displace other workloads. See [MLX memory limit](https://ml-explore.github.io/mlx/build/html/python/_autosummary/mlx.core.set_memory_limit.html).
 
 Verified (sampler at 0.5 s: swap in use, vm_stat, per-process RSS; watchdog on swap growth, compressor growth,
 swap-outs and reclaimable memory; the sampler is `monitor.py` in the Hermes scratch directory, not in this repo):
@@ -239,10 +261,11 @@ Gaps found against the strategy, each open unless stated:
    `drain()` and any idle release drop the session, and the next ask reloads 2.9 GB in about 25 s warm, more cold.
    Nothing decides when the quant may be dropped.
 2. The weights are held twice during load: the file's page cache (file-backed memory grew 3.3 GB on a cold run) and the
-   MLX copy. Page cache is reclaimable, but it competes with other processes. `mlx_load_safetensors` cannot read
-   through the NIO facade or avoid the copy; the zero-copy route (section 5) is unverified.
+  MLX copy. Page cache is reclaimable, but it competes with other processes. The verified reader uses the NIO facade
+   and still copies into MLX; the zero-copy route (section 5) is unverified.
 3. The limits are MLX process-global: every `open()` resets them, the last session wins, and the three numbers are
-   defaults, not derived. Measured peak is 2.96 GiB, so 8 GiB is a guard, not a budget; the budget should be the
+   defaults, not derived. Measured peak is 2.96 GiB for the short fixture; the 8 GiB guideline is not a hard guard.
+   A defensible admission budget would need the
    weights plus a bound on activations per token, and `maxStateLength` (9000 tokens) has not been run: activations
    grow with tokens and no 9000-token run has been made.
 4. No admission control: `JevaElement` does not look at available memory before loading, and nothing refuses a second
@@ -251,8 +274,24 @@ Gaps found against the strategy, each open unless stated:
    wall time. The cause is not profiled; many small op dispatches from the host is the suspect, and the gated-delta
    kernel is the intended fix, not started.
 6. The Python MLX path was never measured under the same sampler, so "no worse than Python" is unproven.
-7. The identity does not hash the backbone weights (section 5, Identity).
-8. The sampler's abort is not a safety property of the product; only the MLX limits are.
+7. The identity includes the backbone block-content manifest. Device admission uses a separate `JevaDeadline` with
+   the configured timeout: bounded file reads, chunked head/tokenizer hashing, parsing, block-manifest construction,
+   and each weight materialization check it cooperatively. A single blocked I/O call or MLX evaluation cannot be
+   preempted by those checks, so this is not a hard wall-clock guarantee.
+8. The sampler's abort is not a safety property of the product, and MLX's settings do not impose a hard host-memory
+   ceiling. No process-wide owner prevents another session from changing them during execution.
+9. The linked Homebrew mlx-c 0.6.0_4 header exposes `mlx_get_memory_limit` but no cache or wired limit getters. Its
+   setters return the previous limit only on success. The mlx-c default error handler exits the process: an isolated
+   child calling `mlx_set_wired_limit(SIZE_MAX)` printed the MLX error and exited 255 before returning a status. No
+   error handler is installed in this repository, so Kotlin status checks alone cannot recover from that failure.
+   Installing a handler is process-global and must be coordinated with every mlx-c caller. Source: [mlx-c v0.6.0 error handler](https://github.com/ml-explore/mlx-c/blob/v0.6.0/mlx/c/error.cpp).
+10. The affine Q4/Q8 path now validates integral quantization settings, supported mode, packed weight and scale/bias
+    shapes and dtypes before quantized kernels, including embedding token bounds. It checks the selected matrices
+    before weight materialization. A closed session also refuses new tensor allocations, and a lazy shape is captured
+    once before its storage size is checked and uploaded. These checks do not protect
+    every mlx-c entry point: malformed safetensors parsing or a missing tensor can still reach mlx-c's default handler.
+    The actual local checkpoint header has 201 quantized triples matching these layout checks; that metadata inspection
+    does not execute the checkpoint or prove its values.
 
 ## 6. Acceptance
 

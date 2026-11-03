@@ -30,6 +30,7 @@ import java.nio.file.StandardOpenOption
 import java.nio.file.attribute.FileAttribute
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.atomic.AtomicLong
+import java.lang.ref.WeakReference
 
 /**
  * Graal's filesystem capability projected onto a UserspaceBtrfs subvolume.
@@ -47,6 +48,8 @@ class TrikeShedGraalVfs(
 ) : GraalFileSystem {
     private val btrfs = UserspaceBtrfs(btrfsRoot, fileOps, cas)
     private val generation = AtomicLong()
+    private val fileLock = Any()
+    private val openFiles = mutableMapOf<String, WeakReference<VfsFile>>()
     private val inodeSalt = kotlin.random.Random.Default.nextLong()
     @Volatile private var workingDirectory: Path = Path.of(WORKSPACE)
     private val canonicalizer = borg.trikeshed.userspace.containment.createFusePathCanonicalizer(instanceId)
@@ -59,34 +62,47 @@ class TrikeShedGraalVfs(
         if (!btrfs.isFile(liveSubvolume, "dev/null")) check(btrfs.writeFile(liveSubvolume, "dev/null", ByteArray(0)))
     }
 
-    fun put(path: String, bytes: ByteArray) {
+    fun put(path: String, bytes: ByteArray): Unit = synchronized(fileLock) {
         val relative = relativeOf(parsePath(path))
         require(relative.isNotEmpty()) { "cannot write VFS root" }
-        check(btrfs.writeFile(liveSubvolume, relative, bytes)) { "VFS write rejected: $path" }
+        val captured = bytes.copyOf()
+        check(btrfs.writeFile(liveSubvolume, relative, captured)) { "VFS write rejected: $path" }
+        openFiles[relative]?.get()?.bytes = captured
         generation.incrementAndGet()
+        Unit
     }
 
-    fun put(files: Series<Join<String, ByteArray>>) {
+    fun put(files: Series<Join<String, ByteArray>>): Unit = synchronized(fileLock) {
         val relativeFiles = ArrayList<Join<String, ByteArray>>(files.size)
         for ((path, bytes) in files.view) {
             val relative = relativeOf(parsePath(path))
             require(relative.isNotEmpty()) { "cannot write VFS root" }
-            relativeFiles += relative j bytes
+            relativeFiles += relative j bytes.copyOf()
         }
         check(btrfs.writeFiles(liveSubvolume, relativeFiles.toSeries())) { "VFS batch write rejected" }
+        for ((path, bytes) in relativeFiles) openFiles[path]?.get()?.bytes = bytes
         generation.addAndGet(relativeFiles.size.toLong())
+        Unit
     }
 
-    fun fetch(path: String): ByteArray? = btrfs.fetchFile(liveSubvolume, relativeOf(parsePath(path)))
+    fun fetch(path: String): ByteArray? = synchronized(fileLock) { btrfs.fetchFile(liveSubvolume, relativeOf(parsePath(path))) }
 
-    fun snapshot(name: String): Boolean = btrfs.snapshot(liveSubvolume, name)
+    /** Atomically compare and publish through this mount; other mounts require separate ownership. */
+    fun putIf(path: String, expected: ByteArray?, bytes: ByteArray): Boolean = synchronized(fileLock) {
+        val current = btrfs.fetchFile(liveSubvolume, relativeOf(parsePath(path)))
+        if (if (expected == null) current != null else current == null || !expected.contentEquals(current)) return@synchronized false
+        put(path, bytes)
+        true
+    }
+
+    fun snapshot(name: String): Boolean = synchronized(fileLock) { btrfs.snapshot(liveSubvolume, name) }
 
     fun fetchSnapshot(name: String, path: String): ByteArray? =
-        btrfs.fetchFile(name, relativeOf(parsePath(path)))
+        synchronized(fileLock) { btrfs.fetchFile(name, relativeOf(parsePath(path))) }
 
     fun generation(): Long = generation.get()
 
-    /** POSIX toolbox seam: the backing volume and the live subvolume it serves. */
+    /** POSIX toolbox seam; callers using the raw mount must exclude concurrent VFS operations. */
     fun btrfsForTools(): UserspaceBtrfs = btrfs
     fun liveSubvolumeForTools(): String = liveSubvolume
 
@@ -97,7 +113,7 @@ class TrikeShedGraalVfs(
 
     override fun parsePath(path: String): Path = Path.of(path.ifEmpty { "." })
 
-    override fun checkAccess(path: Path, modes: Set<out AccessMode>, vararg linkOptions: LinkOption) {
+    override fun checkAccess(path: Path, modes: Set<out AccessMode>, vararg linkOptions: LinkOption) = synchronized(fileLock) {
         val relative = relativeOf(path)
         if (!exists(relative)) throw NoSuchFileException(toAbsolutePath(path).toString())
         if (AccessMode.EXECUTE in modes && !isDirectory(relative)) {
@@ -105,28 +121,31 @@ class TrikeShedGraalVfs(
         }
     }
 
-    override fun createDirectory(path: Path, vararg attrs: FileAttribute<*>) {
+    override fun createDirectory(path: Path, vararg attrs: FileAttribute<*>): Unit = synchronized(fileLock) {
         val relative = relativeOf(path)
         if (relative.isEmpty() || exists(relative)) throw FileAlreadyExistsException(toAbsolutePath(path).toString())
         if (!btrfs.createDirectory(liveSubvolume, relative)) throw IOException("cannot create VFS directory: $path")
         generation.incrementAndGet()
+        Unit
     }
 
-    override fun delete(path: Path) {
+    override fun delete(path: Path) = synchronized(fileLock) {
         val relative = relativeOf(path)
         if (relative.isEmpty()) throw java.nio.file.AccessDeniedException("/")
         if (!exists(relative)) throw NoSuchFileException(path.toString())
         if (!btrfs.deleteFile(liveSubvolume, relative)) throw IOException("cannot delete VFS path: $path")
+        openFiles.remove(relative)
         generation.incrementAndGet()
+        Unit
     }
 
     override fun newByteChannel(
         path: Path,
         options: Set<out OpenOption>,
         vararg attrs: FileAttribute<*>,
-    ): SeekableByteChannel {
+    ): SeekableByteChannel = synchronized(fileLock) {
         val relative = relativeOf(path)
-        if (relative == "dev/null") return DevNullByteChannel
+        if (relative == "dev/null") return@synchronized DevNullByteChannel
         if (relative.isEmpty() || isDirectory(relative)) throw FileSystemException(path.toString(), null, "is a directory")
         val write = StandardOpenOption.WRITE in options || StandardOpenOption.APPEND in options
         val read = StandardOpenOption.READ in options || !write
@@ -140,38 +159,48 @@ class TrikeShedGraalVfs(
         val truncate = write && StandardOpenOption.TRUNCATE_EXISTING in options
         val initial = if (exists && !truncate) btrfs.fetchFile(liveSubvolume, relative)
             ?: throw IOException("missing or corrupt VFS file: $path") else ByteArray(0)
-        val commit: (ByteArray) -> Unit = { bytes ->
-            if (!btrfs.writeFile(liveSubvolume, relative, bytes)) throw IOException("VFS commit rejected: $path")
+        // open(2) visibility: O_CREAT materializes the entry and O_TRUNC empties it NOW, not at close.
+        if (write && (!exists || truncate)) {
+            if (!btrfs.writeFile(liveSubvolume, relative, ByteArray(0))) throw IOException("VFS commit rejected: $path")
             generation.incrementAndGet()
         }
-        // open(2) visibility: O_CREAT materializes the entry and O_TRUNC empties it NOW, not at close.
-        if (write && (!exists || truncate)) commit(ByteArray(0))
-        return VfsByteChannel(
-            initial = initial,
+        openFiles.entries.removeAll { it.value.get() == null }
+        var file = openFiles[relative]?.get()
+        if (file == null) {
+            lateinit var created: VfsFile
+            created = VfsFile(initial, { check(btrfs.hasSubvolume(liveSubvolume)) { "VFS subvolume is unavailable" } }) { bytes ->
+                if (openFiles[relative]?.get() === created) {
+                    if (!btrfs.writeFile(liveSubvolume, relative, bytes)) throw IOException("VFS commit rejected: $path")
+                    generation.incrementAndGet()
+                }
+            }
+            openFiles[relative] = WeakReference(created)
+            file = created
+        } else if (truncate) file.bytes = ByteArray(0)
+        VfsByteChannel(
+            file = file,
             readable = read,
             writable = write,
             append = StandardOpenOption.APPEND in options,
-            commit = commit,
+            lock = fileLock,
         )
     }
 
-    override fun newDirectoryStream(path: Path, filter: DirectoryStream.Filter<in Path>): DirectoryStream<Path> {
+    override fun newDirectoryStream(path: Path, filter: DirectoryStream.Filter<in Path>): DirectoryStream<Path> = synchronized(fileLock) {
         val relative = relativeOf(path)
         val children = btrfs.listDirectory(liveSubvolume, relative) ?: throw java.nio.file.NotDirectoryException(path.toString())
         val parent = toAbsolutePath(path)
-        return object : DirectoryStream<Path> {
+        val maskedChildren = if (relative == "workspace" || relative == "tmp") {
+            children.map { childName ->
+                val childRelative = "$relative/$childName"
+                val isDir = btrfs.isDirectory(liveSubvolume, childRelative)
+                canonicalizer.canonicalizePath(childName, isDir)
+            }
+        } else children
+        object : DirectoryStream<Path> {
             private var open = true
             override fun iterator(): MutableIterator<Path> {
                 check(open) { "directory stream closed" }
-                val maskedChildren = if (relative == "workspace" || relative == "tmp") {
-                    children.map { childName ->
-                        val childRelative = if (relative.isEmpty()) childName else "$relative/$childName"
-                        val isDir = btrfs.isDirectory(liveSubvolume, childRelative)
-                        canonicalizer.canonicalizePath(childName, isDir)
-                    }
-                } else {
-                    children
-                }
                 val acceptedList = ArrayList<Path>()
                 for (childName in maskedChildren) {
                     val childPath = parent.resolve(childName)
@@ -193,13 +222,13 @@ class TrikeShedGraalVfs(
     override fun toAbsolutePath(path: Path): Path =
         (if (path.isAbsolute) path else workingDirectory.resolve(path)).normalize()
 
-    override fun toRealPath(path: Path, vararg linkOptions: LinkOption): Path {
+    override fun toRealPath(path: Path, vararg linkOptions: LinkOption): Path = synchronized(fileLock) {
         val absolute = toAbsolutePath(path)
         if (!exists(relativeOf(absolute))) throw NoSuchFileException(absolute.toString())
-        return absolute
+        absolute
     }
 
-    override fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): Map<String, Any> {
+    override fun readAttributes(path: Path, attributes: String, vararg options: LinkOption): Map<String, Any> = synchronized(fileLock) {
         val relative = relativeOf(path)
         if (!exists(relative)) throw NoSuchFileException(path.toString())
         val directory = isDirectory(relative)
@@ -228,12 +257,14 @@ class TrikeShedGraalVfs(
             "ctime" to time(times.changeTime),
         )
         val requested = attributes.substringAfter(':')
-        if (requested == "*" || requested.isBlank()) return all
-        val names = requested.split(',').toSet()
-        return all.filterKeys { it in names }
+        if (requested == "*" || requested.isBlank()) all
+        else {
+            val names = requested.split(',').toSet()
+            all.filterKeys { it in names }
+        }
     }
 
-    override fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption) {
+    override fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption): Unit = synchronized(fileLock) {
         val view = attribute.substringBefore(':', "basic")
         val name = attribute.substringAfter(':')
         if (view !in setOf("basic", "unix") || name !in setOf("lastModifiedTime", "lastAccessTime", "creationTime"))
@@ -250,9 +281,10 @@ class TrikeShedGraalVfs(
                 creationTime = instant.takeIf { name == "creationTime" }))
             throw FileSystemException(path.toString(), null, "VFS timestamp commit rejected")
         generation.incrementAndGet()
+        Unit
     }
 
-    override fun setCurrentWorkingDirectory(currentWorkingDirectory: Path) {
+    override fun setCurrentWorkingDirectory(currentWorkingDirectory: Path) = synchronized(fileLock) {
         val absolute = toAbsolutePath(currentWorkingDirectory)
         if (!isDirectory(relativeOf(absolute))) throw java.nio.file.NotDirectoryException(absolute.toString())
         workingDirectory = absolute
@@ -315,86 +347,81 @@ private object DevNullByteChannel : SeekableByteChannel {
 }
 
 /**
- * Whole-file channel over one CoW store entry. Every mutation commits (write(2)/ftruncate(2)
+ * Channels for the same open file share its bytes and commit each mutation (write(2)/ftruncate(2)
  * visibility): GraalPy has no refcounted close, so a guest writer that is never close()d flushes at
  * no deterministic point — commit-on-close alone silently lost such writes (the guest-write bug).
- * CoW dedup keeps re-commits of unchanged content cheap in extents; correctness over amplification.
+ * An unlinked open file remains accessible through its handles, but no longer publishes to its old path.
  */
+private class VfsFile(var bytes: ByteArray, val checkMount: () -> Unit, val commit: (ByteArray) -> Unit)
+
 private class VfsByteChannel(
-    initial: ByteArray,
+    file: VfsFile,
     private val readable: Boolean,
     private val writable: Boolean,
     private val append: Boolean,
-    private val commit: (ByteArray) -> Unit,
+    private val lock: Any,
 ) : SeekableByteChannel {
-    private var data = initial.copyOf(maxOf(initial.size, 32))
-    private var length = initial.size
-    private var cursor = if (append) length else 0
-    private var open = true
+    private var file: VfsFile? = file
+    private var cursor = if (append) file.bytes.size else 0
 
-    override fun isOpen(): Boolean = open
+    override fun isOpen(): Boolean = synchronized(lock) { file != null }
 
-    override fun close() {
-        open = false // every mutation already committed; open(2) materialized O_CREAT/O_TRUNC
-    }
+    override fun close() = synchronized(lock) { file = null }
 
-    override fun read(dst: ByteBuffer): Int {
-        ensureOpen()
+    override fun read(dst: ByteBuffer): Int = synchronized(lock) {
+        val data = ensureOpen().bytes
         if (!readable) throw NonReadableChannelException()
-        if (!dst.hasRemaining()) return 0
-        if (cursor >= length) return -1
-        val count = minOf(dst.remaining(), length - cursor)
+        if (!dst.hasRemaining()) return@synchronized 0
+        if (cursor >= data.size) return@synchronized -1
+        val count = minOf(dst.remaining(), data.size - cursor)
         dst.put(data, cursor, count)
         cursor += count
-        return count
+        count
     }
 
-    override fun write(src: ByteBuffer): Int {
-        ensureOpen()
+    override fun write(src: ByteBuffer): Int = synchronized(lock) {
+        val file = ensureOpen()
+        val data = file.bytes
         if (!writable) throw NonWritableChannelException()
         val count = src.remaining()
-        if (count == 0) return 0
-        val offset = if (append) length else cursor
+        if (count == 0) return@synchronized 0
+        val offset = if (append) data.size else cursor
         require(count <= Int.MAX_VALUE - offset) { "VFS file exceeds byte-array capacity" }
         val end = offset + count
-        val nextLength = maxOf(length, end)
-        val candidate = data.copyOf(maxOf(nextLength, 32))
-        if (offset > length) candidate.fill(0, length, offset)
+        val candidate = data.copyOf(maxOf(data.size, end))
         src.duplicate().get(candidate, offset, count)
-        commit(candidate.copyOf(nextLength))
-        data = candidate
-        length = nextLength
+        file.commit(candidate)
+        file.bytes = candidate
         cursor = end
         src.position(src.position() + count)
-        return count
+        count
     }
 
-    override fun position(): Long { ensureOpen(); return cursor.toLong() }
+    override fun position(): Long = synchronized(lock) { ensureOpen(); cursor.toLong() }
 
-    override fun position(newPosition: Long): SeekableByteChannel {
+    override fun position(newPosition: Long): SeekableByteChannel = synchronized(lock) {
         ensureOpen()
         require(newPosition in 0..Int.MAX_VALUE.toLong()) { "invalid position: $newPosition" }
         cursor = newPosition.toInt()
-        return this
+        this
     }
 
-    override fun size(): Long { ensureOpen(); return length.toLong() }
+    override fun size(): Long = synchronized(lock) { ensureOpen().bytes.size.toLong() }
 
-    override fun truncate(size: Long): SeekableByteChannel {
-        ensureOpen()
+    override fun truncate(size: Long): SeekableByteChannel = synchronized(lock) {
+        val file = ensureOpen()
         if (!writable) throw NonWritableChannelException()
         require(size in 0..Int.MAX_VALUE.toLong()) { "invalid size: $size" }
-        if (size < length) {
-            val candidate = data.copyOf(size.toInt())
-            commit(candidate)
-            data = candidate.copyOf(maxOf(candidate.size, 32))
-            length = candidate.size
+        if (size < file.bytes.size) {
+            val candidate = file.bytes.copyOf(size.toInt())
+            file.commit(candidate)
+            file.bytes = candidate
         }
         if (cursor > size) cursor = size.toInt()
-        return this
+        this
     }
 
-    private fun ensureOpen() { if (!open) throw ClosedChannelException() }
+    private fun ensureOpen(): VfsFile = (file ?: throw ClosedChannelException()).also { it.checkMount() }
 
 }
 
@@ -452,4 +479,6 @@ class GraalBtrfsSupervisor(
     override fun stats(): IsolateStats = guest.stats()
     override val isAlive: Boolean get() = guest.isAlive
     override fun close() = guest.close()
+    fun quiesce(finalize: () -> Unit = {}) = guest.quiesce(finalize)
+    fun closeAndAwait() = guest.closeAndAwait()
 }

@@ -1,5 +1,6 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.lib.*
 import org.sqlite.Function
 import org.sqlite.ProgressHandler
 import org.sqlite.SQLiteConfig
@@ -11,11 +12,15 @@ import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Types
 import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 /** Real SQLite execution; database images cross only the supplied userspace storage boundary. */
 class PythonSqlite(
     val readImage: (String) -> ByteArray?,
-    val writeImage: (String, ByteArray) -> Unit,
+    val writeImage: (String, ByteArray?, ByteArray) -> Boolean,
     val callFunction: (String, List<Any?>) -> Any?,
 ) : AutoCloseable {
     class Connection(
@@ -24,12 +29,16 @@ class PythonSqlite(
         val readOnly: Boolean,
         var image: ByteArray?,
         var generation: Long = 0,
-    )
+    ) {
+        // SQLite permits interrupt concurrent with execution, but not with native close.
+        val handle = ReentrantReadWriteLock()
+    }
 
     val connections = mutableMapOf<Int, Connection>()
+    private val interrupts = ConcurrentHashMap<Int, Connection>()
     val writers = mutableMapOf<String, Int>()
     var sequence = 0
-    var closed = false
+    @Volatile var closed = false
 
     companion object {
         fun encode(value: Any?): Any? = when (value) {
@@ -61,10 +70,12 @@ class PythonSqlite(
         }
     }
 
-    @Synchronized
     fun call(request: Map<String, Any?>): Map<String, Any?> = try {
-        check(!closed) { "Python SQLite services are closed" }
-        mapOf("value" to operation(request))
+        val result = if (request["op"] == "interrupt") interrupt(request) else synchronized(this) {
+            check(!closed) { "Python SQLite services are closed" }
+            operation(request)
+        }
+        mapOf("value" to result)
     } catch (failure: Exception) {
         val sqlite = generateSequence<Throwable>(failure) { it.cause }.filterIsInstance<SQLiteException>().firstOrNull()
         val code = sqlite?.resultCode?.code
@@ -78,6 +89,19 @@ class PythonSqlite(
         }
         mapOf("error" to mapOf("kind" to kind, "detail" to failure.message,
             "code" to code, "name" to sqlite?.resultCode?.name))
+    }
+
+    private fun interrupt(request: Map<String, Any?>): Any? {
+        check(!closed) { "Python SQLite services are closed" }
+        val id = (request["id"] as? Number)?.toInt() ?: error("missing id")
+        val connection = interrupts[id] ?: throw IllegalStateException("Cannot operate on a closed database")
+        return connection.handle.read {
+            check(!closed && interrupts[id] === connection && !connection.db.isClosed) {
+                "Cannot operate on a closed database"
+            }
+            connection.db.database.interrupt()
+            null
+        }
     }
 
     fun operation(request: Map<String, Any?>): Any? {
@@ -99,9 +123,12 @@ class PythonSqlite(
             "close" -> {
                 // SQLite close rolls back its pending transaction. Do not run guest progress
                 // callbacks, checkpoints, or image publication while retiring a lease.
-                db.close()
-                connections.remove(id)
-                if (connection.path != null && writers[connection.path] == id) writers.remove(connection.path)
+                connection.handle.write {
+                    db.close()
+                    interrupts.remove(id, connection)
+                    connections.remove(id)
+                    if (connection.path != null && writers[connection.path] == id) writers.remove(connection.path)
+                }
                 return null
             }
             "function" -> {
@@ -151,7 +178,7 @@ class PythonSqlite(
                 })
                 return null
             }
-            "interrupt" -> { db.database.interrupt(); return null }
+            "interrupt" -> return interrupt(request)
         }
         refresh(connection)
         return when (op) {
@@ -209,9 +236,13 @@ class PythonSqlite(
             connections[id] = connection
             if (path != null && !readOnly) writers[path] = id
             if (!readOnly) persist(connection)
-            return stats(connection) + mapOf("id" to id, "path" to path, "readonly" to readOnly)
+            val result = stats(connection) + mapOf("id" to id, "path" to path, "readonly" to readOnly)
+            interrupts[id] = connection
+            return result
         } catch (failure: Exception) {
-            connections.entries.removeIf { it.value.db === db }
+            connections.entries.removeIf {
+                if (it.value.db !== db) false else { interrupts.remove(it.key, it.value); true }
+            }
             if (path != null && !readOnly) writers.remove(path)
             db.close()
             throw failure
@@ -253,7 +284,8 @@ class PythonSqlite(
         val image = connection.db.serialize("main")
         if (connection.image?.contentEquals(image) == true) return
         try {
-            writeImage(connection.path, image)
+            if (!writeImage(connection.path, connection.image, image))
+                throw SQLException("virtual SQLite database image changed under the active writable lease")
             connection.image = image
             connection.generation++
         } catch (failure: Exception) {
@@ -287,6 +319,7 @@ class PythonSqlite(
             db.createStatement().use { it.execute("BEGIN $isolation") }
         }
         var result: Map<String, Any?>? = null
+        val lastId: String
         try {
             db.prepareStatement(sql).use { statement ->
                 val count = statement.parameterMetaData.parameterCount
@@ -323,11 +356,11 @@ class PythonSqlite(
                 result = mapOf("rows" to rows, "columns" to columns,
                     "rowcount" to if (dml) db.database.changes().toString() else "-1")
             }
-            val lastId = db.createStatement().use { statement ->
+            lastId = db.createStatement().use { statement ->
                 statement.executeQuery("SELECT last_insert_rowid()").use { rows -> rows.next(); rows.getLong(1).toString() }
             }
-            return result.orEmpty() + mapOf("lastrowid" to lastId) + stats(connection)
         } finally { persist(connection) }
+        return result.orEmpty() + _m["lastrowid" j lastId] + stats(connection)
     }
 
     fun column(cursor: ResultSet, index: Int): Any? = cursor.getObject(index).let { value ->
@@ -339,14 +372,22 @@ class PythonSqlite(
 
     @Synchronized
     override fun close() {
-        if (closed) return
         closed = true
-        var failure: Exception? = null
-        for (connection in connections.values) try {
-            connection.db.close()
-        } catch (caught: Exception) { if (failure == null) failure = caught else failure.addSuppressed(caught) }
-        connections.clear()
-        writers.clear()
+        var failure: Throwable? = null
+        val iterator = connections.entries.iterator()
+        while (iterator.hasNext()) {
+            val (id, connection) = iterator.next()
+            try {
+                connection.handle.write {
+                    connection.db.close()
+                    interrupts.remove(id, connection)
+                    iterator.remove()
+                    if (connection.path != null && writers[connection.path] == id) writers.remove(connection.path)
+                }
+            } catch (caught: Throwable) {
+                if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
+            }
+        }
         failure?.let { throw it }
     }
 }

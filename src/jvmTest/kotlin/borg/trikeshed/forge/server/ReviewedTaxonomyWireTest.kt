@@ -88,6 +88,18 @@ class ReviewedTaxonomyWireTest {
             assertEquals(walSize, Files.size(wal), "Refused GET must not append a review event")
             val first = request("taxonomy-plan", goal(approved["revision"]))
             val second = request("taxonomy-plan", goal(approved["revision"]))
+            val page = first["page"] as Map<*, *>
+            assertEquals(0, (page["offset"] as Number).toInt())
+            assertEquals(64, (page["limit"] as Number).toInt())
+            assertEquals(1, (page["total"] as Number).toInt())
+            assertEquals(1, (page["returned"] as Number).toInt())
+            assertNull(page["nextOffset"])
+            val end = request("taxonomy-plan", goal(approved["revision"]) + _m["offset" j 1, "limit" j 1])
+            assertTrue((end["selected"] as List<*>).isEmpty())
+            assertTrue((end["assessments"] as List<*>).isEmpty())
+            for (bad in _l[_m["offset" j -1], _m["offset" j 2], _m["offset" j 0.5],
+                _m["limit" j 0], _m["limit" j 65], _m["limit" j "1"]])
+                request("taxonomy-plan", goal(approved["revision"]) + bad, status = 409)
             assertEquals(walSize, Files.size(wal), "Read must not append a review event")
             assertEquals(first["readCid"], second["readCid"])
             assertEquals(first["plan"], second["plan"])

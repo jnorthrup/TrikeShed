@@ -36,9 +36,11 @@ filesystem I/O uses the explicitly installed FileOperations capability and
 fileIoContext; missing capability refuses. Profiles contain only normalized
 absolute path values until FileOperations canonical resolution during execution.
 Before reads, open/size/close rejects oversized trusted files (binary256MiB,
-adapter16KiB, datalog1MiB, input4MiB). Pre/post hashes and canonical path equality
-are checked. Size-check/read is not atomic against a hostile filesystem writer;
-operator-owned immutable SDK/profile paths remain required.
+adapter16KiB, datalog1MiB, input4MiB); a required BoundedFileReader enforces
+the limit while reading even if the path grows after the size check. Pre/post
+hashes and canonical path equality are checked. These checks do not make the
+filesystem immutable during execution; operator-owned immutable SDK/profile
+paths remain required.
 It directly invokes the fixed native instantiate CLI with --argstr path values;
 and a fixed --store dummy://, preventing ambient/remote store selection.
 There is no POSIX shell, request expression interpolation, client-selected path,
@@ -116,3 +118,40 @@ before ready. Actual authenticated Book review, current-source replacement,
 were joined and no exact native executable process remained. This is not a
 full daemon-listener, browser query UI or OS containment claim. Sanitized receipt:
 docs/evidence/2026-11-02/native-horn-bootstrap-v42.json.
+
+Reviewed KIF taxonomy — 2026-11-03
+
+POST /api/documents/review/taxonomy-query is a separate authenticated,
+non-consuming native query over an exact currently approved KIF snapshot. It
+does not accept caller-supplied assertions, proof rules or approval metadata.
+The fixed host policy adds subclass transitivity, instance inheritance and
+known-class reflexivity rules; those rules are host-defined, not separately
+approved source assertions. The result includes the rules and an occurrence
+sidecar binding each reviewed source quotation to its approval and read ID.
+The existing certificate checker verifies each returned proof against this
+exact input. The source and approval are checked before and after execution;
+the read grants no release or sink permit. Book modalities never enter this
+path. A successful no-proof result means UNKNOWN for this positive fragment;
+process failure, stale review, invalid input or timeout is an error, not UNKNOWN.
+
+The pinned adapter accepts at most 128 facts and rules. Five fixed rules leave
+at most 123 reviewed assertions in one native query; larger approved selections
+are refused rather than silently truncated. Independently approved numbered
+partitions can be combined through /taxonomy-union. For more than 123 reviewed
+assertions the host selects a bounded candidate slice, which is then proved by
+the same pinned solver; the result reports both counts and the projection.
+This does not provide corpus-wide aggregation, and UNKNOWN applies only to the
+submitted slice. The process has no OS memory or network isolation. The first
+proof is returned, not all possible supports.
+The separate /taxonomy-plan remains the bounded Kotlin planner and is not
+evidence of native execution.
+
+The native wire fixture ran with a fresh isolated build of exact mlir-nix source
+commit 1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba, built against the installed
+macOS LLVM 23.1.1. That executable's SHA-256 was
+891008eabdb29771e5238daef85798d208c5efcfa01dd7a595f9cd56b9c41486; it is a
+local test build, not a replacement for the operator's provisioned binary pin.
+The pinned datalog and adapter were unchanged. The fixture compared native and
+Kotlin results for transitivity, inheritance, reflexivity, cycles and UNKNOWN,
+and checked authentication, source invalidation, unchanged review WAL and the
+123-selection refusal. The browser panel has not been exercised end to end.

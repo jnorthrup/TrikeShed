@@ -101,9 +101,13 @@ the presence of a 'must' selection and missing world-assertion mapping in the
 record. They never assert the selected original relation, determine obligation
 applicability, establish a legal duty or grant host authority. MUST/MAY/MUST_NOT/
 PRESUMED remain modalities about curated content, not world taxonomy assertions.
-worldObligationApplicability remains UNKNOWN. The existing taxonomy-plan endpoint
-retains its zero-eligible-world-assertion behavior. ReviewedHornPlan is the common
-consumer API; HTTP binding and a supervised native runner are separate host work.
+worldObligationApplicability remains UNKNOWN. The taxonomy-plan endpoint still
+excludes every book modality; its distinct reviewed exact-KIF source path can
+report positive support in the bounded Kotlin taxonomy fragment, without calling
+SUMO-Nix or granting a sink permit. ReviewedHornPlan also backs the authenticated
+HTTP horn-input endpoint and the optional configured NativeHornQuery runner;
+that runner enforces deadline and output bounds but does not provide process
+memory or network isolation.
 
 Validation
 Cached Kotlin 2.4.21/JVM 25 compilation against the immutable v38 main.jar passed.

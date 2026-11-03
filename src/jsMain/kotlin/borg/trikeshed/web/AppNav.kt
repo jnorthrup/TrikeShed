@@ -120,10 +120,7 @@ object AppNav {
         button.setAttribute("aria-label", "Navigation menu")
         button.setAttribute("aria-expanded", "false")
         button.setAttribute("aria-controls", "application-links")
-        val icon = document.createElement("i") as HTMLElement
-        icon.setAttribute("data-lucide", "chevron-right")
-        icon.setAttribute("aria-hidden", "true")
-        button.append(icon)
+        button.textContent = "Menu"
         val links = document.createElement("div") as HTMLElement
         links.id = "application-links"
         val primary = document.createElement("div") as HTMLElement

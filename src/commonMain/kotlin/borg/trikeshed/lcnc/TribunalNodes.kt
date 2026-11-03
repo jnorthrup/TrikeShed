@@ -7,6 +7,8 @@ import borg.trikeshed.kanban.KanbanPredicate
 import borg.trikeshed.kanban.KanbanPredicateRegistry
 import borg.trikeshed.modelmux.BrainChatOptions
 import borg.trikeshed.modelmux.BrainClient
+import borg.trikeshed.modelmux.EndpointModel
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
@@ -48,6 +50,11 @@ fun interface TribunalDialog {
     suspend fun seat(node: LcncNode, system: String, prompt: String): Pair<String, String>
 }
 
+/** A dialog that binds a seat to one endpoint/model pair, rather than choosing a fallback. */
+interface TribunalRouteDialog : TribunalDialog {
+    suspend fun seat(node: LcncNode, system: String, prompt: String, route: EndpointModel): Pair<String, String>
+}
+
 /**
  * The hermes-env dialog: resolve credentials the way Hermes does (the
  * daemon's KeyMux already carries the harness lane — $HERMES_HOME/.env,
@@ -72,10 +79,21 @@ fun hermesEnvDialog(
 
 /** The same authored options and route restrictions used by the HTTP chat surface. */
 fun modelMuxDialog(brain: BrainClient, muxContext: CoroutineContext): TribunalDialog =
-    TribunalDialog { node, system, prompt ->
-        val options = BrainChatOptions.parse(node.params)
-        withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
-            brain.chat(options, listOf("system" to system, "user" to prompt), "tribunal-seat")
+    object : TribunalRouteDialog {
+        override suspend fun seat(node: LcncNode, system: String, prompt: String): Pair<String, String> {
+            val options = BrainChatOptions.parse(node.params)
+            return withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
+                brain.chat(options, _l[("system" j system).pair, ("user" j prompt).pair], "tribunal-seat")
+            }
+        }
+        override suspend fun seat(node: LcncNode, system: String, prompt: String, route: EndpointModel): Pair<String, String> {
+            val options = BrainChatOptions.parse(node.params)
+            require(options.models.size > 0 && options.models.view.any { it.a == route.a && it.b == route.b }) {
+                "Selected model route is not in the seat's authored allowlist"
+            }
+            return withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
+                brain.chatExact(options.copy(models = s_[route]), _l[("system" j system).pair, ("user" j prompt).pair], "tribunal-seat")
+            }
         }
     }
 
@@ -96,7 +114,7 @@ object TribunalNodes {
     fun registry(
         dialog: TribunalDialog,
         record: suspend (String) -> String = { error("tribunal.record: no record service bound") },
-    ): Map<String, LcncNodeRunner> = mapOf(
+    ): Map<String, LcncNodeRunner> {
         // The model seat: params carry the role (`system`) and the fallback
         // prompt; a wired `prompt` input (the prior seat's content) wins —
         // inputs-over-params, the same precedence kanban.submit honours.
@@ -105,7 +123,7 @@ object TribunalNodes {
         // the canned `prompt` param, because human oversight beating the
         // default motion is the preset's whole point (the end-to-end gate
         // pins it). Resolution: input → brief binding → prompt param.
-        "mux.chat" to boundLcnc(TribunalDialogKey(dialog)) { service, node, inputs ->
+        val chat = boundLcnc(TribunalDialogKey(dialog)) { service, node, inputs ->
             // A stored system prompt cabled onto `system?` wins over the param.
             val system = (inputs["system"] as? String) ?: (inputs["system?"] as? String) ?: node.params["system"] ?: ""
             // The prior seat's content arrives on the wire as `prompt?`
@@ -119,10 +137,22 @@ object TribunalNodes {
                 ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
             )?.takeIf { it.isNotBlank() }
             require(prompt != null) { "mux.chat: no prompt wired, bound as '${node.params["brief"] ?: "<brief>"}', or in params" }
-            val (content, model) = service.value.seat(node, system, prompt!!)
+            val selected = inputs["selection"]
+            val (content, model) = if (node.type == WorkSelectNode.MODEL) {
+                val selection = selected as? Map<*, *> ?: error("mux.chat: model selection is required")
+                val endpoint = selection["endpoint"] as? String
+                val selectedModel = selection["model"] as? String
+                require(selection["kind"] == "model" && !endpoint.isNullOrBlank() && !selectedModel.isNullOrBlank() &&
+                    endpoint == endpoint.trim() && selectedModel == selectedModel.trim()) { "mux.chat: invalid selected model route" }
+                val routed = service.value as? TribunalRouteDialog ?: error("mux.chat: dialog does not support exact model routes")
+                routed.seat(node, system, prompt!!, endpoint j selectedModel)
+            } else service.value.seat(node, system, prompt!!)
             // The already selected prompt is evidence, not another resolution of the brief.
             mapOf("content" to content, "model" to model, "prompt" to prompt)
-        },
+        }
+        return mapOf(
+        "mux.chat" to chat,
+        WorkSelectNode.MODEL to chat,
         // The host binds tribunalRecord: retained prose plus a lifecycle receipt.
         // This is not KG parsing, belief admission, or verification of the verdict's truth.
         "tribunal.record" to boundLcnc(TribunalRecordKey(record)) { service, node, inputs ->
@@ -153,9 +183,10 @@ object TribunalNodes {
             mapOf("x" to (inputs["x"] ?: ""))
         },
     )
+    }
 
     /** The full contract: which node types the tribunal registry serves. */
-    fun servedTypes(): Set<String> = setOf("mux.chat", "tribunal.record", "display")
+    fun servedTypes(): Set<String> = setOf("mux.chat", WorkSelectNode.MODEL, "tribunal.record", "display")
 }
 
 /**

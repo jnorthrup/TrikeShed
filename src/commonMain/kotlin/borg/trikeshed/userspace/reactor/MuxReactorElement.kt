@@ -1,12 +1,13 @@
 package borg.trikeshed.userspace.reactor
 
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CompletableJob
 import borg.trikeshed.context.Drain
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -34,11 +35,19 @@ class MuxReactorElement(
     initialConfig: MuxReactorConfig = MuxReactorConfig(),
     private val keyMux: borg.trikeshed.agent.keymux.KeyMux? = null,
     private val modelMuxProvider: (suspend () -> borg.trikeshed.agent.modelmux.ModelMux)? = null,
+    /** Exact key:<id> or endpoint:<URL without trailing slash> bindings assigned to physical concurrency pools. */
+    pools: Map<String, borg.trikeshed.agent.modelmux.MuxPool> = emptyMap(),
 ) : CoroutineContext.Element, Drain {
     companion object Key : CoroutineContext.Key<MuxReactorElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
     val supervisor: CompletableJob = SupervisorJob(parentJob)
+    internal val modelAdmission = try {
+        borg.trikeshed.agent.modelmux.MuxAdmission(supervisor, pools = pools)
+    } catch (failure: Throwable) {
+        supervisor.cancel()
+        throw failure
+    }
     /** Completes at [close]; resolution and the tick loop stop after it. */
     val admission: CompletableJob = Job()
 
@@ -118,12 +127,14 @@ class MuxReactorElement(
 
     override suspend fun drain() = close()
 
-    suspend fun close() {
+    suspend fun close() = withContext(NonCancellable) {
+        modelAdmission.drain()
         admission.complete()
         keysById.clear()
         modelsById.clear()
         operationalHistory.clear()
-        supervisor.cancelAndJoin()
+        supervisor.complete()
+        supervisor.join()
     }
 
     fun updateConfig(newConfig: MuxReactorConfig) {
@@ -385,8 +396,7 @@ class MuxReactorElement(
      * is available. Optional [provider] restricts the pool. The lease is
      * time-bounded by [ttlMs] (0 = no expiry).
      *
-     * Production callers: ModelMux.chat/stream/embed (per-keyId quota) and
-     * the brain/Jules dispatch paths (provider-scoped failover).
+     * Callers must retain their own lease identity and release only that lease.
      */
     fun acquireLease(
         leasedTo: String,

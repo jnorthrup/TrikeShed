@@ -85,12 +85,14 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
         val rendered = ++generation
         fun present() = current() && reviewFocus.sourceConnected(box) && truthy(box.isConnected) && generation == rendered
         val book = review.snapshot?.kind == "book"
+        val kif = review.snapshot?.kind == "taxonomy" || review.snapshot?.kind == "taxonomy-partition"
         val legacyWithdraw = book && review.conditionReviewState == "legacy-unassessed" && review.sourceCurrent == true
         val recoverAssessment = book && review.sourceCurrent == true && review.state == "draft" &&
             typeOf(review.assessmentCid) == "string" && review.assessmentAvailability != "available"
         val mayAssess = review.current == true || recoverAssessment
         var conditionFields: dynamic = null
         var approvalButton: dynamic = null
+        var taxonomyResult: dynamic = null
         var savedAssessmentInspectable = false
         fun forgetSavedAssessment() {
             savedAssessment = null
@@ -148,6 +150,7 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
         credentialChanged = {
             reviewerSession = null
             forgetSavedAssessment()
+            taxonomyResult?.remove()
             identity.textContent = "Reviewer credential changed; authenticate and reload the assessment."
         }
         val credential = document.createElement("input").asDynamic()
@@ -475,7 +478,7 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
             warning.textContent = "Load the saved assessment to inspect whether this approval can be exported."
             box.appendChild(warning)
         }
-        if (review.state == "approve" && review.current == true &&
+        if (!kif && review.state == "approve" && review.current == true &&
             (!book || review.conditionReviewState != "conditional-nonexecutable" && exportReady())) {
             val export = document.createElement("section").asDynamic()
             if (book) export.setAttribute("data-condition-export", "")
@@ -497,6 +500,239 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
                     event.stopPropagation()
                     if (present() && (!book || exportReady())) copyText(value)
                     else status("Review or credential changed; reload before copying approval references.")
+                })
+            }
+        }
+        if (review.current == true && (book && review.state in arrayOf("approve", "release", "consume") ||
+                kif && review.state == "approve")) {
+            val taxonomy = document.createElement("details").asDynamic()
+            taxonomy.setAttribute("data-taxonomy-plan", "")
+            val heading = document.createElement("summary")
+            heading.textContent = "Inspect taxonomy eligibility"
+            taxonomy.appendChild(heading); box.appendChild(taxonomy)
+            val help = document.createElement("p")
+            help.textContent = "Check this approved selection against a positive ground taxonomy goal. The read does not publish assertions or consume an approval. Book modalities are not asserted taxonomy; KIF assertions are source-scoped. Reduce the page size if the response is too large."
+            taxonomy.appendChild(help)
+            val predicate = document.createElement("select").asDynamic()
+            predicate.setAttribute("aria-label", "Taxonomy predicate")
+            for (name in arrayOf("subclass", "instance")) {
+                val option = document.createElement("option").asDynamic()
+                option.value = name; option.textContent = name; predicate.appendChild(option)
+            }
+            taxonomy.appendChild(predicate)
+            fun term(label: String): dynamic {
+                val field = document.createElement("input").asDynamic()
+                field.placeholder = label; field.setAttribute("aria-label", label)
+                taxonomy.appendChild(field)
+                return field
+            }
+            val subject = term("Taxonomy subject")
+            val obj = term("Taxonomy object")
+            val pageSize = document.createElement("select").asDynamic()
+            pageSize.setAttribute("aria-label", "Taxonomy selections per page")
+            for (size in arrayOf(1, 4, 16, 64)) {
+                val option = document.createElement("option").asDynamic()
+                option.value = size.toString(); option.textContent = "$size per page"; pageSize.appendChild(option)
+            }
+            pageSize.value = "16"; taxonomy.appendChild(pageSize)
+            fun clearTaxonomy() { taxonomyResult?.remove(); taxonomyResult = null }
+            for (field in arrayOf(predicate, subject, obj, pageSize)) on(field, "input", { _ -> clearTaxonomy() })
+            val inspect = document.createElement("button").asDynamic()
+            inspect.textContent = "Inspect reviewed selection"; taxonomy.appendChild(inspect)
+            fun inspectPage(offset: Int) {
+                if (busy) return
+                clearTaxonomy()
+                busy = true; inspect.disabled = true
+                val requestEpoch = documentReviewCredentialEpoch
+                val limit = str(pageSize.value).toInt()
+                val goal = objOf { it.predicate = str(predicate.value); it.subject = str(subject.value).trim(); it.`object` = str(obj.value).trim() }
+                val request = objOf { it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision; it.goal = goal; it.offset = offset; it.limit = limit }
+                launchJs {
+                    try {
+                        require(present()) { "The source result or review changed; reopen its current review" }
+                        val report = reviewRequest("/taxonomy-plan", request, authenticated = true)
+                        require(present() && requestEpoch == documentReviewCredentialEpoch &&
+                            report.snapshotCid == review.snapshotCid && report.revision == review.revision &&
+                            report.page?.offset == offset && report.page?.limit == limit && str(pageSize.value) == limit.toString() &&
+                            report.goal?.predicate == goal.predicate && report.goal?.subject == goal.subject && report.goal?.`object` == goal.`object` &&
+                            str(predicate.value) == goal.predicate && str(subject.value).trim() == goal.subject && str(obj.value).trim() == goal.`object`) {
+                            "The review, credential or goal changed while reading; inspect again"
+                        }
+                        val result = document.createElement("section").asDynamic()
+                        result.setAttribute("data-taxonomy-result", "")
+                        taxonomyResult = result; taxonomy.appendChild(result)
+                        val summary = document.createElement("p")
+                        val returned = num(report.page.returned).toInt()
+                        val range = if (returned == 0) "No selections" else "Selections ${offset + 1}–${offset + returned}"
+                        val statusLabel = if (report.coverage == "positive-reviewed-selected-snapshot") " · proof status: " else " · page status: "
+                        summary.textContent = range + " of " + str(report.page.total) + statusLabel + str(report.status) +
+                            " · mapping: " + str(report.mappingStatus) +
+                            " · eligible: " + str(report.counters?.eligible) +
+                            " · excluded: " + str(report.counters?.excluded) + " · proofs: " + str(report.counters?.proofs)
+                        result.appendChild(summary)
+                        if (returned > 0 && typeOf(report.counters?.eligible) == "number") {
+                            val meter = document.createElement("meter").asDynamic()
+                            meter.min = 0; meter.max = returned; meter.value = report.counters.eligible
+                            meter.setAttribute("aria-label", "Eligible selections in this page")
+                            result.appendChild(meter)
+                        }
+                        val scope = document.createElement("p")
+                        scope.textContent = if (report.coverage == "positive-reviewed-selected-snapshot")
+                            "The proof covers the approved selection; quotations shown here cover this page. It does not cover the whole corpus."
+                        else "Results cover this page only, not the whole snapshot or corpus."
+                        result.appendChild(scope)
+                        for (selection in arr(report.selected)) {
+                            val row = document.createElement("details")
+                            val label = document.createElement("summary")
+                            label.textContent = "Selection " + str(selection.selectionId) +
+                                if (arr(selection.exclusionReasons).isEmpty()) " · eligible" else " · excluded"
+                            row.appendChild(label)
+                            val evidence = document.createElement("pre")
+                            evidence.textContent = JSON.stringify(objOf { it.value = selection.value; it.quotation = selection.quotation; it.exclusionReasons = selection.exclusionReasons; it.occurrenceCid = selection.occurrenceCid }, null, 2)
+                            evidence.asDynamic().style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"
+                            row.appendChild(evidence); result.appendChild(row)
+                        }
+                        if (offset > 0) {
+                            val previous = document.createElement("button").asDynamic()
+                            previous.textContent = "Previous selections"; result.appendChild(previous)
+                            on(previous, "click", { e -> e.stopPropagation(); inspectPage(maxOf(0, offset - limit)) })
+                        }
+                        if (typeOf(report.page.nextOffset) == "number") {
+                            val next = document.createElement("button").asDynamic()
+                            next.textContent = "Next selections"; result.appendChild(next)
+                            on(next, "click", { e -> e.stopPropagation(); inspectPage(num(report.page.nextOffset).toInt()) })
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: dynamic) { status("Taxonomy: " + failureText(error)) }
+                    finally { busy = false; inspect.disabled = false }
+                }
+            }
+            on(inspect, "click", { event -> event.stopPropagation(); inspectPage(0) })
+            if (kif) {
+                val native = document.createElement("button").asDynamic()
+                native.textContent = "Run native SUMO-Nix query"; taxonomy.appendChild(native)
+                val nativeHelp = document.createElement("p")
+                nativeHelp.textContent = "Runs only on request against the current approved KIF selection, with at most 123 assertions. A timeout or solver failure is not an UNKNOWN result."
+                taxonomy.appendChild(nativeHelp)
+                on(native, "click", { event ->
+                    event.stopPropagation()
+                    if (!busy) {
+                        clearTaxonomy()
+                        busy = true; native.disabled = true; inspect.disabled = true
+                        val requestEpoch = documentReviewCredentialEpoch
+                        val goal = objOf { it.predicate = str(predicate.value); it.subject = str(subject.value).trim(); it.`object` = str(obj.value).trim() }
+                        val request = objOf { it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision; it.goal = goal }
+                        launchJs {
+                            try {
+                                require(present()) { "The source result or review changed; reopen its current review" }
+                                val report = reviewRequest("/taxonomy-query", request, authenticated = true)
+                                require(present() && requestEpoch == documentReviewCredentialEpoch &&
+                                    str(predicate.value) == goal.predicate && str(subject.value).trim() == goal.subject &&
+                                    str(obj.value).trim() == goal.`object`) { "The review, credential or goal changed while running; inspect again" }
+                                val unavailable = report.status == "UNAVAILABLE"
+                                if (!unavailable) {
+                                    val query = arr(report.query)
+                                    require(report.kind == "reviewed-kif-native-result/1" && report.snapshotCid == review.snapshotCid &&
+                                        report.revision == review.revision && report.status in arrayOf("SUPPORTED", "UNKNOWN") &&
+                                        query.size == 3 && query[0] == goal.predicate && query[1] == goal.subject && query[2] == goal.`object`) {
+                                        "Native result does not match the current review and goal"
+                                    }
+                                }
+                                val result = document.createElement("section").asDynamic()
+                                result.setAttribute("data-taxonomy-native-result", "")
+                                taxonomyResult = result; taxonomy.appendChild(result)
+                                val summary = document.createElement("p")
+                                summary.textContent = if (unavailable) "Native query unavailable: " + str(report.reason)
+                                    else "Native proof status: " + str(report.status) + " · approved assertions: " +
+                                        str(report.selectionCount) + " / " + str(report.selectionLimit)
+                                result.appendChild(summary)
+                                if (!unavailable) {
+                                    val scope = document.createElement("p")
+                                    scope.textContent = "Positive support over this approved selection only; UNKNOWN is not a refutation. The solver returns its first proof and does not publish facts or consume a review permit."
+                                    result.appendChild(scope)
+                                    val evidence = document.createElement("pre")
+                                    evidence.textContent = JSON.stringify(objOf {
+                                        it.proof = report.proof; it.sourceEvidence = report.sourceEvidence; it.hostRules = report.hostRules
+                                        it.inputCid = report.inputCid; it.frameId = report.frameId; it.asOf = report.asOf
+                                    }, null, 2)
+                                    evidence.asDynamic().style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"
+                                    result.appendChild(evidence)
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (error: dynamic) { status("Native taxonomy query failed: " + failureText(error)) }
+                            finally { busy = false; native.disabled = false; inspect.disabled = false }
+                        }
+                    }
+                })
+                val union = document.createElement("details").asDynamic()
+                val unionTitle = document.createElement("summary"); unionTitle.textContent = "Query independently approved snapshots"
+                union.appendChild(unionTitle); taxonomy.appendChild(union)
+                val unionHelp = document.createElement("p")
+                unionHelp.textContent = "Combine up to 16 current approved snapshot references. If more than 123 assertions are reviewed, a bounded candidate slice is sent to the native query. Each approval remains separate; overlapping source occurrences are refused. This does not cover the whole corpus."
+                union.appendChild(unionHelp)
+                val reference = objOf { it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision }
+                val copy = document.createElement("button").asDynamic(); copy.textContent = "Copy this review reference"; union.appendChild(copy)
+                on(copy, "click", { event -> event.stopPropagation(); if (present()) copyText(JSON.stringify(reference)) })
+                val references = document.createElement("textarea").asDynamic()
+                references.setAttribute("aria-label", "Approved snapshot references as JSON array")
+                references.value = JSON.stringify(arrayOf(reference), null, 2)
+                union.appendChild(references)
+                val chainLabel = document.createElement("label")
+                val chain = document.createElement("input").asDynamic(); chain.type = "checkbox"
+                chainLabel.appendChild(chain); chainLabel.appendChild(document.createTextNode(" Compose native-verified segments for paths up to 256 edges"))
+                union.appendChild(chainLabel)
+                val run = document.createElement("button").asDynamic(); run.textContent = "Run combined native query"; union.appendChild(run)
+                on(run, "click", { event ->
+                    event.stopPropagation()
+                    if (!busy) {
+                        clearTaxonomy(); busy = true; run.disabled = true
+                        val epoch = documentReviewCredentialEpoch
+                        val text = str(references.value)
+                        val compose = chain.checked == true
+                        val goal = objOf { it.predicate = str(predicate.value); it.subject = str(subject.value).trim(); it.`object` = str(obj.value).trim() }
+                        launchJs {
+                            try {
+                                require(present()) { "The source result or review changed; reopen its current review" }
+                                val refs = JSON.parse<dynamic>(text)
+                                require(isArray(refs) && arr(refs).size in 1..16 && arr(refs).any {
+                                    it?.snapshotCid == review.snapshotCid && it?.expectedRevision == review.revision
+                                }) { "Enter a JSON array of up to 16 references including this review" }
+                                val result = reviewRequest(if (compose) "/taxonomy-chain" else "/taxonomy-union", objOf { it.references = refs; it.goal = goal }, authenticated = true)
+                                require(present() && epoch == documentReviewCredentialEpoch && str(references.value) == text &&
+                                    (chain.checked == true) == compose &&
+                                    str(predicate.value) == goal.predicate && str(subject.value).trim() == goal.subject &&
+                                    str(obj.value).trim() == goal.`object`) { "The review, credential, references or goal changed while running" }
+                                if (result.status != "UNAVAILABLE") {
+                                    val query = arr(result.query); val reads = arr(result.reads); val submitted = arr(refs)
+                                    require(result.kind == (if (compose) "reviewed-kif-composite-result/1" else "reviewed-kif-union-result/1") &&
+                                        (if (compose) result.status == "SUPPORTED" else result.status in arrayOf("SUPPORTED", "UNKNOWN")) &&
+                                        query.size == 3 && query[0] == goal.predicate && query[1] == goal.subject && query[2] == goal.`object` &&
+                                        reads.size == submitted.size && reads.indices.all {
+                                            reads[it].snapshotCid == submitted[it].snapshotCid && reads[it].revision == submitted[it].expectedRevision
+                                        }) { "Native result does not match the submitted reviews and goal" }
+                                }
+                                val section = document.createElement("section").asDynamic(); taxonomyResult = section; union.appendChild(section)
+                                val summary = document.createElement("p")
+                                summary.textContent = if (result.status == "UNAVAILABLE") "Native query unavailable: " + str(result.reason)
+                                    else if (compose) "Native-verified segments: " + str(result.segmentCount) + " · reviewed assertions: " + str(result.reviewedSelectionCount)
+                                    else "Native proof status: " + str(result.status) + " · queried assertions: " + str(result.selectionCount) + " / " + str(result.selectionLimit) +
+                                        " · reviewed: " + str(result.reviewedSelectionCount) + " · selection: " + str(result.projection)
+                                section.appendChild(summary)
+                                if (result.status != "UNAVAILABLE") {
+                                    val scope = document.createElement("p")
+                                    scope.textContent = if (compose) "The host composes individually verified native proofs. Derived intermediates are not reviewed source assertions."
+                                        else "Proofs apply to the submitted reviewed assertions. UNKNOWN is not a refutation or a complete corpus result."
+                                    section.appendChild(scope)
+                                    val evidence = document.createElement("pre")
+                                    evidence.textContent = JSON.stringify(objOf { it.reads = result.reads; it.proof = result.proof; it.sourceEvidence = result.sourceEvidence
+                                        it.hostRules = result.hostRules; it.inputCid = result.inputCid; it.frameId = result.frameId; it.asOf = result.asOf }, null, 2)
+                                    evidence.asDynamic().style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"; section.appendChild(evidence)
+                                }
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (error: dynamic) { status("Combined taxonomy query failed: " + failureText(error)) }
+                            finally { busy = false; run.disabled = false }
+                        }
+                    }
                 })
             }
         }
@@ -593,12 +829,24 @@ private fun Panels.documentSourceActions(target: dynamic, selection: dynamic, cu
 
 /** Only identifiers are submitted; the server resolves tuples and quotations from the retained receipt. */
 private fun Panels.documentSnapshotAction(target: dynamic, kind: String, receiptCid: String,
-    selections: Array<dynamic>, current: () -> Boolean, frozen: ((dynamic) -> Unit)? = null) {
-    if (selections.isEmpty()) return
+    selections: Array<dynamic>, current: () -> Boolean,
+    basket: MutableSet<String>? = null, basketCurrent: (() -> Boolean)? = null,
+    basketChanged: (() -> Unit)? = null, basketBusy: ((Boolean) -> Unit)? = null,
+    reviewTarget: dynamic = null, reviewCurrent: (() -> Boolean)? = null,
+    frozen: ((dynamic) -> Unit)? = null) {
+    if (selections.isEmpty() && basket.isNullOrEmpty()) return
     documentReviewPane(target)
     val box = document.createElement("section").asDynamic()
     target.appendChild(box)
-    val title = document.createElement("h4"); title.textContent = "Choose material for analyst review"; box.appendChild(title)
+    val title = document.createElement("h4")
+    val kif = kind == "taxonomy" || kind == "taxonomy-partition"
+    title.textContent = if (kif) "Choose exact KIF assertions for analyst review" else "Choose material for analyst review"
+    box.appendChild(title)
+    if (kif) {
+        val note = document.createElement("p")
+        note.textContent = "Only top-level, positive, ground subclass and instance forms are offered. Approval covers the selected source assertions, not the truth of the full corpus."
+        box.appendChild(note)
+    }
     val entries = document.createElement("div").asDynamic()
     entries.className = "document-review-choices"
     entries.style.cssText = "max-height:320px;overflow:auto"
@@ -607,37 +855,166 @@ private fun Panels.documentSnapshotAction(target: dynamic, kind: String, receipt
         val label = document.createElement("label").asDynamic()
         label.style.cssText = "display:flex;align-items:flex-start;gap:8px;margin:6px 0"
         val input = document.createElement("input").asDynamic(); input.type = "checkbox"
+        val id = str(selection.id)
+        if (basket != null) {
+            input.checked = id in basket
+            on(input, "change", { event ->
+                event.stopPropagation()
+                if (!current() || basketCurrent?.invoke() == false) {
+                    input.checked = false
+                    status("The source or reviewer credential changed; load candidates again.")
+                } else if (input.checked == true) {
+                    if (basket.size >= 256 && id !in basket) {
+                        input.checked = false
+                        status("A review snapshot can contain at most 256 assertions.")
+                    } else basket.add(id)
+                } else basket.remove(id)
+                basketChanged?.invoke()
+            })
+        }
         label.appendChild(input)
         val caption = document.createElement("span")
         val value = selection.value ?: selection
         val relation = arrayOf(value.subject, value.predicate, value.`object`).filter { it != null }.joinToString(" ") { str(it) }
         val mapping = value.ontologyMapping?.status
         val classes = if (isArray(value.ontologyMapping?.classes)) arr(value.ontologyMapping.classes).joinToString(", ") { str(it) } else ""
-        caption.textContent = str(selection.label ?: relation.takeIf { it.isNotBlank() } ?: selection.id) +
+        caption.textContent = (if (typeOf(selection.partition) == "number") "Partition " + str(selection.partition) + " · " else "") +
+            str(selection.label ?: relation.takeIf { it.isNotBlank() } ?: selection.id) +
             (if (mapping == null) "" else " [" + str(mapping) + (if (classes.isBlank()) "" else ": " + classes) + "]") +
             " · " + str(selection.quotation?.quote ?: value.quotation?.quote ?: value.sourceEvidence?.quote ?: selection.quote ?: "")
         label.appendChild(caption); entries.appendChild(label)
         documentSourceActions(entries, selection, current)
-        str(selection.id) to input
+        id to input
     }
+    val partition = if (kind == "taxonomy") {
+        val label = document.createElement("label").asDynamic()
+        val toggle = document.createElement("input").asDynamic(); toggle.type = "checkbox"
+        label.appendChild(toggle)
+        val text = document.createElement("span")
+        text.textContent = " Review one numbered partition separately (at most 32 assertions; selections must share its number)."
+        label.appendChild(text); box.appendChild(label); toggle
+    } else null
     val button = document.createElement("button").asDynamic()
     button.textContent = "Freeze selected evidence for review"; box.appendChild(button)
     on(button, "click", { event ->
         event.stopPropagation(); button.disabled = true
+        choices.forEach { it.second.disabled = true }
+        basketBusy?.invoke(true)
+        launchJs {
+            try {
+                require(current() && basketCurrent?.invoke() != false) { "The source result or reviewer credential changed; load candidates again" }
+                val selected = basket?.toList() ?: choices.filter { it.second.checked == true }.map { it.first }
+                require(selected.isNotEmpty()) { "Select at least one relationship or rule" }
+                val selectedKind = if (partition?.checked == true) "taxonomy-partition" else kind
+                require(selected.size <= (if (selectedKind == "taxonomy-partition") 32 else 256)) { "Review selection exceeds its limit" }
+                val review = reviewRequest("/snapshot", objOf {
+                    it.kind = selectedKind; it.receiptCid = receiptCid; it.selection = selected.toTypedArray()
+                })
+                require(current() && basketCurrent?.invoke() != false) { "The source result or reviewer credential changed while retaining the snapshot; reopen its review" }
+                if (frozen != null) frozen(review) else {
+                    if (reviewTarget != null) reviewTarget.textContent = ""
+                    documentReviewActions(reviewTarget ?: target, review, reviewCurrent ?: current)
+                }
+                status("Exact evidence selection retained for analyst review.")
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: dynamic) {
+                if (basket != null) {
+                    basket.clear(); choices.forEach { it.second.checked = false }; basketChanged?.invoke()
+                }
+                status("Review snapshot: " + failureText(error) + if (basket != null) "; selection cleared" else "")
+            }
+            finally {
+                button.disabled = false
+                choices.forEach { it.second.disabled = false }
+                basketBusy?.invoke(false)
+            }
+        }
+    })
+}
+
+private fun Panels.documentTaxonomyPages(target: dynamic, receiptCid: String, initial: Array<dynamic>, current: () -> Boolean) {
+    val section = document.createElement("section").asDynamic(); target.appendChild(section)
+    val note = document.createElement("p")
+    note.textContent = "Choose assertions across pages for one snapshot: at most 256 per review, or 123 for a native query. Changing credentials clears the selection. Regular snapshots replace this source's previous regular review; separately approved numbered partitions can be combined for a bounded native query."
+    section.appendChild(note)
+    val basket = linkedSetOf<String>()
+    val summary = document.createElement("p"); section.appendChild(summary)
+    fun updateSummary() { summary.textContent = "Selected " + basket.size + " of 256 assertions; native queries support at most 123." }
+    updateSummary()
+    val credential = document.createElement("input").asDynamic()
+    credential.type = "password"; credential.placeholder = "Reviewer credential (if not already authenticated)"
+    section.appendChild(credential)
+    val offset = document.createElement("input").asDynamic()
+    offset.type = "number"; offset.min = "0"; offset.value = "256"; offset.setAttribute("aria-label", "Candidate offset")
+    section.appendChild(offset)
+    val limit = document.createElement("input").asDynamic()
+    limit.type = "number"; limit.min = "1"; limit.max = "64"; limit.value = "8"; limit.setAttribute("aria-label", "Candidate page size")
+    section.appendChild(limit)
+    val load = document.createElement("button").asDynamic(); load.textContent = "Load KIF candidates"; section.appendChild(load)
+    val clear = document.createElement("button").asDynamic(); clear.textContent = "Clear selection"; section.appendChild(clear)
+    val pageResult = document.createElement("div").asDynamic(); section.appendChild(pageResult)
+    val reviewResult = document.createElement("div").asDynamic(); section.appendChild(reviewResult)
+    var pageEpoch = 0
+    var credentialEpoch = documentReviewCredentialEpoch
+    var shown = initial
+    var caption = "First " + initial.size + " candidates"
+    fun present() = current() && truthy(section.isConnected) && credentialEpoch == documentReviewCredentialEpoch
+    fun render() {
+        pageEpoch++
+        val shownEpoch = pageEpoch
+        pageResult.textContent = ""
+        val count = document.createElement("p"); count.textContent = caption; pageResult.appendChild(count)
+        documentSnapshotAction(pageResult, "taxonomy", receiptCid, shown,
+            { present() && pageEpoch == shownEpoch && truthy(pageResult.isConnected) },
+            basket, ::present, ::updateSummary, { busy -> load.disabled = busy; clear.disabled = busy },
+            reviewResult, { current() && truthy(section.isConnected) && truthy(reviewResult.isConnected) })
+    }
+    render()
+    val listener: () -> Unit = {
+        if (truthy(section.isConnected)) {
+            basket.clear(); updateSummary(); pageEpoch++
+            credentialEpoch = documentReviewCredentialEpoch
+            shown = emptyArray()
+            caption = "Load candidates again."
+            pageResult.textContent = "Reviewer credential changed. Load candidates again; the selection was cleared."
+        }
+    }
+    documentReviewCredentialListeners.add(listener)
+    page.own { documentReviewCredentialListeners.remove(listener) }
+    on(clear, "click", { event ->
+        event.stopPropagation()
+        if (present()) { basket.clear(); updateSummary(); render() }
+    })
+    on(load, "click", { event ->
+        event.stopPropagation(); load.disabled = true; clear.disabled = true
+        val supplied = str(credential.value).trim()
+        if (supplied.isNotEmpty()) updateDocumentReviewCredential(supplied)
+        credential.value = ""
+        val epoch = documentReviewCredentialEpoch
+        pageEpoch++
+        pageResult.textContent = "Loading candidates…"
         launchJs {
             try {
                 require(current()) { "The source result changed; use its current receipt" }
-                val selected = choices.filter { it.second.checked == true }.map { it.first }
-                require(selected.isNotEmpty()) { "Select at least one relationship or rule" }
-                val review = reviewRequest("/snapshot", objOf {
-                    it.kind = kind; it.receiptCid = receiptCid; it.selection = selected.toTypedArray()
-                })
-                require(current()) { "The source result changed while retaining the snapshot; reopen its review" }
-                if (frozen != null) frozen(review) else documentReviewActions(target, review, current)
-                status("Exact evidence selection retained for analyst review.")
+                val start = num(offset.value); val size = num(limit.value)
+                require(start.isFinite() && start >= 0 && start % 1.0 == 0.0 && start <= 65536 &&
+                    size.isFinite() && size >= 1 && size <= 64 && size % 1.0 == 0.0) { "Enter a valid offset and page size" }
+                val result = reviewRequest("/taxonomy-candidates", objOf {
+                    it.receiptCid = receiptCid; it.offset = start; it.limit = size
+                }, authenticated = true)
+                require(current() && epoch == documentReviewCredentialEpoch && result.receiptCid == receiptCid) {
+                    "The source result or credential changed while reading candidates"
+                }
+                shown = arr(result.selections)
+                caption = "Candidates " + str(start) + "–" + str(start + num(result.selections.length)) + " of " + str(result.total) + " (end exclusive)."
+                render()
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: dynamic) { status("Review snapshot: " + failureText(error)) }
-            finally { button.disabled = false }
+            catch (error: dynamic) {
+                basket.clear(); updateSummary()
+                if (epoch == documentReviewCredentialEpoch) pageResult.textContent = "Could not load candidates. Selection cleared; check the source and reviewer credential, then retry."
+                status("KIF candidates: " + failureText(error))
+            }
+            finally { load.disabled = false; clear.disabled = false }
         }
     })
 }
@@ -842,6 +1219,24 @@ fun Panels.renderDocumentReview(n: dynamic, out: dynamic) {
         documentSnapshotAction(target, "book", str(out.curationReceiptCid), arr(out.relationships), current)
     if (n.type == "document.curate" && typeOf(out.receiptCid) == "string" && isArray(out.reviewSelections))
         documentSnapshotAction(target, "document", str(out.receiptCid), arr(out.reviewSelections), current)
+    if (n.type == "document.curate" && typeOf(out.receiptCid) == "string" && isArray(out.taxonomySelections)) {
+        if (out.taxonomyStatus == "truncated-first-256") {
+            val note = document.createElement("p")
+            note.textContent = "The first 256 KIF assertions are shown below; later assertions can be browsed by offset."
+            target.appendChild(note)
+            documentTaxonomyPages(target, str(out.receiptCid), arr(out.taxonomySelections), current)
+        } else if (out.taxonomyStatus == "invalid-or-over-limit") {
+            val note = document.createElement("p")
+            note.textContent = "This KIF source could not be inspected within the supported syntax and size limits."
+            target.appendChild(note)
+        } else if (out.taxonomyStatus == "original-mismatch") {
+            val note = document.createElement("p")
+            note.textContent = "The extracted text differs from the original KIF bytes, so it cannot be offered as an exact KIF source."
+            target.appendChild(note)
+        }
+        if (out.taxonomyStatus != "truncated-first-256")
+            documentSnapshotAction(target, "taxonomy", str(out.receiptCid), arr(out.taxonomySelections), current)
+    }
     fun action(label: String, preset: String, configure: (dynamic) -> Unit) =
         documentConstructionAction(target, label, preset, { n._lastOut === out && truthy(n.el.isConnected) }, configure = configure)
     if (n.type == "document.curate" && typeOf(out.receiptCid) == "string") {

@@ -24,8 +24,10 @@ import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 import java.io.OutputStream
+import java.util.concurrent.locks.ReentrantLock
 import kotlinx.coroutines.CoroutineScope
 import org.graalvm.polyglot.PolyglotException
+import kotlin.concurrent.withLock
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
@@ -203,6 +205,40 @@ data class HermesPortInventory(
     )
 }
 
+/** Retain each resource until its close succeeds, in dependency order. */
+internal class HermesCandidate(
+    private var guest: (() -> Unit)?,
+    private var sockets: (() -> Unit)?,
+    private var services: (() -> Unit)?,
+) : AutoCloseable {
+    override fun close() {
+        guest?.let { it(); guest = null }
+        sockets?.let { it(); sockets = null }
+        services?.let { it(); services = null }
+    }
+}
+
+internal class HermesCandidates : AutoCloseable {
+    private val pending = mutableListOf<HermesCandidate>()
+
+    fun retire(candidate: HermesCandidate, failure: Throwable) {
+        pending.add(candidate)
+        try {
+            candidate.close()
+            pending.remove(candidate)
+        } catch (closing: Throwable) {
+            if (closing !== failure) failure.addSuppressed(closing)
+        }
+    }
+
+    override fun close() {
+        while (pending.isNotEmpty()) {
+            pending.first().close()
+            pending.removeAt(0)
+        }
+    }
+}
+
 internal fun HermesSignificantGap.toMap(): Map<String, Any?> = mapOf(
     "root" to root,
     "impacted" to impacted,
@@ -232,9 +268,19 @@ class HermesPythonPort(
     private val importPointcut: (Map<String, Any?>) -> Unit = {},
     private val world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
 ) : AutoCloseable {
-    private var isolate: GraalBtrfsSupervisor? = null
+    private val transition = ReentrantLock()
+    @Volatile private var isolate: GraalBtrfsSupervisor? = null
     private var isolateSockets: PythonSocketProvider? = null
     private var isolateServices: PythonHostServices? = null
+    private val candidates = HermesCandidates()
+
+    private inline fun <T> transition(block: () -> T): T {
+        check(!transition.isHeldByCurrentThread) { "Cannot retire or replace a Hermes port from its own transition" }
+        // A concurrent retire may hold transition while joining this crossing.
+        // Reject before waiting for that lock, avoiding an owner/guest inversion.
+        isolate?.guest?.requireOutsideCrossing()
+        return transition.withLock(block)
+    }
 
     fun inventory(root: Path, sleeveRoot: Path? = null): HermesPortInventory {
         require(Files.isDirectory(root)) { "Hermes source root is not a directory: $root" }
@@ -359,11 +405,13 @@ class HermesPythonPort(
     }
 
     /** Replace the owned VM only after a READY module imports successfully; a failed candidate is closed. */
-    fun importInVm(inventory: HermesPortInventory, entry: String): Teleported {
+    fun importInVm(inventory: HermesPortInventory, entry: String): Teleported = transition {
         val module = inventory.modules[entry] ?: error("Hermes module not found: $entry")
         require(module.status == HermesModuleStatus.READY) {
             "Hermes module $entry is ${module.status.name.lowercase()}: ${module.blockedBy.sorted().joinToString()}"
         }
+        candidates.close()
+        if (isolate?.isAlive != true) closeIsolate()
         val importRevision = blackboard.snapshot().revision
         val baseline = "boot-${inventory.ontology.cid.hex.take(16)}"
         val guest = GraalBtrfsSupervisor(
@@ -374,21 +422,21 @@ class HermesPythonPort(
             error = error,
             world = world,
         )
-        val services = PythonHostServices(guest, world)
+        var services: PythonHostServices? = null
         var sockets: PythonSocketProvider? = null
         val result = try {
+            val hostServices = PythonHostServices(guest, world)
+            services = hostServices
             if (pen != null && socketScope != null) sockets = PythonSocketProvider(socketScope)
-            services.install()
+            hostServices.install()
             val imported = importInVm(guest, inventory, entry, baseline, sockets)
-            isolate?.close()
-            isolateSockets?.close()
-            isolateServices?.close()
+            closeIsolate()
             imported
         } catch (failure: Throwable) {
-            try { importFailure(entry, importRevision, failure) } catch (diagnostic: Throwable) { failure.addSuppressed(diagnostic) }
-            try { guest.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
-            try { sockets?.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
-            try { services.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
+            try { importFailure(entry, importRevision, failure) } catch (diagnostic: Throwable) {
+                if (diagnostic !== failure) failure.addSuppressed(diagnostic)
+            }
+            candidates.retire(HermesCandidate(guest::closeAndAwait, sockets?.let { it::close }, services?.let { it::close }), failure)
             throw failure
         }
         isolate = guest
@@ -399,7 +447,7 @@ class HermesPythonPort(
             mapOf("backend" to "userspace-btrfs", "subvolume" to guest.vfs.liveSubvolumeForTools(), "baseline" to result.b, "generation" to guest.vfs.generation()),
             "graal-python",
         )
-        return result.a
+        result.a
     }
 
     private fun importInVm(guest: GraalBtrfsSupervisor, inventory: HermesPortInventory, entry: String, baseline: String,
@@ -529,14 +577,26 @@ class HermesPythonPort(
     fun evalInVm(source: String, name: String = "hermes-console.py"): Teleported =
         isolate?.eval(source, name) ?: error("Hermes VM has not been imported")
 
-    override fun close() {
-        try { isolate?.close() } finally {
-            isolate = null
-            try { isolateSockets?.close() } finally {
-                isolateSockets = null
-                try { isolateServices?.close() } finally { isolateServices = null }
-            }
+    /** Stop guest admission and join its current crossing before its host effects are drained. */
+    fun quiesce(closeCli: Boolean = false) = transition {
+        val guest = isolate ?: return@transition
+        guest.quiesce {
+            if (closeCli) guest.eval("trikeshed_cli.close()", "hermes-cli-close.py")
         }
+    }
+
+    override fun close() = transition {
+        candidates.close()
+        closeIsolate()
+    }
+
+    private fun closeIsolate() {
+        isolate?.closeAndAwait()
+        isolate = null
+        isolateSockets?.close()
+        isolateSockets = null
+        isolateServices?.close()
+        isolateServices = null
     }
 
     private fun projectInventory(inventory: HermesPortInventory) {

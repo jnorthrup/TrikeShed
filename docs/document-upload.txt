@@ -8,6 +8,10 @@ source files on the user's computer stay in place. The default Forge home is
 ~/.local/forge. Project databases and CAS retain content identities and revisions;
 .oroboros/projects.tsv and guarded intake policy keep project state across restart.
 
+File and browser-link drags are accepted across Documents. A plain-text URL
+can be dropped on the upload box; ordinary text drags into editable controls
+remain available to those controls.
+
 The new upload requires persistent manual intake to be confirmed before file
 bytes are sent. Automatic curation is disabled for the project, including boot
 resume. An explicit later PDF/Office/image curation action remains available;
@@ -20,6 +24,9 @@ and Board folder drops use the project uploader. Legacy /forge text/CSV imports
 remain browser-workspace data; its binary dropzone records are a separate store.
 The new Documents uploader is capped at 1,000 files, 32 MiB per file and 128 MiB
 per selection. Unsafe/duplicate paths and already-mounted project names refuse.
+The batch endpoint validates all frame lengths and UTF-8 paths before storing
+any file from that batch. A valid batch can still report individual storage
+failures, so the caller must inspect its stored and failed counts.
 Leaving cancels the browser request, but accepted server writes can still finish;
 restoration reloads controls without retrying previously submitted files.
 

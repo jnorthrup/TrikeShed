@@ -1,6 +1,7 @@
 """The CLI accepts only the clean, committed source selected by its fork lock."""
 
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -107,6 +108,19 @@ class SourcePinTest(unittest.TestCase):
         finally:
             sys.path.remove(str(self.root))
             sys.modules.pop("cli", None)
+
+    def test_repository_lock_matches_gitlink_and_requirements(self):
+        root = Path(__file__).resolve().parents[3]
+        sleeve = root / "utils" / "graalpy-sleeve"
+        lock = json.loads((sleeve / "hermes.lock.json").read_text(encoding="utf-8"))
+        entry = subprocess.check_output(
+            ["git", "-C", str(root), "ls-files", "--stage", "--", "utils/hermes-trikeshed-graalpy"],
+            text=True,
+        ).strip().split()
+        self.assertEqual(entry[0], "160000")
+        self.assertEqual(entry[1], lock["revision"])
+        requirements = root / "utils" / "hermes-trikeshed-graalpy" / "graalpy" / "requirements.txt"
+        self.assertEqual(hashlib.sha256(requirements.read_bytes()).hexdigest(), lock["graalpy"]["requirements_sha256"])
 
 
 if __name__ == "__main__":

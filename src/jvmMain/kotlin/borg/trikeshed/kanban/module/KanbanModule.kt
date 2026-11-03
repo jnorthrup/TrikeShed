@@ -720,10 +720,10 @@ class KanbanModule : ForgeModule {
                 val declared = receipt["queueDeclaredSubnet"] as? String
                 val request = receipt["queueRequest"] as Map<*, *>
                 val subnet = Subnet.parse(request["subnet"] as String)
-                workgroups.pin(program, cid, Subnet.parse(declared ?: "local"))
+                val pinned = workgroups.pin(program, cid, Subnet.parse(declared ?: "local"))
                 val capability = Capability.Custom("lcnc", "program/${program.name}/${cid.value}")
                 val admitted = withContext(reserved.b + currentCoroutineContext().get(Job)!! + fanout) {
-                    fanout.dispatch(nuid(capability, Nonce.RandomBytes(), subnet), reserved)
+                    fanout.dispatchTo(pinned, nuid(capability, Nonce.RandomBytes(), subnet), reserved)
                 }
                 if (admitted.winner == null) return completed(runs.failQueued(reserved, 404, "no_workgroup"))
                 val completion = checkNotNull(admitted.completion) { "Queued workgroup has no executor" }
@@ -743,7 +743,9 @@ class KanbanModule : ForgeModule {
             ctx.blackboard, fanout, publisher::vocabulary,
             bind = { geometry, program, cid ->
                 check(ctx.casStore.put(LcncProgramConfix.toJson(program).encodeToByteArray()) == cid)
-                fanout.register(geometry, cleanup = ::releaseClaim) { claim -> executeClaim(claim, cid) }
+                val cleanup: suspend (NuidFanoutElement.Claim) -> Unit = ::releaseClaim
+                val execute: suspend (NuidFanoutElement.Claim) -> Any? = { claim -> executeClaim(claim, cid) }
+                cleanup j execute
             },
             parentJob = ctx.scope.coroutineContext[Job],
             dispatchQueued = ::dispatchQueued,

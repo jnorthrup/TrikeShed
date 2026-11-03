@@ -49,6 +49,8 @@ data class HarnessProvider(
      * plan the operator does not use.
      */
     val baseUrlEnvVar: String? = null,
+    /** The provider publishes `/models` without credentials; this does not change chat authentication. */
+    val publicModels: Boolean = false,
 )
 
 /**
@@ -156,6 +158,13 @@ object HarnessRegistry {
             s_["MINIMAX_API_KEY"],
             "https://api.minimax.chat/v1",
             baseUrlEnvVar = "MINIMAX_BASE_URL"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "loom",
+            s_["LOOM_API_KEY"],
+            "https://api.loom.vsiwest.com/v1",
+            baseUrlEnvVar = "LOOM_BASE_URL",
+            publicModels = true,
         ),
         // jules/brain are dispatch identities, not chat endpoints.
         borg.trikeshed.agent.keymux.HarnessProvider("jules", s_["JULES_API_KEY"]),

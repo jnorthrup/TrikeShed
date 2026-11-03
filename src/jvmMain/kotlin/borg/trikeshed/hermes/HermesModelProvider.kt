@@ -121,9 +121,10 @@ object HermesModelProvider {
             # No claim of incremental network streaming; usage and finish reasons are the provider's.
             buffered = True
 
-            def __init__(self, completion):
+            def __init__(self, completion, include_usage=False):
                 self.is_closed = False
                 self.completion = completion
+                self.include_usage = include_usage
 
             def __getattr__(self, name):
                 return getattr(self.completion, name)
@@ -141,7 +142,7 @@ object HermesModelProvider {
                     choices[-1].pop('message', None)
                 if not self.is_closed:
                     yield _record(dict(envelope, choices=choices, usage=None))
-                if not self.is_closed and 'usage' in self.completion:
+                if not self.is_closed and self.include_usage and self.completion.get('usage') is not None:
                     yield _record(dict(envelope, choices=[], usage=self.completion.usage))
 
             def close(self):
@@ -183,8 +184,11 @@ object HermesModelProvider {
                     if set(extra_body).intersection(request) or set(extra_body).intersection(('model', 'stream')):
                         raise ValueError('extra_body cannot replace completion fields')
                     request.update(extra_body)
-                if stream_options is not None and stream_options != {'include_usage': True}:
-                    raise ValueError('only include_usage is supported for buffered chunks')
+                if stream_options is not None and (
+                    not isinstance(stream_options, dict) or set(stream_options) != {'include_usage'}
+                    or type(stream_options['include_usage']) is not bool
+                ):
+                    raise ValueError('only boolean include_usage is supported for buffered chunks')
                 if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
                                             or not 0 < timeout <= 2147483):
                     raise ValueError('timeout must be positive seconds')
@@ -192,7 +196,7 @@ object HermesModelProvider {
                 args = (model, json.dumps(request, ensure_ascii=False, allow_nan=False))
                 args += (max(1, int(timeout * 1000)),)
                 completion = _record(_call('mux_completion', *args)['completion'])
-                return _Stream(completion) if stream else completion
+                return _Stream(completion, bool(stream_options and stream_options['include_usage'])) if stream else completion
 
             def close(self):
                 self.is_closed = True

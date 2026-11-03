@@ -169,10 +169,13 @@ class QuotaLegion(
     fun limitFor(provider: String): Long = synchronizedLock(meterGate) { limitsByProvider[provider] ?: defaultLimit }
 
     /** Meter one receipt's tokens against its key. Window rollover included. */
-    fun applyReceipt(keyId: String, provider: String, receipt: ModelResponseReceipt, nowMs: Long): Unit = synchronizedLock(meterGate) {
-        val tokens = receipt.inputTokens.toLong() + receipt.outputTokens.toLong()
+    fun applyReceipt(keyId: String, provider: String, receipt: ModelResponseReceipt, nowMs: Long): Unit =
+        applyUsage(keyId, provider, receipt.httpStatus, receipt.inputTokens, receipt.outputTokens, nowMs)
+
+    internal fun applyUsage(keyId: String, provider: String, status: Int, inputTokens: Int, outputTokens: Int, nowMs: Long): Unit = synchronizedLock(meterGate) {
+        val tokens = inputTokens.toLong() + outputTokens.toLong()
         val meter = meterFor(keyId, provider, nowMs)
-        if (receipt.httpStatus == 429) {
+        if (status == 429) {
             meter.exhausted = true
             if (meter.blockedUntilMs <= nowMs) meter.blockedUntilMs = nowMs + minOf(windowMs, 60_000L)
             return

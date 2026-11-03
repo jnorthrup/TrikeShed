@@ -34,17 +34,18 @@ internal class HermesConsoleGeneration<R : AutoCloseable>(
         if (callbacks) deliver() else null
     }
 
-    /** Refuse callbacks and new effects, drain admitted effects, then close the old guest. */
-    fun retire(closeResource: (R) -> Unit) = synchronized(retirement) {
+    /** Quiesce guest admission, drain admitted effects, then close the old guest. */
+    fun retire(quiesceResource: (R) -> Unit = {}, closeResource: (R) -> Unit) = synchronized(retirement) {
         if (!retired) {
             synchronized(callbackLock) { callbacks = false }
-            try {
-                runBlocking { crossings.drain() }
-                closeResource(resource)
-                retired = true
-            } finally { scope.cancel(); runBlocking { supervisor.join() } }
+            quiesceResource(resource)
+            runBlocking { crossings.drain() }
+            closeResource(resource)
+            supervisor.complete()
+            runBlocking { supervisor.join() }
+            retired = true
         }
     }
 
-    override fun close() = retire(AutoCloseable::close)
+    override fun close() = retire(closeResource = AutoCloseable::close)
 }

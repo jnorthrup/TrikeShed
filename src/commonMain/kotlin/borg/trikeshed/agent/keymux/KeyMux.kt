@@ -570,7 +570,9 @@ class KeyMux constructor(
         providerTag: String?,
         fallbackBaseUrl: String,
         auth: borg.trikeshed.agent.keymux.LlmAuth = borg.trikeshed.agent.keymux.LlmAuth.REQUIRED,
+        providerOnly: Boolean = false,
     ): borg.trikeshed.agent.keymux.LlmResolution? {
+        if (providerOnly && auth != borg.trikeshed.agent.keymux.LlmAuth.REQUIRED) return null
         if (auth == borg.trikeshed.agent.keymux.LlmAuth.NONE) return borg.trikeshed.agent.keymux.LlmResolution(
             null,
             null,
@@ -596,7 +598,8 @@ class KeyMux constructor(
             }
         }.toSeries()
         suspend fun read(path: String): String? = resolver.resolve(snapshot, path.toKeyPath()).a
-        val prefixes = listOfNotNull(providerTag?.let { "llm.$it" }, "llm.$modelId", "llm.default")
+        val prefixes = if (providerOnly) listOf("llm." + requireNotNull(providerTag) { "Provider identity required" })
+            else listOfNotNull(providerTag?.let { "llm.$it" }, "llm.$modelId", "llm.default")
         val key = prefixes.firstNotNullOfOrNull { prefix ->
             val resolved = resolver.resolve(snapshot, "$prefix.key".toKeyPath())
             resolved.a?.let { secret ->

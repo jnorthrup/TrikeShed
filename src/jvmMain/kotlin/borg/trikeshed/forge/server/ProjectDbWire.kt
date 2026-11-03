@@ -196,12 +196,27 @@ class ProjectDbWire(
                         repeat(8) { v = (v shl 8) or (body[off + it].toLong() and 0xFF) }
                         off += 8; return v
                     }
-                    while (off + 12 <= body.size) {
+                    // Validate the complete frame before publishing any file. In particular,
+                    // do not narrow a 64-bit length or ignore an incomplete final frame.
+                    val valid = try {
+                        while (off < body.size) {
+                            require(body.size - off >= 12)
+                            val pLen = i32()
+                            require(pLen > 0 && pLen <= body.size - off - 8)
+                            body.decodeToString(off, off + pLen, throwOnInvalidSequence = true)
+                            off += pLen
+                            val bLen = i64()
+                            require(bLen >= 0 && bLen <= (body.size - off).toLong())
+                            off += bLen.toInt()
+                        }
+                        true
+                    } catch (_: Exception) { false }
+                    if (!valid) return json(400, """{"error":"invalid batch frame"}""")
+                    off = 0
+                    while (off < body.size) {
                         val pLen = i32()
-                        if (pLen <= 0 || off + pLen + 8 > body.size) { failCount++; break }
                         val rel = body.copyOfRange(off, off + pLen).decodeToString(); off += pLen
                         val bLen = i64().toInt()
-                        if (bLen < 0 || off + bLen > body.size) { failCount++; break }
                         val bytes = body.copyOfRange(off, off + bLen); off += bLen
                         runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel), manualIntake) }
                             .fold({ okCount++ }, { failCount++ })

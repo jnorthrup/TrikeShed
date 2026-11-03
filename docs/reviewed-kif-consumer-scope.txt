@@ -25,4 +25,18 @@ Real review ledger+verified source fixture (not an approval-map callback): creat
 Stop point
 No safe reusable reviewed-read capability or declared reviewed taxonomy relation mapping exists yet in the traced production path. Implementing the above requires a deliberate host authority/read-policy addition and authentic taxonomy review fixture, not merely connecting KifActivationPlan to arbitrary quad query rows. Await root decision before coding.
 
-Subsequent implementation boundary: authenticated non-consuming reviewedRead and the real taxonomy inspector now exist. No norm modality, including PRESUMED, is promoted to an asserted taxonomy fact; all such rows remain excluded and UNKNOWN. A distinct asserted-taxonomy source format is still missing. Review-record observation reification is a separate native bridge scope and does not assert the source proposition as a world fact.
+Initial implementation boundary: authenticated non-consuming reviewedRead and the real taxonomy inspector were added. No norm modality, including PRESUMED, was promoted to an asserted taxonomy fact; those rows remain excluded and UNKNOWN. At that point a distinct asserted-taxonomy source format was still missing. Review-record observation reification is a separate native bridge scope and does not assert the source proposition as a world fact.
+
+2026-11-03 update: a distinct source-scoped KIF review path now exists. It offers
+only exact top-level positive ground subclass/instance formulas from a retained
+`.kif` source whose original bytes equal the UTF-8 text, with bounded syntax and
+source sizes. The existing authenticated ledger approves the exact selected
+snapshot; the non-consuming report revalidates current source and approval and
+uses the Kotlin positive-taxonomy fragment across the approved selection. Generic
+release and consume refuse this kind, so it does not grant a sink permit. Evidence
+pages are bounded and later candidates can be browsed. Independently approved
+numbered partitions can now be combined in a native query, subject to the 123-fact
+bound described in reviewed-kif-taxonomy.txt; this does not provide corpus-wide
+aggregation. The Kotlin report does not invoke the native solver, authenticate the
+source author, or assert global facts. Book modalities and review-record
+observation reification remain separate.

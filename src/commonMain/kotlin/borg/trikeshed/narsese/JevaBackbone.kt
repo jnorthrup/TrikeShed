@@ -63,7 +63,9 @@ data class JevaBackboneConfig(
             }
             require(fields["model_type"] == "qwen3_5_text") { "Expected Qwen3.5 text backbone" }
             require(fields["hidden_act"] == "silu") { "Qwen3.5 reference requires SwiGLU" }
-            require(fields["attn_output_gate"] != false) { "Qwen3.5 reference requires the query output gate" }
+            require(!fields.containsKey("attn_output_gate") || fields["attn_output_gate"] == true) {
+                "Qwen3.5 reference requires the query output gate"
+            }
             val rope = requireNotNull(fields["rope_parameters"] as? Map<*, *>) { "Missing Qwen3.5 RoPE" }
             require((rope["rope_type"] ?: rope["type"]) == "default") { "Unsupported Qwen3.5 RoPE type" }
             val count = integer("num_hidden_layers")
@@ -71,13 +73,16 @@ data class JevaBackboneConfig(
             require(layerTypes != null && layerTypes.size == count && layerTypes.all { it is String }) {
                 "Missing Qwen3.5 layer_types"
             }
+            val attentionBias = if (fields.containsKey("attention_bias")) fields["attention_bias"] as? Boolean
+                ?: error("Invalid Qwen3.5 attention_bias") else false
+            val rotaryFactor = if (rope.containsKey("partial_rotary_factor")) (rope["partial_rotary_factor"] as? Number)?.toDouble()
+                ?: error("Invalid Qwen3.5 partial_rotary_factor") else 1.0
             return JevaBackboneConfig(integer("vocab_size"), integer("hidden_size"), integer("intermediate_size"),
                 count j { layerTypes[it] as String }, integer("num_attention_heads"), integer("num_key_value_heads"),
                 integer("head_dim"), integer("linear_num_key_heads"), integer("linear_num_value_heads"),
                 integer("linear_key_head_dim"), integer("linear_value_head_dim"), integer("linear_conv_kernel_dim"),
                 number("rms_norm_eps").toFloat(), requireNotNull((rope["rope_theta"] as? Number)?.toDouble()),
-                (rope["partial_rotary_factor"] as? Number)?.toDouble() ?: 1.0, integer("max_position_embeddings"),
-                fields["attention_bias"] as? Boolean ?: false)
+                rotaryFactor, integer("max_position_embeddings"), attentionBias)
         }
     }
 }

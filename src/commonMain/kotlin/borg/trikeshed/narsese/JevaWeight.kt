@@ -38,5 +38,5 @@ interface EncoderSession : JevaEncoder {
 interface EncoderOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<EncoderOperations>
     override val key: CoroutineContext.Key<*> get() = Key
-    fun open(directory: String): EncoderSession
+    fun open(directory: String, check: () -> Unit = {}): EncoderSession
 }

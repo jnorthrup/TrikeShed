@@ -12,22 +12,24 @@ object JevaHead {
     private class Cells(val storage: Storage, val offset: Int, val shape: IntArray, val stride: IntArray)
     private class Entry(val offset: Int, val size: Int)
 
-    fun parse(archive: ByteArray): Map<String, MetaSeries<Tensor, Float>> {
-        val entries = zip(archive)
+    fun parse(archive: ByteArray, check: () -> Unit = {}): Map<String, MetaSeries<Tensor, Float>> {
+        check()
+        val entries = zip(archive, check)
         val pickle = entries.keys.singleOrNull { it.endsWith("/data.pkl") || it == "data.pkl" }
             ?: error("Torch archive has no data.pkl")
         val base = pickle.removeSuffix("data.pkl")
         entries[base + "byteorder"]?.let {
             require(archive.decodeToString(it.offset, it.offset + it.size) == "little") { "Torch archive is not little-endian" }
         }
-        val state = unpickle(archive.copyOfRange(entries.getValue(pickle).offset, entries.getValue(pickle).let { it.offset + it.size }))
+        val state = unpickle(archive.copyOfRange(entries.getValue(pickle).offset, entries.getValue(pickle).let { it.offset + it.size }), check)
         val tensors = LinkedHashMap<String, MetaSeries<Tensor, Float>>()
         fun walk(prefix: String, value: Any?) {
+            check()
             when (value) {
                 is Map<*, *> -> for ((key, item) in value) {
                     walk(prefix + (key as? String ?: error("Torch state key is not text")) + if (item is Map<*, *>) "." else "", item)
                 }
-                is Cells -> require(tensors.put(prefix, floats(archive, entries, base, value)) == null) { "Duplicate tensor $prefix" }
+                is Cells -> require(tensors.put(prefix, floats(archive, entries, base, value, check)) == null) { "Duplicate tensor $prefix" }
                 is String -> if (prefix == "decision_arch") require(value == "matrix_stack") { "Head architecture is $value" }
             }
         }
@@ -36,7 +38,7 @@ object JevaHead {
         return tensors
     }
 
-    private fun floats(archive: ByteArray, entries: Map<String, Entry>, base: String, cells: Cells): MetaSeries<Tensor, Float> {
+    private fun floats(archive: ByteArray, entries: Map<String, Entry>, base: String, cells: Cells, check: () -> Unit): MetaSeries<Tensor, Float> {
         val entry = entries[base + "data/" + cells.storage.key] ?: error("Missing storage ${cells.storage.key}")
         require(entry.size == cells.storage.elements * 4) { "Storage ${cells.storage.key} is not Float32" }
         val shape = cells.shape
@@ -49,6 +51,7 @@ object JevaHead {
         }
         require(cells.offset >= 0 && cells.offset.toLong() + count <= cells.storage.elements) { "Tensor exceeds its storage" }
         val values = FloatArray(count) {
+            if (it and 4095 == 0) check()
             val at = entry.offset + (cells.offset + it) * 4
             val bits = (archive[at].toInt() and 255) or ((archive[at + 1].toInt() and 255) shl 8) or
                 ((archive[at + 2].toInt() and 255) shl 16) or ((archive[at + 3].toInt() and 255) shl 24)
@@ -64,14 +67,15 @@ object JevaHead {
         return value.toInt()
     }
 
-    private fun zip(b: ByteArray): Map<String, Entry> {
+    private fun zip(b: ByteArray, check: () -> Unit): Map<String, Entry> {
         var end = b.size - 22
-        while (end >= 0 && u32Raw(b, end) != 0x06054b50L) end--
+        while (end >= 0 && u32Raw(b, end) != 0x06054b50L) { if (end and 4095 == 0) check(); end-- }
         require(end >= 0) { "Not a zip archive" }
         val count = u16(b, end + 10)
         var at = u32(b, end + 16)
         val entries = LinkedHashMap<String, Entry>()
         repeat(count) {
+            check()
             require(u32Raw(b, at) == 0x02014b50L) { "Bad zip central directory" }
             require(u16(b, at + 10) == 0) { "Compressed zip entry" }
             val size = u32(b, at + 24)
@@ -90,7 +94,7 @@ object JevaHead {
 
     private fun u32Raw(b: ByteArray, at: Int): Long = u16(b, at).toLong() or (u16(b, at + 2).toLong() shl 16)
 
-    private fun unpickle(b: ByteArray): Any? {
+    private fun unpickle(b: ByteArray, check: () -> Unit): Any? {
         val stack = ArrayList<Any?>()
         val marks = ArrayList<Int>()
         val memo = HashMap<Int, Any?>()
@@ -98,7 +102,11 @@ object JevaHead {
         fun byte() = b[at++].toInt() and 255
         fun word(): Int = u16(b, at).also { at += 2 }
         fun int(): Int = (u16(b, at) or (u16(b, at + 2) shl 16)).also { at += 4 }
-        fun line(): String { val from = at; while (b[at] != '\n'.code.toByte()) at++; return b.decodeToString(from, at++) }
+        fun line(): String {
+            val from = at
+            while (b[at] != '\n'.code.toByte()) { if (at and 4095 == 0) check(); at++ }
+            return b.decodeToString(from, at++)
+        }
         fun pop(): Any? = stack.removeAt(stack.lastIndex)
         fun sinceMark(): List<Any?> {
             val from = marks.removeAt(marks.lastIndex)
@@ -106,6 +114,7 @@ object JevaHead {
         }
         fun ints(value: Any?) = (value as List<*>).map { (it as Int) }.toIntArray()
         while (true) {
+            check()
             when (val op = byte()) {
                 0x80 -> require(byte() == 2) { "Unsupported pickle protocol" }
                 '}'.code -> stack.add(LinkedHashMap<Any?, Any?>())

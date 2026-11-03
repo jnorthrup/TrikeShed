@@ -9,18 +9,12 @@ data class RosterEntry(val provider: String, val model: String)
 /**
  * Assign a UNIQUE, routable card id to every roster endpoint.
  *
- * [ModelMux.session] resolves a model by scanning for the FIRST entry whose id
- * matches. That makes a duplicate model id not an ambiguity but a silent
- * deletion: the second provider offering the same model is registered, listed
- * by `mux.models`, shown in the panel — and unreachable, because every call for
- * that id lands on the first card.
+ * [ModelMux.session] refuses duplicate internal IDs because credentials and
+ * destinations must resolve to the same card. Each provider therefore needs
+ * its own internal ID, even when providers use the same wire model name.
  *
- * The roster collides in exactly this way today. `z-ai/glm-5.2` is served by
- * both nvidia and openrouter, and `nousresearch/hermes-3-llama-3.1-405b` by
- * three hermes endpoints. Since nvidia is registered first, the openrouter route
- * — the one with working credit on this machine — could not be selected at all.
- * The panel offered a menu whose entries mostly failed, and the reason was not
- * visible from anything the panel could show.
+ * `z-ai/glm-5.2` is served by both nvidia and openrouter, and
+ * `nousresearch/hermes-3-llama-3.1-405b` by three hermes endpoints.
  *
  * The assignment:
  *  - the FIRST endpoint claiming a model id keeps the BARE id, so presets and

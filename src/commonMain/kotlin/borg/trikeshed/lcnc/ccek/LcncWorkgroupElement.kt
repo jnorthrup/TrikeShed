@@ -24,7 +24,7 @@ class LcncWorkgroupElement(
     private val blackboard: ConfixBlackboard,
     private val fanout: NuidFanoutElement,
     private val contracts: () -> Map<String, LcncPortContract>,
-    private val bind: suspend (Workgroup, LcncProgram, ContentId) -> Unit,
+    private val bind: suspend (Workgroup, LcncProgram, ContentId) -> Join<suspend (NuidFanoutElement.Claim) -> Unit, suspend (NuidFanoutElement.Claim) -> Any?>,
     parentJob: Job? = null,
     private val dispatchQueued: (suspend (LcncRunQueueEntry) -> Deferred<Any?>)? = null,
 ) : CoroutineContext.Element, Drain {
@@ -43,7 +43,7 @@ class LcncWorkgroupElement(
     private val updating = MutableStateFlow(0)
     private val queue = Channel.buffered<Join<LcncRunQueueEntry, CompletableDeferred<Deferred<Any?>>>>(8)
     private val pinning = Mutex()
-    private val pins = linkedMapOf<String, Join<Workgroup, Join<String, ContentId>>>()
+    private val pins = linkedMapOf<String, Join<NuidFanoutElement.WorkgroupSlot, Join<String, ContentId>>>()
     private val input = Channel.buffered<CompletableDeferred<Unit>?>(8)
     private val stopping = MutableStateFlow(false)
     private val completion = CompletableDeferred<Result<Unit>>()
@@ -168,7 +168,7 @@ class LcncWorkgroupElement(
     }
 
     /** A saved version has an independent binding; latest-program retirement never removes it. */
-    suspend fun pin(program: LcncProgram, cid: ContentId, scope: Subnet): Workgroup = prepare {
+    suspend fun pin(program: LcncProgram, cid: ContentId, scope: Subnet): NuidFanoutElement.WorkgroupSlot = prepare {
         val bytes = LcncProgramConfix.toJson(program).encodeToByteArray()
         require(ContentId.of(bytes) == cid) { "LCNC pinned program CID does not match its document" }
         val frozen = LcncProgramConfix.fromJson(program.name, bytes.decodeToString())
@@ -181,22 +181,16 @@ class LcncWorkgroupElement(
         val key = "${LcncBlackboard.programKey(frozen.name)}@${cid.value}"
         pinning.withLock {
             pins[key]?.let {
-                check(it.a.scope.toString() == scope.toString()) { "LCNC pinned subnet cannot change" }
+                check(it.a.workgroup.scope.toString() == scope.toString()) { "LCNC pinned subnet cannot change" }
                 return@withLock it.a
             }
             val group = Workgroup(key, scope, traitSpaceOf(Capability.Custom("lcnc", "program/${frozen.name}/${cid.value}")))
             check(fanout.slotOf(key) == null) { "Workgroup name is already registered" }
-            try {
-                bind(group, frozen, cid)
-                val slot = fanout.slotOf(key)
-                check(slot != null && slot.workgroup === group && slot.executes) { "Workgroup binding did not register its handler" }
-                pins[key] = group j (frozen.name j cid)
-                pinned = pins.values.toTypedArray().toSeries()
-                group
-            } catch (caught: Throwable) {
-                if (fanout.slotOf(key)?.workgroup === group) fanout.unregister(key)
-                throw caught
-            }
+            val binding = bind(group, frozen, cid)
+            val slot = fanout.register(group, cleanup = binding.a, execute = binding.b)
+            pins[key] = slot j (frozen.name j cid)
+            pinned = pins.values.map { it.a.workgroup j it.b }.toTypedArray().toSeries()
+            slot
         }
     }
 
@@ -334,13 +328,11 @@ class LcncWorkgroupElement(
                         traitSpaceOf(Capability.Custom("lcnc", "program/$name")))
                     try {
                         check(fanout.slotOf(key) == null) { "Workgroup name is already registered" }
-                        bind(group, program, cid)
-                        val slot = fanout.slotOf(key)
-                        check(slot != null && slot.workgroup === group && slot.executes) { "Workgroup binding did not register its handler" }
+                        val binding = bind(group, program, cid)
+                        fanout.register(group, cleanup = binding.a, execute = binding.b)
                         bound[key] = group j (name j cid)
                     } catch (caught: Exception) {
                         if (caught is CancellationException) throw caught
-                        if (fanout.slotOf(key)?.workgroup === group) fanout.unregister(key)
                         reason = caught.message ?: "LCNC workgroup binding failed"
                     }
                     val current = blackboard.snapshot()

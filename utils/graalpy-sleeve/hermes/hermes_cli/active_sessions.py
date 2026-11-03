@@ -219,8 +219,9 @@ def _flock(fh, *, lock: bool) -> None:
 
 
 class _FileLock:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, state_path: Path):
         self.path = path
+        self.state_path = state_path
         self._fh = None
         self._lease = None
 
@@ -228,7 +229,7 @@ class _FileLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         runtime = _vfs_runtime()
         if runtime is not None:
-            self._lease = runtime.ExclusiveLease(self.path).acquire()
+            self._lease = runtime.ExclusiveLease(self.path, publication=self.state_path).acquire()
             return self
         self._fh = open(self.path, "a+b")
         try:
@@ -567,7 +568,7 @@ def try_acquire_active_session(
         lease_id=lease_id, session_id=key, surface=str(surface), state_path=state_path,
         lock_path=lock_path, track_liveness=track_liveness,
     )
-    with _FileLock(lock_path):
+    with _FileLock(lock_path, state_path):
         # A capacity cap could degrade open; exclusivity cannot: "could not
         # prove ownership" must never become "no owner exists".
         loaded = _read_live_entries(
@@ -633,7 +634,7 @@ def release_active_session(lease: ActiveSessionLease) -> None:
     # running under a profile HERMES_HOME override.
     # See #85431.
     state_path, lock_path = _lease_paths(lease)
-    with _FileLock(lock_path):
+    with _FileLock(lock_path, state_path):
         if lease.released:
             return
         loaded = _read_live_entries(
@@ -659,7 +660,7 @@ def transfer_active_session(
         return True
 
     state_path, lock_path = _lease_paths(lease)
-    with _FileLock(lock_path):
+    with _FileLock(lock_path, state_path):
         # release() may have won after the optimistic precheck but before this
         # thread acquired the file lock. Never resurrect a durably removed lease.
         if lease.released:
@@ -722,7 +723,7 @@ def _release_orphaned_leases_in_home(registry_home: Path, live_lease_ids: set[st
     # home — don't take a lock (or create its file) on the idle-reaper tick.
     if not state_path.exists():
         return 0
-    with _FileLock(_lock_path(registry_home)):
+    with _FileLock(_lock_path(registry_home), state_path):
         loaded = _read_live_entries(
             state_path, track_liveness=False,
             warn="Active-session registry is unavailable; skipping orphaned-lease sweep",
@@ -775,7 +776,7 @@ def active_session_registry_snapshot(
     write-back is never lost.
     """
     state_path, lock_path = _lease_paths(registry_home=registry_home)
-    with _FileLock(lock_path):
+    with _FileLock(lock_path, state_path):
         raw_entries = _read_entries(state_path, strict=True)
     entries = _prune_dead(raw_entries, strict=strict)
     if entries != raw_entries:
@@ -785,7 +786,7 @@ def active_session_registry_snapshot(
             for entry in raw_entries
             if str(entry.get("lease_id") or "") not in live_lease_ids
         }
-        with _FileLock(lock_path):
+        with _FileLock(lock_path, state_path):
             current_entries = _read_entries(state_path, strict=True)
             kept_entries = [
                 entry for entry in current_entries
@@ -804,7 +805,7 @@ def active_session_liveness_guard(
     """Hold the registry lock while reporting whether ``session_id`` is leased, so no
     new backend can acquire a lease between the check and the caller's ``end_session``."""
     state_path, lock_path = _lease_paths(registry_home=registry_home)
-    with _FileLock(lock_path):
+    with _FileLock(lock_path, state_path):
         entries = _prune_dead(
             _read_entries(state_path, strict=True), strict=True, target_session_id=session_id,
         )
@@ -828,7 +829,7 @@ def release_active_session_liveness_guard(
         return
 
     state_path, lock_path = _lease_paths(lease)
-    with _FileLock(lock_path):
+    with _FileLock(lock_path, state_path):
         entries = _prune_dead(
             _read_entries(state_path, strict=True), strict=True, target_session_id=session_id,
         )

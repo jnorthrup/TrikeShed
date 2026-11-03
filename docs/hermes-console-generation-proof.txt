@@ -2,7 +2,8 @@ Hermes console generation checkpoint — 2026-11-02
 
 Each successful open constructs a new immutable resource holder: pen, restricted
 port, optional worker, host-effect actor and output/import/worker callback fence.
-Retirement refuses callbacks, closes effect admission, drains admitted work,
+Retirement refuses callbacks and, for the embedded port, first joins the current
+guest crossing before closing effect admission. It drains admitted effects,
 closes guest resources and joins its owning job before replacement. A closed
 worker or port is never reopened. Factory failure also retires its owner.
 Lifecycle and input operations acquire the lifecycle lock before the console
@@ -38,3 +39,152 @@ This is a lifecycle/host-bridge proof with synthetic ModelMux transport, not a
 full donor console/browser or native-worker run. Donor/provider metadata alignment
 is a separate patch; phase-v18 established the earlier donor fallback256000 vs
 host-card131072 boundary in hermes-contained-turn-proof.txt.
+
+2026-11-03 follow-up
+
+The tracked donor gitlink is 2486f52ebd7ecebe432d6de1062125933e706788. The
+native-worker source lock now matches it and the checked-in GraalPy requirements
+hash. This donor differs from the earlier bec8 proof: it removes the inline host
+tool deadline transport and zero-delegate lazy-import changes. The earlier
+restricted-turn proof therefore does not establish those behaviors for this pin.
+
+The embedded console now passes its retained donor session id to HermesCLI on
+reset. `HermesRealCliResetTest` seeded two messages through the donor SQLite store,
+then verified that resume restored both messages and a fresh reset rotated the id
+and history. This is not a donor model-turn test.
+
+An isolated OWN-trust native-worker probe used the real donor CLI, temporary
+HOME and working directory, and a synthetic host ModelMux response. Three turns
+completed: the resumed generation saw the earlier conversation, while the fresh
+generation did not. The registered provider reported the host card's 131072
+context limit before and after resume. The probe required the locally installed
+GraalPy venv; its one-off source was removed and is not a portable regression.
+The portable sleeve tests cover host-owned breadcrumb identity, live catalog
+context lookup and strict buffered-stream options. Test logs from this run were
+retained under /tmp/trikeshed-hermes-*.log on the verification machine.
+
+The restricted in-process CLI remains incomplete: its first real donor turn
+attempted to start `agent.periodic_scheduler` for the durable-turn lease and
+failed because guest threads are forbidden. A host replacement must maintain
+holder-fenced lease renewal and liveness, interrupt failure paths, and join
+admitted host effects before releasing ownership; omitting these timers would
+weaken the donor contract. `onGuestThread` drains only between guest crossings
+and cannot run those callbacks during a turn. `PythonSqlite` serializes calls
+per service, but guest transactions can span calls and SQL callbacks can reenter
+the guest, so a timer cannot safely execute on that connection as-is.
+
+Multiple embedded ports given the same world also mount the same
+`hermes-python` subvolume. Each `UserspaceBtrfs` mount keeps its own live index,
+and each `PythonSqlite` service has its own writer map and check-then-publish
+image boundary; concurrent mounts therefore lack an atomic shared writer
+boundary. A port-only lock acquired after mounting is insufficient. A complete
+solution needs ownership before mount and an isolated candidate/atomic handoff
+that preserves `importInVm`'s replace-after-success behavior, followed by a
+transaction-aware host SQLite renewal API. No partial lock or timer bypass is
+installed by this follow-up.
+
+The ownership failure was reproduced on 2026-11-03 with two embedded ports:
+both opened the same memory world concurrently, and both opened the same durable
+world through real-path and symlink aliases. A pre-mount lease must remain held
+until shutdown is proven, including failed shutdown. The current
+`InProcessIsolate.close()` marks the isolate dead and suppresses failures from
+`context.close(true)` and `engine.close(true)`, so its return does not prove
+that guest work has stopped. Releasing a lease solely on that return can admit
+another writer prematurely. A checked, awaited close boundary and tests for
+incomplete shutdown are therefore prerequisites to the ownership handoff.
+In a bounded real GraalPy probe, a delegate waited on a host completion signal
+while another thread closed its supervisor; `close()` returned before the
+delegate was released. The probe then released and joined both threads. This
+is direct evidence that the current close return is not a drain boundary, not
+just a concern about suppressed exceptions.
+The existing generation worker admits the model and breadcrumb operations,
+but their pen receipts are published by the calling guest thread after that
+work returns. Its drain therefore does not, by itself, join receipt publication.
+Moving the receipt into the worker is not safe with the current blackboard:
+`ConfixBlackboard.put` invokes legacy subscribers synchronously, and a subscriber
+may re-enter the guest while its original thread holds the isolate lock waiting
+for the worker. A complete fix needs a settlement boundary that preserves guest
+thread reentrancy and still joins publication when the caller is interrupted.
+
+Subsequent embedded-console retirement closes guest admission and waits for the
+active crossing while the generation's host-effect channel remains open. It then
+drains that channel and closes the guest and its services. A host-owned CLI
+finalizer runs after the active crossing under the quiescence lock, with its own
+crossing budget; normal reentrant guest callbacks remain on the guest thread.
+Queued crossings recheck admission after obtaining the lock. A failed finalizer
+or resource close leaves the generation owner and its resources retained for
+retry; the console reports failure rather than a completed close. The watchdog's
+forced stop remains separate from this graceful retirement boundary.
+
+The focused JVM `InProcessRetirementTest` and `HermesConsoleGenerationTest`
+passed nine tests, including actual GraalPy crossings blocked in a host delegate,
+post-admission reentry, queued-crossing refusal, a finalizer calling a bounded
+host delegate, a guest crossing that reaches its owned effect after retirement
+starts, and failed finalizer/resource cleanup retry. This addresses the embedded
+console's retirement ordering, not general cancellation of arbitrary delegates,
+the native-worker retirement path, cross-process ownership, shared-VFS mounting,
+or the donor's periodic lease scheduler. The checked boundary deliberately waits
+for an admitted guest crossing; an uncooperative unbounded delegate can delay it.
+The ownership probe imported a minimal `entry` module in each port, expected the
+second import to be refused, and observed both imports succeed; its temporary
+test source was removed. The close probe started `host.call('hold')`, waited for
+the host delegate to enter, called `close()` concurrently, and observed close
+finish before signalling the delegate to return; it too was removed after the
+worker completed. Logs for these local runs are
+`/tmp/trikeshed-workspace-ownership-red.log` and
+`/tmp/trikeshed-hermes-guest-close-probe.log`. Neither probe exercised two
+processes or demonstrated a particular lost write.
+
+Workspace handoff remains unimplemented. The userspace file SPI offers an
+exclusive JVM file lease, but the memory backing has no equivalent. A
+replacement candidate must start from the committed workspace in an isolated
+writable subvolume, and its activation must be durable and atomic while a
+single owner prevents both concurrent mounts and changes to the old workspace
+between capture and handoff. The current VFS fixes its live subvolume at
+construction; the world store provides no logical-subvolume activation. A new
+guest id alone would detach existing workspace and SQLite state. Snapshot names
+must also remain disjoint because mount indexes are independent.
+
+Failed candidate cleanup now retains the guest and its dependencies for retry.
+Sockets and services are not closed until checked guest close succeeds; a later
+import or port close retries the remaining resources. This does not establish a
+workspace lease or solve the shared-mount conflict. Checked Graal shutdown
+itself attempts multiple closes and discards its debugger reference even when
+that close fails, so arbitrary partial Graal cleanup is not proven retryable.
+Port import, quiesce and close now share a per-port transition boundary.
+A transition from its own guest crossing is rejected before acquiring that
+boundary so retirement can join the crossing without a lock inversion. This
+does not establish shared-workspace ownership or prevent a later explicit import
+after close.
+VFS byte channels in one mount now share current file contents, including
+positional writes, append and truncation. Unlink detaches existing handles from
+the path, and host puts update open handles from the same captured bytes that
+were committed. VFS-mediated access to the mount uses one lock; raw
+`btrfsForTools()` callers must exclude concurrent VFS operations. A mount with
+an uncertain manifest publication also refuses reads through open handles.
+Five focused JVM channel tests passed; they do not establish coordination
+between separate mounts or processes.
+`HermesCandidateTest` passed injected guest, socket and file-lease close
+failures, including retained dependencies and retry ordering. These tests do
+not inject failure into Graal's own close operations or prove OS resource close
+after an underlying channel-close failure.
+
+SQLite image publication through one VFS mount now compares the expected image
+and commits its replacement under the mount's file lock. Independent SQLite
+services that raced after reading the same image were tested: one publication
+succeeded and the other refused the stale image. The execution response reports
+the generation after publication. This protects only users of that mount's
+compare-and-publish boundary; separate mounts and raw Btrfs access still need
+the shared workspace ownership and handoff described above.
+
+The active-session registry's VFS publication now holds both its existing lock
+path and a lock for the exact state path. The host refuses publication unless
+the owner has a live lease for that target; a lease for an unrelated path cannot
+authorize it. A failed partial acquisition retains any lock whose cleanup failed
+for owner close and retry. A real Graal guest exercised the current VFS sleeve
+against the JVM lease service, including authorized publication and refusal of
+an unrelated path. A separate Python test exercised the registry's pairing of
+its lock and state paths; source-pin tests confirmed the donor gitlink and
+requirements lock remain unchanged. These tests do not prove full donor CLI
+turns, cross-mount workspace consistency, or coordination with an older host
+that still accepts publication under unrelated leases.

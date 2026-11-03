@@ -459,9 +459,11 @@ object DocumentCurationLegos {
     fun reference(cid: ContentId, record: DocumentCurationRecord): Map<String, Any?> {
         val href = "/api/documents?cid=${cid.value}"
         val sheet = mapOf("sheet" to "document/${cid.value}", "href" to "$href&view=sheet", "pageHref" to sheetHref(cid))
+        val taxonomy = taxonomySelections(record)
         return mapOf(
             "receiptCid" to cid.value,
             "reviewSelections" to DocumentReviewCandidate.selections(record),
+            "taxonomySelections" to taxonomy.first, "taxonomyStatus" to taxonomy.second,
             "record" to mapOf("cid" to cid.value, "href" to href,
                 "originalCid" to record.source.originalCid.value,
                 "extractedTextCid" to record.source.extractedTextCid.value,
@@ -490,9 +492,11 @@ object DocumentCurationLegos {
                     index.facet(DocumentCurationIndexK.DependencyCursor)(ordinal), rootId).toMap())
             }
         }
+        val taxonomy = taxonomySelections(record)
         return mapOf(
             "receiptCid" to cid.value,
             "reviewSelections" to DocumentReviewCandidate.selections(record),
+            "taxonomySelections" to taxonomy.first, "taxonomyStatus" to taxonomy.second,
             "record" to DocumentCuratorCodec.record(record),
             "nlpStatus" to index.facet(DocumentCurationIndexK.NlpStatus).name,
             "nlpAxioms" to nlpAxiomsProjection(record),
@@ -501,6 +505,17 @@ object DocumentCurationLegos {
             "sheet" to root,
             "sheets" to sheets,
         )
+    }
+
+    private fun taxonomySelections(record: DocumentCurationRecord): Pair<List<Map<String, Any?>>, String> {
+        if (!record.source.name.endsWith(".kif", ignoreCase = true)) return emptyList<Map<String, Any?>>() to "not-kif"
+        return try {
+            if (record.source.originalCid != record.source.extractedTextCid ||
+                ContentId.of(record.source.text.encodeToByteArray(throwOnInvalidSequence = true)) != record.source.originalCid)
+                return emptyList<Map<String, Any?>>() to "original-mismatch"
+            val (rows, total) = DocumentTaxonomyCandidate.page(record.source, 0, DocumentTaxonomyCandidate.MAX_SELECTIONS)
+            rows to if (total > DocumentTaxonomyCandidate.MAX_SELECTIONS) "truncated-first-256" else "complete"
+        } catch (failure: IllegalArgumentException) { emptyList<Map<String, Any?>>() to "invalid-or-over-limit" }
     }
 
     /** Source-attributed candidates with the identity of the rule each would become; extraction weights are not parser confidence. */

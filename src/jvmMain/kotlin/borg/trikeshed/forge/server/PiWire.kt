@@ -41,7 +41,7 @@ class PiWire(
     private val owner = CoroutineScope(scope.coroutineContext + supervisor + Dispatchers.IO)
     private val lock = Any()
     private var draining = false
-    private class Session(val id: String, val model: String) {
+    private class Session(val id: String, val model: String, val contextId: String, val existingContext: Boolean) {
         val input = Channel<String>(1)
         lateinit var job: Job
         var state = "starting"
@@ -75,7 +75,7 @@ class PiWire(
                         _m["id" j it.id, "caps" j it.caps.view.toList()]
                     }.orEmpty()])
                 }
-                method == "POST" && endpoint == "/api/pi/session/start" -> start(request(text, _s["model"]))
+                method == "POST" && endpoint == "/api/pi/session/start" -> start(request(text, _s["model", "contextId"], _s["model"]))
                 method == "POST" && endpoint == "/api/pi/session/prompt" -> prompt(request(text, _s["sessionId", "text"]))
                 method == "POST" && endpoint == "/api/pi/session/close" -> close(request(text, _s["sessionId"]))
                 method == "GET" && endpoint == "/api/pi/session/status" -> {
@@ -93,14 +93,19 @@ class PiWire(
 
     private suspend fun start(request: Map<*, *>): JvmKanbanServer.HttpResponse {
         val model = requireNotNull(request["model"] as? String).also { require(it.isNotBlank() && it.length <= 128) }
+        val contextId = (request["contextId"] as? String)?.also { require(it.isNotBlank() && it.length <= 128) }
+        if (request.containsKey("contextId")) require(contextId != null)
         // Explicit platform-catalog selection only; no terminal/session/default-provider lookup.
         val mux = withContext(context.minusKey(Job)) { catalog() } ?: return json(503, _m["error" j "model_catalog_unavailable"])
         require(mux.listModels("chat").view.any { it.id == model }) { "model must be in platform catalog" }
+        if (contextId != null) try { breadcrumbs.transact(contextId, create = false) { } }
+        catch (_: BreadcrumbContextNotFoundException) { return json(404, _m["error" j "unknown_context"]) }
         return synchronized(lock) {
             if (draining || !supervisor.isActive) return@synchronized json(503, _m["error" j "pi_draining"])
             // Bound live and terminal records together; callers can explicitly release closed records by close.
             if (sessions.size >= SESSION_LIMIT) return@synchronized json(409, _m["error" j "session_limit"])
-            val session = Session("pi-" + UUID.randomUUID(), model)
+            val id = "pi-" + UUID.randomUUID()
+            val session = Session(id, model, contextId ?: id, contextId != null)
             sessions[session.id] = session
             session.job = owner.launch { run(session) }
             json(202, snapshot(session))
@@ -139,19 +144,19 @@ class PiWire(
     }
 
     private suspend fun run(session: Session) {
-        val generation = BreadcrumbGeneration(owner, session.id)
+        val generation = BreadcrumbGeneration(owner, session.contextId)
         var port: Port? = null
         var failed = false
         try {
-            breadcrumbs.transact(session.id) { }
+            breadcrumbs.transact(session.contextId, create = !session.existingContext) { }
             synchronized(lock) { session.contextRetained = true }
             port = openPort(session.model, generation)
             synchronized(lock) { if (session.state != "closing") session.state = "ready" }
             for (prompt in session.input) {
                 val turn = synchronized(lock) { session.turn }
                 try {
-                    breadcrumbs.transact(session.id, create = false) {
-                        it.put(BreadcrumbId("pi-input-$turn"), "pi-input", prompt); it.state()
+                    breadcrumbs.transact(session.contextId, create = false) {
+                        it.put(BreadcrumbId("${session.id}-input-$turn"), "pi-input", prompt); it.state()
                     }
                 } catch (failure: Throwable) { throw RetentionFailure(failure) }
                 val result = port.prompt(prompt)
@@ -163,8 +168,8 @@ class PiWire(
                     check(previous == 0 || ContentId.of(jsonOf(messages.take(previous)).encodeToByteArray()).hex == session.retainedPrefixHash)
                     val delta = jsonOf(_m["messages" j messages.drop(previous), "fromMessage" j previous, "buffered" j true])
                     require(delta.length <= PiModelPort.RESPONSE_CHARS) { "Pi turn exceeds retained transcript budget" }
-                    breadcrumbs.transact(session.id, create = false) {
-                        it.put(BreadcrumbId("pi-turn-$turn"), "pi-transcript", delta); it.state()
+                    breadcrumbs.transact(session.contextId, create = false) {
+                        it.put(BreadcrumbId("${session.id}-turn-$turn"), "pi-transcript", delta); it.state()
                     }
                     session.retainedMessages = messages.size
                     session.retainedPrefixHash = ContentId.of(jsonOf(messages).encodeToByteArray()).hex
@@ -210,18 +215,18 @@ class PiWire(
     private class RetentionFailure(cause: Throwable) : IllegalStateException("Pi retention failed", cause)
 
     private fun snapshot(session: Session): Map<String, Any?> = _m[
-        "sessionId" j session.id, "contextId" j session.id, "contextRetained" j session.contextRetained,
+        "sessionId" j session.id, "contextId" j session.contextId, "contextRetained" j session.contextRetained,
         "latestTurnRetained" j session.latestTurnRetained, "persistenceConfigured" j (breadcrumbs.store != null),
         "retention" j "Bounded indexed prompt and new-message evidence; no agent resume or indefinite retention guarantee",
         "workspaceFiles" j workspace?.paths?.toList().orEmpty(),
         "model" j session.model, "state" j session.state, "turnId" j session.turn,
         "result" j session.result, "error" j session.error]
     private fun json(status: Int, value: Map<String, Any?>) = JvmKanbanServer.HttpResponse(status, jsonOf(value))
-    private fun request(text: String, keys: Set<String>): Map<*, *> {
+    private fun request(text: String, keys: Set<String>, required: Set<String> = keys): Map<*, *> {
         val body = text.substringAfter("\r\n\r\n", text.substringAfter("\n\n", text))
         require(body.length <= PiModelPort.PROMPT_CHARS + 4096)
         val value = reifyStrict(body) as? Map<*, *> ?: throw IllegalArgumentException("JSON object required")
-        require(value.keys.all { it is String && it in keys } && value.keys == keys)
+        require(value.keys.all { it is String && it in keys } && value.keys.containsAll(required))
         return value
     }
     private fun headers(text: String): List<String> = text.substringBefore("\r\n\r\n").split("\r\n").drop(1)

@@ -75,6 +75,8 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     BUTTON("button"),
     SLIDER("slider"),
     TEXT_VALUE("text.value"),
+    WORK_SELECT(WorkSelectNode.TYPE),
+    WORK_MODEL(WorkSelectNode.MODEL),
     JSON_VALUE("json.value"),
     DOM_BOARD("dom.board"),
     DOM_EVENTS("dom.events"),

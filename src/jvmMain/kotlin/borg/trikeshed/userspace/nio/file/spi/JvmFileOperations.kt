@@ -39,12 +39,9 @@ class JvmFileOperations : FileOperations, BoundedFileReader {
         try {
             val lock = channel.tryLock() ?: error("Filesystem lease is already held: $path")
             return object : FileLease {
-                private var closed = false
                 override fun close() = synchronized(this) {
-                    if (!closed) {
-                        closed = true
-                        try { lock.release() } finally { channel.close() }
-                    }
+                    if (lock.isValid) lock.release()
+                    if (channel.isOpen) channel.close()
                 }
             }
         } catch (failure: Throwable) {

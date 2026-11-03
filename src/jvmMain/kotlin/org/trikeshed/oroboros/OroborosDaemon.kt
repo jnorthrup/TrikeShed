@@ -209,6 +209,7 @@ object OroborosDaemon {
         val pgPort: Int = DEFAULT_PG_PORT,
         /** Native worker has host filesystem, subprocess and network capabilities. */
         val hermesNativeWorker: Boolean = false,
+        val muxPools: Map<String, borg.trikeshed.agent.modelmux.MuxPool> = emptyMap(),
     )
 
     @Volatile
@@ -231,6 +232,7 @@ object OroborosDaemon {
         val positional = mutableListOf<String>()
         val projects = mutableListOf<String>()
         val modules = mutableListOf<String>()
+        val muxPoolSpecs = mutableListOf<String>()
         var agents: Set<String>? = null
 
         val flags = listOf(
@@ -241,6 +243,7 @@ object OroborosDaemon {
             ForgeCliArgs.Flag(name = "--belief-bag") { _, i -> i + 1 },
             ForgeCliArgs.Flag(name = "--project", withValue = true) { a, i -> projects.add(a[i]); i + 1 },
             ForgeCliArgs.Flag(name = "--module", withValue = true) { a, i -> modules.add(a[i]); i + 1 },
+            ForgeCliArgs.Flag(name = "--mux-pool", withValue = true) { a, i -> muxPoolSpecs.add(a[i]); i + 1 },
             ForgeCliArgs.Flag(name = "--agents", withValue = true) { a, i -> agents = a[i].split(',').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet(); i + 1 },
             ForgeCliArgs.Flag(name = "--interval-ms", withValue = true) { a, i ->
                 val v = a[i].toLongOrNull() ?: die("--interval-ms requires a positive long")
@@ -293,7 +296,31 @@ object OroborosDaemon {
         val agentsResolved = agents
             ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
             ?: borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap, pgPort, hermesNativeWorker)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap, pgPort, hermesNativeWorker, muxPools(muxPoolSpecs))
+    }
+
+    internal fun muxPools(specs: List<String>): Map<String, borg.trikeshed.agent.modelmux.MuxPool> {
+        val bindings = mutableMapOf<String, borg.trikeshed.agent.modelmux.MuxPool>()
+        val capacities = mutableMapOf<String, Int>()
+        for (spec in specs) {
+            val equal = spec.indexOf('=')
+            val separator = spec.indexOf(':', equal + 1)
+            require(equal > 0 && separator > equal + 1) { "--mux-pool requires pool=capacity:binding" }
+            val id = spec.substring(0, equal)
+            val capacity = spec.substring(equal + 1, separator).toIntOrNull()
+            val binding = spec.substring(separator + 1)
+            require(id.isNotBlank() && capacity != null && capacity > 0 &&
+                ((binding.startsWith("key:") && binding.removePrefix("key:").isNotBlank()) ||
+                    (binding.startsWith("endpoint:") && binding.removePrefix("endpoint:").isNotBlank() && !binding.endsWith('/')))) {
+                "--mux-pool requires pool=positive-capacity:key:<id> or pool=positive-capacity:endpoint:<URL without trailing slash>"
+            }
+            val priorCapacity = capacities.put(id, capacity)
+            require(priorCapacity == null || priorCapacity == capacity) { "Conflicting capacities for pool $id" }
+            val pool = borg.trikeshed.agent.modelmux.MuxPool(id, capacity)
+            val prior = bindings.put(binding, pool)
+            require(prior == null || prior == pool) { "Conflicting pools for binding $binding" }
+        }
+        return bindings
     }
 
     /** The native worker is OWN-trust, and cannot uphold the daemon's airgap setting. */
@@ -807,6 +834,7 @@ object OroborosDaemon {
             parentJob = coroutineContext[kotlinx.coroutines.Job],
             keyMux = keyMux,
             modelMuxProvider = { operatorMux.await().invoke() },
+            pools = config.muxPools,
         )
         muxReactor.open()
         // ── CCEK binding: the single control plane for assemblies ────
@@ -2464,9 +2492,9 @@ object OroborosDaemon {
                 runCatching { worktreeWatcher.close() }
                 runCatching { gitWatcher.close() }
                 runCatching { julesWalWatcher.close() }
+                muxReactor.close()
                 try { htxElement.close() } catch (_: Exception) {}
                 try { torrentElement.close() } catch (_: Exception) {}
-                try { muxReactor.close() } catch (_: Exception) {}
                 runCatching { couchStorage.close() }
                 try { nioSupervisor.close() } catch (_: Exception) {}
             }
@@ -3056,8 +3084,10 @@ object OroborosDaemon {
     private fun usage() {
         HostSystem.err(
             """usage: OroborosDaemon [--once | --watch] [--airgap] [--interval-ms N] [--max-slots N] [--kanban-port N] [--pg-port N]
-              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [--hermes-native-worker] [forgeHome] [repoDir]
+              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [--hermes-native-worker] [--mux-pool SPEC] [forgeHome] [repoDir]
               --airgap: disable remote Jev/LLM calls; keep local BERT
+              --mux-pool: repeat pool=capacity:key:<id> or pool=capacity:endpoint:<URL without trailing slash>
+                  Bindings with the same pool share its concurrency cap in this daemon.
               --hermes-native-worker: enable OWN-trust native Hermes worker (not a sandbox; incompatible with --airgap)
               env: JULES_API_KEY (required)
                    HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)

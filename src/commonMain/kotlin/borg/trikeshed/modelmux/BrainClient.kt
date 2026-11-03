@@ -15,6 +15,8 @@ import borg.trikeshed.agent.keymux.KeyMux
 import borg.trikeshed.agent.modelmux.Airgap
 import borg.trikeshed.agent.modelmux.ModelEntry
 import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.RosterEntry
+import borg.trikeshed.agent.modelmux.disambiguateModelIds
 import borg.trikeshed.agent.modelmux.acp.AcpMessage
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.currentCoroutineContext
@@ -98,7 +100,8 @@ open class BrainClient(
                 val p = HarnessRegistry.providers[i]
                 for (j in 0 until p.envVars.size) if (p.envVars[j] == envVar) return p.id
             }
-            return null
+            return envVar.takeIf { it.startsWith("HERMES_CUSTOM_") && it.endsWith("_API_KEY") }
+                ?.removePrefix("HERMES_CUSTOM_")?.removeSuffix("_API_KEY")?.lowercase()?.replace('_', '-')
         }
 
         /**
@@ -213,6 +216,9 @@ open class BrainClient(
         } else 0,
     )
 
+    private fun providerOnly(endpoint: EndpointSpec): Boolean =
+        endpoint.envVar.startsWith("HERMES_CUSTOM_") && endpoint.envVar.endsWith("_API_KEY")
+
     private val endpoints: List<EndpointSpec> = endpointSpecs ?: when {
         apiKey != null -> listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
         // External keyMux: the full roster is admitted (env-present providers
@@ -220,7 +226,12 @@ open class BrainClient(
         this.keyMux != null -> orderEnvFirst(fullRoster())
         else -> discoverEndpoints()
     }
-    private val endpointByModel: Map<String, EndpointSpec> = endpoints.associateBy { it.model }
+    // An externally supplied mux owns its own card IDs; never guess their mapping.
+    private val cardIds: List<String> = if (modelMux == null) disambiguateModelIds(endpoints.map {
+        RosterEntry(it.name, it.model)
+    }) else endpoints.map { it.model }
+    private val endpointIds: Map<EndpointSpec, String> = endpoints.zip(cardIds).toMap()
+    private val endpointByModel: Map<String, EndpointSpec> = cardIds.zip(endpoints).toMap()
 
     /** Internal KeyMux — created when no external one is provided. */
     private val internalKeyMux: KeyMux = this.keyMux ?: buildKeyMux(apiKey, model)
@@ -228,17 +239,18 @@ open class BrainClient(
     /** Internal ModelMux — created when no external one is provided. */
     private val internalModelMux: ModelMux = this.modelMux ?: ModelMux(internalKeyMux) {
         this@BrainClient.quotaLegion?.let { quota(it) }
-        endpoints.forEach { endpoint ->
+        endpoints.forEachIndexed { index, endpoint ->
             model(
-                id = endpoint.model, caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base,
+                id = cardIds[index], caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base,
                 provider = endpoint.provider,
+                providerOnly = providerOnly(endpoint), wireModel = endpoint.model,
                 contextWindow = endpoint.contextWindow,
             )
         }
     }
 
     /** Last model id that answered a chat. */
-    private var lastGoodModelId: String? = endpoints.firstOrNull()?.model
+    private var lastGoodModelId: String? = cardIds.firstOrNull()
 
     /** True if at least one provider endpoint was discovered. */
     open fun hasEndpoints(): Boolean = endpoints.isNotEmpty()
@@ -370,6 +382,28 @@ open class BrainClient(
         }
     }
 
+    /** Execute exactly one authored endpoint/model route with provider, wire model and destination pinned. */
+    open suspend fun chatExact(
+        options: BrainChatOptions,
+        messages: List<Pair<String, String>>,
+        contextId: String? = null,
+    ): Pair<String, String> {
+        require(options.models.size == 1) { "Exact chat requires one endpoint/model route" }
+        val route = options.models[0]
+        require(endpoints.count { it.name == route.a && it.model == route.b } == 1) {
+            "Exact chat requires one unambiguous endpoint/model pair"
+        }
+        val selected = selectEndpoints(options.models)
+        require(selected.size == 1 && (!selected[0].provider.isNullOrBlank() ||
+            internalModelMux.auth(endpointIds.getValue(selected[0])) == borg.trikeshed.agent.keymux.LlmAuth.NONE)) {
+            "Exact chat requires an endpoint-specific provider identity"
+        }
+        Airgap.requireRemote()
+        return withTimeout(outerBudgetMs()) {
+            chatInner(messages, options.maxTokens, options.temperature, contextId, selected, exact = true)
+        }
+    }
+
     /** A single-endpoint lane (the pin / override) retries rate limits with backoff —
      *  its outer budget must cover the ladder; multi-endpoint lanes fail over instead. */
     private fun outerBudgetMs(): Long =
@@ -402,14 +436,15 @@ open class BrainClient(
         temperature: Double,
         contextId: String?,
         selected: List<EndpointSpec>? = null,
+        exact: Boolean = false,
     ): Pair<String, String> {
         var lastError = "all providers exhausted"
-        val routed = internalModelMux.route("conflict-resolve").a
+        val routed = internalModelMux.route(if (exact) "chat" else "conflict-resolve").a
         val modelIds = orderedModelIds(routed)
-        val candidates = selected?.filter { it.model in modelIds } ?: modelIds.mapNotNull(endpointByModel::get)
+        val candidates = selected?.filter { endpointIds[it] in modelIds } ?: modelIds.mapNotNull(endpointByModel::get)
         for (endpoint in candidates) {
             currentCoroutineContext().ensureActive()
-            val modelId = endpoint.model
+            val modelId = endpointIds.getValue(endpoint)
             if (endpoint.name in retiredVerdicts) continue
 
             // Route through ModelMux.chat() — uses HtxKey from coroutine context,
@@ -423,7 +458,10 @@ open class BrainClient(
                         assessmentId = contextId,
                         maxTokens = maxTokens,
                         temperature = temperature,
-                        expectedBaseUrl = if (selected == null) null else endpoint.base,
+                        expectedBaseUrl = if (selected != null || providerOnly(endpoint)) endpoint.base else null,
+                        expectedProvider = if (exact) endpoint.provider else if (providerOnly(endpoint)) requireNotNull(endpoint.provider) else null,
+                        expectedWireModel = if (exact || providerOnly(endpoint)) endpoint.model else null,
+                        expectedKeyless = exact && internalModelMux.auth(modelId) == borg.trikeshed.agent.keymux.LlmAuth.NONE,
                     ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse, not Result<Result<…>>
                 }
             }
@@ -504,6 +542,9 @@ open class BrainClient(
                         maxTokens = maxTokens,
                         temperature = temperature,
                         timeoutMs = timeoutMs,
+                        expectedBaseUrl = if (providerOnly(endpoint)) endpoint.base else null,
+                        expectedProvider = if (providerOnly(endpoint)) requireNotNull(endpoint.provider) else null,
+                        expectedWireModel = if (providerOnly(endpoint)) endpoint.model else null,
                     ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse
                 }
             }
@@ -542,6 +583,7 @@ open class BrainClient(
         } else {
             endpoints.forEach { endpoint ->
                 bind("llm.${endpoint.model}.key", EnvVarSource(endpoint.envVar))
+                if (providerOnly(endpoint)) bind("llm.${requireNotNull(endpoint.provider)}.key", EnvVarSource(endpoint.envVar))
             }
             env()
         }

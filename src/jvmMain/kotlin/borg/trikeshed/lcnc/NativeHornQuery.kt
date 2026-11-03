@@ -63,10 +63,14 @@ class NativeHornProfile(
         }
 
         internal fun boundedRead(files: FileOperations, path: String, limit: Int): ByteArray {
+            val reader = files as? BoundedFileReader
+                ?: throw UnsupportedOperationException("Bounded file reads are unavailable")
             val fd = files.open(path)
             val size = try { files.size(fd) } finally { files.close(fd) }
             require(size in 0..limit.toLong()) { "Native profile file size limit" }
-            return files.readAllBytes(path).also { require(it.size.toLong() == size && it.size <= limit) { "Native profile file changed or exceeds limit" } }
+            return reader.readBounded(path, limit).also {
+                require(it.size.toLong() == size && it.size <= limit) { "Native profile file changed or exceeds limit" }
+            }
         }
         internal fun sha256(files: FileOperations, path: String, limit: Int): String =
             MessageDigest.getInstance("SHA-256").digest(boundedRead(files, path, limit)).joinToString("") { "%02x".format(it) }
@@ -92,13 +96,100 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
             "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
     }
 
+    /** Native positive taxonomy proof over the exact current, separately approved KIF selection. */
+    suspend fun taxonomy(review: CurationReview, cas: CasStore, snapshot: ContentId, revision: Long,
+                         predicate: String, subject: String, obj: String): Map<String, Any?> {
+        val before = ReviewedKifHornPlan.report(review, cas, snapshot, revision, predicate, subject, obj)
+        val result = execute(before, "host-explicit-assertions")
+        val after = ReviewedKifHornPlan.report(review, cas, snapshot, revision, predicate, subject, obj)
+        for (key in s_["readCid", "decisionCid", "approvalCid", "inputCid", "frameId"].view)
+            require(before[key] == after[key]) { "Reviewed KIF changed during native query" }
+        return result + _m[
+            "kind" j "reviewed-kif-native-result/1", "coverage" j "positive-reviewed-selected-snapshot",
+            "snapshotCid" j before["snapshotCid"], "readCid" j before["readCid"],
+            "decisionCid" j before["decisionCid"], "approvalCid" j before["approvalCid"],
+            "asOf" j after["asOf"], "reviewer" j before["reviewer"], "synthetic" j before["synthetic"],
+            "policy" j before["policy"], "sourceEvidence" j before["sourceEvidence"], "hostRules" j before["hostRules"],
+            "selectionCount" j before["selectionCount"], "selectionLimit" j before["selectionLimit"],
+            "authority" j "reviewed-read-only-not-a-sink-permit", "nativeBinarySha256" j profile.binarySha256,
+            "nativeAdapterSha256" j NativeHornProfile.ADAPTER_SHA256, "wallLimitMillis" j profile.timeoutMillis,
+            "outputLimitBytes" j OUTPUT_LIMIT, "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
+    }
+
+    /** Each input remains an independently approved head; the union grants no sink authority. */
+    suspend fun taxonomyUnion(review: CurationReview, cas: CasStore, references: List<CurationTaxonomyRef>,
+                              predicate: String, subject: String, obj: String): Map<String, Any?> {
+        val before = ReviewedKifUnion.report(review, cas, references, predicate, subject, obj)
+        val result = execute(before, "host-explicit-assertions")
+        val after = ReviewedKifUnion.report(review, cas, references, predicate, subject, obj)
+        for (key in s_["reads", "inputCid", "frameId"].view)
+            require(before[key] == after[key]) { "Reviewed KIF changed during native query" }
+        return result + _m["kind" j "reviewed-kif-union-result/1",
+            "coverage" j (if (before["projection"] == "complete-selection") "positive-reviewed-selected-snapshots" else "positive-reviewed-candidate-slice"),
+            "reads" j before["reads"], "asOf" j after["asOf"], "policy" j before["policy"],
+            "sourceEvidence" j before["sourceEvidence"], "hostRules" j before["hostRules"],
+            "selectionCount" j before["selectionCount"], "selectionLimit" j before["selectionLimit"],
+            "reviewedSelectionCount" j before["reviewedSelectionCount"], "projection" j before["projection"],
+            "authority" j "reviewed-read-only-not-a-sink-permit", "nativeBinarySha256" j profile.binarySha256,
+            "nativeAdapterSha256" j NativeHornProfile.ADAPTER_SHA256, "wallLimitMillis" j profile.timeoutMillis,
+            "outputLimitBytes" j OUTPUT_LIMIT, "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
+    }
+
+    /** Compose native-checked proofs of original reviewed facts using the fixed host taxonomy rules. */
+    suspend fun taxonomyChain(review: CurationReview, cas: CasStore, references: List<CurationTaxonomyRef>,
+                              predicate: String, subject: String, obj: String): Map<String, Any?> {
+        return withTimeoutOrNull(profile.timeoutMillis) {
+                val before = ReviewedKifUnion.report(review, cas, references, predicate, subject, obj, search = true)
+                val plan = before["chainPlan"] as? List<*> ?: error("No reviewed path within the chain limit")
+                require(plan.size in 1..ReviewedKifUnion.CHAIN_SEGMENTS) { "Reviewed chain segment limit" }
+                val segments = mutableListOf<Map<String, Any?>>()
+                var next = subject
+                for ((index, raw) in plan.withIndex()) {
+                    val goal = raw as? Map<*, *> ?: error("Invalid reviewed chain segment")
+                    val relation = goal["predicate"] as? String ?: error("Invalid reviewed chain predicate")
+                    val start = goal["subject"] as? String ?: error("Invalid reviewed chain subject")
+                    val end = goal["object"] as? String ?: error("Invalid reviewed chain object")
+                    require(start == next && relation == (if (index == 0) predicate else "subclass")) {
+                        "Reviewed chain does not compose"
+                    }
+                    val input = ReviewedKifUnion.report(review, cas, references, relation, start, end, search = true)
+                    require(input["reads"] == before["reads"] && input["projection"] == "candidate-path" &&
+                        (input["selectionCount"] as Int) in 1..ReviewedKifUnion.CHAIN_SEGMENT_EDGES) {
+                        "Reviewed chain evidence changed"
+                    }
+                    val result = execute(input, "host-explicit-assertions")
+                    require(result["status"] == "SUPPORTED") { "Native chain segment was not proved" }
+                    segments.add(_m["query" j result["query"], "proof" j result["proof"],
+                        "inputCid" j input["inputCid"], "frameId" j input["frameId"],
+                        "sourceEvidence" j input["sourceEvidence"]])
+                    next = end
+                }
+                require(next == obj) { "Reviewed chain target differs" }
+                val after = ReviewedKifUnion.report(review, cas, references, predicate, subject, obj, search = true)
+                for (key in s_["reads", "inputCid", "frameId", "chainPlan"].view)
+                    require(before[key] == after[key]) { "Reviewed KIF changed during native chain query" }
+                _m["kind" j "reviewed-kif-composite-result/1", "status" j "SUPPORTED",
+                    "coverage" j "positive-reviewed-native-segment-composition", "query" j _l[predicate, subject, obj],
+                    "reads" j before["reads"], "asOf" j after["asOf"], "policy" j before["policy"],
+                    "reviewedSelectionCount" j before["reviewedSelectionCount"], "segmentCount" j segments.size,
+                    "proof" j _m["kind" j "reviewed-kif-native-chain/1",
+                        "rule" j (if (predicate == "instance") "instance-inheritance-and-subclass-transitivity" else "subclass-transitivity"),
+                        "segments" j segments], "hostRules" j before["hostRules"],
+                    "authority" j "reviewed-read-only-not-a-sink-permit", "nativeBinarySha256" j profile.binarySha256,
+                    "nativeAdapterSha256" j NativeHornProfile.ADAPTER_SHA256, "wallLimitMillis" j profile.timeoutMillis,
+                    "outputLimitBytes" j OUTPUT_LIMIT, "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
+        } ?: error("Native chain query exceeded its overall wall limit")
+    }
+
     /** Only host-generated exports reach this boundary; internal for actual native fixture verification. */
-    internal suspend fun execute(report: Map<String, Any?>): Map<String, Any?> {
+    internal suspend fun execute(report: Map<String, Any?>, expectedScope: String = "review-record-observations"): Map<String, Any?> {
         val input = (report["inputJson"] as String).encodeToByteArray(throwOnInvalidSequence = true)
         require(input.size <= INPUT_LIMIT) { "Native input exceeds 4MiB" }
         require(ContentId.of(input).value == report["inputCid"]) { "Native input identity differs" }
         val data = reifyMap(input.decodeToString(throwOnInvalidSequence = true))
-        require(data["scope"] == "review-record-observations") { "Native query only accepts reviewed observations" }
+        require(expectedScope in _s["review-record-observations", "host-explicit-assertions"] && data["scope"] == expectedScope) {
+            "Native query scope differs"
+        }
         val files = coroutineContext[FileOperations] ?: error("Native query unavailable: FileOperations capability missing")
         val directory = withContext(NonCancellable + fileIoContext) { files.createTempDir("trikeshed-horn-") }
         val path = files.resolvePath(directory, "input.json")

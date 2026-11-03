@@ -17,10 +17,10 @@ import org.w3c.dom.url.URLSearchParams
 /** Pi is an independent host session; its token never enters storage or a Hermes route. */
 object PiPage {
     private val page = PanelsPage(::pageFailure)
-    private val terminal = XtermTerminal(100, 24)
+    private var terminal = XtermTerminal(100, 24)
     private val grid = TerminalGrid(hermes = true)
     private fun terminalWrite(text: String) {
-        terminal.feed(text.replace("\u001b", "").replace("\r\n", "\n").replace("\n", "\r\n"))
+        terminal.feed(text.replace("\r\n", "\n").replace("\n", "\r\n"))
         val screen = terminal.snapshot(0)
         grid.columns = screen.columns; grid.rows = screen.rows; grid.revision = screen.revision
         grid.cursor = JSON.parse<dynamic>(jsonOf(_m["row" j screen.cursor.row, "column" j screen.cursor.column, "visible" j screen.cursor.visible]))
@@ -66,7 +66,7 @@ object PiPage {
         return value
     }
     private fun append(label: String, text: String, toolResult: String? = null) {
-        terminalWrite("$label\r\n$text\r\n\r\n")
+        terminalWrite("\u001b[0m$label\r\n$text\u001b[0m\r\n\r\n")
         val out = byId("pi-transcript")
         if (out.textContent == "No messages yet.") out.textContent = ""
         val item = window.document.createElement("section")
@@ -76,11 +76,13 @@ object PiPage {
         body.asDynamic().style.cssText = "font:inherit;white-space:pre-wrap;overflow-wrap:anywhere"
         item.appendChild(heading); item.appendChild(body); out.appendChild(item)
     }
-    private fun showResult(result: dynamic, turn: String) {
-        if (result == null || turn.isBlank() || turn == lastResult || !(js("Array").isArray(result.messages) as Boolean)) return
-        lastResult = turn
+    private fun showResult(result: dynamic, session: String, turn: String) {
+        val resultId = "$session:$turn"
+        if (result == null || turn.isBlank() || resultId == lastResult || !(js("Array").isArray(result.messages) as Boolean)) return
+        lastResult = resultId
         byId("pi-transcript").textContent = ""
         terminal.feed("\u001b[2J\u001b[H")
+        terminalWrite("")
         for (message in jsArray(result.messages)) {
             val role = strOrEmpty(message?.role).ifBlank { "Pi" }
             val content = message?.content
@@ -128,7 +130,7 @@ object PiPage {
                     byId("pi-project").hidden = false
                     byId("pi-project").textContent = "Host source grant · " + jsArray(value.workspaceFiles).joinToString(", ") { str(it) }
                 }
-                showResult(value.result, strOrEmpty(value.turnId))
+                showResult(value.result, id, strOrEmpty(value.turnId))
                 val detail = strOrEmpty(value.error?.detail)
                 status("Pi session · " + state + (if (detail.isBlank()) "" else " · " + detail))
                 if (state == "closed") {
@@ -167,6 +169,12 @@ object PiPage {
             })
             page.on(model(), "change", { controls() })
             page.on(prompt(), "input", { remember("draft", prompt().value); controls() })
+            page.on(prompt(), "keydown", { event: dynamic ->
+                if (event.key == "Enter" && event.shiftKey != true && event.isComposing != true) {
+                    event.preventDefault()
+                    if (!button("pi-send").disabled) byId("pi-form").asDynamic().requestSubmit()
+                }
+            })
             page.on(button("pi-refresh"), "click", {
                 val ticket = ++revision; busy = true; verified = false; controls()
                 page.submit {
@@ -195,6 +203,8 @@ object PiPage {
                         if (page.closing || ticket != revision) return@submit
                         val id = strOrEmpty(value.sessionId); require(id.isNotBlank()) { "Pi did not return a session ID" }
                         sessionId = id; state = strOrEmpty(value.state); remember("session", id)
+                        byId("pi-transcript").textContent = "No messages yet."
+                        terminal = XtermTerminal(100, 24); terminalWrite("Pi · xterm-256color\r\n")
                         status("Pi session · " + state); poll(ticket, id)
                     } catch (e: Throwable) { if (!page.closing && ticket == revision) status(e.message ?: "Could not start Pi") }
                     finally { if (!page.closing && ticket == revision) { busy = false; controls() } }

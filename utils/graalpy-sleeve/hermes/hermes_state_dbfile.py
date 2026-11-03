@@ -749,8 +749,26 @@ def quarantine_invalid_state_db(path: Path, *, already_locked: bool = False) -> 
         try:
             path.rename(dest)
         except OSError as exc:
-            logger.error("Failed to quarantine invalid %s: %s", path, exc)
-            return None
+            # The image-backed guest filesystem has no rename operation. Preserve
+            # a zero-byte failed-creation artifact before removing its old name;
+            # nonempty damaged databases still require the normal quarantine.
+            if not _sqlite_image_backend():
+                logger.error("Failed to quarantine invalid %s: %s", path, exc)
+                return None
+            from trikeshed_vfs import ExclusiveLease
+            lease = ExclusiveLease(path)
+            lease.acquire()
+            try:
+                if path.stat().st_size != 0:
+                    logger.error("Failed to quarantine nonempty invalid %s: %s", path, exc)
+                    return None
+                with dest.open("xb"):
+                    pass
+                if dest.stat().st_size != 0:
+                    raise OSError("empty database backup verification failed")
+                path.unlink()
+            finally:
+                lease.release()
         for suffix in ("-wal", "-shm"):
             side = Path(str(path) + suffix)
             if side.exists():

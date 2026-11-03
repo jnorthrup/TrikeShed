@@ -22,6 +22,12 @@ import kotlin.coroutines.CoroutineContext
 import java.io.File
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 
+/** Resolve a listing endpoint without transferring a keyless binding to another URL. */
+fun discoveryEndpoint(provider: borg.trikeshed.agent.keymux.HarnessProvider, configured: String?, keyless: String?): Join<String, Boolean>? {
+    val base = configured?.takeIf { it.isNotBlank() } ?: keyless ?: provider.defaultBaseUrl ?: return null
+    return base j (provider.publicModels || keyless?.trimEnd('/') == base.trimEnd('/'))
+}
+
 /** Session execution is a child of the wire scope; persistence uses the existing CAS gateway. */
 class MuxSessionService(
     private val brain: BrainClient,
@@ -53,11 +59,20 @@ class MuxSessionService(
     private var discovery: Pair<Long, Map<String, Any?>>? = null
 
     /**
-     * provider -> key -> models: every registry provider whose key resolves through the mux's KeyMux, listed by
-     * that provider's own `/models` endpoint under the key. Secrets appear only as length and SHA-256 prefix.
+     * Provider model listings. Credential resolution for the HTTP request happens separately from
+     * the preliminary presence check, so the check cannot establish the request's credential identity.
      */
     private suspend fun discover(mux: ModelMux): Map<String, Any?> = withContext(muxContext) {
-        val roster = mux.listModels("chat").view.mapTo(HashSet()) { (it.providerTag ?: it.a) to it.wireName }
+        val cards = mux.listModels("chat").view.toList()
+        val roster = cards.mapTo(HashSet()) { (it.providerTag ?: it.a) to it.wireName }
+        // A credential-free roster entry is an explicit endpoint binding, including
+        // local GGUF servers. Do not infer that another endpoint for the same
+        // provider is also credential-free.
+        val keyless = cards.filter { mux.auth(it.a) == borg.trikeshed.agent.keymux.LlmAuth.NONE }
+            .mapNotNull { card -> mux.configuredBaseUrl(card.a)?.let { (card.providerTag ?: card.a) j it } }
+            .groupBy({ it.a }, { it.b.trimEnd('/') })
+            .mapNotNull { (provider, bases) -> bases.distinct().singleOrNull()?.let { provider j it } }
+            .associate { it.a to it.b }
         val hermes = borg.trikeshed.agent.keymux.HermesCredentialSource(borg.trikeshed.agent.keymux.defaultHermesHome(), JvmFileOperations())
         val hermesProviders = hermes.providers()
         val configured = hermes.configuredModels()
@@ -65,19 +80,22 @@ class MuxSessionService(
             borg.trikeshed.hermes.HermesModelUsage.ledgerRows().toSeries())
         val probes = Semaphore(4)
         val providerCatalog = (borg.trikeshed.agent.keymux.HarnessRegistry.providers.view.toList() +
-            hermesProviders.view.map { borg.trikeshed.agent.keymux.HarnessProvider(it.provider, emptySeriesOf(), it.baseUrl) }).distinctBy { it.id }
+            hermesProviders.view.map { borg.trikeshed.agent.keymux.HarnessProvider(it.provider, emptySeriesOf(), it.baseUrl) } +
+            keyless.map { (provider, base) -> borg.trikeshed.agent.keymux.HarnessProvider(provider, emptySeriesOf(), base) }).distinctBy { it.id }
         val providers = providerCatalog.map { provider ->
             async {
                 probes.withPermit {
-                    val key = runCatching { mux.keyMux.getWithSource("llm.${provider.id}.key") }.getOrNull()
-                    val secret = key?.a?.takeIf { it.isNotBlank() } ?: return@withPermit null
-                    val base = runCatching { mux.keyMux.get("llm.${provider.id}.base_url") }.getOrNull()
-                        ?: provider.defaultBaseUrl ?: return@withPermit null
+                    val secret = runCatching { mux.keyMux.get("llm.${provider.id}.key") }.getOrNull()?.takeIf { it.isNotBlank() }
+                    val endpoint = discoveryEndpoint(provider,
+                        runCatching { mux.keyMux.get("llm.${provider.id}.base_url") }.getOrNull(), keyless[provider.id])
+                        ?: return@withPermit null
+                    val (base, publicModels) = endpoint
+                    if (secret == null && !publicModels) return@withPermit null
                     borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(base)
-                    val found = withTimeoutOrNull(20_000) { ModelDiscovery.discover(provider.id, base, mux.keyMux) }
+                    val found = withTimeoutOrNull(20_000) { ModelDiscovery.discover(provider.id, base, mux.keyMux,
+                        if (publicModels) borg.trikeshed.agent.keymux.LlmAuth.NONE else borg.trikeshed.agent.keymux.LlmAuth.REQUIRED) }
                         ?: Result.failure(IllegalStateException("Model listing timed out"))
-                    mapOf("provider" to provider.id, "base" to base, "keySource" to key.b,
-                        "key" to "len=${secret.length} sha256=${ContentId.of(secret.encodeToByteArray()).hex.take(8)}",
+                    mapOf("provider" to provider.id, "base" to base, "publicModels" to publicModels,
                         "error" to found.exceptionOrNull()?.message,
                         "models" to found.getOrNull()?.view?.map {
                             mapOf("id" to it.modelId, "contextWindow" to it.contextWindow, "freeTier" to it.freeTier,

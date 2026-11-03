@@ -3,11 +3,15 @@ package borg.trikeshed.hermes
 import borg.trikeshed.agent.keymux.*
 import borg.trikeshed.agent.modelmux.*
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.subvm.*
 import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.*
 import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.*
 
@@ -65,6 +69,86 @@ class HermesConsoleGenerationTest {
         assertTrue(assertNotNull(owner).isCompleted)
         assertTrue(parent.children.none())
         parent.cancel()
+    }
+
+    @Test fun failedRetirementKeepsItsOwnerUntilCleanupCanBeRetried() {
+        val parent = SupervisorJob()
+        var attempts = 0
+        val generation = HermesConsoleGeneration(EmptyCoroutineContext, parent) {
+            Port({}, { if (++attempts == 1) error("cleanup failed") })
+        }
+        try {
+            assertFailsWith<IllegalStateException> { generation.close() }
+            assertFalse(generation.scope.coroutineContext[Job]!!.isCompleted)
+            assertFalse(generation.resource.closed)
+            assertNull(generation.callback { true })
+            generation.close()
+            assertTrue(generation.resource.closed)
+            assertTrue(generation.scope.coroutineContext[Job]!!.isCompleted)
+            assertEquals(2, attempts)
+        } finally { generation.close(); parent.cancel() }
+    }
+
+    @Test fun admittedGuestCanReachOwnedEffectAfterRetirementBegins() = runBlocking<Unit>(Dispatchers.IO) {
+        val parent = SupervisorJob()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val generation = HermesConsoleGeneration(EmptyCoroutineContext, parent) { owner ->
+            InProcessIsolate("retiring-generation", VmFacet.GRAAL_PYTHON, Budget(statements = 0, wallMillis = 0)).also { guest ->
+                guest.delegate("gate") {
+                    entered.countDown()
+                    release.await()
+                    Teleported.Null
+                }
+                guest.delegate("effect") {
+                    runBlocking { owner.crossings.execute { Teleported.Str("owned") } }
+                }
+            }
+        }
+        val guest = generation.resource
+        val crossing = async { guest.eval("host.call('gate')\nhost.call('effect')", "retiring-generation.py") }
+        try {
+            assertTrue(withContext(Dispatchers.IO) { entered.await(20, TimeUnit.SECONDS) })
+            val retirement = async {
+                generation.retire(quiesceResource = { it.quiesce() }, closeResource = { it.closeAndAwait() })
+            }
+            withTimeout(20_000) { while (guest.isAlive) yield() }
+            assertFalse(retirement.isCompleted)
+            release.countDown()
+            assertEquals(Teleported.Str("owned"), withTimeout(20_000) { crossing.await() })
+            withTimeout(20_000) { retirement.await() }
+            assertTrue(generation.scope.coroutineContext[Job]!!.isCompleted)
+        } finally {
+            release.countDown()
+            generation.close()
+            parent.cancel()
+        }
+    }
+
+    @Test fun failedGuestFinalizerRetainsTheEffectOwnerForRetry() {
+        val parent = SupervisorJob()
+        var attempts = 0
+        val generation = HermesConsoleGeneration(EmptyCoroutineContext, parent) { owner ->
+            InProcessIsolate("finalizer-retry", VmFacet.GRAAL_PYTHON, Budget(statements = 0, wallMillis = 0)).also { guest ->
+                guest.delegate("finish") {
+                    if (++attempts == 1) error("finalizer failed")
+                    runBlocking { owner.crossings.execute { Teleported.Str("finished") } }
+                }
+            }
+        }
+        val guest = generation.resource
+        fun retire() = generation.retire(quiesceResource = {
+            it.quiesce { assertEquals(Teleported.Str("finished"), it.eval("host.call('finish')", "finalizer.py")) }
+        }, closeResource = { it.closeAndAwait() })
+        try {
+            assertFails { retire() }
+            assertFalse(guest.isAlive)
+            assertFalse(generation.scope.coroutineContext[Job]!!.isCompleted)
+            assertNull(generation.callback { true })
+            retire()
+            assertEquals(2, attempts)
+            assertTrue(generation.scope.coroutineContext[Job]!!.isCompleted)
+        } finally { generation.close(); parent.cancel() }
     }
 
     private fun fixture(memory: Boolean, verify: suspend (HermesVmConsole, MutableList<HermesPythonPort>, MutableList<String>, ConfixBlackboard, BreadcrumbElement) -> Unit) = runBlocking<Unit>(Dispatchers.IO) {

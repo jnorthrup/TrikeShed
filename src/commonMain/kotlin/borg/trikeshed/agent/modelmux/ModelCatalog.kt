@@ -51,7 +51,7 @@ class ModelCatalog(val entries: Series<borg.trikeshed.agent.modelmux.ModelCatalo
                     2 -> entry.freeTier j { freeTierMeta }
                     3 -> entry.quotaRemaining j { quotaMeta }
                     4 -> entry.latencyEstimateMs j { latencyMeta }
-                    5 -> (entry.pricePerMillionPromptTokens ?: 0.0) j { priceMeta }
+                    5 -> entry.pricePerMillionPromptTokens j { priceMeta }
                     6 -> entry.affinityScore j { affinityMeta }
                     else -> error("Invalid column index: $colIdx")
                 }

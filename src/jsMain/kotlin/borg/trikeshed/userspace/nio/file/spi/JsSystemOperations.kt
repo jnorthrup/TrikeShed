@@ -6,8 +6,10 @@ import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 
 class JsSystemOperations : SystemOperations {
 
-    override fun getenv(name: String, defaultVal: String?): String? =
-        (processObj.env[name] as? String) ?: defaultVal
+    override fun getenv(name: String, defaultVal: String?): String? {
+        val process = processObj
+        return if (process == null || process.env == null) defaultVal else (process.env[name] as? String) ?: defaultVal
+    }
 
     override fun getProperty(name: String, defaultVal: String?): String? = defaultVal
 

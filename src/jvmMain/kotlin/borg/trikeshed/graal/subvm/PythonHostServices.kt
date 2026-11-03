@@ -8,10 +8,9 @@ import borg.trikeshed.vm.Teleported
 
 /** Application-independent Python effects, owned and closed beside one Graal VM. */
 class PythonHostServices(val guest: GraalBtrfsSupervisor, world: BtrfsWorldStore) : AutoCloseable {
-    val leases = PythonFileLeases(world.fileOpsFor(guest.id), "${world.root}/leases/${guest.id}", guest::put, { guest.isAlive })
     val sqlite = PythonSqlite(
         readImage = guest.vfs::fetch,
-        writeImage = guest::put,
+        writeImage = guest.vfs::putIf,
         callFunction = { function, arguments ->
             val result = guest.call("__trikeshed_sqlite_function", Teleported.Str(function),
                 Teleported.Str(jsonOf(arguments.map(PythonSqlite::encode))))
@@ -19,6 +18,8 @@ class PythonHostServices(val guest: GraalBtrfsSupervisor, world: BtrfsWorldStore
             PythonSqlite.decode(reify(encoded))
         },
     )
+    // Register the lease owner last, after the other service has been constructed.
+    val leases = PythonFileLeases(world.fileOpsFor(guest.id), "${world.root}/leases/${guest.id}", guest::put)
 
     fun install() {
         guest.delegate("vfs_lease", leases::call)
@@ -57,6 +58,11 @@ class PythonHostServices(val guest: GraalBtrfsSupervisor, world: BtrfsWorldStore
     }
 
     override fun close() {
-        try { sqlite.close() } finally { leases.close() }
+        var failure: Throwable? = null
+        try { sqlite.close() } catch (caught: Throwable) { failure = caught }
+        try { leases.close() } catch (caught: Throwable) {
+            if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
+        }
+        failure?.let { throw it }
     }
 }

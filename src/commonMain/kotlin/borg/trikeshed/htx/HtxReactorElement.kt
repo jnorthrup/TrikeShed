@@ -32,8 +32,15 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
-typealias HtxDispatch = Join<Join<HtxExchangeState, HtxRequest>, CompletableDeferred<HtxExchangeResult>>
+private class HtxDispatch(
+    val state: HtxExchangeState,
+    val request: HtxRequest,
+    val completion: CompletableDeferred<HtxExchangeResult>,
+    val observer: HtxResponseObserver?,
+    val context: CoroutineContext,
+)
 
 class HtxReactorElement(
     private val channelOperations: ChannelOperations,
@@ -48,7 +55,7 @@ class HtxReactorElement(
     val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private val requests = Channel<HtxDispatch>(16, onUndeliveredElement = { dispatch ->
-        dispatch.b.completeExceptionally(CancellationException("HTX exchange was not dispatched"))
+        dispatch.completion.completeExceptionally(CancellationException("HTX exchange was not dispatched"))
     })
     private var worker: Job? = null
 
@@ -59,13 +66,19 @@ class HtxReactorElement(
                 // a slow upstream never holds the requests queued behind it past their callers' deadlines.
                 for (dispatch in requests) launch {
                     try {
-                        dispatch.b.complete(exchangeRequest(dispatch.a.a, dispatch.a.b))
+                        val result = exchangeRequest(dispatch.state, dispatch.request)
+                        if (dispatch.observer != null && result.a.response != null) {
+                            withContext(dispatch.context.minusKey(Job) + NonCancellable) {
+                                dispatch.observer.accept(result.a.response!!)
+                            }
+                        }
+                        dispatch.completion.complete(result)
                     } catch (failure: Throwable) {
-                        dispatch.b.completeExceptionally(failure)
+                        dispatch.completion.completeExceptionally(failure)
                     }
                 }.invokeOnCompletion { failure ->
                     // Cancellation can prevent the child body (including its catch) from starting.
-                    if (failure != null) dispatch.b.completeExceptionally(failure)
+                    if (failure != null) dispatch.completion.completeExceptionally(failure)
                 }
             }.also { job ->
                 job.invokeOnCompletion { failure ->
@@ -83,7 +96,20 @@ class HtxReactorElement(
     ): HtxExchangeResult {
         check(worker != null && !requests.isClosedForSend) { "HTX reactor is not accepting exchanges" }
         val completion = CompletableDeferred<HtxExchangeResult>()
-        requests.send((state j request) j completion)
+        val context = currentCoroutineContext()
+        val dispatch = HtxDispatch(state, request, completion, context[HtxResponseObserver], context)
+        try {
+            requests.send(dispatch)
+        } catch (cancelled: CancellationException) {
+            // A canceled suspended send may already have delivered the exchange.
+            // The undelivered callback settles the other case.
+            withContext(NonCancellable) {
+                try { completion.await() } catch (failure: Throwable) {
+                    if (failure !== cancelled) cancelled.addSuppressed(failure)
+                }
+            }
+            throw cancelled
+        }
         val result = withContext(NonCancellable) { completion.await() }
         currentCoroutineContext().ensureActive()
         return result

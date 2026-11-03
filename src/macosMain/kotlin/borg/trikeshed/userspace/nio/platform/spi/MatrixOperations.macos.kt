@@ -9,15 +9,20 @@ import platform.posix.size_tVar
 
 /**
  * Float32 GEMM on the MLX GPU stream through mlx-c; tier 1 of docs/mlx-tensor-core.md.
- * The three limits are the process-wide MLX budget, so that a run which outgrows it fails inside MLX instead of
- * paging other processes out: [memoryLimit] bounds all device allocations, [cacheLimit] the freed buffers MLX keeps for
- * reuse, [wiredLimit] the memory kept resident (weights are wired and cannot be swapped out).
+ * The three settings are process-wide MLX controls, applied whenever a session opens. MLX documents [memoryLimit]
+ * as a graph-evaluation guideline rather than a hard allocation or host-memory bound; [cacheLimit] controls its free
+ * buffer cache and [wiredLimit] controls how much memory MLX keeps resident. Other sessions may change these settings.
+ * The default mlx-c error handler terminates the process; checking a returned status does not by itself prevent that.
  */
 class MlxMatrixOperations(
     val memoryLimit: Long = 8L shl 30,
     val cacheLimit: Long = 512L shl 20,
     val wiredLimit: Long = 4L shl 30,
 ) : MatrixOperations {
+    init {
+        require(memoryLimit >= 0 && cacheLimit >= 0 && wiredLimit >= 0) { "MLX limits must be nonnegative" }
+    }
+
     override fun open(): MlxMatrixSession {
         memScoped {
             val previous = alloc<size_tVar>()
@@ -62,27 +67,49 @@ class MlxMatrixOperations(
  * the algebra; the graph is evaluated when a cell is first read. Float32, BFloat16 and Float16 arrays read as Float;
  * packed integer arrays (quantized weights) have no scalar cells and refuse to be read. The session owns the handle.
  */
+internal class MlxAllocation(internal var value: CValue<mlx_array_>?)
+
 class MlxTensor internal constructor(
     private val session: MlxMatrixSession,
-    internal val handle: CValue<mlx_array_>,
+    handle: CValue<mlx_array_>,
     shape: Tensor,
 ) : JevaWeight {
+    internal val allocation = session.allocation(handle)
+    internal val handle: CValue<mlx_array_> get() = checkNotNull(allocation.value) { "MLX tensor has been released" }
     override val a: Tensor = IntArray(shape.size) { shape[it] }.toSeries()
     override val size: Int = tensorSize(a)
-    override val b: (Tensor) -> Float = { index -> cells()[tensorOffset(a, index)] }
+    override val b: (Tensor) -> Float = { index ->
+        cells()[tensorOffset(a, index)].also { session.checkReaders() }
+    }
 
-    private val host: CPointer<FloatVar> by lazy { session.floats(handle) }
+    private var host: Join<MlxAllocation, CPointer<FloatVar>>? = null
 
-    private fun cells(): CPointer<FloatVar> { session.gpu(); return host }
+    private fun cells(): CPointer<FloatVar> {
+        session.gpu()
+        val value = handle
+        val retained = host
+        if (retained != null && retained.a.value != null) return retained.b
+        return session.floats(value).also { host = it }.b
+    }
 
     override fun read(offset: Int, dst: FloatArray, start: Int, length: Int, check: () -> Unit) {
         require(offset >= 0 && offset <= size && length >= 0 && length <= size - offset) { "MLX range exceeds tensor" }
         require(start >= 0 && start <= dst.size && length <= dst.size - start) { "MLX range exceeds destination" }
         check()
-        if (length == 0) return
+        if (length == 0) {
+            session.gpu()
+            checkNotNull(allocation.value) { "MLX tensor has been released" }
+            return
+        }
         val source = cells()
-        dst.usePinned { memcpy(it.addressOf(start), source + offset.toLong(), length.toULong() * 4u) }
-        check()
+        try {
+            dst.usePinned { memcpy(it.addressOf(start), source + offset.toLong(), length.toULong() * 4u) }
+            session.checkReaders()
+            check()
+        } catch (failure: Throwable) {
+            dst.fill(0f, start, start + length)
+            throw failure
+        }
     }
 }
 
@@ -91,14 +118,40 @@ class MlxMatrixSession internal constructor(
     private var stream: CValue<mlx_stream_>?,
     override val identity: String,
 ) : MatrixSession {
-    private val owned = ArrayList<CValue<mlx_array_>>()
+    private val owned = ArrayList<MlxAllocation>()
+    private val readers = ArrayList<Join<CValue<mlx_io_reader_>, MlxVerifiedReader>>()
+    val fileIdentity: String get() { checkReaders(); return readers.single().b.identity }
+    internal fun checkReaders() { for ((_, reader) in readers) reader.check() }
 
-    internal fun gpu(): CValue<mlx_stream_> = checkNotNull(stream) { "Matrix session is closed" }
+    internal fun gpu(): CValue<mlx_stream_> {
+        checkReaders()
+        return checkNotNull(stream) { "Matrix session is closed" }
+    }
 
-    private fun own(handle: CValue<mlx_array_>): CValue<mlx_array_> = handle.also { owned += it }
+    private fun own(handle: CValue<mlx_array_>): CValue<mlx_array_> = handle.also { owned += MlxAllocation(it) }
+
+    /** The latest owned result is the handle returned by the immediately preceding MLX call. */
+    internal fun allocation(handle: CValue<mlx_array_>): MlxAllocation {
+        val record = checkNotNull(owned.lastOrNull()) { "MLX array is not owned by this session" }
+        check(record.value?.useContents { ctx } == handle.useContents { ctx }) { "MLX array is not the latest owned result" }
+        return record
+    }
+
+    private fun free(record: MlxAllocation) {
+        val handle = checkNotNull(record.value) { "MLX array has already been released" }
+        record.value = null
+        mlx_array_free(handle)
+    }
 
     /** Position in the owned handles; pair with [settle]. */
-    fun mark(): Int = owned.size
+    fun mark(): Int { gpu(); return owned.size }
+
+    /** Release an evaluated tensor once no subsequent graph needs it. */
+    internal fun release(tensor: MlxTensor) {
+        val index = owned.indexOfLast { it === tensor.allocation }
+        check(index >= 0) { "Tensor is not owned by this session" }
+        free(owned.removeAt(index))
+    }
 
     /**
      * Ends the lazy graph here: evaluates [keep], then frees every handle made since [mark] that is not one of them.
@@ -106,21 +159,28 @@ class MlxMatrixSession internal constructor(
      * since [mark] other than [keep] must not be used afterwards.
      */
     fun settle(mark: Int, vararg keep: MlxTensor) {
-        for (tensor in keep) MlxMatrixOperations.status(mlx_array_eval(tensor.handle), "eval")
-        val kept = keep.map { tensor -> tensor.handle.useContents { ctx } }
-        val survivors = ArrayList<CValue<mlx_array_>>()
+        gpu()
+        require(mark in 0..owned.size) { "Invalid MLX allocation mark" }
+        for (tensor in keep) {
+            require(owned.any { it === tensor.allocation }) { "Tensor is not owned by this session" }
+            MlxMatrixOperations.status(mlx_array_eval(tensor.handle), "eval")
+            checkReaders()
+        }
+        val kept = keep.map { tensor -> tensor.allocation }
+        val survivors = ArrayList<MlxAllocation>()
         while (owned.size > mark) {
-            val handle = owned.removeAt(owned.lastIndex)
-            if (kept.contains(handle.useContents { ctx })) survivors += handle else mlx_array_free(handle)
+            val allocation = owned.removeAt(owned.lastIndex)
+            if (kept.any { it === allocation }) survivors += allocation else free(allocation)
         }
         owned.addAll(survivors.reversed())
     }
 
     /** Handles made inside [block] are freed when it returns; the result must be copied out of the device before then. */
     fun <R> scoped(block: () -> R): R {
+        gpu()
         val mark = owned.size
         try { return block() } finally {
-            while (owned.size > mark) mlx_array_free(owned.removeAt(owned.lastIndex))
+            while (owned.size > mark) free(owned.removeAt(owned.lastIndex))
         }
     }
 
@@ -137,7 +197,7 @@ class MlxMatrixSession internal constructor(
     }
 
     /** Float32 cells of any float array, row-contiguous and evaluated. */
-    internal fun floats(handle: CValue<mlx_array_>): CPointer<FloatVar> {
+    internal fun floats(handle: CValue<mlx_array_>): Join<MlxAllocation, CPointer<FloatVar>> {
         val stream = gpu()
         val kind = mlx_array_dtype(handle)
         require(kind == mlx_dtype.MLX_FLOAT32 || kind == mlx_dtype.MLX_BFLOAT16 || kind == mlx_dtype.MLX_FLOAT16) {
@@ -146,26 +206,41 @@ class MlxMatrixSession internal constructor(
         val wide = if (kind == mlx_dtype.MLX_FLOAT32) handle
             else make("astype") { mlx_astype(it, handle, mlx_dtype.MLX_FLOAT32, stream) }
         val dense = make("contiguous") { mlx_contiguous(it, wide, false, stream) }
+        val allocation = allocation(dense)
         MlxMatrixOperations.status(mlx_array_eval(dense), "eval")
-        return checkNotNull(mlx_array_data_float32(dense)) { "mlx-c returned no data" }
+        checkReaders()
+        val data = checkNotNull(mlx_array_data_float32(dense)) { "mlx-c returned no data" }
+        checkReaders()
+        return allocation j data
     }
 
     /** Copy host cells to the device; the result is owned by this session. */
     fun tensor(values: FloatArray, shape: Tensor): MlxTensor {
-        require(tensorSize(shape) == values.size) { "Tensor storage differs from its shape" }
+        gpu()
+        // A shape is an index oracle; capture it once before validating and
+        // crossing the native boundary so it cannot change the admitted span.
+        val captured = IntArray(shape.size) { shape[it] }.toSeries()
+        require(tensorSize(captured) == values.size) { "Tensor storage differs from its shape" }
         val handle = memScoped {
-            val extents = allocArray<IntVar>(shape.size).also { for (i in 0 until shape.size) it[i] = shape[i] }
-            values.usePinned { mlx_array_new_data(it.addressOf(0), extents, shape.size, mlx_dtype.MLX_FLOAT32) }
+            val extents = allocArray<IntVar>(captured.size).also { for (i in 0 until captured.size) it[i] = captured[i] }
+            values.usePinned { mlx_array_new_data(it.addressOf(0), extents, captured.size, mlx_dtype.MLX_FLOAT32) }
         }
-        return MlxTensor(this, own(handle), shape)
+        return MlxTensor(this, own(handle), captured)
     }
 
     /**
-     * Named tensors of one safetensors file, read by MLX itself on first evaluation. This bypasses the NIO file facade;
-     * whether that stays is the open decision in docs/mlx-tensor-core.md section 5.
+     * Named tensors of one safetensors file. Lazy MLX reads are verified against the admitted block manifest.
      */
-    fun load(path: String, vararg names: String): List<MlxTensor> {
+    fun load(path: String, vararg names: String, check: () -> Unit = {}): List<MlxTensor> {
         gpu()
+        check()
+        val verified = MlxVerifiedReader(path, check)
+        try { verified.header(names, check) } catch (error: Throwable) {
+            try { verified.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
+            throw error
+        }
+        val input = verified.handle()
+        readers += input j verified
         // Load::eval_gpu is not implemented in MLX; the file read runs on a CPU stream, consumers run on the GPU stream.
         val reader = mlx_default_cpu_stream_new()
         return memScoped {
@@ -174,8 +249,11 @@ class MlxMatrixSession internal constructor(
             val metadata = alloc<mlx_map_string_to_string_>()
             mlx_map_string_to_string_new().place(metadata.ptr)
             try {
-                MlxMatrixOperations.status(mlx_load_safetensors(tensors.ptr, metadata.ptr, path, reader), "load")
+                MlxMatrixOperations.status(mlx_load_safetensors_reader(tensors.ptr, metadata.ptr, input, reader), "load")
+                verified.check()
+                check()
                 names.map { name ->
+                    check()
                     val handle = make("get $name") { mlx_map_string_to_array_get(it, tensors.readValue(), name) }
                     MlxTensor(this@MlxMatrixSession, handle, shapeOf(handle))
                 }
@@ -187,16 +265,52 @@ class MlxMatrixSession internal constructor(
         }
     }
 
+    /** Complete verified CPU reads before a GPU graph can wait on the file reader. */
+    fun materialize(tensors: Iterable<MlxTensor>, check: () -> Unit = {}) {
+        gpu()
+        for (tensor in tensors) {
+            check()
+            MlxMatrixOperations.status(mlx_array_eval(tensor.handle), "eval weight")
+            checkReaders()
+            check()
+        }
+    }
+
     /** input [rows, in] against a packed weight [out, in * bits / 32] with its scales and biases: [rows, out]. */
     fun quantizedLinear(input: MlxTensor, weight: MlxTensor, scales: MlxTensor, biases: MlxTensor,
                         groupSize: Int, bits: Int): MlxTensor {
+        val width = quantizedWidth(weight, scales, biases, groupSize, bits)
+        require(input.a.size > 0 && input.a[input.a.size - 1] == width) { "Quantized input width differs from weight" }
         val stream = gpu()
         val group = cValue<mlx_optional_int_> { value = groupSize; has_value = true }
-        val width = cValue<mlx_optional_int_> { value = bits; has_value = true }
+        val bitWidth = cValue<mlx_optional_int_> { value = bits; has_value = true }
         val handle = make("quantized_matmul") {
-            mlx_quantized_matmul(it, input.handle, weight.handle, scales.handle, biases.handle, true, group, width, "affine", stream)
+            mlx_quantized_matmul(it, input.handle, weight.handle, scales.handle, biases.handle, true, group, bitWidth, "affine", stream)
         }
         return MlxTensor(this, handle, shapeOf(handle))
+    }
+
+    /** Check the affine packed layout before entering mlx-c, whose default handler can terminate the process. */
+    internal fun quantizedWidth(weight: MlxTensor, scales: MlxTensor, biases: MlxTensor,
+                                groupSize: Int, bits: Int): Int {
+        require(mlxAffine(groupSize, bits)) { "Unsupported affine quantization" }
+        require(weight.a.size == 2 && scales.a.size == 2 && biases.a.size == 2 &&
+            weight.a[0] > 0 && weight.a[1] > 0 && scales.a[1] > 0 &&
+            scales.a[0] == weight.a[0] && biases.a[0] == scales.a[0] && biases.a[1] == scales.a[1]) {
+            "Invalid quantized weight, scale or bias shape"
+        }
+        val width = scales.a[1].toLong() * groupSize
+        require(width <= Int.MAX_VALUE && width * bits == weight.a[1].toLong() * 32L) {
+            "Quantized packed width differs from scales"
+        }
+        require(mlx_array_dtype(weight.handle) == mlx_dtype.MLX_UINT32) { "Quantized weight must be uint32" }
+        require(floating(scales) && floating(biases)) { "Quantized scales and biases must be floating point" }
+        return width.toInt()
+    }
+
+    internal fun floating(tensor: MlxTensor): Boolean = when (mlx_array_dtype(tensor.handle)) {
+        mlx_dtype.MLX_FLOAT32, mlx_dtype.MLX_FLOAT16, mlx_dtype.MLX_BFLOAT16 -> true
+        else -> false
     }
 
     private fun derived(name: String, call: (CPointer<mlx_array_>) -> Int): MlxTensor {
@@ -213,6 +327,8 @@ class MlxMatrixSession internal constructor(
     /** Rows of a quantized embedding table named by token ids, dequantized to Float32: [tokens, width]. */
     fun embed(tokens: IntArray, weight: MlxTensor, scales: MlxTensor, biases: MlxTensor, groupSize: Int, bits: Int): MlxTensor {
         require(tokens.isNotEmpty()) { "No tokens" }
+        quantizedWidth(weight, scales, biases, groupSize, bits)
+        require(tokens.all { it in 0 until weight.a[0] }) { "Embedding token outside vocabulary" }
         val stream = gpu()
         val ids = own(memScoped {
             val extent = allocArray<IntVar>(1).also { it[0] = tokens.size }
@@ -235,7 +351,10 @@ class MlxMatrixSession internal constructor(
         return derived("matmul") { mlx_matmul(it, input.handle, transposed, stream) }
     }
 
-    fun zeros(vararg extents: Int): MlxTensor = tensor(FloatArray(tensorSize(extents.toSeries())), extents.toSeries())
+    fun zeros(vararg extents: Int): MlxTensor {
+        gpu()
+        return tensor(FloatArray(tensorSize(extents.toSeries())), extents.toSeries())
+    }
 
     private fun binary(name: String, left: MlxTensor, right: MlxTensor,
                        op: (CPointer<mlx_array_>, CValue<mlx_array_>, CValue<mlx_array_>, CValue<mlx_stream_>) -> Int): MlxTensor {
@@ -404,19 +523,29 @@ class MlxMatrixSession internal constructor(
                 MlxMatrixOperations.status(mlx_matmul(product.ptr, left, right, gpu), "matmul")
                 val result = product.readValue().also { handles += it }
                 MlxMatrixOperations.status(mlx_array_eval(result), "eval")
+                checkReaders()
                 val data = checkNotNull(mlx_array_data_float32(result)) { "mlx-c returned no data" }
-                c.usePinned { out ->
-                    repeat(m) { row ->
-                        memcpy(out.addressOf(cOffset + row * ldc), data + row.toLong() * n, n.toULong() * 4u)
+                checkReaders()
+                try {
+                    c.usePinned { out ->
+                        repeat(m) { row ->
+                            memcpy(out.addressOf(cOffset + row * ldc), data + row.toLong() * n, n.toULong() * 4u)
+                        }
                     }
+                    checkReaders()
+                } catch (failure: Throwable) {
+                    repeat(m) { row -> c.fill(0f, cOffset + row * ldc, cOffset + row * ldc + n) }
+                    throw failure
                 }
             }
         } finally { handles.forEach { mlx_array_free(it) } }
     }
 
     override fun close() {
-        owned.forEach { mlx_array_free(it) }
+        owned.forEach(::free)
         owned.clear()
+        readers.forEach { (reader, _) -> mlx_io_reader_free(reader) }
+        readers.clear()
         stream?.let { mlx_stream_free(it) }
         stream = null
     }

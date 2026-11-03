@@ -46,7 +46,7 @@ def select_model(model=None, *, vision=False):
     return selected
 
 
-def _sse(completion):
+def _sse(completion, include_usage=False):
     envelope = {key: value for key, value in completion.items() if key not in ("choices", "usage")}
     envelope["object"] = "chat.completion.chunk"
     choices = []
@@ -58,7 +58,7 @@ def _sse(completion):
         chunk.update(index=choice.get("index", index), delta=delta)
         choices.append(chunk)
     chunks = [dict(envelope, choices=choices, usage=None)]
-    if completion.get("usage") is not None:
+    if include_usage and completion.get("usage") is not None:
         chunks.append(dict(envelope, choices=[], usage=completion["usage"]))
     return ("".join("data: " + json.dumps(chunk, ensure_ascii=False, allow_nan=False) + "\n\n"
                     for chunk in chunks) + "data: [DONE]\n\n").encode("utf-8")
@@ -74,20 +74,21 @@ class ModelMuxTransport(httpx.BaseTransport):
         model = body.pop("model")
         stream = body.pop("stream", False)
         stream_options = body.pop("stream_options", None)
-        if stream_options not in (None, {"include_usage": True}):
+        if stream_options is not None and (
+            not isinstance(stream_options, dict) or set(stream_options) != {"include_usage"}
+            or type(stream_options["include_usage"]) is not bool
+        ):
             raise ValueError("ModelMux buffered SSE supports include_usage only")
         timeout = request.extensions.get("timeout", {}).get("read")
         timeout = TIMEOUT_SECONDS if timeout is None else min(float(timeout), TIMEOUT_SECONDS)
         if not 0 < timeout <= TIMEOUT_SECONDS:
             raise ValueError("ModelMux timeout must be positive seconds")
-        from gateway.session_context import get_session_env
-        session = get_session_env("HERMES_SESSION_ID")
         completion = _call("mux_completion", model,
                            json.dumps(body, ensure_ascii=False, allow_nan=False),
-                           max(1, int(timeout * 1000)), session)["completion"]
+                           max(1, int(timeout * 1000)))["completion"]
         if stream:
             return httpx.Response(200, headers={"content-type": "text/event-stream", "x-trikeshed-buffered": "true"},
-                                  content=_sse(completion))
+                                  content=_sse(completion, bool(stream_options and stream_options["include_usage"])))
         return httpx.Response(200, json=completion)
 
 
@@ -113,6 +114,11 @@ def register():
 
         def fetch_models(self, **options):
             return [card["id"] for card in _call("mux_catalog")["models"]]
+
+        def get_model_context_length(self, model):
+            card = next((card for card in _call("mux_catalog")["models"] if card["id"] == model), {})
+            context = card.get("contextWindow")
+            return context if type(context) is int and context > 0 else None
 
     profile = ModelMuxProfile(name=PROVIDER, api_mode="chat_completions", base_url=BASE_URL,
                               supports_health_check=False)

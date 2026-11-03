@@ -173,13 +173,21 @@ internal object DocumentsUpload {
         fun supportedDrag(event: Event): Boolean {
             val transfer = event.asDynamic().dataTransfer ?: return false
             val types: Array<dynamic> = js("Array.from(transfer.types || [])")
-            return types.any { it == "Files" || it == "text/uri-list" || it == "text/plain" }
+            if (types.any { it == "Files" }) return true
+            // Keep ordinary text and internal drags available to the page's own editors.
+            val target = event.target.asDynamic()
+            if (target?.closest != null && target.closest("input,textarea,select,[contenteditable]:not([contenteditable='false'])") != null) return false
+            if (types.any { it == "text/x-lcnc-value" }) return false
+            return types.any { it == "text/uri-list" } ||
+                (panel.asDynamic().contains(target) == true && types.any { it == "text/plain" })
         }
         fun dragOver(event: Event) {
             if (!supportedDrag(event) || !present()) return
             event.preventDefault()
+            panel.classList.add("ds-drag")
         }
         fun dropped(event: Event) {
+            panel.classList.remove("ds-drag")
             if (!supportedDrag(event) || !present()) return
             val transfer = event.asDynamic().dataTransfer ?: return
             val items: Array<dynamic> = js("Array.from(transfer.items || [])")
@@ -227,6 +235,11 @@ internal object DocumentsUpload {
             }
             if (items.size > MAX_FILES) { message("Upload at most $MAX_FILES entries at once. Nothing was sent."); return }
             val roots = items.mapNotNull { item -> if (item.webkitGetAsEntry != null) item.webkitGetAsEntry() else null }
+            val fileItems = items.count { it.kind == "file" }
+            if (roots.isNotEmpty() && roots.size != fileItems) {
+                message("Could not read every dropped entry. Choose files or a folder instead; nothing was sent.")
+                return
+            }
             val fallback = transfer.files
             if (roots.isEmpty()) {
                 val entries = mutableListOf<Entry>()
@@ -237,9 +250,10 @@ internal object DocumentsUpload {
                 var visited = 0
                 suspend fun walk(entry: dynamic, prefix: String, depth: Int) {
                     visited++
-                    require(depth <= 32 && entries.size < MAX_FILES && visited <= 4096) { "Folder exceeds depth or file-count limit" }
+                    require(depth <= 32 && visited <= 4096) { "Folder exceeds depth or entry-count limit" }
                     val path = safe(prefix + (entry.name as String))
                     if (entry.isFile == true) {
+                        require(entries.size < MAX_FILES) { "Folder exceeds file-count limit" }
                         val file = Promise<dynamic> { resolve, reject -> entry.file({ value: dynamic -> resolve(value) }, { failure: dynamic -> reject(failure) }) }.await()
                         entries.add(Entry(path, file))
                     } else {
@@ -269,6 +283,9 @@ internal object DocumentsUpload {
         panel.addEventListener("drop", { event -> dropped(event) })
         window.addEventListener("dragover", { event -> dragOver(event) })
         window.addEventListener("drop", { event -> dropped(event) })
+        window.addEventListener("dragleave", { event ->
+            if (event.asDynamic().relatedTarget == null) panel.classList.remove("ds-drag")
+        })
         window.addEventListener("pagehide", { _: Event -> closed = true; abort?.abort(); owner.cancel() })
         // A cached page owns cancelled work. Rebuild its controls from the retained URL;
         // never retry an upload whose server may already have admitted some files.

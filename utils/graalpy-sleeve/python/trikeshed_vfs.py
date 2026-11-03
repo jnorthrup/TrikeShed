@@ -38,14 +38,16 @@ def _path(path):
 
 
 class ExclusiveLease:
-    def __init__(self, path):
+    def __init__(self, path, publication=None):
         self.path = _path(path)
+        self.publication = None if publication is None else _path(publication)
         self._handle = None
 
     def acquire(self):
         if self._handle is not None:
             raise RuntimeError("VFS lease is already held")
-        handle = _host_call("vfs_lease", "acquire", self.path)
+        handle = (_host_call("vfs_lease", "acquire", self.path) if self.publication is None
+                  else _host_call("vfs_lease", "acquire", self.path, self.publication))
         if handle is None:
             raise BlockingIOError("VFS lease is held: " + self.path)
         if not isinstance(handle, str) or not handle:

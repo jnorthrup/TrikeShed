@@ -7,13 +7,16 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.common.Files
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.Sha256
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.yaml.parse as yamlOf
 import borg.trikeshed.userspace.nio.channels.FileChannel
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.platform.spi.MatrixOperations
+import borg.trikeshed.util.toLowerHex
 import kotlin.time.TimeSource
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -28,6 +31,45 @@ class JevaDeadline(val timeoutMs: Long, val phase: String, clock: TimeSource = T
         val elapsed = started.elapsedNow()
         if (elapsed >= timeoutMs.milliseconds) throw Expired(location, timeoutMs, elapsed.inWholeMilliseconds)
     }
+}
+
+/** Bounded device checkpoint input, with a cooperative check between positioned reads. */
+fun jevaFile(path: String, maxBytes: Int, check: () -> Unit = {}): ByteArray {
+    require(maxBytes > 0)
+    check()
+    return FileChannel.open(path, StandardOpenOption.READ).use { channel ->
+        val size = channel.size()
+        require(size in 1..maxBytes.toLong()) { "Jeva file exceeds its byte bound: $path" }
+        val bytes = ByteArray(size.toInt())
+        var done = 0
+        while (done < bytes.size) {
+            val count = minOf(JevaWeights.BUFFER_BYTES, bytes.size - done)
+            val buffer = ByteBuffer(bytes, done, count)
+            while (buffer.hasRemaining()) {
+                check()
+                val position = buffer.position()
+                val read = channel.read(buffer, done.toLong() + position)
+                require(read > 0 && read <= count - position && buffer.position() == position + read) { "Truncated Jeva file: $path" }
+            }
+            done += count
+        }
+        check()
+        bytes
+    }
+}
+
+/** SHA-256 with the same digest as ContentId, checking during large device inputs. */
+internal fun jevaDigest(bytes: ByteArray, check: () -> Unit): String {
+    val digest = Sha256()
+    var offset = 0
+    while (offset < bytes.size) {
+        check()
+        val count = minOf(JevaWeights.BLOCK_BYTES, bytes.size - offset)
+        digest.update(bytes, offset, count)
+        offset += count
+    }
+    check()
+    return digest.digest().toLowerHex()
 }
 
 /** One serial inference owner: mapped checkpoint, causal text backbone and factorized decision memory. */
@@ -100,16 +142,25 @@ class JevaInference(
     fun close() {
         if (!closed) { closed = true; options.clear() }
         var failure: Throwable? = null
-        try { model.decision.matrix.close() } catch (e: Throwable) { failure = e }
+        // A device encoder owns the matrix session that its decision head borrows.
+        // CPU weights and their separately opened matrix remain independent owners.
+        if (weights !is DeviceTensors) try { model.decision.matrix.close() } catch (e: Throwable) { failure = e }
         try { weights.close() } catch (e: Throwable) {
-            if (failure == null) failure = e else failure.addSuppressed(e)
+            if (failure == null) failure = e else if (e !== failure) failure.addSuppressed(e)
         }
         failure?.let { throw it }
     }
 
     /** Releases the head and the device session together. */
-    private class DeviceTensors(val head: JevaHeadTensors, val session: EncoderSession) : JevaTensors by head {
-        override fun close() { try { head.close() } finally { session.close() } }
+    internal class DeviceTensors(val head: JevaTensors, val session: EncoderSession) : JevaTensors by head {
+        override fun close() {
+            var failure: Throwable? = null
+            try { head.close() } catch (error: Throwable) { failure = error }
+            try { session.close() } catch (error: Throwable) {
+                if (failure == null) failure = error else if (error !== failure) failure.addSuppressed(error)
+            }
+            failure?.let { throw it }
+        }
     }
 
     companion object {
@@ -117,23 +168,38 @@ class JevaInference(
         const val DEVICE_VERSION = "device-f32-1"
 
         /** The device lane: backbone from [encoders], head from `head.pt`, tokenizer beside the device weights, no Python. */
-        fun loadDevice(config: JevaConfig, encoders: EncoderOperations): JevaInference {
+        fun loadDevice(config: JevaConfig, encoders: EncoderOperations): JevaInference =
+            loadDevice(config, encoders, JevaDeadline(config.timeoutMs, "load"))
+
+        internal fun loadDevice(config: JevaConfig, encoders: EncoderOperations, deadline: JevaDeadline): JevaInference {
+            val check = deadline::check
             val directory = config.model
-            val configuration = Files.readString("$directory/config.yaml")
+            deadline.location = "load configuration"
+            val configuration = jevaFile("$directory/config.yaml", JevaWeights.HEADER_BYTES, check).decodeToString(throwOnInvalidSequence = true)
             val settings = requireNotNull(yamlOf(configuration)["model"] as? Map<*, *>) { "Jeva config requires model mapping" }
-            val tokenizerText = Files.readString("$directory/backbone_mlx/tokenizer.json")
-            val headBytes = Files.readAllBytes("$directory/head.pt")
-            val session = encoders.open("$directory/backbone_mlx")
+            check()
+            deadline.location = "load tokenizer"
+            val tokenizerBytes = jevaFile("$directory/backbone_mlx/tokenizer.json", 64 * 1024 * 1024, check)
+            val tokenizerText = tokenizerBytes.decodeToString(throwOnInvalidSequence = true)
+            deadline.location = "load decision head"
+            val headBytes = jevaFile("$directory/head.pt", 512 * 1024 * 1024, check)
+            deadline.location = "load device backbone"
+            val session = encoders.open("$directory/backbone_mlx", check)
             try {
-                val tokenizer = JevaTokenizer.parse(tokenizerText)
-                val head = JevaHeadTensors(JevaHead.parse(headBytes))
+                check()
+                deadline.location = "parse tokenizer"
+                val tokenizer = JevaTokenizer.parse(tokenizerText, check)
+                deadline.location = "parse decision head"
+                val head = JevaHeadTensors(JevaHead.parse(headBytes, check))
+                check()
                 val decision = JevaDecision(JevaDecisionConfig.from(settings), head::get, JevaMatrix(session.matrix))
                 val model = JevaModel(session.hiddenSize, JevaPooling.of(settings["pooling"] as? String ?: "last"), decision, head::get)
                 val identity = config.model + "@" + DEVICE_VERSION + ":" + ContentId.of(jsonOf(mapOf(
                     "runtime" to session.identity, "config" to ContentId.of(configuration.encodeToByteArray()).hex,
-                    "head" to ContentId.of(headBytes).hex, "tokenizer" to ContentId.of(tokenizerText.encodeToByteArray()).hex,
+                    "head" to jevaDigest(headBytes, check), "tokenizer" to jevaDigest(tokenizerBytes, check),
                     "state_limit" to config.maxStateLength, "option_limit" to config.maxOptionLength,
                 )).encodeToByteArray()).hex
+                check()
                 return JevaInference(DeviceTensors(head, session), tokenizer, session, model, config, identity)
             } catch (failure: Throwable) {
                 try { session.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }

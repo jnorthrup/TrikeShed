@@ -117,8 +117,15 @@ class HermesPenDelegatesTest {
                         assert data.model == 'wire-fixture' and data.vendor.retained is True
                         assert usage.choices == [] and usage.usage.total_tokens == 6
                     assert list(chunks) == []
+                    for options in (None, {'include_usage': False}):
+                        chunks = client.chat.completions.create(model='fixture', messages=[{'role':'user','content':'without usage'}],
+                                                               stream=True, stream_options=options)
+                        data, = list(chunks)
+                        assert data.choices[0].delta.tool_calls[0].index == 0
+                        assert data.usage is None
                     for invalid in ({'extra_headers':{'Authorization':'guest'}}, {'timeout':0},
-                                    {'extra_body':{'model':'foreign'}}, {'stream_options':{'unknown':True}}):
+                                    {'extra_body':{'model':'foreign'}}, {'stream_options':{'unknown':True}},
+                                    *({'stream_options':{'include_usage': value}} for value in (0, 1, 'true', None, [], {}))):
                         try:
                             client.chat.completions.create(model='fixture', messages=[], **invalid)
                         except ValueError:
@@ -135,7 +142,7 @@ class HermesPenDelegatesTest {
                     True
                 """.trimIndent()))
             }
-            assertEquals(2, sent.size)
+            assertEquals(4, sent.size)
             assertTrue(sent.first().timeoutMs in 1L..1500L)
             val first = confixDoc(sent.first().body.toArray().decodeToString())
             assertEquals("wire-fixture", first.value("model"))

@@ -26,11 +26,11 @@ import borg.trikeshed.util.oroboros.FileCasStore
  * snapshots, and publication. [ofMemory] keeps a stable private metadata backing
  * per guest for this world's lifetime; a newly constructed memory world is empty.
  *
- * ## Why several live mounts on one file root are safe, and what would break it
- * [UserspaceBtrfs] documents itself as "one live instance is one mount", and [ofFiles] hands each
- * guest its own instance over a shared [root]. That holds because the guests touch disjoint state:
- * each writes only its own `<id>.manifest`, and extents are content-addressed and append-only, so
- * concurrent writers either write different files or write identical bytes to the same name.
+ * Each [UserspaceBtrfs] mount maintains its own metadata index. Separate mounts may share a
+ * file root only while their writable subvolumes and snapshot names are disjoint. This class
+ * does not enforce that condition: callers must establish ownership before mounting, including
+ * across independently constructed stores for the same root. In particular, two writers of
+ * the same guest id can overwrite one another's changes from stale indexes.
  *
  * Guest mounts borrow [cas], so deleting a subvolume never sweeps shared CAS
  * objects using only that guest's references. Shared-object reclamation belongs

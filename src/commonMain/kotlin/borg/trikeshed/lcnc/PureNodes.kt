@@ -61,6 +61,7 @@ object PureNodes {
 
     fun registry(clock: () -> Long): Map<String, LcncNodeRunner> = mapOf(
         "timer" to boundLcnc(LcncClockKey(clock)) { source, _, _ -> mapOf("tick" to source.value()) },
+        WorkSelectNode.TYPE to WorkSelectNode.runner(clock),
         RdfSelectNode.TYPE to RdfSelectNode.runner,
         KifNodes.INSPECT to KifNodes.runner,
         "pick" to object : LcncPureRunner {

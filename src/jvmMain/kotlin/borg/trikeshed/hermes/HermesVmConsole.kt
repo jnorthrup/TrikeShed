@@ -149,9 +149,9 @@ class HermesVmConsole(
         val stderr: TerminalOutputStream,
     ) : AutoCloseable {
         override fun close() {
-            try { worker?.close() } finally {
-                try { port.close() } finally { try { stdout.close() } finally { stderr.close() } }
-            }
+            worker?.close()
+            port.close()
+            try { stdout.close() } finally { stderr.close() }
         }
     }
 
@@ -263,7 +263,7 @@ class HermesVmConsole(
                     import trikeshed_files
                     from cli import HermesCLI
                     __hermes_cli = HermesCLI(model=mux.select_model(), provider=mux.PROVIDER,
-                                            base_url=mux.BASE_URL)
+                                            base_url=mux.BASE_URL, resume=${resumeSession?.let(::pythonString) ?: "None"})
                     if __hermes_cli._session_db_unavailable or __hermes_cli._session_db is None:
                         from hermes_state import get_last_init_error
                         raise RuntimeError('HermesCLI session store is unavailable: ' +
@@ -274,6 +274,7 @@ class HermesVmConsole(
                 """.trimIndent(), "hermes-cli-start.py")
                 check(started is Teleported.Obj) { "HermesCLI did not return its state" }
                 cliStatus = reifyMap(started.canonical())
+                resumeSession = null
                 modelId = cliStatus?.get("model") as? String
                 cliStarted = true
             } else {
@@ -901,24 +902,28 @@ class HermesVmConsole(
         val retiring = runtime
         val started = synchronized(lock) {
             val started = cliStarted
-            cliStarted = false
             boot = boot?.let { it.copy(status = State.CLOSED, updatedAtMs = System.currentTimeMillis(), revision = it.revision + 1) }
             transition(State.CLOSED, "closing")
             started
         }
         try {
-            retiring?.retire { guest ->
-                try {
-                    if (guest.worker == null && started && guest.port.vmStarted)
-                        guest.port.evalInVm("trikeshed_cli.close()", "hermes-cli-close.py")
-                } finally { guest.close() }
-            }
+            retiring?.retire(quiesceResource = { guest ->
+                guest.port.quiesce(closeCli = guest.worker == null && started)
+            }, closeResource = { guest -> guest.close() })
             if (retiring != null) retainedHostSession = retiring.session
             runtime = null
+            synchronized(lock) { cliStarted = false; transition(State.CLOSED, "closed") }
+        } catch (failure: Throwable) {
+            val message = "close failed: ${failure.message ?: failure::class.simpleName}"
+            synchronized(lock) {
+                boot = boot?.copy(status = State.FAILED, updatedAtMs = System.currentTimeMillis(),
+                    detail = message, failure = message, revision = boot!!.revision + 1)
+                transition(State.FAILED, message)
+            }
+            throw failure
         } finally {
             synchronized(lock) {
                 failTerminalInput("Hermes console closed before terminal input completed")
-                transition(State.CLOSED, "closed")
             }
         }
     }

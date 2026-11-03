@@ -10,7 +10,7 @@ object LcncModelSelection {
         val seats = mutableListOf<LcncNode>()
         fun visit(nodes: Series<LcncNode>) {
             for (node in nodes.view) {
-                if (node.type == "mux.chat" || node.type == "council.seat") seats.add(node)
+                if (node.type == "mux.chat" || node.type == "council.seat" || node.type == WorkSelectNode.MODEL) seats.add(node)
                 visit(node.children)
             }
         }
