@@ -21,6 +21,7 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.UUID
 import kotlin.test.*
 
@@ -64,12 +65,32 @@ class ManualProjectUploadTest {
         val listener = LitebikeListenerElement(parentJob = owner).also { it.open() }
         val slot = listener.register(Protocol.Http)
         val probePath = "/__document_probe_" + UUID.randomUUID()
-        val probe: RawRoute = { _, path, _, _ -> if (path == probePath) WireHttpResponse(200, probePath) else null }
+        val binaryPath = "/__document_binary_" + UUID.randomUUID()
+        val allocated = AtomicLong(-1)
+        val memory = java.lang.management.ManagementFactory.getThreadMXBean() as com.sun.management.ThreadMXBean
+        check(memory.isThreadAllocatedMemorySupported)
+        memory.isThreadAllocatedMemoryEnabled = true
+        val probe: RawRoute = { _, path, payload, _ ->
+            when (path) {
+                probePath -> WireHttpResponse(200, probePath)
+                binaryPath -> {
+                    check(payload.last() == 0xff.toByte())
+                    WireHttpResponse(200, binaryPath)
+                }
+                else -> null
+            }
+        }
         val server = JvmKanbanServer(rawRoutes = _l[probe, rig.wire::route], stateDir = directory.toFile())
         val worker = scope.launch {
             while (isActive) {
                 val message = try { slot.consume() } catch (_: kotlinx.coroutines.channels.ClosedReceiveChannelException) { break }
+                val thread = Thread.currentThread().id
+                val before = memory.getThreadAllocatedBytes(thread)
                 val result = server.routeHttp(message.payload)
+                if (result.body == binaryPath) {
+                    check(thread == Thread.currentThread().id)
+                    allocated.set(memory.getThreadAllocatedBytes(thread) - before)
+                }
                 val head = "HTTP/1.1 ${result.status} OK\r\nContent-Length: ${result.payloadBytes.size}\r\n" +
                     "Content-Type: ${result.contentType}\r\nConnection: close\r\n\r\n"
                 message.respond?.invoke(head.encodeToByteArray() + result.payloadBytes)
@@ -104,6 +125,19 @@ class ManualProjectUploadTest {
                         return reifyMap(connection.inputStream.bufferedReader().use { it.readText() })
                     } finally { connection.disconnect() }
                 }
+                val binary = URL("http://127.0.0.1:$port$binaryPath").openConnection() as HttpURLConnection
+                try {
+                    binary.requestMethod = "POST"
+                    binary.connectTimeout = 10_000; binary.readTimeout = 60_000
+                    binary.doOutput = true
+                    val bytes = ByteArray(8 * 1024 * 1024) { 0xff.toByte() }
+                    binary.setFixedLengthStreamingMode(bytes.size)
+                    binary.outputStream.use { it.write(bytes) }
+                    assertEquals(200, binary.responseCode)
+                    assertEquals(binaryPath, binary.inputStream.bufferedReader().use { it.readText() })
+                    assertTrue(allocated.get() in 0 until 2L * 1024 * 1024,
+                        "Routing the binary payload allocated ${allocated.get()} bytes")
+                } finally { binary.disconnect() }
                 val begun = post("/_project/large/begin?kind=assets&intake=manual")
                 assertEquals("manual", begun["intake"])
                 val bytes = ByteArray(32 * 1024 * 1024) { (it * 17).toByte() }

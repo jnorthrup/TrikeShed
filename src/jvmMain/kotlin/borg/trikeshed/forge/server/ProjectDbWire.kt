@@ -10,6 +10,7 @@ import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.context.Drain
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.lib.*
+import borg.trikeshed.htx.indexOfHeaderBoundary
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
@@ -181,43 +182,44 @@ class ProjectDbWire(
                 "putBatch" -> {
                     if (manualIntake && scopes.intakeMode(name) != CurationIntake.Mode.Manual)
                         return json(409, """{"error":"project is not configured for manual intake"}""")
-                    val body = CouchWire.bodyOf(payload)
-                    if (body.isEmpty()) return json(400, """{"error":"empty body"}""")
-                    var off = 0
+                    val boundary = payload.indexOfHeaderBoundary()
+                    val bodyStart = if (boundary < 0) payload.size else boundary + 4
+                    if (bodyStart == payload.size) return json(400, """{"error":"empty body"}""")
+                    var off = bodyStart
                     var okCount = 0
                     var failCount = 0
                     fun i32(): Int {
-                        val v = ((body[off].toInt() and 0xFF) shl 24) or ((body[off + 1].toInt() and 0xFF) shl 16) or
-                            ((body[off + 2].toInt() and 0xFF) shl 8) or (body[off + 3].toInt() and 0xFF)
+                        val v = ((payload[off].toInt() and 0xFF) shl 24) or ((payload[off + 1].toInt() and 0xFF) shl 16) or
+                            ((payload[off + 2].toInt() and 0xFF) shl 8) or (payload[off + 3].toInt() and 0xFF)
                         off += 4; return v
                     }
                     fun i64(): Long {
                         var v = 0L
-                        repeat(8) { v = (v shl 8) or (body[off + it].toLong() and 0xFF) }
+                        repeat(8) { v = (v shl 8) or (payload[off + it].toLong() and 0xFF) }
                         off += 8; return v
                     }
                     // Validate the complete frame before publishing any file. In particular,
                     // do not narrow a 64-bit length or ignore an incomplete final frame.
                     val valid = try {
-                        while (off < body.size) {
-                            require(body.size - off >= 12)
+                        while (off < payload.size) {
+                            require(payload.size - off >= 12)
                             val pLen = i32()
-                            require(pLen > 0 && pLen <= body.size - off - 8)
-                            body.decodeToString(off, off + pLen, throwOnInvalidSequence = true)
+                            require(pLen > 0 && pLen <= payload.size - off - 8)
+                            payload.decodeToString(off, off + pLen, throwOnInvalidSequence = true)
                             off += pLen
                             val bLen = i64()
-                            require(bLen >= 0 && bLen <= (body.size - off).toLong())
+                            require(bLen >= 0 && bLen <= (payload.size - off).toLong())
                             off += bLen.toInt()
                         }
                         true
                     } catch (_: Exception) { false }
                     if (!valid) return json(400, """{"error":"invalid batch frame"}""")
-                    off = 0
-                    while (off < body.size) {
+                    off = bodyStart
+                    while (off < payload.size) {
                         val pLen = i32()
-                        val rel = body.copyOfRange(off, off + pLen).decodeToString(); off += pLen
+                        val rel = payload.decodeToString(off, off + pLen); off += pLen
                         val bLen = i64().toInt()
-                        val bytes = body.copyOfRange(off, off + bLen); off += bLen
+                        val bytes = payload.copyOfRange(off, off + bLen); off += bLen
                         runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel), manualIntake) }
                             .fold({ okCount++ }, { failCount++ })
                     }

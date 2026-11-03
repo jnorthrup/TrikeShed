@@ -73,6 +73,11 @@ typealias ExtraRoute = borg.trikeshed.litebike.WireExtraRoute
  */
 typealias RawRoute = borg.trikeshed.litebike.WireRawRoute
 
+private fun requestLine(payload: ByteArray): String {
+    val end = payload.indexOfFirst { it == '\r'.code.toByte() || it == '\n'.code.toByte() }
+    return String(payload, 0, if (end < 0) payload.size else end, StandardCharsets.UTF_8)
+}
+
 class JvmKanbanServer(
     /** Extension seam: tried after the built-in routes and static assets, first non-null wins (BlackboardWire, VmWire, …). */
     private val extraRoutes: List<ExtraRoute> = emptyList(),
@@ -268,8 +273,8 @@ class JvmKanbanServer(
 
                 // SSE — intercept before routeHttp to stream events without
                 // Content-Length (SSE has no end, client closes on disconnect).
-                val text = String(payload, StandardCharsets.UTF_8)
-                val reqLine = text.lineSequence().firstOrNull() ?: ""
+                val text by lazy { String(payload, StandardCharsets.UTF_8) }
+                val reqLine = requestLine(payload)
                 val reqParts = reqLine.split(' ')
                 val reqPath = reqParts.getOrNull(1) ?: "/"
                 val isSse = reqPath == SSE_PATH &&
@@ -374,8 +379,8 @@ class JvmKanbanServer(
     }
 
     internal suspend fun routeHttp(payload: ByteArray): HttpResponse {
-        val text = String(payload, StandardCharsets.UTF_8)
-        val firstLine = text.lineSequence().firstOrNull() ?: ""
+        val text by lazy { String(payload, StandardCharsets.UTF_8) }
+        val firstLine = requestLine(payload)
         val parts = firstLine.split(' ')
         val method = parts.getOrNull(0) ?: "GET"
         val path = parts.getOrNull(1) ?: "/"
