@@ -47,9 +47,10 @@ internal object DocumentsUpload {
             return path
         }
         suspend fun request(path: String, body: dynamic = null): Map<*, *> {
-            val response = window.fetch(path, RequestInit(method = "POST", body = body,
-                headers = Headers().apply { if (body != null) append("Content-Type", "application/octet-stream") },
-                signal = abort.signal)).await()
+            val init = RequestInit(method = "POST", body = body,
+                headers = Headers().apply { if (body != null) append("Content-Type", "application/octet-stream") })
+            init.asDynamic().signal = abort.signal
+            val response = window.fetch(path, init).await()
             val result = reifyStrict(response.text().await()) as? Map<*, *> ?: error("Upload returned an unreadable response")
             require(response.ok && result["verdict"] == "ok") { (result["detail"] ?: result["error"] ?: "Upload refused (HTTP ${response.status})").toString() }
             return result
