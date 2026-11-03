@@ -215,7 +215,7 @@ class JevaWeights private constructor(
         }
         require(headerSize in 2..HEADER_BYTES.toLong() && headerSize <= size - 8) { "Invalid Jeva safetensors header length" }
         val header = read(channel, 8, ByteArray(headerSize.toInt()), check)
-        val fields = objectMap(reifyStrict(header.decodeToString(throwOnInvalidSequence = true)), "Jeva header")
+        val fields = metadata(header.decodeToString(throwOnInvalidSequence = true), "Jeva header")
         val dataAt = 8 + headerSize
         val entries = LinkedHashMap<String, Parameter>()
         for ((name, value) in fields) {
@@ -225,11 +225,12 @@ class JevaWeights private constructor(
                 require(metadata.values.all { it is String }) { "Jeva metadata values must be strings" }
                 continue
             }
-            require(name.isNotBlank()) { "Empty Jeva tensor name" }
+            require(name.isNotBlank() && name.length <= 1024) { "Invalid Jeva tensor name" }
             val descriptor = objectMap(value, "Jeva tensor $name")
             require(descriptor.keys.toSet() == setOf("dtype", "shape", "data_offsets")) { "Invalid Jeva tensor $name descriptor fields" }
             val dtype = Dtype.entries.firstOrNull { it.name == descriptor["dtype"] }
-                ?: error("Unsupported Jeva tensor $name dtype: ${descriptor["dtype"]}")
+                ?: error("Unsupported Jeva tensor $name dtype: ${descriptor["dtype"].toString().take(64)}. " +
+                    "Kotlin CPU weights require unquantized F32, BF16 or F16; packed MLX/Q4 tensors are not float tensors.")
             val dims = descriptor["shape"] as? List<*> ?: error("Missing Jeva tensor $name shape")
             require(dims.size <= 8) { "Jeva tensor $name rank exceeds eight" }
             val shape = IntArray(dims.size) { integer(dims[it], "Jeva tensor extent", Int.MAX_VALUE.toLong()).toInt() }.toSeries()
@@ -267,23 +268,33 @@ class JevaWeights private constructor(
             require(maxCacheBytes >= 4) { "Jeva mapped window budget must hold at least one F32 value" }
             val weights = JevaWeights(files, directory, channels, maxCacheBytes)
             try {
-                val indexText = weights.text("backbone_full/model.safetensors.index.json", check = check)
-                val index = objectMap(reifyStrict(indexText), "Jeva shard index")
-                val mapping = objectMap(index["weight_map"], "Jeva weight_map")
-                require(mapping.isNotEmpty()) { "Empty Jeva weight_map" }
-                val shards = LinkedHashMap<String, MutableSet<String>>()
-                for ((name, value) in mapping) {
-                    check()
-                    require(name.isNotBlank() && value is String && '/' !in value && value.endsWith(".safetensors")) { "Invalid Jeva shard mapping" }
-                    shards.getOrPut(value) { mutableSetOf() }.add(name)
-                }
-                weights.receipts += mapOf("path" to weights.path("backbone_full/model.safetensors.index.json"),
-                    "index_sha256" to ContentId.of(indexText.encodeToByteArray()).hex)
-                for ((shard, expected) in shards) {
-                    val parameters = weights.shard("backbone_full/$shard", check)
-                    require(parameters.keys == expected) { "Jeva shard $shard tensors differ from weight_map" }
-                    for ((name, parameter) in parameters) if (name.startsWith("language_model.")) {
-                        require(weights.parameters.put(name, parameter) == null) { "Duplicate Jeva tensor: $name" }
+                val indexPath = weights.path("backbone_full/model.safetensors.index.json")
+                val singlePath = weights.path("backbone_full/model.safetensors")
+                if (!files.exists(indexPath) && files.isFile(singlePath)) {
+                    // A single safetensors file has the SAME tensor descriptors as an indexed shard.
+                    // No renaming, quantized unpacking, adapter merge or dtype conversion is implied.
+                    val parameters = weights.shard("backbone_full/model.safetensors", check)
+                    for ((name, parameter) in parameters) if (name.startsWith("language_model."))
+                        weights.parameters[name] = parameter
+                } else {
+                    val indexText = weights.text("backbone_full/model.safetensors.index.json", check = check)
+                    val index = metadata(indexText, "Jeva shard index")
+                    val mapping = objectMap(index["weight_map"], "Jeva weight_map")
+                    require(mapping.isNotEmpty()) { "Empty Jeva weight_map" }
+                    val shards = LinkedHashMap<String, MutableSet<String>>()
+                    for ((name, value) in mapping) {
+                        check()
+                        require(name.isNotBlank() && value is String && '/' !in value && value.endsWith(".safetensors")) { "Invalid Jeva shard mapping" }
+                        shards.getOrPut(value) { mutableSetOf() }.add(name)
+                    }
+                    weights.receipts += mapOf("path" to weights.path("backbone_full/model.safetensors.index.json"),
+                        "index_sha256" to ContentId.of(indexText.encodeToByteArray()).hex)
+                    for ((shard, expected) in shards) {
+                        val parameters = weights.shard("backbone_full/$shard", check)
+                        require(parameters.keys == expected) { "Jeva shard $shard tensors differ from weight_map" }
+                        for ((name, parameter) in parameters) if (name.startsWith("language_model.")) {
+                            require(weights.parameters.put(name, parameter) == null) { "Duplicate Jeva tensor: $name" }
+                        }
                     }
                 }
                 require(weights.parameters.isNotEmpty()) { "Jeva checkpoint has no language_model tensors" }
@@ -296,8 +307,33 @@ class JevaWeights private constructor(
                 return weights
             } catch (failure: Throwable) {
                 try { weights.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
-                throw failure
+                if (failure is kotlinx.coroutines.CancellationException || failure is JevaDeadline.Expired || failure is Error) throw failure
+                throw IllegalArgumentException("Jeva Kotlin CPU checkpoint at '$directory' could not load: ${failure.message?.take(1024)}. " +
+                    "Required weights: backbone_full/model.safetensors.index.json with its shards OR backbone_full/model.safetensors, " +
+                    "plus head.safetensors; only unquantized language_model.* F32/BF16/F16 tensors are supported. " +
+                    "An HF repository ID is not a downloaded local checkpoint. Packed MLX/Q4 requires an explicitly configured " +
+                    "device=mlx EncoderOperations provider and backbone_mlx/head.pt layout; no runtime switch or download was attempted.", failure)
             }
+        }
+
+        /** Byte bounds are applied by text()/shard(); reject nesting before the recursive JSON parser. */
+        internal fun metadata(text: String, name: String): Map<String, Any?> {
+            var depth = 0
+            var quoted = false
+            var escaped = false
+            for (c in text) {
+                if (quoted) when {
+                    escaped -> escaped = false
+                    c == '\\' -> escaped = true
+                    c == '"' -> quoted = false
+                } else when (c) {
+                    '"' -> quoted = true
+                    '{', '[' -> { depth++; require(depth <= 32) { "$name exceeds JSON nesting limit" } }
+                    '}', ']' -> { depth--; require(depth >= 0) { "Malformed $name" } }
+                }
+            }
+            require(depth == 0 && !quoted) { "Malformed $name" }
+            return objectMap(reifyStrict(text), name)
         }
 
         private fun objectMap(value: Any?, name: String): Map<String, Any?> {
