@@ -211,6 +211,7 @@ summary:focus-visible,
 <input id="ds-upload-folder" type="file" webkitdirectory multiple hidden>
 <button id="ds-upload-choose" type="button">Choose files</button><button id="ds-upload-choose-folder" type="button">Choose folder</button>
 <p>Or drop onto this box. Up to 1,000 files, 32 MiB each, 128 MiB total. Storage only: this upload does not call a model or approve facts. Curate later; TXT/MD source retention stays separate.</p>
+<p>Leaving this page cancels the browser request, but files the server has already received may still be saved. Returning does not retry the upload.</p>
 <p id="ds-upload-status" role="status" aria-live="polite"></p>
 </details>
 <script src="./kotlin/documents/documents.js" defer></script>
