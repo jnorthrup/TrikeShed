@@ -261,10 +261,14 @@ class LitebikeListenerElement(
      * CCEK subscriber — this is the bridge SCTP / HTX elements use to
      * observe inbound protocol traffic.
      */
-    suspend fun accept(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null,
-                       completion: CompletableDeferred<Unit>? = null): Boolean =
-        if (completion == null) acceptMessage(protocolId, payload, respond, null)
-        else withContext(NonCancellable) { acceptMessage(protocolId, payload, respond, completion) }
+    suspend fun accept(protocolId: UByte, payload: ByteArray,
+                       respond: (suspend (ByteArray) -> Unit)? = null): Boolean =
+        acceptMessage(protocolId, payload, respond, null)
+
+    /** The supplied completion owns an admitted payload until its consumer finishes. */
+    suspend fun accept(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?,
+                       completion: CompletableDeferred<Unit>): Boolean =
+        withContext(NonCancellable) { acceptMessage(protocolId, payload, respond, completion) }
 
     private suspend fun acceptMessage(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?,
                                       completion: CompletableDeferred<Unit>?): Boolean {
@@ -300,8 +304,12 @@ class LitebikeListenerElement(
      * Convenience overload: caller did the protocol detection and has a
      * `Protocol` enum value. Same behavior.
      */
-    suspend fun accept(protocol: Protocol, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null,
-                       completion: CompletableDeferred<Unit>? = null): Boolean =
+    suspend fun accept(protocol: Protocol, payload: ByteArray,
+                       respond: (suspend (ByteArray) -> Unit)? = null): Boolean =
+        accept(protocol.id, payload, respond)
+
+    suspend fun accept(protocol: Protocol, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?,
+                       completion: CompletableDeferred<Unit>): Boolean =
         accept(protocol.id, payload, respond, completion)
 
     /**

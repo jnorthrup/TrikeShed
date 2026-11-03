@@ -146,7 +146,7 @@ class JvmDocumentIngressTest {
             val done = CompletableDeferred<Unit>()
             val active = scope.launch {
                 val permit = DocumentPermit(admission, coroutineContext[Job]!!, done)
-                listener.accept(borg.trikeshed.litebike.taxonomy.Protocol.Http, ByteArray(1), completion = permit.completion)
+                listener.accept(borg.trikeshed.litebike.taxonomy.Protocol.Http, ByteArray(1), respond = null, completion = permit.completion)
             }
             sender = active
             slot.consume()
