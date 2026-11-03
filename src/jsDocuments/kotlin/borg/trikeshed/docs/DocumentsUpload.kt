@@ -2,6 +2,7 @@ package borg.trikeshed.docs
 
 import borg.trikeshed.graal.console.Ingest
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.wiki.WikiSurface
 import kotlinx.browser.document
@@ -54,6 +55,16 @@ internal object DocumentsUpload {
             val result = reifyStrict(response.text().await()) as? Map<*, *> ?: error("Upload returned an unreadable response")
             require(response.ok && result["verdict"] == "ok") { (result["detail"] ?: result["error"] ?: "Upload refused (HTTP ${response.status})").toString() }
             return result
+        }
+        suspend fun parse(project: String): String {
+            val init = RequestInit(method = "POST")
+            init.asDynamic().signal = abort.signal
+            val response = window.fetch("/api/projects/${WikiSurface.encode(project)}/mine", init).await()
+            val result = reifyStrict(response.text().await()) as? Map<*, *> ?: error("Parse response is unreadable")
+            require(response.ok && (result["verdict"] == "mining" || result["verdict"] == "mined")) {
+                (result["detail"] ?: result["error"] ?: "Parsing could not start (HTTP ${response.status})").toString()
+            }
+            return if (result["verdict"] == "mining") "Parsing started." else "Parsing finished: ${result["extracted"]} extracted, ${result["failed"]} failed."
         }
         suspend fun upload(entries: List<Entry>, suggested: String) {
             require(entries.isNotEmpty()) { "No files were selected" }
@@ -114,7 +125,12 @@ internal object DocumentsUpload {
             flush()
             require(sent == entries.size) { "Project $actual stored $sent of ${entries.size} files; inspect the project before retrying" }
             if (!present()) return
-            status.textContent = "Added $sent files to new project $actual; automatic curation is off. Stored in your Forge data folder / files / $actual. Uploaded content remains unreviewed; no model was called and no facts were approved. TXT/MD source retention is separate. "
+            message("Uploaded $sent files; starting parsing…")
+            val parsing = try { parse(actual) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (failure: Throwable) { "Files were saved, but parsing could not start: ${failure.message ?: "unknown error"}." }
+            if (!present()) return
+            status.textContent = "Added $sent files to $actual. $parsing Content remains unreviewed. "
             val link = document.createElement("a")
             link.textContent = "Open uploaded project"
             link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(actual)}#${WikiSurface.encode(actual)}")
@@ -154,23 +170,61 @@ internal object DocumentsUpload {
         folder.addEventListener("change", { picked(folder) })
         document.getElementById("ds-upload-choose")!!.addEventListener("click", { files.click() })
         document.getElementById("ds-upload-choose-folder")!!.addEventListener("click", { folder.click() })
-        fun fileDrag(event: Event): Boolean {
+        fun supportedDrag(event: Event): Boolean {
             val transfer = event.asDynamic().dataTransfer ?: return false
             val types: Array<dynamic> = js("Array.from(transfer.types || [])")
-            return types.any { it == "Files" }
+            return types.any { it == "Files" || it == "text/uri-list" || it == "text/plain" }
         }
         fun dragOver(event: Event) {
-            if (!fileDrag(event) || !present()) return
-            event.preventDefault(); event.stopPropagation()
-            panel.asDynamic().open = true
+            if (!supportedDrag(event) || !present()) return
+            event.preventDefault()
         }
         fun dropped(event: Event) {
-            if (!fileDrag(event) || !present()) return
+            if (!supportedDrag(event) || !present()) return
+            val transfer = event.asDynamic().dataTransfer ?: return
+            val items: Array<dynamic> = js("Array.from(transfer.items || [])")
+            val raw = ((transfer.getData("text/uri-list") as? String).orEmpty().ifBlank {
+                (transfer.getData("text/plain") as? String).orEmpty()
+            })
+            val links = raw.lineSequence().map { it.trim() }
+                .filter { it.startsWith("https://", true) || it.startsWith("http://", true) }.distinct().toList()
+            val types: Array<dynamic> = js("Array.from(transfer.types || [])")
+            val hasFiles = types.any { it == "Files" }
+            if (!hasFiles && links.isEmpty()) return
             event.preventDefault(); event.stopPropagation()
             if (pending || !present()) return
             panel.asDynamic().open = true
-            val transfer = event.asDynamic().dataTransfer ?: return
-            val items: Array<dynamic> = js("Array.from(transfer.items || [])")
+            if (!hasFiles) {
+                pending = true; disable(true); abort = js("new AbortController()")
+                scope.launch {
+                    try {
+                        for (url in links) {
+                            message("Fetching $url…")
+                            val init = RequestInit(method = "POST", body = jsonOf(_m["url" j url, "manualIntake" j true]),
+                                headers = Headers().apply { append("Content-Type", "application/json") })
+                            init.asDynamic().signal = abort.signal
+                            val response = window.fetch("/api/projects/link", init).await()
+                            val value = reifyStrict(response.text().await()) as? Map<*, *> ?: error("Link response is unreadable")
+                            require(response.ok && value["verdict"] == "ok") { (value["detail"] ?: value["error"] ?: "Link could not be fetched").toString() }
+                            val project = value["name"] as? String ?: error("Link project identity is missing")
+                            message("Fetched $url; starting parsing…")
+                            val parsing = try { parse(project) }
+                                catch (cancelled: CancellationException) { throw cancelled }
+                                catch (failure: Throwable) { "Link was saved, but parsing could not start: ${failure.message ?: "unknown error"}." }
+                            if (present()) {
+                                status.textContent = "Added $url to $project. $parsing "
+                                val link = document.createElement("a")
+                                link.textContent = "Open project"
+                                link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(project)}#${WikiSurface.encode(project)}")
+                                status.appendChild(link)
+                            }
+                        }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Throwable) { message("Link drop stopped: ${failure.message ?: "Unable to fetch"}") }
+                    finally { pending = false; if (present()) disable(false) }
+                }
+                return
+            }
             if (items.size > MAX_FILES) { message("Upload at most $MAX_FILES entries at once. Nothing was sent."); return }
             val roots = items.mapNotNull { item -> if (item.webkitGetAsEntry != null) item.webkitGetAsEntry() else null }
             val fallback = transfer.files

@@ -342,7 +342,7 @@ class ProjectMiner(
                 pdb.store.head.getRev(id) == sourceRev) {
                 "source changed during extraction: $id"
             }
-            if (body.length < 80) return@withContext mapOf("verdict" to "no_text", "id" to id)
+            if (body.isBlank()) return@withContext mapOf("verdict" to "no_text", "id" to id)
             putExtraction(name, id, source.contentId, sourceRev, body, anchors)
             mapOf("verdict" to "ingested", "id" to id, "chars" to body.length,
                 "route" to when { ext == "pdf" -> "pdf pages (${PDF_ROUTE.name.lowercase()})"; ext in MARKUP -> "markup"; else -> "tika" },

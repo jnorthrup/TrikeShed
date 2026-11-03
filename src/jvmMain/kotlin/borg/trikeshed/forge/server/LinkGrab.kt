@@ -74,13 +74,17 @@ class LinkGrab(
      * A dragged link: its document fetched and landed as the root of a group of its own, named for its host and path,
      * at `<host>/<path>` like every document its links reach. Answers the group and the root's id.
      */
-    suspend fun root(url: String, provider: DecisionProvider?, requirePdf: Boolean = false): Pair<String, String> {
+    suspend fun root(url: String, provider: DecisionProvider?, requirePdf: Boolean = false, manualIntake: Boolean = false): Pair<String, String> {
         val host = name(host(url) ?: error("not a web address: $url"))
         val group = (host + "-" + stem(url).lowercase()).replace(Regex("[^a-z0-9._-]+"), "-").trim('-', '.').take(64).trimEnd('-', '.')
         val (bytes, type, at) = fetch(url)
         val ext = extension(bytes, type, requirePdf)
         val digest = borg.trikeshed.job.ContentId.of(bytes).hex
-        if (scopes.list().none { it.name == group }) scopes.beginUpload(group, "assets", provider)
+        if (manualIntake) {
+            require(provider == null) { "Manual link intake does not select a model" }
+            require(scopes.list().none { it.name == group }) { "Project $group already exists" }
+            scopes.beginUpload(group, "assets", manualIntake = true)
+        } else if (scopes.list().none { it.name == group }) scopes.beginUpload(group, "assets", provider)
         held(group).let { h -> h.works.add(work(url)); h.works.add(work(at)); h.digests.add(digest) }
         val doc = "$host/${stem(url)}.$ext"
         val twin = buildString {
@@ -91,8 +95,8 @@ class LinkGrab(
             append("bytes: ").append(bytes.size).append('\n').append("type: ").append(type).append('\n')
             append("depth: 0\n")
         }
-        scopes.uploadPut(group, doc + ProjectNodes.NOTES_SUFFIX, twin.encodeToByteArray(), provider)
-        scopes.uploadPut(group, doc, bytes, provider)
+        scopes.uploadPut(group, doc + ProjectNodes.NOTES_SUFFIX, twin.encodeToByteArray(), provider, manualIntake = manualIntake)
+        scopes.uploadPut(group, doc, bytes, provider, manualIntake = manualIntake)
         return group to doc
     }
 

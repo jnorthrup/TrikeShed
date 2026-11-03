@@ -431,7 +431,9 @@ class CurationIntake(
                 val url = q["url"]?.toString()?.trim().orEmpty()
                 runCatching {
                     require(q["requirePdf"] == null || q["requirePdf"] is Boolean) { "requirePdf must be a boolean" }
-                    links.root(url, q["decisionProvider"]?.toString()?.takeIf { it.isNotBlank() }?.let(DecisionProvider::of), q["requirePdf"] == true)
+                    require(q["manualIntake"] == null || q["manualIntake"] is Boolean) { "manualIntake must be a boolean" }
+                    links.root(url, q["decisionProvider"]?.toString()?.takeIf { it.isNotBlank() }?.let(DecisionProvider::of),
+                        q["requirePdf"] == true, q["manualIntake"] == true)
                 }.fold(
                     onSuccess = { (name, id) -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200,
                         borg.trikeshed.parse.jsonOf(mapOf("verdict" to "ok", "name" to name, "id" to id))) },
