@@ -12,6 +12,7 @@ import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.lcnc.DocumentCurationLegos
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
@@ -80,6 +81,9 @@ class CurationIntake(
     private val admission = Any()
     private var admissionVersion = 0L
     private val inFlight = ConcurrentHashMap.newKeySet<Doc>()
+    private enum class Outcome { HELD, JOINED }
+    // Successful in-flight outcomes remain observable until finish removes the admission.
+    private val outcomes = HashMap<Doc, Outcome>()
     // At most one latest follow-up per document; access only while holding admission.
     private val followUps = HashMap<Pair<String, String>, Doc>()
     private val tallies = ConcurrentHashMap<String, Tally>()
@@ -111,6 +115,25 @@ class CurationIntake(
     suspend fun drain() = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
         synchronized(admission) { queue.close() }
         worker.join()
+        // Hard parent cancellation can stop every consumer with identifiers still
+        // queued. The joined worker can no longer take ownership of those admissions.
+        if (worker.isCancelled) settlement.withLock {
+            val settledCancelled = synchronized(admission) {
+                var cleared = false
+                while (true) {
+                    val d = pending.poll() ?: break
+                    inFlight.remove(d)
+                    outcomes.remove(d)
+                    if (removed.remove(d)) uncountQueued(d) else cancelled(d)
+                    cleared = true
+                }
+                for (d in followUps.values) { cancelled(d); cleared = true }
+                followUps.clear()
+                cleared
+            }
+            if (settledCancelled && synchronized(admission) { inFlight.isEmpty() }) runCatching { settled() }
+                .onFailure { System.err.println("[INTAKE] inference release failed: ${it.message}") }
+        }
         check(tallies.values.all { it.pending == 0 }) { "Document curation stopped with unfinished admitted work" }
     }
 
@@ -132,12 +155,41 @@ class CurationIntake(
     /** A document removed from its upload: a queued reading of it is dropped, not failed. */
     fun forget(project: String, id: String) {
         synchronized(admission) {
-            removed.addAll(inFlight.filter { it.project == project && it.id == id })
+            val affected = inFlight.filter { it.project == project && it.id == id }
+            removed.addAll(affected)
+            for (doc in affected) {
+                when (outcomes.remove(doc)) {
+                    Outcome.JOINED -> {
+                        val tally = tallies.getValue(project)
+                        tally.curated.decrementAndGet()
+                        tally.failed.incrementAndGet()
+                        tally.note = "${doc.id}: removed near join; derived membership may be stale"
+                        doc.decisionProvider?.let {
+                            val provider = providerTallies.getValue(project to it)
+                            provider.curated.decrementAndGet()
+                            provider.failed.incrementAndGet()
+                            provider.note = tally.note
+                        }
+                    }
+                    Outcome.HELD -> {
+                        tallies.getValue(project).curated.decrementAndGet()
+                        doc.decisionProvider?.let { providerTallies.getValue(project to it).curated.decrementAndGet() }
+                        uncountQueued(doc)
+                    }
+                    null -> Unit
+                }
+            }
             followUps.remove(project to id)?.let { uncountQueued(it) }
             clearObservations(project, id)
         }
     }
     private val removed = ConcurrentHashMap.newKeySet<Doc>()
+
+    private class RemovedDuringJoin(cause: Throwable? = null) :
+        IllegalStateException("source removed near join; derived membership may be stale", cause)
+
+    private class JoinCancellation(val original: kotlinx.coroutines.CancellationException) :
+        kotlinx.coroutines.CancellationException(original.message)
 
     /** Called under admission: discard superseded observations and their admission counts. */
     private fun clearObservations(project: String, id: String) {
@@ -158,6 +210,18 @@ class CurationIntake(
     private fun uncountQueued(d: Doc) {
         tallies.getValue(d.project).queued.decrementAndGet()
         d.decisionProvider?.let { providerTallies.getValue(d.project to it).queued.decrementAndGet() }
+    }
+
+    /** Called under admission after an owning worker can no longer execute this item. */
+    private fun cancelled(d: Doc) {
+        val tally = tallies.getValue(d.project)
+        tally.failed.incrementAndGet()
+        tally.note = "${d.id}: curation owner cancelled before execution"
+        d.decisionProvider?.let {
+            val provider = providerTallies.getValue(d.project to it)
+            provider.failed.incrementAndGet()
+            provider.note = tally.note
+        }
     }
 
     /** Queue one landed document. PDFs and the miner's other formats curate; twins and the rest do not. */
@@ -252,6 +316,42 @@ class CurationIntake(
             if (d.mode is Mode.Blocked) error("Intake policy blocked: ${d.mode.reason}")
             selectedCurrent()
             val root = constellations()
+            // A removal observed before a later stage stops that stage.
+            fun discarded(orphan: Boolean = false): Boolean = synchronized(admission) {
+                if (d !in removed) false else {
+                    if (orphan) {
+                        t.note = "${d.id}: removed during curation; unjoined artifacts may remain"
+                        providerTally?.note = t.note
+                    }
+                    uncountQueued(d)
+                    true
+                }
+            }
+            fun completed(joinedNow: Boolean): Boolean = synchronized(admission) {
+                if (d in removed) {
+                    if (joinedNow) {
+                        t.failed.incrementAndGet()
+                        t.note = "${d.id}: removed near join; derived membership may be stale"
+                        providerTally?.let { it.failed.incrementAndGet(); it.note = t.note }
+                    } else uncountQueued(d)
+                    false
+                } else {
+                    t.curated.incrementAndGet(); providerTally?.curated?.incrementAndGet()
+                    outcomes[d] = if (joinedNow) Outcome.JOINED else Outcome.HELD
+                    true
+                }
+            }
+            suspend fun <T> afterJoin(block: suspend () -> T): T {
+                if (d in removed) throw RemovedDuringJoin()
+                val result = try { block() } catch (failure: kotlinx.coroutines.CancellationException) {
+                    throw JoinCancellation(failure)
+                } catch (failure: Throwable) {
+                    if (d in removed) throw RemovedDuringJoin(failure)
+                    throw failure
+                }
+                if (d in removed) throw RemovedDuringJoin()
+                return result
+            }
             val nodes = d.decisionProvider?.let { root?.ingestAccess(it) } ?: root
             r = if (d.decisionProvider != null && nodes != null)
                 LinkedHashMap<String, LcncNodeRunner>().also { nodes.register(it) } else runners()
@@ -307,12 +407,14 @@ class CurationIntake(
             // Held only when curated from this very text: a re-read source curates again by itself.
             if (nodes != null && nodes.holds(constellation, d.id, borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)) {
                 d.decisionProvider?.let { provider -> reading.withLock {
+                    if (discarded()) return
                     score(provider, d.id)
+                    if (discarded(orphan = true)) return
                     selectedCurrent()
-                    runner(ConstellationNodes.JOIN).run(
-                        LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to d.id))
+                    afterJoin { runner(ConstellationNodes.JOIN).run(
+                        LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to d.id)) }
                 } }
-                t.curated.incrementAndGet(); providerTally?.curated?.incrementAndGet()
+                if (!completed(d.decisionProvider != null)) return
                 if (d.decisionProvider != null) grabbing(d)
                 return
             }
@@ -322,6 +424,7 @@ class CurationIntake(
                     "extractedTextCid" to retained.extractedTextCid.value)
             } ?: emptyMap())
             reading.withLock {
+            if (discarded()) return
             selectedCurrent()
             LcncTrail.live.run("intake/${d.project}")
             val curated = runner(ConstellationNodes.CURATE).run(
@@ -333,24 +436,55 @@ class CurationIntake(
                 },
             )
             val book = curated["book"] ?: error("book.curate returned no book")
+            if (discarded(orphan = true)) return
             selectedCurrent()
-            runner(ConstellationNodes.JOIN).run(
-                LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book))
+            afterJoin { runner(ConstellationNodes.JOIN).run(
+                LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book)) }
             d.decisionProvider?.let {
-                score(it, book.toString())
-                selectedCurrent()
-                runner(ConstellationNodes.JOIN).run(
-                    LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book))
+                afterJoin { score(it, book.toString()) }
+                afterJoin {
+                    selectedCurrent()
+                    runner(ConstellationNodes.JOIN).run(
+                        LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book))
+                }
             }
-            t.curated.incrementAndGet(); providerTally?.curated?.incrementAndGet()
+            if (!completed(joinedNow = true)) return
             System.err.println("[INTAKE] ${d.project}/${d.id}: ${curated["statements"]} statements from ${curated["sections"]} sections")
             }
             if (d.decisionProvider != null) grabbing(d)
         } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
+            val ownerCancelled = !kotlinx.coroutines.currentCoroutineContext().isActive
+            synchronized(admission) {
+                if (e is JoinCancellation && d in removed) {
+                    t.failed.incrementAndGet()
+                    t.note = "${d.id}: source removed near join; derived membership may be stale"
+                    providerTally?.let { it.failed.incrementAndGet(); it.note = t.note }
+                } else {
+                    if (d in removed) {
+                        t.note = "${d.id}: removed during curation; unjoined artifacts may remain"
+                        providerTally?.note = t.note
+                        uncountQueued(d)
+                    } else {
+                        t.failed.incrementAndGet()
+                        t.note = "${d.id}: ${if (ownerCancelled) "curation owner cancelled" else "operation cancelled"}: ${e.message ?: e}"
+                        providerTally?.let { it.failed.incrementAndGet(); it.note = t.note }
+                    }
+                }
+            }
+            if (ownerCancelled) throw if (e is JoinCancellation) e.original else e
         } catch (e: Throwable) {
             synchronized(admission) {
-                if (d.mode != Mode.Legacy && (removed.contains(d) || followUps.containsKey(d.project to d.id))) t.queued.decrementAndGet()
+                if (e is RemovedDuringJoin) {
+                    t.failed.incrementAndGet(); t.note = "${d.id}: ${e.message}"
+                    providerTally?.let { it.failed.incrementAndGet(); it.note = t.note }
+                } else if (removed.contains(d)) {
+                    if (d.mode == Mode.Legacy) {
+                        t.note = "${d.id}: removed during curation; unjoined artifacts may remain"
+                        providerTally?.note = t.note
+                    }
+                    uncountQueued(d)
+                }
+                else if (d.mode != Mode.Legacy && followUps.containsKey(d.project to d.id)) t.queued.decrementAndGet()
                 else {
                     t.failed.incrementAndGet(); t.note = "${d.id}: ${e.message ?: e}"
                     providerTally?.let { it.failed.incrementAndGet(); it.note = t.note }
@@ -375,6 +509,7 @@ class CurationIntake(
     private suspend fun finish(d: Doc) {
         val idleVersion = synchronized(admission) {
             removed.remove(d)
+            outcomes.remove(d)
             inFlight.remove(d)
             val key = d.project to d.id
             if (inFlight.none { it.project == d.project && it.id == d.id }) {

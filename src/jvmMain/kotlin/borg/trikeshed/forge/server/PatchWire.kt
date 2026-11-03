@@ -294,10 +294,12 @@ class ProjectScopes(
             }
             decisionProvider?.let { documentProviders[name to rel] = it }
             scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
+            // Keep source publication and its synchronous intake admission ordered
+            // against removal of the same document.
+            if (!manualIntake && !borg.trikeshed.lcnc.ProjectNodes.twin(rel))
+                onDocument?.invoke(name, rel, decisionProvider)
             cid
         }
-        if (!manualIntake && !borg.trikeshed.lcnc.ProjectNodes.twin(rel))
-            onDocument?.invoke(name, rel, decisionProvider)
         return cid
     }
 
@@ -351,9 +353,10 @@ class ProjectScopes(
             }
             for (id in ids) ProjectMiner.ocrDir(name, id).takeIf { it.isDirectory }?.deleteRecursively()
             scopes = scopes.map { if (it.name == name) it.copy(paths = maxOf(0, it.paths - ids.size), docs = pdb.docCount) else it }
+            // A later replacement cannot overtake removal from derived state.
+            for (id in ids) if (!borg.trikeshed.lcnc.ProjectNodes.twin(id)) onRemoved?.invoke(name, id)
             ids
         }
-        for (id in ids) if (!borg.trikeshed.lcnc.ProjectNodes.twin(id)) onRemoved?.invoke(name, id)
         System.err.println("[OROBOROS] project db $name: removed ${ids.size} docs under $rel")
         ids
     }

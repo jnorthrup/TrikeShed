@@ -3,18 +3,30 @@ package borg.trikeshed.forge.server
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.narsese.DocumentSource
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -469,6 +481,246 @@ class CurationIntakeTest {
             assertEquals(0, status["curated"])
             assertEquals(0, status["pending"])
             assertTrue((status["awaitingReviews"] as List<*>).isEmpty())
+        }
+    }
+
+    @Test
+    fun replacementUploadWaitsUntilTheRemovalHookHasFinished(): Unit = runBlocking {
+        val cas = borg.trikeshed.job.CasStore.inMemory()
+        val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(cas)
+        val gateway = borg.trikeshed.util.oroboros.CouchAttachmentGateway(store, cas)
+        val index = borg.trikeshed.memory.CouchIndexBridge(gateway,
+            borg.trikeshed.memory.MemoryIndexLayer(borg.trikeshed.memory.MemoryStore(cas, store)))
+        val registry = ProjectDbRegistry("primary")
+        val home = Files.createTempDirectory("intake-remove-order").toFile()
+        val scopes = ProjectScopes(borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), gateway, index, cas, null,
+            projectDbs = registry, ledgerFile = File(home, "projects.tsv"), filesRoot = File(home, "files"))
+        val project = scopes.beginUpload("legal").name
+        scopes.uploadPut(project, "agreement.pdf", "old".encodeToByteArray())
+        val entered = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val replacementStarted = CompletableDeferred<Unit>()
+        val events = java.util.concurrent.CopyOnWriteArrayList<String>()
+        scopes.onRemoved = { _, _ ->
+            events.add("remove-start")
+            entered.complete(Unit)
+            check(release.await(5, TimeUnit.SECONDS)) { "removal hook was not released" }
+            events.add("remove-end")
+        }
+        scopes.onDocument = { _, _, _ -> events.add("replacement") }
+        val removing = async(Dispatchers.IO) { scopes.uploadRemove(project, "agreement.pdf") }
+        try {
+            withTimeout(5_000) { entered.await() }
+            val replacing = async(Dispatchers.IO) {
+                replacementStarted.complete(Unit)
+                scopes.uploadPut(project, "agreement.pdf", "new".encodeToByteArray())
+            }
+            withTimeout(5_000) { replacementStarted.await() }
+            val overtook = withTimeoutOrNull(1_000) { replacing.await(); true } ?: false
+            release.countDown()
+            withTimeout(5_000) { removing.await(); replacing.await() }
+            assertFalse(overtook, "replacement admission overtook the earlier removal callback")
+            assertEquals(_l["remove-start", "remove-end", "replacement"], events.toList())
+            assertContentEquals("new".encodeToByteArray(), registry.get(project)?.gateway?.getAttachment("agreement.pdf")?.second)
+        } finally {
+            release.countDown()
+            removing.await()
+            scopes.unmount(project)
+            scopes.drain()
+            home.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun internallyCancelledJoinSettlesFailureAndKeepsTheConsumerAvailable(): Unit = runBlocking {
+        var joins = 0
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, inputs ->
+                val doc = inputs.getValue("doc") as Map<*, *>
+                _m["book" j (doc["id"] as String)]
+            },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ ->
+                joins++
+                if (joins == 1) throw CancellationException("provider timed out")
+                emptyMap()
+            },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, this)
+        intake.offer("project", "first.pdf")
+        intake.offer("project", "second.pdf")
+        withTimeout(5_000) { intake.drain() }
+        val status = intake.status().getValue("project") as Map<*, *>
+        assertEquals(2, joins)
+        assertEquals(2, status["queued"])
+        assertEquals(1, status["failed"])
+        assertEquals(1, status["curated"])
+        assertEquals(0, status["pending"])
+        assertTrue((status["note"] as String).contains("provider timed out"))
+    }
+
+    @Test
+    fun concurrentDrainsWaitForCancelledWorkToReleaseInference(): Unit = runBlocking {
+        val owner = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(owner + Dispatchers.Default)
+        val started = Channel<String>(Channel.UNLIMITED)
+        val releaseStarted = CompletableDeferred<Unit>()
+        val releaseGate = CompletableDeferred<Unit>()
+        val intake = CurationIntake(Corpus(), { emptyMap() }, { null }, scope,
+            settled = { releaseStarted.complete(Unit); releaseGate.await() },
+            retainedSource = { _, id -> started.send(id); awaitCancellation() })
+        try {
+            repeat(CurationIntake.DOCUMENTS + 1) { intake.offer("project", "book-$it.pdf") }
+            repeat(CurationIntake.DOCUMENTS) { withTimeout(5_000) { started.receive() } }
+            owner.cancel()
+            val first = async { intake.drain() }
+            withTimeout(5_000) { releaseStarted.await() }
+            val secondStarted = CompletableDeferred<Unit>()
+            val second = async { secondStarted.complete(Unit); intake.drain() }
+            withTimeout(5_000) { secondStarted.await() }
+            val early = withTimeoutOrNull(500) { second.await(); true } ?: false
+            releaseGate.complete(Unit)
+            withTimeout(5_000) { first.await(); second.await() }
+            assertFalse(early, "every drain must wait for the inference release")
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(0, status["pending"])
+            assertEquals(CurationIntake.DOCUMENTS + 1, status["failed"])
+        } finally {
+            releaseGate.complete(Unit)
+            owner.cancelAndJoin()
+        }
+    }
+
+    @Test
+    fun ownerCancellationSettlesActiveQueuedAndFollowUpAdmissions(): Unit = runBlocking {
+        val owner = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(owner + Dispatchers.Default)
+        val started = Channel<String>(Channel.UNLIMITED)
+        val released = java.util.concurrent.atomic.AtomicInteger()
+        val intake = CurationIntake(Corpus(), { emptyMap() }, { null }, scope,
+            settled = { released.incrementAndGet(); Unit },
+            retainedSource = { _, id -> started.send(id); awaitCancellation() })
+        try {
+            val count = CurationIntake.DOCUMENTS + 2
+            repeat(count) { intake.offer("project", "book-$it.pdf", DecisionProvider.JEV) }
+            val first = withTimeout(5_000) { started.receive() }
+            repeat(CurationIntake.DOCUMENTS - 1) { withTimeout(5_000) { started.receive() } }
+            intake.offer("project", first, DecisionProvider.JEV)
+            owner.cancel()
+            withTimeout(5_000) { intake.drain() }
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertTrue(owner.isCancelled)
+            assertEquals(count + 1, status["queued"])
+            assertEquals(count + 1, status["failed"])
+            assertEquals(0, status["curated"])
+            assertEquals(0, status["pending"])
+            assertTrue((status["note"] as String).contains("cancel"))
+            val providers = status["providers"] as Map<*, *>
+            val provider = providers[DecisionProvider.JEV.id] as Map<*, *>
+            assertEquals(count + 1, provider["queued"])
+            assertEquals(count + 1, provider["failed"])
+            assertEquals(0, provider["pending"])
+            assertEquals(1, released.get(), "cancelled queued work must not strand the inference lease")
+        } finally { owner.cancelAndJoin() }
+    }
+
+    @Test
+    fun ownerCancellationDuringRemovedJoinReportsUncertaintyAndPropagates(): Unit = runBlocking {
+        val owner = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(owner + Dispatchers.Default)
+        val started = CompletableDeferred<Unit>()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "renamed-book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> started.complete(Unit); awaitCancellation() },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, scope)
+        try {
+            intake.offer("project", "agreement.pdf")
+            withTimeout(5_000) { started.await() }
+            intake.forget("project", "agreement.pdf")
+            owner.cancel()
+            withTimeout(5_000) { intake.drain() }
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertTrue(owner.isCancelled)
+            assertEquals(1, status["failed"])
+            assertEquals(0, status["curated"])
+            assertEquals(0, status["pending"])
+            assertTrue((status["note"] as String).contains("derived membership may be stale"))
+        } finally {
+            owner.cancelAndJoin()
+        }
+    }
+
+    @Test
+    fun removalDuringJoinReportsUncertainMembershipAndKeepsTheReplacement(): Unit = runBlocking {
+        val joinStarted = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var joins = 0
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "renamed-book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ ->
+                joins++
+                if (joins == 1) {
+                    joinStarted.complete(Unit)
+                    release.await()
+                }
+                emptyMap()
+            },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, this)
+        intake.offer("project", "agreement.pdf")
+        try {
+            withTimeout(5_000) { joinStarted.await() }
+            intake.forget("project", "agreement.pdf")
+            intake.offer("project", "agreement.pdf")
+            release.complete(Unit)
+            withTimeout(5_000) { intake.drain() }
+            assertEquals(2, joins, "the replacement must still be allowed to join")
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(2, status["queued"])
+            assertEquals(1, status["failed"])
+            assertEquals(1, status["curated"])
+            assertEquals(0, status["pending"])
+            assertTrue((status["note"] as String).contains("derived membership may be stale"))
+        } finally {
+            release.complete(Unit)
+            intake.drain()
+        }
+    }
+
+    @Test
+    fun forgettingDuringLegacyCurationDoesNotJoinADeletedDocument(): Unit = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val joined = mutableListOf<String>()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, inputs ->
+                started.complete(Unit)
+                release.await()
+                val doc = inputs.getValue("doc") as Map<*, *>
+                _m["book" j (doc["id"] as String)]
+            },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, inputs ->
+                joined.add(inputs.getValue("book") as String)
+                emptyMap()
+            },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, this)
+        intake.offer("project", "agreement.pdf")
+        try {
+            withTimeout(5_000) { started.await() }
+            intake.forget("project", "agreement.pdf")
+            release.complete(Unit)
+            withTimeout(5_000) { intake.drain() }
+            assertTrue(joined.isEmpty(), "a deleted document must not be joined after curation finishes")
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(0, status["queued"])
+            assertEquals(0, status["curated"])
+            assertEquals(0, status["failed"])
+            assertEquals(0, status["pending"])
+            assertTrue((status["note"] as String).contains("unjoined artifacts may remain"))
+        } finally {
+            release.complete(Unit)
+            intake.drain()
         }
     }
 
