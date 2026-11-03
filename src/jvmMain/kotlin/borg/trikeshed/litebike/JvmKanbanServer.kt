@@ -258,8 +258,8 @@ class JvmKanbanServer(
         val httpScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         // The HTTP handler logic is handled by the Protocol.Http slot.
+        val httpSlot = listener.register(Protocol.Http)
         httpScope.launch {
-            val httpSlot = listener.register(Protocol.Http)
             while (true) {
                 // A closed slot is the listener shutting down (the finally below): end the worker
                 // quietly. Before this, the close resumed us with ClosedReceiveChannelException on a
@@ -269,6 +269,18 @@ class JvmKanbanServer(
                 val payload = msg.payload
 
                 val wireNuid = nuid(Capability.Wireproto("http"), Nonce.RandomBytes(), Subnet.lanLocalhost)
+                val completion = msg.completion
+                if (completion != null) {
+                    // Admission-only fanout slots may retain their payload. The bounded
+                    // Documents lane publishes its header, never its request body.
+                    httpScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                        val boundary = indexOfHeaderBoundary(payload, payload.size)
+                        val head = if (boundary < 0) ByteArray(0) else payload.copyOf(boundary + 4)
+                        fanout.dispatch(wireNuid, head)
+                        answer(msg, routeHttp(payload))
+                    }.invokeOnCompletion { completion.complete(Unit) }
+                    continue
+                }
                 fanout.dispatch(wireNuid, payload)
 
                 // SSE — intercept before routeHttp to stream events without
@@ -316,27 +328,7 @@ class JvmKanbanServer(
                 // client behind it. The single-consumer slot stays the only
                 // reader; handling is forked per message.
                 httpScope.launch {
-                    val resp = routeHttp(payload)
-                    val payloadOut = resp.payloadBytes
-                    val head = buildString {
-                        append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
-                        append("Content-Length: ${payloadOut.size}\r\n")
-                        append("Content-Type: ${resp.contentType}\r\n")
-                        // Operator surface: NEVER heuristically cached. With no header the
-                        // browser is free to serve day-old pages — every "stale slop" report
-                        // this daemon has eaten traces to that. no-cache still allows
-                        // conditional revalidation; it forbids silent staleness.
-                        append("Cache-Control: no-cache\r\n")
-                        // CR/LF stripped: a header value carrying them would let a route's
-                        // payload-derived string inject frame structure of its own.
-                        for ((k, v) in resp.headers) {
-                            append("$k: ${v.replace("\r", "").replace("\n", "")}\r\n")
-                        }
-                        append("Access-Control-Allow-Origin: *\r\n\r\n")
-                    }.toByteArray(StandardCharsets.UTF_8)
-                    val outBytes = head + payloadOut
-                    // Write back through the listener's response callback
-                    runCatching { msg.respond?.invoke(outBytes) }
+                    answer(msg, routeHttp(payload))
                 }
             }
         }
@@ -364,11 +356,27 @@ class JvmKanbanServer(
                 runCatching { listener.close() }
                 runCatching { fanout.close() }
                 httpScope.cancel()
+                // Once the worker is canceled, queued requests have no consumer.
+                // Hard cancellation invokes each undelivered request's completion.
+                httpSlot.cancel()
             }
         }
     }
 
     // ── routes (single worker, hand-rolled) ──────────────────────────────
+
+    private suspend fun answer(msg: LitebikeListenerElement.ChannelMessage, resp: HttpResponse) {
+        val payload = resp.payloadBytes
+        val head = buildString {
+            append("HTTP/1.1 ${resp.status} ${statusReason(resp.status)}\r\n")
+            append("Content-Length: ${payload.size}\r\n")
+            append("Content-Type: ${resp.contentType}\r\n")
+            append("Cache-Control: no-cache\r\n")
+            for ((k, v) in resp.headers) append("$k: ${v.replace("\r", "").replace("\n", "")}\r\n")
+            append("Access-Control-Allow-Origin: *\r\n\r\n")
+        }.toByteArray(StandardCharsets.UTF_8)
+        runCatching { msg.respond?.invoke(head + payload) }
+    }
 
     private fun isStreamingRequest(reqPath: String): Boolean {
         val p = reqPath.substringBefore('?')

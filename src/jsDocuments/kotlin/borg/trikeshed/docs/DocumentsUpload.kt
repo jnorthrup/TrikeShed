@@ -2,6 +2,7 @@ package borg.trikeshed.docs
 
 import borg.trikeshed.graal.console.Ingest
 import borg.trikeshed.lib.*
+import borg.trikeshed.litebike.DocumentBatch
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.wiki.WikiSurface
@@ -17,9 +18,9 @@ import org.w3c.fetch.RequestInit
 
 /** Browser files go through the existing project upload boundary, never the selected document. */
 internal object DocumentsUpload {
-    private const val MAX_FILES = 1000
-    private const val MAX_FILE_BYTES = 32 * 1024 * 1024
-    private const val MAX_TOTAL_BYTES = 128 * 1024 * 1024
+    private const val MAX_FILES = DocumentBatch.FILES
+    private const val MAX_FILE_BYTES = DocumentBatch.FILE_BYTES
+    private const val MAX_TOTAL_BYTES = DocumentBatch.TOTAL_BYTES
     private class Entry(val path: String, val file: dynamic)
 
     fun mount() {
@@ -42,7 +43,7 @@ internal object DocumentsUpload {
             panel.setAttribute("aria-busy", value.toString())
         }
         fun safe(path: String): String {
-            require(path.isNotBlank() && path.length <= 1024 && !path.startsWith('/') && '\\' !in path &&
+            require(path.isNotBlank() && path.length <= DocumentBatch.PATH_UNITS && !path.startsWith('/') && '\\' !in path &&
                 path.none { it < ' ' || it == '\u007f' } && path.split('/').none { it.isEmpty() || it == "." || it == ".." } &&
                 path.encodeToByteArray().decodeToString(throwOnInvalidSequence = true) == path) { "Unsafe upload path: $path" }
             return path
@@ -105,7 +106,7 @@ internal object DocumentsUpload {
                 val batchFiles = parts.size / 4
                 val blob: dynamic = js("new Blob(frameParts)")
                 parts = mutableListOf(); packed = 0
-                val result = request("/_project/${WikiSurface.encode(actual)}/putBatch?intake=manual", blob)
+                val result = request("/_project/${WikiSurface.encode(actual)}/putDocumentBatch?intake=manual", blob)
                 val stored = (result["stored"] as? Number)?.toInt() ?: error("Upload count is missing")
                 val failed = (result["failed"] as? Number)?.toInt() ?: error("Upload failure count is missing")
                 sent += stored

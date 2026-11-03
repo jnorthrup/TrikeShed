@@ -5,6 +5,8 @@ package borg.trikeshed.litebike
 import borg.trikeshed.litebike.taxonomy.Protocol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
@@ -12,6 +14,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.Semaphore
+import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import java.net.InetSocketAddress
 import java.net.StandardSocketOptions
@@ -22,6 +27,20 @@ import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+
+/** An acquired document slot is retained by both its sending job and its receiver. */
+internal class DocumentPermit(admission: Semaphore, sender: Job, done: CompletableDeferred<Unit>) {
+    private val owner = Job()
+    private val sent = CompletableDeferred<Unit>(owner)
+    val completion = CompletableDeferred<Unit>(owner)
+
+    init {
+        owner.invokeOnCompletion { admission.release() }
+        completion.invokeOnCompletion { done.complete(Unit) }
+        sender.invokeOnCompletion { sent.complete(Unit) }
+        owner.complete()
+    }
+}
 
 /**
  * JvmLitebikeBindAdapter — the only place native bind lives for the
@@ -96,7 +115,7 @@ object JvmLitebikeBindAdapter {
         // fanout here would race the daemon's consumers and consume messages
         // before the HTTP worker can dispatch them through NUID.
         try {
-            acceptLoop(server, element, connections)
+            acceptLoop(server, element, connections, Semaphore(DocumentBatch.IN_FLIGHT))
         } finally {
             withContext(NonCancellable + Dispatchers.IO) {
                 runCatching { connections.closeAll() }
@@ -116,6 +135,7 @@ object JvmLitebikeBindAdapter {
         server: AsynchronousServerSocketChannel,
         element: LitebikeListenerElement,
         connections: ConnectionRegistry,
+        documents: Semaphore,
     ) {
         val supervisor = kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.nio.spi.NioSupervisor.Key]
         while (kotlinx.coroutines.currentCoroutineContext().isActive) {
@@ -149,7 +169,7 @@ object JvmLitebikeBindAdapter {
             // Read all bytes from the channel asynchronously, then
             // forward to the listener with the detected protocol.
             CoroutineScope(element.supervisor).launch(start = CoroutineStart.UNDISPATCHED) {
-                drainOne(ch, element, connections, connId)
+                drainOne(ch, element, connections, connId, documents)
             }
         }
     }
@@ -159,6 +179,7 @@ object JvmLitebikeBindAdapter {
             element: LitebikeListenerElement,
             connections: ConnectionRegistry,
             connId: Long,
+            documents: Semaphore,
         ) {
             val buf = ByteBuffer.allocate(8 * 1024)
             // Reassembly buffer: grows by doubling, so a large body costs O(n), not O(n²).
@@ -191,6 +212,14 @@ object JvmLitebikeBindAdapter {
                             // protocol (Json) and the connection is dropped.
                             val head = pending.copyOf(minOf(pendingSize, 8))
                             val proto: Protocol = ProtocolDetector.detect(head, pendingSize)
+                            if (proto == Protocol.Http && isDocumentRequest(pending, pendingSize)) {
+                                val initial = pending.copyOf(pendingSize)
+                                CoroutineScope(element.supervisor).launch(start = CoroutineStart.UNDISPATCHED) {
+                                    try { documentOne(ch, element, connections, connId, documents, initial, done) }
+                                    catch (failure: Throwable) { done.complete(Unit); throw failure }
+                                }
+                                return
+                            }
                             if (proto == Protocol.Http && !httpFrameComplete(pending, pendingSize)) {
                                 // Incomplete frame: keep the accumulated bytes and read
                                 // the next chunk into a cleared buffer; re-check on append.
@@ -254,6 +283,106 @@ object JvmLitebikeBindAdapter {
                 connections.unregister(connId)
             }
         }
+
+    /** Only the dedicated Documents route uses the bounded body contract. */
+    private fun isDocumentRequest(bytes: ByteArray, size: Int): Boolean {
+        var start = 0
+        while (start < size && bytes[start] != ' '.code.toByte()) start++
+        if (start == size) return false
+        start++
+        var end = start
+        while (end < size && bytes[end] != ' '.code.toByte() && bytes[end] != '?'.code.toByte() &&
+            bytes[end] != '\r'.code.toByte() && bytes[end] != '\n'.code.toByte()) end++
+        if (end == size) return false
+        val path = String(bytes, start, end - start, Charsets.ISO_8859_1).trim('/')
+        val segments = path.split('/')
+        return segments.size >= 3 && segments[0] == "_project" && segments[2] == "putDocumentBatch"
+    }
+
+    private class FrameFailure(val status: Int) : Exception()
+
+    internal suspend fun readDocument(ch: AsynchronousSocketChannel, initial: ByteArray,
+                                      idleMs: Long = DocumentBatch.READ_IDLE_MS): ByteArray {
+        if (initial.size > DocumentBatch.HEAD_BYTES) throw FrameFailure(431)
+        val head = ByteArray(DocumentBatch.HEAD_BYTES)
+        initial.copyInto(head)
+        var size = initial.size
+        var boundary = indexOfHeaderBoundary(head, size)
+        while (boundary < 0) {
+            if (size == head.size) throw FrameFailure(431)
+            val read = ch.readAwait(ByteBuffer.wrap(head, size, minOf(8192, head.size - size)), idleMs)
+            if (read <= 0) throw java.io.EOFException()
+            size += read
+            boundary = indexOfHeaderBoundary(head, size)
+        }
+        val lines = String(head, 0, boundary, Charsets.ISO_8859_1).split("\r\n")
+        var length: Long? = null
+        for (line in lines.drop(1)) {
+            val colon = line.indexOf(':')
+            if (colon <= 0 || line.substring(0, colon).any { it <= ' ' || it >= '\u007f' }) throw FrameFailure(400)
+            val name = line.substring(0, colon)
+            val value = line.substring(colon + 1).trim()
+            if (name.equals("Transfer-Encoding", ignoreCase = true)) throw FrameFailure(400)
+            if (name.equals("Content-Length", ignoreCase = true)) {
+                if (length != null || value.isEmpty() || value.any { it !in '0'..'9' }) throw FrameFailure(400)
+                length = value.toLongOrNull() ?: throw FrameFailure(400)
+            }
+        }
+        val contentLength = length ?: throw FrameFailure(400)
+        if (contentLength > DocumentBatch.BODY_BYTES) throw FrameFailure(413)
+        val headSize = boundary + 4
+        val frameSize = headSize + contentLength.toInt()
+        if (size > frameSize) throw FrameFailure(400)
+        val frame = ByteArray(frameSize)
+        head.copyInto(frame, endIndex = size)
+        while (size < frame.size) {
+            val read = ch.readAwait(ByteBuffer.wrap(frame, size, frame.size - size), idleMs)
+            if (read <= 0) throw java.io.EOFException()
+            size += read
+        }
+        return frame
+    }
+
+    private suspend fun AsynchronousSocketChannel.readAwait(buffer: ByteBuffer, idleMs: Long): Int =
+        withTimeout(idleMs) { suspendCancellableCoroutine { continuation ->
+            read(buffer, null, object : CompletionHandler<Int, Any?> {
+                override fun completed(result: Int, attachment: Any?) {
+                    if (continuation.isActive) continuation.resume(result)
+                }
+                override fun failed(failure: Throwable, attachment: Any?) {
+                    if (continuation.isActive) continuation.resumeWithException(failure)
+                }
+            })
+            continuation.invokeOnCancellation { runCatching { close() } }
+        } }
+
+    private suspend fun documentOne(
+        ch: AsynchronousSocketChannel,
+        element: LitebikeListenerElement,
+        connections: ConnectionRegistry,
+        connId: Long,
+        documents: Semaphore,
+        initial: ByteArray,
+        done: CompletableDeferred<Unit>,
+    ) {
+        suspend fun reject(status: Int) {
+            val reason = when (status) { 400 -> "Bad Request"; 413 -> "Payload Too Large"; 431 -> "Request Header Fields Too Large"; else -> "Service Unavailable" }
+            val body = "{\"error\":\"$reason\"}"
+            connections.write(connId, "HTTP/1.1 $status $reason\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\nConnection: close\r\n\r\n$body".encodeToByteArray())
+        }
+        if (!documents.tryAcquire()) { try { reject(503) } finally { done.complete(Unit) }; return }
+        // Both the sending coroutine and the receiver may retain the same frame.
+        // The permit outlives each independently and returns only after both end.
+        val completion = DocumentPermit(documents, kotlinx.coroutines.currentCoroutineContext()[Job]!!, done).completion
+        val payload = try { withTimeout(DocumentBatch.READ_LIFETIME_MS) { readDocument(ch, initial) } }
+        catch (failure: FrameFailure) { try { reject(failure.status) } finally { completion.complete(Unit) }; return }
+        catch (failure: Throwable) { completion.complete(Unit); throw failure }
+        val respond: suspend (ByteArray) -> Unit = { bytes -> connections.write(connId, bytes) }
+        // Admission transfers completion to the channel; it may outlive this socket.
+        withContext(NonCancellable) {
+            try { element.accept(Protocol.Http, payload, respond, completion) } catch (_: Throwable) { }
+        }
+    }
 
 /** Companion helper for users who want a fire-and-forget lifecycle. */
 suspend fun LitebikeListenerElement.serveOnPort(

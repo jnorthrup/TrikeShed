@@ -4,6 +4,7 @@ package borg.trikeshed.litebike
 
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.CompletableDeferred
 import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.context.Drain
 import borg.trikeshed.litebike.taxonomy.Protocol
@@ -14,6 +15,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -57,6 +60,8 @@ class LitebikeListenerElement(
         val sequenceId: Long,
         val payload: ByteArray,
         val respond: (suspend (ByteArray) -> Unit)? = null,
+        /** Completed by the consumer after it no longer retains the request. */
+        val completion: CompletableDeferred<Unit>? = null,
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -68,6 +73,7 @@ class LitebikeListenerElement(
             if (sequenceId != other.sequenceId) return false
             if (!payload.contentEquals(other.payload)) return false
             if (respond != other.respond) return false
+            if (completion != other.completion) return false
 
             return true
         }
@@ -77,13 +83,16 @@ class LitebikeListenerElement(
             result = 31 * result + sequenceId.hashCode()
             result = 31 * result + payload.contentHashCode()
             result = 31 * result + (respond?.hashCode() ?: 0)
+            result = 31 * result + (completion?.hashCode() ?: 0)
             return result
         }
     }
 
     /** Per-protocol inbox. Each registered worker drains via [ChannelWorkgroupSlot.consume]. */
     class ChannelWorkgroupSlot(val protocol: Protocol) {
-        private val inbox: Channel<ChannelMessage> = Channel(Channel.BUFFERED)
+        private val inbox: Channel<ChannelMessage> = Channel(Channel.BUFFERED, onUndeliveredElement = {
+            it.completion?.complete(Unit)
+        })
 
         /** Consume one message at a time; suspending when empty. */
         suspend fun consume(): ChannelMessage = inbox.receive()
@@ -96,6 +105,9 @@ class LitebikeListenerElement(
 
         /** Close the slot. Outstanding sends will fail; consumers drain what's left. */
         fun close() { inbox.close() }
+
+        /** Stop a removed slot and release ownership of its undelivered messages. */
+        fun cancel() { inbox.cancel() }
     }
 
     // ── registry ──────────────────────────────────────────────────
@@ -249,15 +261,28 @@ class LitebikeListenerElement(
      * CCEK subscriber — this is the bridge SCTP / HTX elements use to
      * observe inbound protocol traffic.
      */
-    suspend fun accept(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null): Boolean {
-        check(worker != null && !fanoutChannel.isClosedForSend) {
-            "LitebikeListenerElement must be open before accept()"
+    suspend fun accept(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null,
+                       completion: CompletableDeferred<Unit>? = null): Boolean =
+        if (completion == null) acceptMessage(protocolId, payload, respond, null)
+        else withContext(NonCancellable) { acceptMessage(protocolId, payload, respond, completion) }
+
+    private suspend fun acceptMessage(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?,
+                                      completion: CompletableDeferred<Unit>?): Boolean {
+        if (worker == null || fanoutChannel.isClosedForSend) {
+            completion?.complete(Unit)
+            error("LitebikeListenerElement must be open before accept()")
         }
-        val slot = registry[protocolId] ?: return false
+        val slot = registry[protocolId] ?: run { completion?.complete(Unit); return false }
         val proto = Protocol.fromId(protocolId)
-        val sequenceId = nextSequenceId()
-        val msg = ChannelMessage(protocolId, sequenceId, payload, respond)
-        slot.offer(msg)
+        val sequenceId = try { nextSequenceId() } catch (failure: Throwable) {
+            completion?.complete(Unit)
+            throw failure
+        }
+        val msg = ChannelMessage(protocolId, sequenceId, payload, respond, completion)
+        try { slot.offer(msg) } catch (failure: Throwable) {
+            completion?.complete(Unit)
+            throw failure
+        }
         // Bridge: notify every CCEK subscriber of the fanout event.
         val event = LitebikeFanoutEvent(
             protocol = proto ?: return true,
@@ -275,8 +300,9 @@ class LitebikeListenerElement(
      * Convenience overload: caller did the protocol detection and has a
      * `Protocol` enum value. Same behavior.
      */
-    suspend fun accept(protocol: Protocol, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null): Boolean =
-        accept(protocol.id, payload, respond)
+    suspend fun accept(protocol: Protocol, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null,
+                       completion: CompletableDeferred<Unit>? = null): Boolean =
+        accept(protocol.id, payload, respond, completion)
 
     /**
      * Notify every CCEK subscriber of [event]. Subscribers may implement

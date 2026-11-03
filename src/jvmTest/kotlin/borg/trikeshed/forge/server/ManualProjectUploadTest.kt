@@ -84,16 +84,20 @@ class ManualProjectUploadTest {
         val worker = scope.launch {
             while (isActive) {
                 val message = try { slot.consume() } catch (_: kotlinx.coroutines.channels.ClosedReceiveChannelException) { break }
-                val thread = Thread.currentThread().id
-                val before = memory.getThreadAllocatedBytes(thread)
-                val result = server.routeHttp(message.payload)
-                if (result.body == binaryPath) {
-                    check(thread == Thread.currentThread().id)
-                    allocated.set(memory.getThreadAllocatedBytes(thread) - before)
+                try {
+                    val thread = Thread.currentThread().id
+                    val before = memory.getThreadAllocatedBytes(thread)
+                    val result = server.routeHttp(message.payload)
+                    if (result.body == binaryPath) {
+                        check(thread == Thread.currentThread().id)
+                        allocated.set(memory.getThreadAllocatedBytes(thread) - before)
+                    }
+                    val head = "HTTP/1.1 ${result.status} OK\r\nContent-Length: ${result.payloadBytes.size}\r\n" +
+                        "Content-Type: ${result.contentType}\r\nConnection: close\r\n\r\n"
+                    message.respond?.invoke(head.encodeToByteArray() + result.payloadBytes)
+                } finally {
+                    message.completion?.complete(Unit)
                 }
-                val head = "HTTP/1.1 ${result.status} OK\r\nContent-Length: ${result.payloadBytes.size}\r\n" +
-                    "Content-Type: ${result.contentType}\r\nConnection: close\r\n\r\n"
-                message.respond?.invoke(head.encodeToByteArray() + result.payloadBytes)
             }
         }
         val binding = scope.launch(Dispatchers.IO) {
@@ -141,7 +145,7 @@ class ManualProjectUploadTest {
                 val begun = post("/_project/large/begin?kind=assets&intake=manual")
                 assertEquals("manual", begun["intake"])
                 val bytes = ByteArray(32 * 1024 * 1024) { (it * 17).toByte() }
-                val result = post("/_project/large/putBatch?intake=manual", batch(_l["nested/large.bin" j bytes]))
+                val result = post("/_project/large/putDocumentBatch?intake=manual", batch(_l["nested/large.bin" j bytes]))
                 assertEquals(1, (result["stored"] as Number).toInt())
                 assertEquals(0, (result["failed"] as Number).toInt())
                 val attachment = assertNotNull(rig.registry.get("large")?.gateway?.getAttachmentRef("nested/large.bin"))

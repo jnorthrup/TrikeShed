@@ -12,6 +12,7 @@ import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.lib.*
 import borg.trikeshed.htx.indexOfHeaderBoundary
 import borg.trikeshed.litebike.JvmKanbanServer
+import borg.trikeshed.litebike.DocumentBatch
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
@@ -179,7 +180,9 @@ class ProjectDbWire(
                 // One request carries ~3MB of small files — the fix for 10-files/sec
                 // sequential round-trip uploads (each frame still lands via uploadPut:
                 // CAS + manifest + mirror per entry, one HTTP turnaround total).
-                "putBatch" -> {
+                "putBatch", "putDocumentBatch" -> {
+                    val documents = segments[2] == "putDocumentBatch"
+                    if (documents && !manualIntake) return json(400, """{"error":"manual intake required"}""")
                     if (manualIntake && scopes.intakeMode(name) != CurationIntake.Mode.Manual)
                         return json(409, """{"error":"project is not configured for manual intake"}""")
                     val boundary = payload.indexOfHeaderBoundary()
@@ -201,14 +204,21 @@ class ProjectDbWire(
                     // Validate the complete frame before publishing any file. In particular,
                     // do not narrow a 64-bit length or ignore an incomplete final frame.
                     val valid = try {
+                        var count = 0
                         while (off < payload.size) {
                             require(payload.size - off >= 12)
                             val pLen = i32()
                             require(pLen > 0 && pLen <= payload.size - off - 8)
-                            payload.decodeToString(off, off + pLen, throwOnInvalidSequence = true)
+                            val path = payload.decodeToString(off, off + pLen, throwOnInvalidSequence = true)
+                            if (documents) {
+                                require(++count <= DocumentBatch.FILES && pLen <= DocumentBatch.PATH_BYTES && path.isNotBlank() && path.length <= DocumentBatch.PATH_UNITS &&
+                                    !path.startsWith('/') && '\\' !in path && path.none { it < ' ' || it == '\u007f' } &&
+                                    path.split('/').none { it.isEmpty() || it == "." || it == ".." })
+                            }
                             off += pLen
                             val bLen = i64()
                             require(bLen >= 0 && bLen <= (payload.size - off).toLong())
+                            if (documents) require(bLen <= DocumentBatch.FILE_BYTES.toLong())
                             off += bLen.toInt()
                         }
                         true
