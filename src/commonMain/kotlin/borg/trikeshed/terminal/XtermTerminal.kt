@@ -55,6 +55,8 @@ data class VtSnapshot(
     val applicationCursorKeys: Boolean,
     val lines: Series<Series<VtCell>>,
     val scrollback: Series<Series<VtCell>>,
+    val rowIds: Series<Long> = emptySeriesOf(),
+    val scrollbackIds: Series<Long> = emptySeriesOf(),
 )
 
 enum class VtKey {
@@ -83,6 +85,10 @@ class XtermTerminal(
     var alternateScreen: Boolean = false; private set
     var revision: Long = 0L; private set
 
+    private var nextRowId = 0L
+    private fun allocateRowId(): Long = nextRowId++
+    private var rowIds = LongArray(this.rows) { allocateRowId() }
+    private val scrollbackRowIds = ArrayDeque<Long>()
     private var cells: Array<Array<VtCell>> = blankScreen(this.columns, this.rows)
     private var dirty: Array<BooleanArray> = Array(this.rows) { BooleanArray(this.columns) { true } }
     private var row = 0
@@ -187,9 +193,11 @@ class XtermTerminal(
         val nextRows = rows.coerceAtLeast(1)
         if (nextColumns == this.columns && nextRows == this.rows) return emptySeriesOf()
         val next = resizeScreen(cells, nextColumns, nextRows)
+        val nextIds = resizeIds(rowIds, nextRows)
         mainScreen = mainScreen?.let { main ->
             main.copy(
                 cells = resizeScreen(main.cells, nextColumns, nextRows),
+                rowIds = resizeIds(main.rowIds, nextRows),
                 row = main.row.coerceIn(0, nextRows - 1),
                 column = main.column.coerceIn(0, nextColumns - 1),
                 scrollTop = 0,
@@ -199,6 +207,7 @@ class XtermTerminal(
         this.columns = nextColumns
         this.rows = nextRows
         cells = next
+        rowIds = nextIds
         dirty = Array(nextRows) { BooleanArray(nextColumns) { true } }
         row = row.coerceIn(0, nextRows - 1)
         column = column.coerceIn(0, nextColumns - 1)
@@ -218,6 +227,7 @@ class XtermTerminal(
 
     private fun resetState() {
         cells = blankScreen(columns, rows)
+        rowIds = LongArray(rows) { allocateRowId() }
         dirty = Array(rows) { BooleanArray(columns) { true } }
         row = 0; column = 0; savedRow = 0; savedColumn = 0
         style = VtStyle(); savedStyle = style
@@ -240,6 +250,11 @@ class XtermTerminal(
         // A snapshot crosses the mutable terminal's ownership boundary. Keep Series projections,
         // but capture their backing cells now, before subsequent output/resize changes this screen.
         lines = Array(rows) { r -> cells[r].copyOf().toSeries() }.toSeries(),
+        rowIds = rowIds.copyOf().toSeries(),
+        scrollbackIds = scrollbackRows.coerceAtLeast(0).let { count ->
+            val start = (scrollbackRowIds.size - count).coerceAtLeast(0)
+            LongArray(scrollbackRowIds.size - start) { scrollbackRowIds[start + it] }.toSeries()
+        },
         scrollback = scrollbackRows.coerceAtLeast(0).let { count ->
             val start = (this.scrollbackRows.size - count).coerceAtLeast(0)
             val selected = this.scrollbackRows.drop(start)
@@ -363,13 +378,23 @@ class XtermTerminal(
                 val retained = if (scrollTop == 0 && scrollBottom == rows - 1 && !alternateScreen) scrollbackLimit else 0
                 val steps = minOf(count.toLong(), scrollBottom.toLong() - scrollTop + 1 + retained).toInt()
                 repeat(steps) { scrollUp(scrollTop, scrollBottom) }
-                revision += (count - steps).toLong()
+                val remaining = count - steps
+                val witness = minOf(remaining.toLong(), scrollBottom.toLong() - scrollTop + 1 + retained).toInt()
+                val skipped = remaining - witness
+                nextRowId += skipped.toLong()
+                revision += skipped.toLong()
+                repeat(witness) { scrollUp(scrollTop, scrollBottom) }
             }
             'T' -> {
                 val count = p()
                 val steps = minOf(count, scrollBottom - scrollTop + 1)
                 repeat(steps) { scrollDown(scrollTop, scrollBottom) }
-                revision += (count - steps).toLong()
+                val remaining = count - steps
+                val witness = minOf(remaining, scrollBottom - scrollTop + 1)
+                val skipped = remaining - witness
+                nextRowId += skipped.toLong()
+                revision += skipped.toLong()
+                repeat(witness) { scrollDown(scrollTop, scrollBottom) }
             }
             'm' -> sgr(values, clean.split(';'), ::parameter)
             'r' -> setScrollRegion(values)
@@ -398,8 +423,9 @@ class XtermTerminal(
     private fun enterAlternateScreen(save: Boolean) {
         if (alternateScreen) return
         if (save) saveCursor()
-        mainScreen = SavedScreen(cells, row, column, style, scrollTop, scrollBottom)
+        mainScreen = SavedScreen(cells, rowIds, row, column, style, scrollTop, scrollBottom)
         cells = blankScreen(columns, rows)
+        rowIds = LongArray(rows) { allocateRowId() }
         dirty = Array(rows) { BooleanArray(columns) { true } }
         row = 0; column = 0; scrollTop = 0; scrollBottom = rows - 1
         alternateScreen = true; revision++
@@ -408,6 +434,7 @@ class XtermTerminal(
     private fun leaveAlternateScreen(restore: Boolean) {
         val main = mainScreen ?: return
         cells = main.cells
+        rowIds = main.rowIds
         row = main.row.coerceIn(0, rows - 1); column = main.column.coerceIn(0, columns - 1)
         style = main.style; scrollTop = main.scrollTop.coerceIn(0, rows - 1); scrollBottom = main.scrollBottom.coerceIn(scrollTop, rows - 1)
         mainScreen = null; alternateScreen = false
@@ -552,16 +579,19 @@ class XtermTerminal(
     private fun scrollUp(top: Int, bottom: Int) {
         if (top == 0 && bottom == rows - 1 && !alternateScreen && scrollbackLimit > 0) {
             scrollbackRows.addLast(cells[top].copyOf())
-            while (scrollbackRows.size > scrollbackLimit) scrollbackRows.removeFirst()
+            scrollbackRowIds.addLast(rowIds[top])
+            while (scrollbackRows.size > scrollbackLimit) { scrollbackRows.removeFirst(); scrollbackRowIds.removeFirst() }
         }
-        for (r in top until bottom) cells[r] = cells[r + 1]
+        for (r in top until bottom) { cells[r] = cells[r + 1]; rowIds[r] = rowIds[r + 1] }
         cells[bottom] = blankRow()
+        rowIds[bottom] = allocateRowId()
         markRows(top, bottom); revision++
     }
 
     private fun scrollDown(top: Int, bottom: Int) {
-        for (r in bottom downTo top + 1) cells[r] = cells[r - 1]
+        for (r in bottom downTo top + 1) { cells[r] = cells[r - 1]; rowIds[r] = rowIds[r - 1] }
         cells[top] = blankRow()
+        rowIds[top] = allocateRowId()
         markRows(top, bottom); revision++
     }
 
@@ -571,7 +601,7 @@ class XtermTerminal(
             1 -> { for (r in 0 until row) eraseRange(r, 0, columns); eraseRange(row, 0, column + 1) }
             2, 3 -> for (r in 0 until rows) eraseRange(r, 0, columns)
         }
-        if (mode == 3) scrollbackRows.clear()
+        if (mode == 3) { scrollbackRows.clear(); scrollbackRowIds.clear() }
     }
 
     private fun eraseLine(mode: Int) = when (mode) {
@@ -617,8 +647,9 @@ class XtermTerminal(
     private fun insertLines(count: Int) {
         if (row !in scrollTop..scrollBottom) return
         repeat(count.coerceIn(1, scrollBottom - row + 1)) {
-            for (r in scrollBottom downTo row + 1) cells[r] = cells[r - 1]
+            for (r in scrollBottom downTo row + 1) { cells[r] = cells[r - 1]; rowIds[r] = rowIds[r - 1] }
             cells[row] = blankRow()
+            rowIds[row] = allocateRowId()
         }
         markRows(row, scrollBottom); revision++
     }
@@ -626,8 +657,9 @@ class XtermTerminal(
     private fun deleteLines(count: Int) {
         if (row !in scrollTop..scrollBottom) return
         repeat(count.coerceIn(1, scrollBottom - row + 1)) {
-            for (r in row until scrollBottom) cells[r] = cells[r + 1]
+            for (r in row until scrollBottom) { cells[r] = cells[r + 1]; rowIds[r] = rowIds[r + 1] }
             cells[scrollBottom] = blankRow()
+            rowIds[scrollBottom] = allocateRowId()
         }
         markRows(row, scrollBottom); revision++
     }
@@ -655,8 +687,12 @@ class XtermTerminal(
     private fun markRange(r: Int, start: Int, end: Int) { for (c in start until end) mark(r, c) }
     private fun markRows(start: Int, end: Int) { for (r in start..end) dirty[r].fill(true) }
 
+    private fun resizeIds(ids: LongArray, size: Int): LongArray =
+        LongArray(size) { index -> if (index < ids.size) ids[index] else allocateRowId() }
+
     private data class SavedScreen(
         val cells: Array<Array<VtCell>>,
+        val rowIds: LongArray,
         val row: Int,
         val column: Int,
         val style: VtStyle,
