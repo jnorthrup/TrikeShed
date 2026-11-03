@@ -145,14 +145,20 @@ class JevaInference(
                  channels: (String) -> FileChannel): JevaInference {
             val deadline = JevaDeadline(config.timeoutMs, "load")
             val check = deadline::check
-            val weights = JevaWeights.open(files, config.model, channels, check = check)
+            val weights = try { JevaWeights.open(files, config.model, channels, check = check) }
+            catch (failure: IllegalArgumentException) { throw IllegalArgumentException(config.layoutError(failure.message.orEmpty()), failure) }
             var matrix: JevaMatrix? = null
             try {
                 val arithmetic = JevaMatrix(matrices?.open()).also { matrix = it }
                 deadline.location = "load configuration"
                 val yaml = yamlOf(weights.text("config.yaml", 1024 * 1024, check))
                 val settings = requireNotNull(yaml["model"] as? Map<*, *>) { "Jeva config requires model mapping" }
-                val backboneConfig = JevaBackboneConfig.parse(weights.text("backbone_full/config.json", 1024 * 1024, check))
+                val backboneText = weights.text("backbone_full/config.json", 1024 * 1024, check)
+                val metadata = JevaWeights.metadata(backboneText, "Jeva backbone configuration")
+                require(metadata["quantization"] == null && metadata["quantization_config"] == null) {
+                    config.layoutError("Quantized backbone configuration is not an unquantized Kotlin CPU checkpoint")
+                }
+                val backboneConfig = JevaBackboneConfig.parse(backboneText)
                 deadline.location = "load tokenizer"
                 val tokenizer = JevaTokenizer.parse(weights.text("tokenizer/tokenizer.json", 64 * 1024 * 1024, check), check)
                 deadline.location = "load decision head"
@@ -170,7 +176,8 @@ class JevaInference(
             } catch (failure: Throwable) {
                 try { matrix?.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
                 try { weights.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
-                throw failure
+                if (failure is kotlinx.coroutines.CancellationException || failure is JevaDeadline.Expired || failure is Error) throw failure
+                throw IllegalArgumentException(config.layoutError(failure.message.orEmpty()), failure)
             }
         }
     }
