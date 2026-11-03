@@ -103,6 +103,10 @@ object RouteManifest {
             RouteEntry("GET", "/rest/v1/rpc/{fn}", "a stable function called with its arguments in the query string"),
             RouteEntry("POST", "/pg/query", "pg-meta raw SQL: SELECT, CREATE TABLE, DROP TABLE, and SPARQL … (SPASQL) over DB.DBA.RDF_QUAD"),
         ),
+        "DocumentPdfLinksWire" to listOf(
+            RouteEntry("POST", "/api/documents/pdf-links", "retain unreviewed URI annotation candidates from an exact current PDF revision; no fetch or model"),
+            RouteEntry("POST", "/api/documents/pdf-links/collect", "collect selected host-issued PDF links under existing egress policy into the same manual project; source-linked and unreviewed"),
+        ),
         "DocumentReviewWire" to listOf(
             RouteEntry("POST", "/api/documents/review/horn-query", "bounded operator-configured native Horn query over authenticated review observations; no admission"),
             RouteEntry("POST", "/api/documents/review/horn-input", "prepare authenticated review-record observations for the pinned Horn backend; no execution or admission"),
