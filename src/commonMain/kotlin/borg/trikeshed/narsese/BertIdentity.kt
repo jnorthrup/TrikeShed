@@ -6,7 +6,7 @@ import borg.trikeshed.util.toLowerHex
 
 /** Identity of the effective loaded F32 encoder and WordPiece rules, not a signature on its source files. */
 internal object BertIdentity {
-    const val VERSION = "bert-common-f32-1"
+    const val VERSION = "bert-common-f32-2"
 
     fun digest(weights: BertWeights, tokenizer: BertWordPiece, check: () -> Unit = {}): String {
         val hash = Sha256()

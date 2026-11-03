@@ -136,6 +136,7 @@ class BertWordPiece(vocabulary: Series<String>, val maxLength: Int = 512) {
             if (complete) count j { i: Int -> hits[i] } else emptySeriesOf())
     }
 
+    /** Inferred matches use whole normalized basic tokens; explicit source offsets remain authoritative. */
     fun target(token: BertToken): Join<Twin<Int>?, BertSpan> {
         require(token.lemma.isNotBlank() && token.lemma.length <= 128 && token.sentence.length <= 16_384) {
             "Invalid BERT target"
@@ -149,32 +150,32 @@ class BertWordPiece(vocabulary: Series<String>, val maxLength: Int = 512) {
             return (start j end) j BertSpan.Explicit
         }
         val text = token.sentence
+        val wanted = basic(token.lemma)
+        if (wanted.isEmpty()) return null j BertSpan.Missing
+        val words = basic(text)
         var first: Twin<Int>? = null
         var count = 0
-        var at = 0
-        while (at <= text.length - token.lemma.length) {
-            val end = at + token.lemma.length
-            if (text.regionMatches(at, token.lemma, 0, token.lemma.length, ignoreCase = true) &&
-                (at == 0 || !asciiLetterFold(text[at - 1])) &&
-                (end == text.length || !asciiLetterFold(text[end]))) {
-                first = at j end
+        for (at in 0..words.size - wanted.size) {
+            val end = at + wanted.size
+            if ((wanted.indices).all { words[at + it].value == wanted[it].value } &&
+                (at == 0 || words[at - 1].end <= words[at].start) &&
+                (end == words.size || words[end].start >= words[end - 1].end)) {
+                first = words[at].start j words[end - 1].end
                 count++
-                at = end
-            } else at++
+            }
         }
         if (count > 0) return (if (count == 1) first else null) j
             (if (count == 1) BertSpan.Exact else BertSpan.Ambiguous)
-        val lemmaLength = scalarBounds(token.lemma).size - 1
-        val lower = token.lemma.lowercase()
-        val lowerBounds = scalarBounds(lower)
-        val stem = lower.substring(0, lowerBounds[minOf(maxOf(4, lemmaLength - 2), lowerBounds.size - 1)])
-        at = 0
-        while (at < text.length) {
-            if (!asciiLetter(text[at])) { at++; continue }
-            val start = at
-            while (at < text.length && asciiLetter(text[at])) at++
-            if (text.substring(start, at).lowercase().startsWith(stem)) {
-                first = start j at
+        val lemma = wanted.singleOrNull()?.value?.takeIf { it.isNotEmpty() && it.all(::asciiLetter) }
+            ?: return null j BertSpan.Missing
+        val stem = lemma.substring(0, minOf(maxOf(4, lemma.length - 2), lemma.length))
+        for (at in words.indices) {
+            val word = words[at]
+            if (word.value.all(::asciiLetter) && text.substring(word.start, word.end).all(::asciiLetter) &&
+                word.value.startsWith(stem) &&
+                (at == 0 || words[at - 1].end <= word.start) &&
+                (at + 1 == words.size || words[at + 1].start >= word.end)) {
+                first = word.start j word.end
                 count++
             }
         }
@@ -184,6 +185,53 @@ class BertWordPiece(vocabulary: Series<String>, val maxLength: Int = 512) {
             else -> BertSpan.Missing
         }
     }
+
+    /** Basic-token boundaries and offsets mirror the normalization used in [sentence]. */
+    private fun basic(text: String): List<Basic> {
+        val result = ArrayList<Basic>()
+        val word = StringBuilder()
+        var begin = 0
+        var end = 0
+        fun flush() {
+            if (word.isNotEmpty()) result.add(Basic(word.toString(), begin, end))
+            word.clear()
+        }
+        fun append(cp: Int, start: Int, limit: Int) {
+            val boundary = punctuation(cp) || chinese(cp)
+            if (boundary) flush()
+            if (space(cp)) flush()
+            else {
+                if (word.isEmpty()) begin = start
+                word.append(scalarString(cp))
+                end = limit
+                if (boundary) flush()
+            }
+        }
+        var at = 0
+        while (at < text.length) {
+            val added = special.view.firstOrNull { text.startsWith(it, at) }
+            if (added != null) {
+                flush()
+                result.add(Basic(added, at, at + added.length))
+                at += added.length
+                continue
+            }
+            val cp = scalar(text, at)
+            val next = at + scalarWidth(cp)
+            val normalized = normalize(cp)
+            var offset = 0
+            while (offset < normalized.length) {
+                val n = scalar(normalized, offset)
+                append(n, at, next)
+                offset += scalarWidth(n)
+            }
+            at = next
+        }
+        flush()
+        return result
+    }
+
+    private data class Basic(val value: String, val start: Int, val end: Int)
 
     data class Piece(val id: Int, val start: Int, val end: Int)
 
