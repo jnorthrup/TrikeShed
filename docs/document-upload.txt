@@ -51,3 +51,14 @@ Evidence: docs/evidence/2026-11-02/documents-upload.
 External replay sources/logs: library-files/documents-upload-proof and
 library-files/documents-native-folder-drop-proof. Earlier compilation and guard
 regressions were retained; tests and compile inputs were not excluded.
+
+Whole-window drop follow-up
+File/folder drops are now accepted anywhere in the Documents window and open the
+upload controls. Plain text, links and internal drags keep their prior behavior.
+The panel stops propagation so a single drop cannot submit twice. Production
+Documents JS built in v46 from source 3bcbc667760a08b37c6826f12ced7109af488a4b;
+the JVM is unchanged from the 70-test v44 artifact. Real Chromium CDP directory
+drag into the center of document content, outside the sidebar uploader, passed
+through production routes with exact nested bytes, one begin, no model calls or
+browser errors. Text-only drag was not prevented and sent no request.
+Evidence: docs/evidence/2026-11-02/documents-window-drop.
