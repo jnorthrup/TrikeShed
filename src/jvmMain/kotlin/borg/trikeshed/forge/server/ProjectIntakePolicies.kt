@@ -66,9 +66,9 @@ internal class ProjectIntakePolicies(
         if (parts.size <= 4) return CurationIntake.Mode.Legacy
         return try {
             when (parts[4]) {
-                "legacy" -> {
-                    require(parts.size == 5 || parts[5].isBlank()) { "Unexpected legacy ontology" }
-                    CurationIntake.Mode.Legacy
+                "legacy", "manual" -> {
+                    require(parts.size == 5 || parts[5].isBlank()) { "Unexpected ontology for this intake policy" }
+                    if (parts[4] == "manual") CurationIntake.Mode.Manual else CurationIntake.Mode.Legacy
                 }
                 "review-required" -> {
                     require(parts.size == 6 && parts[5].isNotBlank()) { "Review ontology CID is missing" }
@@ -133,6 +133,7 @@ internal class ProjectIntakePolicies(
             while (fields.size < 4) fields.add("")
             when (selected) {
                 CurationIntake.Mode.Legacy -> fields.add("legacy")
+                CurationIntake.Mode.Manual -> fields.add("manual")
                 is CurationIntake.Mode.ReviewRequired -> { fields.add("review-required"); fields.add(selected.ontologyCid.value) }
                 is CurationIntake.Mode.Blocked -> error("Blocked policy cannot be selected")
             }

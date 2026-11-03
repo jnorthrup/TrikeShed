@@ -1,0 +1,13 @@
+{
+  "result": {
+    "result": "PASS",
+    "freshJvm": true,
+    "projects": 5,
+    "exactFilesAndCids": 7,
+    "manualPolicies": true,
+    "modelCalls": 0
+  },
+  "mainJarSha256": "dfdc3f3ca47d0174227bc9ff5abc897cd43329977d1bf1c0c169ebdbfd44fc9e",
+  "separateJvm": true,
+  "exit": 0
+}

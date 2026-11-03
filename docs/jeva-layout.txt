@@ -1,0 +1,28 @@
+Jeva local checkpoint loading
+
+An OPENAT -2 for backbone_full/model.safetensors.index.json means the selected
+local model cannot be opened in the configured unquantized Kotlin layout. The
+path can come from the default LIQIIIII/Jeva-4B identifier resolved relative to
+the process directory; a repository identifier does not install checkpoint files.
+
+The Kotlin loader now accepts either an indexed backbone_full checkpoint or
+backbone_full/model.safetensors when no index exists. Both use the same validated
+F32/BF16/F16 safetensors parser, language_model.* names and head.safetensors.
+config.yaml, tokenizer/tokenizer.json and backbone_full/config.json are also
+required. An existing malformed index is not bypassed. Index/header/config JSON
+has explicit depth/byte bounds. Failed loads close channels and preserve deadline,
+cancellation and Error types. Diagnostics name the configured model/runtime/device
+and required layout.
+
+Packed MLX/Q4 is a different layout and backend. Quantized tensor dtypes and
+quantization configuration are refused by this unquantized path. Native Kotlin
+MLX needs an installed EncoderOperations provider and backbone_mlx/head.pt;
+Python compatibility is an explicit runtime selection. TRIKESHED_JEVA_MODEL,
+TRIKESHED_JEVA_DEVICE and TRIKESHED_JEVA_RUNTIME select configuration. Setting
+only MODEL does not select the MLX backend. No automatic download, conversion,
+Python switch or replacement model is performed.
+
+The user's Mac checkpoint was not mounted in this workspace and remains
+unverified. Synthetic loader tests and the coordinated JVM build passed; no real
+4B/Q4 inference or model-quality result is claimed. Documents manual uploads do
+not require this model to be available.

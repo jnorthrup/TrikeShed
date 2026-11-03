@@ -1,0 +1,298 @@
+{
+  "kind": "actual-sulong-bitcode-proof/1",
+  "verified": true,
+  "parentSourceCommit": "26e647e3da54f6875cfc9697b344eacffcbef7f9",
+  "frozenBuildSource": "6246c3085daae5ce74890d4291a6d49a3b01e439",
+  "frozenMainJarSha256": "1f2ab5525bd001159f4b2bfe366333e40ef9eb1b543e47b5451ef430527104c1",
+  "sourceHashes": {
+    "src/jvmMain/kotlin/borg/trikeshed/pointcut/SubgraalPointcutRunner.kt": "758754f216b1bc8d8da6919a25b44b1051d22eaf38682dbe9e910479cfb68bb9",
+    "src/jvmMain/kotlin/borg/trikeshed/graal/subvm/InProcessIsolate.kt": "b85f9056bc26f4b8da1cfe31e51ad570a28cdb77c436fb236cb26f1f81314148",
+    "src/jvmMain/kotlin/borg/trikeshed/graal/subvm/GuestBounds.kt": "c1aafe89a1be0f3b639ba8c4bb7e4766dbe4223970156b5be82b7b137ee07feb"
+  },
+  "compiledClassHashes": {
+    "borg/trikeshed/pointcut/SubgraalPointcutRunner.class": "e5047a01fe1ba3e230e4f87583d5811f94604d8ff2900f26491303e3f5fe6418",
+    "borg/trikeshed/graal/subvm/InProcessIsolate.class": "a600acfa39fb83dd79488cf2a81e2329067ee55c938fddedfb763aab105be786",
+    "borg/trikeshed/graal/subvm/GuestBounds.class": "00cc22a20d58f21e83a63b3a97d2b8fb3ecb23ff225d9d85e32aeb0a14409bde"
+  },
+  "llvmArtifactHashes": {
+    "llvm-language-native-25.3.4.1.jar": "b49d4ea22e77be015a8a4dedd497e725326add5c03297eafd8eca50806a388ef",
+    "llvm-language-nfi-25.3.4.1.jar": "c3eed55afc590063636b939e0d75597dbe5d57edb5f237da898b179eaaaf02c9",
+    "llvm-language-25.3.4.1.jar": "c835fc80abdc818b7487c9e0b9ecd6c7cd59a7bbb7ac7041d6e2cda2be4b9335",
+    "llvm-language-native-resources-25.3.4.1.jar": "2b5fb413806a0046127c975dae8a55d1047b2c3757072b97cb9d06b024c541c3",
+    "llvm-api-25.3.4.1.jar": "4e7bf9f0f6e41dbdb9fb68b2b9004548dcda154f83bd769609435f50d8ec593c"
+  },
+  "assembler": {
+    "name": "llvm-as",
+    "version": "22.1.8",
+    "sha256": "c8b9ac9ef05cf0eeeb5381558fd15b7ca282b990abe32a1fcf1fc711830d919c"
+  },
+  "inputs": {
+    "add.c": {
+      "sha256": "398a259dcd115d87c39d0dce0be95224bc977bcad5c6cbf1dcc1cc532ef599ae",
+      "bytes": 128
+    },
+    "add.ll": {
+      "sha256": "47400ca14761616eeac6803f91f67cba6c4dbc1a18ed9eb76ec8adde39dc9fa9",
+      "bytes": 303
+    },
+    "add.bc": {
+      "sha256": "a3c73eeeb8da2e6b81469a66ef598814bb9dfde37cb96cdb2118042080fb5f57",
+      "bytes": 1632
+    },
+    "add.roundtrip.ll": {
+      "sha256": "9116109ad778b0a1e500a1af5f51a1d9ba9734da7724a36f78b555fe3ec256b7",
+      "bytes": 233
+    },
+    "SulongProof.kt": {
+      "sha256": "1ec2886ae00646523cee4a03b3407735256b565bca88036600254be320b747a5",
+      "bytes": 4506
+    },
+    "classes/SulongProofKt.class": {
+      "sha256": "b17a50b0d4385de444dadcc688267955c27f29691a196779dfee6aff3a40ffbd",
+      "bytes": 14949
+    }
+  },
+  "cFrontendCompiled": false,
+  "inputPipeline": "handwritten add.ll assembled by llvm-as22; add.c is a semantic reference only",
+  "engineInventory": {
+    "mode": "inventory",
+    "engineVersion": "25.3.4.1",
+    "engineImplementation": "Interpreted",
+    "languages": [
+      {
+        "id": "js",
+        "name": "JavaScript",
+        "version": "25.3.4.1",
+        "implementation": "GraalVM JavaScript",
+        "mimeTypes": [
+          "application/javascript",
+          "application/javascript+module",
+          "application/octet-stream",
+          "text/javascript"
+        ]
+      },
+      {
+        "id": "python",
+        "name": "Python",
+        "version": "3.13.14",
+        "implementation": "GraalPy",
+        "mimeTypes": [
+          "text/x-python"
+        ]
+      },
+      {
+        "id": "llvm",
+        "name": "LLVM",
+        "version": "22.1.8",
+        "implementation": "",
+        "mimeTypes": [
+          "application/x-dosexec",
+          "application/x-executable",
+          "application/x-llvm-ir-bitcode",
+          "application/x-mach-binary",
+          "application/x-sharedlib"
+        ]
+      },
+      {
+        "id": "ruby",
+        "name": "Ruby",
+        "version": "4.0.2",
+        "implementation": "TruffleRuby",
+        "mimeTypes": [
+          "application/x-ruby"
+        ]
+      }
+    ],
+    "llvmPresent": true,
+    "status": "OBSERVED",
+    "lastStage": "Engine.languages"
+  },
+  "cases": [
+    {
+      "mode": "inventory",
+      "exit": 0,
+      "timedOut": false,
+      "wallSeconds": 0.4877,
+      "stdoutFile": "inventory.stdout",
+      "stderrFile": "inventory.stderr",
+      "argvFile": "inventory.argv.json",
+      "stdoutBytes": 847,
+      "stderrBytes": 0,
+      "observed": {
+        "mode": "inventory",
+        "engineVersion": "25.3.4.1",
+        "engineImplementation": "Interpreted",
+        "languages": [
+          {
+            "id": "js",
+            "name": "JavaScript",
+            "version": "25.3.4.1",
+            "implementation": "GraalVM JavaScript",
+            "mimeTypes": [
+              "application/javascript",
+              "application/javascript+module",
+              "application/octet-stream",
+              "text/javascript"
+            ]
+          },
+          {
+            "id": "python",
+            "name": "Python",
+            "version": "3.13.14",
+            "implementation": "GraalPy",
+            "mimeTypes": [
+              "text/x-python"
+            ]
+          },
+          {
+            "id": "llvm",
+            "name": "LLVM",
+            "version": "22.1.8",
+            "implementation": "",
+            "mimeTypes": [
+              "application/x-dosexec",
+              "application/x-executable",
+              "application/x-llvm-ir-bitcode",
+              "application/x-mach-binary",
+              "application/x-sharedlib"
+            ]
+          },
+          {
+            "id": "ruby",
+            "name": "Ruby",
+            "version": "4.0.2",
+            "implementation": "TruffleRuby",
+            "mimeTypes": [
+              "application/x-ruby"
+            ]
+          }
+        ],
+        "llvmPresent": true,
+        "status": "OBSERVED",
+        "lastStage": "Engine.languages"
+      }
+    },
+    {
+      "mode": "runner",
+      "exit": 0,
+      "timedOut": false,
+      "wallSeconds": 0.8594,
+      "stdoutFile": "runner.stdout",
+      "stderrFile": "runner.stderr",
+      "argvFile": "runner.argv.json",
+      "stdoutBytes": 377,
+      "stderrBytes": 576,
+      "observed": {
+        "mode": "runner",
+        "calls": [
+          {
+            "a": 20,
+            "b": 22,
+            "expected": 42,
+            "actual": 42
+          },
+          {
+            "a": -7,
+            "b": 5,
+            "expected": -2,
+            "actual": -2
+          },
+          {
+            "a": 0,
+            "b": 0,
+            "expected": 0,
+            "actual": 0
+          }
+        ],
+        "status": "PASS",
+        "profile": {
+          "existingRunnerNativeAccess": true,
+          "existingRunnerVerifyBitcode": false,
+          "traceExecution": false,
+          "statementLimit": 0,
+          "hostClassLookup": false
+        },
+        "lastStage": "host-to-Sulong primitive calls"
+      }
+    },
+    {
+      "mode": "normal-isolate",
+      "exit": 0,
+      "timedOut": false,
+      "wallSeconds": 0.8254,
+      "stdoutFile": "normal-isolate.stdout",
+      "stderrFile": "normal-isolate.stderr",
+      "argvFile": "normal-isolate.argv.json",
+      "stdoutBytes": 271,
+      "stderrBytes": 576,
+      "observed": {
+        "mode": "normal-isolate",
+        "status": "REFUSED_OR_FAILED",
+        "lastStage": "InProcessIsolate.construct (unchanged restricted profile)",
+        "exception": "org.graalvm.polyglot.PolyglotException",
+        "message": "Access to native code is not allowed by the host environment.",
+        "causes": []
+      }
+    },
+    {
+      "mode": "direct-native-denied",
+      "exit": 0,
+      "timedOut": false,
+      "wallSeconds": 0.7866,
+      "stdoutFile": "direct-native-denied.stdout",
+      "stderrFile": "direct-native-denied.stderr",
+      "argvFile": "direct-native-denied.argv.json",
+      "stdoutBytes": 300,
+      "stderrBytes": 576,
+      "observed": {
+        "mode": "direct-native-denied",
+        "allowNativeAccess": false,
+        "status": "REFUSED_OR_FAILED",
+        "lastStage": "direct Context.eval bitcode with verification default",
+        "exception": "org.graalvm.polyglot.PolyglotException",
+        "message": "Access to native code is not allowed by the host environment.",
+        "causes": []
+      }
+    },
+    {
+      "mode": "direct-native-allowed-verified",
+      "exit": 0,
+      "timedOut": false,
+      "wallSeconds": 1.3201,
+      "stdoutFile": "direct-native-allowed-verified.stdout",
+      "stderrFile": "direct-native-allowed-verified.stderr",
+      "argvFile": "direct-native-allowed-verified.argv.json",
+      "stdoutBytes": 132,
+      "stderrBytes": 576,
+      "observed": {
+        "mode": "direct-native-allowed-verified",
+        "allowNativeAccess": true,
+        "actual": 42,
+        "status": "PASS",
+        "lastStage": "direct library.add"
+      }
+    }
+  ],
+  "limits": {
+    "deadlineSeconds": 20,
+    "timeoutCleanup": "kill entire owned child process group; wait for output/termination",
+    "javaHeapBytes": 536870912,
+    "nativeMemoryBound": null,
+    "osIsolationProvided": false
+  },
+  "initialHarnessFailures": [
+    "8-GiB address-space cap: JVM libjvmci isolate reservation failed before Engine",
+    "64-GiB address-space cap: same JVM libjvmci isolate reservation failure"
+  ],
+  "claimLimits": [
+    "No C frontend compilation",
+    "No performance/JIT claim: engine reports Interpreted",
+    "No LLVM root instrumentation claim: runner traceExecution=false",
+    "No Pi LLVM lane or SUMO inference claim",
+    "Restricted InProcessIsolate policy unchanged and still refuses native access"
+  ],
+  "llvmOptionDefaults": {
+    "llvmVersion": "22.1.8",
+    "verifyBitcodeDefault": true
+  }
+}

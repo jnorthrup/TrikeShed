@@ -6,7 +6,7 @@ enum class JevaRuntime { KOTLIN, PYTHON }
 
 /** Local-only inference; no constructor or status check downloads checkpoints.
  * Kotlin model directories contain config.yaml, tokenizer/tokenizer.json, backbone_full
- * safetensors/index/config and flattened head.safetensors. Python is explicit compatibility mode.
+ * safetensors (indexed shards or model.safetensors)/config and flattened head.safetensors. Python is explicit compatibility mode.
  */
 data class JevaConfig(
     val python: String = "python3",
@@ -34,6 +34,14 @@ data class JevaConfig(
         "env" to env,
         "runtime" to runtime.name.lowercase(),
     )
+
+    /** Diagnostic only; identifiers are never downloaded or silently resolved as remote models. */
+    fun layoutError(detail: String): String =
+        "Jeva local model='${model.take(4096)}', runtime=${runtime.name.lowercase()}, device='$device': ${detail.take(2048)}. " +
+        "Kotlin CPU requires config.yaml, tokenizer/tokenizer.json, backbone_full/config.json, " +
+        "backbone_full/model.safetensors.index.json plus shards OR backbone_full/model.safetensors, and head.safetensors. " +
+        "A repository ID alone does not install these files. Packed MLX/Q4 uses a separately selected device=mlx " +
+        "with an available native EncoderOperations provider and backbone_mlx/head.pt; no Python switch or download is automatic."
 
     val identity: String get() = jsonOf(fields())
 

@@ -1,0 +1,63 @@
+{
+  "result": "PASS",
+  "scope": "Actual Documents upload UI and production project begin/putBatch/read routes on isolated synthetic fixture. Files, folder picker, loose-file drop, duplicate/unsafe-path preflight, server collision refusal, exact storage bytes and durable manual intake including a supported-miner PDF; deterministic persisted pagehide/pageshow dispatch verifies reload and fresh controls without retry (not a claim of browser BFCache use); no models or approval.",
+  "meta": {
+    "project": "existing-documents",
+    "id": "selected.txt"
+  },
+  "writes": [
+    {
+      "path": "/_project/proof-loose-files/begin",
+      "query": "?kind=assets&intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-loose-files/putBatch",
+      "query": "?intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-folder/begin",
+      "query": "?kind=assets&intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-folder/putBatch",
+      "query": "?intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-loose-drop/begin",
+      "query": "?kind=assets&intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-loose-drop/putBatch",
+      "query": "?intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-folder/begin",
+      "query": "?kind=assets&intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-restored-controls/begin",
+      "query": "?kind=assets&intake=manual",
+      "method": "POST"
+    },
+    {
+      "path": "/_project/proof-restored-controls/putBatch",
+      "query": "?intake=manual",
+      "method": "POST"
+    }
+  ],
+  "evidence": {
+    "manualIntakePersisted": true,
+    "modelCalls": 0,
+    "originalBytesExact": true,
+    "filesChecked": 6,
+    "mainJarSource": "frozen-coordinated-build"
+  },
+  "browserErrors": []
+}
