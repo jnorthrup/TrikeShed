@@ -1,0 +1,26 @@
+Documents PDF links: synthetic end-to-end evidence
+
+Native Chromium CDP file drop supplied an on-disk valid annotated PDF plus text file
+onto Documents main content. Production begin/putBatch created a Manual project;
+selection remained on the old document until the explicit result link was chosen.
+The exact uploaded PDF CID/revision/sequence was echoed in Poppler inventory.
+HTTP and javascript URI annotations were displayed; javascript could not be selected.
+Only the selected HTTP occurrence was fetched by production host HTX and retained
+with exact bytes/CID and source/evidence references, unreviewed. No browser external
+requests, automatic intake or model calls occurred. Replacing the PDF refused stale
+discovery; a held late response did not overwrite another selected document.
+
+Four actual screenshots show upload, inventory, collection and stale refusal.
+The final UI copy distinguishes a selected PDF from an unavailable text preview.
+
+The external harness used the exact frozen main JAR, immutable dependency JARs and
+fresh browser bundles identified in execution-identity.json, without production
+class overlays or friend access. Actual Poppler and controlled host HTTP collection
+were used. This is not a full-daemon listener, manual Finder, provider-model or OS
+sandbox proof. Driver and fixture exited zero; owned peer/listener sockets closed.
+The earlier first proof also passed; its only compilation retry fixed an external
+harness TimeUnit import ambiguity. No product sources or checks were excluded.
+
+Original user-supplied PDFs and extracted text are not part of this evidence.
+Poppler URI annotations exclude printed legal citations and internal GoTo actions.
+Full coverage/limits/deployment: docs/pdf-link-curation.txt.

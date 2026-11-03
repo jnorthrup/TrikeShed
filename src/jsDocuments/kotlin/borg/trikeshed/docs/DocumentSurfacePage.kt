@@ -61,6 +61,7 @@ object DocumentSurfacePage {
     /** Bumped on every navigation; a poll whose generation has moved on stops. */
     private var generation = 0
     private var passageView: String? = null
+    private var pdfSelection: DocRevision? = null
     private var sourceRetention: SourceRetentionState? = null
     private val retainingSources = mutableSetOf<DocRevision>()
 
@@ -82,6 +83,7 @@ object DocumentSurfacePage {
         val root = document.getElementById(DocumentSurface.ROOT_ID) as HTMLElement
         root.innerHTML = DocumentSurface.layout()
         DocumentsUpload.mount()
+        window.addEventListener("pagehide", { DocumentsPdfLinks.clear() })
         root.addEventListener("click", { e -> onClick(e) })
         root.addEventListener("submit", { e -> onSubmit(e) })
         root.addEventListener("input", { e -> onInput(e) })
@@ -112,7 +114,7 @@ object DocumentSurfacePage {
                 }
             }
         } else {
-            generation++; clearPassage(); curationMode = false; project = null; doc = null; docError = null
+            generation++; clearPassage(); curationMode = false; project = null; doc = null; docError = null; pdfSelection = null
             docs = emptyList(); blocks = emptyList(); runStates.clear(); view = SurfaceView.PAGE
             render(keepLocation = true)
         }
@@ -195,6 +197,7 @@ object DocumentSurfacePage {
     /** Independent of project browsing: leaving it and returning finds the workspace unchanged. */
     suspend fun openCuration(cid: String?, keepLocation: Boolean = false) {
         val ticket = ++generation
+        pdfSelection = null
         clearPassage()
         curationMode = true
         curationFormError = null
@@ -275,7 +278,7 @@ object DocumentSurfacePage {
         val ticket = ++generation
         clearPassage()
         curationMode = false
-        project = name; doc = null; docError = null; docs = emptyList()
+        project = name; doc = null; docError = null; docs = emptyList(); pdfSelection = null
         view = SurfaceView.TABLE
         blocks = emptyList(); runStates.clear()
         render(keepLocation = true)
@@ -291,13 +294,16 @@ object DocumentSurfacePage {
         curationMode = false
         clearPassage()
         val generationHere = ++generation
-        doc = null; docError = null; blocks = emptyList(); runStates.clear()
+        doc = null; docError = null; blocks = emptyList(); runStates.clear(); pdfSelection = null
         render(keepLocation = true)
         val response = requestJson("/api/projects/" + encode(p) + "/docs/" + encode(id))
         if (generationHere != generation || project != p || curationMode) return
         docError = DocumentSurface.documentError(response)
         doc = if (docError == null) DocumentSurface.document(response) else null
         if (doc == null && docError == null) docError = "Document could not be read."
+        val pdf = pdfRevision(p, id, response)
+        if (generationHere != generation || project != p || curationMode) return
+        pdfSelection = pdf
         blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
         runStates.clear()
         render(keepLocation)
@@ -315,7 +321,7 @@ object DocumentSurfacePage {
     /** The receipt, project listing and current document belong to the same navigation ticket. */
     private suspend fun openPassage(p: String, id: String, receipt: String, ordinal: Int) {
         val ticket = ++generation
-        project = p; doc = null; docError = null; curationMode = false; view = SurfaceView.PAGE
+        project = p; doc = null; docError = null; curationMode = false; view = SurfaceView.PAGE; pdfSelection = null
         docs = emptyList(); blocks = emptyList(); runStates.clear()
         passageView = "<section data-passage-result=\"1\"><p>Reading selected passage…</p></section>"
         render(keepLocation = true)
@@ -332,6 +338,9 @@ object DocumentSurfacePage {
         val current = if (docError == null) DocumentSurface.document(response) else null
         if (current == null && docError == null) docError = "Document could not be read."
         doc = current
+        val pdf = pdfRevision(p, id, response)
+        if (ticket != generation || project != p || curationMode) return
+        pdfSelection = pdf
         blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
         runStates.clear()
         passageView = DocumentSurface.passageHtml(current, selected)
@@ -399,9 +408,22 @@ object DocumentSurfacePage {
         refreshBlocks()
     }
 
+    /** Metadata names a selection; the explicit inventory POST verifies its current bytes. */
+    private suspend fun pdfRevision(p: String, id: String, response: Any?): DocRevision? {
+        val fields = response as? Map<*, *>
+        val type = (fields?.get("contentType") as? String).orEmpty().substringBefore(';').trim()
+        if (!id.endsWith(".pdf", ignoreCase = true) && type != "application/pdf") return null
+        val direct = DocumentSurface.document(response)?.sourceRevision
+        val revision = direct ?: DocumentSurface.docs(requestJson("/api/projects/" + encode(p) + "/docs?prefix=" + encode(id) + "&limit=8"))
+            .firstOrNull { it.id == id }?.let { DocRevision(p, id, it.cid, it.rev, it.seq) }
+        return revision?.takeIf { it.project == p && it.id == id && it.rev.isNotBlank() && it.seq >= 0 && Regex("^sha256:[0-9a-f]{64}$").matches(it.cid) }
+    }
+
     private fun render(keepLocation: Boolean = false) {
-        setHtml(DocumentSurface.SIDE_ID, DocumentSurface.sidebarHtml(projects, project, docs, doc?.id, curationMode))
+        val selectedId = doc?.id ?: pdfSelection?.id
+        setHtml(DocumentSurface.SIDE_ID, DocumentSurface.sidebarHtml(projects, project, docs, selectedId, curationMode))
         if (curationMode) {
+            DocumentsPdfLinks.clear()
             setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.curationCrumbHtml(curationResult))
             setHtml(DocumentSurface.CONTENT_ID, DocumentSurface.curationHtml(
                 curationAvailable, curationDestination, curationRecords,
@@ -413,20 +435,29 @@ object DocumentSurfacePage {
             document.title = listOfNotNull(curationResult?.name?.ifBlank { null }, "Curate", "Documents").joinToString(" · ")
             return
         }
-        setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.crumbHtml(project, doc?.id, view))
+        setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.crumbHtml(project, selectedId, view))
         setHtml(
             DocumentSurface.CONTENT_ID,
             if (view == SurfaceView.TABLE) DocumentSurface.tableHtml(project, docs, column, ascending, doc?.id)
-            else (passageView ?: "") + (docError?.let(DocumentSurface::documentErrorHtml) ?: DocumentSurface.documentHtml(doc, runStates.toMap(),
+            else (passageView ?: "") + (docError?.let { error -> DocumentSurface.documentErrorHtml(
+                if (pdfSelection != null && error == "Document unavailable: not_text") "PDF selected. Text preview unavailable." else error
+            ) } ?: DocumentSurface.documentHtml(doc, runStates.toMap(),
                 doc?.let(DocumentSurface::retainableRevision)?.let { selected ->
                     if (selected in retainingSources) SourceRetentionState(selected, true, "Retaining source…")
                     else sourceRetention?.takeIf { it.revision == selected }
                 })),
         )
+        val pdf = pdfSelection
+        if (view == SurfaceView.PAGE && pdf != null) {
+            val ticket = generation
+            val host = document.createElement("div") as HTMLElement
+            document.getElementById(DocumentSurface.CONTENT_ID)?.appendChild(host)
+            DocumentsPdfLinks.mount(host, pdf, ticket) { generation == ticket && !curationMode && view == SurfaceView.PAGE && project == pdf.project && pdfSelection == pdf }
+        } else DocumentsPdfLinks.clear()
         val p = project
-        val wanted = if (p == null) "" else "#" + encode(p) + (doc?.let { "/" + encode(it.id) } ?: "")
+        val wanted = if (p == null) "" else "#" + encode(p) + (selectedId?.let { "/" + encode(it) } ?: "")
         if (!keepLocation) setHash(wanted)
-        document.title = listOfNotNull(doc?.id, project, "Documents").joinToString(" · ")
+        document.title = listOfNotNull(selectedId, project, "Documents").joinToString(" · ")
     }
 
     private fun setHash(wanted: String) {

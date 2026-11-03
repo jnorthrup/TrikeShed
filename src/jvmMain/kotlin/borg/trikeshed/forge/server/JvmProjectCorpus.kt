@@ -100,6 +100,22 @@ class JvmProjectCorpus(
         return receipt + mapOf("sourceCid" to cid.value, "reviewStatus" to "unreviewed", "action" to "retained-source")
     }
 
+    internal fun requireManualLinkProject(expected: ProjectDoc) {
+        require(expected.project != primary?.name && registry.get(expected.project) != null &&
+            scopes.intakeMode(expected.project) == CurationIntake.Mode.Manual) { "Link collection requires a mounted Manual project" }
+    }
+
+    internal fun retainSelectedPdfLink(expected: ProjectDoc, inventory: ContentId, linkId: String,
+        extension: String, bytes: ByteArray, evidence: ContentId): String {
+        requireManualLinkProject(expected)
+        require(extension == "pdf" || extension == "html")
+        val identity = ContentId.of((inventory.value + "/" + linkId + "/" + ContentId.of(bytes).value).encodeToByteArray())
+        val id = "pdf-links/${identity.hex}.$extension"
+        val notes = "inventory-cid: ${inventory.value}\nsource-cid: ${expected.cid}\nlink-id: $linkId\nevidence-cid: ${evidence.value}\nreview-status: unreviewed\n".encodeToByteArray()
+        scopes.importSelectedLink(expected, id, bytes, notes)
+        return id
+    }
+
     /** Primary worktrees are read-only here; only mounted project databases support intake. */
     internal fun intakeEligible(project: String): Boolean = project != primary?.name && registry.get(project) != null
 

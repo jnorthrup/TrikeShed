@@ -1,0 +1,14 @@
+{
+  "source": "a086625e04d3ca0ff41246799709005960bf8b56",
+  "mainJarSha256": "63de3b71ebeb4534065b28935dc2bd11bd2ae8f88eee3849fa50d909ce974d95",
+  "documentsJsSha256": "e07cfd530b076ec9a860496f41f6045e5d89f7ba7d18503290f93661c2b5f275",
+  "spacegraphJsSha256": "2636588580d20be3e16546aefec7ea23b99b9f424ef6ab62a7744971049e80b9",
+  "pagesJsSha256": "7c1bafec4222f1667cd2714f295d25486de10768603690083717023f8ef8875f",
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "fixture": "External localhost HTTP transport forwards production project/PDF routes; not a full daemon-listener or OS containment claim.",
+  "jvmTests": 76,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0
+}
