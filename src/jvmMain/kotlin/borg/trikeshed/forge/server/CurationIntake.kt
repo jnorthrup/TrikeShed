@@ -166,18 +166,21 @@ class CurationIntake(
         offer(project, id, selectedProvider(project, id))
     }
 
-    fun offer(project: String, id: String, decisionProvider: DecisionProvider?) = offer(project, id, decisionProvider, false)
+    fun offer(project: String, id: String, decisionProvider: DecisionProvider?) = offer(project, id, decisionProvider, null)
 
     /** Manual policy disables automatic intake; this explicit document action retains legacy curation. */
-    fun offerSelected(project: String, id: String, decisionProvider: DecisionProvider?) = offer(project, id, decisionProvider, true)
+    fun offerSelected(selected: ProjectDoc, decisionProvider: DecisionProvider?) {
+        require(selected.cid.isNotBlank() && selected.rev.isNotBlank() && selected.seq >= 0) { "Document selection requires a complete revision" }
+        offer(selected.project, selected.id, decisionProvider, selected)
+    }
 
-    private fun offer(project: String, id: String, decisionProvider: DecisionProvider?, selected: Boolean) {
+    private fun offer(project: String, id: String, decisionProvider: DecisionProvider?, selected: ProjectDoc?) {
         if (!eligible(project)) return
         if (ProjectNodes.twin(id)) return
         if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return
         val selectedMode = mode(project, id)
-        if (selectedMode == Mode.Manual && !selected) return
-        enqueue(project, id, decisionProvider, if (selectedMode == Mode.Manual) Mode.Legacy else selectedMode)
+        if (selectedMode == Mode.Manual && selected == null) return
+        enqueue(project, id, decisionProvider, if (selectedMode == Mode.Manual) Mode.Legacy else selectedMode, selected)
     }
 
     /** An operator selects this particular text document; it is never admitted by mount, upload or resume. */
@@ -222,6 +225,24 @@ class CurationIntake(
         var r = emptyMap<String, LcncNodeRunner>()
         val params = mapOf("constellation" to constellation) +
             (d.decisionProvider?.let { mapOf("decisionProvider" to it.id) } ?: emptyMap())
+        suspend fun selectedCurrent() {
+            d.expected?.let { expected ->
+                val current = requireNotNull(corpus.document(d.project, d.id)) { "Selected document is unavailable" }
+                require(current.cid == expected.cid && current.rev == expected.rev && current.seq == expected.seq) {
+                    "Selected document revision changed before curation or join"
+                }
+            }
+        }
+        fun selectedSource(source: DocumentSource?) {
+            d.expected?.let { expected ->
+                val retained = requireNotNull(source) { "Selected document source is unavailable" }
+                val revision = requireNotNull(retained.project) { "Selected document source lacks a project revision" }
+                require(revision.project == expected.project && revision.id == expected.id && revision.cid == expected.cid &&
+                    revision.rev == expected.rev && revision.seq == expected.seq && retained.originalCid.value == expected.cid) {
+                    "Retained source differs from selected document revision"
+                }
+            }
+        }
         try {
             settlement.withLock { }
             if (removed.contains(d) || !eligible(d.project)) {
@@ -229,6 +250,7 @@ class CurationIntake(
                 return
             }
             if (d.mode is Mode.Blocked) error("Intake policy blocked: ${d.mode.reason}")
+            selectedCurrent()
             val root = constellations()
             val nodes = d.decisionProvider?.let { root?.ingestAccess(it) } ?: root
             r = if (d.decisionProvider != null && nodes != null)
@@ -236,20 +258,8 @@ class CurationIntake(
             fun runner(type: String) = r[type] ?: error("no runner '$type'")
             if (d.mode is Mode.ReviewRequired) {
                 val sourceReader = requireNotNull(retainedSource) { "Review-required intake needs a retained source" }
-                d.expected?.let { expected ->
-                    val current = requireNotNull(corpus.document(d.project, d.id)) { "Selected document is unavailable" }
-                    require(current.cid == expected.cid && current.rev == expected.rev && current.seq == expected.seq) {
-                        "Selected document revision changed before curation"
-                    }
-                }
                 val source = sourceReader(d.project, d.id)
-                d.expected?.let { expected ->
-                    val revision = requireNotNull(source.project) { "Selected document source lacks a project revision" }
-                    require(revision.project == expected.project && revision.id == expected.id && revision.cid == expected.cid &&
-                        revision.rev == expected.rev && revision.seq == expected.seq && source.originalCid.value == expected.cid) {
-                        "Retained source differs from selected document revision"
-                    }
-                }
+                selectedSource(source)
                 // Names include the project, document, source revision, and complete ontology identity.
                 val identity = borg.trikeshed.job.ContentId.of(borg.trikeshed.job.CanonicalCbor.encodeMap(mapOf(
                     "project" to d.project, "document" to d.id, "originalCid" to source.originalCid.value,
@@ -259,6 +269,7 @@ class CurationIntake(
                     ?: ConstellationNodes.curationBookName(bookBase, d.mode.ontologyCid)
                 val curated = reading.withLock {
                     if (removed.contains(d)) return@withLock null
+                    selectedCurrent()
                     LcncTrail.live.run("intake/${d.project}")
                     // This preflight avoids known members; direct external joins do not share this lock.
                     check(root?.constellationOf(bookBase) == null && root?.constellationOf(bookName) == null) {
@@ -290,12 +301,14 @@ class CurationIntake(
                 return
             }
             val source = retainedSource?.invoke(d.project, d.id)
+            selectedSource(source)
             val text = source?.text ?: corpus.extract(d.project, d.id, Int.MAX_VALUE / 4)?.text
                 ?: error("no text read from ${d.id}")
             // Held only when curated from this very text: a re-read source curates again by itself.
             if (nodes != null && nodes.holds(constellation, d.id, borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)) {
                 d.decisionProvider?.let { provider -> reading.withLock {
                     score(provider, d.id)
+                    selectedCurrent()
                     runner(ConstellationNodes.JOIN).run(
                         LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to d.id))
                 } }
@@ -309,6 +322,7 @@ class CurationIntake(
                     "extractedTextCid" to retained.extractedTextCid.value)
             } ?: emptyMap())
             reading.withLock {
+            selectedCurrent()
             LcncTrail.live.run("intake/${d.project}")
             val curated = runner(ConstellationNodes.CURATE).run(
                 LcncNode("curate", ConstellationNodes.CURATE, params = params),
@@ -319,10 +333,12 @@ class CurationIntake(
                 },
             )
             val book = curated["book"] ?: error("book.curate returned no book")
+            selectedCurrent()
             runner(ConstellationNodes.JOIN).run(
                 LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book))
             d.decisionProvider?.let {
                 score(it, book.toString())
+                selectedCurrent()
                 runner(ConstellationNodes.JOIN).run(
                     LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book))
             }
@@ -400,7 +416,7 @@ class CurationIntake(
                         requireNotNull(corpus.document(project, id)) { "Source document is unavailable" })
                 }, mode = { project, _ -> scopes.intakeMode(project) }, eligible = corpus::intakeEligible)
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
-            scopes.onExplicitDocument = { project, id, provider -> intake.offerSelected(project, id, provider) }
+            scopes.onExplicitDocument = { selected, provider -> intake.offerSelected(selected, provider) }
             scopes.onTextForReview = { selected -> intake.offerTextForReview(selected) }
             scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
             scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
