@@ -203,7 +203,7 @@ class ProjectDbWire(
                         val bLen = i64().toInt()
                         if (bLen < 0 || off + bLen > body.size) { failCount++; break }
                         val bytes = body.copyOfRange(off, off + bLen); off += bLen
-                        runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel)) }
+                        runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel), manualIntake) }
                             .fold({ okCount++ }, { failCount++ })
                     }
                     json(200, """{"verdict":"ok","stored":$okCount,"failed":$failCount}""")
@@ -217,7 +217,7 @@ class ProjectDbWire(
                         ?: return json(400, """{"error":"path query required"}""")
                     val bytes = CouchWire.bodyOf(payload)
                     if (bytes.isEmpty()) return json(400, """{"error":"empty body"}""")
-                    runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel)) }.fold(
+                    runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel), manualIntake) }.fold(
                         onSuccess = { json(200, """{"verdict":"ok","cid":"${it.value}","bytes":${bytes.size}}""") },
                         onFailure = { json(400, """{"verdict":"refused","detail":"${(it.message ?: "").replace('"', '\'')}"}""") },
                     )

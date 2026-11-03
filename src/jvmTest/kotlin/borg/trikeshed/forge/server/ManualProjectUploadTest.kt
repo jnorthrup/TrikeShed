@@ -109,7 +109,9 @@ class ManualProjectUploadTest {
         val ontology = ContentId.of("synthetic ontology".encodeToByteArray())
         for (policy in _l[CurationIntake.Mode.Manual, CurationIntake.Mode.ReviewRequired(ontology), CurationIntake.Mode.Blocked("bad guard")]) {
             val extracts = AtomicInteger(); val curates = AtomicInteger(); val joins = AtomicInteger()
-            val source = DocumentSource(cid, cid, text, "selected.pdf", "text/plain", "synthetic")
+            val selected = ProjectDoc("project", "selected.pdf", cid.value, "1", 1, text.length.toLong(), "application/pdf")
+            val source = DocumentSource(cid, cid, text, "selected.pdf", "text/plain", "synthetic",
+                project = DocumentRevision(selected.project, selected.id, selected.cid, selected.rev, selected.seq))
             val corpus = object : ProjectCorpus {
                 override suspend fun projects() = _l[ProjectRef("project", "assets", "@upload", 1)]
                 override suspend fun docs(project: String, prefix: String, glob: String, limit: Int) =
@@ -131,7 +133,7 @@ class ManualProjectUploadTest {
             val intake = CurationIntake(corpus, { runners }, { null }, this, settled = {},
                 mode = { _, _ -> policy }, retainedSource = { _, _ -> source })
             try {
-                intake.offerSelected("project", "selected.pdf", null); intake.drain()
+                intake.offerSelected(selected, null); intake.drain()
                 val status = intake.status()["project"] as Map<*, *>
                 when (policy) {
                     CurationIntake.Mode.Manual -> { assertEquals(1, curates.get()); assertEquals(1, joins.get()); assertEquals(1, status["curated"]) }
@@ -141,6 +143,74 @@ class ManualProjectUploadTest {
                 }
                 assertEquals(0, extracts.get(), "Retained source or blocked gate must prevent parser extraction")
             } finally { intake.drain() }
+        }
+    }
+
+    @Test fun storageOnlyRequestsNeverOfferAndGuardEachFile(): Unit = runBlocking {
+        val rig = Rig(directory)
+        val offered = AtomicInteger()
+        rig.scopes.onDocument = { _, _, _ -> offered.incrementAndGet() }
+        val bytes = "Synthetic PDF fixture".encodeToByteArray()
+        try {
+            rig.request("/_project/manual/begin?intake=manual")
+            rig.request("/_project/manual/putBatch?intake=manual", batch(_l["one.pdf" j bytes, "two.pdf" j bytes]))
+            assertEquals(0, offered.get(), "A storage-only request must never publish an automatic offer")
+            rig.scopes.setIntakePolicy("manual", CurationIntake.Mode.Legacy)
+            assertFailsWith<IllegalArgumentException> {
+                rig.scopes.uploadPut("manual", "refused.pdf", bytes, manualIntake = true)
+            }
+            assertNull(rig.registry.get("manual")?.gateway?.getAttachmentRef("refused.pdf"))
+            assertEquals(0, offered.get())
+            rig.scopes.uploadPut("manual", "automatic.pdf", bytes)
+            assertEquals(1, offered.get(), "Changing policy may affect later ordinary uploads, not earlier storage-only requests")
+        } finally { rig.scopes.drain() }
+    }
+
+    @Test fun selectedManualRevisionIsCheckedBeforeCurationAndBeforeJoin(): Unit = runBlocking {
+        for (replaceDuringCuration in _l[false, true]) {
+            val root = directory.resolve(if (replaceDuringCuration) "during" else "before")
+            Files.createDirectories(root)
+            val rig = Rig(root)
+            val curates = AtomicInteger(); val joins = AtomicInteger()
+            val original = "Original selected source.".encodeToByteArray()
+            val replacement = "Replacement not explicitly selected.".encodeToByteArray()
+            rig.request("/_project/manual/begin?intake=manual")
+            rig.scopes.uploadPut("manual", "selected.pdf", original, manualIntake = true)
+            val runners = _m[
+                ConstellationNodes.CURATE j LcncNodeRunner { _, inputs ->
+                    curates.incrementAndGet()
+                    assertEquals(original.decodeToString(), inputs["text"])
+                    rig.scopes.uploadPut("manual", "selected.pdf", replacement, manualIntake = true)
+                    _m["book" j "selected.pdf"]
+                },
+                ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> joins.incrementAndGet(); emptyMap() },
+            ]
+            val intake = CurationIntake(rig.corpus, { runners }, { null }, this, settled = {},
+                mode = { p, _ -> rig.scopes.intakeMode(p) }, retainedSource = { p, id ->
+                    val doc = requireNotNull(rig.corpus.document(p, id))
+                    val cid = ContentId(doc.cid)
+                    val text = requireNotNull(rig.cas.get(cid)).decodeToString()
+                    DocumentSource(cid, cid, text, id, "text/plain", "synthetic",
+                        project = DocumentRevision(p, id, doc.cid, doc.rev, doc.seq))
+                })
+            rig.scopes.onDocument = { p, id, provider -> intake.offer(p, id, provider) }
+            rig.scopes.onExplicitDocument = { selected, provider ->
+                assertEquals(ContentId.of(original).value, selected.cid)
+                assertTrue(selected.rev.isNotBlank() && selected.seq >= 0)
+                intake.offerSelected(selected, provider)
+            }
+            try {
+                rig.scopes.admitDocument("manual", "selected.pdf")
+                if (!replaceDuringCuration) rig.scopes.uploadPut("manual", "selected.pdf", replacement, manualIntake = true)
+                intake.drain()
+                assertEquals(if (replaceDuringCuration) 1 else 0, curates.get())
+                assertEquals(0, joins.get(), "Changed selected source must never join")
+                val status = intake.status()["manual"] as Map<*, *>
+                assertEquals(1, status["failed"])
+                assertEquals(0, status["curated"])
+                assertEquals(0, status["pending"])
+                assertTrue((status["note"] as String).contains("Selected document revision changed"))
+            } finally { intake.drain(); rig.scopes.drain() }
         }
     }
 }

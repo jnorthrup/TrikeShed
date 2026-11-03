@@ -114,7 +114,7 @@ class ProjectScopes(
     } + ("appliesTo" to "future-intake-admissions")
 
     /** Persist a per-project selection; failure never acknowledges a policy change. */
-    fun setIntakePolicy(project: String, mode: CurationIntake.Mode) {
+    fun setIntakePolicy(project: String, mode: CurationIntake.Mode) = synchronized(sourceWrites) {
         require(scopes.any { it.name == project }) { "no project '$project'" }
         check(!unmountRecovery.containsKey(project)) { "Project requires unmount recovery" }
         intakePolicies.set(project, mode)
@@ -126,28 +126,27 @@ class ProjectScopes(
         require(!borg.trikeshed.lcnc.ProjectNodes.twin(id) && !id.endsWith(ProjectMiner.FOOTNOTES_SUFFIX) &&
             (selectedText || id.substringAfterLast('.', "").lowercase() in ProjectMiner.MINEABLE)) { "Document format is not supported for curation: $id" }
         val pdb = requireNotNull(projectDbs?.get(project)) { "no project db '$project'" }
-        if (selectedText) {
-            synchronized(sourceWrites) {
-                check(project !in closingSources) { "project is unmounting: $project" }
-                val head = pdb.store.head
-                val rev = requireNotNull(head.getRev(id)) { "no document '$project/$id'" }
-                val seq = requireNotNull(head.sequenceOf(id)) { "Document sequence is unavailable" }
-                val ref = requireNotNull(pdb.gateway.getAttachmentRef(id)) { "no document '$project/$id'" }
-                check(!head.isDeleted(id) && head.getRev(id) == rev && head.sequenceOf(id) == seq) {
-                    "Document revision changed during selection"
-                }
-                val selected = borg.trikeshed.lcnc.ProjectDoc(project, id, ref.contentId.value, rev, seq, ref.length, ref.contentType)
-                requireNotNull(onTextForReview) { "Text review intake is not available" }.invoke(selected)
+        synchronized(sourceWrites) {
+            check(project !in closingSources) { "project is unmounting: $project" }
+            val head = pdb.store.head
+            val rev = requireNotNull(head.getRev(id)) { "no document '$project/$id'" }
+            val seq = requireNotNull(head.sequenceOf(id)) { "Document sequence is unavailable" }
+            val ref = requireNotNull(pdb.gateway.getAttachmentRef(id)) { "no document '$project/$id'" }
+            check(!head.isDeleted(id) && head.getRev(id) == rev && head.sequenceOf(id) == seq) {
+                "Document revision changed during selection"
             }
-            return
+            val selected = borg.trikeshed.lcnc.ProjectDoc(project, id, ref.contentId.value, rev, seq, ref.length, ref.contentType)
+            if (selectedText) {
+                requireNotNull(onTextForReview) { "Text review intake is not available" }.invoke(selected)
+            } else {
+                val intake = requireNotNull(onExplicitDocument) { "Document curation intake is not available" }
+                if (provider != null) {
+                    manifestFileFor(project)?.appendText("$id\t${ref.contentId.value}\t${ref.length}\t${provider.id}\n")
+                    documentProviders[project to id] = provider
+                }
+                intake.invoke(selected, provider)
+            }
         }
-        val ref = requireNotNull(pdb.gateway.getAttachmentRef(id)) { "no document '$project/$id'" }
-        val intake = requireNotNull(onExplicitDocument ?: onDocument) { "Document curation intake is not available" }
-        if (provider != null) {
-            manifestFileFor(project)?.appendText("$id\t${ref.contentId.value}\t${ref.length}\t${provider.id}\n")
-            documentProviders[project to id] = provider
-        }
-        intake.invoke(project, id, provider)
     }
 
     /** The primary repo registers as scope zero (already absorbed by the daemon's own choreography). */
@@ -248,17 +247,19 @@ class ProjectScopes(
     /** Told of every document an upload lands (never its twins): the intake that reads and curates it. */
     @Volatile var onDocument: ((project: String, id: String, decisionProvider: DecisionProvider?) -> Unit)? = null
     /** User-requested curation is distinct from automatic upload/remount offers. */
-    @Volatile var onExplicitDocument: ((project: String, id: String, decisionProvider: DecisionProvider?) -> Unit)? = null
+    @Volatile var onExplicitDocument: ((selected: borg.trikeshed.lcnc.ProjectDoc, decisionProvider: DecisionProvider?) -> Unit)? = null
     /** Separate from automatic mount/upload intake; selected text requires review. */
     @Volatile var onTextForReview: ((borg.trikeshed.lcnc.ProjectDoc) -> Unit)? = null
 
     /** One uploaded file into an upload-kind project db; manifest line makes it boot-durable. */
     fun uploadPut(name: String, relPath: String, bytes: ByteArray,
-                  decisionProvider: DecisionProvider? = decisionProvider(name, relPath.trim('/'))): borg.trikeshed.job.ContentId {
+                  decisionProvider: DecisionProvider? = decisionProvider(name, relPath.trim('/')),
+                  manualIntake: Boolean = false): borg.trikeshed.job.ContentId {
         val rel = relPath.trim('/')
         require(rel.isNotBlank() && !rel.split('/').any { it == ".." }) { "bad path '$relPath'" }
         val cid = synchronized(sourceWrites) {
             check(name !in closingSources) { "project is unmounting: $name" }
+            require(!manualIntake || intakeMode(name) == CurationIntake.Mode.Manual) { "Project is not configured for manual intake" }
             val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
             val cid = borg.trikeshed.job.ContentId.of(bytes)
             pdb.gateway.getAttachmentRef(rel)?.takeIf { it.contentId != cid }?.let { prior ->
@@ -295,7 +296,7 @@ class ProjectScopes(
             scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
             cid
         }
-        if (!borg.trikeshed.lcnc.ProjectNodes.twin(rel))
+        if (!manualIntake && !borg.trikeshed.lcnc.ProjectNodes.twin(rel))
             onDocument?.invoke(name, rel, decisionProvider)
         return cid
     }
