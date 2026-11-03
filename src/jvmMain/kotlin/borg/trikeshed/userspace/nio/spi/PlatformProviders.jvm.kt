@@ -5,6 +5,7 @@ import borg.trikeshed.htx.HtxReactorElement
 import borg.trikeshed.reactor.JvmTlsCodecBackend
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations
+import borg.trikeshed.userspace.nio.channels.spi.JvmHostMemoryOperations
 import borg.trikeshed.userspace.nio.channels.spi.JvmReactorOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmSystemOperations
@@ -29,6 +30,7 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
         channelOperations,
         reactorOperations,
         JvmProcessOperations(),
+        JvmHostMemoryOperations(),
         tlsBackend,
         HtxReactorElement(
             channelOperations = channelOperations,

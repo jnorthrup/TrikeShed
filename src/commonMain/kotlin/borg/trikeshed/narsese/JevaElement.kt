@@ -160,6 +160,15 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
             owned.open()
             requireNotNull(owned.service<ProcessOperations>()) { "Jeva requires local ProcessOperations" }
         }
+        val monitor = config.hostLimit?.let { limit ->
+            val memory = context[HostMemoryOperations] ?: context[NioSupervisor]?.service<HostMemoryOperations>()
+                ?: nio?.service<HostMemoryOperations>() ?: run {
+                    val owned = nio ?: NioSupervisor().also { nio = it; it.open() }
+                    requireNotNull(owned.service<HostMemoryOperations>()) { "Jeva host memory monitoring unavailable" }
+                }
+            // Preflight precedes process creation; the returned monitor owns the same baseline.
+            limit.watch(memory)
+        }
         val executable = config.worker ?: config.python
         val arguments = if (config.worker != null) emptyList() else
             listOf("-u", "-c", JevaProcess.program, jsonOf(config.fields() +
@@ -167,7 +176,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
         val opened = ProcessLineChannel.open(CoroutineScope(context + ops), executable, arguments,
             env = config.env + mapOf("HF_HUB_OFFLINE" to "1", "TRANSFORMERS_OFFLINE" to "1", "HF_HUB_DISABLE_TELEMETRY" to "1"),
             capacity = 1, frameBytes = 8_388_608, timeoutMs = config.timeoutMs,
-            collectStderrOnFailure = config.mlxMaxFootprintBytes != null)
+            collectStderrOnFailure = config.mlxMaxFootprintBytes != null, monitor = monitor)
         process = opened
         try {
             if (config.worker != null) {

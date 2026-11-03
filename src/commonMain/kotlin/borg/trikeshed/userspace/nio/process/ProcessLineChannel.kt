@@ -20,17 +20,19 @@ class ProcessLineChannel private constructor(
     private val frameBytes: Int,
     private val timeoutMs: Long,
     private val collectStderrOnFailure: Boolean,
+    private val monitor: (suspend () -> Unit)?,
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ProcessLineChannel> {
         suspend fun open(scope: CoroutineScope, command: String, args: List<String> = emptyList(),
                          env: Map<String, String> = emptyMap(), capacity: Int = 8,
                          frameBytes: Int = 1_048_576, timeoutMs: Long = 120_000,
-                         collectStderrOnFailure: Boolean = false): ProcessLineChannel {
+                         collectStderrOnFailure: Boolean = false,
+                         monitor: (suspend () -> Unit)? = null): ProcessLineChannel {
             require(capacity > 0 && frameBytes > 0 && timeoutMs > 0)
             scope.coroutineContext.ensureActive()
             val ops = requireNotNull(scope.coroutineContext[ProcessOperations]) { "Missing ProcessOperations" }
             val pipes = ops.open(command, args, env)
-            return try { ProcessLineChannel(scope, pipes, capacity, frameBytes, timeoutMs, collectStderrOnFailure) }
+            return try { ProcessLineChannel(scope, pipes, capacity, frameBytes, timeoutMs, collectStderrOnFailure, monitor) }
             catch (failure: Throwable) { pipes.close(); throw failure }
         }
     }
@@ -120,6 +122,24 @@ class ProcessLineChannel private constructor(
             supervisor.complete()
         }
     }
+
+    // The monitor belongs to the same child as the protocol, including while idle.
+    private val watcher = monitor?.let { watch ->
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                watch()
+                error("Process monitor returned without completion")
+            } catch (failure: Throwable) {
+                // A provider can throw CancellationException without the monitor being
+                // cancelled. Only owner cancellation may stop monitoring silently.
+                currentCoroutineContext().ensureActive()
+                worker.cancel(CancellationException(failure.message ?: "Process monitor failed"))
+                withContext(NonCancellable) { runCatching { closePipes() } }
+            }
+        }
+    }
+
+    init { worker.invokeOnCompletion { watcher?.cancel() } }
 
     suspend fun exchange(line: String): String {
         require('\n' !in line && '\r' !in line) { "Request must be one line" }

@@ -1,11 +1,12 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations
+import borg.trikeshed.userspace.nio.channels.spi.*
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
 
 /** Explicit opt-in: only a tiny, operator-supplied synthetic checkpoint is admitted. */
@@ -23,7 +24,20 @@ class JevaNativeWorkerIntegrationTest {
         val config = JevaConfig(model = modelPath, device = "mlx", worker = requireNotNull(worker), timeoutMs = 15_000,
             maxStateLength = 64, maxOptionLength = 64, mlxMaxTokens = 64, mlxCheckpointLimitBytes = 65_536)
         val questions = _m["q" j _m["type" j "noul", "instructions" j "Q"]]
-        val lane = JevaElement(CoroutineScope(coroutineContext + JvmProcessOperations()), config)
+        val host = JvmHostMemoryOperations()
+        val baseline = host.sample()
+        assertTrue(baseline.freeBytes > 0)
+        val swapMargin = 512L * 1024 * 1024
+        val maxSwap = baseline.swapBytes + minOf(swapMargin, Long.MAX_VALUE - baseline.swapBytes)
+        val samples = AtomicInteger()
+        val memory = object : HostMemoryOperations {
+            override suspend fun sample(): HostMemory = host.sample().also { samples.incrementAndGet() }
+        }
+        val guarded = config.copy(hostLimit = JevaHostLimit(
+            minFreeBytes = maxOf(1, baseline.freeBytes / 2), maxSwapBytes = maxSwap,
+            maxFreeDropBytes = baseline.freeBytes / 2, maxSwapIncreaseBytes = swapMargin,
+            sampleMs = 1_000, lifetimeMs = 60_000))
+        val lane = JevaElement(CoroutineScope(coroutineContext + JvmProcessOperations() + memory), guarded)
         try {
             val status = withTimeout(20_000) { lane.availability() }
             assertEquals(true, status["available"], status["error"]?.toString())
@@ -33,6 +47,7 @@ class JevaNativeWorkerIntegrationTest {
             assertEquals(identity, reply["model"])
             val answers = assertIs<Map<*, *>>(reply["answers"])
             assertEquals(0.5, assertIs<Map<*, *>>(answers["q"])["noul"])
+            withTimeout(5_000) { while (samples.get() < 2) delay(20) }
             val confirmed = withTimeout(20_000) { lane.availability() }
             assertEquals(true, confirmed["available"])
             assertEquals(identity, confirmed["model_identity"])

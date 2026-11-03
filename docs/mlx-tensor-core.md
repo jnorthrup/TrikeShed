@@ -287,12 +287,32 @@ or cannot be sampled. A configured footprint limit requires the isolated `device
 the in-process lane. The parent recognizes a fixed watchdog marker, rather than exposing arbitrary worker stderr;
 the marker is best effort so a full stderr pipe cannot delay termination.
 
-This is process and elapsed-time isolation, not a host-memory watchdog or a hard memory ceiling. It does not sample
-host memory pressure or protect against a host stall before a timer or sampler can run. The optional sampled footprint
-limit is not a bound on all GPU/driver allocations, other processes, or host memory. Termination/reaping can itself be
-delayed by the operating system. It owns the direct child, not an arbitrary process tree. Configuring the worker does
-not establish real-checkpoint parity, resource safety or the drain acceptance below; the in-process Kotlin and Python
-paths remain available under their existing selection rules.
+An optional parent-side monitor applies to an isolated worker. All six settings must be supplied together; absent,
+blank, invalid, or incomplete values are rejected when any one is specified. They can be supplied as the environment
+variables below or as `trikeshed.jeva.` system properties using the lowercase suffixes, such as
+`trikeshed.jeva.host_min_free_bytes`:
+
+| Environment variable | Meaning |
+|---|---|
+| `TRIKESHED_JEVA_HOST_MIN_FREE_BYTES` | Minimum OS-reported free physical memory. |
+| `TRIKESHED_JEVA_HOST_MAX_SWAP_BYTES` | Maximum OS-reported swap currently used. |
+| `TRIKESHED_JEVA_HOST_MAX_FREE_DROP_BYTES` | Maximum free-memory decrease from the preflight sample. |
+| `TRIKESHED_JEVA_HOST_MAX_SWAP_INCREASE_BYTES` | Maximum swap-use increase from the preflight sample. |
+| `TRIKESHED_JEVA_HOST_SAMPLE_MS` | Sampling interval and maximum time to obtain a sample. |
+| `TRIKESHED_JEVA_HOST_LIFETIME_MS` | Maximum worker lifetime, measured from preflight. |
+
+The minimum free memory, sample interval and lifetime must be positive; the other byte limits may be zero. Preflight
+must succeed before the child starts. The monitor remains active while the child is idle and revokes it if a limit is
+crossed, a sample fails or times out, or the lifetime expires. It fails closed when metrics are unavailable. The JVM
+provider reads the operating-system MXBean's free physical memory and total/free swap; these are OS-reported metrics,
+not a reservation or a direct measure of reclaimable memory. Other parent platforms require their own
+`HostMemoryOperations` provider for this opt-in monitor.
+
+These sampled checks are best effort, not a hard host-memory ceiling. They cannot protect against a host stall before
+a sampler can run, and the footprint limit does not bound all GPU/driver allocations, other processes, or host memory.
+Termination/reaping can itself be delayed by the operating system. The monitor owns the direct child, not an arbitrary
+process tree. Configuring these limits does not establish real-checkpoint parity, resource safety or the drain
+acceptance below; the in-process Kotlin and Python paths remain available under their existing selection rules.
 
 Verified (sampler at 0.5 s: swap in use, vm_stat, per-process RSS; watchdog on swap growth, compressor growth,
 swap-outs and reclaimable memory; the sampler is `monitor.py` in the Hermes scratch directory, not in this repo):

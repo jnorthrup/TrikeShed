@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.lib.*
 
 enum class JevaRuntime { KOTLIN, PYTHON }
 
@@ -25,6 +26,8 @@ data class JevaConfig(
     val mlxCheckpointLimitBytes: Long? = null,
     /** Optional sampled physical-footprint limit for the isolated macOS worker. */
     val mlxMaxFootprintBytes: Long? = null,
+    /** Optional parent-side sampled OS memory and worker lifetime limits. */
+    val hostLimit: JevaHostLimit? = null,
 ) {
     init {
         require(python.isNotBlank() && model.isNotBlank() && device.isNotBlank())
@@ -33,6 +36,7 @@ data class JevaConfig(
         require(mlxMaxTokens == null || mlxMaxTokens > 0)
         require(mlxCheckpointLimitBytes == null || mlxCheckpointLimitBytes >= 0)
         require(mlxMaxFootprintBytes == null || mlxMaxFootprintBytes in 1..9_007_199_254_740_991L)
+        require(hostLimit == null || worker != null) { "Host memory limits require an isolated worker" }
     }
 
     fun fields(): Map<String, Any?> = mapOf(
@@ -46,7 +50,11 @@ data class JevaConfig(
     ) + (worker?.let { mapOf("worker" to it) } ?: emptyMap()) +
         (mlxMaxTokens?.let { mapOf("mlx_max_tokens" to it) } ?: emptyMap()) +
         (mlxCheckpointLimitBytes?.let { mapOf("mlx_checkpoint_limit_bytes" to it) } ?: emptyMap()) +
-        (mlxMaxFootprintBytes?.let { mapOf("mlx_max_footprint_bytes" to it) } ?: emptyMap())
+        (mlxMaxFootprintBytes?.let { mapOf("mlx_max_footprint_bytes" to it) } ?: emptyMap()) +
+        (hostLimit?.let { _m["host_limit" j _m[
+            "min_free_bytes" j it.minFreeBytes, "max_swap_bytes" j it.maxSwapBytes,
+            "max_free_drop_bytes" j it.maxFreeDropBytes, "max_swap_increase_bytes" j it.maxSwapIncreaseBytes,
+            "sample_ms" j it.sampleMs, "lifetime_ms" j it.lifetimeMs]] } ?: emptyMap())
 
     /** Diagnostic only; identifiers are never downloaded or silently resolved as remote models. */
     fun layoutError(detail: String): String =
@@ -62,6 +70,17 @@ data class JevaConfig(
         fun configured(property: (String) -> String?, environment: (String) -> String?): JevaConfig {
             fun value(name: String) = property("trikeshed.jeva.$name")?.takeIf { it.isNotBlank() }
                 ?: environment("TRIKESHED_JEVA_${name.uppercase()}")?.takeIf { it.isNotBlank() }
+            val hostNames = _a["host_min_free_bytes", "host_max_swap_bytes", "host_max_free_drop_bytes",
+                "host_max_swap_increase_bytes", "host_sample_ms", "host_lifetime_ms"]
+            val hostValues = hostNames.map { name ->
+                property("trikeshed.jeva.$name") ?: environment("TRIKESHED_JEVA_${name.uppercase()}")
+            }
+            val hostLimit = if (hostValues.all { it == null }) null else {
+                val numbers = hostValues.mapIndexed { index, text ->
+                    requireNotNull(text?.toLongOrNull()) { "Invalid or missing Jeva ${hostNames[index]}" }
+                }
+                JevaHostLimit(numbers[0], numbers[1], numbers[2], numbers[3], numbers[4], numbers[5])
+            }
             return JevaConfig(python = value("python") ?: "python3", model = value("model") ?: Jeva.MODEL,
                 source = value("source"), device = value("device") ?: "cpu", revision = value("revision"),
                 env = listOf("GRAAL_PYTHON_VM_ARGS", "PYTORCH_MPS_HIGH_WATERMARK_RATIO", "PYTORCH_MPS_LOW_WATERMARK_RATIO")
@@ -71,6 +90,7 @@ data class JevaConfig(
                 mlxMaxTokens = environment("TRIKESHED_MLX_MAX_TOKENS")?.let { requireNotNull(it.toIntOrNull()) { "Invalid MLX max tokens" } },
                 mlxCheckpointLimitBytes = environment("TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES")?.let { requireNotNull(it.toLongOrNull()) { "Invalid MLX checkpoint limit" } },
                 mlxMaxFootprintBytes = environment("TRIKESHED_MLX_MAX_FOOTPRINT_BYTES")?.let { requireNotNull(it.toLongOrNull()) { "Invalid MLX physical footprint limit" } },
+                hostLimit = hostLimit,
                 timeoutMs = value("timeout_ms")?.let { requireNotNull(it.toLongOrNull()) { "Invalid Jeva timeout_ms" } } ?: 600_000)
         }
     }
