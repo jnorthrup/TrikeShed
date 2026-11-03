@@ -35,6 +35,7 @@ internal object DocumentsPdfLinks {
         private val selected = mutableSetOf<String>()
         private var pending = false
         private var failure: String? = null
+        private var collectionSourceChanged = false
         fun close() { abort?.abort(); job.cancel() }
         private fun present() = owner === this && job.isActive && current() && host.asDynamic().isConnected == true
         private fun revision() = _m["project" j source.project, "id" j source.id, "cid" j source.cid, "rev" j source.rev, "seq" j source.seq]
@@ -79,7 +80,7 @@ internal object DocumentsPdfLinks {
                     val ids = links.map { (it as Map<*, *>)["id"] as String }
                     require(ids.distinct().size == ids.size && ids.all { it.length in 1..128 && it.none { ch -> ch < ' ' } }) { "PDF inventory link identity is ambiguous" }
                     if (!present()) return@launch
-                    inventory = value; selected.clear(); results = emptyList()
+                    inventory = value; selected.clear(); results = emptyList(); collectionSourceChanged = false
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Throwable) { if (present()) failure = error.message ?: "PDF links unavailable" }
                 finally { if (present()) { pending = false; render() } }
@@ -98,7 +99,7 @@ internal object DocumentsPdfLinks {
                         ?: error("Collection results unavailable")
                     require(documents.size == ids.size && documents.map { it["id"] }.toSet() == ids) { "Collection results differ from the selected links" }
                     if (!present()) return@launch
-                    results = documents
+                    results = documents; collectionSourceChanged = value["sourceCurrent"] == false
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Throwable) { if (present()) failure = error.message ?: "Link collection unavailable" }
                 finally { if (present()) { pending = false; render() } }
@@ -134,6 +135,7 @@ internal object DocumentsPdfLinks {
                 (link["reason"] as? String)?.let { text(section, "p", it.take(2048)) }
             }
             button(section, "Collect selected links", pending || selected.isEmpty(), ::collect)
+            if (collectionSourceChanged) text(section, "p", "The PDF source changed during collection. Retained documents remain unreviewed; reopen the PDF to inspect its current revision.").setAttribute("role", "status")
             for (result in results) {
                 if (result["status"] == "failed") {
                     text(section, "p", "${result["id"]}: not collected · ${result["error"]}")
