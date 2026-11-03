@@ -76,7 +76,7 @@ internal object DocumentsPdfLinks {
                     require(cid(value["receiptCid"]) && value["sourceCid"] == source.cid && value["reviewStatus"] == "unreviewed") { "PDF inventory identity is unavailable" }
                     require(value["status"] in _s["AVAILABLE", "UNAVAILABLE", "LIMIT"]) { "Unknown PDF inventory status" }
                     val links = value["links"] as? List<*> ?: error("PDF inventory links are unavailable")
-                    require(links.size <= 256 && links.all { it is Map<*, *> && it["id"] is String }) { "PDF inventory exceeds the supported display bound" }
+                    require(links.size <= 4096 && links.all { it is Map<*, *> && it["id"] is String }) { "PDF inventory exceeds the supported display bound" }
                     val ids = links.map { (it as Map<*, *>)["id"] as String }
                     require(ids.distinct().size == ids.size && ids.all { it.length in 1..128 && it.none { ch -> ch < ' ' } }) { "PDF inventory link identity is ambiguous" }
                     if (!present()) return@launch

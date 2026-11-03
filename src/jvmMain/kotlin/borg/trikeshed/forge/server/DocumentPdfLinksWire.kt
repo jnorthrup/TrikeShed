@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 /** Source inspection and explicitly selected collection, never review or model authority. */
 class DocumentPdfLinksWire(private val ctx: ModuleContext, private val corpus: ProjectCorpus,
     private val parser: PdfLinks = PdfLinks()) {
-    private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext + fileIoContext))
+    private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     // A public CAS object is data, not proof that this host issued an inventory. Restart requires rediscovery.
     private val issued = ConcurrentHashMap<String, ProjectDoc>()
     fun attach() {
