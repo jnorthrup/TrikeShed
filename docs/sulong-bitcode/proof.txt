@@ -1,0 +1,92 @@
+Actual Sulong bitcode execution — 2026-11-03
+
+Outcome
+The existing SubgraalPointcutRunner loaded real LLVM bitcode and returned exact
+host-call results: add(20,22)=42, add(-7,5)=-2, add(0,0)=0. This replaces the earlier
+read-only finding that no retained Sulong execution proof had been located.
+It establishes this raw runner's scalar function interchange, not a Pi LLVM lane,
+SUMO inference, a secure native guest adapter, performance or JIT compilation.
+
+Input and compiler boundary
+No clang/C frontend executable was installed or present in the extracted SDK.
+add.c is ONLY a semantic reference for these non-overflowing integer cases.
+The actually executed source is handwritten add.ll, assembled into add.bc by the
+already extracted official llvm-as 22.1.8. llvm-dis roundtrip succeeded. No C-to-
+bitcode compilation is claimed; no dependency download or installation was used.
+The IR defines one ordinary exported add(i32,i32)->i32 function, with no external
+calls, pointers, intrinsics, memory access or loops. Broader ABI coverage is not
+established. Exact source/bitcode/tool hashes are retained in proof.json.
+
+Runtime inventory and compatibility
+A separate child queried the real Engine.languages registry:
+  Graal polyglot engine: 25.3.4.1; implementation reports Interpreted.
+  LLVM language: 22.1.8; bitcode MIME application/x-llvm-ir-bitcode is present.
+  JavaScript 25.3.4.1, Python 3.13.14 and Ruby 4.0.2 were also observed.
+The underlying LLVM language version matches llvm-as 22.1.8; Graal's 25.3.4.1
+artifact version is not an incompatible LLVM version number. A separate option
+probe confirmed llvm.verifyBitcode defaults to true in this installed language.
+No throughput or JIT claim follows from these small interpreted executions.
+
+Profiles actually exercised
+1. Existing SubgraalPointcutRunner, languages={llvm}, statementLimit=0 and
+   traceExecution=false: PASS, all three exact integer calls. Its existing code
+   enables native access and explicitly sets llvm.verifyBitcode=false. Host class
+   lookup remains denied. No LLVM root/listener instrumentation is established.
+2. Unchanged normal InProcessIsolate for GRAAL_LLVM: REFUSED during construction,
+   with "Access to native code is not allowed by the host environment."
+3. Direct restricted polyglot Context, native access=false: the same REFUSAL
+   when evaluating the exact bitcode. IO/process/thread/Java context flags remained
+   configured to deny access.
+4. Direct polyglot Context, native access=true and verification left at its
+   confirmed true default: PASS, add(20,22)=42. Other context permission flags
+   remained false; no native syscall sandbox test is claimed.
+These controls retain the difference between the raw native-capable hook and the
+normal restricted guest. No application defaults or source permissions changed.
+The JVM --enable-native-access flag authorizes runtime native-library loading;
+it did not override the context-level false permission in the refusal controls.
+
+Frozen sources and bounds
+The proof worktree is based on TrikeShed 26e647e3da54f6875cfc9697b344eacffcbef7f9.
+It uses the independently frozen v42 main.jar, SHA-256
+1f2ab5525bd001159f4b2bfe366333e40ef9eb1b543e47b5451ef430527104c1,
+inside the historically named forge-source-context-proof-v39/snapshot directory.
+That build's source is 6246c3085daae5ce74890d4291a6d49a3b01e439. The three relevant
+runner/bounds source files were checked byte-identical between those revisions;
+source and compiled-class hashes are in proof.json. No live central build output
+or Gradle build was used.
+
+Every profile ran in its own finite child with a 20-second hard deadline. The
+harness owns the process group, kills that group on timeout and joins capture.
+Actual successful/refused profiles finished within 1.4 seconds. The JVM heap cap
+was 512 MiB, with separate finite metaspace/code-cache/class-space settings in
+the retained argv. This is NOT a native-memory or OS sandbox guarantee.
+Initial trials with 8-GiB and 64-GiB virtual-address caps failed before Engine
+initialization because libjvmci could not reserve its compiler isolate. Both
+failed attempts are retained. The final successful profiles omit that OS address
+cap and explicitly claim no native-memory or network isolation. Guest security
+settings were not relaxed to repair the harness reservation failure.
+
+Evidence and reproduction
+Artifacts: /workspace/library-files/sulong-bitcode-proof
+  add.ll/add.bc/add.roundtrip.ll: actual source, assembled bitcode and disassembly
+  SulongProof.kt: actual external host harness; helper-compile.argv.json/log
+  inventory.stdout: real installed-language inventory, separate from execution
+  runner.stdout: exact SubgraalPointcutRunner results
+  normal-isolate.stdout/direct-native-denied.stdout: unchanged-policy refusals
+  direct-native-allowed-verified.stdout: default-verification positive control
+  option-default.stdout: actual LLVM verification option default
+  *.argv.json, *.stderr, results.json and verified-summary.json
+  dependency-hashes.json and artifact-sha256.json
+  attempt1-AS8GiB and attempt2-AS64GiB: retained pre-Engine harness failures
+
+Core invocation used the frozen project's real class, not a replacement runner:
+  SubgraalPointcutRunner(statementLimit=0, languages=setOf("llvm"),
+      traceExecution=false).use { runner ->
+      val library = runner.evalFile("llvm", File("add.bc"))
+      check(library.getMember("add").execute(20,22).asInt() == 42)
+  }
+Exact compiler and child argv, full immutable classpath and hashes are external
+artifacts. Only PATH/LANG/TMPDIR were passed to the proof child environment.
+No model, credentials, native Pi controller or SUMO ontology input was involved.
+A production native lane would still need an explicit trusted capability and
+owned userspace process lifecycle; this docs-only proof does not add that lane.
