@@ -184,17 +184,31 @@ class JevaTokenizer internal constructor(
             var at = 0
             var from = 0
             var budget = 0
+            fun step(work: Int = 1) {
+                if (budget < work) { check(); budget = 4096 }
+                budget -= work
+            }
             while (at < text.length) {
-                if (budget <= 0) { check(); budget = 4096 }
-                val prior = at
-                val added = special.keys.asSequence().filter { text.startsWith(it, at) }.maxByOrNull { it.length }
+                step()
+                var added: String? = null
+                for (candidate in special.keys) {
+                    step()
+                    if (candidate.length > text.length - at || candidate.length <= (added?.length ?: -1)) continue
+                    var i = 0
+                    while (i < candidate.length) {
+                        val count = minOf(4096, candidate.length - i)
+                        step(count)
+                        if (!text.regionMatches(at + i, candidate, i, count)) break
+                        i += count
+                    }
+                    if (i == candidate.length) added = candidate
+                }
                 if (added != null) {
                     plain(text.substring(from, at))
                     token(special.getValue(added))
                     at += added.length
                     from = at
                 } else at += BertWordPiece.scalarWidth(BertWordPiece.scalar(text, at))
-                budget -= at - prior
             }
             plain(text.substring(from))
         }

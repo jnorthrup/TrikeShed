@@ -344,6 +344,7 @@ object OroborosDaemon {
     fun main(args: Array<String>) {
         val config = parseConfig(args)
         nativeHermesWorker(config)
+        piAccessHash()
         if (config.airgap) {
             // Pin the process before child initialization, including scopes that drop the context.
             System.setProperty(Airgap.PROPERTY, "true")
@@ -2905,6 +2906,28 @@ object OroborosDaemon {
         return memoryStore
     }
 
+    internal fun piAccessHash(
+        configuredHash: String? = HostSystem.getProperty(borg.trikeshed.forge.server.PiWire.TOKEN_PROPERTY),
+        environment: (String) -> String? = { HostSystem.getenv(it) },
+    ): String? {
+        val supplied = configuredHash?.trim()?.takeIf { it.isNotEmpty() }
+        val hash = if (supplied != null) supplied else {
+            val token = environment("PI_ACCESS_TOKEN")?.takeIf { it.isNotBlank() }
+            val tokenHash = environment("PI_ACCESS_TOKEN_SHA256")?.takeIf { it.isNotBlank() }
+            require(token == null || tokenHash == null) { "Set only one of PI_ACCESS_TOKEN and PI_ACCESS_TOKEN_SHA256" }
+            tokenHash ?: token?.let {
+                require(it.length in 17..2041 && '\r' !in it && '\n' !in it) {
+                    "PI_ACCESS_TOKEN must contain 17–2041 characters on one line"
+                }
+                borg.trikeshed.job.ContentId.of(it.encodeToByteArray()).hex
+            }
+        }
+        require(hash == null || hash.matches(Regex("[0-9a-f]{64}"))) {
+            "Pi access token hash must be lowercase SHA-256 hex"
+        }
+        return hash
+    }
+
     /** Pi boot remains independent of the Hermes VM and outside the size-limited daemon boot method. */
     private fun piWire(
         config: DaemonConfig,
@@ -2915,7 +2938,7 @@ object OroborosDaemon {
     ): borg.trikeshed.forge.server.PiWire = borg.trikeshed.forge.server.PiWire(
         scope, htxElement + muxReactor + (scope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
         breadcrumbContexts, { muxReactor.modelMux() },
-        HostSystem.getProperty(borg.trikeshed.forge.server.PiWire.TOKEN_PROPERTY)?.trim()?.takeIf { it.isNotEmpty() },
+        piAccessHash(),
     )
 
     private suspend fun drainPi(wire: borg.trikeshed.forge.server.PiWire) {

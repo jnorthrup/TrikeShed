@@ -616,7 +616,7 @@ object MuxPage {
                 btn("fork", "Fork session", "git-branch") + btn("export-session", "Export session", "download") + btn("archive", "Archive session", "archive") +
                 "</div></div><div id=\"detailMeta\" class=\"detail-meta\"></div><div class=\"session-tabs\" role=\"tablist\" aria-label=\"Session views\"><button role=\"tab\" data-action=\"session-tab\" data-tab=\"conversation\">Conversation</button><button role=\"tab\" data-action=\"session-tab\" data-tab=\"branches\">Branches</button><button role=\"tab\" data-action=\"session-tab\" data-tab=\"receipts\">Receipts</button></div><div id=\"sessionPanel\" role=\"tabpanel\"></div><form id=\"followupForm\" class=\"followup\"><textarea id=\"followupPrompt\" aria-label=\"Continue session\" placeholder=\"Continue this session...\" maxlength=\"32000\" required></textarea><div class=\"toolbar\"><select id=\"followupModel\" aria-label=\"Reply model\"></select><div class=\"toolbar\">" +
                 btn("cancel", "Stop run", "square", "class=\"danger\"") + "<button type=\"submit\" class=\"primary\" aria-label=\"Send message\" title=\"Send message\">" + icon("arrow-up") + "</button></div></div></form>")
-            (qq("#followupForm") as HTMLFormElement).onsubmit = { e: Event -> launchPage { sendFollowup(e) }; null }
+            (qq("#followupForm") as HTMLFormElement).onsubmit = { e: Event -> sendFollowup(e); null }
             detailShell = s.id
         }
         qq("#detailTitle").textContent = strOrEmpty(s.title)
@@ -1004,20 +1004,29 @@ object MuxPage {
         (qq("#endpointDialog") as HTMLDialogElement).showModal()
     }
 
-    private suspend fun sendFollowup(event: Event) {
+    private fun sendFollowup(event: Event) {
         event.preventDefault()
-        val button = (event.currentTarget as Element).querySelector("button[type=submit]") as HTMLButtonElement
-        val prompt = (qq("#followupPrompt") as HTMLTextAreaElement).value
-        val model = (qq("#followupModel") as HTMLSelectElement).value
+        if (mutating) return
+        val id = selected ?: return
+        val form = event.currentTarget as HTMLFormElement
+        val button = form.querySelector("button[type=submit]") as HTMLButtonElement
+        val input = form.querySelector("textarea") as HTMLTextAreaElement
+        val prompt = input.value
+        val model = (form.querySelector("select") as HTMLSelectElement).value
         button.disabled = true
-        mutate {
-            val b: dynamic = obj()
-            b.id = selected; b.prompt = prompt; b.models = if (model.isNotEmpty()) arrayOf(model) else emptyArray<String>()
-            b.mode = "chat"; b.maxTokens = 1024; b.temperature = .2
-            request("/api/mux/sessions/run", b)
-            (qq("#followupPrompt") as HTMLTextAreaElement).value = ""
+        launchPage {
+            try {
+                mutate {
+                    val b: dynamic = obj()
+                    b.id = id; b.prompt = prompt; b.models = if (model.isNotEmpty()) arrayOf(model) else emptyArray<String>()
+                    b.mode = "chat"; b.maxTokens = 1024; b.temperature = .2
+                    request("/api/mux/sessions/run", b)
+                    if (input.value == prompt) input.value = ""
+                }
+            } finally {
+                button.disabled = selected == id && isActive(detail?.status)
+            }
         }
-        button.disabled = isActive(detail?.status)
     }
 
     private fun onClick(event: Event) {

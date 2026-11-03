@@ -344,8 +344,8 @@ Gaps found against the strategy, each open unless stated:
 7. The identity includes the backbone block-content manifest. Device admission uses a separate `JevaDeadline` with
    the configured timeout: bounded file reads, chunked head/tokenizer hashing, parsing, block-manifest construction,
    and each weight materialization check it cooperatively. Tokenization polls across scalar scans, normalization,
-   and merge work; individual built-in string operations, UTF-8 conversions, bulk allocations and copies, a scan
-   of a large special-token map, blocked I/O calls and MLX evaluations cannot be preempted by those checks, so this
+   merge work, and added-token table and prefix comparisons; individual built-in string operations, UTF-8 conversions,
+   bulk allocations and copies, blocked I/O calls and MLX evaluations cannot be preempted by those checks, so this
    is not a hard wall-clock guarantee. The heap bounds pair-lookups, not total memory: near the text-length limit,
    multibyte input can produce millions of byte-symbol nodes, and their arrays, heap and growth copies can retain
    hundreds of MiB. This is a capacity estimate, not a measured peak. Encoding consumes pre-tokenized pieces as

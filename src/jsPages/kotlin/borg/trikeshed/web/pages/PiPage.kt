@@ -62,7 +62,14 @@ object PiPage {
             else requestInit("POST", headers, JSON.stringify(body), cache = "no-store")
         val response = fetchResponse("/api/pi" + path, init)
         val value = response.jsonValue()
-        if (!response.ok) error(strOrEmpty(value?.detail).ifBlank { strOrEmpty(value?.error).ifBlank { "Pi is unavailable" } })
+        if (!response.ok) {
+            val code = strOrEmpty(value?.error)
+            error(when (code) {
+                "pi_access_unconfigured" -> "Pi access is not configured. Set PI_ACCESS_TOKEN or PI_ACCESS_TOKEN_SHA256 on the host, then restart Oroboros."
+                "authentication_required" -> "The Pi access token was not accepted. Enter the token configured on this host, then refresh models."
+                else -> strOrEmpty(value?.detail).ifBlank { code.ifBlank { "Pi is unavailable" } }
+            })
+        }
         return value
     }
     private fun append(label: String, text: String, toolResult: String? = null) {
