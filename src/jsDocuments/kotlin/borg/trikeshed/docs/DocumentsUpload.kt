@@ -201,5 +201,10 @@ internal object DocumentsUpload {
             }
         })
         window.addEventListener("pagehide", { _: Event -> closed = true; abort?.abort(); owner.cancel() })
+        // A cached page owns cancelled work. Rebuild its controls from the retained URL;
+        // never retry an upload whose server may already have admitted some files.
+        window.addEventListener("pageshow", { event: Event ->
+            if (closed && event.asDynamic().persisted == true) window.location.reload()
+        })
     }
 }
