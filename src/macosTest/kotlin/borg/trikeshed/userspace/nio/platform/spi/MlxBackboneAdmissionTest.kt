@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.nio.platform.spi
 
 import borg.trikeshed.common.Files
 import borg.trikeshed.lib.*
+import borg.trikeshed.narsese.JevaBackboneConfig
 import kotlin.test.*
 
 class MlxBackboneAdmissionTest {
@@ -92,5 +93,49 @@ class MlxBackboneAdmissionTest {
                 try { assertFails { MlxBackbone(session, directory) } } finally { session.close() }
             }
         } finally { Files.deleteRecursively(directory) }
+    }
+
+    @Test fun configuredTokenLimitRefusesBeforeReadingOrAllocatingDeviceInput() {
+        val directory = Files.createTempDir("mlx-token-limit-")
+        try {
+            checkpoint(directory)
+            val operations = MlxMatrixOperations.configured { name ->
+                if (name == "TRIKESHED_MLX_MAX_TOKENS") "2" else null
+            }
+            val session = operations.open()
+            try {
+                val model = MlxBackbone(session, directory)
+                val before = session.mark()
+                val oversized: Series<Int> = 3 j { error("rejected tokens must not be read") }
+                val error = assertFailsWith<IllegalArgumentException> { model.encode(oversized, {}, { _, _ -> }) }
+                assertTrue(error.message.orEmpty().contains("token"))
+                assertEquals(before, session.mark())
+                class Interrupted : RuntimeException()
+                assertFailsWith<Interrupted> { model.encode(s_[0], { throw Interrupted() }, { _, _ -> }) }
+                assertEquals(before, session.mark())
+                var checks = 0
+                var allocated = 0
+                assertFailsWith<Interrupted> {
+                    model.encode(s_[0, 1], { if (++checks == 5) {
+                        allocated = session.mark() - before
+                        throw Interrupted()
+                    } }, { _, _ -> })
+                }
+                assertEquals(5, checks, "Cancellation reached the first evaluated recurrence chunk")
+                assertTrue(allocated > 0, "Cancellation must interrupt real device work")
+                assertEquals(before, session.mark(), "Canceled inference must release its device intermediates")
+                val short = model.encode(s_[0, 1], {}, { _, _ -> })
+                assertEquals(2, short.a[0])
+                assertEquals(32, short.a[1])
+                assertEquals(before, session.mark())
+            } finally { session.close() }
+            assertEquals(0L, MlxMatrixOperations.checkpointUsage().bytes)
+        } finally { Files.deleteRecursively(directory) }
+    }
+
+    @Test fun sequenceShapesAreCheckedBeforeMaterialization() {
+        mlxSequenceShapes(2, JevaBackboneConfig())
+        assertFailsWith<IllegalArgumentException> { mlxSequenceShapes(233_017, JevaBackboneConfig()) }
+        assertFailsWith<IllegalArgumentException> { mlxSequenceShapes(2, JevaBackboneConfig(convKernel = Int.MAX_VALUE)) }
     }
 }

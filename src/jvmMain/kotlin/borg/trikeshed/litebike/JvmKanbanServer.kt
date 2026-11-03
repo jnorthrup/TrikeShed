@@ -84,7 +84,7 @@ class JvmKanbanServer(
     private val streamingPaths: Set<String> = emptySet(),
     /** Binary-safe routes (CouchWire). Tried after `/api/…` built-ins, before static assets and the shell. */
     private val rawRoutes: List<RawRoute> = emptyList(),
-    /** Listener batch/reassembly unit: request cap is `maxRequestBatch * 1024` bytes (64 KiB at the default). */
+    /** Capacity of the listener's fanout event channel; this does not bound request bytes. */
     private val maxRequestBatch: Int = 64,
     /** Root for server-owned state files (.causal.wal). The daemon passes forgeHome; never the worktree. */
     private val stateDir: File = File("."),

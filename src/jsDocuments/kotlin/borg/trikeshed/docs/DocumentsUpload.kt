@@ -242,8 +242,13 @@ internal object DocumentsUpload {
             }
             val fallback = transfer.files
             if (roots.isEmpty()) {
+                val fileCount = (fallback?.length as? Int) ?: 0
+                if (fileItems > 0 && fileCount != fileItems) {
+                    message("Could not read every dropped entry. Choose files or a folder instead; nothing was sent.")
+                    return
+                }
                 val entries = mutableListOf<Entry>()
-                for (i in 0 until ((fallback?.length as? Int) ?: 0)) { val file = fallback.item(i); entries.add(Entry(file.name as String, file)) }
+                for (i in 0 until fileCount) { val file = fallback.item(i); entries.add(Entry(file.name as String, file)) }
                 submit { entries j (entries.firstOrNull()?.path?.substringBeforeLast('.') ?: "documents") }
             } else submit {
                 val entries = mutableListOf<Entry>()

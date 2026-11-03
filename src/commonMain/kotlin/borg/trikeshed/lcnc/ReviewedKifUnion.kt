@@ -5,6 +5,8 @@ import borg.trikeshed.kif.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.DocumentQuotationCheck
 import borg.trikeshed.parse.reifyMap
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** A bounded union of independently approved, current KIF snapshots. */
 object ReviewedKifUnion {
@@ -15,32 +17,42 @@ object ReviewedKifUnion {
     private data class Focus(val rows: List<Row>, val projection: String, val path: List<Row>? = null)
 
     /** Retrieve a candidate witness; the native solver still proves the submitted facts. */
-    private fun focus(rows: List<Row>, predicate: String, subject: String, obj: String, search: Boolean): Focus {
+    private fun focus(rows: List<Row>, predicate: String, subject: String, obj: String, search: Boolean,
+                      check: () -> Unit): Focus {
+        check()
         if (!search && rows.size <= ReviewedKifHornPlan.MAX_SELECTIONS) return Focus(rows, "complete-selection")
         if (predicate == "subclass" && subject == obj) {
             val witness = rows.firstOrNull {
+                check()
                 (it.predicate == "subclass" && (it.subject == subject || it.obj == subject)) ||
                     (it.predicate == "instance" && it.obj == subject)
             }
             if (witness != null) return Focus(_l[witness], "candidate-path", _l[witness])
         }
         val outgoing = mutableMapOf<String, MutableList<Int>>()
-        for ((index, row) in rows.withIndex()) if (row.predicate == "subclass")
-            outgoing.getOrPut(row.subject) { mutableListOf() }.add(index)
+        for ((index, row) in rows.withIndex()) {
+            check()
+            if (row.predicate == "subclass") outgoing.getOrPut(row.subject) { mutableListOf() }.add(index)
+        }
         val queue = ArrayDeque<String>()
         val previous = mutableMapOf<String, Join<String?, Int?>>()
         if (predicate == "subclass") {
             previous[subject] = null j null
             queue.addLast(subject)
         } else {
-            for ((index, row) in rows.withIndex()) if (row.predicate == "instance" && row.subject == subject && row.obj !in previous) {
-                previous[row.obj] = null j index
-                queue.addLast(row.obj)
+            for ((index, row) in rows.withIndex()) {
+                check()
+                if (row.predicate == "instance" && row.subject == subject && row.obj !in previous) {
+                    previous[row.obj] = null j index
+                    queue.addLast(row.obj)
+                }
             }
         }
         while (queue.isNotEmpty() && obj !in previous) {
+            check()
             val node = queue.removeFirst()
             for (index in outgoing[node].orEmpty()) {
+                check()
                 val next = rows[index].obj
                 if (next !in previous) {
                     previous[next] = node j index
@@ -52,6 +64,7 @@ object ReviewedKifUnion {
             val path = mutableListOf<Row>()
             var node: String? = obj
             while (node != null) {
+                check()
                 val step = previous.getValue(node)
                 step.b?.let { path.add(rows[it]) }
                 node = step.a
@@ -66,6 +79,9 @@ object ReviewedKifUnion {
 
     suspend fun report(review: CurationReview, cas: CasStore, references: List<CurationTaxonomyRef>,
                        predicate: String, subject: String, obj: String, search: Boolean = false): Map<String, Any?> {
+        val context = currentCoroutineContext()
+        fun check() = context.ensureActive()
+        check()
         require(predicate in _s["subclass", "instance"]) { "Goal must be subclass or instance" }
         fun constant(value: String): Boolean {
             if (value.length !in 1..256) return false
@@ -74,6 +90,7 @@ object ReviewedKifUnion {
         }
         require(constant(subject) && constant(obj)) { "Goal requires two exact ground KIF constants" }
         val reads = review.taxonomyReads(references)
+        check()
         val count = reads.sumOf { it.candidate.selections.size }
         require(count <= 4096) { "Reviewed KIF selection limit" }
         val reader = cas as? BoundedCasReader ?: error("Bounded CAS reads are required")
@@ -82,6 +99,7 @@ object ReviewedKifUnion {
         val rows = mutableListOf<Row>()
         var bytesRead = 0
         for (read in reads) for (item in read.candidate.selections.view) {
+            check()
             val q = item.quotation
             require(q.originalCid == q.extractedTextCid) { "Selected source identity differs" }
             require(occurrences.add("${q.originalCid.value}:${q.begin}:${q.end}")) {
@@ -91,9 +109,11 @@ object ReviewedKifUnion {
                 val remaining = minOf(16 * 1024 * 1024, 32 * 1024 * 1024 - bytesRead)
                 require(remaining > 0) { "Reviewed source byte limit" }
                 val bytes = requireNotNull(reader.getBounded(q.extractedTextCid, remaining)) { "Selected text is unavailable" }
+                check()
                 require(ContentId.of(bytes) == q.extractedTextCid) { "Selected source identity differs" }
+                check()
                 bytesRead += bytes.size
-                bytes.decodeToString(throwOnInvalidSequence = true)
+                bytes.decodeToString(throwOnInvalidSequence = true).also { check() }
             }
             require(item.value["format"] == DocumentTaxonomyCandidate.POLICY &&
                 DocumentQuotationCheck.exactSpan(source, q.begin, q.end, q.quote)) { "Selected KIF evidence differs" }
@@ -110,7 +130,7 @@ object ReviewedKifUnion {
                 occurrence, formula.name, (formula.arguments[0] as KifTerm.Constant).token,
                 (formula.arguments[1] as KifTerm.Constant).token))
         }
-        val focus = focus(rows, predicate, subject, obj, search)
+        val focus = focus(rows, predicate, subject, obj, search, ::check)
         val focused = focus.rows
         val plan = if (!search) null else focus.path?.let { path ->
             if (path.size > CHAIN_SEGMENT_EDGES * CHAIN_SEGMENTS) null
@@ -127,11 +147,13 @@ object ReviewedKifUnion {
         }
         // The occurrence identities include every individual read; no synthetic review revision is asserted.
         val exported = SumoNixBridge.compile(0, sources, "($predicate $subject $obj)")
+        check()
         val input = reifyMap(exported.inputJson)
         require((input["excluded"] as? List<*>)?.isEmpty() == true &&
             (input["facts"] as? List<*>)?.size == focused.size &&
             (input["rules"] as? List<*>)?.size == ReviewedKifHornPlan.rules.size) { "Reviewed KIF is outside the native fragment" }
         val checked = review.taxonomyReads(references)
+        check()
         require(checked.indices.all { checked[it].readCid == reads[it].readCid && checked[it].decisionCid == reads[it].decisionCid }) {
             "Reviewed material changed during export"
         }

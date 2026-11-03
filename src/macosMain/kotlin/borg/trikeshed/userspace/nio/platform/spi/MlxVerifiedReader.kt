@@ -28,7 +28,11 @@ fun mlxBlockDigest(bytes: ByteArray): String {
 }
 
 /** The digest describes the exact blocks admitted to the lazy MLX reader. */
-class MlxVerifiedReader(path: String, loadCheck: () -> Unit = {}) {
+class MlxVerifiedReader internal constructor(
+    path: String, admit: (Long) -> Unit, private val retire: (Long) -> Unit,
+    private val closeFile: (FileChannel) -> Unit, loadCheck: () -> Unit,
+) {
+    constructor(path: String, loadCheck: () -> Unit = {}) : this(path, {}, {}, { it.close() }, loadCheck)
     companion object {
         const val BLOCK_BYTES = 1 shl 20
     }
@@ -37,6 +41,7 @@ class MlxVerifiedReader(path: String, loadCheck: () -> Unit = {}) {
     private lateinit var channel: FileChannel
     private lateinit var label: CPointer<ByteVar>
     private val failure = AtomicReference<String?>(null)
+    private val closeFailure = AtomicReference<Throwable?>(null)
     private val released = AtomicBoolean(false)
     private var cursor = 0L
     private var size = 0L
@@ -56,6 +61,7 @@ class MlxVerifiedReader(path: String, loadCheck: () -> Unit = {}) {
             label = (strdup("verified safetensors") ?: error("reader label allocation failed")).also { text = it }
             size = channel.size()
             require(size in 8..34_359_738_368L) { "Invalid safetensors size" }
+            admit(size)
             var offset = 0L
             while (offset < size) {
                 loadCheck()
@@ -94,6 +100,7 @@ class MlxVerifiedReader(path: String, loadCheck: () -> Unit = {}) {
 
     private fun fail(error: Throwable) { failure.compareAndSet(null, error.message ?: "Safetensors reader failed") }
     fun check() { val message = failure.load(); check(message == null) { message ?: "Safetensors reader failed" } }
+    internal fun checkClose() { closeFailure.load()?.let { throw it } }
     fun good(): Boolean = failure.load() == null
 
     /** Validate the exact verified bytes before the native parser or named lookup sees them. */
@@ -224,7 +231,21 @@ class MlxVerifiedReader(path: String, loadCheck: () -> Unit = {}) {
 
     fun close() {
         if (released.compareAndSet(false, true)) {
-            try { channel.close() } finally { free(label); pthread_mutex_destroy(mutex.ptr); nativeHeap.free(mutex) }
+            var problem: Throwable? = null
+            try { closeFile(channel) } catch (caught: Throwable) { problem = caught }
+            try { free(label); pthread_mutex_destroy(mutex.ptr); nativeHeap.free(mutex) } catch (caught: Throwable) {
+                if (problem == null) problem = caught else if (problem !== caught) problem.addSuppressed(caught)
+            }
+            // UringFileChannel.close revokes the channel even on failure. The accounting is
+            // for usable verified readers, not for an OS descriptor or resident memory.
+            if (!channel.isOpen()) try { retire(size) } catch (caught: Throwable) {
+                if (problem == null) problem = caught else if (problem !== caught) problem.addSuppressed(caught)
+            }
+            problem?.let {
+                closeFailure.compareAndSet(null, it)
+                fail(it)
+                throw it
+            }
         }
     }
 

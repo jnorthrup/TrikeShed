@@ -45,6 +45,7 @@ Shared context (ModelMux breadcrumbs):
   --peer-timeout-s N     bound for one block fetch, 1..3600 (default 30)
   --oversight mlx        System1 relevance review by the local 4-bit MLX Jeva (needs TRIKESHED_JEVA_* from
                          config/jeva-mlx.env.sh); without it, oversight=advisory|required reports UNAVAILABLE
+                         TRIKESHED_JEVA_RUNTIME=kotlin explicitly selects the unqualified macOS native runtime.
 
 Models (spends provider quota; keys come only from the named environment variables):
   --model-lane PROVIDER,MODEL,BASE_URL,KEY_ENV   (repeatable) register modelmux_models and modelmux_chat.

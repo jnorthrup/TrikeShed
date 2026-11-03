@@ -3,6 +3,8 @@ package borg.trikeshed.agent.modelmux
 import borg.trikeshed.htx.HtxHeaders
 import borg.trikeshed.lib.*
 import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 /** Quota facts reported by one HTTP response; absence remains unknown. */
 data class HttpQuota(
@@ -33,7 +35,7 @@ data class HttpQuota(
             return HttpQuota(limit, remaining, resetAt ?: (nowMs + fallbackMs), exhausted)
         }
 
-        /** Provider reset formats: relative seconds, unit durations, epoch seconds/ms, or ISO time. */
+        /** Provider reset formats: relative seconds, unit durations, epoch seconds/ms, ISO time, or HTTP-date. */
         fun reset(value: String?, nowMs: Long): Long? {
             val raw = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
             raw.toDoubleOrNull()?.takeIf { it >= 0.0 && it.isFinite() }?.let {
@@ -44,6 +46,7 @@ data class HttpQuota(
                 }
             }
             runCatching { Instant.parse(raw).toEpochMilliseconds() }.getOrNull()?.let { return it }
+            httpDate(raw)?.let { return it }
             val parts = Regex("""(\d+(?:\.\d+)?)(ms|s|m|h|d)""").findAll(raw).toList()
             if (parts.isEmpty() || parts.joinToString("") { it.value } != raw) return null
             val duration = parts.sumOf {
@@ -56,6 +59,22 @@ data class HttpQuota(
                 }
             }
             return duration.takeIf { it.isFinite() }?.let { nowMs + it.toLong() }
+        }
+
+        /** IMF-fixdate, the fixed-width UTC form used by HTTP Retry-After. */
+        private fun httpDate(raw: String): Long? {
+            if (raw.length != 29) return null
+            val match = Regex("""(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT""").matchEntire(raw) ?: return null
+            val (weekday, day, month, year, hour, minute, second) = match.destructured
+            val monthNumber = when (month) {
+                "Jan" -> "01"; "Feb" -> "02"; "Mar" -> "03"; "Apr" -> "04"
+                "May" -> "05"; "Jun" -> "06"; "Jul" -> "07"; "Aug" -> "08"
+                "Sep" -> "09"; "Oct" -> "10"; "Nov" -> "11"; "Dec" -> "12"
+                else -> return null
+            }
+            val instant = runCatching { Instant.parse("$year-$monthNumber-${day}T$hour:$minute:${second}Z") }.getOrNull() ?: return null
+            if (!instant.toLocalDateTime(TimeZone.UTC).dayOfWeek.name.startsWith(weekday.uppercase())) return null
+            return instant.toEpochMilliseconds()
         }
     }
 }

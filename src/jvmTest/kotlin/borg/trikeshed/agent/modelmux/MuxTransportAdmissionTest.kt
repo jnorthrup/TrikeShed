@@ -11,9 +11,55 @@ import kotlinx.coroutines.flow.toList
 import java.util.concurrent.atomic.AtomicInteger
 import java.net.ServerSocket
 import java.net.InetAddress
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.test.*
 
 class MuxTransportAdmissionTest {
+    @Test fun realHttpDateRetryAfterBlocksUntilTheReportedReset() = runBlocking {
+        val owner = SupervisorJob(coroutineContext[Job])
+        val network = HtxReactorElement(JvmChannelOperations(), parentJob = owner)
+        withContext(Dispatchers.IO + owner) { network.open() }
+        val htx = openHtxElement(routeService = network, parentJob = owner)
+        val reactor = MuxReactorElement(parentJob = owner)
+        val ledger = QuotaLegion()
+        val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+        val baseUrl = "http://127.0.0.1:${server.localPort}/v1"
+        val mux = ModelMux(KeyMux { }) {
+            quota(ledger)
+            model("local", caps = _s["chat"], auth = LlmAuth.NONE, baseUrl = baseUrl)
+        }
+        val resetMs = (System.currentTimeMillis() / 1000L + 180L) * 1000L
+        val retry = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss 'GMT'", Locale.US)
+            .withZone(ZoneOffset.UTC).format(Instant.ofEpochMilli(resetMs))
+        val serving = CoroutineScope(Dispatchers.IO + owner).launch {
+            server.accept().use { socket ->
+                val input = socket.getInputStream().bufferedReader()
+                while (!input.readLine().isNullOrEmpty()) { }
+                socket.getOutputStream().write("HTTP/1.1 429 Too Many Requests\r\nRetry-After: $retry\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encodeToByteArray())
+            }
+        }
+        try {
+            val first = withContext(reactor + htx) { mux.chat("local", s_["user" j "first"], timeoutMs = 5_000) }
+            assertTrue(first.isFailure)
+            val key = "endpoint:$baseUrl"
+            assertFalse(ledger.isAvailable(key, resetMs - 1))
+            assertTrue(ledger.isAvailable(key, resetMs))
+            val second = withContext(reactor + htx) { mux.chat("local", s_["user" j "second"], timeoutMs = 1_000) }
+            assertContains(second.exceptionOrNull()?.message.orEmpty(), "quota exhausted")
+            serving.join()
+        } finally {
+            server.close()
+            reactor.close()
+            htx.close()
+            network.drain()
+            owner.complete()
+            owner.join()
+        }
+    }
+
     private class Transport(private val firstStatus: Int = 200) : HtxRouteService {
         val starts = Channel<Int>(8)
         val release = CompletableDeferred<Unit>()

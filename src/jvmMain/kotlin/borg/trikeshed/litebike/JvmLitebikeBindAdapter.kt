@@ -4,6 +4,7 @@ package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
@@ -11,7 +12,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import java.net.InetSocketAddress
 import java.net.StandardSocketOptions
@@ -119,59 +119,37 @@ object JvmLitebikeBindAdapter {
     ) {
         val supervisor = kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.nio.spi.NioSupervisor.Key]
         while (kotlinx.coroutines.currentCoroutineContext().isActive) {
-            // NioSupervisor backpressure: acquire permit before accepting
-            if (supervisor?.tryAcquireIo() == false) {
-                // back-pressure: close the socket immediately
-                // Since this is AsynchronousServerSocketChannel, we must accept and then close
-                val ch = kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
-                    val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
-                        override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
-                            cont.resume(result)
-                        }
-                        override fun failed(t: Throwable, attached: Any?) {
-                            if (cont.isActive) cont.resumeWithException(t)
-                        }
+            val ch = kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
+                val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
+                    override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
+                        cont.resume(result) { _, socket, _ -> runCatching { socket.close() } }
                     }
-                    server.accept(null, handler)
-                    cont.invokeOnCancellation {
-                        runCatching { server.close() }
+
+                    override fun failed(t: Throwable, attached: Any?) {
+                        if (cont.isActive) cont.resumeWithException(t)
                     }
                 }
+                server.accept(null, handler)
+                cont.invokeOnCancellation {
+                    runCatching { server.close() }
+                }
+            }
+            // The permit belongs to an accepted socket, not to an idle accept.
+            if (supervisor?.tryAcquireIo() == false) {
                 runCatching { ch.close() }
                 continue
-            }
-
-            val ch = try {
-                kotlinx.coroutines.suspendCancellableCoroutine<AsynchronousSocketChannel> { cont ->
-                    val handler = object : CompletionHandler<AsynchronousSocketChannel, Any?> {
-                        override fun completed(result: AsynchronousSocketChannel, attached: Any?) {
-                            cont.resume(result)
-                        }
-
-                        override fun failed(t: Throwable, attached: Any?) {
-                            if (cont.isActive) cont.resumeWithException(t)
-                        }
-                    }
-                    server.accept(null, handler)
-                    cont.invokeOnCancellation {
-                        runCatching { server.close() }
-                    }
-                }
-            } catch (e: Throwable) {
-                supervisor?.releaseIo()
-                throw e
             }
 
             // R05 — register the channel up front. The drain loop
             // attaches the sequence id once the listener assigns
             // one, so the HTTP worker can route responses back
             // through the originating socket.
-            val connId = connections.register(ch)
+            val connId = connections.register(ch) { supervisor?.releaseIo() }
             System.err.println("[BIND] accepted conn=$connId")
             // Read all bytes from the channel asynchronously, then
             // forward to the listener with the detected protocol.
-            CoroutineScope(element.supervisor).launch {
-                drainOne(ch, element, connections, connId, supervisor)
+            CoroutineScope(element.supervisor).launch(start = CoroutineStart.UNDISPATCHED) {
+                drainOne(ch, element, connections, connId)
             }
         }
     }
@@ -181,7 +159,6 @@ object JvmLitebikeBindAdapter {
             element: LitebikeListenerElement,
             connections: ConnectionRegistry,
             connId: Long,
-            supervisor: borg.trikeshed.userspace.nio.spi.NioSupervisor? = null,
         ) {
             val buf = ByteBuffer.allocate(8 * 1024)
             // Reassembly buffer: grows by doubling, so a large body costs O(n), not O(n²).
@@ -200,7 +177,6 @@ object JvmLitebikeBindAdapter {
                                 // Peer closed — drop the registry entry.
                                 connections.unregister(connId)
                                 runCatching { ch.close() }
-                                supervisor?.releaseIo()
                                 done.complete(Unit)
                                 return
                             }
@@ -247,7 +223,6 @@ object JvmLitebikeBindAdapter {
                                 done.complete(Unit)
                                 return
                             }
-                            supervisor?.releaseIo()
                             // Continue reading
                             buf.clear()
                             readLoop()
@@ -256,7 +231,6 @@ object JvmLitebikeBindAdapter {
                         override fun failed(t: Throwable, attached: Any?) {
                             connections.unregister(connId)
                             runCatching { ch.close() }
-                            supervisor?.releaseIo()
                             // The registry closes the socket after the worker's
                             // reply (Connection: close); the pending read then
                             // fails with AsynchronousCloseException. A peer reset
@@ -272,11 +246,13 @@ object JvmLitebikeBindAdapter {
             }
         
             // Start the read loop
-            buf.clear()
-            readLoop()
-            
-            // Wait for completion
-            done.await()
+            try {
+                buf.clear()
+                readLoop()
+                done.await()
+            } finally {
+                connections.unregister(connId)
+            }
         }
 
 /** Companion helper for users who want a fire-and-forget lifecycle. */

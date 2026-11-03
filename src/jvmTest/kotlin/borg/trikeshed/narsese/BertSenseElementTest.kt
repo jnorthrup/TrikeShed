@@ -381,6 +381,35 @@ class BertSenseElementTest {
     }
 
     @Test
+    fun conflictingContextsAreNotEncodedForAnOtherwiseSupportedQuery(): Unit = runBlocking {
+        val seen = mutableSetOf<BertToken>()
+        val encoder = object : BertEncoder {
+            override val model = "test"
+            override suspend fun encode(tokens: Series<BertToken>): Series<BertVector> {
+                seen.addAll(tokens.view)
+                return tokens α { BertVector(it, BertSpan.Exact, _a[1f, 0f]) }
+            }
+            override suspend fun drain() {}
+        }
+        val lane = BertSenseElement(this, { encoder })
+        val valid: Series<BertSenseLabel> = 7 j { i: Int ->
+            BertSenseLabel("valid-$i", "sense", BertToken("word", "valid context $i"))
+        }
+        val conflict: Series<BertSenseLabel> = 128 j { i: Int ->
+            BertSenseLabel("conflict-$i", if (i % 2 == 0) "sense" else "other",
+                BertToken("word", "conflicting context ${i / 2}"))
+        }
+        val query = BertSenseQuery("query", BertToken("word", "query"), s_["sense", "other"])
+        try {
+            val result = lane.read(s_[query], valid + conflict)
+            assertEquals(BertSenseStatus.Supported, result.results[0].status)
+            assertEquals(7, result.results[0].neighbors.size)
+            assertTrue(result.results[0].neighbors.view.all { it.evidence.source.startsWith("valid-") })
+            assertEquals(8, seen.size, "Only the seven eligible contexts and query need vectors")
+        } finally { lane.drain() }
+    }
+
+    @Test
     fun ambiguousOrInvalidDistributionsDoNotBecomeEvidence() {
         val files = InMemoryFileOperations()
         files.mkdirs("/books/book.jev.history")

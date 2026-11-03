@@ -11,9 +11,32 @@ import borg.trikeshed.parse.reifyMap
 
 /** Validate admission before reading a potentially lazy token series or allocating its device input. */
 fun mlxTokenIds(tokens: Series<Int>, maxPositions: Int, vocabulary: Int): IntArray {
-    require(tokens.size in 1..maxPositions) { "Qwen3.5 sequence length outside configured positions" }
-    return IntArray(tokens.size) { tokens[it] }.also { ids ->
+    val count = tokens.size
+    require(count in 1..maxPositions) { "Qwen3.5 sequence length outside configured positions" }
+    return IntArray(count) { tokens[it] }.also { ids ->
         require(ids.all { it in 0 until vocabulary }) { "Qwen3.5 token outside vocabulary" }
+    }
+}
+
+/** Reject shapes that the shared Int-indexed tensor contract cannot represent before MLX sees them. */
+internal fun mlxSequenceShapes(count: Int, config: JevaBackboneConfig) {
+    require(count in 1..config.maxPositions) { "Qwen3.5 sequence length outside configured positions" }
+    tensorSize(s_[count, config.hiddenSize])
+    tensorSize(s_[count, config.intermediateSize])
+    if (config.layers.view.any { it == "full_attention" }) {
+        tensorSize(s_[count, config.attentionHeads, config.headDim, 2])
+        tensorSize(s_[count, config.keyValueHeads, config.headDim])
+    }
+    if (config.layers.view.any { it == "linear_attention" }) {
+        val keyWidth = tensorSize(s_[config.linearKeyHeads, config.linearKeyDim])
+        val valueWidth = tensorSize(s_[config.linearValueHeads, config.linearValueDim])
+        val channels = keyWidth.toLong() * 2 + valueWidth
+        val history = count.toLong() + config.convKernel - 1
+        require(channels <= Int.MAX_VALUE && history <= Int.MAX_VALUE) { "Qwen3.5 sequence dimensions exceed MLX limits" }
+        tensorSize(s_[history.toInt(), channels.toInt()])
+        tensorSize(s_[count, config.linearValueHeads, config.linearKeyDim])
+        tensorSize(s_[count, config.linearValueHeads, config.linearValueDim])
+        tensorSize(s_[config.linearValueHeads, config.linearValueDim, config.linearKeyDim])
     }
 }
 
@@ -142,39 +165,47 @@ class MlxBackbone(private val session: MlxMatrixSession, directory: String, chec
         return MlxQuantized(vector("$name.weight"), vector("$name.scales"), vector("$name.biases"), group, bits)
     }
 
-    override fun encode(tokens: Series<Int>, check: () -> Unit, progress: (Int, Int) -> Unit): MetaSeries<Tensor, Float> = session.scoped {
-        val ids = mlxTokenIds(tokens, config.maxPositions, config.vocabSize)
+    override fun encode(tokens: Series<Int>, check: () -> Unit, progress: (Int, Int) -> Unit): MetaSeries<Tensor, Float> {
         check()
-        val table = matrix("embed_tokens")
-        var hidden = session.embed(ids, table.weight, table.scales, table.biases, table.groupSize, table.bits)
-        val epsilon = config.rmsEpsilon
-        for (layer in 0 until config.layers.size) {
-            check(); progress(layer, 0)
-            val previous = hidden
-            val mark = session.mark()
-            val at = "layers.$layer."
-            val input = session.rmsNorm(hidden, vector(at + "input_layernorm.weight"), epsilon)
-            val mixed = if (config.layers[layer] == "full_attention") {
-                val m = at + "self_attn."
-                session.fullAttention(input, matrix(m + "q_proj"), matrix(m + "k_proj"), matrix(m + "v_proj"), matrix(m + "o_proj"),
-                    vector(m + "q_norm.weight"), vector(m + "k_norm.weight"), config.attentionHeads, config.keyValueHeads,
-                    config.headDim, config.rotaryDim, config.ropeTheta.toFloat(), epsilon)
-            } else {
-                val m = at + "linear_attn."
-                session.linearAttention(input, matrix(m + "in_proj_qkv"), matrix(m + "in_proj_z"), vector(m + "in_proj_b.weight"),
-                    vector(m + "in_proj_a.weight"), matrix(m + "out_proj"), vector(m + "conv1d.weight"), vector(m + "A_log"),
-                    vector(m + "dt_bias"), vector(m + "norm.weight"), config.linearKeyHeads, config.linearValueHeads,
-                    config.linearKeyDim, config.linearValueDim, config.convKernel, epsilon, check)
+        val count = tokens.size
+        session.maxTokens?.let { require(count <= it) { "Qwen3.5 token count exceeds configured MLX limit $it" } }
+        mlxSequenceShapes(count, config)
+        check()
+        val captured: Series<Int> = count j { index -> tokens[index] }
+        return session.scoped {
+            val ids = mlxTokenIds(captured, config.maxPositions, config.vocabSize)
+            check()
+            val table = matrix("embed_tokens")
+            var hidden = session.embed(ids, table.weight, table.scales, table.biases, table.groupSize, table.bits)
+            val epsilon = config.rmsEpsilon
+            for (layer in 0 until config.layers.size) {
+                check(); progress(layer, 0)
+                val previous = hidden
+                val mark = session.mark()
+                val at = "layers.$layer."
+                val input = session.rmsNorm(hidden, vector(at + "input_layernorm.weight"), epsilon)
+                val mixed = if (config.layers[layer] == "full_attention") {
+                    val m = at + "self_attn."
+                    session.fullAttention(input, matrix(m + "q_proj"), matrix(m + "k_proj"), matrix(m + "v_proj"), matrix(m + "o_proj"),
+                        vector(m + "q_norm.weight"), vector(m + "k_norm.weight"), config.attentionHeads, config.keyValueHeads,
+                        config.headDim, config.rotaryDim, config.ropeTheta.toFloat(), epsilon)
+                } else {
+                    val m = at + "linear_attn."
+                    session.linearAttention(input, matrix(m + "in_proj_qkv"), matrix(m + "in_proj_z"), vector(m + "in_proj_b.weight"),
+                        vector(m + "in_proj_a.weight"), matrix(m + "out_proj"), vector(m + "conv1d.weight"), vector(m + "A_log"),
+                        vector(m + "dt_bias"), vector(m + "norm.weight"), config.linearKeyHeads, config.linearValueHeads,
+                        config.linearKeyDim, config.linearValueDim, config.convKernel, epsilon, check)
+                }
+                hidden = session.add(hidden, mixed)
+                val gated = session.rmsNorm(hidden, vector(at + "post_attention_layernorm.weight"), epsilon)
+                val gate = session.linear(gated, matrix(at + "mlp.gate_proj"))
+                val up = session.linear(gated, matrix(at + "mlp.up_proj"))
+                hidden = session.add(hidden, session.linear(session.times(session.silu(gate), up), matrix(at + "mlp.down_proj")))
+                session.settleLayer(mark, previous, hidden)
             }
-            hidden = session.add(hidden, mixed)
-            val gated = session.rmsNorm(hidden, vector(at + "post_attention_layernorm.weight"), epsilon)
-            val gate = session.linear(gated, matrix(at + "mlp.gate_proj"))
-            val up = session.linear(gated, matrix(at + "mlp.up_proj"))
-            hidden = session.add(hidden, session.linear(session.times(session.silu(gate), up), matrix(at + "mlp.down_proj")))
-            session.settleLayer(mark, previous, hidden)
+            check(); progress(config.layers.size, 0)
+            val result = session.rmsNorm(hidden, vector("norm.weight"), epsilon)
+            tensorOf(result.a, FloatArray(result.size).also { result.read(0, it) })
         }
-        check(); progress(config.layers.size, 0)
-        val result = session.rmsNorm(hidden, vector("norm.weight"), epsilon)
-        tensorOf(result.a, FloatArray(result.size).also { result.read(0, it) })
     }
 }

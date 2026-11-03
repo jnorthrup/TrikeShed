@@ -17,6 +17,7 @@ import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
 import borg.trikeshed.graal.subvm.PythonWheels
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.parse.yaml.YamlParser
+import borg.trikeshed.userspace.nio.file.spi.FileLease
 import borg.trikeshed.vm.Teleported
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -24,6 +25,7 @@ import java.nio.file.Path
 import java.nio.file.SimpleFileVisitor
 import java.nio.file.attribute.BasicFileAttributes
 import java.io.OutputStream
+import java.util.IdentityHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlinx.coroutines.CoroutineScope
 import org.graalvm.polyglot.PolyglotException
@@ -273,6 +275,7 @@ class HermesPythonPort(
     private var isolateSockets: PythonSocketProvider? = null
     private var isolateServices: PythonHostServices? = null
     private val candidates = HermesCandidates()
+    private var workspaceLease: FileLease? = null
 
     private inline fun <T> transition(block: () -> T): T {
         check(!transition.isHeldByCurrentThread) { "Cannot retire or replace a Hermes port from its own transition" }
@@ -412,6 +415,14 @@ class HermesPythonPort(
         }
         candidates.close()
         if (isolate?.isAlive != true) closeIsolate()
+        if (workspaceLease == null) {
+            workspaceLease = if (world.durable) {
+                val files = world.fileOpsFor("hermes-python")
+                val directory = files.resolvePath(world.root, "owners")
+                files.mkdirs(directory)
+                files.acquireExclusiveLease(files.resolvePath(directory, "hermes-python.lock"))
+            } else memoryWorkspaceLease(world)
+        }
         val importRevision = blackboard.snapshot().revision
         val baseline = "boot-${inventory.ontology.cid.hex.take(16)}"
         val guest = GraalBtrfsSupervisor(
@@ -588,6 +599,8 @@ class HermesPythonPort(
     override fun close() = transition {
         candidates.close()
         closeIsolate()
+        workspaceLease?.close()
+        workspaceLease = null
     }
 
     private fun closeIsolate() {
@@ -723,6 +736,21 @@ class HermesPythonPort(
     }
 
     companion object {
+        private val memoryOwners = IdentityHashMap<BtrfsWorldStore, Any>()
+
+        /** One in-process owner for the fixed Hermes guest in a shared memory world. */
+        private fun memoryWorkspaceLease(world: BtrfsWorldStore): FileLease = synchronized(memoryOwners) {
+            check(!memoryOwners.containsKey(world)) { "Hermes memory workspace is already owned" }
+            val owner = Any()
+            memoryOwners[world] = owner
+            FileLease {
+                synchronized(memoryOwners) {
+                    if (memoryOwners[world] === owner) memoryOwners.remove(world)
+                }
+                Unit
+            }
+        }
+
         const val IMPORT_WALL_MILLIS = 60_000L
         /** Sleeve module holding the withheld/ported capability twins; imported at the waist when present. */
         const val GUEST_PRELUDE = "trikeshed_guest_prelude"

@@ -123,6 +123,9 @@ class BertSenseElement(
         for ((token, sense) in contexts) if (sense != null) counts[token.lemma] = (counts[token.lemma] ?: 0) + 1
         if (read.queries.view.none { (counts[it.token.lemma] ?: 0) >= 7 }) return BertSenseReading(null,
             read.queries.size j { BertSense(null, BertSenseStatus.InsufficientEvidence, emptySeriesOf()) })
+        // Contradictory contexts cannot vote; avoid encoding them merely because
+        // another context makes this batch eligible for inference.
+        val evidence = labels.filter { contexts[it.token] != null }
         val model = encoder ?: encoderFactory(scope).also { encoder = it }
         var identity = vectorsModel
         if (identity != null && model.model != identity) {
@@ -132,7 +135,7 @@ class BertSenseElement(
             vectorsModel = null
             identity = null
         }
-        val targets = (labels.map { it.token } + read.queries.view.map { it.token }).distinct()
+        val targets = (evidence.map { it.token } + read.queries.view.map { it.token }).distinct()
         val encoded = HashMap<BertToken, BertVector>()
         val missing = targets.filter { token -> vectors[token]?.let { encoded[token] = it; false } ?: true }
         for (batch in missing.chunked(128)) {
@@ -160,9 +163,10 @@ class BertSenseElement(
             values.size
         } }.distinct()
         check(dimensions.size <= 1) { "BERT encoder returned incompatible dimensions" }
+        require(labels.all { it.source.isNotBlank() && it.sense.isNotBlank() }) { "Invalid BERT evidence" }
         val resolved = checkNotNull(identity) { "BERT model identity is unavailable" }
         check(model.model == resolved) { "BERT model identity changed during reading" }
-        val index = BertSenseIndex(resolved, labels.map {
+        val index = BertSenseIndex(resolved, evidence.map {
             val vector = checkNotNull(encoded[it.token])
             // Neighbor receipts escape this lane; do not expose cached mutable arrays.
             BertSenseEvidence(it.source, it.sense, vector.copy(values = vector.values?.copyOf()), it.table)

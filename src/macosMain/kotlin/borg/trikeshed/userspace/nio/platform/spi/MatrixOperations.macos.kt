@@ -2,6 +2,7 @@ package borg.trikeshed.userspace.nio.platform.spi
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.JevaWeight
+import borg.trikeshed.userspace.nio.channels.FileChannel
 import kotlinx.cinterop.*
 import mlxc.*
 import platform.posix.memcpy
@@ -9,31 +10,67 @@ import platform.posix.size_tVar
 
 /**
  * Float32 GEMM on the MLX GPU stream through mlx-c; tier 1 of docs/mlx-tensor-core.md.
- * The three settings are process-wide MLX controls, applied whenever a session opens. MLX documents [memoryLimit]
+ * The three settings are process-wide MLX controls, shared by live sessions. MLX documents [memoryLimit]
  * as a graph-evaluation guideline rather than a hard allocation or host-memory bound; [cacheLimit] controls its free
- * buffer cache and [wiredLimit] controls how much memory MLX keeps resident. Other sessions may change these settings.
+ * buffer cache and [wiredLimit] controls how much memory MLX keeps resident. Cooperating sessions must agree on
+ * these settings while any is live; unrelated callers of the MLX API can still change the process-wide values.
  * The default mlx-c error handler terminates the process; checking a returned status does not by itself prevent that.
  */
 class MlxMatrixOperations(
     val memoryLimit: Long = 8L shl 30,
     val cacheLimit: Long = 512L shl 20,
     val wiredLimit: Long = 4L shl 30,
+    /** Limit on the exact file bytes retained by this process's verified safetensors readers, not on memory use. */
+    val checkpointLimitBytes: Long = if (memoryLimit == 0L) Long.MAX_VALUE else memoryLimit,
+    /** Optional per-encode token admission limit; it is not a memory or execution-time limit. */
+    val maxTokens: Int? = null,
 ) : MatrixOperations {
+    /** Reserved checkpoint file bytes in this process; not GPU or host memory consumption. */
+    data class CheckpointUsage(val bytes: Long, val limit: Long?, val sessions: Int)
+
     init {
-        require(memoryLimit >= 0 && cacheLimit >= 0 && wiredLimit >= 0) { "MLX limits must be nonnegative" }
+        require(memoryLimit >= 0 && cacheLimit >= 0 && wiredLimit >= 0 && checkpointLimitBytes >= 0) { "MLX limits must be nonnegative" }
+        require(maxTokens == null || maxTokens > 0) { "MLX token limit must be positive" }
     }
 
     override fun open(): MlxMatrixSession {
-        memScoped {
-            val previous = alloc<size_tVar>()
-            status(mlx_set_memory_limit(previous.ptr, memoryLimit.toULong()), "set_memory_limit")
-            status(mlx_set_cache_limit(previous.ptr, cacheLimit.toULong()), "set_cache_limit")
-            status(mlx_set_wired_limit(previous.ptr, wiredLimit.toULong()), "set_wired_limit")
+        val owner = Any()
+        MlxCapacity.open(owner, MlxLimits(memoryLimit, cacheLimit, wiredLimit, checkpointLimitBytes)) {
+            memScoped {
+                val previous = alloc<size_tVar>()
+                status(mlx_set_memory_limit(previous.ptr, memoryLimit.toULong()), "set_memory_limit")
+                status(mlx_set_cache_limit(previous.ptr, cacheLimit.toULong()), "set_cache_limit")
+                status(mlx_set_wired_limit(previous.ptr, wiredLimit.toULong()), "set_wired_limit")
+            }
         }
-        return MlxMatrixSession(mlx_default_gpu_stream_new(), identity)
+        try {
+            val name = identity
+            val stream = mlx_default_gpu_stream_new()
+            check(stream.useContents { ctx } != null) { "MLX GPU stream creation failed" }
+            return MlxMatrixSession(stream, name, owner, maxTokens)
+        } catch (failure: Throwable) {
+            try { MlxCapacity.close(owner) } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+            throw failure
+        }
     }
 
     companion object {
+        /** The platform provider reads explicit admission limits once, when the provider is composed. */
+        fun configured(environment: (String) -> String?): MlxMatrixOperations {
+            val defaults = MlxMatrixOperations()
+            val limit = environment("TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES")?.let { raw ->
+                val value = raw.toLongOrNull()
+                require(value != null && value >= 0) { "TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES must be a nonnegative integer" }
+                value
+            } ?: defaults.checkpointLimitBytes
+            val tokens = environment("TRIKESHED_MLX_MAX_TOKENS")?.let { raw ->
+                val value = raw.toIntOrNull()
+                require(value != null && value > 0) { "TRIKESHED_MLX_MAX_TOKENS must be a positive integer" }
+                value
+            }
+            return MlxMatrixOperations(checkpointLimitBytes = limit, maxTokens = tokens)
+        }
+
         val identity: String by lazy {
             memScoped {
                 val text = alloc<mlx_string_>()
@@ -51,6 +88,8 @@ class MlxMatrixOperations(
         class DeviceMemory(val active: Long, val peak: Long, val cache: Long) {
             override fun toString() = "active=${active shr 20}MiB peak=${peak shr 20}MiB cache=${cache shr 20}MiB"
         }
+
+        fun checkpointUsage(): CheckpointUsage = MlxCapacity.snapshot()
 
         fun deviceMemory(): DeviceMemory = memScoped {
             val active = alloc<size_tVar>(); val peak = alloc<size_tVar>(); val cache = alloc<size_tVar>()
@@ -117,7 +156,10 @@ class MlxTensor internal constructor(
 class MlxMatrixSession internal constructor(
     private var stream: CValue<mlx_stream_>?,
     override val identity: String,
+    owner: Any,
+    internal val maxTokens: Int?,
 ) : MatrixSession {
+    private var owner: Any? = owner
     private val owned = ArrayList<MlxAllocation>()
     private val readers = ArrayList<Join<CValue<mlx_io_reader_>, MlxVerifiedReader>>()
     val fileIdentity: String get() { checkReaders(); return readers.single().b.identity }
@@ -231,15 +273,34 @@ class MlxMatrixSession internal constructor(
     /**
      * Named tensors of one safetensors file. Lazy MLX reads are verified against the admitted block manifest.
      */
-    fun load(path: String, vararg names: String, check: () -> Unit = {}): List<MlxTensor> {
+    fun load(path: String, vararg names: String, check: () -> Unit = {}): List<MlxTensor> =
+        load(path, names, check) { it.close() }
+
+    internal fun load(path: String, names: Array<out String>, check: () -> Unit,
+                      closeFile: (FileChannel) -> Unit): List<MlxTensor> {
         gpu()
         check()
-        val verified = MlxVerifiedReader(path, check)
+        val sessionOwner = checkNotNull(owner) { "Matrix session is closed" }
+        var admitted = 0L
+        fun release(failure: Throwable) {
+            if (admitted != 0L) try { MlxCapacity.release(sessionOwner, admitted) }
+            catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+        }
+        val verified = try {
+            MlxVerifiedReader(path, admit = { bytes -> MlxCapacity.reserve(sessionOwner, bytes); admitted = bytes },
+                retire = { bytes -> MlxCapacity.release(sessionOwner, bytes) }, closeFile = closeFile, loadCheck = check)
+        } catch (failure: Throwable) {
+            release(failure)
+            throw failure
+        }
         try { verified.header(names, check) } catch (error: Throwable) {
             try { verified.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
             throw error
         }
-        val input = verified.handle()
+        val input = try { verified.handle() } catch (error: Throwable) {
+            try { verified.close() } catch (cleanup: Throwable) { error.addSuppressed(cleanup) }
+            throw error
+        }
         readers += input j verified
         // Load::eval_gpu is not implemented in MLX; the file read runs on a CPU stream, consumers run on the GPU stream.
         val reader = mlx_default_cpu_stream_new()
@@ -542,12 +603,33 @@ class MlxMatrixSession internal constructor(
     }
 
     override fun close() {
-        owned.forEach(::free)
-        owned.clear()
-        readers.forEach { (reader, _) -> mlx_io_reader_free(reader) }
-        readers.clear()
-        stream?.let { mlx_stream_free(it) }
-        stream = null
+        val sessionOwner = owner ?: return
+        var failure: Throwable? = null
+        fun failed(caught: Throwable) {
+            if (failure == null) failure = caught else if (failure !== caught) failure!!.addSuppressed(caught)
+        }
+        val allocations = owned.iterator()
+        while (allocations.hasNext()) try {
+            free(allocations.next()); allocations.remove()
+        } catch (caught: Throwable) { failed(caught) }
+        val inputs = readers.iterator()
+        while (inputs.hasNext()) {
+            val (reader, verified) = inputs.next()
+            try {
+                MlxMatrixOperations.status(mlx_io_reader_free(reader), "reader_free")
+                inputs.remove()
+                verified.checkClose()
+            } catch (caught: Throwable) { failed(caught) }
+        }
+        stream?.let { current ->
+            try { MlxMatrixOperations.status(mlx_stream_free(current), "stream_free"); stream = null }
+            catch (caught: Throwable) { failed(caught) }
+        }
+        if (owned.isEmpty() && readers.isEmpty() && stream == null) try {
+            MlxCapacity.close(sessionOwner)
+            owner = null
+        } catch (caught: Throwable) { failed(caught) }
+        failure?.let { throw it }
     }
 
     private fun upload(values: FloatArray, offset: Int, rows: Int, columns: Int, stride: Int): CValue<mlx_array_> {

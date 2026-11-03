@@ -30,6 +30,7 @@ class ConnectionRegistry {
 
     private data class Entry(
         val channel: AsynchronousSocketChannel,
+        val onClose: () -> Unit,
         /** SequenceId of the in-flight request, if any. */
         @Volatile var pendingSequenceId: Long? = null,
     )
@@ -41,9 +42,9 @@ class ConnectionRegistry {
      * connectionId that the caller can later use with [write] or
      * [unregister].
      */
-    fun register(channel: AsynchronousSocketChannel): Long {
+    fun register(channel: AsynchronousSocketChannel, onClose: () -> Unit = {}): Long {
         val id = nextId.incrementAndGet()
-        connections[id] = Entry(channel)
+        connections[id] = Entry(channel, onClose)
         return id
     }
 
@@ -121,8 +122,11 @@ class ConnectionRegistry {
     fun unregister(connectionId: Long) {
         streaming.remove(connectionId)
         val entry = connections.remove(connectionId) ?: return
-        runCatching { entry.channel.close() }
-        // NioSupervisor permit is released gracefully during drain or explicitly by adapter.
+        try {
+            runCatching { entry.channel.close() }
+        } finally {
+            entry.onClose()
+        }
     }
 
     /**

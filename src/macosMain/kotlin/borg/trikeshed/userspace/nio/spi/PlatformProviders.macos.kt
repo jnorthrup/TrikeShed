@@ -1,6 +1,7 @@
 package borg.trikeshed.userspace.nio.spi
 
 import borg.trikeshed.context.Synchronization
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.channels.spi.PosixChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.PosixProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.KqueueReactorOperations
@@ -36,4 +37,8 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
 
 }
 
-actual fun platformMatrixProviders(): List<CoroutineContext.Element> = listOf(MlxMatrixOperations(), MlxEncoderOperations())
+actual fun platformMatrixProviders(): List<CoroutineContext.Element> {
+    val system = PosixSystemOperations()
+    val matrices = MlxMatrixOperations.configured { system.getenv(it, null) }
+    return _l[matrices, MlxEncoderOperations(matrices)]
+}

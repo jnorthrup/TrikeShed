@@ -28,6 +28,7 @@ import borg.trikeshed.mcp.ToolFailure
 import borg.trikeshed.narsese.JevaConfig
 import borg.trikeshed.narsese.JevaElement
 import borg.trikeshed.narsese.JevaRuntime
+import borg.trikeshed.narsese.EncoderOperations
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
 import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -94,6 +95,12 @@ interface McpStdioHost {
     fun claimProtocol(): ProtocolChannel
 }
 
+/** The oversight adapter and the Jeva lane share the already-owned NIO supervisor. */
+internal fun jevaOversight(scope: CoroutineScope, nio: NioSupervisor, config: JevaConfig): Join<JevaElement, JevaOversight> {
+    val element = JevaElement(CoroutineScope(scope.coroutineContext + nio), config)
+    return element j JevaOversight { state, questions -> element.ask(state, questions) }
+}
+
 /**
  * The stdio MCP server, whole, with no platform in it. All policy, protocol and tool logic is commonMain; the host binds
  * the process's streams and owns its lifecycle (the JVM entry point, the native one, a test).
@@ -151,10 +158,24 @@ object McpStdio {
 
             val oversight = if (!options.oversightMlx) null else {
                 val config = JevaConfig.configured({ null }, { SystemOperations.default.getenv(it) })
-                check(config.device == "mlx" && config.runtime == JevaRuntime.PYTHON) { "--oversight mlx needs the local MLX Jeva: source config/jeva-mlx.env.sh first" }
-                val element = JevaElement(CoroutineScope(currentCoroutineContext() + jevaOwner), config)
-                jeva = element
-                JevaOversight { state, questions -> element.ask(state, questions) }
+                if (config.device != "mlx") {
+                    host.diagnose("mcp-stdio: --oversight mlx requires TRIKESHED_JEVA_DEVICE=mlx")
+                    error("MLX oversight device required")
+                }
+                if (config.runtime == JevaRuntime.KOTLIN) {
+                    if (!"kotlin".equals(SystemOperations.default.getenv("TRIKESHED_JEVA_RUNTIME"), ignoreCase = true)) {
+                        host.diagnose("mcp-stdio: select TRIKESHED_JEVA_RUNTIME=kotlin explicitly for unqualified Kotlin MLX oversight")
+                        error("explicit Kotlin runtime selection required")
+                    }
+                    if (nio.service<EncoderOperations>() == null) {
+                        host.diagnose("mcp-stdio: Kotlin MLX oversight requires the macOS native EncoderOperations provider")
+                        error("MLX encoder provider unavailable")
+                    }
+                    host.diagnose("mcp-stdio: Kotlin MLX oversight is unqualified; parity, resource and drain acceptance are pending")
+                }
+                val binding = jevaOversight(CoroutineScope(currentCoroutineContext() + jevaOwner), nio, config)
+                jeva = binding.a
+                binding.b
             }
 
             val port = if (options.lanes.isEmpty()) null else {

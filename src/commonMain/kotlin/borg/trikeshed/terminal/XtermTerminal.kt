@@ -333,7 +333,7 @@ class XtermTerminal(
         }
         val values = if (clean.isEmpty()) listOf(0) else clean.split(';').map(::parameter)
         fun p(index: Int = 0, default: Int = 1): Int = values.getOrNull(index)?.takeIf { it > 0 } ?: default
-        wrapPending = false
+        if (final != 'm') wrapPending = false
         when (final) {
             'A' -> row -= minOf(p(), row - if (originMode) scrollTop else 0)
             'B' -> row += minOf(p(), (if (originMode) scrollBottom else rows - 1) - row)
@@ -364,7 +364,7 @@ class XtermTerminal(
                 repeat(steps) { scrollDown(scrollTop, scrollBottom) }
                 revision += (count - steps).toLong()
             }
-            'm' -> sgr(values)
+            'm' -> sgr(values, clean.split(';'), ::parameter)
             'r' -> setScrollRegion(values)
             's' -> saveCursor()
             'u' -> restoreCursor()
@@ -409,10 +409,42 @@ class XtermTerminal(
         revision++
     }
 
-    private fun sgr(values: List<Int>) {
+    private fun sgr(values: List<Int>, fields: List<String>, parameter: (String) -> Int) {
         if (values.isEmpty()) { style = VtStyle(); return }
+        fun number(value: String): Int? =
+            if (value.isNotEmpty() && value.all { it in '0'..'9' }) parameter(value) else null
+        fun color(foreground: Boolean, arguments: List<String>) {
+            val mode = arguments.firstOrNull()?.let(::number) ?: return
+            val value = when (mode) {
+                5 -> if (arguments.size == 2) arguments[1].let(::number)?.let { VtColor(it.coerceIn(0, 255)) } else null
+                2 -> {
+                    val first = if (arguments.size == 4) 1 else if (arguments.size >= 5 &&
+                        (arguments[1].isEmpty() || number(arguments[1]) != null)) 2 else return
+                    val red = number(arguments[first]) ?: return
+                    val green = number(arguments[first + 1]) ?: return
+                    val blue = number(arguments[first + 2]) ?: return
+                    VtColor(rgb = (red.coerceIn(0, 255) shl 16) or
+                        (green.coerceIn(0, 255) shl 8) or blue.coerceIn(0, 255))
+                }
+                else -> null
+            } ?: return
+            style = if (foreground) style.copy(foreground = value) else style.copy(background = value)
+        }
         var i = 0
         while (i < values.size) {
+            if (':' in fields[i]) {
+                val parts = fields[i].split(':')
+                when (number(parts[0])) {
+                    38 -> color(true, parts.drop(1))
+                    48 -> color(false, parts.drop(1))
+                    4 -> if (parts.size == 2) when (number(parts[1])) {
+                        0 -> style = style.copy(underline = false)
+                        in 1..5 -> style = style.copy(underline = true)
+                    }
+                }
+                i++
+                continue
+            }
             when (val code = values[i]) {
                 0 -> style = VtStyle()
                 1 -> style = style.copy(bold = true)
@@ -438,7 +470,10 @@ class XtermTerminal(
                 in 100..107 -> style = style.copy(background = VtColor(code - 100 + 8))
                 38, 48 -> {
                     val foreground = code == 38
-                    if (values.getOrNull(i + 1) == 5 && values.getOrNull(i + 2) != null) {
+                    val next = fields.getOrNull(i + 1)
+                    if (next != null && ':' in next) {
+                        color(foreground, next.split(':')); i++
+                    } else if (values.getOrNull(i + 1) == 5 && values.getOrNull(i + 2) != null) {
                         val color = VtColor(values[i + 2].coerceIn(0, 255)); i += 2
                         style = if (foreground) style.copy(foreground = color) else style.copy(background = color)
                     } else if (values.getOrNull(i + 1) == 2 && values.getOrNull(i + 4) != null) {

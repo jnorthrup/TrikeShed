@@ -4,6 +4,8 @@ import borg.trikeshed.couch.*
 import borg.trikeshed.job.*
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.litebike.*
+import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.memory.*
 import borg.trikeshed.narsese.*
 import borg.trikeshed.ontology.CorpusOntology
@@ -12,9 +14,14 @@ import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.UUID
 import kotlin.test.*
 
 class ManualProjectUploadTest {
@@ -48,6 +55,73 @@ class ManualProjectUploadTest {
             out.write(bytes)
         }
     }.toByteArray()
+
+    @Test fun maximumDocumentCrossesTheRealHttpListenerAndProjectRoute(): Unit = runBlocking {
+        val rig = Rig(directory)
+        val port = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
+        val owner = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(owner + Dispatchers.Default)
+        val listener = LitebikeListenerElement(parentJob = owner).also { it.open() }
+        val slot = listener.register(Protocol.Http)
+        val probePath = "/__document_probe_" + UUID.randomUUID()
+        val probe: RawRoute = { _, path, _, _ -> if (path == probePath) WireHttpResponse(200, probePath) else null }
+        val server = JvmKanbanServer(rawRoutes = _l[probe, rig.wire::route], stateDir = directory.toFile())
+        val worker = scope.launch {
+            while (isActive) {
+                val message = try { slot.consume() } catch (_: kotlinx.coroutines.channels.ClosedReceiveChannelException) { break }
+                val result = server.routeHttp(message.payload)
+                val head = "HTTP/1.1 ${result.status} OK\r\nContent-Length: ${result.payloadBytes.size}\r\n" +
+                    "Content-Type: ${result.contentType}\r\nConnection: close\r\n\r\n"
+                message.respond?.invoke(head.encodeToByteArray() + result.payloadBytes)
+            }
+        }
+        val binding = scope.launch(Dispatchers.IO) {
+            JvmLitebikeBindAdapter.bindAndServe(listener, port, host = "127.0.0.1")
+        }
+        try {
+            withContext(Dispatchers.IO) {
+                val deadline = java.lang.System.nanoTime() + 20_000_000_000L
+                while (true) {
+                    val ready = runCatching {
+                        val connection = URL("http://127.0.0.1:$port$probePath").openConnection() as HttpURLConnection
+                        try {
+                            connection.connectTimeout = 500; connection.readTimeout = 500
+                            connection.responseCode == 200 && connection.inputStream.bufferedReader().use { it.readText() } == probePath
+                        } finally { connection.disconnect() }
+                    }.getOrDefault(false)
+                    if (ready) break
+                    check(java.lang.System.nanoTime() < deadline) { "Document listener did not bind" }
+                    Thread.sleep(20)
+                }
+                fun post(path: String, body: ByteArray = ByteArray(0)): Map<String, Any?> {
+                    val connection = URL("http://127.0.0.1:$port$path").openConnection() as HttpURLConnection
+                    try {
+                        connection.requestMethod = "POST"
+                        connection.connectTimeout = 10_000; connection.readTimeout = 60_000
+                        connection.doOutput = true; connection.setFixedLengthStreamingMode(body.size)
+                        connection.outputStream.use { it.write(body) }
+                        assertEquals(200, connection.responseCode)
+                        return reifyMap(connection.inputStream.bufferedReader().use { it.readText() })
+                    } finally { connection.disconnect() }
+                }
+                val begun = post("/_project/large/begin?kind=assets&intake=manual")
+                assertEquals("manual", begun["intake"])
+                val bytes = ByteArray(32 * 1024 * 1024) { (it * 17).toByte() }
+                val result = post("/_project/large/putBatch?intake=manual", batch(_l["nested/large.bin" j bytes]))
+                assertEquals(1, (result["stored"] as Number).toInt())
+                assertEquals(0, (result["failed"] as Number).toInt())
+                val attachment = assertNotNull(rig.registry.get("large")?.gateway?.getAttachmentRef("nested/large.bin"))
+                assertEquals(ContentId.of(bytes), attachment.contentId)
+                assertContentEquals(bytes, rig.cas.get(attachment.contentId))
+            }
+        } finally {
+            binding.cancelAndJoin()
+            listener.close()
+            worker.cancelAndJoin()
+            owner.cancelAndJoin()
+            rig.scopes.drain()
+        }
+    }
 
     @Test fun malformedBatchIsRejectedBeforeAnyFileIsStored(): Unit = runBlocking {
         val rig = Rig(directory)

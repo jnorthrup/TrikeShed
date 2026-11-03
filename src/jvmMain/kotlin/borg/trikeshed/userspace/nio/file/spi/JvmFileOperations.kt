@@ -34,18 +34,42 @@ class JvmFileOperations : FileOperations, BoundedFileReader {
 
     override val durability: StorageDurability get() = StorageDurability.DURABLE
 
-    override fun acquireExclusiveLease(path: String): FileLease {
-        val channel = FileChannel.open(pathOf(path), StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+    override fun acquireExclusiveLease(path: String): FileLease = synchronized(leases) {
+        // POSIX record locks are process-associated: closing a second descriptor for the
+        // same file can release the first descriptor's lock. Identify contenders before
+        // opening, including symlink and hard-link aliases. Serialize creation so two
+        // differently cased names of an absent file cannot race on a case-insensitive FS.
+        val key = canonicalPath(path)
+        check(key !in leases) { "Filesystem lease is already held: $path" }
+        val attributes = try { NioFiles.readAttributes(pathOf(key), BasicFileAttributes::class.java) }
+            catch (_: NoSuchFileException) { null }
+        if (attributes != null) for ((heldPath, held) in leases) {
+            val identity = attributes.fileKey()
+            val same = if (identity != null && held.fileKey != null) identity == held.fileKey
+                else NioFiles.isSameFile(pathOf(key), pathOf(heldPath))
+            check(!same) { "Filesystem lease is already held: $path" }
+        }
+        val owner = LeaseIdentity(attributes?.fileKey())
+        leases[key] = owner
+        val channel = try { FileChannel.open(pathOf(key), StandardOpenOption.CREATE, StandardOpenOption.WRITE) }
+        catch (failure: Throwable) { leases.remove(key, owner); throw failure }
         try {
+            if (owner.fileKey == null)
+                owner.fileKey = NioFiles.readAttributes(pathOf(key), BasicFileAttributes::class.java).fileKey()
             val lock = channel.tryLock() ?: error("Filesystem lease is already held: $path")
-            return object : FileLease {
-                override fun close() = synchronized(this) {
-                    if (lock.isValid) lock.release()
-                    if (channel.isOpen) channel.close()
+            object : FileLease {
+                override fun close() = synchronized(leases) {
+                    try {
+                        if (lock.isValid) lock.release()
+                        if (channel.isOpen) channel.close()
+                    } finally {
+                        if (!lock.isValid && !channel.isOpen) leases.remove(key, owner)
+                    }
                 }
             }
         } catch (failure: Throwable) {
             try { channel.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            if (!channel.isOpen) leases.remove(key, owner)
             throw failure
         }
     }
@@ -313,6 +337,8 @@ class JvmFileOperations : FileOperations, BoundedFileReader {
         runCatching { NioFiles.getLastModifiedTime(Paths.get(filename)).toMillis() }.getOrDefault(0L)
 
     companion object {
+        private class LeaseIdentity(var fileKey: Any?)
+        private val leases = mutableMapOf<String, LeaseIdentity>()
         /**
          * Cap on entries [listDir] will skip in one directory before it stops advancing the
          * iterator. Skipping is only safe while the iterator stays usable; the cap is what

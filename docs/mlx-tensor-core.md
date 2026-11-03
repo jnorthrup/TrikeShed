@@ -245,7 +245,20 @@ peak memory or establish a 9,000-token bound. `MlxMatrixOperations(memoryLimit =
 process-wide MLX settings when a session opens; `deviceMemory()` reads MLX active, peak and cache allocations.
 The memory setting is a graph-evaluation guideline, not a hard allocation limit: MLX says allocations may exceed it
 and fail only after available RAM and swap are exhausted. Cache and wired settings are likewise not host-wide memory
-admission. The process can still displace other workloads. See [MLX memory limit](https://ml-explore.github.io/mlx/build/html/python/_autosummary/mlx.core.set_memory_limit.html).
+admission. Cooperating sessions now agree on process-wide settings and reserve the exact file size of each verified
+safetensors reader before hashing or native loading; the reservation remains until that reader actually closes. The
+shared checkpoint-byte budget defaults to the numeric value of a positive MLX memory setting (8 GiB by default), can
+be set through `TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES` or the provider constructor, and permits multiple checkpoints
+within the budget. A zero MLX memory setting keeps checkpoint-byte admission unbounded unless explicitly overridden.
+The reservation measures checkpoint file bytes, not MLX allocations, activations, available RAM or other processes;
+it is not a hard host-memory ceiling. Other MLX callers that bypass this provider are not coordinated. See
+[MLX memory limit](https://ml-explore.github.io/mlx/build/html/python/_autosummary/mlx.core.set_memory_limit.html).
+
+`TRIKESHED_MLX_MAX_TOKENS` optionally sets a positive per-encode token admission limit for the native provider.
+The checkpoint position limit still applies; over-limit inputs fail before token iteration or device-input allocation,
+without truncation. When unset, there is no additional token limit. This is an operator-selected input bound, not a
+memory estimate or watchdog, and it does not establish safety for any particular length on a loaded host. Planned
+tensor dimensions are also checked against the shared Int-indexed tensor contract before MLX execution.
 
 Verified (sampler at 0.5 s: swap in use, vm_stat, per-process RSS; watchdog on swap growth, compressor growth,
 swap-outs and reclaimable memory; the sampler is `monitor.py` in the Hermes scratch directory, not in this repo):
@@ -263,13 +276,13 @@ Gaps found against the strategy, each open unless stated:
 2. The weights are held twice during load: the file's page cache (file-backed memory grew 3.3 GB on a cold run) and the
   MLX copy. Page cache is reclaimable, but it competes with other processes. The verified reader uses the NIO facade
    and still copies into MLX; the zero-copy route (section 5) is unverified.
-3. The limits are MLX process-global: every `open()` resets them, the last session wins, and the three numbers are
-   defaults, not derived. Measured peak is 2.96 GiB for the short fixture; the 8 GiB guideline is not a hard guard.
+3. The limits are MLX process-global: cooperating live sessions now use identical settings, but unrelated MLX callers
+   can still change them. Measured peak is 2.96 GiB for the short fixture; the 8 GiB guideline is not a hard guard.
    A defensible admission budget would need the
    weights plus a bound on activations per token, and `maxStateLength` (9000 tokens) has not been run: activations
    grow with tokens and no 9000-token run has been made.
-4. No admission control: `JevaElement` does not look at available memory before loading, and nothing refuses a second
-   concurrent device session (two would hold two copies of the weights).
+4. Checkpoint-byte admission bounds the file bytes reserved by cooperating in-process sessions, including multiple
+   sessions; it does not check available host memory or account for device allocations, and does not constrain another process.
 5. Speed: 56 s per ask of two short questions with the weights resident; the cold run used 95.8 s of user CPU in 89 s of
    wall time. The cause is not profiled; many small op dispatches from the host is the suspect, and the gated-delta
    kernel is the intended fix, not started.
@@ -279,7 +292,7 @@ Gaps found against the strategy, each open unless stated:
    and each weight materialization check it cooperatively. A single blocked I/O call or MLX evaluation cannot be
    preempted by those checks, so this is not a hard wall-clock guarantee.
 8. The sampler's abort is not a safety property of the product, and MLX's settings do not impose a hard host-memory
-   ceiling. No process-wide owner prevents another session from changing them during execution.
+   ceiling. The provider coordinates its own live sessions, but cannot prevent another MLX caller from changing them.
 9. The linked Homebrew mlx-c 0.6.0_4 header exposes `mlx_get_memory_limit` but no cache or wired limit getters. Its
    setters return the previous limit only on success. The mlx-c default error handler exits the process: an isolated
    child calling `mlx_set_wired_limit(SIZE_MAX)` printed the MLX error and exited 255 before returning a status. No
@@ -288,8 +301,8 @@ Gaps found against the strategy, each open unless stated:
 10. The affine Q4/Q8 path now validates integral quantization settings, supported mode, packed weight and scale/bias
     shapes and dtypes before quantized kernels, including embedding token bounds. It checks the selected matrices
     before weight materialization. A closed session also refuses new tensor allocations, and a lazy shape is captured
-    once before its storage size is checked and uploaded. These checks do not protect
-    every mlx-c entry point: malformed safetensors parsing or a missing tensor can still reach mlx-c's default handler.
+    once before its storage size is checked and uploaded. Safetensors header structure, names and ranges are checked
+    before the native parser; these checks still do not protect every mlx-c entry point or isolate native crashes.
     The actual local checkpoint header has 201 quantized triples matching these layout checks; that metadata inspection
     does not execute the checkpoint or prove its values.
 

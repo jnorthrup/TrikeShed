@@ -2102,7 +2102,7 @@ object OroborosDaemon {
                     HostSystem.err("[OROBOROS] pg wire failed to listen on :$pgPort: ${t.message}")
                 }
             }
-            launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
+            launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default + nioSupervisor) {
                 // Boot race seen in the wild: bindAndServe dies with "Parent job is Cancelling"
                 // moments after the port binds. Until the racing job is named, the server RETRIES —
                 // a daemon whose HTTP tier can be killed once at boot must not stay headless.

@@ -5,10 +5,10 @@ import borg.trikeshed.narsese.EncoderOperations
 import borg.trikeshed.narsese.EncoderSession
 
 /** MLX backbones for `JevaInference.loadDevice`: one GPU session per checkpoint, shared with the head's matrices. */
-class MlxEncoderOperations : EncoderOperations {
+class MlxEncoderOperations(private val matrices: MlxMatrixOperations = MlxMatrixOperations()) : EncoderOperations {
     override fun open(directory: String, check: () -> Unit): EncoderSession {
         check()
-        val session = MlxMatrixOperations().open()
+        val session = matrices.open()
         try {
             val backbone = MlxBackbone(session, directory, check)
             check()
