@@ -1,0 +1,14 @@
+{
+  "hostSource": "67634cb98c2544ffeb7757095b21ddf803d1601f",
+  "clientSource": "3bcbc667760a08b37c6826f12ced7109af488a4b",
+  "hostMainJar": "/workspace/library-files/documents-upload-proof/snapshot/main.jar",
+  "hostMainJarSha256": "dfdc3f3ca47d0174227bc9ff5abc897cd43329977d1bf1c0c169ebdbfd44fc9e",
+  "documentsProductionBundleSha256": "d9f66b52ddb80d21cb22d1a4da5ce3026897a26f0a7226dc4b002fff966a53f7",
+  "runtimeClasspath": "/workspace/library-files/documents-upload-proof/runtime-classpath.txt",
+  "limitations": [
+    "separate host and frontend artifacts",
+    "JVM unchanged from70-test-v44",
+    "new production frontend compiled v46",
+    "real production routes via external localhost HTTP transport"
+  ]
+}
