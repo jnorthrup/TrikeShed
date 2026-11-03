@@ -301,6 +301,26 @@ class ProjectScopes(
         return cid
     }
 
+    /** Explicit source-linked collection: atomic source/current-policy checks with manual-only writes. */
+    fun importSelectedLink(expected: borg.trikeshed.lcnc.ProjectDoc, target: String, bytes: ByteArray,
+                           notes: ByteArray): borg.trikeshed.job.ContentId = synchronized(sourceWrites) {
+        check(expected.project !in closingSources) { "Project is unmounting" }
+        require(intakeMode(expected.project) == CurationIntake.Mode.Manual) { "Link collection requires a Manual project" }
+        val pdb = requireNotNull(projectDbs?.get(expected.project)) { "Mounted project unavailable" }
+        val head = pdb.store.head
+        require(!head.isDeleted(expected.id) && head.getRev(expected.id) == expected.rev &&
+            head.sequenceOf(expected.id) == expected.seq &&
+            pdb.gateway.getAttachmentRef(expected.id)?.contentId?.value == expected.cid) { "Selected PDF revision changed" }
+        require(target.startsWith("pdf-links/") && target.length <= 256 && !target.split('/').any { it == ".." }) { "Invalid collection target" }
+        val cid = borg.trikeshed.job.ContentId.of(bytes)
+        require(pdb.gateway.getAttachmentRef(target)?.contentId.let { it == null || it == cid }) { "Collection target collision" }
+        val notePath = target + borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX
+        val noteCid = borg.trikeshed.job.ContentId.of(notes)
+        require(pdb.gateway.getAttachmentRef(notePath)?.contentId.let { it == null || it == noteCid }) { "Collection notes collision" }
+        uploadPut(expected.project, notePath, notes, null, manualIntake = true)
+        uploadPut(expected.project, target, bytes, null, manualIntake = true)
+    }
+
     /** Told of every document a removal takes out of an upload (never its twins): what was curated from it leaves too. */
     @Volatile var onRemoved: ((project: String, id: String) -> Unit)? = null
 
