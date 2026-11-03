@@ -84,6 +84,39 @@ class MuxTransportAdmissionTest {
         }
     }
 
+    @Test fun keyedCallsAlsoRespectTheirSharedEndpointPool() = runBlocking {
+        val keys = KeyMux {
+            bind("llm.first.key", TestKeySource(value = "one"))
+            bind("llm.second.key", TestKeySource(value = "two"))
+        }
+        val baseUrl = "https://shared.invalid/v1"
+        val mux = ModelMux(keys) {
+            model("first/model", caps = _s["chat"], provider = "first", baseUrl = baseUrl)
+            model("second/model", caps = _s["chat"], provider = "second", baseUrl = baseUrl)
+        }
+        val transport = Transport()
+        val htx = openHtxElement(routeService = transport)
+        val reactor = MuxReactorElement(parentJob = coroutineContext[Job], pools = _m[
+            "key:llm.first.key" j MuxPool("account", 1),
+            "endpoint:$baseUrl" j MuxPool("endpoint", 1),
+        ])
+        try {
+            val first = async { withContext(reactor + htx) { mux.chat("first/model", s_["user" j "first"]).getOrThrow() } }
+            assertEquals(1, withTimeout(5_000) { transport.starts.receive() })
+            val second = async(start = CoroutineStart.UNDISPATCHED) { withContext(reactor + htx) {
+                mux.chat("second/model", s_["user" j "second"]).getOrThrow()
+            } }
+            assertNull(withTimeoutOrNull(150) { transport.starts.receive() })
+            transport.release.complete(Unit)
+            withTimeout(5_000) { first.await(); second.await() }
+            assertEquals(2, transport.calls.get())
+        } finally {
+            transport.release.complete(Unit)
+            reactor.close()
+            htx.close()
+        }
+    }
+
     @Test fun differentKeysShareAnExplicitPhysicalPool() = runBlocking {
         val keys = KeyMux {
             bind("llm.first.key", TestKeySource(value = "one"))

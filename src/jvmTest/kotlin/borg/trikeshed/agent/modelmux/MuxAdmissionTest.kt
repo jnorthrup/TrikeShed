@@ -1,9 +1,36 @@
 package borg.trikeshed.agent.modelmux
 
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
 import kotlin.test.*
 
 class MuxAdmissionTest {
+    @Test fun poolRemainsHeldUntilInheritedChildrenComplete(): Unit = runBlocking {
+        val owner = MuxAdmission(coroutineContext[Job]!!, workers = 2, pools = _m[
+            "a" j MuxPool("shared", 1), "b" j MuxPool("shared", 1),
+        ])
+        val childStarted = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val secondStarted = CompletableDeferred<Unit>()
+        try {
+            val first = async { owner.run("a") {
+                CoroutineScope(currentCoroutineContext()).launch(start = CoroutineStart.UNDISPATCHED) {
+                    childStarted.complete(Unit)
+                    release.await()
+                }
+                Unit
+            } }
+            withTimeout(5_000) { childStarted.await() }
+            val second = async(start = CoroutineStart.UNDISPATCHED) { owner.run("b") { secondStarted.complete(Unit) } }
+            assertNull(withTimeoutOrNull(150) { secondStarted.await() })
+            release.complete(Unit)
+            withTimeout(5_000) { first.await(); second.await() }
+        } finally {
+            release.complete(Unit)
+            owner.drain()
+        }
+    }
+
     @Test fun physicalPoolLimitsDistinctBindingsAndReleasesCancelledWaiters() = runBlocking {
         val owner = MuxAdmission(coroutineContext[Job]!!, workers = 4, capacity = 8, pools = mapOf(
             "a" to MuxPool("account", 2), "b" to MuxPool("account", 2), "c" to MuxPool("account", 2),
