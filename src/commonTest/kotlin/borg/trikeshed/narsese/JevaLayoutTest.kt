@@ -10,8 +10,8 @@ import kotlin.test.*
 
 class JevaLayoutTest {
     private fun tensor(dtype: String, data: ByteArray, name: String = "language_model.weight"): ByteArray {
-        val header = jsonOf(mapOf(name to mapOf("dtype" to dtype, "shape" to listOf(1),
-            "data_offsets" to listOf(0, data.size)))).encodeToByteArray()
+        val header = jsonOf(_m[name j _m["dtype" j dtype, "shape" j _l[1],
+            "data_offsets" j _l[0, data.size]]]).encodeToByteArray()
         return ByteArray(8 + header.size + data.size).also { out ->
             for (i in 0..7) out[i] = (header.size.toLong() ushr (i * 8)).toByte()
             header.copyInto(out, 8); data.copyInto(out, 8 + header.size)
@@ -24,7 +24,7 @@ class JevaLayoutTest {
             files.write("/weights/backbone_full/model.safetensors", backbone)
             files.write("/weights/head.safetensors", tensorHead())
             if (indexed) files.write("/weights/backbone_full/model.safetensors.index.json",
-                jsonOf(mapOf("weight_map" to mapOf("language_model.weight" to "model.safetensors"))))
+                jsonOf(_m["weight_map" j _m["language_model.weight" j "model.safetensors"]]))
         }
         fun channel(path: String): FileChannel = Bytes(files.readAllBytes(path)).also(opened::add)
         fun open() = JevaWeights.open(files, "/weights", ::channel)
@@ -38,8 +38,8 @@ class JevaLayoutTest {
     }
 
     @Test fun singleFileAndIndexUseIdenticalUnquantizedDecoding() {
-        for ((dtype, bytes) in listOf("F32" to byteArrayOf(0, 0, 0x80.toByte(), 0x3f),
-            "BF16" to byteArrayOf(0x80.toByte(), 0x3f), "F16" to byteArrayOf(0, 0x3c))) {
+        for ((dtype, bytes) in s_["F32" j _a[0.toByte(), 0.toByte(), 0x80.toByte(), 0x3f.toByte()],
+            "BF16" j _a[0x80.toByte(), 0x3f.toByte()], "F16" j _a[0.toByte(), 0x3c.toByte()]].view) {
             val blob = tensor(dtype, bytes)
             val indexed = Fixture(blob, true); val single = Fixture(blob, false)
             val a = indexed.open(); val b = single.open()
@@ -55,7 +55,7 @@ class JevaLayoutTest {
     }
 
     @Test fun malformedIndexDoesNotFallThroughToExistingSingleFile() {
-        val f = Fixture(tensor("F32", byteArrayOf(0, 0, 0, 0)), true)
+        val f = Fixture(tensor("F32", ByteArray(4)), true)
         f.files.write("/weights/backbone_full/model.safetensors.index.json", "{invalid}")
         val failure = assertFailsWith<IllegalArgumentException> { f.open() }
         assertTrue(failure.message.orEmpty().contains("/weights"))
@@ -64,11 +64,11 @@ class JevaLayoutTest {
     }
 
     @Test fun packedQuantizationAndMissingHeadFailWithoutMappingOrRuntimeSwitch() {
-        val q4 = Fixture(tensor("U32", byteArrayOf(0, 0, 0, 0)), false)
+        val q4 = Fixture(tensor("U32", ByteArray(4)), false)
         val quantized = assertFailsWith<IllegalArgumentException> { q4.open() }
         assertTrue(quantized.message.orEmpty().contains("packed MLX/Q4"))
         assertTrue(q4.opened.all { !it.isOpen() && it.maps == 0 })
-        val configured = Fixture(tensor("F32", byteArrayOf(0, 0, 0, 0)), false)
+        val configured = Fixture(tensor("F32", ByteArray(4)), false)
         configured.files.write("/weights/config.yaml", "model:\n  pooling: last\n")
         configured.files.write("/weights/backbone_full/config.json", "{\"quantization\":{\"bits\":4}}")
         val declaredQuantization = assertFailsWith<IllegalArgumentException> {
@@ -76,7 +76,7 @@ class JevaLayoutTest {
         }
         assertTrue(declaredQuantization.message.orEmpty().contains("Quantized backbone configuration"))
         assertTrue(configured.opened.all { !it.isOpen() && it.maps == 0 })
-        val missing = Fixture(tensor("F32", byteArrayOf(0, 0, 0, 0)), false)
+        val missing = Fixture(tensor("F32", ByteArray(4)), false)
         missing.files.deleteRecursively("/weights/head.safetensors")
         val absent = assertFailsWith<IllegalArgumentException> { missing.open() }
         assertTrue(absent.message.orEmpty().contains("head.safetensors"))

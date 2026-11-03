@@ -155,15 +155,21 @@ class ProjectDbWire(
             val name = borg.trikeshed.relaxfactory.CouchHttpSurface.percentDecode(segments[1])
             val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
             val kind = query["kind"] ?: "assets"
+            val manualIntake = when (query["intake"]) {
+                null -> false
+                "manual" -> true
+                else -> return json(400, """{"error":"intake must be manual when supplied"}""")
+            }
             val provider = try { query["decisionProvider"]?.let { DecisionProvider.of(it) } }
                 catch (e: IllegalArgumentException) { return json(400, jsonOf(mapOf("error" to e.message))) }
                 catch (e: IllegalStateException) { return json(400, jsonOf(mapOf("error" to e.message))) }
             return when (segments[2]) {
-                "begin" -> runCatching { scopes.beginUpload(name, kind, provider) }.fold(
+                "begin" -> runCatching { scopes.beginUpload(name, kind, provider, manualIntake) }.fold(
                     onSuccess = {
                         java.lang.System.err.println("[OROBOROS] project db upload begun: ${it.name} (${it.kind})")
                         json(200, jsonOf(mapOf("verdict" to "ok", "name" to it.name, "kind" to it.kind,
-                            "decisionProvider" to it.decisionProvider?.id)))
+                            "decisionProvider" to it.decisionProvider?.id,
+                            "intake" to scopes.intakePolicyStatus(it.name)["mode"])))
                     },
                     onFailure = { json(400, """{"verdict":"refused","detail":"${(it.message ?: "").replace('"', '\'')}"}""") },
                 )
@@ -173,6 +179,8 @@ class ProjectDbWire(
                 // sequential round-trip uploads (each frame still lands via uploadPut:
                 // CAS + manifest + mirror per entry, one HTTP turnaround total).
                 "putBatch" -> {
+                    if (manualIntake && scopes.intakeMode(name) != CurationIntake.Mode.Manual)
+                        return json(409, """{"error":"project is not configured for manual intake"}""")
                     val body = CouchWire.bodyOf(payload)
                     if (body.isEmpty()) return json(400, """{"error":"empty body"}""")
                     var off = 0
@@ -202,6 +210,8 @@ class ProjectDbWire(
                 }
 
                 "put" -> {
+                    if (manualIntake && scopes.intakeMode(name) != CurationIntake.Mode.Manual)
+                        return json(409, """{"error":"project is not configured for manual intake"}""")
                     val rel = borg.trikeshed.relaxfactory.CouchHttpSurface
                         .parseQuery(path.substringAfter('?', ""))["path"]
                         ?: return json(400, """{"error":"path query required"}""")

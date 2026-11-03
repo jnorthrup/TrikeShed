@@ -52,6 +52,8 @@ class CurationIntake(
 ) {
     sealed interface Mode {
         data object Legacy : Mode
+        /** Retain originals; automatic offers and boot resume do not admit readings. */
+        data object Manual : Mode
         data class ReviewRequired(val ontologyCid: borg.trikeshed.job.ContentId) : Mode
         /** No intake action may join while persisted project policy cannot be verified. */
         data class Blocked(val reason: String) : Mode
@@ -164,12 +166,18 @@ class CurationIntake(
         offer(project, id, selectedProvider(project, id))
     }
 
-    fun offer(project: String, id: String, decisionProvider: DecisionProvider?) {
+    fun offer(project: String, id: String, decisionProvider: DecisionProvider?) = offer(project, id, decisionProvider, false)
+
+    /** Manual policy disables automatic intake; this explicit document action retains legacy curation. */
+    fun offerSelected(project: String, id: String, decisionProvider: DecisionProvider?) = offer(project, id, decisionProvider, true)
+
+    private fun offer(project: String, id: String, decisionProvider: DecisionProvider?, selected: Boolean) {
         if (!eligible(project)) return
         if (ProjectNodes.twin(id)) return
         if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return
         val selectedMode = mode(project, id)
-        enqueue(project, id, decisionProvider, selectedMode)
+        if (selectedMode == Mode.Manual && !selected) return
+        enqueue(project, id, decisionProvider, if (selectedMode == Mode.Manual) Mode.Legacy else selectedMode)
     }
 
     /** An operator selects this particular text document; it is never admitted by mount, upload or resume. */
@@ -392,6 +400,7 @@ class CurationIntake(
                         requireNotNull(corpus.document(project, id)) { "Source document is unavailable" })
                 }, mode = { project, _ -> scopes.intakeMode(project) }, eligible = corpus::intakeEligible)
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
+            scopes.onExplicitDocument = { project, id, provider -> intake.offerSelected(project, id, provider) }
             scopes.onTextForReview = { selected -> intake.offerTextForReview(selected) }
             scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
             scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }

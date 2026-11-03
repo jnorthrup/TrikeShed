@@ -108,6 +108,7 @@ class ProjectScopes(
 
     fun intakePolicyStatus(project: String): Map<String, Any?> = when (val mode = intakeMode(project)) {
         CurationIntake.Mode.Legacy -> mapOf("mode" to "legacy")
+        CurationIntake.Mode.Manual -> _m["mode" j "manual"]
         is CurationIntake.Mode.ReviewRequired -> mapOf("mode" to "review-required", "ontologyCid" to mode.ontologyCid.value)
         is CurationIntake.Mode.Blocked -> mapOf("mode" to "blocked", "reason" to mode.reason)
     } + ("appliesTo" to "future-intake-admissions")
@@ -141,7 +142,7 @@ class ProjectScopes(
             return
         }
         val ref = requireNotNull(pdb.gateway.getAttachmentRef(id)) { "no document '$project/$id'" }
-        val intake = requireNotNull(onDocument) { "Document curation intake is not available" }
+        val intake = requireNotNull(onExplicitDocument ?: onDocument) { "Document curation intake is not available" }
         if (provider != null) {
             manifestFileFor(project)?.appendText("$id\t${ref.contentId.value}\t${ref.length}\t${provider.id}\n")
             documentProviders[project to id] = provider
@@ -219,7 +220,8 @@ class ProjectScopes(
      * (relpath TAB cid TAB length TAB decisionProvider?) beside the ledger — blobs are already CAS
      * citizens, so boot rebuilds the db from the manifest alone.
      */
-    suspend fun beginUpload(rawName: String, kind: String = "assets", decisionProvider: DecisionProvider? = null): Scope = mutex.withLock {
+    suspend fun beginUpload(rawName: String, kind: String = "assets", decisionProvider: DecisionProvider? = null,
+                            manualIntake: Boolean = false): Scope = mutex.withLock { synchronized(sourceWrites) {
         val registry = projectDbs ?: throw IllegalStateException("project dbs not wired")
         val name = rawName.lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-', '.')
         require(name.isNotBlank()) { "name '$rawName' sanitizes to nothing" }
@@ -239,11 +241,14 @@ class ProjectScopes(
         ledgerAppend(name, k, "@upload", decisionProvider)
         val scope = Scope(name, "@upload", k, "$name/", 0, 0, docs = 0, decisionProvider = decisionProvider)
         scopes = scopes + scope
+        if (manualIntake) intakePolicies.set(name, CurationIntake.Mode.Manual)
         scope
-    }
+    } }
 
     /** Told of every document an upload lands (never its twins): the intake that reads and curates it. */
     @Volatile var onDocument: ((project: String, id: String, decisionProvider: DecisionProvider?) -> Unit)? = null
+    /** User-requested curation is distinct from automatic upload/remount offers. */
+    @Volatile var onExplicitDocument: ((project: String, id: String, decisionProvider: DecisionProvider?) -> Unit)? = null
     /** Separate from automatic mount/upload intake; selected text requires review. */
     @Volatile var onTextForReview: ((borg.trikeshed.lcnc.ProjectDoc) -> Unit)? = null
 
