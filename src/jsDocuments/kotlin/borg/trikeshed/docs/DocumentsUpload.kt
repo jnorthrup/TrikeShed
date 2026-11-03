@@ -80,7 +80,8 @@ internal object DocumentsUpload {
             }
             message("Creating new project $project; the current document will stay selected…")
             uploadStarted = true
-            val begun = request("/_project/${WikiSurface.encode(project)}/begin?kind=assets")
+            val begun = request("/_project/${WikiSurface.encode(project)}/begin?kind=assets&intake=manual")
+            require(begun["intake"] == "manual") { "Server did not confirm storage-only intake; no file bytes were sent" }
             val actual = requireNotNull(begun["name"] as? String) { "Upload project identity is missing" }
             require(actual == project) { "Upload returned another project identity" }
             var sent = 0
