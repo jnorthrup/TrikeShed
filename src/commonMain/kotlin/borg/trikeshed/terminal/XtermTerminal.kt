@@ -687,5 +687,7 @@ class XtermTerminal(
             cp in 0x2E80..0xA4CF || cp in 0xAC00..0xD7A3 || cp in 0xF900..0xFAFF ||
             cp in 0xFE10..0xFE19 || cp in 0xFE30..0xFE6F || cp in 0xFF00..0xFF60 ||
             cp in 0xFFE0..0xFFE6 || cp in 0x1F300..0x1FAFF || cp in 0x20000..0x3FFFD
+        /** Cell width under the same classification used by this terminal's renderer. */
+        internal fun cellWidth(cp: Int): Int = if (isCombining(cp)) 0 else if (isWide(cp)) 2 else 1
     }
 }

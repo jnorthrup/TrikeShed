@@ -12,6 +12,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.terminal.VtCell
 import borg.trikeshed.terminal.VtKey
 import borg.trikeshed.terminal.TerminalOutputStream
+import borg.trikeshed.terminal.XtermTerminal
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import borg.trikeshed.vm.Teleported
 import borg.trikeshed.parse.reifyMap
@@ -409,6 +410,21 @@ class HermesVmConsole(
         }
         var index = 0
         while (index < text.length) {
+            if (text[index] >= ' ' && text[index] != '\u007f') {
+                // One manual input may contain a whole paste. Coalesce only
+                // uninterrupted printable runs, so controls still take effect
+                // at their original positions in the input stream.
+                val available = XtermMediaPatchPanel.MAX_SIGNAL_PAYLOAD - line.length
+                val run = StringBuilder()
+                while (index < text.length && text[index] >= ' ' && text[index] != '\u007f') {
+                    val ch = text[index]
+                    val units = if (ch.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate()) 2 else 1
+                    if (run.length + units <= available) run.append(text, index, index + units)
+                    index += units
+                }
+                if (run.isNotEmpty()) insert(run.toString(), timestampMs)
+                continue
+            }
             when (val ch = text[index]) {
                 '\r', '\n' -> {
                     // CRLF is one submission, not two.
@@ -425,7 +441,7 @@ class HermesVmConsole(
                 '\u000b' -> { line.setLength(lineCursor); redrawLine(timestampMs) }   // Ctrl-K
                 '\u0017' -> killWord(timestampMs)                                     // Ctrl-W
                 '\b', '\u007f' -> backspace(timestampMs)
-                else -> if (ch >= ' ') insert(ch, timestampMs)                        // other C0 is inert
+                else -> Unit                                                         // other C0 is inert
             }
             index++
         }
@@ -451,7 +467,7 @@ class HermesVmConsole(
         when (key) {
             VtKey.ENTER -> submitLine(timestampMs)
             VtKey.BACKSPACE -> backspace(timestampMs)
-            VtKey.DELETE -> if (lineCursor < line.length) { line.deleteCharAt(lineCursor); redrawLine(timestampMs) }
+            VtKey.DELETE -> if (lineCursor < line.length) { line.delete(lineCursor, nextBoundary(lineCursor)); redrawLine(timestampMs) }
             VtKey.LEFT -> moveCursor(if (ctrl) -wordLeftSpan() else -1, timestampMs)
             VtKey.RIGHT -> moveCursor(if (ctrl) wordRightSpan() else 1, timestampMs)
             VtKey.HOME -> { lineCursor = 0; redrawLine(timestampMs) }
@@ -459,7 +475,7 @@ class HermesVmConsole(
             VtKey.UP -> recallHistory(-1, timestampMs)
             VtKey.DOWN -> recallHistory(1, timestampMs)
             VtKey.ESCAPE -> cancelLine(timestampMs)
-            VtKey.TAB -> insert(' ', timestampMs)
+            VtKey.TAB -> insert(" ", timestampMs)
             else -> Unit
         }
         manual
@@ -468,23 +484,45 @@ class HermesVmConsole(
     /** The visible line buffer — the operator's uncommitted input. Exposed for tests and TUI parity. */
     fun lineState(): Pair<String, Int> = synchronized(lock) { line.toString() to lineCursor }
 
-    private fun insert(ch: Char, timestampMs: Long) {
-        if (line.length >= XtermMediaPatchPanel.MAX_SIGNAL_PAYLOAD) return
-        line.insert(lineCursor, ch); lineCursor++
+    private fun insert(text: String, timestampMs: Long) {
+        if (line.length + text.length > XtermMediaPatchPanel.MAX_SIGNAL_PAYLOAD) return
+        line.insert(lineCursor, text); lineCursor += text.length
         redrawLine(timestampMs)
     }
 
     private fun backspace(timestampMs: Long) {
         if (lineCursor <= 0) return
-        line.deleteCharAt(lineCursor - 1); lineCursor--
+        val start = previousBoundary(lineCursor)
+        line.delete(start, lineCursor); lineCursor = start
         redrawLine(timestampMs)
     }
 
     private fun moveCursor(delta: Int, timestampMs: Long) {
-        val next = (lineCursor + delta).coerceIn(0, line.length)
+        val next = when {
+            delta == -1 && lineCursor > 0 -> previousBoundary(lineCursor)
+            delta == 1 && lineCursor < line.length -> nextBoundary(lineCursor)
+            else -> (lineCursor + delta).coerceIn(0, line.length)
+        }
         if (next == lineCursor) return
         lineCursor = next
         redrawLine(timestampMs)
+    }
+
+    /** A base code point and the combining marks understood by the terminal stay together. */
+    private fun nextBoundary(from: Int): Int {
+        if (from >= line.length) return line.length
+        var next = Character.offsetByCodePoints(line, from, 1)
+        while (next < line.length && XtermTerminal.cellWidth(Character.codePointAt(line, next)) == 0)
+            next = Character.offsetByCodePoints(line, next, 1)
+        return next
+    }
+
+    private fun previousBoundary(from: Int): Int {
+        if (from <= 0) return 0
+        var previous = Character.offsetByCodePoints(line, from, -1)
+        while (previous > 0 && XtermTerminal.cellWidth(Character.codePointAt(line, previous)) == 0)
+            previous = Character.offsetByCodePoints(line, previous, -1)
+        return previous
     }
 
     private fun wordLeftSpan(): Int {
@@ -554,16 +592,53 @@ class HermesVmConsole(
      * keeps a line longer than the terminal legible without ever wrapping onto a row the console owns.
      */
     private fun redrawLine(timestampMs: Long) {
-        val width = (panel.terminal.columns - PROMPT_WIDTH - 1).coerceAtLeast(8)
+        val promptWidth = PROMPT_WIDTH.coerceAtMost((panel.terminal.columns - 1).coerceAtLeast(0))
+        val prompt = if (promptWidth == PROMPT_WIDTH) PROMPT
+            else "\u001b[38;5;208m${"hermes> ".take(promptWidth)}\u001b[0m"
+        val width = (panel.terminal.columns - promptWidth - 1).coerceAtLeast(0)
         if (lineCursor < windowStart) windowStart = lineCursor
-        if (lineCursor - windowStart > width) windowStart = lineCursor - width
-        if (windowStart > 0 && line.length - windowStart < width) windowStart = (line.length - width).coerceAtLeast(0)
-        val slice = line.substring(windowStart, minOf(line.length, windowStart + width))
+        var before = cells(windowStart, lineCursor)
+        while (before > width && windowStart < lineCursor) {
+            val next = nextBoundary(windowStart)
+            before -= cells(windowStart, next)
+            windowStart = next
+        }
+        var remaining = cells(windowStart, line.length, width)
+        while (windowStart > 0 && remaining <= width) {
+            val previous = previousBoundary(windowStart)
+            val prefix = cells(previous, windowStart)
+            if (remaining + prefix > width) break
+            windowStart = previous
+            remaining += prefix
+            before += prefix
+        }
+        var end = windowStart
+        var shown = 0
+        while (end < line.length) {
+            val next = nextBoundary(end)
+            val span = cells(end, next)
+            if (shown + span > width) break
+            shown += span
+            end = next
+        }
+        val slice = line.substring(windowStart, end)
         causalOutput(
-            "\r$PROMPT$slice\u001b[K\u001b[${PROMPT_WIDTH + (lineCursor - windowStart) + 1}G",
+            "\r$prompt$slice\u001b[K\u001b[${promptWidth + before + 1}G",
             null,
             timestampMs,
         )
+    }
+
+    private fun cells(from: Int, to: Int, stop: Int = Int.MAX_VALUE): Int {
+        var index = from
+        var width = 0
+        while (index < to) {
+            val cp = Character.codePointAt(line, index)
+            width += XtermTerminal.cellWidth(cp)
+            if (width > stop) break
+            index += Character.charCount(cp)
+        }
+        return width
     }
 
     private fun promptAndRedraw(timestampMs: Long) {
@@ -575,7 +650,11 @@ class HermesVmConsole(
     fun resize(columns: Int, rows: Int, timestampMs: Long = System.currentTimeMillis()): CausalMediaEmission = synchronized(lifecycle) {
         val worker = worker
         if (state == State.READY && worker?.isAlive == true) worker.resize(rows, columns)
-        synchronized(lock) { panel.manualResize(columns, rows, timestampMs).also(::emitCausal) }
+        synchronized(lock) {
+            val emission = panel.manualResize(columns, rows, timestampMs).also(::emitCausal)
+            if (worker == null && line.isNotEmpty()) redrawLine(timestampMs)
+            emission
+        }
     }
 
     fun snapshotMap(): Map<String, Any?> = synchronized(lock) {
