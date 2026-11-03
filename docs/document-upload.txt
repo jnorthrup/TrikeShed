@@ -1,0 +1,53 @@
+Document upload and storage
+
+Documents now has an Add files / curate later box. Choose files, choose a folder,
+or drop a folder onto that box. This creates a new project and preserves the
+currently selected document. Open uploaded project explicitly switches to it.
+Uploaded copies are stored under <forgeHome>/files/<project>/<relative path>;
+source files on the user's computer stay in place. The default Forge home is
+~/.local/forge. Project databases and CAS retain content identities and revisions;
+.oroboros/projects.tsv and guarded intake policy keep project state across restart.
+
+The new upload requires persistent manual intake to be confirmed before file
+bytes are sent. Automatic curation is disabled for the project, including boot
+resume. An explicit later PDF/Office/image curation action remains available;
+it selects an exact CID/revision/sequence and refuses a replaced source before
+curation or joining. Review-required and blocked policies are not bypassed.
+TXT/MD source retention and reviewed curation keep their existing separate paths.
+
+Existing Graal drops still use their existing project upload/mount route. Panels
+and Board folder drops use the project uploader. Legacy /forge text/CSV imports
+remain browser-workspace data; its binary dropzone records are a separate store.
+The new Documents uploader is capped at 1,000 files, 32 MiB per file and 128 MiB
+per selection. Unsafe/duplicate paths and already-mounted project names refuse.
+Leaving cancels the browser request, but accepted server writes can still finish;
+restoration reloads controls without retrying previously submitted files.
+
+Build and delivery
+Rebuild the daemon and staged browser/runtime libraries from the new checkout:
+  ./gradlew jvmJar stageDaemonLib
+Restart the existing local daemon with utils/oroboros, then refresh Documents.
+The launcher now uses -Xmx24g (PR1081). That is a maximum heap, not a fixed
+resident allocation.
+
+Verification
+Coordinated v44 source 67634cb98c2544ffeb7757095b21ddf803d1601f passed all 70
+selected JUnit checks, no failures/errors/skips, with actual native integration
+and Documents/Pages/Spacegraph bundles. Exact frozen main.jar SHA256:
+dfdc3f3ca47d0174227bc9ff5abc897cd43329977d1bf1c0c169ebdbfd44fc9e.
+Actual browser proof used this JAR plus immutable dependencies and fresh bundles
+with an external localhost transport forwarding production project routes, not a
+full daemon-listener claim. A file picker, native folder picker, loose-file drop
+and real Chromium CDP directory drag all passed. CDP supplied a real on-disk
+folder and browser FileSystemDirectoryEntry traversal; there were no JS directory
+mocks. This is not a manual Finder/desktop-platform test. Exact nested/Unicode/
+CRLF/binary/PDF bytes, source CIDs, collision/path refusal, preserved selection,
+explicit result navigation and zero attempted curation were checked. Deterministic
+persisted-page events tested restored controls; actual browser BFCache use is
+not claimed. A separate fresh JVM reopened CAS/project storage and verified five
+manual projects and seven exact files/CIDs, with zero automatic curation calls.
+
+Evidence: docs/evidence/2026-11-02/documents-upload.
+External replay sources/logs: library-files/documents-upload-proof and
+library-files/documents-native-folder-drop-proof. Earlier compilation and guard
+regressions were retained; tests and compile inputs were not excluded.
