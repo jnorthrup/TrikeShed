@@ -204,13 +204,13 @@ summary:focus-visible,
 <div id="document-surface" class="ds"><p class="ds-loading">Loading documents…</p></div>
 <details id="ds-upload" class="ds-upload">
 <summary>Add files · curate later</summary>
-<p>Files and folders create a <strong>new project</strong>, shown in Documents. Originals go into your Forge data folder under <code>files/&lt;project&gt;/</code>. The selected document is not replaced.</p>
+<p>Files and folders create a <strong>new project</strong>, shown in Documents. Uploaded copies are stored in your Forge data folder under <code>files/&lt;project&gt;/</code>. Your source files stay in place and the selected document stays open.</p>
 <label for="ds-upload-project">New project name (optional)</label>
 <input id="ds-upload-project" type="text" maxlength="100" placeholder="Defaults to file or folder name">
 <input id="ds-upload-files" type="file" multiple hidden>
 <input id="ds-upload-folder" type="file" webkitdirectory multiple hidden>
 <button id="ds-upload-choose" type="button">Choose files</button><button id="ds-upload-choose-folder" type="button">Choose folder</button>
-<p>Or drop onto this box. Up to 1,000 files, 32 MiB each, 128 MiB total. Storage only: this upload does not call a model or approve facts. Curate later; TXT/MD source retention stays separate.</p>
+<p>Or drop onto this box. Up to 1,000 files, 32 MiB each, 128 MiB total. Automatic curation is off for this project. Uploaded content remains unreviewed; curate it when you are ready.</p>
 <p>Leaving this page cancels the browser request, but files the server has already received may still be saved. Returning does not retry the upload.</p>
 <p id="ds-upload-status" role="status" aria-live="polite"></p>
 </details>

@@ -114,7 +114,7 @@ internal object DocumentsUpload {
             flush()
             require(sent == entries.size) { "Project $actual stored $sent of ${entries.size} files; inspect the project before retrying" }
             if (!present()) return
-            status.textContent = "Added $sent files to new project $actual; curate later. Storage: Forge data folder / files / $actual. This upload does not call a model or approve facts. TXT/MD source retention is separate. "
+            status.textContent = "Added $sent files to new project $actual; automatic curation is off. Stored in your Forge data folder / files / $actual. Uploaded content remains unreviewed. "
             val link = document.createElement("a")
             link.textContent = "Open uploaded project"
             link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(actual)}#${WikiSurface.encode(actual)}")
