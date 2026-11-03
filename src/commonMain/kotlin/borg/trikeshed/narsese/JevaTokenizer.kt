@@ -4,15 +4,19 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.reifyStrict
 
 /** Qwen's NFC, Unicode split and byte-level BPE. No chat template or implicit special tokens. */
-class JevaTokenizer(
+class JevaTokenizer internal constructor(
     val vocabulary: Map<String, Int>,
     merges: Series<Twin<String>>,
-    val special: Map<String, Int> = emptyMap(),
+    val special: Map<String, Int>,
+    val ranks: HashMap<String, Int>,
 ) {
-    val ranks = HashMap<String, Int>()
+    constructor(vocabulary: Map<String, Int>, merges: Series<Twin<String>>, special: Map<String, Int> = emptyMap()) :
+        this(vocabulary, merges, special, HashMap())
+
     val bytes = CharArray(256)
 
     init {
+        require(ranks.isEmpty()) { "Jeva BPE ranks must start empty" }
         var extra = 256
         for (byte in 0..255) bytes[byte] = if (byte in 33..126 || byte in 161..172 || byte in 174..255)
             byte.toChar() else (extra++).toChar()
@@ -29,27 +33,11 @@ class JevaTokenizer(
         check()
         require(maxLength > 0 && text.length <= Jeva.MAX_TEXT_CHARS)
         val result = ArrayList<Int>()
+        val alphabet = Array(bytes.size) { bytes[it].toString() }
         fun plain(value: String) {
             for (piece in split(normalize(value, check), check).view) {
                 check()
-                val symbols = piece.encodeToByteArray().mapTo(ArrayList()) { bytes[it.toInt() and 255].toString() }
-                while (symbols.size > 1) {
-                    check()
-                    var best = -1
-                    var rank = Int.MAX_VALUE
-                    for (i in 0 until symbols.size - 1) {
-                        if (i and 4095 == 0) check()
-                        val candidate = ranks[symbols[i] + '\u0000' + symbols[i + 1]] ?: continue
-                        if (candidate < rank) { rank = candidate; best = i }
-                    }
-                    if (best < 0) break
-                    symbols[best] += symbols.removeAt(best + 1)
-                }
-                for (symbol in symbols) {
-                    if (result.size and 4095 == 0) check()
-                    result.add(requireNotNull(vocabulary[symbol]) { "Jeva vocabulary lacks byte sequence" })
-                    require(result.size <= maxLength) { "Jeva input exceeds $maxLength tokens; truncation is disabled" }
-                }
+                merge(piece, alphabet, result, maxLength, check)
             }
         }
         var at = 0
@@ -66,6 +54,121 @@ class JevaTokenizer(
         plain(text.substring(from))
         check()
         return result.toIntArray().toSeries()
+    }
+
+    /** Adjacent pair candidates are ordered by merge rank and then original left position. */
+    private fun merge(piece: String, alphabet: Array<String>, result: MutableList<Int>, maxLength: Int, check: () -> Unit) {
+        if (piece.length == 1 && piece[0].code < 128) {
+            if (result.size and 4095 == 0) check()
+            result.add(requireNotNull(vocabulary[alphabet[piece[0].code]]) { "Jeva vocabulary lacks byte sequence" })
+            require(result.size <= maxLength) { "Jeva input exceeds $maxLength tokens; truncation is disabled" }
+            return
+        }
+        val encoded = piece.encodeToByteArray()
+        if (encoded.isEmpty()) return
+        val symbols = Array(encoded.size) { i ->
+            if (i and 4095 == 0) check()
+            alphabet[encoded[i].toInt() and 255]
+        }
+        val previous = IntArray(encoded.size) { it - 1 }
+        val next = IntArray(encoded.size) { if (it + 1 < encoded.size) it + 1 else -1 }
+        val versions = IntArray(encoded.size)
+        val candidates = MergeQueue(minOf(encoded.size, 1024))
+        fun offer(left: Int) {
+            if (left < 0) return
+            val right = next[left]
+            if (right < 0) return
+            val rank = ranks[symbols[left] + '\u0000' + symbols[right]] ?: return
+            candidates.add(left, right, versions[left], versions[right], rank)
+        }
+        for (i in 0 until encoded.size - 1) {
+            if (i and 4095 == 0) check()
+            offer(i)
+        }
+        while (candidates.isNotEmpty()) {
+            check()
+            val pair = candidates.remove()
+            val left = pair.left
+            val right = pair.right
+            if (next[left] != right || versions[left] != pair.leftVersion || versions[right] != pair.rightVersion) continue
+            symbols[left] += symbols[right]
+            symbols[right] = ""
+            versions[left]++
+            versions[right]++
+            val after = next[right]
+            next[left] = after
+            if (after >= 0) previous[after] = left
+            next[right] = -1
+            offer(previous[left])
+            offer(left)
+        }
+        var at = 0
+        while (at >= 0) {
+            if (result.size and 4095 == 0) check()
+            result.add(requireNotNull(vocabulary[symbols[at]]) { "Jeva vocabulary lacks byte sequence" })
+            require(result.size <= maxLength) { "Jeva input exceeds $maxLength tokens; truncation is disabled" }
+            at = next[at]
+        }
+    }
+
+    private data class Merge(val left: Int, val right: Int, val leftVersion: Int, val rightVersion: Int, val rank: Int)
+
+    /** A compact binary heap avoids allocating one object for every queued pair. */
+    private class MergeQueue(capacity: Int) {
+        private var left = IntArray(maxOf(1, capacity))
+        private var right = IntArray(left.size)
+        private var leftVersion = IntArray(left.size)
+        private var rightVersion = IntArray(left.size)
+        private var rank = IntArray(left.size)
+        private var size = 0
+
+        fun isNotEmpty() = size != 0
+
+        private fun before(r: Int, l: Int, index: Int): Boolean = r < rank[index] || (r == rank[index] && l < left[index])
+        private fun copy(from: Int, to: Int) {
+            left[to] = left[from]; right[to] = right[from]
+            leftVersion[to] = leftVersion[from]; rightVersion[to] = rightVersion[from]; rank[to] = rank[from]
+        }
+        private fun set(index: Int, l: Int, r: Int, lv: Int, rv: Int, priority: Int) {
+            left[index] = l; right[index] = r
+            leftVersion[index] = lv; rightVersion[index] = rv; rank[index] = priority
+        }
+
+        fun add(l: Int, r: Int, lv: Int, rv: Int, priority: Int) {
+            if (size == left.size) {
+                val capacity = left.size * 2
+                left = left.copyOf(capacity); right = right.copyOf(capacity)
+                leftVersion = leftVersion.copyOf(capacity); rightVersion = rightVersion.copyOf(capacity); rank = rank.copyOf(capacity)
+            }
+            var at = size++
+            while (at > 0) {
+                val parent = (at - 1) / 2
+                if (!before(priority, l, parent)) break
+                copy(parent, at)
+                at = parent
+            }
+            set(at, l, r, lv, rv, priority)
+        }
+
+        fun remove(): Merge {
+            check(size > 0)
+            val result = Merge(left[0], right[0], leftVersion[0], rightVersion[0], rank[0])
+            val last = --size
+            if (last > 0) {
+                val tailLeft = left[last]; val tailRight = right[last]
+                val tailLeftVersion = leftVersion[last]; val tailRightVersion = rightVersion[last]; val tailRank = rank[last]
+                var at = 0
+                while (at * 2 + 1 < size) {
+                    var child = at * 2 + 1
+                    if (child + 1 < size && before(rank[child + 1], left[child + 1], child)) child++
+                    if (tailRank < rank[child] || (tailRank == rank[child] && tailLeft <= left[child])) break
+                    copy(child, at)
+                    at = child
+                }
+                set(at, tailLeft, tailRight, tailLeftVersion, tailRightVersion, tailRank)
+            }
+            return result
+        }
     }
 
     companion object {
