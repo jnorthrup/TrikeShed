@@ -4,6 +4,45 @@ import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class XtermTerminalUnicodeTest {
+    @Test fun characterEditsDoNotLeaveHalfOfAWideGlyph() {
+        val erased = XtermTerminal(5, 1)
+        erased.feed("A界B\u001b[1;3H\u001b[X")
+        var row = erased.snapshot().lines[0]
+        assertEquals("A", row[0].text)
+        assertEquals(" ", row[1].text)
+        assertEquals(" ", row[2].text)
+        assertEquals("B", row[3].text)
+
+        val deleted = XtermTerminal(5, 1)
+        deleted.feed("A界B\u001b[1;2H\u001b[P")
+        row = deleted.snapshot().lines[0]
+        assertEquals(" ", row[1].text)
+        assertEquals("B", row[2].text)
+        assertFalse(row[1].continuation)
+
+        val inserted = XtermTerminal(5, 1)
+        inserted.feed("A界B\u001b[1;3H\u001b[@")
+        row = inserted.snapshot().lines[0]
+        assertEquals(" ", row[1].text)
+        assertEquals(" ", row[2].text)
+        assertEquals("B", row[4].text)
+        assertFalse(row[3].continuation)
+
+        val clipped = XtermTerminal(4, 1)
+        clipped.feed("AB界\u001b[1;1H\u001b[@")
+        row = clipped.snapshot().lines[0]
+        assertEquals("A", row[1].text)
+        assertEquals("B", row[2].text)
+        assertEquals(" ", row[3].text)
+
+        val intact = XtermTerminal(6, 1)
+        intact.feed("X界B\u001b[1;1H\u001b[P")
+        row = intact.snapshot().lines[0]
+        assertEquals("界", row[0].text)
+        assertTrue(row[1].continuation)
+        assertEquals("B", row[2].text)
+    }
+
     @Test fun resizeDropsAWideGlyphClippedOnEitherScreen() {
         val terminal = XtermTerminal(4, 2)
         terminal.feed("AB界\u001b[?1049hAB界")

@@ -533,6 +533,12 @@ class XtermTerminal(
         }
     }
 
+    private fun clearWideGlyph(r: Int, c: Int) {
+        clearWideAt(r, c)
+        cells[r][c] = blank()
+        mark(r, c)
+    }
+
     private fun lineFeed() {
         wrapPending = false
         if (row == scrollBottom) scrollUp(scrollTop, scrollBottom) else row = (row + 1).coerceAtMost(rows - 1)
@@ -578,12 +584,21 @@ class XtermTerminal(
     private fun eraseCharacters(count: Int) = eraseRange(row, column, column + minOf(count, columns - column))
 
     private fun eraseRange(r: Int, start: Int, end: Int) {
-        for (c in start.coerceAtLeast(0) until end.coerceAtMost(columns)) { cells[r][c] = blank(); mark(r, c) }
+        val first = start.coerceAtLeast(0)
+        val limit = end.coerceAtMost(columns)
+        if (first < limit) {
+            clearWideAt(r, first)
+            if (limit - 1 != first) clearWideAt(r, limit - 1)
+            for (c in first until limit) { cells[r][c] = blank(); mark(r, c) }
+        }
         revision++
     }
 
     private fun insertCharacters(count: Int) {
         val n = count.coerceIn(1, columns - column)
+        if (cells[row][column].continuation) clearWideGlyph(row, column)
+        val cutoff = columns - n
+        if (cells[row][cutoff].continuation) clearWideGlyph(row, cutoff)
         for (c in columns - 1 downTo column + n) cells[row][c] = cells[row][c - n]
         for (c in column until column + n) cells[row][c] = blank()
         markRange(row, column, columns); revision++
@@ -591,6 +606,9 @@ class XtermTerminal(
 
     private fun deleteCharacters(count: Int) {
         val n = count.coerceIn(1, columns - column)
+        if (cells[row][column].continuation) clearWideGlyph(row, column)
+        val cutoff = column + n
+        if (cutoff < columns && cells[row][cutoff].continuation) clearWideGlyph(row, cutoff)
         for (c in column until columns - n) cells[row][c] = cells[row][c + n]
         for (c in columns - n until columns) cells[row][c] = blank()
         markRange(row, column, columns); revision++
