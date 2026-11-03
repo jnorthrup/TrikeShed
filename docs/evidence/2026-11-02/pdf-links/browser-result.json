@@ -1,0 +1,166 @@
+{
+  "result": "PASS",
+  "scope": "Actual native valid-PDF file drop onto Documents main content, then PDF inventory/collection UI with real annotated PDF, production project/PDF routes and controlled host HTTP collection. Explicit selected links retained unreviewed; no model or approval. Stale PDF source refused; late response discarded after navigation.",
+  "meta": {
+    "project": "pdf-links-proof",
+    "id": "agreement.pdf",
+    "otherId": "other.txt",
+    "startProject": "existing-documents",
+    "startId": "other.txt",
+    "nativeFilePaths": [
+      "agreement.pdf",
+      "other.txt"
+    ],
+    "originalCid": "sha256:16c869eb5ed3e284721bafd40e42809ea01df70ac818346b17cec76584d989ef"
+  },
+  "inventory": {
+    "schema": "trikeshed.pdf-links.v1",
+    "reviewStatus": "unreviewed",
+    "selection": {
+      "project": "pdf-links-proof",
+      "id": "agreement.pdf",
+      "cid": "sha256:16c869eb5ed3e284721bafd40e42809ea01df70ac818346b17cec76584d989ef",
+      "rev": "1-sha256:70e0aacb3ebe92273f1ce55396bedfa47aac6a4ee9361cf49a3668e67de89a9f",
+      "seq": 0
+    },
+    "sourceCid": "sha256:16c869eb5ed3e284721bafd40e42809ea01df70ac818346b17cec76584d989ef",
+    "status": "AVAILABLE",
+    "pages": 1,
+    "parser": "poppler-pdfinfo-url/1",
+    "toolVersion": "26.05.0",
+    "coverage": "URI annotations reported by pdfinfo -url only; excludes GoTo actions and printed citations",
+    "diagnostic": null,
+    "links": [
+      {
+        "id": "link-0",
+        "page": 1,
+        "type": "Annotation",
+        "uri": "http://127.0.0.1:40369/article",
+        "followable": true,
+        "reason": null
+      },
+      {
+        "id": "link-1",
+        "page": 1,
+        "type": "Annotation",
+        "uri": "javascript:bad",
+        "followable": false,
+        "reason": "unsupported-scheme"
+      }
+    ],
+    "authority": "source-link-inventory-only",
+    "receiptCid": "sha256:be5ea6ce1557ed965dd5e0a3da4cce6ecc9b7d3f22a6108d178f5bf260f85f94",
+    "collection": "explicit-selection-only",
+    "issuance": "current-host-lifetime"
+  },
+  "collection": {
+    "status": "collected",
+    "sourceCurrent": true,
+    "selection": {
+      "id": "agreement.pdf",
+      "cid": "sha256:16c869eb5ed3e284721bafd40e42809ea01df70ac818346b17cec76584d989ef",
+      "rev": "1-sha256:70e0aacb3ebe92273f1ce55396bedfa47aac6a4ee9361cf49a3668e67de89a9f",
+      "seq": 0,
+      "project": "pdf-links-proof"
+    },
+    "action": "retained-unreviewed-not-model-curated",
+    "documents": [
+      {
+        "id": "link-0",
+        "project": "pdf-links-proof",
+        "documentId": "pdf-links/2096bc9e4480cd4827fddb883c4ca140d9cea48aa3519ef05a3984acadb1fcd0.html",
+        "cid": "sha256:04edc79d3f9ad469be4159b4f0396b5a92933f4708ee3c2d4a54675d0ec50f92",
+        "evidenceCid": "sha256:dcbf4e09dbae5da6f8e3d681ca8e85248ed7d54444df3a6e567d7c028735728d",
+        "reviewStatus": "unreviewed"
+      }
+    ]
+  },
+  "collected": {
+    "project": "pdf-links-proof",
+    "id": "pdf-links/2096bc9e4480cd4827fddb883c4ca140d9cea48aa3519ef05a3984acadb1fcd0.html",
+    "cid": "sha256:04edc79d3f9ad469be4159b4f0396b5a92933f4708ee3c2d4a54675d0ec50f92",
+    "rev": "1-sha256:4897f46d7a62e464940355264d98bc137fa4674f20f692173584ba5ee8403465",
+    "seq": 3,
+    "contentType": "text/html",
+    "length": 76,
+    "text": "<html><body>Controlled linked page; unreviewed source content.</body></html>",
+    "sourceRevision": {
+      "project": "pdf-links-proof",
+      "id": "pdf-links/2096bc9e4480cd4827fddb883c4ca140d9cea48aa3519ef05a3984acadb1fcd0.html",
+      "cid": "sha256:04edc79d3f9ad469be4159b4f0396b5a92933f4708ee3c2d4a54675d0ec50f92",
+      "rev": "1-sha256:4897f46d7a62e464940355264d98bc137fa4674f20f692173584ba5ee8403465",
+      "seq": 3,
+      "length": 76,
+      "contentType": "text/html"
+    },
+    "displayTextRevision": {
+      "project": "pdf-links-proof",
+      "id": "pdf-links/2096bc9e4480cd4827fddb883c4ca140d9cea48aa3519ef05a3984acadb1fcd0.html",
+      "cid": "sha256:04edc79d3f9ad469be4159b4f0396b5a92933f4708ee3c2d4a54675d0ec50f92",
+      "rev": "1-sha256:4897f46d7a62e464940355264d98bc137fa4674f20f692173584ba5ee8403465",
+      "seq": 3
+    },
+    "extractionRevision": null,
+    "canRetainSource": false,
+    "notes": "inventory-cid: sha256:be5ea6ce1557ed965dd5e0a3da4cce6ecc9b7d3f22a6108d178f5bf260f85f94\nsource-cid: sha256:16c869eb5ed3e284721bafd40e42809ea01df70ac818346b17cec76584d989ef\nlink-id: link-0\nevidence-cid: sha256:dcbf4e09dbae5da6f8e3d681ca8e85248ed7d54444df3a6e567d7c028735728d\nreview-status: unreviewed\n"
+  },
+  "writes": [
+    {
+      "path": "/_project/pdf-links-proof/begin",
+      "query": "?kind=assets&intake=manual"
+    },
+    {
+      "path": "/_project/pdf-links-proof/putBatch",
+      "query": "?intake=manual"
+    },
+    {
+      "path": "/api/documents/pdf-links",
+      "body": {
+        "project": "pdf-links-proof",
+        "id": "agreement.pdf",
+        "cid": "sha256:16c869eb5ed3e284721bafd40e42809ea01df70ac818346b17cec76584d989ef",
+        "rev": "1-sha256:70e0aacb3ebe92273f1ce55396bedfa47aac6a4ee9361cf49a3668e67de89a9f",
+        "seq": 0
+      }
+    },
+    {
+      "path": "/api/documents/pdf-links/collect",
+      "body": {
+        "inventoryCid": "sha256:be5ea6ce1557ed965dd5e0a3da4cce6ecc9b7d3f22a6108d178f5bf260f85f94",
+        "selectionIds": [
+          "link-0"
+        ]
+      }
+    },
+    {
+      "path": "/api/documents/pdf-links",
+      "body": {
+        "project": "pdf-links-proof",
+        "id": "agreement.pdf",
+        "cid": "sha256:16c869eb5ed3e284721bafd40e42809ea01df70ac818346b17cec76584d989ef",
+        "rev": "1-sha256:70e0aacb3ebe92273f1ce55396bedfa47aac6a4ee9361cf49a3668e67de89a9f",
+        "seq": 0
+      }
+    },
+    {
+      "path": "/api/documents/pdf-links",
+      "body": {
+        "project": "pdf-links-proof",
+        "id": "agreement.pdf",
+        "cid": "sha256:d916bfc8f5d0c00b01f8d911284079f4f6ad710718cd2dcb3e9c7c81390424fd",
+        "rev": "2-sha256:9acdbbc718bb253f07f08e25b117e36568b17654e2819d5a7954a57df24a4a1f",
+        "seq": 4
+      }
+    }
+  ],
+  "evidence": {
+    "originalRetained": true,
+    "collectedDocumentRetained": true,
+    "modelCalls": 0,
+    "automaticIntake": 0,
+    "hostPeerRequests": 1
+  },
+  "browserErrors": [],
+  "externalBrowserRequests": [],
+  "publication": "Synthetic PDF and controlled loopback linked page only; local fixture path prefixes removed. No user-uploaded document content."
+}

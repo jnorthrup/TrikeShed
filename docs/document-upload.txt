@@ -1,7 +1,7 @@
 Document upload and storage
 
 Documents now has an Add files / curate later box. Choose files, choose a folder,
-or drop a folder onto that box. This creates a new project and preserves the
+or drop a PDF, files or folder anywhere in Documents. This creates a new project and preserves the
 currently selected document. Open uploaded project explicitly switches to it.
 Uploaded copies are stored under <forgeHome>/files/<project>/<relative path>;
 source files on the user's computer stay in place. The default Forge home is
@@ -62,3 +62,9 @@ drag into the center of document content, outside the sidebar uploader, passed
 through production routes with exact nested bytes, one begin, no model calls or
 browser errors. Text-only drag was not prevented and sent no request.
 Evidence: docs/evidence/2026-11-02/documents-window-drop.
+
+PDF follow-up
+Select an uploaded PDF and choose Find PDF links to inspect its URI annotations.
+Explicitly collect selected HTTP(S) targets as unreviewed source documents,
+subject to host network policy. See docs/pdf-link-curation.txt for coverage,
+revision checks, limits and deployment. Printed legal citations are not resolved.

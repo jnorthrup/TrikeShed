@@ -1,0 +1,61 @@
+PDF link discovery and selected collection
+
+Open Documents and drop a PDF, files, or a folder anywhere in the window, or use
+Add files / curate later. Upload creates a new Manual project and keeps the
+current selection until Open uploaded project is chosen. Select its PDF, then
+choose Find PDF links. This reads the retained PDF locally; opening the PDF does
+not scan links or fetch their destinations automatically.
+
+The inventory retains each URI occurrence, page, type and original URI against
+the PDF's project, document ID, CID, revision and sequence. Its CAS receipt is
+unreviewed. Select up to eight HTTP(S) occurrences and choose Collect selected
+links. The host checks its existing egress policy on each destination and redirect;
+the UI does not fetch those URLs. Collected HTML/PDF documents and their evidence
+are retained under pdf-links/ in the same Manual project. Result links open the
+retained documents. No model, automatic curation or review approval is invoked.
+
+A replaced source refuses discovery and collection. Every final import rechecks
+the selected revision and Manual policy under the managed-source write lock.
+Completed imports remain unreviewed if later selections fail or the source changes;
+partial results and sourceCurrent report that outcome. Only inventories issued
+by the current host lifetime can authorize collection: rediscover after restart.
+Navigation aborts the browser request and ignores late responses, but accepted
+host writes can still finish. Collection is not a transaction across all targets.
+
+Coverage and deployment
+Install Poppler's pdfinfo on the daemon PATH. Without it, discovery reports
+UNAVAILABLE. This reader inventories URI annotations reported by pdfinfo -url;
+it does not resolve printed legal citations or true internal GoTo actions. Zero
+URI annotations does not establish that a PDF has no legal references. Candidate
+classification describes URI syntax, not permission to fetch or legal authority.
+
+Discovery is bounded to 32 MiB, 10,000 pages, 4,096 occurrences, 1 MiB combined
+process output and 45 seconds. Collection allows eight distinct occurrences,
+8 MiB per response, 20 seconds per link, 60 seconds overall, and five request
+steps including redirects. Only supported HTML/PDF content is retained. Denied
+egress, missing HTX service, unsupported content and fetch failures are reported;
+this flow does not widen network policy or enable remote access for an air gap.
+Process time/output limits are not an OS sandbox or native memory limit.
+
+Rebuild and restart the local checkout to expose the new Documents controls:
+  ./gradlew jvmJar stageDaemonLib
+  ./utils/oroboros --watch
+Refresh Documents after restart. The launcher uses -Xmx24g.
+
+Verification
+Coordinated v49 at a086625e04d3ca0ff41246799709005960bf8b56 passed 76 selected
+JUnit checks with no failures/errors/skips and built Documents/Pages/Spacegraph.
+Frozen main JAR SHA256:
+63de3b71ebeb4534065b28935dc2bd11bd2ae8f88eee3849fa50d909ce974d95
+Documents bundle SHA256:
+e07cfd530b076ec9a860496f41f6045e5d89f7ba7d18503290f93661c2b5f275
+Tests used actual Poppler and host HTX collection of a controlled local page;
+stale, invented and unsafe selections and denied egress were refused.
+The real GraalPy provider-client check also passed with the host catalog's
+contextWindow field, including an explicit unknown capacity. This test-only
+expectation was the sole patch missing from the earlier agent-branch integration.
+
+Private supplied-document assessment sampled Chambers separately: 198 text-bearing
+pages, zero URI annotations and zero explicit printed HTTP(S)/www candidates.
+Its legal citations remain outside this URL reader. Original PDFs and extracted
+text remain outside Git; no destinations were fetched for that assessment.
