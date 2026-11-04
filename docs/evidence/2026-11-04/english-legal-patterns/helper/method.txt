@@ -1,0 +1,65 @@
+Synthetic modal-role and duration-language helper experiment, 2026-11-04
+
+One actual local Stanford CoreNLP 4.6.0 syntax-v1 child processed eight fixed,
+synthetic snippets. Its recorded elapsed time was 14.021 seconds. It used the
+immutable v54 runtime source 46da66cdb / main JAR c753a967ff83be06... with only the
+newly compiled EnglishLegalPatterns helper at 7e384b49c and experiment classes.
+No existing production class was replaced. This was not a final release-JAR,
+host/API, browser, private-document, or legal-comprehension proof.
+
+All eight snippets produced exact source-spanned observations. Seven of eight
+duration expectations held in that first run. The matching thirty (30) business
+days case emitted NO duration. Its full actual 17 token nodes and 17 dependency
+edges are preserved in numeric-head-counterexample.json. In this observed graph,
+thirty heads days via obl:npmod; there is no nummod(days,thirty). The initial miss
+remains explicit in both public evidence selections and the original report
+identified by SHA256. Roles, the full sentence, and unless/not were retained.
+
+Correction d5035d5c accepts the observed inverse numeric-head unit edge only
+when the head is POS CD or NER NUMBER. The exact observed graph became a focused
+regression fixture. Pure helper replay of all eight FROZEN annotations meets all
+eight quantity expectations without changing quotes, nodes, or dependency IDs.
+That replay executed NO parser. It is not a second actual parser run and is not
+an independent accuracy benchmark: the eight synthetic expectations are narrow,
+preselected quantity checks. Both conflicting-number forms remain unresolved.
+
+The eight cases and their first/replay results are in eight-cases.json:
+  matching thirty (30), negative exception: first miss; replay lexical 30
+  conflicting thirty (60), negative exception: unresolved in both
+  two calendar months: lexical 2 months; no conversion to days
+  passive Notice must be given: Notice is parser nsubj:pass; no object
+  coordinated give/retain: one modal action observed; scope unresolved
+  enhanced-copy attempt: ZERO actual copy nodes; copy handling NOT exercised
+  reversed Notice must give Tenant: ordered parser roles remain reversed
+  half of 30 days: unsupported number language; no integer chosen
+
+The passive parser label does not identify an obligated party. The coordinated
+case does not establish a shared modal or both actions' legal force. All actual
+cases had zero copied nodes; explicit copy fixtures test helper handling, not
+actual CoreNLP copy coverage. Legal force, exception application, negation scope,
+intersentence/paragraph scope, and calendar calculations are not established.
+There were no model calls, NARS/Rete/SUMO admissions, or private PDF reads.
+
+Focused source checks are separately versioned in fixture-verification.json:
+  7e384b49c: 9 methods, standalone JVM PASS; helper used in the actual run
+  d5035d5c: 10 methods, standalone JVM PASS; includes actual graph regression
+  70a74e1b: 11 methods, standalone JVM PASS; Unicode/CRLF/tab capture offsets
+The coordinated root v57 commonJS compile exposed JVM-only MatchGroup.range.
+70a74e1b replaces it with common String indices and exact source validation.
+These standalone JVM checks do not prove commonJS compilation. The separate root
+v58 coordinated result, once available, owns that claim; nothing was excluded
+or hidden from the commonJS compile. No Gradle or parser was run to publish this
+documentation.
+
+Execution identities, new helper class hashes, source hashes, and hashes of the
+retained raw reports are in execution-identity.json. Compact public selections
+are not retained inspection receipts and do not authenticate parser execution.
+The actual fixture CAS was volatile and isolated, with source/result readback;
+it does not establish durable host retention. The child exited 0 and its reader
+closed. A 240-second wall cap and 4 GiB maximum Java heap applied to the child,
+not all native memory. Outbound connect/send syscalls were denied by a tested
+seccomp wrapper; outbound-deny-profile.json records its probes and scope. This
+does not establish a full OS sandbox, filesystem isolation, or production airgap.
+
+No binaries, models, private uploaded PDFs, extracted private passages, or full
+all-case inventory duplication are published here. The inputs are synthetic.

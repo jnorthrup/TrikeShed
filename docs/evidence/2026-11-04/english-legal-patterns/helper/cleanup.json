@@ -1,0 +1,13 @@
+{
+  "readerClosed": true,
+  "actualChildExit": 0,
+  "actualParserRuns": 1,
+  "newParserRunsDuringFix": 0,
+  "state": "CHILD_EXITED",
+  "limits": {
+    "wallSeconds": 240,
+    "maxJavaHeap": "4g"
+  },
+  "sourceOnlyInputs": true,
+  "privatePdfReads": false
+}

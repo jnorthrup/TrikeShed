@@ -1,0 +1,149 @@
+{
+  "publicationScope": "Compact synthetic selections from the original retained reports; raw all-case inventories and class binaries are intentionally not duplicated. Hashes identify those retained artifacts, not independent proof of execution. No private PDF input.",
+  "actual": {
+    "helperHead": "7e384b49c11a9ca4fb16a5e7d24aabf17c7623c4",
+    "helperSha256": "2bdb3e42793edbd86d755eb0181897cf553bc2d96735b350f0f80cd148d8d909",
+    "harnessSha256": "558e6a6cdb3cadb249d45be2b105e4cf5d5321fae543900f83237cbaf33becbd",
+    "runtimeSource": "46da66cdb28e650e71490ae48741e6f5dcfa0563",
+    "runtimeJarSha256": "c753a967ff83be0652c219b010d7100fcc50d34bcae0132ab7a8a11ff4421361",
+    "runtimeClassOverlays": "Only new EnglishLegalPatterns helper plus experiment classes; no replacement of existing production classes. Not a released helper artifact.",
+    "limits": {
+      "wallSeconds": 240,
+      "maximumJavaHeap": "4g",
+      "scope": "Child process only, no native memory cap or full OS sandbox"
+    },
+    "syntheticOnly": true,
+    "privateDocumentsRead": false,
+    "compilationRetry": "Attempt1 failed only external harness java.lang.System shadowing; attempt2 uses explicit java.lang.System. No production source changed.",
+    "runtimeClassLocation": "file:/workspace/library-files/english-corpus-browser-proof/snapshot/main.jar",
+    "newHelperClassLocation": "file:/workspace/library-files/english-legal-patterns-actual-proof/classes/",
+    "observedElapsedMillis": 14021,
+    "readerClosed": true,
+    "childExit": 0,
+    "fixtureMethodsAtThatSource": 9
+  },
+  "frozenReplay": {
+    "fixHead": "d5035d5c4131821bf423f6c51c3aa62a052fcf7c",
+    "helperSourceSha256": "0640bf8618faac3413f43b80855c7978d001172091b6bccbc68107970818eb7d",
+    "testSourceSha256": "6ad9b8b810df78dbf39beda4347c940d6dd0cf571c15efa322add262b81199ea",
+    "frozenActualResultSha256": "6b616dd806cefda6855d26d852a35815c62fe60e6689e24e593cd7a7ec562e16",
+    "replayResultSha256": "e3287acbade129348d7dd2df07a13c3d19ee80eb35cc77534ad137dd346a8308",
+    "focusedMethods": 10,
+    "sourceCheck": "PASS",
+    "frozenActualParseReplay": "8 cases PASS; no second parser execution",
+    "actualParserRuns": 1,
+    "actualFirstHelper": "7e384b49c",
+    "actualFirstOutcome": "8 parsed observations,7/8 duration expectations; matching thirty(30) npmod shape missing; synthetic copy attempt observed0copies",
+    "runtimeJarSource": "46da66cdb28e650e71490ae48741e6f5dcfa0563",
+    "runtimeJarSha256": "c753a967ff83be0652c219b010d7100fcc50d34bcae0132ab7a8a11ff4421361",
+    "existingProductionClassOverrides": false,
+    "modelCalls": 0,
+    "privateDocumentsRead": false
+  },
+  "portableOffsets": {
+    "head": "70a74e1b602137f6d3dd879dfff0504738f1c1f8",
+    "compile": "PASS",
+    "focusedMethods": 11,
+    "testResult": "PASS",
+    "commonJsValidation": "Pending root v58; this replaces MatchGroup.range rejected by actual commonJS compile in root v57. No source/test exclusion or platform shim.",
+    "mode": "New helper and focused fixture tests only, against immutable v52JAR/dependency JARs. Standalone JVM source verification, not coordinated commonJS proof; no Gradle, existing production overrides, friend access or actual parser execution.",
+    "newFixture": "Exact paired-number captures after a non-BMP Unicode prefix with CRLF/tabs/parenthesis padding, preserving global UTF16 offsets and original quantity literal.",
+    "sourceSha256": {
+      "src/commonMain/kotlin/borg/trikeshed/nlp/EnglishLegalPatterns.kt": "791eed9bb54abc3211f9ba2c1e334bc7d59d6b9770c54070bab914295d6a0185",
+      "src/commonTest/kotlin/borg/trikeshed/nlp/EnglishLegalPatternsTest.kt": "5633ddc56aa8932f3e2b94d83a007ce479347f3f4c14ce99d130d8c175802b99"
+    }
+  },
+  "retainedCompiledHelperClasses": {
+    "actual7e384": {
+      "scope": "SHA256 of retained compiled helper class files; derived after execution, not independent attestation of execution",
+      "files": [
+        {
+          "name": "borg/trikeshed/nlp/EnglishLegalPatterns$Reading.class",
+          "bytes": 4178,
+          "sha256": "2131401d5c5f6f050481a611c1c2e4e1ab2543f95e8e747a62b3a9abc41b0003"
+        },
+        {
+          "name": "borg/trikeshed/nlp/EnglishLegalPatterns.class",
+          "bytes": 71384,
+          "sha256": "a6746008ea087cafc3f6d2c85682b48c4bdd78d23cac8452d8af88eb31be3a19"
+        }
+      ]
+    },
+    "replayD5035": {
+      "scope": "SHA256 of retained compiled helper class files; derived after execution, not independent attestation of execution",
+      "files": [
+        {
+          "name": "borg/trikeshed/nlp/EnglishLegalPatterns$Reading.class",
+          "bytes": 4178,
+          "sha256": "6f49a774636dcc5fc08f5cf46a4f42556d00cc6ee96b28c3a0c09d6748b1f74c"
+        },
+        {
+          "name": "borg/trikeshed/nlp/EnglishLegalPatterns.class",
+          "bytes": 75367,
+          "sha256": "393957ee64c75cfd764c416c92f1af0447a61f38b35451c6ccf2153315e54a60"
+        }
+      ]
+    },
+    "portable70a74": {
+      "scope": "SHA256 of retained compiled helper class files; derived after execution, not independent attestation of execution",
+      "files": [
+        {
+          "name": "borg/trikeshed/nlp/EnglishLegalPatterns$Reading.class",
+          "bytes": 4178,
+          "sha256": "6f49a774636dcc5fc08f5cf46a4f42556d00cc6ee96b28c3a0c09d6748b1f74c"
+        },
+        {
+          "name": "borg/trikeshed/nlp/EnglishLegalPatterns.class",
+          "bytes": 76247,
+          "sha256": "d1498a20b57daba7cea9f6572bd88b87ba25cfff4e3e154e7ecc2cbe3fc6f51f"
+        }
+      ]
+    }
+  },
+  "upstreamReports": [
+    {
+      "name": "result.json",
+      "bytes": 94013,
+      "sha256": "6b616dd806cefda6855d26d852a35815c62fe60e6689e24e593cd7a7ec562e16"
+    },
+    {
+      "name": "partial-result.json",
+      "bytes": 93475,
+      "sha256": "3200b0379c44705e4ea9c71a046880d60318cf7ebea573d87d6817eabbe16491"
+    },
+    {
+      "name": "replay-result.json",
+      "bytes": 73345,
+      "sha256": "e3287acbade129348d7dd2df07a13c3d19ee80eb35cc77534ad137dd346a8308"
+    },
+    {
+      "name": "Probe.kt",
+      "bytes": 6259,
+      "sha256": "558e6a6cdb3cadb249d45be2b105e4cf5d5321fae543900f83237cbaf33becbd"
+    },
+    {
+      "name": "Replay.kt",
+      "bytes": 4289,
+      "sha256": "f7e5a8c66d02fe8db20c1e25650f3ce05f42baaf4dffd98b44b42586c9ac2ef7"
+    },
+    {
+      "name": "run-attempt1.stdout",
+      "bytes": 13639,
+      "sha256": "90ef688cfebf96f2e3ddfc7efcbab811d34158abb5aa70dbee8677496cb2b026"
+    },
+    {
+      "name": "run-attempt1.stderr",
+      "bytes": 1472,
+      "sha256": "059237dec71974df14537f70d1a0a25c903df43d8128af825a89cea7b2aa147d"
+    }
+  ],
+  "notClaimed": [
+    "released-host/API/browser behavior",
+    "coordinated commonJS success",
+    "legal-force or applicability correctness",
+    "actual enhanced-copy coverage",
+    "full OS sandbox or production air gap",
+    "NARS/Rete/SUMO fact admission",
+    "private PDF extraction quality"
+  ]
+}

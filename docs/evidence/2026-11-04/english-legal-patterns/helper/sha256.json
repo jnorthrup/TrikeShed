@@ -1,0 +1,13 @@
+{
+  "algorithm": "SHA-256",
+  "scope": "Published helper synthetic evidence files; excludes this manifest. Raw retained report hashes and source/class identities are separately in execution-identity.json.",
+  "files": {
+    "cleanup.json": "9e891764fbd27f5104cdbf85ff7d3507555a9e0be8707feb73847ed43584f0db",
+    "eight-cases.json": "e16ab75bc9a3d4dbb58d6b9c94b78e1679eef343888951a76db982c9d9c8a00f",
+    "execution-identity.json": "eef7c6a8a222efd9c8431f12daeba62b69c5dc4dc8f679368f749584f931d4e3",
+    "fixture-verification.json": "7e62b6b482f230b3e0bd012a2f216663efe30d61ec9ff7ffaa28cc2044556ff1",
+    "method.txt": "09d616968d36f7c87a0f23f09cf3c14a549a8cc308ddde2b9870ed85a518b88f",
+    "numeric-head-counterexample.json": "476bbb36634383eec524dbfc98688d2f6e61d0e0954b90923cefa4890d009ddc",
+    "outbound-deny-profile.json": "fa9995b05612912be0a6fc8e47bea57a7d41ab5cf0ef4b7d8ee1a8af00a5d810"
+  }
+}
