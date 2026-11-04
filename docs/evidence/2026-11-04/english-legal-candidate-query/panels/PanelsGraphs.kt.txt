@@ -1,0 +1,65 @@
+package proof.englishlegalquery
+
+import proof.legalpanels.PanelPrograms
+import borg.trikeshed.job.*
+import borg.trikeshed.kanban.module.KanbanModule
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.litebike.WireHttpResponse
+import borg.trikeshed.module.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.util.oroboros.*
+import kotlinx.coroutines.*
+import java.io.File
+
+/** External fixture assembly; a separate actual Kanban owner borrows the primary query runners. */
+class PanelsFixture(val ctx: ModuleContext, val root: File, val snapshot: File, val inspections: Map<String, String>) {
+    val modules = ModuleSupervisor(ctx)
+    val programs = PanelPrograms.programs(inspections.getValue("matching"), inspections.getValue("conflicting"))
+    suspend fun attach() {
+        ctx.lcncRunners.putAll(PureNodes.registry(ctx.clock))
+        ctx.lcncRunners.putAll(TribunalNodes.registry(TribunalDialog { _, _, _ -> error("No model provider in Panels query proof") }).filterKeys { it == "display" })
+        for ((name, program) in programs) {
+            val errors = LcncTypeCheck.check(program, LcncContracts.all().associateBy { it.type }, strict = true)
+            check(errors.isEmpty()) { "$name: $errors" }
+            val bytes = LcncProgramConfix.toJson(program).encodeToByteArray()
+            ctx.attachments.putAttachment(OroborosAttachmentRef("panels/$name", "application/json", bytes.size.toLong(),
+                ContentId.of(bytes), "external-proof", "1", 1L), bytes)
+        }
+        modules.attach(KanbanModule())
+    }
+    fun evidence(): Map<String, Any?> = _m[
+        "programs" j programs.mapValues { reifyStrict(LcncProgramConfix.toJson(it.value)) },
+        "scope" j "Actual Panels and actual Kanban durable inline runs in a separate operational board context. Primary query Rete is independent.",
+        "parser" j "No parser invoked. Retained actual v58 CoreNLP4.6 observations; producer authority is not established.",
+        "operationalBoardReteFacts" j runBlocking { ctx.rete.snapshot().size },
+        "operationalBoardBlackboardEntries" j ctx.blackboard.snapshot().values.size,
+        "operationalScope" j "Board/run records are not admitted legal world facts from the queried candidate dataset.",
+        "beliefBagPresent" j (ctx.beliefBag != null), "reviewOwnerPresent" j (ctx.documentReview != null),
+    ]
+    suspend fun route(method: String, target: String, body: String): WireHttpResponse? {
+        val path = target.substringBefore('?')
+        if (method == "GET" && path == "/panels") return WireHttpResponse(200, File(snapshot, "web/panels.html").readText(), "text/html; charset=utf-8")
+        if (method == "GET" && path == "/kotlin/spacegraph/spacegraph.js") return WireHttpResponse(200, File(snapshot, "spacegraph.js").readText(), "application/javascript")
+        if (method == "GET" && (path.endsWith(".css") || path.startsWith("/vendor/"))) {
+            val file = File(snapshot, "web" + path)
+            if (file.isFile) return WireHttpResponse(200, file.readText(), if (path.endsWith(".css")) "text/css" else "application/javascript")
+        }
+        fun json(value: Any?, status: Int = 200) = WireHttpResponse(status, jsonOf(value), "application/json; charset=utf-8")
+        if (method == "GET" && path == "/api/panels") return json(_m["panels" j programs.keys.map { _m["name" j it] }])
+        if (method == "GET" && path == "/api/panels/presets") return json(_m["presets" j programs.map { (name, program) ->
+            _m["name" j name, "title" j name, "does" j "Inspect retained unreviewed legal language candidates", "needs" j "Exact retained inspection CID",
+                "see" j "Source-linked bindings and explicit scope", "tweakFirst" j "Inspection CID, source mode and inner visual BGP; choose Run explicitly",
+                "document" j reifyStrict(LcncProgramConfix.toJson(program))]
+        }])
+        if (method == "GET" && path.startsWith("/api/panels/")) {
+            val name = path.substringAfterLast('/'); val program = programs[name] ?: return json(_m["error" j "not_found"], 404)
+            return if (target.substringAfter('?', "") == "entry=1") json(LcncBlackboard.programEntry(name, program, LcncContracts.all().associateBy { it.type }))
+                else WireHttpResponse(200, LcncProgramConfix.toJson(program), "application/json; charset=utf-8")
+        }
+        if (path.startsWith("/api/lcnc/")) return ctx.routes.match(path)?.route(method, target, body, null)
+        return null
+    }
+
+    suspend fun drain() { modules.drainAll() }
+}

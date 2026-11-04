@@ -1,0 +1,8 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+400 !== 200
+
+    at execute (/workspace/library-files/legal-candidate-query-panels-proof/driver.cjs:20:245)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at process.processImmediate (node:internal/timers:502:9)
+    at async main (/workspace/library-files/legal-candidate-query-panels-proof/driver.cjs:28:49)
