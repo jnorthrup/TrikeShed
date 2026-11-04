@@ -1,0 +1,241 @@
+package proof.evidencelifecycle
+
+import borg.trikeshed.forge.server.*
+import borg.trikeshed.couch.*
+import borg.trikeshed.dag.*
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.subvm.CoreNlpRuntime
+import borg.trikeshed.nlp.*
+import borg.trikeshed.htx.HtxKey
+import borg.trikeshed.job.*
+import borg.trikeshed.kanban.module.KanbanModule
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.memory.*
+import borg.trikeshed.modelmux.*
+import borg.trikeshed.module.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.*
+import java.io.File
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+
+/** Local transport only. All document, parser, graph, preset and durable execution owners are production classes. */
+fun main() = runBlocking {
+    val artifacts = File(requireNotNull(java.lang.System.getenv("PROOF_ROOT")))
+    val snapshot = File(requireNotNull(java.lang.System.getenv("PROOF_SNAPSHOT")))
+    val root = File(artifacts, "runtime").apply { require(isDirectory) }
+    val project = "english-copular-fresh-proof"
+    val id = "synthetic copular guarded clauses.txt"
+    val source = File(requireNotNull(java.lang.System.getenv("PROOF_SOURCE"))).readBytes()
+    check(source.size == 228)
+    val text = source.decodeToString(throwOnInvalidSequence = true)
+    val sourceCid = ContentId.of(source)
+    check(sourceCid.value == "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5")
+    val moduleRoot = File(requireNotNull(java.lang.System.getenv("TRIKESHED_SUBVM_HOME")), "corenlp")
+    val manifest = File(moduleRoot, "MANIFEST.tsv").readBytes()
+    check(manifest.decodeToString().contains("stanford-corenlp:4.6.0"))
+    val manifestCid = ContentId.of(manifest)
+    val files = JvmFileOperations(); val cas = PackCasStore(files, File(root, "cas").absolutePath)
+    val store = CouchStoreFactory.casBacked(cas); val gateway = CouchAttachmentGateway(store, cas)
+    val registry = ProjectDbRegistry("primary")
+    val scopes = ProjectScopes(files, gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, store))), cas,
+        null, projectDbs = registry, ledgerFile = File(root, "projects.tsv"), filesRoot = File(root, "files"))
+    check(scopes.remountLedger() == 2)
+    val miner = ProjectMiner(registry, scopes, cas, null, File(root, "files"))
+    val corpus = JvmProjectCorpus(registry, scopes, miner)
+    val owners = mutableListOf<CompletableJob>()
+    fun context(name: String): ModuleContext {
+        val owner = SupervisorJob(coroutineContext[Job]); owners.add(owner)
+        return ModuleContext(Couch(name, store, cas), ReteNetwork(), ReteProductionRegistry(), null, null,
+            ConfixBlackboard.empty(), cas, gateway, ModuleRouteRegistry(), CoroutineScope(Dispatchers.IO + owner + files),
+            { 123L }, File(root, name).apply { mkdirs() })
+    }
+    val ctx = context("english-observation")
+    val parserCalls = AtomicInteger()
+    val priorCleanup = reifyStrict(File(artifacts, "producer-cleanup.json").readText()) as Map<*, *>
+    check((priorCleanup["parserCalls"] as Number).toInt() == 1 && priorCleanup["allSupervisorsCompleted"] == true)
+    val priorProgress = reifyStrict(File(artifacts, "producer-progress.json").readText()) as Map<*, *>
+    val priorInspection = (priorProgress["observations"] as Map<*, *>)["inspection"] as Map<*, *>
+    val priorReceipt = ContentId(priorInspection["receiptCid"] as String)
+    val checked = EnglishObservationGraph.read(cas, priorReceipt)
+    val priorBytes = requireNotNull(cas.getBounded(priorReceipt, 8 * 1024 * 1024))
+    check(ContentId.of(priorBytes) == priorReceipt)
+    val priorDecoded = CanonicalCbor.decodeMapBounded(priorBytes, 8 * 1024 * 1024, 32, 500_000)
+    check(reifyStrict(jsonOf(priorDecoded)) == priorInspection.filterKeys { it != "receiptCid" }) { "Actual prior HTTP JSON differs from stored canonical receipt" }
+    val firstExport = File(artifacts, "cas-readbacks").apply { mkdirs() }
+    File(firstExport, priorReceipt.hex + ".cbor").writeBytes(priorBytes)
+    File(firstExport, sourceCid.hex + ".txt").writeBytes(requireNotNull(cas.getBounded(sourceCid, source.size)))
+    for (expected in requireNotNull(checked.sourceSnapshots)) check(corpus.document(expected.project, expected.id) == expected) { "Reopened source tuple changed" }
+    check(checked.source.originalCid == sourceCid && checked.source.text == text)
+    val wire = EnglishObservationWire(ctx, corpus); wire.attach()
+    val boardCtx = context("operational-board")
+    boardCtx.lcncRunners.putAll(PureNodes.registry(boardCtx.clock))
+    boardCtx.lcncRunners.putAll(TribunalNodes.registry(TribunalDialog { _, _, _ -> error("No provider in copular proof") }).filterKeys { it == "display" })
+    boardCtx.lcncRunners.putAll(ctx.lcncRunners)
+    val modules = ModuleSupervisor(boardCtx); modules.attach(KanbanModule())
+    val automatic = AtomicInteger(); scopes.onDocument = { _, _, _ -> automatic.incrementAndGet() }
+    val reviewIntake = AtomicInteger(); scopes.onTextForReview = { reviewIntake.incrementAndGet() }
+    scopes.onExplicitDocument = { _, _ -> reviewIntake.incrementAndGet() }
+    val modelCalls = AtomicInteger()
+    val brain = object : BrainClient(endpointSpecs = emptyList()) {
+        override suspend fun chat(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double, contextId: String?): String { modelCalls.incrementAndGet(); error("No model configured") }
+        override suspend fun chat(options: BrainChatOptions, messages: List<Pair<String, String>>, contextId: String?): Pair<String, String> { modelCalls.incrementAndGet(); error("No model configured") }
+        override suspend fun chatExact(options: BrainChatOptions, messages: List<Pair<String, String>>, contextId: String?): Pair<String, String> { modelCalls.incrementAndGet(); error("No model configured") }
+        override suspend fun chatSeat(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double, contextId: String?, preferredModel: String?, timeoutMs: Long): Pair<String, String> { modelCalls.incrementAndGet(); error("No model configured") }
+    }
+    check(!brain.hasEndpoints() && brain.modelMux().listModels().isEmpty())
+    val patch = PatchWire(brain, scopes, attachments = gateway, corpus = corpus, miner = miner)
+    val uploads = ProjectDbWire(registry, scopes)
+    // No source ingestion or parser owner is installed in this continuation.
+    val nativeFile = File(File(artifacts, "drop-input").apply { mkdirs() }, id).apply { writeBytes(source) }
+    val finish = CountDownLatch(1)
+    val inspections = java.util.Collections.synchronizedList(mutableListOf<Map<*, *>>(priorInspection))
+    val posts = java.util.Collections.synchronizedList(mutableListOf<Map<String, Any?>>())
+    val runProgress = reifyStrict(File(artifacts, "query-progress.json").readText()) as Map<*, *>
+    val priorRun = (runProgress["observations"] as Map<*, *>)["run"] as Map<*, *>
+    val recordedInputs = reifyStrict(File(artifacts, "inputs.json").readText()) as Map<*, *>
+    val durableCids = java.util.Collections.synchronizedSet((_l["receiptCid", "programCid", "invocationsCid"].map { priorRun[it] as String } + (recordedInputs["previousReceiptCid"] as String)).toMutableSet())
+    val exactExports = File(artifacts, "cas-readbacks").apply { mkdirs() }
+    for (value in durableCids) {
+        val cid = ContentId(value); val bytes = requireNotNull(cas.getBounded(cid, 4 * 1024 * 1024)) { "Promised retained v68 block missing: $value" }
+        check(ContentId.of(bytes) == cid); File(exactExports, cid.hex + ".json").writeBytes(bytes)
+    }
+    val reads = java.util.Collections.synchronizedList(mutableListOf<Map<String, Any?>>())
+    val executor = Executors.newFixedThreadPool(8)
+    fun deniedNetwork(): Map<String, Any?> {
+        fun denied(operation: () -> Unit): String = try { operation(); error("Unexpected outgoing success") }
+            catch (failure: java.net.SocketException) { check(failure.message.orEmpty().contains("Permission denied", true)); failure.message.orEmpty() }
+        val tcp = denied { Socket().use { it.connect(InetSocketAddress("127.0.0.1", 9), 1000) } }
+        val udp = denied { DatagramSocket().use { it.send(DatagramPacket(_a[1.toByte()], 1, InetAddress.getByName("127.0.0.1"), 9)) } }
+        return _m["tcpConnect" j tcp, "udpSend" j udp, "result" j "DENIED"]
+    }
+    val denyBefore = deniedNetwork()
+    fun safety(): Map<String, Any?> = _m[
+        "parserCalls" j parserCalls.get(), "producerParserReads" j 1, "continuationParserCalls" j parserCalls.get(), "inspectionCount" j 0, "recordedInspectionCount" j inspections.size, "modelCalls" j modelCalls.get(),
+        "configuredModelCount" j brain.modelMux().listModels().size, "automaticIntake" j automatic.get(), "reviewIntakeCalls" j reviewIntake.get(),
+        "analysisReteFacts" j runBlocking { ctx.rete.snapshot().size }, "analysisBlackboardEntries" j ctx.blackboard.snapshot().values.size,
+        "operationalBoardReteFacts" j runBlocking { boardCtx.rete.snapshot().size }, "operationalBoardBlackboardEntries" j boardCtx.blackboard.snapshot().values.size,
+        "operationalScope" j "Board/run records only, separate from English observation query context; no legal world facts admitted",
+        "beliefBagPresent" j (ctx.beliefBag != null), "reviewOwnerPresent" j (ctx.documentReview != null), "htxPresent" j (ctx.muxContext[HtxKey] != null)]
+    val sources = _m["id" j id, "text" j text, "cid" j sourceCid.value]
+    val identities = _m["EnglishObservationGraph" j EnglishObservationGraph::class.java.protectionDomain.codeSource.location.toString(),
+        "EnglishObservationWire" j EnglishObservationWire::class.java.protectionDomain.codeSource.location.toString(),
+        "EnglishLcncPreset" j EnglishLcncPreset::class.java.protectionDomain.codeSource.location.toString(),
+        "KanbanModule" j KanbanModule::class.java.protectionDomain.codeSource.location.toString()]
+    File(artifacts, "startup-evidence.json").writeText(jsonOf(_m["classCodeSources" j identities, "selectedSourceSnapshots" j checked.sourceSnapshots?.map { it.toMap() }, "moduleManifestCid" j manifestCid.value,
+        "sdkVersion" j "4.6.0", "sourceCid" j sourceCid.value, "sourceBytes" j source.size, "networkDenyBefore" j denyBefore]))
+    val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 8); server.executor = executor
+    server.createContext("/") { exchange ->
+        try {
+            val method = exchange.requestMethod; val path = exchange.requestURI.rawPath; val target = exchange.requestURI.toASCIIString()
+            val raw = exchange.requestBody.readBytes(); val body = raw.decodeToString()
+            check(!(method == "POST" && path in _s["/api/lcnc/run", "/api/documents/english", "/api/documents/english/query"])) { "Read-only proof transport refuses a new execution; this is fixture policy, not a production API result" }
+            var status = 200; var mime = "application/json; charset=utf-8"
+            val bytes = when {
+                path == "/_fixture/meta" -> jsonOf(_m["project" j project, "source" j sources, "startProject" j "existing-documents", "startId" j "other.txt",
+                    "nativeFilePath" j nativeFile.absolutePath, "moduleManifestCid" j manifestCid.value, "sdkVersion" j "4.6.0",
+                    "parserCounting" j "One actual parser read occurred in fully drained attempt1. This continuation installs only the retained observation query owner; no parser owner or second inspection.", "classCodeSources" j identities]).encodeToByteArray()
+                path == "/_fixture/counters" -> jsonOf(safety()).encodeToByteArray()
+                path == "/_fixture/evidence" -> {
+                    check(parserCalls.get() == 0 && inspections.size == 1)
+                    check(cas.getBounded(sourceCid, source.size)?.contentEquals(source) == true)
+                    val reading = inspections.single(); val receiptCid = ContentId(reading["receiptCid"] as String)
+                    val block = requireNotNull(cas.getBounded(receiptCid, 8 * 1024 * 1024)); check(ContentId.of(block) == receiptCid)
+                    val decoded = CanonicalCbor.decodeMapBounded(block, 8 * 1024 * 1024, 32, 500_000)
+                    check(decoded["schema"] == "trikeshed.english-inspection.v1" && decoded["reviewStatus"] == "unreviewed")
+                    val runtime = ((reading["parser"] as Map<*, *>)["runtime"] as Map<*, *>)
+                    check(runtime["packageVersion"] == "4.6.0" && runtime["manifestCid"] == manifestCid.value)
+                    val exported = File(artifacts, "cas-readbacks").apply { mkdirs() }
+                    File(exported, receiptCid.hex + ".cbor").writeBytes(block)
+                    File(exported, sourceCid.hex + ".txt").writeBytes(source)
+                    val retained = mutableListOf<Map<String, Any?>>(_m["receiptCid" j receiptCid.value, "schema" j decoded["schema"], "bytes" j block.size])
+                    for (value in synchronized(durableCids) { durableCids.toList().sorted() }) {
+                        val cid = ContentId(value); val stored = requireNotNull(cas.getBounded(cid, 4 * 1024 * 1024)); check(ContentId.of(stored) == cid)
+                        val parsed = reifyStrict(stored.decodeToString(throwOnInvalidSequence = true))
+                        File(exported, cid.hex + ".json").writeBytes(stored)
+                        retained.add(_m["receiptCid" j cid.value, "bytes" j stored.size, "encoding" j "exact-stored-json", "hasLcncRun" j ((parsed as? Map<*, *>)?.containsKey("lcncRun") == true)])
+                    }
+                    val proofSafety = safety()
+                    check(automatic.get() == 0 && reviewIntake.get() == 0 && modelCalls.get() == 0)
+                    check(proofSafety["analysisReteFacts"] == 0 && proofSafety["analysisBlackboardEntries"] == 0)
+                    check(ctx.beliefBag == null && ctx.documentReview == null && ctx.muxContext[HtxKey] == null)
+                    check(!File(root, "documents/review.wal").exists())
+                    val evidence = proofSafety + _m["originalSourceRetained" j true, "sourceCid" j sourceCid.value, "inspectionReceiptCid" j receiptCid.value,
+                        "retainedReadbacks" j retained, "safety" j proofSafety, "posts" j synchronized(posts) { posts.toList() },
+                        "contentReadbacks" j synchronized(reads) { reads.toList() }, "networkDenyBefore" j denyBefore, "networkDenyAfter" j deniedNetwork(),
+                        "classCodeSources" j identities, "selectedSourceSnapshots" j checked.sourceSnapshots?.map { it.toMap() }, "moduleManifestCid" j manifestCid.value,
+                        "uploadMining" j miner.progress(project)?.let { _m["total" j it.total, "extracted" j it.extracted, "minted" j it.minted, "failed" j it.failed, "done" j it.done] }]
+                    File(artifacts, "fixture-evidence.json").writeText(jsonOf(evidence)); jsonOf(evidence).encodeToByteArray()
+                }
+                path == "/_fixture/finish" -> { finish.countDown(); "{}".encodeToByteArray() }
+                path == "/documents" -> { mime = "text/html; charset=utf-8"; File(snapshot, "web/documents.html").readBytes() }
+                path == "/panels" -> { mime = "text/html; charset=utf-8"; File(snapshot, "web/panels.html").readBytes() }
+                path == "/kotlin/documents/documents.js" -> { mime = "application/javascript"; File(snapshot, "documents.js").readBytes() }
+                path == "/kotlin/spacegraph/spacegraph.js" -> { mime = "application/javascript"; File(snapshot, "spacegraph.js").readBytes() }
+                path == "/kotlin/pages/pages.js" -> { mime = "application/javascript"; File(snapshot, "pages.js").readBytes() }
+                path.endsWith(".css") || path.startsWith("/vendor/") -> {
+                    val file = File(snapshot, "web" + path); if (!file.isFile) { status = 404; "".encodeToByteArray() }
+                    else { mime = if (path.endsWith(".css")) "text/css" else "application/javascript"; file.readBytes() }
+                }
+                path.startsWith("/api/documents/english") -> {
+                    val response = runBlocking { requireNotNull(ctx.routes.match(path)).route(method, target, body, null) }!!
+                    status = response.status; mime = response.contentType
+                    if (method == "POST") {
+                        val reply = reifyStrict(response.body) as Map<*, *>
+                        posts.add(_m["method" j method, "path" j path, "status" j status, "request" j reifyStrict(body), "response" j reply])
+                        if (path == DocumentEnglishWire.PATH && status == 200) inspections.add(reply)
+                    }
+                    response.body.encodeToByteArray()
+                }
+                path.startsWith("/_project/") -> {
+                    val response = runBlocking { requireNotNull(uploads.route(method, target, "$method $target HTTP/1.1\r\n\r\n".encodeToByteArray() + raw, null)) }
+                    status = response.status; mime = response.contentType; response.body.encodeToByteArray()
+                }
+                path.startsWith("/api/lcnc/") || path == "/api/board" || path == "/api/invoke" -> {
+                    val response = runBlocking { requireNotNull(boardCtx.routes.match(path)).route(method, target, body, null) }!!
+                    status = response.status; mime = response.contentType
+                    if (method == "POST") {
+                        val parsed = reifyStrict(response.body) as? Map<*, *>
+                        posts.add(_m["method" j method, "path" j path, "status" j status, "request" j runCatching { reifyStrict(body) }.getOrDefault(body), "response" j parsed])
+                        if (path == "/api/lcnc/run") for (key in _l["receiptCid", "programCid", "invocationsCid"]) (parsed?.get(key) as? String)?.takeIf { it.startsWith("sha256:") }?.let { durableCids.add(it) }
+                    }
+                    if (method == "GET" && path == "/api/lcnc/content" && status == 200) {
+                        val cid = java.net.URLDecoder.decode(target.substringAfter("cid=", "").substringBefore('&'), "UTF-8")
+                        if (cid.startsWith("sha256:")) durableCids.add(cid)
+                        reads.add(_m["path" j target, "status" j status, "body" j reifyStrict(response.body)])
+                    }
+                    response.body.encodeToByteArray()
+                }
+                path.startsWith("/api/projects") || path.startsWith("/api/panels") -> {
+                    val response = runBlocking { patch.route(method, target, "$method $target HTTP/1.1\r\n\r\n$body", null) }
+                    if (response == null) { status = 404; "{}".encodeToByteArray() }
+                    else { status = response.status; mime = response.contentType; response.body.encodeToByteArray() }
+                }
+                else -> { status = 404; "{}".encodeToByteArray() }
+            }
+            exchange.responseHeaders.set("Content-Type", mime); exchange.sendResponseHeaders(status, bytes.size.toLong()); exchange.responseBody.use { it.write(bytes) }
+        } catch (failure: Throwable) {
+            failure.printStackTrace()
+            runCatching { val bytes = jsonOf(_m["error" j (failure.message ?: "Fixture failure")]).encodeToByteArray(); exchange.sendResponseHeaders(500, bytes.size.toLong()); exchange.responseBody.use { it.write(bytes) } }
+        } finally { exchange.close() }
+    }
+    try { server.start(); println("PANELS_EVIDENCE_LIFECYCLE_URL=http://127.0.0.1:${server.address.port}"); check(withContext(Dispatchers.IO) { finish.await(12, TimeUnit.MINUTES) }) }
+    finally {
+        server.stop(0); executor.shutdownNow(); modules.drainAll(); wire.drain(); scopes.drain()
+        for (owner in owners) { owner.complete(); owner.join() }; cas.close()
+        File(artifacts, "cleanup.json").writeText(jsonOf(_m["wireDrained" j true, "kanbanDrained" j true, "scopesDrained" j true, "safetyAfterDrain" j safety(),
+            "allSupervisorsCompleted" j owners.all { it.isCompleted }, "parserCalls" j parserCalls.get(), "producerParserReads" j 1, "continuationParserCalls" j parserCalls.get(), "listenerStopped" j true]))
+    }
+}

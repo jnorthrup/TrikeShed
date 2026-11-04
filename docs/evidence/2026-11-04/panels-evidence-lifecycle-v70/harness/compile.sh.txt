@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+lifecycle_proof=/workspace/library-files/panels-evidence-lifecycle-v70-proof
+lifecycle_snapshot=/workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot
+lifecycle_cp=$(cat "$lifecycle_snapshot/classpath.txt")
+lifecycle_compiler=$(rg --files --no-ignore /workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21 | rg '\.jar$' | head -n 1)
+mkdir "$lifecycle_proof/classes"
+java -Xmx768m -cp "$lifecycle_compiler:$lifecycle_cp" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+ -no-stdlib -no-reflect -jvm-target 25 -classpath "$lifecycle_cp" \
+ -d "$lifecycle_proof/classes" "$lifecycle_proof/Fixture.kt"
