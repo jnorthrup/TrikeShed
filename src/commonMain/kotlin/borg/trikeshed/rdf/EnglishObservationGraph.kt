@@ -99,6 +99,16 @@ object EnglishObservationGraph {
         return Snapshot(cid, source, regenerated, selection, snapshots, legacy, parsed)
     }
 
+    /** Reassemble the exact retained payload, including legacy identity spelling, without reparsing. */
+    fun retained(snapshot: Snapshot): Map<String, Any?> {
+        val inventory = if (snapshot.legacyIdentity) legacy(snapshot.inventory) else snapshot.inventory
+        val receipt = inventory + _m["source" j (DocumentCuratorCodec.source(snapshot.source) - "text"),
+            "selection" j snapshot.selection.toMap()] +
+            (snapshot.sourceSnapshots?.let { _m["sourceSnapshots" j it.map(ProjectDoc::toMap)] } ?: emptyMap())
+        require(ContentId.of(CanonicalCbor.encodeMap(receipt)) == snapshot.receiptCid) { "Reopened English receipt identity differs" }
+        return receipt
+    }
+
     internal fun validateSnapshots(source: DocumentSource, selected: DocumentRevision, rows: List<ProjectDoc>,
         read: (ContentId, Int) -> ByteArray) {
         require(rows.size in 1..4 && rows.map { it.project j it.id }.distinct().size == rows.size) { "Invalid English source snapshots" }
