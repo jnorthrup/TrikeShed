@@ -55,7 +55,7 @@ class EnglishTaxonomyCarrierTest {
             project = revision, extraction = revision)
         val inventory = EnglishInspection.inspect(document, parsed, 0, end)
         val row = ProjectDoc("legal", "agreement.txt", cid.value, revision.rev, revision.seq, source.encodeToByteArray().size.toLong(), "text/plain")
-        val receipt = cas.put(CanonicalCbor.encodeMap(inventory + _m["source" j (DocumentCuratorCodec.source(document) - "text"),
+        val receipt = cas.put(CanonicalCbor.encodeMap(inventory + _m["source" j (englishTaxonomyFixtureSource(document) - "text"),
             "selection" j revision.toMap(), "sourceSnapshots" j _l[row.toMap()]]))
         return EnglishObservationGraph.read(cas, receipt)
     }
@@ -69,9 +69,11 @@ class EnglishTaxonomyCarrierTest {
     private fun tampered(cas: BoundedMemory, value: EnglishTaxonomyCarrier.Verified, change: (Map<String, Any?>) -> Map<String, Any?>): ContentId {
         val changed = change(value.built.declaration)
         val declaration = cas.put(CanonicalCbor.encodeMap(changed))
-        val record = value.record.copy(source = value.record.source.copy(provenance = value.record.source.provenance +
-            _m[EnglishTaxonomyCarrier.DECLARATION j declaration.value]))
-        return cas.put(DocumentCuratorCodec.encode(record))
+        val record = CanonicalCbor.decodeMap(assertNotNull(cas.get(value.receiptCid)))
+        val source = record["source"] as Map<String, Any?>
+        val provenance = source["provenance"] as Map<String, Any?>
+        return cas.put(CanonicalCbor.encodeMap(record + _m["source" j (source +
+            _m["provenance" j (provenance + _m[EnglishTaxonomyCarrier.DECLARATION j declaration.value])])]))
     }
 
     @Test fun exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars() {
@@ -162,9 +164,12 @@ class EnglishTaxonomyCarrierTest {
             tampered(cas, prepared) { it + _m["approved" j true] }]) {
             assertFailsWith<IllegalArgumentException> { EnglishTaxonomyCarrier.verify(cas, cid) }
         }
-        val missing = prepared.record.copy(source = prepared.record.source.copy(provenance = emptyMap()), modelId = "")
-        assertTrue(EnglishTaxonomyCarrier.marked(missing), "Suffix alone prevents ordinary KIF fallback")
-        assertFailsWith<IllegalArgumentException> { EnglishTaxonomyCarrier.verify(cas, cas.put(DocumentCuratorCodec.encode(missing))) }
+        val raw = CanonicalCbor.decodeMap(assertNotNull(cas.get(prepared.receiptCid)))
+        val source = raw["source"] as Map<String, Any?>
+        val missing = cas.put(CanonicalCbor.encodeMap(raw + _m["modelId" j "", "source" j (source +
+            _m["provenance" j emptyMap<String, String>()])]))
+        assertTrue(EnglishTaxonomyCarrier.marked(DocumentTaxonomyCandidate.record(cas, missing)), "Suffix alone prevents ordinary KIF fallback")
+        assertFailsWith<IllegalArgumentException> { EnglishTaxonomyCarrier.verify(cas, missing) }
         val candidate = EnglishTaxonomyCarrier.candidate(cas, prepared.receiptCid, selected(prepared))
         assertFailsWith<IllegalArgumentException> { EnglishTaxonomyCarrier.evidence(cas, candidate.copy(
             selections = candidate.selections α { it.copy(value = it.value + _m["englishOrigin" j "forged"]) })) }
