@@ -1,0 +1,39 @@
+{
+  "result": "COUNTEREXAMPLE_CONFIRMED",
+  "scope": "Actual immutable v59 public bridge and public signal evidence getter; no bag or live rule admission",
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "mainJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "probeSourceSha256": "65ca824d077560b9cbd0c43962f24972f98f0dd627f0b357f47751524c03a425",
+  "observations": [
+    {
+      "predicate": "https://legal.example/vocabulary#not",
+      "copula": "SIMILARITY",
+      "relation": "CONTRADICTION",
+      "positiveEvidence": 0,
+      "negativeEvidence": 900
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#causes",
+      "copula": "IMPLICATION",
+      "relation": "CAUSALITY",
+      "positiveEvidence": 900,
+      "negativeEvidence": 0
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#type",
+      "copula": "INHERITANCE",
+      "relation": "MATCH",
+      "positiveEvidence": 900,
+      "negativeEvidence": 0
+    },
+    {
+      "predicate": "http://www.w3.org/2002/07/owl#disjointWith",
+      "copula": "SIMILARITY",
+      "relation": "CONTRADICTION",
+      "positiveEvidence": 0,
+      "negativeEvidence": 900
+    }
+  ],
+  "exitCode": 0,
+  "ownedChildExited": true
+}

@@ -1,0 +1,164 @@
+{
+  "result": "COUNTEREXAMPLE_CONFIRMED",
+  "scope": "Actual public calls against immutable v59 main JAR; no CoreNLP, models, bag, Rete admission or production overlays",
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "mainJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "probeSourceSha256": "159d03799ab40cde8d9a16eacb01f223bd1bf1f548f405e0bc36662c1cc9f0be",
+  "mappings": [
+    {
+      "predicate": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+      "copula": "INHERITANCE",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#type",
+      "copula": "INHERITANCE",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#TYPE",
+      "copula": "INHERITANCE",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "http://www.w3.org/2000/01/rdf-schema#subClassOf",
+      "copula": "INHERITANCE",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#subClassOf",
+      "copula": "INHERITANCE",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "http://www.w3.org/2002/07/owl#sameAs",
+      "copula": "SIMILARITY",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#sameAs",
+      "copula": "SIMILARITY",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#causes",
+      "copula": "IMPLICATION",
+      "relation": "CAUSALITY"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#not",
+      "copula": "SIMILARITY",
+      "relation": "CONTRADICTION"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#disjointWith",
+      "copula": "SIMILARITY",
+      "relation": "CONTRADICTION"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#mentions",
+      "copula": "PRODUCT",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "instance",
+      "copula": "INHERITANCE",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "subclass",
+      "copula": "INHERITANCE",
+      "relation": "MATCH"
+    },
+    {
+      "predicate": "causes",
+      "copula": "IMPLICATION",
+      "relation": "CAUSALITY"
+    },
+    {
+      "predicate": "not",
+      "copula": "SIMILARITY",
+      "relation": "CONTRADICTION"
+    }
+  ],
+  "parsedRdfCrossings": [
+    {
+      "predicate": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+      "copula": "INHERITANCE",
+      "relation": "MATCH",
+      "gloss": "urn:example:grant --> urn:example:payment"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#type",
+      "copula": "INHERITANCE",
+      "relation": "MATCH",
+      "gloss": "urn:example:grant --> urn:example:payment"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#causes",
+      "copula": "IMPLICATION",
+      "relation": "CAUSALITY",
+      "gloss": "urn:example:grant ==> urn:example:payment"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#not",
+      "copula": "SIMILARITY",
+      "relation": "CONTRADICTION",
+      "gloss": "urn:example:grant <-> urn:example:payment"
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#mentions",
+      "copula": "PRODUCT",
+      "relation": "MATCH",
+      "gloss": "(*, urn:example:grant, urn:example:payment) --> https://legal.example/vocabulary#mentions"
+    }
+  ],
+  "derivedRuleCandidates": [
+    {
+      "predicate": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+      "copula": "INHERITANCE",
+      "eternalCandidate": false
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#type",
+      "copula": "INHERITANCE",
+      "eternalCandidate": false
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#causes",
+      "copula": "IMPLICATION",
+      "eternalCandidate": true
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#not",
+      "copula": "SIMILARITY",
+      "eternalCandidate": false
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#mentions",
+      "copula": "PRODUCT",
+      "eternalCandidate": false
+    }
+  ],
+  "sameMappingInReadOnlySources": [
+    {
+      "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+      "mappingSourceSha256": "9a9837a6ab4a3c9c35277b6ff2f1e708781343f0ed301fb38607e255bbafec3e"
+    },
+    {
+      "source": "4e87c9380cd766c2343f88e5c6097b1be8f3327c",
+      "mappingSourceSha256": "9a9837a6ab4a3c9c35277b6ff2f1e708781343f0ed301fb38607e255bbafec3e"
+    },
+    {
+      "source": "8a0e8603c19160f2bb68f4c0222041dc70da8d32",
+      "mappingSourceSha256": "9a9837a6ab4a3c9c35277b6ff2f1e708781343f0ed301fb38607e255bbafec3e"
+    }
+  ],
+  "ownedChildExited": true,
+  "exitCode": 0,
+  "limits": [
+    "Eternal candidate eligibility was observed; no candidate was admitted to a live Rete or asserted as a true causal rule",
+    "This baseline JAR predates later RDF term-fidelity changes; exact namespace map source is unchanged in the two later inspected sources",
+    "Default candidate-only admission already limits live effects; predicate/source PID retention does not correct the initial semantic mapping"
+  ]
+}
