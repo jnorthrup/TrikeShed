@@ -25,15 +25,15 @@ object TurtleRdf {
     fun parseStrict(turtle: String): RdfGraph {
         require(turtle.length <= 65536) { "Strict Turtle input exceeds 65536 characters" }
         turtle.encodeToByteArray(throwOnInvalidSequence = true)
-        literalLines(turtle)
+        val source = structuralLines(turtle)
         val prefixes = defaultPrefixes().toMutableMap()
         val directive = Regex("""@prefix\s+([A-Za-z_][A-Za-z0-9_-]*)?:\s*<([^<>]*)>\s*\.\s*(?:#.*)?""")
         var at = 0
         var declarations = 0
         // Only header lines are removed: @prefix-looking text inside later literals is data.
-        while (at < turtle.length) {
-            val end = turtle.indexOf('\n', at).let { if (it < 0) turtle.length else it }
-            val line = turtle.substring(at, end).trim()
+        while (at < source.length) {
+            val end = source.indexOf('\n', at).let { if (it < 0) source.length else it }
+            val line = source.substring(at, end).trim()
             if (line.isNotEmpty() && !line.startsWith('#') && !line.startsWith("@prefix")) break
             if (line.startsWith("@prefix")) {
                 require(++declarations <= 128) { "Strict Turtle prefix limit" }
@@ -43,9 +43,9 @@ object TurtleRdf {
                 }
                 prefixes[match.groupValues[1]] = namespace.iri
             }
-            at = if (end == turtle.length) end else end + 1
+            at = if (end == source.length) end else end + 1
         }
-        val parser = SparqlParser(turtle.substring(at))
+        val parser = SparqlParser(source.substring(at))
         require(parser.tokens.size <= 8192) { "Strict Turtle token limit" }
         parser.prefixes.putAll(prefixes)
         fun constant(): RdfTerm {
@@ -79,8 +79,8 @@ object TurtleRdf {
         return RdfGraph(triples)
     }
 
-    /** The shared tokenizer normalizes CR/tab; reject illegal short-string line breaks first. */
-    private fun literalLines(text: String) {
+    /** Check original short spelling, preserve long literal bytes, normalize only structural EOLs. */
+    private fun structuralLines(text: String): String = buildString(text.length) {
         var quote: Char? = null
         var long = false
         var escaped = false
@@ -91,25 +91,35 @@ object TurtleRdf {
             val ch = text[at]
             val q = quote
             when {
-                comment -> { if (ch == '\n' || ch == '\r') comment = false; at++ }
-                iri -> { if (ch == '>') iri = false; at++ }
+                comment -> {
+                    if (ch == '\n' || ch == '\r') {
+                        comment = false; append('\n')
+                        at += if (ch == '\r' && at + 1 < text.length && text[at + 1] == '\n') 2 else 1
+                    } else { append(ch); at++ }
+                }
+                iri -> { append(ch); if (ch == '>') iri = false; at++ }
                 q != null -> {
                     require(long || ch != '\r' && ch != '\n') { "Raw CR/LF is invalid in a short RDF literal" }
                     when {
-                        escaped -> { escaped = false; at++ }
-                        ch == '\\' -> { escaped = true; at++ }
-                        long && text.startsWith("$q$q$q", at) -> { quote = null; at += 3 }
-                        !long && ch == q -> { quote = null; at++ }
-                        else -> at++
+                        escaped -> { append(ch); escaped = false; at++ }
+                        ch == '\\' -> { append(ch); escaped = true; at++ }
+                        long && text.startsWith("$q$q$q", at) -> { append("$q$q$q"); quote = null; at += 3 }
+                        !long && ch == q -> { append(ch); quote = null; at++ }
+                        else -> { append(ch); at++ }
                     }
                 }
-                ch == '#' -> { comment = true; at++ }
-                ch == '<' -> { iri = true; at++ }
+                ch == '\r' || ch == '\n' -> {
+                    append('\n')
+                    at += if (ch == '\r' && at + 1 < text.length && text[at + 1] == '\n') 2 else 1
+                }
+                ch == '#' -> { append(ch); comment = true; at++ }
+                ch == '<' -> { append(ch); iri = true; at++ }
                 ch == '\'' || ch == '"' -> {
                     quote = ch; long = text.startsWith("$ch$ch$ch", at)
+                    append(if (long) "$ch$ch$ch" else ch.toString())
                     at += if (long) 3 else 1
                 }
-                else -> at++
+                else -> { append(ch); at++ }
             }
         }
     }

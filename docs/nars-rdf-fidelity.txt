@@ -73,3 +73,24 @@ dependencies, with the matching Kotlin/Compose compiler and no friend access.
 RdfModel was included because the standalone module boundary prevents an existing
 smart cast in emit; its production behavior was not changed. This is explicitly
 a source-overlay check, not a final coordinated-artifact result.
+
+Structural CR and test-discovery follow-up
+
+A later source review found that the first strict header scan and the shared
+comment tokenizer recognized LF only. Valid triples following a CR-only comment
+terminator could disappear: focused pre-fix source execution returned 0 rows for
+one header case (expected 1), and 1 row for a body case (expected 2). The strict entry
+now checks original short-literal spelling while normalizing only structural and
+comment CR/CRLF to LF. Long quoted literal CR, CRLF and LF stay exact, raw TAB
+stays valid, and original source bytes/context are not rewritten. The permissive
+parser/tokenizer APIs remain unchanged.
+
+The first coordinated v61 build compiled successfully but was incomplete:
+Jupiter discarded actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate
+because its inferred coroutine expression returned IllegalArgumentException,
+leaving 160 executed methods instead of 161. That method now explicitly returns
+Unit. The focused driver also checks every annotated method's JVM void return
+before invoking it. A new structural-line regression brings the fixed-input set
+to 32 methods; all 32 pass, including exact before/after counterexamples changing
+[0,1,1] rows to [1,2,1]. These are source-overlay checks. No v61 GREEN or final
+artifact claim is made; coordinated v62 validation remains required.
