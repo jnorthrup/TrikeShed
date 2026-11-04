@@ -1,0 +1,80 @@
+{
+  "scope": "Same synthetic pure KG inputs as immutable-v55 BEFORE witness; no bag or world assertion",
+  "productionCodeSource": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+  "predicateOmission": {
+    "firstPredicate": "pays",
+    "secondPredicate": "owes",
+    "firstGloss": "(*, Tenant, Landlord) --> pays",
+    "secondGloss": "(*, Tenant, Landlord) --> owes",
+    "sameNaturalAngular": true,
+    "identicalSignalBytes": false,
+    "angular": "4616048923953881095",
+    "firstPropositionCid": "sha256:4a4c26a41efa22909eaeaf24ae935855c7bbedd7cdb2f80bab0ebe948f34cb15",
+    "secondPropositionCid": "sha256:30c74548c6eb24dfa8996cf75c30e6ddf82344841e7123b24673efc8aa408a11"
+  },
+  "thirdRoleLoss": {
+    "firstSource": "(transfers Tenant Landlord Dollar)",
+    "secondSource": "(transfers Tenant Landlord Euro)",
+    "firstLegacyCrossing": {
+      "status": "REFUSED",
+      "errorClass": "java.lang.IllegalArgumentException",
+      "error": "Legacy KG triplets require ground binary scalar KIF predicates"
+    },
+    "secondLegacyCrossing": {
+      "status": "REFUSED",
+      "errorClass": "java.lang.IllegalArgumentException",
+      "error": "Legacy KG triplets require ground binary scalar KIF predicates"
+    },
+    "fullKifFormulasDistinct": true
+  },
+  "retainedScopeCases": [
+    {
+      "source": "(not (pays Tenant Landlord))",
+      "fullSyntax": "(not (pays Tenant Landlord))",
+      "formulaKind": "Not",
+      "unsupportedForms": 0,
+      "legacyTripletCrossing": {
+        "status": "REFUSED",
+        "errorClass": "java.lang.IllegalArgumentException",
+        "error": "Legacy KG triplets do not interpret scoped KIF formulas"
+      }
+    },
+    {
+      "source": "(necessarily (pays Tenant Landlord))",
+      "fullSyntax": "(necessarily (pays Tenant Landlord))",
+      "formulaKind": "Unsupported",
+      "unsupportedForms": 1,
+      "legacyTripletCrossing": {
+        "status": "REFUSED",
+        "errorClass": "java.lang.IllegalArgumentException",
+        "error": "Legacy KG triplets do not interpret scoped KIF formulas"
+      }
+    },
+    {
+      "source": "(holdsDuring ContractA (pays Tenant Landlord))",
+      "fullSyntax": "(holdsDuring ContractA (pays Tenant Landlord))",
+      "formulaKind": "Unsupported",
+      "unsupportedForms": 1,
+      "legacyTripletCrossing": {
+        "status": "REFUSED",
+        "errorClass": "java.lang.IllegalArgumentException",
+        "error": "Legacy KG triplets do not interpret scoped KIF formulas"
+      }
+    },
+    {
+      "source": "(=> (noticeGiven Tenant) (pays Tenant Landlord))",
+      "fullSyntax": "(=> (noticeGiven Tenant) (pays Tenant Landlord))",
+      "formulaKind": "Implies",
+      "unsupportedForms": 0,
+      "legacyTripletCrossing": {
+        "status": "REFUSED",
+        "errorClass": "java.lang.IllegalArgumentException",
+        "error": "Legacy KG triplets do not interpret scoped KIF formulas"
+      }
+    }
+  ],
+  "modelCalls": 0,
+  "bagOperations": 0,
+  "reviewAuthority": "not-established",
+  "scopeLimit": "Exact declared projection and refusing unsupported triplets; semantic role query/retraction remain unsupported"
+}
