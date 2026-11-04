@@ -1,0 +1,14 @@
+{
+  "scope": "Actual fixture JVM while native Documents/default parser pilot is active; in-process Graal CoreNLP shares this JVM. This is not a global parser-call counter or OS-wide sandbox.",
+  "processes": [
+    {
+      "pid": 60197,
+      "jvmHeapFlags": [
+        "-Xmx4g"
+      ],
+      "noNewPrivs": "1",
+      "seccompMode": "2",
+      "rssAtObservation": "2926524 kB"
+    }
+  ]
+}

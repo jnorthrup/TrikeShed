@@ -1,0 +1,203 @@
+package proof.englishtaxonomyui
+
+import borg.trikeshed.couch.*
+import borg.trikeshed.dag.*
+import borg.trikeshed.forge.server.*
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.subvm.CoreNlpRuntime
+import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.memory.*
+import borg.trikeshed.modelmux.*
+import borg.trikeshed.module.*
+import borg.trikeshed.narsese.ConstellationNodes
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import kotlinx.coroutines.*
+import java.io.File
+import java.net.*
+import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import com.sun.net.httpserver.HttpServer
+
+/** Synthetic native UI pilot. All parser, review, source, translation and support routes are production owners. */
+fun main() = runBlocking {
+    val out = File(requireNotNull(java.lang.System.getenv("PROOF_ROOT")))
+    val snapshot = File(requireNotNull(java.lang.System.getenv("PROOF_SNAPSHOT")))
+    val root = File(out, "runtime").apply { require(!exists()); mkdirs() }
+    val source = File(out, "source.txt").readBytes(); check(source.size == 41)
+    val text = source.decodeToString(throwOnInvalidSequence = true)
+    check(text == "Tenant is a Person. A Person is an Agent.")
+    val sourceCid = ContentId.of(source)
+    val project = "english-taxonomy-reviewed-pilot"; val id = "synthetic taxonomy review clauses.txt"
+    val token = "synthetic-english-taxonomy-analyst"; val reviewerId = "synthetic:taxonomy-pilot"
+    val manifest = File(File(requireNotNull(java.lang.System.getenv("TRIKESHED_SUBVM_HOME")), "corenlp"), "MANIFEST.tsv").readBytes()
+    check(manifest.decodeToString().contains("stanford-corenlp:4.6.0")); val manifestCid = ContentId.of(manifest)
+    val files = JvmFileOperations(); val cas = PackCasStore(files, File(root, "cas").absolutePath)
+    val store = CouchStoreFactory.casBacked(cas); val gateway = CouchAttachmentGateway(store, cas)
+    val registry = ProjectDbRegistry("primary")
+    val scopes = ProjectScopes(files, gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, store))), cas, null,
+        projectDbs = registry, ledgerFile = File(root, "projects.tsv"), filesRoot = File(root, "files"))
+    val automatic = AtomicInteger(); val intake = AtomicInteger()
+    scopes.onDocument = { _, _, _ -> automatic.incrementAndGet() }; scopes.onExplicitDocument = { _, _ -> intake.incrementAndGet() }
+    scopes.onTextForReview = { intake.incrementAndGet() }
+    val miner = ProjectMiner(registry, scopes, cas, null, File(root, "files"))
+    val corpus = JvmProjectCorpus(registry, scopes, miner)
+    val owner = SupervisorJob(coroutineContext[Job]); val scope = CoroutineScope(Dispatchers.IO + owner + files)
+    val state = File(root, "owner").apply { mkdirs() }
+    val ctx = ModuleContext(Couch("english-taxonomy-native-ui", store, cas), ReteNetwork(), ReteProductionRegistry(), null, null,
+        ConfixBlackboard.empty(), cas, gateway, ModuleRouteRegistry(), scope, { 123L }, state)
+    val docs = File(state, "documents").apply { mkdirs() }
+    File(docs, "review-principals.json").writeText(jsonOf(_m["principals" j _l[_m[
+        "tokenSha256" j ContentId.of(token.encodeToByteArray()).hex, "id" j reviewerId, "synthetic" j true]]]))
+    val books = ConstellationNodes(stateDir = ctx.stateDir, blackboard = ctx.blackboard, files = files, scope = scope, cas = cas)
+    val reviewWire = DocumentReviewWire.open(ctx, corpus, books, nativeHorn = null)
+    val boardBaseline = ctx.blackboard.snapshot().values.toMap()
+    val baselineCid = ContentId.of(CanonicalCbor.encodeMap(boardBaseline)).value
+    val wal = File(docs, "review.wal"); val baselineWal = wal.length()
+    val modelCalls = AtomicInteger()
+    val brain = object : BrainClient(endpointSpecs = emptyList()) {
+        override suspend fun chat(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double, contextId: String?): String { modelCalls.incrementAndGet(); error("No provider configured") }
+        override suspend fun chat(options: BrainChatOptions, messages: List<Pair<String, String>>, contextId: String?): Pair<String, String> { modelCalls.incrementAndGet(); error("No provider configured") }
+        override suspend fun chatExact(options: BrainChatOptions, messages: List<Pair<String, String>>, contextId: String?): Pair<String, String> { modelCalls.incrementAndGet(); error("No provider configured") }
+        override suspend fun chatSeat(messages: List<Pair<String, String>>, maxTokens: Int, temperature: Double, contextId: String?, preferredModel: String?, timeoutMs: Long): Pair<String, String> { modelCalls.incrementAndGet(); error("No provider configured") }
+    }
+    check(brain.modelMux().listModels().isEmpty() && !brain.hasEndpoints())
+    val patch = PatchWire(brain, scopes, attachments = gateway, corpus = corpus, miner = miner)
+    val uploads = ProjectDbWire(registry, scopes)
+    scopes.beginUpload("existing-documents", manualIntake = true)
+    scopes.uploadPut("existing-documents", "other.txt", "Another selected document.".encodeToByteArray(), null, manualIntake = true)
+    val nativeFile = File(File(out, "drop-input").apply { mkdirs() }, id).apply { writeBytes(source) }
+    val inspectPosts = AtomicInteger(); val inspections = java.util.Collections.synchronizedList(mutableListOf<Map<*, *>>())
+    val calls = java.util.Collections.synchronizedList(mutableListOf<Map<String, Any?>>())
+    val retained = java.util.Collections.synchronizedSet(mutableSetOf(sourceCid.value))
+    val mutation = AtomicReference<Map<String, Any?>?>()
+    val finish = CountDownLatch(1); val executor = Executors.newFixedThreadPool(8)
+    fun network(): Map<String, Any?> {
+        fun denied(action: () -> Unit): String = try { action(); error("Outgoing call unexpectedly succeeded") }
+            catch (e: SocketException) { check(e.message.orEmpty().contains("Permission denied", true)); e.message.orEmpty() }
+        return _m["tcpConnect" j denied { Socket().use { it.connect(InetSocketAddress("127.0.0.1", 9), 1000) } },
+            "udpSend" j denied { DatagramSocket().use { it.send(DatagramPacket(byteArrayOf(1), 1, InetAddress.getByName("127.0.0.1"), 9)) } }]
+    }
+    val denyBefore = network()
+    fun counters(): Map<String, Any?> = _m["inspectionPosts" j inspectPosts.get(), "inspectionResponses" j inspections.size,
+        "parserObservability" j "Exactly one actual native Inspect POST through the unmodified default owner; no injected reader and no claim of a private global parser call counter",
+        "walBytes" j wal.length(), "baselineWalBytes" j baselineWal,
+        "modelCalls" j modelCalls.get(), "configuredModelCount" j brain.modelMux().listModels().size,
+        "automaticIntake" j automatic.get(), "reviewIntakeCalls" j intake.get(),
+        "analysisReteFacts" j runBlocking { ctx.rete.snapshot().size },
+        "blackboardBaselineCid" j baselineCid, "blackboardCurrentCid" j ContentId.of(CanonicalCbor.encodeMap(ctx.blackboard.snapshot().values)).value,
+        "blackboardUnchangedFromReadinessBaseline" j (ctx.blackboard.snapshot().values == boardBaseline),
+        "readinessBaselineEntries" j boardBaseline.keys.sorted(), "beliefBagPresent" j (ctx.beliefBag != null),
+        "nativeHornConfigured" j false, "syntheticReviewer" j true]
+    val codeSources = _m["DocumentReviewWire" j DocumentReviewWire::class.java.protectionDomain.codeSource.location.toString(),
+        "DocumentEnglishWire" j DocumentEnglishWire::class.java.protectionDomain.codeSource.location.toString(),
+        "CoreNlpRuntime" j CoreNlpRuntime::class.java.protectionDomain.codeSource.location.toString(),
+        "EnglishObservationGraph" j EnglishObservationGraph::class.java.protectionDomain.codeSource.location.toString(),
+        "ConstellationNodes" j ConstellationNodes::class.java.protectionDomain.codeSource.location.toString()]
+    val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 8); server.executor = executor
+    server.createContext("/") { ex ->
+        try {
+            val path = ex.requestURI.rawPath; val target = ex.requestURI.toASCIIString(); val method = ex.requestMethod
+            val raw = ex.requestBody.readBytes(); val body = raw.decodeToString()
+            val headers = buildString {
+                append("$method $target HTTP/1.1\r\n")
+                for ((name, values) in ex.requestHeaders) for (value in values) append("$name: $value\r\n")
+                append("\r\n"); append(body)
+            }
+            var status = 200; var mime = "application/json; charset=utf-8"
+            val response = when {
+                path == "/_fixture/meta" -> jsonOf(_m["project" j project, "source" j _m["id" j id, "text" j text, "cid" j sourceCid.value],
+                    "startProject" j "existing-documents", "startId" j "other.txt", "nativeFilePath" j nativeFile.absolutePath,
+                    "moduleManifestCid" j manifestCid.value, "sdkVersion" j "4.6.0", "reviewerToken" j token, "reviewerId" j reviewerId,
+                    "credentialScope" j "Public deterministic fixture-only synthetic principal, not a real user credential or human legal approval", "classCodeSources" j codeSources]).encodeToByteArray()
+                path == "/_fixture/counters" -> jsonOf(counters()).encodeToByteArray()
+                path == "/_fixture/mutate" -> {
+                    val before = runBlocking { requireNotNull(corpus.document(project, id)) }
+                    scopes.uploadPut(project, id, (text + "\nSource amended after synthetic review.").encodeToByteArray(), null, manualIntake = true)
+                    val after = runBlocking { requireNotNull(corpus.document(project, id)) }
+                    check(before.cid != after.cid && before.rev != after.rev && before.seq != after.seq)
+                    val rows = _m["before" j before.toMap(), "after" j after.toMap()]; mutation.set(rows); jsonOf(rows).encodeToByteArray()
+                }
+                path == "/_fixture/evidence" -> {
+                    check(inspectPosts.get() == 1 && inspections.size == 1)
+                    val inspection = inspections.single(); val cid = ContentId(inspection["receiptCid"] as String)
+                    val observed = EnglishObservationGraph.read(cas, cid)
+                    check(observed.source.text == text && observed.source.originalCid == sourceCid)
+                    val runtime = ((inspection["parser"] as Map<*, *>)["runtime"] as Map<*, *>)
+                    check(runtime["packageVersion"] == "4.6.0" && runtime["manifestCid"] == manifestCid.value)
+                    val export = File(out, "cas-readbacks").apply { mkdirs() }; val entries = mutableListOf<Map<String, Any?>>()
+                    for (value in synchronized(retained) { retained.toList().sorted() }) {
+                        val id = ContentId(value); val bytes = requireNotNull(cas.getBounded(id, 8 * 1024 * 1024)) { "Promised retained artifact absent: $value" }
+                        check(ContentId.of(bytes) == id)
+                        val looksCbor = bytes.firstOrNull()?.toInt()?.and(0xe0) == 0xa0
+                        val extension = if (looksCbor) "cbor" else "txt"
+                        if (looksCbor) CanonicalCbor.decodeMapBounded(bytes, 8 * 1024 * 1024, 32, 500_000)
+                        File(export, id.hex + "." + extension).writeBytes(bytes)
+                        entries.add(_m["cid" j value, "bytes" j bytes.size, "encoding" j if (looksCbor) "canonical-cbor" else "exact-utf8"])
+                    }
+                    val safety = counters(); check(safety["analysisReteFacts"] == 0 && safety["blackboardUnchangedFromReadinessBaseline"] == true)
+                    check(automatic.get() == 0 && intake.get() == 0 && modelCalls.get() == 0 && ctx.beliefBag == null)
+                    val result = _m["scope" j "Actual final Documents/default parser and synthetic authenticated review pilot; not an actual human legal approval or world admission",
+                        "safety" j safety, "classCodeSources" j codeSources, "sourceCid" j sourceCid.value, "inspectionCid" j cid.value,
+                        "sourceSnapshots" j observed.sourceSnapshots?.map { it.toMap() }, "mutation" j mutation.get(),
+                        "retainedReadbacks" j entries, "requests" j synchronized(calls) { calls.toList() },
+                        "networkBefore" j denyBefore, "networkAfter" j network(), "reviewer" j _m["id" j reviewerId, "synthetic" j true]]
+                    File(out, "fixture-evidence.json").writeText(jsonOf(result)); jsonOf(result).encodeToByteArray()
+                }
+                path == "/_fixture/finish" -> { finish.countDown(); "{}".encodeToByteArray() }
+                path == "/documents" -> { mime = "text/html; charset=utf-8"; File(snapshot, "web/documents.html").readBytes() }
+                path == "/kotlin/documents/documents.js" -> { mime = "application/javascript"; File(snapshot, "documents.js").readBytes() }
+                path.endsWith(".css") || path.startsWith("/vendor/") -> {
+                    val file = File(snapshot, "web" + path); if (!file.isFile) { status = 404; byteArrayOf() }
+                    else { mime = if (path.endsWith(".css")) "text/css" else "application/javascript"; file.readBytes() }
+                }
+                path.startsWith("/api/documents/") -> {
+                    if (path == DocumentEnglishWire.PATH && method == "POST") check(inspectPosts.incrementAndGet() == 1) { "Only one native Inspect request is authorized" }
+                    val before = wal.length()
+                    val routed = runBlocking { requireNotNull(ctx.routes.match(path)).route(method, target, headers, null) }!!
+                    status = routed.status; mime = routed.contentType
+                    val parsed = reifyStrict(routed.body) as Map<*, *>
+                    val request = if (body.isBlank()) null else reifyStrict(body)
+                    calls.add(_m["method" j method, "path" j path, "query" j ex.requestURI.rawQuery, "status" j status,
+                        "authorizationHeaderPresent" j ex.requestHeaders.containsKey("Authorization"), "request" j request,
+                        "response" j parsed, "walBytesBefore" j before, "walBytesAfter" j wal.length()])
+                    if (path == DocumentEnglishWire.PATH && method == "POST" && status == 200) inspections.add(parsed)
+                    if (status == 200) {
+                        val keys = when (path) {
+                            DocumentEnglishWire.PATH -> _l["receiptCid"]
+                            "/api/documents/review/english-taxonomy" -> _l["translationCid", "derivedKifCid", "receiptCid"]
+                            "/api/documents/review", "/api/documents/review/snapshot", "/api/documents/review/decision" -> _l["snapshotCid", "decisionCid"]
+                            "/api/documents/review/taxonomy-plan" -> _l["approvalCid"]
+                            else -> emptyList<String>()
+                        }
+                        for (key in keys) (parsed[key] as? String)?.takeIf { it.startsWith("sha256:") }?.let { retained.add(it) }
+                    }
+                    routed.body.encodeToByteArray()
+                }
+                path.startsWith("/_project/") -> {
+                    val routed = runBlocking { requireNotNull(uploads.route(method, target, "$method $target HTTP/1.1\r\n\r\n".encodeToByteArray() + raw, null)) }
+                    status = routed.status; mime = routed.contentType; routed.body.encodeToByteArray()
+                }
+                path.startsWith("/api/projects") -> {
+                    val routed = runBlocking { patch.route(method, target, headers, null) }
+                    if (routed == null) { status = 404; "{}".encodeToByteArray() } else { status = routed.status; mime = routed.contentType; routed.body.encodeToByteArray() }
+                }
+                else -> { status = 404; "{}".encodeToByteArray() }
+            }
+            ex.responseHeaders.set("Content-Type", mime); ex.sendResponseHeaders(status, response.size.toLong()); ex.responseBody.use { it.write(response) }
+        } catch (failure: Throwable) { failure.printStackTrace(); runCatching {
+            val bytes = jsonOf(_m["error" j failure.message]).encodeToByteArray(); ex.sendResponseHeaders(500, bytes.size.toLong()); ex.responseBody.use { it.write(bytes) }
+        } } finally { ex.close() }
+    }
+    try { server.start(); println("ENGLISH_TAXONOMY_UI_URL=http://127.0.0.1:${server.address.port}"); check(withContext(Dispatchers.IO) { finish.await(12, TimeUnit.MINUTES) }) }
+    finally {
+        server.stop(0); executor.shutdownNow(); reviewWire.drain(); reviewWire.close(); books.drain(); scopes.drain()
+        owner.complete(); owner.join(); cas.close()
+        File(out, "cleanup.json").writeText(jsonOf(_m["reviewWireDrainedAndClosed" j true, "booksDrained" j true, "scopesDrained" j true,
+            "allSupervisorsCompleted" j owner.isCompleted, "listenerStopped" j true, "inspectionPosts" j inspectPosts.get(), "inspectionResponses" j inspections.size]))
+    }
+}
