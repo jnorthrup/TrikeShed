@@ -147,10 +147,10 @@ internal object DocumentsEnglish {
             host.querySelector("[data-english-result]")?.remove()
             host.querySelector("[data-english-pending]")?.remove()
             host.querySelector("[data-english-failure]")?.remove()
-            host.querySelector("[data-english-inspect]")?.asDynamic()?.disabled = preview.isEmpty()
-            host.querySelector("[data-english-open-retained]")?.asDynamic()?.disabled = !cid(retainedCid) || !validRange()
-            host.querySelector("[data-english-begin]")?.asDynamic()?.disabled = false
-            host.querySelector("[data-english-end]")?.asDynamic()?.disabled = false
+            host.querySelector("[data-english-inspect]")?.let { it.asDynamic().disabled = preview.isEmpty() }
+            host.querySelector("[data-english-open-retained]")?.let { it.asDynamic().disabled = !cid(retainedCid) || !validRange() }
+            host.querySelector("[data-english-begin]")?.let { it.asDynamic().disabled = false }
+            host.querySelector("[data-english-end]")?.let { it.asDynamic().disabled = false }
         }
         private fun inspect() = load(false)
         private fun load(retained: Boolean) {
