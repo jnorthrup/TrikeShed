@@ -229,7 +229,6 @@ class PrimaryProjectCorpusTest {
         } finally { rig.scopes.drain() }
     }
 
-<<<<<<< HEAD
     @Test fun primaryVisitorRejectsMissingCidLikeTheListing(): Unit = runBlocking {
         val rig = Rig(directory.toFile())
         val primary = File(directory.toFile(), "primary").apply { mkdirs() }
@@ -271,46 +270,6 @@ class PrimaryProjectCorpusTest {
         } finally { rig.scopes.drain() }
     }
 
-||||||| cc0b7feaa
-=======
-    @Test fun primaryVisitorRejectsMissingCidLikeTheListing(): Unit = runBlocking {
-        val rig = Rig(directory.toFile())
-        val primary = File(directory.toFile(), "primary").apply { mkdirs() }
-        File(primary, "valid.pdf").writeText("document")
-        val binding = rig.register(primary)
-        val corpus = rig.corpus(binding)
-        try {
-            rig.store.put(Document(binding.prefix + "no-cid.pdf", _l[Field("contentType", "application/pdf")]))
-            assertFailsWith<IllegalStateException> { corpus.docs(binding.name) }
-            assertFailsWith<IllegalStateException> { corpus.visit(binding.name) { } }
-        } finally { rig.scopes.drain() }
-    }
-
-    @Test fun primaryDocumentKeepsItsVerifiedIdentityAfterHeadBodyMutation(): Unit = runBlocking {
-        val rig = Rig(directory.toFile())
-        val primary = File(directory.toFile(), "primary").apply { mkdirs() }
-        File(primary, "valid.txt").writeText("verified source")
-        val binding = rig.register(primary)
-        val corpus = rig.corpus(binding)
-        try {
-            val original = assertNotNull(corpus.document(binding.name, "valid.txt"))
-            assertEquals("verified-bytes", original.contentStatus)
-            val body = assertNotNull(rig.store.get(binding.prefix + "valid.txt"))
-            @Suppress("UNCHECKED_CAST")
-            (body.fields as? MutableList<Field>)?.let { fields ->
-                val index = fields.indexOfFirst { it.name == "contentId" }
-                assertTrue(index >= 0)
-                runCatching { fields[index] = Field("contentId", ContentId.of("replacement".encodeToByteArray()).value) }
-            }
-            val after = assertNotNull(corpus.document(binding.name, "valid.txt"))
-            assertEquals(original.cid, after.cid)
-            assertEquals(original.rev, after.rev)
-            assertEquals(original.seq, after.seq)
-            assertEquals("verified-bytes", after.contentStatus)
-        } finally { rig.scopes.drain() }
-    }
-
->>>>>>> 3e949429ed73e8d92ead483d51e68fc9ac4d3332
     @Test fun duplicatePrimaryAndMountedAliasIsRefusedRatherThanSelected(): Unit = runBlocking {
         val rig = Rig(directory.toFile())
         val secondary = File(directory.toFile(), "mounted/clash").apply { mkdirs() }

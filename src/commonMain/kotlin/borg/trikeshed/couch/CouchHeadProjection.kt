@@ -138,7 +138,6 @@ class CouchHeadProjection {
 
     fun ids(): Join<Int, (Int) -> String> = docs.α { it.id }
 
-<<<<<<< HEAD
     /** Capture the slot count, then read each immutable committed identity atomically. */
     fun slots(): Series<CouchHeadSlot> = synchronized(gate) {
         docs.a j { index: Int -> synchronized(gate) { requireNotNull(frames[docs[index].id]) } }
@@ -170,40 +169,6 @@ class CouchHeadProjection {
             cid?.value as? String, type?.value as? String, length?.value as? String, hidden, ambiguous)
     }
 
-||||||| cc0b7feaa
-=======
-    /** Capture the slot count, then read each immutable committed identity atomically. */
-    fun slots(): Series<CouchHeadSlot> = synchronized(gate) {
-        docs.a j { index: Int -> synchronized(gate) { requireNotNull(frames[docs[index].id]) } }
-    }
-
-    /** Read one immutable committed identity without exposing the mutable head body. */
-    fun slot(docId: String): CouchHeadSlot? = synchronized(gate) { frames[docId] }
-
-    private fun slot(frame: CouchCommittedFrame): CouchHeadSlot {
-        var cid: Field? = null
-        var type: Field? = null
-        var length: Field? = null
-        var deleted: Field? = null
-        var hidden = false
-        var ambiguous = false
-        for (field in frame.doc?.fields.orEmpty()) {
-            when (field.name) {
-                "_id" -> ambiguous = true
-                "contentId" -> if (cid == null) cid = field else ambiguous = true
-                "contentType" -> if (type == null) type = field else ambiguous = true
-                "length" -> if (length == null) length = field else ambiguous = true
-                "deleted" -> {
-                    if (deleted == null) deleted = field else ambiguous = true
-                    if (field.value == "true") hidden = true
-                }
-            }
-        }
-        return CouchHeadSlot(frame.docId, frame.rev, frame.sequence, frame.deleted,
-            cid?.value as? String, type?.value as? String, length?.value as? String, hidden, ambiguous)
-    }
-
->>>>>>> 3e949429ed73e8d92ead483d51e68fc9ac4d3332
     fun query(): QueryResult {
         val cursor = buildCursorFromDocs(docs)
         return QueryResult(cursor, docs.a.toLong())
