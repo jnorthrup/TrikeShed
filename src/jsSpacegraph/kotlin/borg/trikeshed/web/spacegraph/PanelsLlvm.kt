@@ -4,7 +4,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.web.*
 
 /** Text from a retained invocation; reading it never enters the guest or infers missing counters. */
-internal fun llvmObservation(runtime: dynamic): List<String> {
+internal fun llvmObservation(runtime: dynamic, compact: Boolean = false): List<String> {
     fun value(name: String): String = if (typeOf(runtime[name]) == "string" && str(runtime[name]).isNotBlank())
         str(runtime[name]).take(256) else "unavailable"
     fun count(name: String): String {
@@ -20,6 +20,22 @@ internal fun llvmObservation(runtime: dynamic): List<String> {
             num(n) >= 1_000 -> fixed(num(n) / 1_000, 3) + " µs"
             else -> str(n) + " ns"
         }
+    }
+    if (compact) {
+        val summary = mutableListOf(
+            "Recorded LLVM observation · " + value("abi"),
+            "Queue " + duration("queueNanos") + " · call " + duration("callNanos"),
+            "Internal progress: " + value("internalProgress"),
+            "Pause: " + value("pauseBoundary"),
+        )
+        if (runtime.abi == "confix.flat/1") {
+            summary.add("Scanner " + duration("scanNanos"))
+            summary.add("Bridge allocation " + count("allocatedBytes") + " bytes")
+            summary.add("After release " + count("liveBytesAfter") + " bytes")
+            summary.add("Buffer guards: " + when (runtime.guardsVerified) { true -> "verified"; false -> "failed"; else -> "unavailable" })
+        } else summary.add("Allocation counters: not recorded by this ABI")
+        summary.add("Full module identity and limits: Evidence")
+        return summary
     }
     val lines = mutableListOf(
         "Recorded LLVM observation · " + value("abi"),

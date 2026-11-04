@@ -105,7 +105,7 @@ class PanelsBlip(private val p: Panels) {
         val recorded = n._lastOut?.runtime
         if (recorded?.backend == "graalvm-llvm") {
             h += "<h6 class=\"graal\">last displayed run · recorded LLVM evidence</h6>"
-            for (line in llvmObservation(recorded)) h += row("g", esc(line))
+            for (line in llvmObservation(recorded, compact = true)) h += row("g", esc(line))
             val out = n._lastOut
             if (out.sourceCid != null) h += row("g", "<b>source</b> " + esc(out.sourceCid))
             if (out.rowCount != null) h += row("g", "<b>copied rows</b> " + esc(out.rowCount) +
