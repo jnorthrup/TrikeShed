@@ -1,0 +1,151 @@
+{
+  "kind": "sulong-lcnc-publication/1",
+  "testedCommit": "0ae529c1a7fc1cd8f289b15e23d8e87f86d82760",
+  "targetVerificationCommit": "0ae529c1a7fc1cd8f289b15e23d8e87f86d82760",
+  "targetSourceEquivalence": "All listed targets rebuilt at the same combined D3M commit",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "jdk": "OpenJDK 25.0.4.1+1-jvmci-25.3-b22",
+  "engineVersion": "25.3.4.1",
+  "llvmVersion": "22.1.8",
+  "gradleVersion": "9.8.2",
+  "kotlinVersion": "2.4.21",
+  "verifiedTargets": [
+    "JVM main and complete test-source compilation",
+    "JS main",
+    "Wasm-JS main",
+    "Wasm-WASI main",
+    "Linux x64 main"
+  ],
+  "offline": {
+    "boundary": "Linux user/network namespace; same uid; loopback only; no external route",
+    "gradleMode": "--offline",
+    "freshMlirRebuild": false,
+    "wholeProgramAndReopen": true,
+    "testSuites": [
+      {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "name": "LlvmScalarRunTest[jvm]",
+        "timestamp": "2026-11-04T21:39:55.520Z",
+        "cases": [
+          "mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm]",
+          "failedConfiguredBootstrapReleasesItsRootOwner()[jvm]"
+        ]
+      },
+      {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "name": "LlvmScalarTest[jvm]",
+        "timestamp": "2026-11-04T21:39:59.208Z",
+        "cases": [
+          "nativeDeniedControlStillRefusesLlvm()[jvm]",
+          "cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm]",
+          "drainSettlesAcceptedQueueBeforeClosingContext()[jvm]",
+          "runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm]",
+          "invalidModuleOpenReleasesSeatForRetry()[jvm]",
+          "profileIsStrictOperatorConfiguration()[jvm]",
+          "verifiedBinaryExecutesAndCopiesHostScalars()[jvm]"
+        ]
+      },
+      {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "name": "NativeHornProfileTest[jvm]",
+        "timestamp": "2026-11-04T21:39:59.468Z",
+        "cases": [
+          "trustedReadChecksSizeBeforeReading()[jvm]",
+          "strictPureOperatorProfile()[jvm]",
+          "missingFileCapabilityRefuses()[jvm]",
+          "growthBetweenSizeAndReadRemainsBounded()[jvm]"
+        ]
+      },
+      {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "name": "PresetAssemblyTest[jvm]",
+        "timestamp": "2026-11-04T21:39:59.482Z",
+        "cases": [
+          "everyPresetNodeTypeIsContractDeclared()[jvm]",
+          "tribunalCarriesBoundedLoopAbortEdgesAndValidates()[jvm]",
+          "everyPresetWireConnectsPortsWithMatchingKinds()[jvm]",
+          "presetsAreOfferedNotInstalled()[jvm]",
+          "allOfferedPresetsExistAndRoundTrip()[jvm]",
+          "presetsCarryViewportGeometryForRoundTripping()[jvm]"
+        ]
+      }
+    ],
+    "dependencyState": "Previously staged JDK/LLVM SDK and Gradle/Maven/native resource caches; not a clean-machine distribution-closure test",
+    "priorFreshMlirRebuild": {
+      "evidence": "../verification.json",
+      "sourceAndCompilerUnchanged": true,
+      "reason": "The forced offline rebuild was already verified; this publication merge only adds an upstream LCNC viewport and preset inventory test to executable sources."
+    },
+    "gradleCache": "/workspace/gradle-offline-cache; separately staged cache avoids cross-namespace lock contention with concurrent target compilation"
+  },
+  "artifacts": {
+    "program": {
+      "cid": "sha256:8c3efce7e6327dc8b9e7bdc1a5af40460e9ee709bc63146ac02bbebefd8f9f31",
+      "bytes": 512
+    },
+    "receipt": {
+      "cid": "sha256:dd3aa97cdf3f39d9713da079193248ee0d8ec41d68e0572ce4f9e1fe3679d900",
+      "bytes": 3089
+    },
+    "invocations": {
+      "cid": "sha256:82dc697de9c112684a867700abea8c880c04da246d47fec32f69664dff4da931",
+      "bytes": 2367
+    }
+  },
+  "preview": "response-preview.json is a parsed response preview, not the bytes identified by receiptCid",
+  "sourceSha256": {
+    "build.gradle.kts": "d11eae25b2b6f51438c692b364fc1d4cfc311cdf1b5d756a45670f21db56fa8c",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LlvmScalarContract.kt": "d80a35bd8b40538a1587ced9371768e573a03988a09d83a6170bf9d78539cf47",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "66efb12cc1e82b939a14a823eb122052e30089fafc2e96f47d817a2a24eafcb7",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncNodeKey.kt": "bba04aa566b69e55b56adf4153c79d3228ca1cc6dada75781aaeb6d94d490025",
+    "src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/KernelSeat.kt": "123486927780069e2cf157f43201398d868a16d66999af717c8ff2b7e20eb36c",
+    "src/commonMain/kotlin/borg/trikeshed/kernel/KernelElement.kt": "828afbb02f02ff40728eb4961dba5c40ac56336bf0bb42c7766d5c74daa1a100",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/LlvmScalar.kt": "34df75fe2336c2fbf01dd2443fa580a7da6b92e3ef0635d71858ad5dedf4f1cf",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/OroborosLcncWiring.kt": "7f02f0ee6c95b60d990e64f48c36c61d321fe22eb28ca76f14ca72a72f5cb01a",
+    "src/jvmMain/kotlin/org/trikeshed/oroboros/OroborosDaemon.kt": "1c7224edb0608a7cccdc1f6cef5e5fbe2d683ac8c7604a83f3276d69a4d485f8",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/LlvmScalarTest.kt": "e2fcc142644ac8e861c824f4176d21e8394dcc6db8ef7c2ef46d67910aacc3d2",
+    "src/jvmTest/kotlin/borg/trikeshed/kanban/module/LlvmScalarRunTest.kt": "7b9ffb361bd75d9da0bc80f090a8341509da8f8cfe64481ebd2036793c1fd8d2",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncPresets.kt": "4285ff161b609654d967518e2f6478eb7c77e1e86b4a0ba31ac0f08ff363e850",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt": "f57f130349d45ddb9a334e98d146703317a43d8ee6567a5027693aca02ed809f",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/SubVmLegos.kt": "ca7386b61d274ac33be4a08d1e64eabab4868f823de7fd8e27ea8495515a3d78",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt": "37875ea6f3a9c0af75d4a48ad55638df934e062d410874d0b6c86f5f5b6732f6",
+    "docs/sulong-bitcode/add.mlir": "820226db05add054598e92b1699652d8ca9517be814ae275a8fe3b87aa237a2a",
+    "docs/sulong-bitcode/add.ll": "47400ca14761616eeac6803f91f67cba6c4dbc1a18ed9eb76ec8adde39dc9fa9",
+    "src/jvmTest/resources/sulong/add.bc": "7f657500b8e1b7d2b956ae5529ac7eb1a29df9ba0af1964b64f78986fbc68305",
+    "src/jvmTest/resources/sulong/add-mlir.bc": "75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b"
+  },
+  "logSha256": {
+    "gradle-llvm-publication-isolated.log": "f87ed2d4cfe0ec46eb1edaff454915402bfa87244ff45a06bb9787b83be1bceb",
+    "gradle-llvm-publication-targets.log": "cc802be60729645c20db92d4a3a5f9447c33206bf245d0a07a366f2e55394084"
+  },
+  "limitations": [
+    "Scalar i32 ABI only; no Nix evaluator",
+    "No native memory isolation or hard native cancellation",
+    "LLVM internal progress unobserved",
+    "No browser animation acceptance or Apple Silicon execution claimed"
+  ],
+  "vm": "GraalVM CE 25.3.4.1+1.1",
+  "compilerSha256": {
+    "llvm-as": "2b89d57e9f4f7b6a0d069dfc60770bac8ab289cf22c390bf5a0139d2bb1d0a5d",
+    "mlir-opt": "45092a31bf61175e2917ce59e12e71f8e287a73bb6bb241142b362f2c1e03850",
+    "mlir-translate": "d7b45c78ebde8830f3951f5f7845b9c584d33dcafebc93aafdc32ae53168fb65"
+  },
+  "previousEvidence": "../verification.json",
+  "setupFailure": {
+    "log": "/workspace/gradle-llvm-publication.log",
+    "reason": "The first simultaneous invocation could not acquire the shared Gradle journal lock across isolated network namespaces; a separate pre-staged Gradle user home resolved this without source changes."
+  }
+}
