@@ -307,7 +307,9 @@ class DocumentReviewWire private constructor(
                                     require(it <= Int.MAX_VALUE) { "KIF page value exceeds integer range" }; it.toInt()
                                 }
                                 val receipt = cid("receiptCid")
-                                val source = DocumentTaxonomyCandidate.record(ctx.casStore, receipt).source
+                                val record = DocumentTaxonomyCandidate.record(ctx.casStore, receipt)
+                                require(!EnglishTaxonomyCarrier.marked(record)) { "English translation carriers require their origin-bound translation preview" }
+                                val source = record.source
                                 suspend fun current(): Boolean {
                                     val evidenceId = source.metadata["evidenceId"]?.singleOrNull()
                                     val evidence = evidenceId?.let { ctx.blackboard.snapshot().values["headhunter/$it"] as? Map<*, *> }

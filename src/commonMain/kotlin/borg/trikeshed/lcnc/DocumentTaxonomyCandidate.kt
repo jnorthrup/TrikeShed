@@ -21,9 +21,9 @@ object DocumentTaxonomyCandidate {
 
     fun record(cas: CasStore, cid: ContentId): DocumentCurationRecord {
         val reader = cas as? BoundedCasReader ?: error("Bounded CAS reads are required")
-        val bytes = requireNotNull(reader.getBounded(cid, 32 * 1024 * 1024)) { "Document curation receipt is unavailable" }
+        val bytes = requireNotNull(reader.getBounded(cid, 16 * 1024 * 1024)) { "Document curation receipt is unavailable" }
         require(ContentId.of(bytes) == cid) { "Document curation receipt identity differs" }
-        return DocumentCuratorCodec.decodeBounded(bytes, 32 * 1024 * 1024, 64, 1_000_000)
+        return DocumentCuratorCodec.decodeBounded(bytes, 16 * 1024 * 1024, 64, 1_000_000)
     }
 
     /** Require a complete sequence of top-level lists; quoted and nested forms never become assertions. */

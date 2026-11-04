@@ -135,6 +135,7 @@ class EnglishTaxonomyWireTest {
                 assertEquals(_l["4:0", "5:0"], sentences.map { it["predicateNode"] })
                 val prepared = prepare(f)
                 assertEquals("unreviewed", prepared["reviewStatus"]); assertFalse(prepared.containsKey("approvalCid"))
+                request(f, "/taxonomy-candidates", _m["receiptCid" j prepared["receiptCid"], "offset" j 0, "limit" j 32], status = 409)
                 val declarationBytes = assertNotNull(f.cas.getBounded(ContentId(prepared["translationCid"] as String), EnglishTaxonomyCarrier.MAX_BYTES))
                 val declaration = CanonicalCbor.decodeMap(declarationBytes)
                 assertEquals("proposed", declaration["reviewStatus"]); assertEquals(f.inspectionCid, declaration["inspectionCid"])
