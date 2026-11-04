@@ -1,0 +1,243 @@
+{
+  "scope": "Actual immutable-v59 public pure RDF parser/bridge observations, synthetic only",
+  "sourceContext": "sha256:76eaefec09777735eea6c7735e3dbd2420d38afc5eea159aa39643412a6ba126",
+  "cases": [
+    {
+      "name": "iri",
+      "input": "<urn:s> <urn:p> <urn:o> .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:p",
+          "object": "urn:o",
+          "angular": "4616048921637884679",
+          "propositionCid": "sha256:59396f8529f33715ade8ce94ac5f6b1ca330b37fdf5adfe0ae941399481d5aa8"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:p>",
+          "object": "<urn:o>",
+          "objectKind": "Iri"
+        }
+      ]
+    },
+    {
+      "name": "literal",
+      "input": "<urn:s> <urn:p> \"urn:o\" .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:p",
+          "object": "urn:o",
+          "angular": "4616048921637884679",
+          "propositionCid": "sha256:59396f8529f33715ade8ce94ac5f6b1ca330b37fdf5adfe0ae941399481d5aa8"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:p>",
+          "object": "\"urn:o\"",
+          "objectKind": "Literal"
+        }
+      ]
+    },
+    {
+      "name": "comma",
+      "input": "<urn:s> <urn:label> \"Smith, Jones\" .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:label",
+          "object": "Smith",
+          "angular": "4616048921638283143",
+          "propositionCid": "sha256:157941fa42dcc5b21cf761743bd436700d7182dbcd0d53e248ead2661027ab11"
+        },
+        {
+          "subject": "urn:s",
+          "predicate": "urn:label",
+          "object": "Jones\"",
+          "angular": "4616048921637257511",
+          "propositionCid": "sha256:d113f08573c1b79799ffcb85c6c5907ad9ca8cc233f237e5e71010ea4cedb28b"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:label>",
+          "object": "\"Smith, Jones\"",
+          "objectKind": "Literal"
+        }
+      ]
+    },
+    {
+      "name": "semicolon",
+      "input": "<urn:s> <urn:label> \"Alpha; beta.\" .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:label",
+          "object": "Alpha",
+          "angular": "4616048921637227783",
+          "propositionCid": "sha256:9e0c4183133ab7a2ad33b3f92ff5881c6795e6fc19a1670fef31c75f7f1526dd"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:label>",
+          "object": "\"Alpha; beta.\"",
+          "objectKind": "Literal"
+        }
+      ]
+    },
+    {
+      "name": "period",
+      "input": "<urn:s> <urn:label> \"First. Second\" .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:label",
+          "object": "First",
+          "angular": "4616048921638019143",
+          "propositionCid": "sha256:f7f903bfdcd099e3d9835c085422d20ea317cf5e3fadbf55e95089d83b71bb83"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:label>",
+          "object": "\"First. Second\"",
+          "objectKind": "Literal"
+        }
+      ]
+    },
+    {
+      "name": "escapedQuoteComma",
+      "input": "<urn:s> <urn:label> \"He said \\\"hello\\\", then left\" .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:label",
+          "object": "He said \\\" hello\\",
+          "angular": "4616048921638146055",
+          "propositionCid": "sha256:218967c20eafaa88fb45ebd400c8ec6637972c6042875b21a37f5239347a1299"
+        },
+        {
+          "subject": "urn:s",
+          "predicate": "urn:label",
+          "object": "then left\"",
+          "angular": "4616048921637045639",
+          "propositionCid": "sha256:d51980715b002e0b676e7353618fea28df36749a6f5ec30e409a70d749b934dd"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:label>",
+          "object": "\"He said \\\"hello\\\", then left\"",
+          "objectKind": "Literal"
+        }
+      ]
+    },
+    {
+      "name": "language",
+      "input": "<urn:s> <urn:p> \"hello\"@en-US .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:p",
+          "object": "hello\" @en-US",
+          "angular": "4616048921637428615",
+          "propositionCid": "sha256:57f1d2c8b65f82719481386609f8a35c02c042842f3c89aa2cb87ab075e7d1fa"
+        }
+      ],
+      "existingTurtleRows": []
+    },
+    {
+      "name": "datatype",
+      "input": "<urn:s> <urn:p> \"01\"^^<http://www.w3.org/2001/XMLSchema#integer> .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:p",
+          "object": "01\" ^^<http://www.w3.org/2001/XMLSchema#integer>",
+          "angular": "4616048921637950247",
+          "propositionCid": "sha256:5f9c7ff66da820ec97f39e239833b89a6404eed1a49266af6c05ba3286a6498e"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:p>",
+          "object": "\"01\"^^<http://www.w3.org/2001/XMLSchema#integer>",
+          "objectKind": "Literal"
+        }
+      ]
+    },
+    {
+      "name": "namespace",
+      "input": "@prefix ex: <urn:example:> .\nex:s ex:p ex:o .",
+      "kgRows": [
+        {
+          "subject": "urn:example:s",
+          "predicate": "urn:example:p",
+          "object": "urn:example:o",
+          "angular": "4616048937257513735",
+          "propositionCid": "sha256:1c7ac3085b09a4527e60bfa14c9e6a471ed1d9c817560810533efd184e6db0cd"
+        }
+      ],
+      "existingTurtleRows": []
+    },
+    {
+      "name": "sameLinePrefix",
+      "input": "@prefix ex: <urn:example:> . ex:s ex:p ex:o .",
+      "kgRows": [],
+      "existingTurtleRows": []
+    },
+    {
+      "name": "invalidSuffix",
+      "input": "<urn:s> <urn:p> \"hello\"garbage .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:p",
+          "object": "hello\" garbage",
+          "angular": "4616048921637421831",
+          "propositionCid": "sha256:d1dd3117e4484c618f87ceece304947895fa93543f9aa0c218853e24a5a5453b"
+        }
+      ],
+      "existingTurtleRows": []
+    },
+    {
+      "name": "invalidEscape",
+      "input": "<urn:s> <urn:p> \"bad\\q\" .",
+      "kgRows": [
+        {
+          "subject": "urn:s",
+          "predicate": "urn:p",
+          "object": "bad\\q",
+          "angular": "4616048921638292871",
+          "propositionCid": "sha256:5ddf7dcdc9bf2fdb68d26497e69cd3b39b3627f25bebcb2e79f9604ec873638e"
+        }
+      ],
+      "existingTurtleRows": [
+        {
+          "subject": "<urn:s>",
+          "predicate": "<urn:p>",
+          "object": "\"badq\"",
+          "objectKind": "Literal"
+        }
+      ]
+    }
+  ],
+  "productionCodeSources": {
+    "KgNalBridge": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "TurtleRdf": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar"
+  },
+  "bagOperations": 0,
+  "modelCalls": 0,
+  "reviewAuthority": "not-established"
+}

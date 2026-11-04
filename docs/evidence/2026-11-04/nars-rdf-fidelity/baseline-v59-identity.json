@@ -1,0 +1,10 @@
+{
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "mainJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "mainJar": "/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+  "productionOverlays": false,
+  "friendPaths": false,
+  "runtimeSeconds": 0.4046737179996853,
+  "harnessSha256": "c0489dead7749f1e9ba40b1be393e40048b4f9f372ec15e4e3cbcbb09b376ad0",
+  "attempt": 1
+}
