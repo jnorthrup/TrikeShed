@@ -32,7 +32,7 @@ class PresetAssemblyTest {
                 "preset-hermes", "preset-tribunal", "preset-curator",
                 "preset-tribunal-case", "preset-legal-tribunal-case",
                 "preset-tribunal-case-v2", "preset-legal-tribunal-case-v2",
-                "preset-context", "preset-kanban", "preset-ccek", "preset-scope", "preset-scope-inner",
+                "preset-context", "preset-breadcrumb-context", "preset-kanban", "preset-ccek", "preset-scope", "preset-scope-inner",
                 "preset-pairs", "preset-brain-mux", "preset-prompt", "preset-corpus", "preset-ccek-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
                 "preset-council", "preset-bughunter", "preset-subvm-audit",

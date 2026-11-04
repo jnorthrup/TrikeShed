@@ -912,7 +912,7 @@ object LcncPresets {
             LcncWire("project", "sourceCid", "recall", "cid"),
             LcncWire("project", "context", "recall", "context"),
             LcncWire("recall", "recall", "display", "x"),
-        ], seq = 6,
+        ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.8), seq = 6,
     ))
 
     private fun context(): String {
