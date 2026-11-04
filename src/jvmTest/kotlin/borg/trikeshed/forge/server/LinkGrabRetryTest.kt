@@ -72,8 +72,8 @@ class LinkGrabRetryTest {
         val attempts = AtomicInteger()
         val rig = Rig(this, cas = bounded) { attempts.incrementAndGet(); response("unavailable", 503) }
         val project = rig.open("http://localhost/child")
+        val bytes = "<html>retained</html>".encodeToByteArray()
         try {
-            val bytes = "<html>retained</html>".encodeToByteArray()
             val cid = rig.scopes.uploadPut(project, "localhost/child.html", bytes)
             rig.scopes.uploadPut(project, "localhost/child.html.notes.md",
                 "url: http://localhost/child\nsha256: ${cid.hex}\nbytes: ${bytes.size}\n".encodeToByteArray())
@@ -84,7 +84,11 @@ class LinkGrabRetryTest {
             links.grab(project, "root.html", DecisionProvider.JEV)
             assertEquals(4, attempts.get(), "A failed retrieval must remain eligible for retry")
             assertFailsWith<IllegalStateException> { backing.get(cid) }
-        } finally { rig.close() }
+        } finally {
+            // Unmount retains source bytes; restore the injected damage after its assertions.
+            backing.put(bytes)
+            rig.close()
+        }
     }
 
     @Test fun failedAdmissionCanBeRetriedAfterBodyLands(): Unit = runBlocking {
