@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.job.*
 import borg.trikeshed.kif.*
+import borg.trikeshed.lcnc.LcncRdf
 import borg.trikeshed.lib.*
 import borg.trikeshed.ontology.SumoOntology
 import borg.trikeshed.rdf.*
@@ -162,10 +163,26 @@ object KgNalBridge {
 
     // ── the mapping (the gap itself) ──────────────────────────────────
 
-    /** Predicate → (copula, relation) as a Join — heterogeneous pair, destructured at binding site. */
+    /**
+     * Expanded RDF IRIs have exact, case-sensitive identity. Only the vocabularies below
+     * and the owned LCNC causal projection select a formal NAL interpretation; another
+     * namespace's `type`, `not` or `causes` remains an opaque PRODUCT predicate.
+     *
+     * Bare KIF/KG policy aliases retain their existing case/underscore spellings. This
+     * public triplet API does not resolve prefixes, strip IRI delimiters or trim terms:
+     * callers must expand RDF predicates before mapping. These are NAL projections,
+     * not a claim to implement all RDF/RDFS/OWL entailment semantics.
+     */
     fun mapPredicate(rawPredicate: String): Join<NalCopula, RelationKind> {
-        val p = rawPredicate.substringAfterLast('/').substringAfterLast('#').substringAfterLast(':')
-            .trim().lowercase().replace('_', '-')
+        when (rawPredicate) {
+            RdfVocab.RDF + "type", RdfVocab.RDFS + "subClassOf", RdfVocab.RDFS + "subPropertyOf" ->
+                return NalCopula.INHERITANCE j RelationKind.MATCH
+            RdfVocab.OWL + "sameAs", RdfVocab.OWL + "equivalentClass" ->
+                return NalCopula.SIMILARITY j RelationKind.MATCH
+            RdfVocab.OWL + "disjointWith" -> return NalCopula.SIMILARITY j RelationKind.CONTRADICTION
+            LcncRdf.NS + "causes" -> return NalCopula.IMPLICATION j RelationKind.CAUSALITY
+        }
+        val p = rawPredicate.lowercase().replace('_', '-')
         return when (p) {
             "type", "a", "instance", "instance-of", "isa", "is-a" -> NalCopula.INHERITANCE j RelationKind.MATCH
             "subclassof", "subclass", "subclass-of", "subpropertyof" -> NalCopula.INHERITANCE j RelationKind.MATCH
