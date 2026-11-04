@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
+
 /**
  * The registered route manifest, written once at each wire's definition site
  * and consumed by [RouteParityGate] and RouteManifestParityTest. A route that
@@ -103,6 +105,10 @@ object RouteManifest {
             RouteEntry("GET", "/rest/v1/rpc/{fn}", "a stable function called with its arguments in the query string"),
             RouteEntry("POST", "/pg/query", "pg-meta raw SQL: SELECT, CREATE TABLE, DROP TABLE, and SPARQL … (SPASQL) over DB.DBA.RDF_QUAD"),
         ),
+        ("DocumentEnglishWire" j _l[
+            RouteEntry("GET", "/api/documents/english", "local English parser availability and explicit range limits; no model required"),
+            RouteEntry("POST", "/api/documents/english", "retain unreviewed source-bound local English syntax and lexical marker observations"),
+        ]).pair,
         "DocumentPdfLinksWire" to listOf(
             RouteEntry("POST", "/api/documents/pdf-links", "retain unreviewed URI annotation candidates from an exact current PDF revision; no fetch or model"),
             RouteEntry("POST", "/api/documents/pdf-links/collect", "collect selected host-issued PDF links under existing egress policy into the same manual project; source-linked and unreviewed"),
