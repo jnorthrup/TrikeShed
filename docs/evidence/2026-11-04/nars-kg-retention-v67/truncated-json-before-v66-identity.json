@@ -1,0 +1,13 @@
+{
+  "source": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+  "mainJarSha256": "e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397",
+  "testAndHarnessSources": {
+    "KgRetentionTest.kt": "9e7e1866577dde52d1209469847788b943335e71dc416b6226bfedc45d5693c6",
+    "Probe.kt": "953d51f2354df5f3a4af4e0c27cc71ec7c68bd1291a25ee8c1319eda7e949acd"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "scope": "Only2synthetictruncatedJSON publicroute observations onactualv66; no parser/model/socket/provider/network/live state.",
+  "runSeconds": 0.939,
+  "runExit": 0
+}
