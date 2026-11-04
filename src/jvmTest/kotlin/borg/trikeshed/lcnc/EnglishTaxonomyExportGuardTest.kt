@@ -35,8 +35,7 @@ class EnglishTaxonomyExportGuardTest {
             val textCid = cas.put(text.encodeToByteArray())
             val source = DocumentSource(textCid, textCid, text, "$name.kif", "text/plain", "synthetic-policy-test",
                 metadata = _m["evidenceId" j _l[name]])
-            val record = DocumentCurationRecord(source, null, null, "synthetic-policy-test", emptySeriesOf(), emptySeriesOf())
-            val receipt = cas.put(DocumentCuratorCodec.encode(record))
+            val receipt = englishTaxonomyFixtureRecord(cas, source, "synthetic-policy-test")
             val ids = DocumentTaxonomyCandidate.selections(source).map { it.id }
             val manual = DocumentTaxonomyCandidate.candidate(cas, receipt, ids)
             val candidate = if (marker == null) manual else manual.copy(selections = manual.selections α { selection ->

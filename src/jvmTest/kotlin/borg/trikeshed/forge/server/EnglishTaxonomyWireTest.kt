@@ -72,9 +72,10 @@ class EnglishTaxonomyWireTest {
         val producer = DocumentEnglishWire(ctx, corpus) { NlpReader { reads.count++; syntheticSyntax(it) } }
         producer.attach()
         val inspection = try {
-            val response = producer.route("POST", DocumentEnglishWire.PATH, jsonOf(_m["project" j selected.project,
+            val route = assertNotNull(ctx.routes.match(DocumentEnglishWire.PATH))
+            val response = assertNotNull(route.route("POST", DocumentEnglishWire.PATH, jsonOf(_m["project" j selected.project,
                 "id" j selected.id, "cid" j selected.cid, "rev" j selected.rev, "seq" j selected.seq,
-                "begin" j 0, "end" j sourceText.length]), null)
+                "begin" j 0, "end" j sourceText.length]), null))
             assertEquals(200, response.status, response.body); reifyMap(response.body)
         } finally { producer.drain() }
         val docs = root.resolve("documents"); Files.createDirectories(docs)
