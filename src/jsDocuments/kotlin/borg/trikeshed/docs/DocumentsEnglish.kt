@@ -306,6 +306,7 @@ internal object DocumentsEnglish {
         private var pending = false
         private var failure: String? = null
         private var result: Map<*, *>? = null
+        private var corpusNotice: String? = null
         fun close() { abort?.abort(); job.cancel() }
         private fun present() = owner === this && job.isActive && current() && host.asDynamic().isConnected == true
         private fun splitScalar(at: Int) = at in 1 until preview.length && preview[at - 1].isHighSurrogate() && preview[at].isLowSurrogate()
@@ -402,7 +403,7 @@ internal object DocumentsEnglish {
                     val value = reifyStrict(response.text().await()) as? Map<*, *> ?: error("Unreadable English inspection response")
                     require(response.ok && value["error"] == null) { (value["detail"] ?: value["error"] ?: "Local English inspection failed (HTTP ${response.status})").toString() }
                     validate(value, requestedBegin, requestedEnd)
-                    if (present()) result = value
+                    if (present()) { result = value; corpusNotice = null }
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Throwable) { if (present()) failure = error.message ?: "Local English inspection is unavailable" }
                 finally { if (present()) { pending = false; render() } }
@@ -444,6 +445,17 @@ internal object DocumentsEnglish {
             text(section, "p", "Evidence receipt: ${value["receiptCid"]}", "ds-cid")
             val parser = value["parser"] as? Map<*, *>
             text(section, "p", "Reader: ${parser?.get("processor") ?: "not reported"}. Markers are literal word and phrase candidates; their scope and legal effect require review.", "ds-curate-label")
+            val use = text(section, "button", "Use this inspection in corpus", "ds-curate-submit")
+            use.setAttribute("type", "button"); use.setAttribute("data-corpus-use-inspection", "1"); use.asDynamic().disabled = pending
+            use.style.cssText = "margin:10px 0;padding:8px 12px"
+            use.addEventListener("click", {
+                if (present() && !pending) {
+                    corpusNotice = runCatching { DocumentsCorpus.add(source.project, value["receiptCid"] as String) }
+                        .getOrElse { it.message ?: "Inspection could not be added to the corpus shelf" }
+                    render()
+                }
+            })
+            corpusNotice?.let { text(section, "p", it, "ds-curate-label").setAttribute("role", "status") }
             for (raw in value["sentences"] as List<*>) sentence(section, raw as Map<*, *>)
         }
         private fun sentence(parent: HTMLElement, value: Map<*, *>) {

@@ -84,12 +84,18 @@ object DocumentSurfacePage {
         root.innerHTML = DocumentSurface.layout()
         DocumentsUpload.mount()
 <<<<<<< HEAD
+<<<<<<< HEAD
         window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear(); DocumentsCorpus.clear() })
 ||||||| 62eb34b08
         window.addEventListener("pagehide", { DocumentsPdfLinks.clear() })
 =======
         window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear() })
 >>>>>>> 6bc57dbcbd743793fb3096ae68afebf3a2330e1d
+||||||| 5878d7d14
+        window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear() })
+=======
+        window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear(); DocumentsCorpus.clear() })
+>>>>>>> 287a790d26f59f5619606287092225c4946faf8f
         root.addEventListener("click", { e -> onClick(e) })
         root.addEventListener("submit", { e -> onSubmit(e) })
         root.addEventListener("input", { e -> onInput(e) })
@@ -432,11 +438,16 @@ object DocumentSurfacePage {
             DocumentsPdfLinks.clear()
 <<<<<<< HEAD
             DocumentsEnglish.clear()
+<<<<<<< HEAD
             DocumentsCorpus.clear()
 ||||||| 62eb34b08
 =======
             DocumentsEnglish.clear()
 >>>>>>> 6bc57dbcbd743793fb3096ae68afebf3a2330e1d
+||||||| 5878d7d14
+=======
+            DocumentsCorpus.clear()
+>>>>>>> 287a790d26f59f5619606287092225c4946faf8f
             setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.curationCrumbHtml(curationResult))
             setHtml(DocumentSurface.CONTENT_ID, DocumentSurface.curationHtml(
                 curationAvailable, curationDestination, curationRecords,
@@ -486,6 +497,7 @@ object DocumentSurfacePage {
                 document.getElementById(DocumentSurface.CONTENT_ID)?.appendChild(note)
             }
         }
+<<<<<<< HEAD
         val corpusProject = project
         if (corpusProject != null) {
             val ticket = generation
@@ -517,6 +529,19 @@ object DocumentSurfacePage {
             }
         }
 >>>>>>> 6bc57dbcbd743793fb3096ae68afebf3a2330e1d
+||||||| 5878d7d14
+=======
+        val corpusProject = project
+        if (corpusProject != null) {
+            val ticket = generation
+            val selected = doc?.sourceRevision ?: pdfSelection
+            val host = document.createElement("div") as HTMLElement
+            document.getElementById(DocumentSurface.CONTENT_ID)?.let { content -> content.insertBefore(host, content.firstChild) }
+            DocumentsCorpus.mount(host, corpusProject, selected, ticket) {
+                generation == ticket && !curationMode && project == corpusProject && (doc?.sourceRevision ?: pdfSelection) == selected
+            }
+        } else DocumentsCorpus.clear()
+>>>>>>> 287a790d26f59f5619606287092225c4946faf8f
         val p = project
         val wanted = if (p == null) "" else "#" + encode(p) + (selectedId?.let { "/" + encode(it) } ?: "")
         if (!keepLocation) setHash(wanted)
