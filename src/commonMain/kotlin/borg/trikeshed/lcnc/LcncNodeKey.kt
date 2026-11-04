@@ -218,6 +218,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     ENGLISH_QUERY(EnglishObservationContract.TYPE),
     ENGLISH_CORPUS(EnglishCorpusContract.TYPE),
     ENGLISH_PATTERNS(EnglishLegalPatternsContract.TYPE),
+    ENGLISH_LEGAL_QUERY(EnglishLegalQueryContract.TYPE),
     WIKI_PROPOSE(LcncContracts.WIKI_PROPOSE);
 
     fun construct(node: LcncNode, inputs: Map<String, Any?>, runner: LcncNodeRunner, parent: Job): LcncNodeElement {
