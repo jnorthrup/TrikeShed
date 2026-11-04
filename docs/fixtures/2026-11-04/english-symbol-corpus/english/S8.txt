@@ -1,0 +1,1 @@
+Clerk may read Record unless Record is sealed. Clerk requests Record. The seal status is unresolved.

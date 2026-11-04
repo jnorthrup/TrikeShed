@@ -1,0 +1,771 @@
+{
+  "kind": "invented-symbolic-gold-sidecar/1",
+  "scope": "declared synthetic assumptions, not expert legal ground truth or engine observations",
+  "cases": [
+    {
+      "id": "S1",
+      "caseCid": "sha256:44529a492ace2f628c89e784e6c1ab9612f36677a59b2ba82f04afaf725f0317",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "positive-ground-taxonomy",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "SUPPORTED",
+        "requiredPremiseIds": [
+          "S1:p1"
+        ],
+        "absentRequirements": [],
+        "ruleIds": [
+          "kif-taxonomy/v1/instance-assertion"
+        ],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S1:p1"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": []
+    },
+    {
+      "id": "S2",
+      "caseCid": "sha256:23c4e736a46519b185968c677f1a5bbdf4eb9ca0fa07c75ceb40c0b7aa123c86",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "positive-ground-taxonomy",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "SUPPORTED",
+        "requiredPremiseIds": [
+          "S2:p1",
+          "S2:p2"
+        ],
+        "absentRequirements": [],
+        "ruleIds": [
+          "kif-taxonomy/v1/subclass-assertion",
+          "kif-taxonomy/v1/subclass-transitivity"
+        ],
+        "bindings": {
+          "middle": "urn:fixture:legal:S2:Agent"
+        },
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S2:p1",
+          "S2:p2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "Both ordered premises are required; one supporting quote is not a complete proof."
+      ]
+    },
+    {
+      "id": "S3",
+      "caseCid": "sha256:0f9ce6573124655b3a3efe2cac697125aa2c81b692f5e52ef2bff885f7fcf04d",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "positive-ground-taxonomy",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "SUPPORTED",
+        "requiredPremiseIds": [
+          "S3:p1",
+          "S3:p2"
+        ],
+        "absentRequirements": [],
+        "ruleIds": [
+          "kif-taxonomy/v1/instance-assertion",
+          "kif-taxonomy/v1/instance-subclass"
+        ],
+        "bindings": {
+          "middle": "urn:fixture:legal:S3:Tenant"
+        },
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S3:p1",
+          "S3:p2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "The typed instance-subclass rule is required; numeric NAL alone is not a rule binder."
+      ]
+    },
+    {
+      "id": "S4",
+      "caseCid": "sha256:4bce2142fa8bd8f9df3c52bcbbf878ba88c70231e97e10eb229b8f5a73d0b7a8",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "positive-ground-taxonomy",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNKNOWN",
+        "requiredPremiseIds": [],
+        "absentRequirements": [],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S4:p1"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "An instance premise is not a subclass premise. This is not a global sort-checking claim.",
+        "UNKNOWN is the pure taxonomy expectation. A reviewed English carrier can reject the individual-in-class query earlier; that profile refusal must stay distinct."
+      ]
+    },
+    {
+      "id": "S5",
+      "caseCid": "sha256:01b30c1c6900ab852912756ae13c519588ada3cba2f7d08635b56e8bb0c571b0",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "positive-horn-outside-taxonomy",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNKNOWN",
+        "requiredPremiseIds": [
+          "S5:r1",
+          "S5:missing-forward-assignment",
+          "S5:p2"
+        ],
+        "absentRequirements": [
+          {
+            "id": "S5:missing-forward-assignment",
+            "kif": "(assignedTo Lark Harbor)",
+            "present": false
+          }
+        ],
+        "ruleIds": [
+          "declared-positive-read-rule/1"
+        ],
+        "bindings": {
+          "?operator": "Lark",
+          "?resource": "Harbor"
+        },
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S5:r1",
+          "S5:p1",
+          "S5:p2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "Reversed assignedTo roles do not satisfy the requested binding; no general bag unifier is available.",
+        "S5:p1 is inspected as a reversed-role distractor. The Horn fragment does not itself enforce the resource/operator sort annotations."
+      ]
+    },
+    {
+      "id": "S6",
+      "caseCid": "sha256:928f71e5c822017e18bcc86f46472ffb4ef2d33e7fef446d7d0a7548649f9de4",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "positive-horn-outside-taxonomy",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNKNOWN",
+        "requiredPremiseIds": [
+          "S6:r1",
+          "S6:p1",
+          "S6:missing-authorization"
+        ],
+        "absentRequirements": [
+          {
+            "id": "S6:missing-authorization",
+            "kif": "(authorized Lark Access)",
+            "present": false
+          }
+        ],
+        "ruleIds": [
+          "declared-positive-read-rule/1"
+        ],
+        "bindings": {
+          "?operator": "Lark",
+          "?resource": "Harbor"
+        },
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S6:r1",
+          "S6:p1"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "Absence of authorization is not a refutation."
+      ]
+    },
+    {
+      "id": "S7",
+      "caseCid": "sha256:0807932838f6cc4cc6b6585b2ce1c0616417257e501936d27734ebf782b9eff7",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "guarded-norm",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNSUPPORTED",
+        "requiredPremiseIds": [
+          "S7:r1",
+          "S7:missing-receipt"
+        ],
+        "absentRequirements": [
+          {
+            "id": "S7:missing-receipt",
+            "kif": "(received Clerk Report)",
+            "present": false
+          }
+        ],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S7:r1"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "Preserve the if-guard and modality. Do not flatten to an unconditional positive norm."
+      ]
+    },
+    {
+      "id": "S8",
+      "caseCid": "sha256:cd30cdd0e86784ea48343dd953172bc0ae72fb6f439758d63b8d2c3b823d1ca9",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "exception-and-negative-premise",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNSUPPORTED",
+        "requiredPremiseIds": [
+          "S8:r1",
+          "S8:p1",
+          "S8:unresolved-not-sealed"
+        ],
+        "absentRequirements": [
+          {
+            "id": "S8:unresolved-not-sealed",
+            "kif": "(not (sealed Record))",
+            "present": false
+          }
+        ],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S8:r1",
+          "S8:p1"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "No closed-world not-sealed atom is supplied or inferred from unresolved seal status."
+      ]
+    },
+    {
+      "id": "S9",
+      "caseCid": "sha256:2a1d9626531acb3239e01ac26b36c1b2b61272d2d1381a279dc81049c3f9f41f",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "negative-syntax-outside-positive-core",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNSUPPORTED",
+        "requiredPremiseIds": [],
+        "absentRequirements": [],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S9:p1"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "REFUTED is an authored excerpt label. The positive core must not manufacture classical refutation."
+      ]
+    },
+    {
+      "id": "S10",
+      "caseCid": "sha256:0a397a8b220526d05417c8d88c06129271bebaf6c813bb321d406d79d691814c",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "context-frame-no-borrowing",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNSUPPORTED",
+        "requiredPremiseIds": [
+          "S10:p1",
+          "S10:missing-A-second-edge"
+        ],
+        "absentRequirements": [
+          {
+            "id": "S10:missing-A-second-edge",
+            "kif": "(ist urn:fixture:agreement:A (subclass Agent Entity))",
+            "present": false
+          }
+        ],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S10:p1",
+          "S10:p2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "One newly authored combined excerpt, not an extraction assembled from real documents. Scoped ist syntax is retained; no existing context-aware solver adapter is claimed."
+      ]
+    },
+    {
+      "id": "S11",
+      "caseCid": "sha256:b2d57bbcc53abe2536b5461e7f121cfbe09604e5747b8ec3c5e63d5f1ca22730",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "unreviewed-suggestion",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNSUPPORTED",
+        "requiredPremiseIds": [],
+        "absentRequirements": [],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S11:proposal"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "This companion records a suggestion only. It is not an instance/subclass fact, SUMO truth, or approved support."
+      ]
+    },
+    {
+      "id": "S12",
+      "caseCid": "sha256:4c80b77457c7a76e0f6d28f00a3db5bb74bfbf1553530cb673b7cfb2e2068101",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "declared-offline-NAL-implication",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNSUPPORTED",
+        "requiredPremiseIds": [
+          "S12:p3",
+          "S12:p4"
+        ],
+        "absentRequirements": [],
+        "ruleIds": [
+          "NAL_INDUCTION"
+        ],
+        "bindings": {
+          "shared-subject": "EPSILON"
+        },
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "S12:p1",
+          "S12:p2",
+          "S12:p3",
+          "S12:p4",
+          "S12:p5"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null,
+        "pathMeaning": "Prerequisites for weak synthetic induction only; no complete theorem path or held-out outcome is declared."
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": "EXISTING_FIXED_ALGEBRA_CONTROL_ONLY",
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "English bytes exactly match the existing fixed SyntheticNalExperiment primary source. Its numeric result is a synthetic hypothesis, not a per-case semantic prediction or held-out outcome."
+      ]
+    },
+    {
+      "id": "C1",
+      "caseCid": "sha256:dfeb7b40a5be47290a35b4141c70b3987309fb070f49fbeb22d56e4d9818acd6",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "positive-ground-taxonomy",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "SUPPORTED",
+        "requiredPremiseIds": [
+          "C1:p1"
+        ],
+        "absentRequirements": [],
+        "ruleIds": [
+          "kif-taxonomy/v1/subclass-assertion"
+        ],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "C1:p1",
+          "C1:p2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null,
+        "alternativeCompletePremisePaths": [
+          [
+            "C1:p1"
+          ],
+          [
+            "C1:p2"
+          ]
+        ]
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "The second occurrence is an alternative witness. Both have the same source basis and are not independent votes. Replaying p1 reuses its occurrence identity."
+      ]
+    },
+    {
+      "id": "C2",
+      "caseCid": "sha256:d875f1e4538b64b88c897221fd52d3ce9cdb78b55c89d1b1b70b87a7132139e9",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "PROPOSITION_MISMATCH_ON_SECOND",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "exact-PID-admission-control",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "UNSUPPORTED",
+        "requiredPremiseIds": [
+          "C2:p1"
+        ],
+        "absentRequirements": [],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "C2:p1",
+          "C2:p2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "Different exact PIDs can share one angular. The expected second-cell refusal is admission coverage, not semantic falsehood or a recall miss."
+      ]
+    },
+    {
+      "id": "C3",
+      "caseCid": "sha256:65cc7710d63801b9fd92c028ea94d70a8e8b9337b7158a17780c4681378bca95",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "FIXTURE_IDENTITY_ONLY",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "explicit-manual-global-union",
+        "capability": "SUPPORTED_FRAGMENT",
+        "engineStatus": null,
+        "declaredExpectedStatus": "SUPPORTED",
+        "requiredPremiseIds": [
+          "C3:p1",
+          "C3:p2"
+        ],
+        "absentRequirements": [],
+        "ruleIds": [
+          "kif-taxonomy/v1/subclass-assertion",
+          "kif-taxonomy/v1/subclass-transitivity"
+        ],
+        "bindings": {
+          "middle": "Agent"
+        },
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "C3:p1",
+          "C3:p2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "Authored setup only: independent current approvals and exact references are required before a protected union run. No actual review IDs exist here. English-carrier union remains refused."
+      ]
+    },
+    {
+      "id": "C4",
+      "caseCid": "sha256:6491db669b29223b265f8eb8a4583d3972e08af1419f001f8d92d532da545bd8",
+      "fixtureState": "READY",
+      "execution": "PENDING",
+      "identityAdmission": {
+        "expected": "STALE_CURRENT_READ_REFUSAL",
+        "observed": null
+      },
+      "typedProof": {
+        "fragment": "review-currentness-policy-control",
+        "capability": "UNSUPPORTED_OR_POLICY_BOUNDARY",
+        "engineStatus": null,
+        "declaredExpectedStatus": "REFUSAL",
+        "requiredPremiseIds": [],
+        "absentRequirements": [],
+        "ruleIds": [],
+        "bindings": {},
+        "completePathObserved": null,
+        "inspectedRecordIds": [
+          "C4:v1",
+          "C4:v2"
+        ],
+        "observedPremiseIds": null,
+        "observedRuleIds": null,
+        "truncated": null
+      },
+      "recallHypothesisUnits": {
+        "seat": "MISSING",
+        "semanticPrediction": null,
+        "recallAtK": null,
+        "admittedCoverage": null,
+        "residentCoverage": null,
+        "observedUnits": null,
+        "nalHypothesis": null,
+        "unitPolicy": "Nal.UNIT=1000; source occurrence is not an independent vote; attention does not add units"
+      },
+      "notes": [
+        "Authored version/review setup; expected current-read refusal is not a bag source-retraction or proof-revocation implementation claim. No live source or review WAL is changed."
+      ]
+    }
+  ],
+  "caseCidDefinition": "caseCid is the existing LegalEvalCase.propositionCid emitted by LegalNarsEvaluationCli prepare, not a new codec or proof identity.",
+  "proofContract": "requiredPremiseIds is the ordered prerequisite list for the declared path or blocked attempted path; present and absent entries stay distinct. inspectedRecordIds lists comparison context. An UNKNOWN/UNSUPPORTED/refusal row has no observed derivation. Annotation agreement and complete proof-path comparison are different metrics."
+}

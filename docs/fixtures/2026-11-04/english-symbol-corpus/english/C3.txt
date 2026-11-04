@@ -1,0 +1,1 @@
+The declared experiment explicitly combines Agreement A and Agreement B as global manual premises. A Finch is an Agent. An Agent is an Entity.
