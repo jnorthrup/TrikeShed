@@ -27,7 +27,9 @@ internal object DocumentsSyntaxGraph {
         val tokens = (sentence["tokens"] as List<*>).map { it as Map<*, *> }
         val edges = (sentence["dependencies"] as List<*>).map { it as Map<*, *> }
         val shown = tokens.take(TOKEN_LIMIT)
-        val positions = shown.mapIndexed { index, token -> (token["index"] as Number).toInt() to (140.0 + index * 100) }.toMap()
+        val positions = buildMap<Int, Double> {
+            shown.forEachIndexed { index, token -> put((token["index"] as Number).toInt(), 140.0 + index * 100) }
+        }
         val visible = edges.filter { edge ->
             val governor = (edge["governor"] as Number).toInt(); val dependent = (edge["dependent"] as Number).toInt()
             (governor == 0 || governor in positions) && dependent in positions
