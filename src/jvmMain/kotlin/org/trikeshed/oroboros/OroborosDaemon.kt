@@ -433,13 +433,13 @@ object OroborosDaemon {
     private suspend fun drainCuration(
         follow: kotlinx.coroutines.Job?,
         intake: borg.trikeshed.forge.server.CurationIntake,
-        modules: borg.trikeshed.module.ModuleSupervisor,
+        drainModules: suspend () -> Unit,
         ctx: borg.trikeshed.module.ModuleContext,
         llvm: borg.trikeshed.kernel.KernelElement?,
     ) {
         follow?.join()
         intake.drain()
-        runCatching { modules.drainAll() }
+        runCatching { drainModules() }
         ctx.drainCouncilCases()
         intake.constellations()?.drain()
         llvm?.drain()
@@ -447,7 +447,7 @@ object OroborosDaemon {
 
     /** Startup remains joined by the outer owner even when a later bootstrap step throws. */
     private fun CoroutineScope.startModules(supervisor: borg.trikeshed.module.ModuleSupervisor,
-                                           config: DaemonConfig, ownCleanup: (suspend () -> Unit) -> Unit) {
+                                           config: DaemonConfig, ownCleanup: (suspend () -> Unit) -> Unit): suspend () -> Unit {
         val startup = launch {
             if (HostSystem.getenv("TRIKESHED_NO_KANBAN_MODULE") != "1") {
                 runCatching { supervisor.attach(borg.trikeshed.kanban.module.KanbanModule()) }
@@ -460,7 +460,9 @@ object OroborosDaemon {
                     .onFailure { HostSystem.err("[OROBOROS] module attach FAILED for $fqcn: ${it.message}") }
             }
         }
-        ownCleanup { startup.join(); supervisor.drainAll() }
+        val drain: suspend () -> Unit = { startup.join(); supervisor.drainAll() }
+        ownCleanup(drain)
+        return drain
     }
 
     /** Keep consumer shutdown and its fact dependencies outside mainImpl's large state machine. */
@@ -2081,7 +2083,7 @@ object OroborosDaemon {
         runCatching { programLedger.thaw() }
             .onSuccess { restored -> HostSystem.err("[OROBOROS] programs: $restored head(s) restored from the ledger") }
             .onFailure { HostSystem.err("[OROBOROS] programs: ledger thaw FAILED (${it.message}); the daemon boots without the ledger's heads") }
-        startModules(moduleSupervisor, config, ownCleanup)
+        val drainModules = startModules(moduleSupervisor, config, ownCleanup)
 
         // ── Project dbs: every mounted db grows its own Changes→Rete tendon
         //    (partition = db name — blackboard subscope seams by project), then
@@ -2473,7 +2475,7 @@ object OroborosDaemon {
                 runCatching { documentReviewWire.stopAdmission() }
                 // The follow/Wiki producer stops at its admission boundary and settles its
                 // current pass before the runner registry, model clients, or stores close.
-                drainCuration(curatorFollowJob, curationIntake, moduleSupervisor, moduleContext, llvmKernel)
+                drainCuration(curatorFollowJob, curationIntake, drainModules, moduleContext, llvmKernel)
                 // Join accepted route commands, then consumers and their final facts. A failed
                 // stop is not permission to close the observation dependencies underneath it.
                 drainCamel(moduleContext, blackboardFacts, graalFacts, jvmVitals)
