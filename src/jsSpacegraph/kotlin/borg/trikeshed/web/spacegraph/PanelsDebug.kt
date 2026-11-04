@@ -280,7 +280,7 @@ class PanelsDebug(private val panels: Panels) {
             evidenceError = "Retained evidence refused: " + failureText(e)
         }
         ended = true; available = false
-        panels.trace.unavailable("Observation ended; remaining activity is recorded")
+        panels.trace.recorded("Observation ended; remaining activity is recorded")
         state = null
         buttons()
         val accepted = retained && evidenceError.isEmpty()

@@ -83,6 +83,14 @@ class PanelsTrace(private val panels: Panels) {
     }
 
     fun unavailable(reason: String) {
+        panels.page.cancelFrame(frame); frame = 0
+        omitted += pending.sumOf { it.count }; pending.clear()
+        for (spark in visible) { spark.dot?.remove(); spark.label?.remove() }
+        visible.clear()
+        recorded(reason)
+    }
+
+    fun recorded(reason: String) {
         mode = reason
         for (n in panels.nodes()) n.el?.removeAttribute("data-observed-phase")
         report()
