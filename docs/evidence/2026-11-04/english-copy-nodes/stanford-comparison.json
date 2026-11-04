@@ -1,0 +1,1214 @@
+{
+  "result": "PASS",
+  "scope": "Fixed source-span/copy-identity and conservative guard counterexamples; not OCR completeness, legal truth, general English accuracy, performance superiority or full daemon airgap",
+  "host": {
+    "sourceHead": "5878d7d14095cf0aa8fda5d997ffb35cacf73c5c",
+    "hostJarSha256": "f575d402f9b84bacab0cb805636571eab973e4e18212733ec6a67b8a891d28b8",
+    "classpathSha256": "f2ae8251b2b51b65bb663d76051e3fd8fcb65771980f29a2aa5c14f0488c08d7",
+    "probeSha256": "81b805e801754ff6973ad1eec54f7ecb0a7ec97f50ce9e8715f1952252da247f",
+    "productionClassOverlays": false,
+    "friendAccess": false,
+    "parserProfile": "syntax-v1",
+    "freshJvmPerVersion": true,
+    "externalTimeoutSeconds": 180,
+    "heapLimit": "4g",
+    "nativeMemoryLimit": false,
+    "fullOsSandbox": false,
+    "compileMode": "Reused hash-verified external helper compiled against this exact frozen JAR/classpath"
+  },
+  "privateSourceRanges": 3,
+  "syntheticCases": 13,
+  "casesPerVersion": 16,
+  "structuralOutputsIdentical": 16,
+  "selectedSyntaxWeightFilesByteIdentical": 6,
+  "coreNlp4_6BundleManifestVerified": true,
+  "installed4_5BundleManifestVerified": true,
+  "installed4_5ManifestUnchanged": true,
+  "versions": {
+    "4.5.10": {
+      "exit": 0,
+      "timedOut": false,
+      "elapsedMillis": 18361,
+      "kernelMaxRssKiB": 3210392,
+      "userCpuSeconds": 39.152065,
+      "systemCpuSeconds": 4.232889,
+      "status": "PASS",
+      "originalAndExtractionUnchanged": true,
+      "parser": {
+        "packageVersion": "4.5.10",
+        "jar": "stanford-corenlp-4.5.10.jar",
+        "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+        "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+        "dependencyGraph": "enhanced-plus-plus",
+        "dependencyNodeIdentity": "token-index+copy-count/1",
+        "profile": "syntax-v1",
+        "configuration": {
+          "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+          "threads": "1"
+        }
+      },
+      "cases": [
+        {
+          "id": "private-range-0",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 1898,
+          "counts": {
+            "sentences": 11,
+            "tokens": 380,
+            "nodes": 381,
+            "dependencies": 401,
+            "markers": 5
+          },
+          "copyNodes": 1,
+          "exactSpansChecked": 396,
+          "conditionIssues": [
+            "UNSUPPORTED",
+            null,
+            "UNSUPPORTED",
+            null,
+            null,
+            "COPIED_NODE",
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "normCount": 3,
+          "parseMillis": 15114,
+          "caseMillis": 15255
+        },
+        {
+          "id": "private-range-1",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 1672,
+          "counts": {
+            "sentences": 11,
+            "tokens": 310,
+            "nodes": 310,
+            "dependencies": 326,
+            "markers": 13
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 334,
+          "conditionIssues": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            "UNSUPPORTED",
+            "UNSUPPORTED",
+            "MULTIPLE",
+            null,
+            "PASSIVE",
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 1072,
+          "caseMillis": 1127
+        },
+        {
+          "id": "private-range-2",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 1794,
+          "counts": {
+            "sentences": 10,
+            "tokens": 327,
+            "nodes": 327,
+            "dependencies": 341,
+            "markers": 9
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 346,
+          "conditionIssues": [
+            null,
+            null,
+            "UNSUPPORTED",
+            null,
+            null,
+            "COORDINATED",
+            null,
+            null,
+            null,
+            null
+          ],
+          "normCount": 5,
+          "parseMillis": 1055,
+          "caseMillis": 1094
+        },
+        {
+          "id": "simple-if",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 39,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 12,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 1,
+          "parseMillis": 31,
+          "caseMillis": 34
+        },
+        {
+          "id": "simple-unless",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 43,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 3
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 13,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 1,
+          "parseMillis": 28,
+          "caseMillis": 29
+        },
+        {
+          "id": "allcaps-negated-exception",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 41,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 4
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 14,
+          "conditionIssues": [
+            "NEGATED"
+          ],
+          "normCount": 0,
+          "parseMillis": 22,
+          "caseMillis": 23
+        },
+        {
+          "id": "passive-guard",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 43,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 12,
+          "conditionIssues": [
+            "PASSIVE"
+          ],
+          "normCount": 0,
+          "parseMillis": 19,
+          "caseMillis": 20
+        },
+        {
+          "id": "modal-guard",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 45,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 3
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 13,
+          "conditionIssues": [
+            "MODAL"
+          ],
+          "normCount": 0,
+          "parseMillis": 21,
+          "caseMillis": 22
+        },
+        {
+          "id": "two-guards",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 69,
+          "counts": {
+            "sentences": 1,
+            "tokens": 13,
+            "nodes": 13,
+            "dependencies": 13,
+            "markers": 4
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 18,
+          "conditionIssues": [
+            "MULTIPLE"
+          ],
+          "normCount": 0,
+          "parseMillis": 28,
+          "caseMillis": 29
+        },
+        {
+          "id": "coordinated-guard",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 65,
+          "counts": {
+            "sentences": 1,
+            "tokens": 13,
+            "nodes": 13,
+            "dependencies": 14,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 16,
+          "conditionIssues": [
+            "COORDINATED"
+          ],
+          "normCount": 0,
+          "parseMillis": 25,
+          "caseMillis": 26
+        },
+        {
+          "id": "save-that",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 52,
+          "counts": {
+            "sentences": 1,
+            "tokens": 10,
+            "nodes": 10,
+            "dependencies": 10,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 13,
+          "conditionIssues": [
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 22,
+          "caseMillis": 23
+        },
+        {
+          "id": "other-than",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 37,
+          "counts": {
+            "sentences": 1,
+            "tokens": 8,
+            "nodes": 8,
+            "dependencies": 8,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 11,
+          "conditionIssues": [
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 16,
+          "caseMillis": 17
+        },
+        {
+          "id": "unicode-allcaps",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 28,
+          "counts": {
+            "sentences": 1,
+            "tokens": 7,
+            "nodes": 7,
+            "dependencies": 7,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 10,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 1,
+          "parseMillis": 17,
+          "caseMillis": 19
+        },
+        {
+          "id": "dated-notice",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 49,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 12,
+          "conditionIssues": [
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 47,
+          "caseMillis": 48
+        },
+        {
+          "id": "repeated-text",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 51,
+          "counts": {
+            "sentences": 2,
+            "tokens": 10,
+            "nodes": 10,
+            "dependencies": 10,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 14,
+          "conditionIssues": [
+            null,
+            null
+          ],
+          "normCount": 2,
+          "parseMillis": 25,
+          "caseMillis": 26
+        },
+        {
+          "id": "enhanced-copy-roles",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 27,
+          "counts": {
+            "sentences": 1,
+            "tokens": 10,
+            "nodes": 10,
+            "dependencies": 11,
+            "markers": 0
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 11,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 0,
+          "parseMillis": 23,
+          "caseMillis": 24
+        }
+      ],
+      "outboundDeny": {
+        "scope": "fixture process and descendants only; inbound listener and ordinary response writes allowed",
+        "notClaimed": [
+          "full OS sandbox",
+          "production daemon air gap",
+          "filesystem isolation",
+          "kernel exploit containment"
+        ],
+        "deniedSyscalls": [
+          "connect",
+          "sendto",
+          "sendmsg",
+          "sendmmsg"
+        ],
+        "errno": 13,
+        "selfProbes": [
+          {
+            "operation": "tcp-connect",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendto",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendmsg",
+            "errno": 13,
+            "result": "DENIED"
+          }
+        ],
+        "noNewPrivileges": 1,
+        "seccompMode": 2,
+        "wrapperSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+      },
+      "graphIdentityCoverage": {
+        "dependencyNodeIdentity": "token-index+copy-count/1",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "casesVerified": 16
+      }
+    },
+    "4.6.0": {
+      "exit": 0,
+      "timedOut": false,
+      "elapsedMillis": 17559,
+      "kernelMaxRssKiB": 3175604,
+      "userCpuSeconds": 39.687553,
+      "systemCpuSeconds": 2.897952,
+      "status": "PASS",
+      "originalAndExtractionUnchanged": true,
+      "parser": {
+        "packageVersion": "4.6.0",
+        "jar": "stanford-corenlp-4.6.0.jar",
+        "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+        "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+        "dependencyGraph": "enhanced-plus-plus",
+        "dependencyNodeIdentity": "token-index+copy-count/1",
+        "profile": "syntax-v1",
+        "configuration": {
+          "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+          "threads": "1"
+        }
+      },
+      "cases": [
+        {
+          "id": "private-range-0",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 1898,
+          "counts": {
+            "sentences": 11,
+            "tokens": 380,
+            "nodes": 381,
+            "dependencies": 401,
+            "markers": 5
+          },
+          "copyNodes": 1,
+          "exactSpansChecked": 396,
+          "conditionIssues": [
+            "UNSUPPORTED",
+            null,
+            "UNSUPPORTED",
+            null,
+            null,
+            "COPIED_NODE",
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "normCount": 3,
+          "parseMillis": 14278,
+          "caseMillis": 14425
+        },
+        {
+          "id": "private-range-1",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 1672,
+          "counts": {
+            "sentences": 11,
+            "tokens": 310,
+            "nodes": 310,
+            "dependencies": 326,
+            "markers": 13
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 334,
+          "conditionIssues": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            "UNSUPPORTED",
+            "UNSUPPORTED",
+            "MULTIPLE",
+            null,
+            "PASSIVE",
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 1129,
+          "caseMillis": 1171
+        },
+        {
+          "id": "private-range-2",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 1794,
+          "counts": {
+            "sentences": 10,
+            "tokens": 327,
+            "nodes": 327,
+            "dependencies": 341,
+            "markers": 9
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 346,
+          "conditionIssues": [
+            null,
+            null,
+            "UNSUPPORTED",
+            null,
+            null,
+            "COORDINATED",
+            null,
+            null,
+            null,
+            null
+          ],
+          "normCount": 5,
+          "parseMillis": 1100,
+          "caseMillis": 1124
+        },
+        {
+          "id": "simple-if",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 39,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 12,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 1,
+          "parseMillis": 22,
+          "caseMillis": 24
+        },
+        {
+          "id": "simple-unless",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 43,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 3
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 13,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 1,
+          "parseMillis": 23,
+          "caseMillis": 24
+        },
+        {
+          "id": "allcaps-negated-exception",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 41,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 4
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 14,
+          "conditionIssues": [
+            "NEGATED"
+          ],
+          "normCount": 0,
+          "parseMillis": 21,
+          "caseMillis": 22
+        },
+        {
+          "id": "passive-guard",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 43,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 12,
+          "conditionIssues": [
+            "PASSIVE"
+          ],
+          "normCount": 0,
+          "parseMillis": 19,
+          "caseMillis": 20
+        },
+        {
+          "id": "modal-guard",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 45,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 3
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 13,
+          "conditionIssues": [
+            "MODAL"
+          ],
+          "normCount": 0,
+          "parseMillis": 21,
+          "caseMillis": 22
+        },
+        {
+          "id": "two-guards",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 69,
+          "counts": {
+            "sentences": 1,
+            "tokens": 13,
+            "nodes": 13,
+            "dependencies": 13,
+            "markers": 4
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 18,
+          "conditionIssues": [
+            "MULTIPLE"
+          ],
+          "normCount": 0,
+          "parseMillis": 27,
+          "caseMillis": 28
+        },
+        {
+          "id": "coordinated-guard",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 65,
+          "counts": {
+            "sentences": 1,
+            "tokens": 13,
+            "nodes": 13,
+            "dependencies": 14,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 16,
+          "conditionIssues": [
+            "COORDINATED"
+          ],
+          "normCount": 0,
+          "parseMillis": 53,
+          "caseMillis": 54
+        },
+        {
+          "id": "save-that",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 52,
+          "counts": {
+            "sentences": 1,
+            "tokens": 10,
+            "nodes": 10,
+            "dependencies": 10,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 13,
+          "conditionIssues": [
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 23,
+          "caseMillis": 24
+        },
+        {
+          "id": "other-than",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 37,
+          "counts": {
+            "sentences": 1,
+            "tokens": 8,
+            "nodes": 8,
+            "dependencies": 8,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 11,
+          "conditionIssues": [
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 17,
+          "caseMillis": 18
+        },
+        {
+          "id": "unicode-allcaps",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 28,
+          "counts": {
+            "sentences": 1,
+            "tokens": 7,
+            "nodes": 7,
+            "dependencies": 7,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 10,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 1,
+          "parseMillis": 18,
+          "caseMillis": 20
+        },
+        {
+          "id": "dated-notice",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 49,
+          "counts": {
+            "sentences": 1,
+            "tokens": 9,
+            "nodes": 9,
+            "dependencies": 9,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 12,
+          "conditionIssues": [
+            "UNSUPPORTED"
+          ],
+          "normCount": 0,
+          "parseMillis": 24,
+          "caseMillis": 26
+        },
+        {
+          "id": "repeated-text",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 51,
+          "counts": {
+            "sentences": 2,
+            "tokens": 10,
+            "nodes": 10,
+            "dependencies": 10,
+            "markers": 2
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 14,
+          "conditionIssues": [
+            null,
+            null
+          ],
+          "normCount": 2,
+          "parseMillis": 23,
+          "caseMillis": 24
+        },
+        {
+          "id": "enhanced-copy-roles",
+          "status": "PASS",
+          "sourceIntegrity": "PASS",
+          "rangeUtf16Units": 27,
+          "counts": {
+            "sentences": 1,
+            "tokens": 10,
+            "nodes": 10,
+            "dependencies": 11,
+            "markers": 0
+          },
+          "copyNodes": 0,
+          "exactSpansChecked": 11,
+          "conditionIssues": [
+            null
+          ],
+          "normCount": 0,
+          "parseMillis": 25,
+          "caseMillis": 26
+        }
+      ],
+      "outboundDeny": {
+        "scope": "fixture process and descendants only; inbound listener and ordinary response writes allowed",
+        "notClaimed": [
+          "full OS sandbox",
+          "production daemon air gap",
+          "filesystem isolation",
+          "kernel exploit containment"
+        ],
+        "deniedSyscalls": [
+          "connect",
+          "sendto",
+          "sendmsg",
+          "sendmmsg"
+        ],
+        "errno": 13,
+        "selfProbes": [
+          {
+            "operation": "tcp-connect",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendto",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendmsg",
+            "errno": 13,
+            "result": "DENIED"
+          }
+        ],
+        "noNewPrivileges": 1,
+        "seccompMode": 2,
+        "wrapperSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+      },
+      "graphIdentityCoverage": {
+        "dependencyNodeIdentity": "token-index+copy-count/1",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "casesVerified": 16
+      }
+    }
+  },
+  "comparison": [
+    {
+      "case": "private-range-0",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 15114,
+      "newParseMillis": 14278,
+      "oldCopyNodes": 1,
+      "newCopyNodes": 1,
+      "oldConditionIssues": [
+        "UNSUPPORTED",
+        null,
+        "UNSUPPORTED",
+        null,
+        null,
+        "COPIED_NODE",
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "newConditionIssues": [
+        "UNSUPPORTED",
+        null,
+        "UNSUPPORTED",
+        null,
+        null,
+        "COPIED_NODE",
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "case": "private-range-1",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 1072,
+      "newParseMillis": 1129,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        "UNSUPPORTED",
+        "UNSUPPORTED",
+        "MULTIPLE",
+        null,
+        "PASSIVE",
+        "UNSUPPORTED"
+      ],
+      "newConditionIssues": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        "UNSUPPORTED",
+        "UNSUPPORTED",
+        "MULTIPLE",
+        null,
+        "PASSIVE",
+        "UNSUPPORTED"
+      ]
+    },
+    {
+      "case": "private-range-2",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 1055,
+      "newParseMillis": 1100,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        null,
+        null,
+        "UNSUPPORTED",
+        null,
+        null,
+        "COORDINATED",
+        null,
+        null,
+        null,
+        null
+      ],
+      "newConditionIssues": [
+        null,
+        null,
+        "UNSUPPORTED",
+        null,
+        null,
+        "COORDINATED",
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "case": "simple-if",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 31,
+      "newParseMillis": 22,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        null
+      ],
+      "newConditionIssues": [
+        null
+      ]
+    },
+    {
+      "case": "simple-unless",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 28,
+      "newParseMillis": 23,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        null
+      ],
+      "newConditionIssues": [
+        null
+      ]
+    },
+    {
+      "case": "allcaps-negated-exception",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 22,
+      "newParseMillis": 21,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "NEGATED"
+      ],
+      "newConditionIssues": [
+        "NEGATED"
+      ]
+    },
+    {
+      "case": "passive-guard",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 19,
+      "newParseMillis": 19,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "PASSIVE"
+      ],
+      "newConditionIssues": [
+        "PASSIVE"
+      ]
+    },
+    {
+      "case": "modal-guard",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 21,
+      "newParseMillis": 21,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "MODAL"
+      ],
+      "newConditionIssues": [
+        "MODAL"
+      ]
+    },
+    {
+      "case": "two-guards",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 28,
+      "newParseMillis": 27,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "MULTIPLE"
+      ],
+      "newConditionIssues": [
+        "MULTIPLE"
+      ]
+    },
+    {
+      "case": "coordinated-guard",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 25,
+      "newParseMillis": 53,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "COORDINATED"
+      ],
+      "newConditionIssues": [
+        "COORDINATED"
+      ]
+    },
+    {
+      "case": "save-that",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 22,
+      "newParseMillis": 23,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "UNSUPPORTED"
+      ],
+      "newConditionIssues": [
+        "UNSUPPORTED"
+      ]
+    },
+    {
+      "case": "other-than",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 16,
+      "newParseMillis": 17,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "UNSUPPORTED"
+      ],
+      "newConditionIssues": [
+        "UNSUPPORTED"
+      ]
+    },
+    {
+      "case": "unicode-allcaps",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 17,
+      "newParseMillis": 18,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        null
+      ],
+      "newConditionIssues": [
+        null
+      ]
+    },
+    {
+      "case": "dated-notice",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 47,
+      "newParseMillis": 24,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        "UNSUPPORTED"
+      ],
+      "newConditionIssues": [
+        "UNSUPPORTED"
+      ]
+    },
+    {
+      "case": "repeated-text",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 25,
+      "newParseMillis": 23,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        null,
+        null
+      ],
+      "newConditionIssues": [
+        null,
+        null
+      ]
+    },
+    {
+      "case": "enhanced-copy-roles",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": 23,
+      "newParseMillis": 25,
+      "oldCopyNodes": 0,
+      "newCopyNodes": 0,
+      "oldConditionIssues": [
+        null
+      ],
+      "newConditionIssues": [
+        null
+      ]
+    }
+  ],
+  "publication": "Counts and parser identities only. No uploaded PDF/source text, quotations, derived condition strings, original document digests, or corpus offsets."
+}

@@ -174,9 +174,11 @@ class DocumentReviewWire private constructor(
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + fileIoContext))
     private val bindings = linkedMapOf<String, LcncNodeRunner>()
     private val pdfLinks = DocumentPdfLinksWire(ctx, corpus)
+    private val english = DocumentEnglishWire(ctx, corpus)
 
     private fun attach() {
         pdfLinks.attach()
+        english.attach()
         bindings[DocumentCurationLegos.SOURCE] = DocumentCurationLegos.source(ctx.casStore, corpus)
         bindings[DocumentCurationLegos.SHEET] = DocumentCurationLegos.sheet(ctx.casStore)
         bindings["document.reviewSnapshot"] = LcncNodeRunner { node, inputs ->
@@ -367,6 +369,7 @@ class DocumentReviewWire private constructor(
     suspend fun stopAdmission() {
         ctx.routes.release("document-review")
         pdfLinks.drain()
+        english.drain()
         requests.drain()
     }
 

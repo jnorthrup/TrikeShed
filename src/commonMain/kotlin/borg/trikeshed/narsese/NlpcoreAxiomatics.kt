@@ -8,6 +8,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpToken
+import borg.trikeshed.nlp.projectionIssue
 
 /**
  * One parser-grounded, SOURCE-ATTRIBUTED candidate reading — never a claim that
@@ -83,6 +84,8 @@ object NlpcoreAxiomatics {
         val found = LinkedHashMap<String, NlpcoreAxiom>()
         for (ordinal in 0 until document.sentences.size) {
             val sentence = document.sentences[ordinal]
+            // Copy vertices and historical unreported identity remain observations, not index-only rules.
+            if (document.projectionIssue(sentence) != null) continue
             if (sentence.begin < 0 || sentence.end <= sentence.begin || sentence.end > document.text.length) continue
             // Reported/quoted material inside this sentence's own span: a source
             // quoting a claim is not the source asserting it. Fail the whole sentence closed.

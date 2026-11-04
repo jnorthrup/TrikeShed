@@ -19,13 +19,14 @@ import borg.trikeshed.parse.reifyMap
  * from a bounded cache, so curation passes that re-read the same sections cost no parse.
  */
 class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoCloseable {
-    /** Host selection only. NO_KBP omits typed entity-slot extraction; it is not semantically equivalent or time bounded. */
+    /** Host selection only. Reduced profiles are not semantically equivalent to FULL or time bounded. */
     enum class Profile(val id: String) {
-        FULL("full-v1"), NO_KBP("no-kbp-v1");
+        FULL("full-v1"), NO_KBP("no-kbp-v1"), SYNTAX("syntax-v1");
 
         val configuration: Map<String, String> get() = when (this) {
             FULL -> CONFIGURATION
             NO_KBP -> CONFIGURATION + ("annotators" j "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie").pair
+            SYNTAX -> _m["annotators" j "tokenize,ssplit,pos,lemma,depparse,ner", "threads" j "1"]
         }
     }
 
@@ -98,6 +99,8 @@ class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoClose
         }
 
         private fun analyze(profile: Profile, text: String): NlpDocument {
+            // A replacement-encoded source must never share an apparent identity with valid text.
+            text.encodeToByteArray(throwOnInvalidSequence = true)
             val state = state(profile)
             val parsed = state.parsed
             synchronized(parsed) { parsed[text] }?.let { return it }
@@ -111,7 +114,9 @@ class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoClose
                     Guest(loader, profile).also { lane.guest = it }
                 }
                 val cased = sentenceCase(text)
-                if (cased.length <= PARSE_CHARS) g.analyze(cased) else stitch(cased, pieces(cased).map { r -> r.first to g.analyze(cased.substring(r.first, r.last + 1)) })
+                val parsed = if (cased.length <= PARSE_CHARS) g.analyze(cased)
+                    else stitch(cased, pieces(cased).map { r -> r.first to g.analyze(cased.substring(r.first, r.last + 1)) })
+                sourceDocument(text, parsed)
             }
             synchronized(parsed) { parsed.put(text, doc) }
             return doc
@@ -138,6 +143,44 @@ class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoClose
             return String(out)
         }
 
+        /**
+         * Sentence case is a parser-input view, never a replacement for the retained source.
+         * Its char-for-char mapping permits exact source tokens at the same scalar-safe UTF-16
+         * spans. Lemmas, tags, dependencies and relation glosses remain parser observations;
+         * glosses are not relabeled as exact source quotations. The profile configuration stays
+         * unchanged while runtime metadata records the actual input and normalization.
+         */
+        internal fun sourceDocument(source: String, parsed: NlpDocument): NlpDocument {
+            val sourceBytes = source.encodeToByteArray(throwOnInvalidSequence = true)
+            val input = sentenceCase(source)
+            require(input.length == source.length && parsed.text == input) { "CoreNLP parser input differs from its source view" }
+            val sentences = parsed.sentences α { sentence ->
+                sourceSpan(source, sentence.begin, sentence.end)
+                sentence.copy(tokens = sentence.tokens α { token ->
+                    sourceSpan(source, token.begin, token.end)
+                    require(token.end > token.begin && token.begin >= sentence.begin && token.end <= sentence.end &&
+                        input.substring(token.begin, token.end) == token.word) { "CoreNLP token differs from its parser-input span" }
+                    token.copy(word = source.substring(token.begin, token.end))
+                })
+            }
+            // Validate before caching: a lazy projection must not defer a bad parser span until a consumer reads it.
+            for (sentence in sentences.view) for (token in sentence.tokens.view) token.word
+            val metadata = parsed.metadata?.let { metadata -> metadata.copy(runtime = metadata.runtime + _m[
+                "parserNormalization" j if (source == input) "identity/1" else "sentence-case/1",
+                "sourceTextCid" j ContentId.of(sourceBytes).value,
+                "parserInputCid" j ContentId.of(if (source == input) sourceBytes else input.encodeToByteArray(throwOnInvalidSequence = true)).value,
+                "relationGlossSource" j "parser-input",
+            ]) }
+            return parsed.copy(text = source, sentences = sentences, metadata = metadata)
+        }
+
+        /** Internal because the inlined Series projection calls it from a generated JVM class. */
+        internal fun sourceSpan(source: String, begin: Int, end: Int) {
+            fun boundary(offset: Int): Boolean = offset in 0..source.length &&
+                !(offset > 0 && offset < source.length && source[offset].isLowSurrogate() && source[offset - 1].isHighSurrogate())
+            require(begin <= end && boundary(begin) && boundary(end)) { "CoreNLP source span cuts or exceeds UTF-16 text" }
+        }
+
         /** Cuts of at most [PARSE_CHARS]: at the last paragraph break, else the last sentence end, else the last space. */
         internal fun pieces(text: String): List<IntRange> {
             val out = ArrayList<IntRange>()
@@ -148,6 +191,7 @@ class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoClose
                     val floor = from + PARSE_CHARS / 4
                     to = sequenceOf(text.lastIndexOf("\n\n", to), text.lastIndexOf(". ", to).let { if (it < 0) it else it + 1 }, text.lastIndexOf(' ', to))
                         .firstOrNull { it > floor }?.let { it + 1 } ?: to
+                    if (to < text.length && text[to].isLowSurrogate() && text[to - 1].isHighSurrogate()) to--
                 }
                 out.add(from until to)
                 from = to
@@ -223,6 +267,8 @@ class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoClose
             return buildMap {
                 put("module", manifest.module)
                 put("profile", profile.id)
+                put("dependencyGraph", "enhanced-plus-plus")
+                put("dependencyNodeIdentity", "token-index+copy-count/1")
                 manifest.parent?.let { put("parent", it) }
                 if (manifest.declared.isNotEmpty()) put("declared", manifest.declared.joinToString(","))
                 manifestText?.let { put("manifestCid", ContentId.of(it.encodeToByteArray()).value) }
@@ -320,11 +366,16 @@ function parse(text) {
       toks.push([t.index(), t.beginPosition(), t.endPosition(), t.originalText(), t.lemma() || '', t.tag() || '', t.ner() || 'O']);
     }
     var g = s.dependencyParse(), deps = [], roots = [];
-    for (var ri = g.getRoots().iterator(); ri.hasNext();) roots.push(ri.next().index());
-    roots.sort(function (a, b) { return a - b; });
-    for (var j = 0; j < roots.length; j++) deps.push([0, roots[j], 'root']);
+    for (var ri = g.getRoots().iterator(); ri.hasNext();) {
+      var root = ri.next(); roots.push([root.index(), root.copyCount()]);
+    }
+    roots.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    for (var j = 0; j < roots.length; j++) deps.push([0, roots[j][0], 'root', 0, roots[j][1]]);
     var es = g.edgeListSorted();
-    for (var j = 0; j < es.size(); j++) { var e = es.get(j); deps.push([e.getGovernor().index(), e.getDependent().index(), e.getRelation().toString()]); }
+    for (var j = 0; j < es.size(); j++) {
+      var e = es.get(j), governor = e.getGovernor(), dependent = e.getDependent();
+      deps.push([governor.index(), dependent.index(), e.getRelation().toString(), governor.copyCount(), dependent.copyCount()]);
+    }
     var cm = s.coreMap();
     out.push([k, toks.length ? toks[0][1] : 0, toks.length ? toks[toks.length - 1][2] : 0, toks, deps, relations(cm, TRIPLES), relations(cm, KBP)]);
   }

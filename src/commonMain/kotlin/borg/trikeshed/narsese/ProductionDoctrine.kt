@@ -120,7 +120,7 @@ data class EvidenceBasis(
     }
 
     fun overlaps(other: EvidenceBasis): Boolean {
-        if (bloom == 0L || other.bloom == 0L || bloom and other.bloom == 0L) return false
+        // Routing/Bloom hints cannot prove independence: supplied or legacy hints may be incomplete.
         for (i in 0 until leaves.size) if (other.contains(leaves[i])) return true
         return false
     }
@@ -140,8 +140,9 @@ data class RevisionDecision(
 )
 
 /**
- * Evidence revision with duplicate and ancestry protection. A Bloom overlap is
- * only a trigger for exact leaf comparison; it is never proof of independence.
+ * Evidence revision with duplicate and ancestry protection. Only nonempty disjoint
+ * exact leaf sets authorize additional units; missing or overlapping ancestry does not.
+ * Bloom hints never replace that exact comparison.
  */
 object OverlapSafeRevision {
     fun revise(
@@ -155,26 +156,24 @@ object OverlapSafeRevision {
         if (existingReceipt == incomingReceipt) {
             return RevisionDecision(existingEvidence, EvidenceDependence.DUPLICATE, accepted = false)
         }
-        if (existingBasis == null || incomingBasis == null) {
+        if (existingBasis == null || incomingBasis == null || existingBasis.leaves.size == 0 || incomingBasis.leaves.size == 0) {
             return RevisionDecision(
-                conservativeMax(existingEvidence, incomingEvidence),
+                existingEvidence,
                 EvidenceDependence.UNRESOLVED,
-                accepted = true,
+                accepted = false,
             )
         }
         return if (!existingBasis.overlaps(incomingBasis)) {
             RevisionDecision(revise(existingEvidence, incomingEvidence), EvidenceDependence.INDEPENDENT, accepted = true)
         } else {
             RevisionDecision(
-                conservativeMax(existingEvidence, incomingEvidence),
+                existingEvidence,
                 EvidenceDependence.DEPENDENT,
                 accepted = true,
             )
         }
     }
 
-    private fun conservativeMax(a: EvidenceCoord, b: EvidenceCoord): EvidenceCoord =
-        EvidenceCoord(maxOf(a.positive, b.positive), maxOf(a.negative, b.negative))
 }
 
 enum class ActivationState {

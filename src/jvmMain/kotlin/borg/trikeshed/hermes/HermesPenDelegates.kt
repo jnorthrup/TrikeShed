@@ -47,7 +47,7 @@ import kotlin.time.TimeSource
  * Every crossing records its actual verdict, including refusals returned as data —
  *  1. a blackboard landing (`hermes/python/pen/<verb>/<seq>`) that the Rete
  *     tendon sees as a fact: model behavior IS working memory;
- *  2. when the leased bag admits it, a SemanticSignal about the tool use itself (CAUSALITY, subject =
+ *  2. when the leased bag queues it, a SemanticSignal about the tool use itself (CAUSALITY, subject =
  *     agent×verb, evidence = Nal.observe(outcome)) — the harness inductively
  *     models its models. The receipt exposes beliefAdmission; queue admission is
  *     not a claim that the consumer has processed or persisted the belief.
@@ -167,7 +167,7 @@ class HermesPen(
         )
         val beliefAdmission = when {
             admission == null -> "unavailable"
-            admission.isSuccess -> "admitted"
+            admission.isSuccess -> "queued"
             admission.isClosed -> "closed"
             else -> "full"
         }
@@ -180,7 +180,7 @@ class HermesPen(
                 "argShapes" to args.map { it::class.simpleName },
                 "ok" to success,
                 "verdict" to outcome.b["verdict"],
-                "admitted" to outcome.b["admitted"],
+                "queued" to outcome.b["queued"],
                 "error" to outcome.b["detail"].takeUnless { success },
                 "beliefAdmission" to beliefAdmission,
             ) + if (verb == "socket") mapOf("operation" to str(args, 0)) else emptyMap(),
@@ -356,8 +356,8 @@ class HermesPen(
                 gloss = "$subjectTerm ==> ${objectTerm ?: "?"} (${if (success) "ok" else "failed"})",
             ),
         )
-        if (admission.isFailure) return refusal(if (admission.isClosed) "bag-closed" else "bag-full", "assertion was not admitted")
-        return true j mapOf("verdict" to "ok", "angular" to angular.toString(), "admitted" to true)
+        if (admission.isFailure) return refusal(if (admission.isClosed) "bag-closed" else "bag-full", "assertion was not queued")
+        return true j mapOf("verdict" to "ok", "angular" to angular.toString(), "queued" to true)
     }
 
     private fun crumbWalk(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {

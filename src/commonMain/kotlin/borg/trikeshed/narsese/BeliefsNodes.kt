@@ -3,8 +3,10 @@ package borg.trikeshed.narsese
 import borg.trikeshed.parse.reify
 
 import borg.trikeshed.cursor.BudgetCoord
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.boundLcnc
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.currentCoroutineContext
 import kotlin.math.abs
@@ -203,25 +205,42 @@ object BeliefsNodes {
     }
 
     /**
-     * `nal.reinforce` — [BeliefIntake.Reinforce] as a lego: an evidence delta
-     * onto an existing angular, budget untouched. `wPlus`/`wMinus` are in
-     * observation units (scaled by [Nal.UNIT] like [Nal.observe]).
+     * `nal.reinforce` — a processed receipted observation, not an unrestricted evidence delta.
+     * Explicit receipt/source-leaf CIDs declare ancestry; they do not authenticate source independence.
+     * `wPlus`/`wMinus` are observation units (scaled by [Nal.UNIT] like [Nal.observe]).
      */
     fun reinforceRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
-        val angular = parseAngular(port(inputs, "angular") ?: node.params["angular"])
-            ?: return@boundLcnc mapOf("revised" to mapOf("error" to "angular required"))
-        val wPlus = node.params["wPlus"]?.toFloatOrNull() ?: 1f
-        val wMinus = node.params["wMinus"]?.toFloatOrNull() ?: 0f
+        val rawAngular = port(inputs, "angular") ?: node.params["angular"]
+        if (rawAngular is Number && rawAngular !is Long) {
+            val number = rawAngular.toDouble()
+            require(number.isFinite() && number % 1.0 == 0.0 && abs(number) <= 9_007_199_254_740_991.0) {
+                "angular must be an exact integer; use a decimal string for 64-bit coordinates"
+            }
+        }
+        val angular = parseAngular(rawAngular)
+            ?: throw IllegalArgumentException("angular required")
+        val receipt = ContentId(requireNotNull((port(inputs, "receiptCid") ?: node.params["receiptCid"]) as? String) {
+            "receiptCid required for an evidence revision"
+        })
+        val rawBasis = port(inputs, "basis") ?: node.params["basis"]?.let(::reify)
+        val leaves = requireNotNull(rawBasis as? List<*>) { "basis must be a nonempty JSON array of source leaf CIDs" }
+        require(leaves.size in 1..256 && leaves.all { it is String } && leaves.distinct().size == leaves.size) {
+            "basis must contain 1..256 distinct source leaf CIDs"
+        }
+        val basis = EvidenceBasis.of(*leaves.map { ContentId(it as String) }.toTypedArray())
+        fun units(name: String, fallback: Double): Double {
+            val raw = node.params[name]
+            val value = if (raw == null) fallback else requireNotNull(raw.toDoubleOrNull()) { "$name must be numeric" }
+            require(value.isFinite() && value >= 0 && value * Nal.UNIT <= 0xFFFFFFFFL.toDouble()) { "$name outside evidence range" }
+            return value
+        }
+        val wPlus = units("wPlus", 1.0)
+        val wMinus = units("wMinus", 0.0)
         val delta = EvidenceCoord((wPlus * Nal.UNIT).toLong(), (wMinus * Nal.UNIT).toLong())
-        bag.intake.send(BeliefIntake.Reinforce(angular, delta))
-        mapOf(
-            "revised" to mapOf(
-                "angular" to angular.toString(),
-                "wPlus" to delta.positive,
-                "wMinus" to delta.negative,
-                "resident" to (bag.budgetOf(angular) != null),
-            ),
-        )
+        bag.submit(BeliefIntake.Reinforce(angular, delta, receipt, basis))
+        _m["revised" j _m["angular" j angular.toString(), "requestedWPlus" j delta.positive,
+            "requestedWMinus" j delta.negative, "receiptCid" j receipt.value, "basis" j leaves,
+            "processed" j true, "resident" j (bag.budgetOf(angular) != null)]]
     }
 
     /**

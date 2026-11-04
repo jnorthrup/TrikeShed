@@ -1,0 +1,38 @@
+Actual copied-node English browser proof
+
+Exact frozen coordinated v52 production main JAR and fresh Documents/Pages/Spacegraph
+bundles are identified in execution-identity.json. External Fixture.kt and driver
+were compiled/executed separately without friend access or production class overlays.
+The synthetic agreement was supplied by a native Chromium CDP file drop onto
+Documents, retained as a Manual project, and explicitly opened and inspected.
+
+Direct actual CoreNLP4.5.10 API search recorded all sixteen synthetic candidates.
+Eight initial gapping examples had no copies. The first positive prepositional-
+coordination example in the next eight was chosen solely for this regression:
+The requirements for sellers and for buyers are clear.
+The actual observed copied node is 2:3, not an assumed boolean/nonzero or copy1.
+Its production bridge result matches the direct donor API finding. This purpose-
+selected synthetic regression is not a parser accuracy or prevalence sample.
+
+The browser verified complete index:copy identities, all edge fields and endpoint
+references, matching source-token words/lemmas/tags/UTF16 anchors, original source
+tokens exactly once, copy-aware token/edge tables and directed SVG IDs gov>dep.
+The copied sentence has ten source tokens, eleven parser nodes and twelve edges.
+Projected 2->2 is retained as 2:0->2:3, and both 9:0->2:0 and 9:0->2:3 survive.
+No source token is added for the parser copy. Actual semantic guard returns
+COPIED_NODE and zero norm interpretations even when generic subjects are supplied.
+
+Uppercase/Unicode source preservation, negative exception guards, explicit partial
+coverage, stale-source refusal and late-response navigation isolation also passed.
+Receipt bytes/CIDs were read back from owned CAS. There were no configured models,
+provider calls, automatic/review intake, bag owner or Rete facts. Upstream upload
+mining actually ran and found no mineable TXT inputs; its zero-work state is recorded.
+
+The fixture and descendants inherited seccomp denial of connect/sendto/sendmsg/
+sendmmsg, self-tested before exec and by Java TCP/UDP probes before and after.
+Ordinary inbound accept and response writes remained allowed for the browser.
+This is a test-process egress profile, not a full sandbox or production air-gap claim.
+Both driver and fixture exited zero; browser and listener were closed.
+Seven real screenshots, raw synthetic results, filter receipt, exact hashes and
+all finder outcomes are retained. The earlier phase1 artifacts were not modified
+and their integer-only observations must not be relabeled copy-aware.

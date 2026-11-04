@@ -125,6 +125,8 @@ private fun DocumentSource.curationIndex(
                     DocumentIndexColumn.GOVERNOR -> dependency.governor
                     DocumentIndexColumn.DEPENDENT -> dependency.dependent
                     DocumentIndexColumn.RELATION -> dependency.relation
+                    DocumentIndexColumn.GOVERNOR_COPY -> dependency.governorCopy
+                    DocumentIndexColumn.DEPENDENT_COPY -> dependency.dependentCopy
                     else -> error("Not a dependency column: $column")
                 }
             }
@@ -277,6 +279,8 @@ private enum class DocumentIndexColumn(val columnName: String, val type: IOMemen
     GOVERNOR("governor", IOMemento.IoInt),
     DEPENDENT("dependent", IOMemento.IoInt),
     RELATION("relation", IOMemento.IoString),
+    GOVERNOR_COPY("governorCopy", IOMemento.IoInt),
+    DEPENDENT_COPY("dependentCopy", IOMemento.IoInt),
     TOKENS("tokens", IOMemento.IoArray),
     DEPENDENCIES("dependencies", IOMemento.IoArray),
     SUBJECT("subject", IOMemento.IoString),
@@ -308,7 +312,8 @@ private val tokenColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexCol
     DocumentIndexColumn.SENTENCE, DocumentIndexColumn.INDEX, DocumentIndexColumn.BEGIN, DocumentIndexColumn.END,
     DocumentIndexColumn.WORD, DocumentIndexColumn.LEMMA, DocumentIndexColumn.TAG, DocumentIndexColumn.NER]
 private val dependencyColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexColumn.EXTRACTED_TEXT_CID,
-    DocumentIndexColumn.SENTENCE, DocumentIndexColumn.GOVERNOR, DocumentIndexColumn.DEPENDENT, DocumentIndexColumn.RELATION]
+    DocumentIndexColumn.SENTENCE, DocumentIndexColumn.GOVERNOR, DocumentIndexColumn.DEPENDENT, DocumentIndexColumn.RELATION,
+    DocumentIndexColumn.GOVERNOR_COPY, DocumentIndexColumn.DEPENDENT_COPY]
 private val proposalColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexColumn.EXTRACTED_TEXT_CID,
     DocumentIndexColumn.SUBJECT, DocumentIndexColumn.PREDICATE, DocumentIndexColumn.OBJECT,
     DocumentIndexColumn.CONFIDENCE, DocumentIndexColumn.POLARITY, DocumentIndexColumn.MODALITY,

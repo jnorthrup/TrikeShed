@@ -1,0 +1,22 @@
+{
+  "source": "5878d7d14095cf0aa8fda5d997ffb35cacf73c5c",
+  "tests": 63,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suites": [
+    "DocumentPdfLinksWireTest[jvm]",
+    "NlpNodeIdentityTest[jvm]",
+    "DependencyCopyInferenceTest[jvm]",
+    "ApplicabilityFactsTest[jvm]",
+    "EnglishInspectionTest[jvm]",
+    "CamelDispatchOwnershipTest[jvm]",
+    "NormClauseConditionsTest[jvm]",
+    "DocumentSurfaceTest[jvm]",
+    "ConstellationPremiseTest[jvm]",
+    "DocumentEnglishWireTest[jvm]",
+    "CoreNlpSourceTest[jvm]",
+    "PrimaryProjectCorpusTest[jvm]"
+  ],
+  "result": "PASS"
+}

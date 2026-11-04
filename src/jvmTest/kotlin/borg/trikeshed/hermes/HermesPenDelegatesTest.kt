@@ -406,7 +406,8 @@ class HermesPenDelegatesTest {
         val receipt = blackboard.get("hermes/python/pen/mux_converse/1") as Map<*, *>
         assertEquals(false, receipt["ok"])
         assertEquals("no-mux", receipt["verdict"])
-        assertEquals("admitted", receipt["beliefAdmission"])
+        assertEquals("queued", receipt["beliefAdmission"])
+        assertFalse(receipt.containsKey("admitted"))
     }
 
     @Test
@@ -449,10 +450,12 @@ class HermesPenDelegatesTest {
         val tool = signals.single { it.subjectCid == ContentId.of("graal-python:bag_assert".encodeToByteArray()).value }
         assertEquals(0L, claim.evidence.positive)
         assertEquals(Nal.UNIT, claim.evidence.negative)
-        assertEquals(Nal.UNIT, tool.evidence.positive, "admitting negative evidence is still a successful admission")
+        assertEquals(Nal.UNIT, tool.evidence.positive, "queueing negative evidence is still a successful operation")
         val receipt = blackboard.get("hermes/python/pen/bag_assert/1") as Map<*, *>
         assertEquals(true, receipt["ok"])
-        assertEquals(true, receipt["admitted"])
+        assertEquals(true, receipt["queued"])
+        assertEquals("queued", receipt["beliefAdmission"])
+        assertFalse(receipt.containsKey("admitted"))
     }
 
     @Test
@@ -484,8 +487,8 @@ class HermesPenDelegatesTest {
         val pen = HermesPen(blackboard, bag = bag)
         val g = guest()
         pen.install(g)
-        val admitted = g.eval("import json\njson.loads(host.call('bag_assert', 'context kotlin build', 'kotlin-gradle', True))['admitted']", "pen-assert.py")
-        assertEquals(true, (admitted as Teleported.Bool).v)
+        val queued = g.eval("import json\njson.loads(host.call('bag_assert', 'context kotlin build', 'kotlin-gradle', True))['queued']", "pen-assert.py")
+        assertEquals(true, (queued as Teleported.Bool).v)
         bag.settle()
         // landing 1: the blackboard fact (Rete-visible)
         val landings = blackboard.keys().filter { k -> k.startsWith("hermes/python/pen/bag_assert/") }

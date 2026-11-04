@@ -18,7 +18,7 @@ import borg.trikeshed.narsese.SemanticSignal
  * Session start:
  *  1. [ingestUserEdits] — diff disk vs the last rendered CID. New/changed §
  *     entries mint at USER-scale evidence (actor="user" authority rung);
- *     deleted entries take counter-evidence + attention-zero. `!`-prefix pins
+ *     deleted entries take attention-zero without changing factual evidence. `!`-prefix pins
  *     (durability=1 → render-immune).
  *  2. [renderTo] — deterministic render of the bag's top-k, written to disk
  *     and recorded as THE snapshot for the session. Mid-session belief changes
@@ -32,7 +32,7 @@ class HermesMemoryFiles(
 ) {
     private val stampFile = memoriesDir.resolve(".render-cid")
 
-    /** Diff disk content against the last render; user deltas become heavy evidence. */
+    /** New entries retain the existing user-observation path; deletion changes attention only. */
     suspend fun ingestUserEdits(fileName: String = "MEMORY.md"): Int {
         val file = memoriesDir.resolve(fileName)
         if (!file.isFile()) return 0
@@ -64,15 +64,17 @@ class HermesMemoryFiles(
             gloss(angular, entry)
             deltas++
         }
-        for ((angular, entry) in known) {
+        for ((angular, _) in known) {
             if (diskEntries.none { entryAngular(it) == angular }) {
-                // user deleted it: counter-evidence + attention floor
-                bag.intake.send(BeliefIntake.Reinforce(angular, EvidenceCoord(0L, Nal.USER_UNIT)))
+                // Deleting retrieved memory is an attention preference, not a negative-world observation.
                 bag.intake.send(BeliefIntake.Attend(angular, BudgetCoord.zero()))
                 glossTable.remove(angular)
+                writeGlosses()
                 deltas++
             }
         }
+        // Finish queued attention changes before the caller renders its next frozen snapshot.
+        if (deltas > 0) bag.awaitProcessed()
         return deltas
     }
 
@@ -106,6 +108,10 @@ class HermesMemoryFiles(
 
     fun gloss(angular: Long, entry: String) {
         glossTable[angular] = entry.replace('\t', ' ').replace('\n', ' ')
+        writeGlosses()
+    }
+
+    private fun writeGlosses() {
         memoriesDir.mkdirs()
         glossFile.writeText(glossTable.entries.sortedBy { it.key }.joinToString("\n") { "${it.key}\t${it.value}" })
     }

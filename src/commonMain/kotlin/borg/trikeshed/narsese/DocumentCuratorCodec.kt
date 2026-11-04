@@ -6,14 +6,20 @@ import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib._l
+import borg.trikeshed.lib._m
+import borg.trikeshed.lib._s
 import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.modelmux.ModelUsage
 import borg.trikeshed.nlp.NlpDependency
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpMetadata
+import borg.trikeshed.nlp.NlpMention
+import borg.trikeshed.nlp.NlpRelation
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
 import borg.trikeshed.reduction.j
@@ -47,23 +53,64 @@ internal object DocumentCuratorCodec {
             "tokens" to s.tokens.values { t -> mapOf("index" to t.index, "begin" to t.begin,
                 "end" to t.end, "word" to t.word, "lemma" to t.lemma, "tag" to t.tag, "ner" to t.ner) },
             "dependencies" to s.dependencies.values { d -> mapOf("governor" to d.governor,
-                "dependent" to d.dependent, "relation" to d.relation) },
+                "dependent" to d.dependent, "relation" to d.relation,
+                "governorCopy" to d.governorCopy, "dependentCopy" to d.dependentCopy) },
+            "relations" to s.relations.map(::nlpRelation), "kbp" to s.kbp.map(::nlpRelation),
         ) },
         "metadata" to doc.metadata?.let { m -> mapOf("processor" to m.processor, "implementation" to m.implementation,
-            "runtime" to m.runtime, "configuration" to m.configuration) })
+            "runtime" to m.runtime, "configuration" to m.configuration) },
+        "mentions" to doc.mentions.map { mention -> _m["sentence" j mention.sentence,
+            "span" j _l[mention.span.first, mention.span.last], "text" j mention.text,
+            "chain" j mention.chain, "representative" j mention.representative] })
+
+    /** Ranges are inclusive token endpoints, not quotation offsets; empty ranges and glosses stay unchanged. */
+    private fun nlpRelation(relation: NlpRelation): Map<String, Any?> {
+        require(relation.confidence.isFinite()) { "NLP relation confidence must be finite" }
+        return _m["subject" j _l[relation.subject.first, relation.subject.last],
+            "relation" j _l[relation.relation.first, relation.relation.last],
+            "object" j _l[relation.`object`.first, relation.`object`.last],
+            "subjectText" j relation.subjectText, "relationText" j relation.relationText,
+            "objectText" j relation.objectText, "confidence" j relation.confidence]
+    }
+
+    private fun relationRow(relation: NlpRelation): List<Any?> {
+        require(relation.confidence.isFinite()) { "NLP relation confidence must be finite" }
+        return _l[relation.subject.first, relation.subject.last, relation.relation.first, relation.relation.last,
+            relation.`object`.first, relation.`object`.last, relation.subjectText, relation.relationText,
+            relation.objectText, relation.confidence]
+    }
 
     /** Prompt rows declare columns once; text is supplied by [source], storage uses [nlp]. */
     fun nlpPrompt(doc: NlpDocument): Map<String, Any?> = mapOf(
         "columns" to mapOf(
-            "sentence" to listOf("index", "begin", "end", "tokens", "dependencies"),
+            "sentence" to _l["index", "begin", "end", "tokens", "dependencies", "relations", "kbp"],
             "token" to listOf("index", "begin", "end", "word", "lemma", "tag", "ner"),
-            "dependency" to listOf("governor", "dependent", "relation"),
+            "dependency" to listOf("governor", "dependent", "relation", "governorCopy", "dependentCopy"),
+            "relation" to _l["subjectFirstToken", "subjectLastToken", "relationFirstToken", "relationLastToken",
+                "objectFirstToken", "objectLastToken", "subjectText", "relationText", "objectText", "confidence"],
+            "mention" to _l["sentence", "firstToken", "lastToken", "text", "chain", "representative"],
         ),
         "sentences" to doc.sentences.values { s -> listOf(s.index, s.begin, s.end,
             s.tokens.values { t -> listOf(t.index, t.begin, t.end, t.word, t.lemma, t.tag, t.ner) },
-            s.dependencies.values { d -> listOf(d.governor, d.dependent, d.relation) },
+            s.dependencies.values { d -> listOf(d.governor, d.dependent, d.relation, d.governorCopy, d.dependentCopy) },
+            s.relations.map(::relationRow), s.kbp.map(::relationRow),
         ) },
+        "mentions" to doc.mentions.map { _l[it.sentence, it.span.first, it.span.last, it.text, it.chain, it.representative] },
     )
+
+    /**
+     * Raw stored-field presence only, not producer execution, valid semantics or a claim of zero outputs.
+     * Absent historical fields decode to empty lists but cannot be recovered. No observed metadata or
+     * historical reasons are changed. As with [decode], callers must bound and authorize retrieval.
+     * For an empty sentence array the per-sentence field checks are vacuous; inspect `nlp` and `mentions` too.
+     */
+    fun nlpRetentionCoverage(bytes: ByteArray): Map<String, Boolean> {
+        val document = CanonicalCbor.decodeMap(bytes)["nlp"] as? Map<*, *>
+        val sentences = document?.get("sentences") as? List<*>
+        fun everySentence(key: String) = sentences?.all { it is Map<*, *> && it.containsKey(key) } == true
+        return _m["nlp" j (document != null), "relations" j everySentence("relations"),
+            "kbp" j everySentence("kbp"), "mentions" j (document?.containsKey("mentions") == true)]
+    }
 
     fun proposal(p: DocumentProposal): Map<String, Any?> = mapOf(
         "raw" to p.raw, "subject" to p.subject, "predicate" to p.predicate, "object" to p.obj,
@@ -176,11 +223,12 @@ internal object DocumentCuratorCodec {
                     NlpToken(t.int("index"), t.int("begin"), t.int("end"), t.str("word"),
                         t.str("lemma"), t.str("tag"), t.str("ner"))
                 } }.toSeries(), sentence.array("dependencies").map { edge -> (edge as Map<*, *>).let { e ->
-                    NlpDependency(e.int("governor"), e.int("dependent"), e.str("relation"))
-                } }.toSeries())
+                    NlpDependency(e.int("governor"), e.int("dependent"), e.str("relation"),
+                        e.copyCount("governorCopy"), e.copyCount("dependentCopy"))
+                } }.toSeries(), sentence.nlpRelations("relations"), sentence.nlpRelations("kbp"))
         }.toSeries(), (d["metadata"] as? Map<*, *>)?.let { meta -> NlpMetadata(meta.str("processor"), meta.str("implementation"),
             meta.obj("runtime").mapValues { (_, v) -> v as String },
-            meta.obj("configuration").mapValues { (_, v) -> v as String }) }) }
+            meta.obj("configuration").mapValues { (_, v) -> v as String }) }, d.nlpMentions()) }
         val model = (m["model"] as? Map<*, *>)?.let { r -> ModelResponse(r.str("content"),
             ModelUsage(r.int("promptTokens"), r.int("completionTokens"), r.int("totalTokens")), r.str("providerId"), r["modelId"] as? String) }
         val proposals = m.array("proposals").map { value -> (value as Map<*, *>).let { p -> DocumentProposal(
@@ -219,6 +267,48 @@ internal object DocumentCuratorCodec {
 
     private fun Map<*, *>.str(key: String) = this[key] as String
     private fun Map<*, *>.int(key: String) = (this[key] as Number).toInt()
+    private fun observationInt(value: Any?): Int {
+        val number = (value as? Number)?.toDouble() ?: error("NLP observation integer required")
+        require(number.isFinite() && number >= Int.MIN_VALUE && number <= Int.MAX_VALUE && number == number.toInt().toDouble()) {
+            "NLP observation integer outside range"
+        }
+        return number.toInt()
+    }
+    private fun observationRange(value: Any?): IntRange {
+        val endpoints = value as? List<*> ?: error("NLP observation range must be a pair")
+        require(endpoints.size == 2) { "NLP observation range must have two endpoints" }
+        // Keep empty and implicit spans verbatim. They do not create source tokens or quotations.
+        return observationInt(endpoints[0])..observationInt(endpoints[1])
+    }
+    private fun Map<*, *>.observationArray(key: String): List<*> =
+        if (!containsKey(key)) _l.get<Any?>() else this[key] as? List<*> ?: error("NLP $key must be an array")
+    private fun Map<*, *>.nlpRelations(key: String): List<NlpRelation> = observationArray(key).map { value ->
+        val relation = value as? Map<*, *> ?: error("NLP relation must be an object")
+        require(relation.keys == _s["subject", "relation", "object", "subjectText", "relationText", "objectText", "confidence"]) {
+            "Missing or unsupported NLP relation fields"
+        }
+        val confidence = (relation["confidence"] as? Number)?.toDouble() ?: error("NLP relation confidence must be numeric")
+        require(confidence.isFinite()) { "NLP relation confidence must be finite" }
+        NlpRelation(observationRange(relation["subject"]), observationRange(relation["relation"]),
+            observationRange(relation["object"]), relation.str("subjectText"), relation.str("relationText"),
+            relation.str("objectText"), confidence)
+    }
+    private fun Map<*, *>.nlpMentions(): List<NlpMention> = observationArray("mentions").map { value ->
+        val mention = value as? Map<*, *> ?: error("NLP mention must be an object")
+        require(mention.keys == _s["sentence", "span", "text", "chain", "representative"]) {
+            "Missing or unsupported NLP mention fields"
+        }
+        NlpMention(observationInt(mention["sentence"]), observationRange(mention["span"]), mention.str("text"),
+            observationInt(mention["chain"]), mention["representative"] as? Boolean ?: error("NLP mention representative must be boolean"))
+    }
+    private fun Map<*, *>.copyCount(key: String): Int {
+        if (!containsKey(key)) return 0 // Historical records did not retain copied-node identity.
+        val number = (this[key] as? Number)?.toDouble() ?: error("Dependency copy count must be an integer")
+        require(number.isFinite() && number >= 0 && number <= Int.MAX_VALUE && number == number.toInt().toDouble()) {
+            "Dependency copy count must be a nonnegative integer"
+        }
+        return number.toInt()
+    }
     private fun Map<*, *>.array(key: String) = this[key] as List<*>
     private fun Map<*, *>.obj(key: String) = (this[key] as Map<*, *>).entries.associate { it.key as String to it.value }
     private fun Map<*, *>.cids(key: String) = array(key).let { arr -> arr.size j { i -> ContentId(arr[i] as String) } }

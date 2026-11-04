@@ -1,0 +1,12 @@
+{
+  "serversStopped": {
+    "36319": true,
+    "41343": true,
+    "36027": true
+  },
+  "browserClosed": true,
+  "fixtureExit": 0,
+  "driverExit": 0,
+  "runtimeCasRetained": true,
+  "earlierHarnessAttemptsPreserved": 2
+}

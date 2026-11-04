@@ -1,0 +1,47 @@
+Actual local English inspection proof
+
+The exact frozen v51 production main JAR and Documents browser bundle are recorded
+in execution-identity.json. Only the external transport Fixture classes were added
+to its classpath. No existing production class was overlaid and no friend access
+was used. The fixture forwarded the production ProjectDbWire, PatchWire and
+DocumentEnglishWire routes. It was not the full Oroboros daemon listener.
+
+Chromium CDP supplied two actual on-disk TXT files to a native Files drag onto the
+Documents main content. The production uploader created a new Manual project,
+used putDocumentBatch, and preserved the old selection until the explicit result
+link was chosen. The latest upstream uploader also called the actual production
+mine route. With only TXT inputs that miner completed zero work, extracted zero
+files and minted zero beliefs. It was not replaced by a fake successful response.
+
+Inspection was explicit. Actual installed CoreNLP 4.5.10 SYNTAX produced eight
+sentences, 114 tokens and 24 lexical marker occurrences over 655 UTF-16 units.
+Original uppercase, CRLF, accented characters and a non-BMP owl were checked via
+exact source slices, token spans, quotations, CIDs and retained receipt readback.
+Negated unless, multiple conditions, exceptions, definition and cross-reference
+markers remained visible. Tokens and syntax details rendered a real SVG dependency
+graph: exact governor/dependent pairs, ROOT, arrow marker and original source-word
+labels were checked against the parser observations. This is not a constituency
+parse or established legal meaning. Partial-range results were explicit. Source
+replacement refused stale inspection, and a held late response did not overwrite
+a different selected document.
+
+The separate actual-parser guard probe preserved TENANT MAY REMAIN UNLESS RENT IS
+NOT DUE exactly, reported NEGATED and emitted zero interpreted norms. The old
+immutable v49 JAR had actually changed its case and emitted condition 'unless rent
+be due'; that Red evidence is retained separately in baseline-old.
+
+The fixture JVM had no configured model, HTX, belief bag or review owner. All model,
+automatic intake, explicit review intake and Rete-fact counters stayed zero. Its
+process inherited a seccomp filter denying connect/sendto/sendmsg/sendmmsg with
+EACCES. Python before-exec selfprobes and actual Java TCP/UDP probes before and
+after parsing were refused. The loopback listener still accepted browser requests
+and wrote responses. This demonstrates this local parser workflow under the stated
+outbound syscall filter; it is not a full OS sandbox or production air-gap claim.
+The browser made zero external requests and reported zero page errors.
+
+Successful attempt 3 exited zero for both browser driver and fixture. Earlier
+attempts were preserved: both stopped before upload or parsing because the old
+harness assumed one summary element and a closed upload panel; latest upstream
+HTML has nested Upload details and the panel open by default. Only driver setup
+was adjusted. All three owned listener sockets were checked closed; browser closed;
+CAS and evidence files were intentionally retained for inspection.

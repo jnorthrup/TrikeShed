@@ -1,0 +1,408 @@
+{
+  "result": "PASS",
+  "scope": "Two short synthetic FULL binary/runtime compatibility cases, not legal truth, general quality, nonempty KBP-slot coverage, large-document behavior or performance comparison",
+  "host": {
+    "sourceHead": "5878d7d14095cf0aa8fda5d997ffb35cacf73c5c",
+    "hostJarSha256": "f575d402f9b84bacab0cb805636571eab973e4e18212733ec6a67b8a891d28b8",
+    "classpathSha256": "f2ae8251b2b51b65bb663d76051e3fd8fcb65771980f29a2aa5c14f0488c08d7",
+    "probeSha256": "230acfc11d513e5d9658ee8549a1e06b1e2c1d9d76621554c1ae67ea57568903",
+    "productionClassOverlays": false,
+    "friendAccess": false,
+    "parserProfile": "full-v1",
+    "freshJvmPerVersion": true,
+    "externalTimeoutSeconds": 180,
+    "heapLimit": "4g",
+    "nativeMemoryLimit": false,
+    "fullOsSandbox": false,
+    "compileMode": "Compiled external helper against frozen JAR/classpath"
+  },
+  "syntheticCasesPerVersion": 2,
+  "fullProfileConfiguration": {
+    "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp",
+    "kbp.maxlen": "100",
+    "threads": "1"
+  },
+  "observedStructurePairsIdentical": 2,
+  "kbpEmittedRelationsPerVersion": 0,
+  "versions": {
+    "4.5.10": {
+      "exit": 0,
+      "timedOut": false,
+      "elapsedMillis": 22756,
+      "kernelMaxRssKiB": 3159492,
+      "userCpuSeconds": 45.669325,
+      "cases": [
+        {
+          "id": "positive-if",
+          "status": "PASS",
+          "exactSourceAndTokens": true,
+          "tokenCount": 9,
+          "allSentencesBelowKbpMaxLength": true,
+          "nerTypes": [],
+          "openieRelations": 5,
+          "kbpRelations": 0,
+          "observedRelationsValidated": 5,
+          "conditionIssues": [
+            null
+          ],
+          "normCandidates": 1,
+          "conditions": [
+            "if payment be due"
+          ],
+          "structuralCid": "sha256:8500c178e5ddd6952e1d1f038638619df6e27aad3f5ed4b06b97ab514663efc2",
+          "parser": {
+            "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+            "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+            "runtime": {
+              "module": "corenlp",
+              "profile": "full-v1",
+              "dependencyGraph": "enhanced-plus-plus",
+              "dependencyNodeIdentity": "token-index+copy-count/1",
+              "declared": "edu.stanford.nlp:stanford-corenlp:4.5.10,edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+              "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+              "jar": "stanford-corenlp-4.5.10.jar",
+              "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+              "packageVersion": "4.5.10",
+              "parserNormalization": "identity/1",
+              "sourceTextCid": "sha256:d6de3786b30bc27bce8d3ee31b12f13d325d5cf45f2131f7c4c7cf57255f9ce4",
+              "parserInputCid": "sha256:d6de3786b30bc27bce8d3ee31b12f13d325d5cf45f2131f7c4c7cf57255f9ce4",
+              "relationGlossSource": "parser-input"
+            },
+            "configuration": {
+              "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp",
+              "kbp.maxlen": "100",
+              "threads": "1"
+            }
+          },
+          "coverage": {
+            "kind": "bounded-text-range",
+            "semantics": "not-established",
+            "markerMethod": "literal-word-and-phrase-candidates",
+            "dependencyNodeIdentity": "token-index+copy-count/1",
+            "parserDependencyNodeIdentity": "token-index+copy-count/1",
+            "parserNodeIdentityReported": true,
+            "scope": "sentence-token-dependency-observations",
+            "omitted": [
+              "constituency",
+              "coreference",
+              "openie",
+              "kbp",
+              "legal-interpretation"
+            ]
+          },
+          "elapsedMillis": 22006
+        },
+        {
+          "id": "named-negated-exception",
+          "status": "PASS",
+          "exactSourceAndTokens": true,
+          "tokenCount": 11,
+          "allSentencesBelowKbpMaxLength": true,
+          "nerTypes": [
+            "ORGANIZATION",
+            "PERSON"
+          ],
+          "openieRelations": 2,
+          "kbpRelations": 0,
+          "observedRelationsValidated": 2,
+          "conditionIssues": [
+            "NEGATED"
+          ],
+          "normCandidates": 0,
+          "conditions": [],
+          "structuralCid": "sha256:69b3a69f6f51aad3d36d6af6dd13c53b71db0c896fd26b649a33f87af5d184f3",
+          "parser": {
+            "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+            "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+            "runtime": {
+              "module": "corenlp",
+              "profile": "full-v1",
+              "dependencyGraph": "enhanced-plus-plus",
+              "dependencyNodeIdentity": "token-index+copy-count/1",
+              "declared": "edu.stanford.nlp:stanford-corenlp:4.5.10,edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+              "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+              "jar": "stanford-corenlp-4.5.10.jar",
+              "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+              "packageVersion": "4.5.10",
+              "parserNormalization": "identity/1",
+              "sourceTextCid": "sha256:ddf9e001cbc235e2f0773a66ac0609f02bb7ffaaf91458f68387c72156929fca",
+              "parserInputCid": "sha256:ddf9e001cbc235e2f0773a66ac0609f02bb7ffaaf91458f68387c72156929fca",
+              "relationGlossSource": "parser-input"
+            },
+            "configuration": {
+              "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp",
+              "kbp.maxlen": "100",
+              "threads": "1"
+            }
+          },
+          "coverage": {
+            "kind": "bounded-text-range",
+            "semantics": "not-established",
+            "markerMethod": "literal-word-and-phrase-candidates",
+            "dependencyNodeIdentity": "token-index+copy-count/1",
+            "parserDependencyNodeIdentity": "token-index+copy-count/1",
+            "parserNodeIdentityReported": true,
+            "scope": "sentence-token-dependency-observations",
+            "omitted": [
+              "constituency",
+              "coreference",
+              "openie",
+              "kbp",
+              "legal-interpretation"
+            ]
+          },
+          "elapsedMillis": 136
+        }
+      ],
+      "modelMuxCalls": 0,
+      "narsAdmissionCalls": 0,
+      "liveCorpusAccess": false,
+      "reviewStatus": "unreviewed",
+      "outboundDeny": {
+        "scope": "fixture process and descendants only; inbound listener and ordinary response writes allowed",
+        "notClaimed": [
+          "full OS sandbox",
+          "production daemon air gap",
+          "filesystem isolation",
+          "kernel exploit containment"
+        ],
+        "deniedSyscalls": [
+          "connect",
+          "sendto",
+          "sendmsg",
+          "sendmmsg"
+        ],
+        "errno": 13,
+        "selfProbes": [
+          {
+            "operation": "tcp-connect",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendto",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendmsg",
+            "errno": 13,
+            "result": "DENIED"
+          }
+        ],
+        "noNewPrivileges": 1,
+        "seccompMode": 2,
+        "wrapperSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+      }
+    },
+    "4.6.0": {
+      "exit": 0,
+      "timedOut": false,
+      "elapsedMillis": 17561,
+      "kernelMaxRssKiB": 2897564,
+      "userCpuSeconds": 38.911754,
+      "cases": [
+        {
+          "id": "positive-if",
+          "status": "PASS",
+          "exactSourceAndTokens": true,
+          "tokenCount": 9,
+          "allSentencesBelowKbpMaxLength": true,
+          "nerTypes": [],
+          "openieRelations": 5,
+          "kbpRelations": 0,
+          "observedRelationsValidated": 5,
+          "conditionIssues": [
+            null
+          ],
+          "normCandidates": 1,
+          "conditions": [
+            "if payment be due"
+          ],
+          "structuralCid": "sha256:8500c178e5ddd6952e1d1f038638619df6e27aad3f5ed4b06b97ab514663efc2",
+          "parser": {
+            "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+            "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+            "runtime": {
+              "module": "corenlp",
+              "profile": "full-v1",
+              "dependencyGraph": "enhanced-plus-plus",
+              "dependencyNodeIdentity": "token-index+copy-count/1",
+              "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+              "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+              "jar": "stanford-corenlp-4.6.0.jar",
+              "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+              "packageVersion": "4.6.0",
+              "parserNormalization": "identity/1",
+              "sourceTextCid": "sha256:d6de3786b30bc27bce8d3ee31b12f13d325d5cf45f2131f7c4c7cf57255f9ce4",
+              "parserInputCid": "sha256:d6de3786b30bc27bce8d3ee31b12f13d325d5cf45f2131f7c4c7cf57255f9ce4",
+              "relationGlossSource": "parser-input"
+            },
+            "configuration": {
+              "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp",
+              "kbp.maxlen": "100",
+              "threads": "1"
+            }
+          },
+          "coverage": {
+            "kind": "bounded-text-range",
+            "semantics": "not-established",
+            "markerMethod": "literal-word-and-phrase-candidates",
+            "dependencyNodeIdentity": "token-index+copy-count/1",
+            "parserDependencyNodeIdentity": "token-index+copy-count/1",
+            "parserNodeIdentityReported": true,
+            "scope": "sentence-token-dependency-observations",
+            "omitted": [
+              "constituency",
+              "coreference",
+              "openie",
+              "kbp",
+              "legal-interpretation"
+            ]
+          },
+          "elapsedMillis": 17085
+        },
+        {
+          "id": "named-negated-exception",
+          "status": "PASS",
+          "exactSourceAndTokens": true,
+          "tokenCount": 11,
+          "allSentencesBelowKbpMaxLength": true,
+          "nerTypes": [
+            "ORGANIZATION",
+            "PERSON"
+          ],
+          "openieRelations": 2,
+          "kbpRelations": 0,
+          "observedRelationsValidated": 2,
+          "conditionIssues": [
+            "NEGATED"
+          ],
+          "normCandidates": 0,
+          "conditions": [],
+          "structuralCid": "sha256:69b3a69f6f51aad3d36d6af6dd13c53b71db0c896fd26b649a33f87af5d184f3",
+          "parser": {
+            "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+            "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+            "runtime": {
+              "module": "corenlp",
+              "profile": "full-v1",
+              "dependencyGraph": "enhanced-plus-plus",
+              "dependencyNodeIdentity": "token-index+copy-count/1",
+              "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+              "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+              "jar": "stanford-corenlp-4.6.0.jar",
+              "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+              "packageVersion": "4.6.0",
+              "parserNormalization": "identity/1",
+              "sourceTextCid": "sha256:ddf9e001cbc235e2f0773a66ac0609f02bb7ffaaf91458f68387c72156929fca",
+              "parserInputCid": "sha256:ddf9e001cbc235e2f0773a66ac0609f02bb7ffaaf91458f68387c72156929fca",
+              "relationGlossSource": "parser-input"
+            },
+            "configuration": {
+              "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp",
+              "kbp.maxlen": "100",
+              "threads": "1"
+            }
+          },
+          "coverage": {
+            "kind": "bounded-text-range",
+            "semantics": "not-established",
+            "markerMethod": "literal-word-and-phrase-candidates",
+            "dependencyNodeIdentity": "token-index+copy-count/1",
+            "parserDependencyNodeIdentity": "token-index+copy-count/1",
+            "parserNodeIdentityReported": true,
+            "scope": "sentence-token-dependency-observations",
+            "omitted": [
+              "constituency",
+              "coreference",
+              "openie",
+              "kbp",
+              "legal-interpretation"
+            ]
+          },
+          "elapsedMillis": 155
+        }
+      ],
+      "modelMuxCalls": 0,
+      "narsAdmissionCalls": 0,
+      "liveCorpusAccess": false,
+      "reviewStatus": "unreviewed",
+      "outboundDeny": {
+        "scope": "fixture process and descendants only; inbound listener and ordinary response writes allowed",
+        "notClaimed": [
+          "full OS sandbox",
+          "production daemon air gap",
+          "filesystem isolation",
+          "kernel exploit containment"
+        ],
+        "deniedSyscalls": [
+          "connect",
+          "sendto",
+          "sendmsg",
+          "sendmmsg"
+        ],
+        "errno": 13,
+        "selfProbes": [
+          {
+            "operation": "tcp-connect",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendto",
+            "errno": 13,
+            "result": "DENIED"
+          },
+          {
+            "operation": "udp-sendmsg",
+            "errno": 13,
+            "result": "DENIED"
+          }
+        ],
+        "noNewPrivileges": 1,
+        "seccompMode": 2,
+        "wrapperSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+      }
+    }
+  },
+  "comparison": [
+    {
+      "case": "positive-if",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": null,
+      "newParseMillis": null,
+      "oldOpenieRelations": 5,
+      "newOpenieRelations": 5,
+      "oldKbpRelations": 0,
+      "newKbpRelations": 0,
+      "oldConditionIssues": [
+        null
+      ],
+      "newConditionIssues": [
+        null
+      ]
+    },
+    {
+      "case": "named-negated-exception",
+      "oldStatus": "PASS",
+      "newStatus": "PASS",
+      "structuralOutputIdentical": true,
+      "oldParseMillis": null,
+      "newParseMillis": null,
+      "oldOpenieRelations": 2,
+      "newOpenieRelations": 2,
+      "oldKbpRelations": 0,
+      "newKbpRelations": 0,
+      "oldConditionIssues": [
+        "NEGATED"
+      ],
+      "newConditionIssues": [
+        "NEGATED"
+      ]
+    }
+  ],
+  "publication": "Entire corpus is two synthetic examples; no supplied private PDF text or corpus paths."
+}

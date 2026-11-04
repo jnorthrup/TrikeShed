@@ -1,0 +1,200 @@
+{
+  "module": "corenlp",
+  "declaredVersion": "4.6.0",
+  "jarCount": 28,
+  "bytes": 495983146,
+  "allManifestRowsVerified": true,
+  "errors": [],
+  "installed4_5_10ManifestUnchanged": true,
+  "installed4_5_10AllManifestRowsVerified": true,
+  "classfileMajors": {
+    "edu/stanford/nlp/pipeline/StanfordCoreNLP.class": 55,
+    "edu/stanford/nlp/pipeline/CoreDocument.class": 55,
+    "edu/stanford/nlp/ling/IndexedWord.class": 55,
+    "edu/stanford/nlp/semgraph/semgrex/SemgrexPattern.class": 55
+  },
+  "moduleDescriptors": [],
+  "manifestText": "Manifest-Version: 1.0\r\nImplementation-Version: 4.6.0\r\nBuilt-Date: 2026-09-24\r\nCreated-By: Stanford JavaNLP (horatio)\r\nMain-class: edu.stanford.nlp.pipeline.StanfordCoreNLP\r\nAutomatic-Module-Name: edu.stanford.nlp.corenlp\r\n\r\n",
+  "files": [
+    {
+      "file": "commons-lang3-3.20.0.jar",
+      "bytes": 713862,
+      "sha256": "69e5c9fa35da7a51a5fd2099dfe56a2d8d32cf233e2f6d770e796146440263f4",
+      "verified": true
+    },
+    {
+      "file": "ejml-cdense-0.39.jar",
+      "bytes": 74558,
+      "sha256": "ab333ff4984a8b8d7c5ef5015f52ea27f1a2fc24ee377f2e5dab31da0a10165c",
+      "verified": true
+    },
+    {
+      "file": "ejml-core-0.39.jar",
+      "bytes": 199222,
+      "sha256": "937fb1b1a0859d88e76b5cf0b2ddc62d03198120fbf213b5cdf2d6c950abc995",
+      "verified": true
+    },
+    {
+      "file": "ejml-ddense-0.39.jar",
+      "bytes": 335068,
+      "sha256": "28bb9c06901211de146d80ef4ef0299c5dae468a8f9d585d016c19479ed93ef2",
+      "verified": true
+    },
+    {
+      "file": "ejml-dsparse-0.39.jar",
+      "bytes": 70943,
+      "sha256": "c45113df12bb5ca6f6d69e6c2b5dfb74e91acb518c90adc75fa90225c4c1616e",
+      "verified": true
+    },
+    {
+      "file": "ejml-fdense-0.39.jar",
+      "bytes": 334005,
+      "sha256": "9deed9648a6954c37f79543630638689fc683fb341154bf265cf41aa019e8d38",
+      "verified": true
+    },
+    {
+      "file": "ejml-fsparse-0.39.jar",
+      "bytes": 70300,
+      "sha256": "8e588f16233c5961ddc0f517a165ca35c46f85136756ee6119727885b375d1b9",
+      "verified": true
+    },
+    {
+      "file": "ejml-simple-0.39.jar",
+      "bytes": 178321,
+      "sha256": "7639609431b267091f81362c70897768a3b8193836206d344c08b2004934d2ef",
+      "verified": true
+    },
+    {
+      "file": "ejml-zdense-0.39.jar",
+      "bytes": 74948,
+      "sha256": "475ac2a2cf4467f814a54f13fa68c1345f82cd2cabaa23757e96e2c0cb2c80d3",
+      "verified": true
+    },
+    {
+      "file": "istack-commons-runtime-3.0.7.jar",
+      "bytes": 25523,
+      "sha256": "6443e10ba2e259fb821d9b6becf10db5316285fc30c53cec9d7b19a3877e7fdf",
+      "verified": true
+    },
+    {
+      "file": "jakarta.json-1.1.6.jar",
+      "bytes": 140425,
+      "sha256": "4e1414edc1d6c7dc0747d187c94b451515ed340a9b735156daa91fcefc6aa1b0",
+      "verified": true
+    },
+    {
+      "file": "jakarta.servlet-api-4.0.4.jar",
+      "bytes": 82973,
+      "sha256": "586e27706c21258f5882f43be06904f49b02db9ac54e345d393fe4a32494d127",
+      "verified": true
+    },
+    {
+      "file": "javax.activation-api-1.2.0.jar",
+      "bytes": 56674,
+      "sha256": "43fdef0b5b6ceb31b0424b208b930c74ab58fac2ceeb7b3f6fd3aeb8b5ca4393",
+      "verified": true
+    },
+    {
+      "file": "jaxb-api-2.4.0-b180830.0359.jar",
+      "bytes": 128032,
+      "sha256": "56b9e9702753763007435162ea788055efcfefc86ab920f032c0411dc547b836",
+      "verified": true
+    },
+    {
+      "file": "jaxb-impl-2.4.0-b180830.0438.jar",
+      "bytes": 1099271,
+      "sha256": "4e4e4876368f5e1d088839a4ac37cfd419b6d1792518919116650a61a99f6a7a",
+      "verified": true
+    },
+    {
+      "file": "joda-time-2.14.0.jar",
+      "bytes": 639779,
+      "sha256": "1e2da6f9eb65f20a25d9a3186831ed2b3fb14f7a48e1ef8206135ee58cb143d3",
+      "verified": true
+    },
+    {
+      "file": "jollyday-0.5.10.jar",
+      "bytes": 229231,
+      "sha256": "587a429686131844738f319d860d88c46882d2ab70650a7b8c34e12491cc57b9",
+      "verified": true
+    },
+    {
+      "file": "jsr305-3.0.2.jar",
+      "bytes": 19936,
+      "sha256": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+      "verified": true
+    },
+    {
+      "file": "protobuf-java-3.25.5.jar",
+      "bytes": 1875414,
+      "sha256": "8540247fad9e06baefa8fb45eb313802d019f485f14300e0f9d6b556ed88e753",
+      "verified": true
+    },
+    {
+      "file": "serializer-2.7.3.jar",
+      "bytes": 283536,
+      "sha256": "5f6804bacdfdb3ccc52d2538536fab8986696d61559b081054a420c653806667",
+      "verified": true
+    },
+    {
+      "file": "slf4j-api-1.7.12.jar",
+      "bytes": 32127,
+      "sha256": "0aee9a77a4940d72932b0d0d9557793f872e66a03f598e473f45e7efecdccf99",
+      "verified": true
+    },
+    {
+      "file": "stanford-corenlp-4.6.0-models.jar",
+      "bytes": 474409584,
+      "sha256": "b3ff73020ea5b764bae94a3f4ff727e913df5c0ce998bf4506e9bb569a8b2e60",
+      "verified": true
+    },
+    {
+      "file": "stanford-corenlp-4.6.0.jar",
+      "bytes": 9225639,
+      "sha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+      "verified": true
+    },
+    {
+      "file": "threeten-extra-1.5.0.jar",
+      "bytes": 233745,
+      "sha256": "e7def554536188fbaf8aac1a0a2f956b039cbbb5696edc3b8336c442c56ae445",
+      "verified": true
+    },
+    {
+      "file": "xalan-2.7.3.jar",
+      "bytes": 3455761,
+      "sha256": "febd48bb133a96c447282213951a6b74ea7fb45c0d896121296c014316bda6b0",
+      "verified": true
+    },
+    {
+      "file": "xercesImpl-2.12.2.jar",
+      "bytes": 1446149,
+      "sha256": "6fc991829af1708d15aea50c66f0beadcd2cfeb6968e0b2f55c1b0909883fe16",
+      "verified": true
+    },
+    {
+      "file": "xml-apis-1.4.01.jar",
+      "bytes": 220536,
+      "sha256": "a840968176645684bb01aed376e067ab39614885f9eee44abe35a5f20ebe7fad",
+      "verified": true
+    },
+    {
+      "file": "xom-1.4.1.jar",
+      "bytes": 327584,
+      "sha256": "a14c97f9669a6798821024d6182b63ca3fdb1d2853a788f7f77288e066dad8ba",
+      "verified": true
+    }
+  ],
+  "englishSyntaxResourceNames": [
+    "edu/stanford/nlp/models/parser/nndep/english_SD.gz",
+    "edu/stanford/nlp/models/parser/nndep/english_UD.gz",
+    "edu/stanford/nlp/models/ner/english.all.3class.distsim.prop",
+    "edu/stanford/nlp/models/ner/english.muc.7class.distsim.crf.ser.gz",
+    "edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz",
+    "edu/stanford/nlp/models/ner/english.muc.7class.distsim.prop",
+    "edu/stanford/nlp/models/ner/english.conll.4class.distsim.prop",
+    "edu/stanford/nlp/models/ner/english.conll.4class.distsim.crf.ser.gz",
+    "edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger.props",
+    "edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger"
+  ]
+}

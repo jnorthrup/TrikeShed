@@ -1,0 +1,2881 @@
+{
+  "result": "PASS",
+  "scope": "Actual native TXT drop and production Documents English UI with actual local CoreNLP SYNTAX under a fixture-only outbound syscall deny filter. Exact uppercase/Unicode source spans, legal lexical markers, token syntax, explicit partial coverage and retained receipt readback. Stale source refused; late response isolated. Upstream upload mining was real and found no mineable TXT inputs. No configured model, provider call, automatic curation intake or reasoning admission.",
+  "meta": {
+    "project": "english-proof",
+    "id": "agreement.txt",
+    "otherId": "other.txt",
+    "startProject": "existing-documents",
+    "startId": "other.txt",
+    "nativeFilePaths": [
+      "agreement.txt",
+      "other.txt"
+    ],
+    "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+    "originalText": "THE TENANT MUST NOT DISCLOSE CUSTOMER DATA UNLESS THE CUSTOMER HAS GIVEN WRITTEN CONSENT.\r\nTenant may occupy unless rent is not due, and only if the permit remains valid.\r\nIf written notice is received, the supplier shall deliver the records, except where a court prohibits disclosure.\r\nConfidential Information means records described in Section 4.2.\r\nThe Montr\u00e9al office may retain the record \ud83e\udd89 until the audit is complete.\r\nAn observer reported that the tenant must destroy the records.\r\nTenant may inspect the ledger provided that payment is received, subject to Section 7.\r\nNotwithstanding Section 8, the agent shall preserve this original phrase.\r\n",
+    "partialBegin": 91,
+    "partialEnd": 170
+  },
+  "availability": {
+    "available": true,
+    "requiresModel": false,
+    "module": "corenlp",
+    "profile": "syntax-v1",
+    "maxChars": 16384,
+    "semantics": "not-established",
+    "parseWallDeadline": null
+  },
+  "inventory": {
+    "schema": "trikeshed.english-inspection.v1",
+    "reviewStatus": "unreviewed",
+    "authority": "lexical-and-parser-observations-only",
+    "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+    "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+    "range": {
+      "begin": 0,
+      "end": 655,
+      "totalLength": 655,
+      "complete": true
+    },
+    "parser": {
+      "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+      "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+      "runtime": {
+        "module": "corenlp",
+        "profile": "syntax-v1",
+        "declared": "edu.stanford.nlp:stanford-corenlp:4.5.10,edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+        "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+        "jar": "stanford-corenlp-4.5.10.jar",
+        "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+        "packageVersion": "4.5.10",
+        "parserNormalization": "sentence-case/1",
+        "sourceTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "parserInputCid": "sha256:f171ea394025492585aac5a343540a1ee48b2edc0e400fbad953e2ebfa28b815",
+        "relationGlossSource": "parser-input"
+      },
+      "configuration": {
+        "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+        "threads": "1"
+      }
+    },
+    "coverage": {
+      "kind": "bounded-text-range",
+      "semantics": "not-established",
+      "markerMethod": "literal-word-and-phrase-candidates",
+      "scope": "sentence-token-dependency-observations",
+      "omitted": [
+        "constituency",
+        "coreference",
+        "openie",
+        "kbp",
+        "legal-interpretation"
+      ]
+    },
+    "sentences": [
+      {
+        "index": 0,
+        "begin": 0,
+        "end": 89,
+        "quote": "THE TENANT MUST NOT DISCLOSE CUSTOMER DATA UNLESS THE CUSTOMER HAS GIVEN WRITTEN CONSENT.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 0,
+          "end": 89,
+          "quote": "THE TENANT MUST NOT DISCLOSE CUSTOMER DATA UNLESS THE CUSTOMER HAS GIVEN WRITTEN CONSENT.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 0,
+            "end": 3,
+            "word": "THE",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 4,
+            "end": 10,
+            "word": "TENANT",
+            "lemma": "tenant",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 11,
+            "end": 15,
+            "word": "MUST",
+            "lemma": "must",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 16,
+            "end": 19,
+            "word": "NOT",
+            "lemma": "not",
+            "pos": "RB",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 20,
+            "end": 28,
+            "word": "DISCLOSE",
+            "lemma": "disclose",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 29,
+            "end": 37,
+            "word": "CUSTOMER",
+            "lemma": "customer",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 38,
+            "end": 42,
+            "word": "DATA",
+            "lemma": "datum",
+            "pos": "NNS",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 43,
+            "end": 49,
+            "word": "UNLESS",
+            "lemma": "unless",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 50,
+            "end": 53,
+            "word": "THE",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 54,
+            "end": 62,
+            "word": "CUSTOMER",
+            "lemma": "customer",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 63,
+            "end": 66,
+            "word": "HAS",
+            "lemma": "have",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 12,
+            "begin": 67,
+            "end": 72,
+            "word": "GIVEN",
+            "lemma": "give",
+            "pos": "VBN",
+            "ner": "O"
+          },
+          {
+            "index": 13,
+            "begin": 73,
+            "end": 80,
+            "word": "WRITTEN",
+            "lemma": "write",
+            "pos": "VBN",
+            "ner": "O"
+          },
+          {
+            "index": 14,
+            "begin": 81,
+            "end": 88,
+            "word": "CONSENT",
+            "lemma": "consent",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 15,
+            "begin": 88,
+            "end": 89,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 5,
+            "relation": "root"
+          },
+          {
+            "governor": 2,
+            "dependent": 1,
+            "relation": "det"
+          },
+          {
+            "governor": 5,
+            "dependent": 2,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 5,
+            "dependent": 3,
+            "relation": "aux"
+          },
+          {
+            "governor": 5,
+            "dependent": 4,
+            "relation": "advmod"
+          },
+          {
+            "governor": 7,
+            "dependent": 6,
+            "relation": "compound"
+          },
+          {
+            "governor": 5,
+            "dependent": 7,
+            "relation": "obj"
+          },
+          {
+            "governor": 12,
+            "dependent": 8,
+            "relation": "mark"
+          },
+          {
+            "governor": 10,
+            "dependent": 9,
+            "relation": "det"
+          },
+          {
+            "governor": 12,
+            "dependent": 10,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 12,
+            "dependent": 11,
+            "relation": "aux"
+          },
+          {
+            "governor": 5,
+            "dependent": 12,
+            "relation": "advcl:unless"
+          },
+          {
+            "governor": 14,
+            "dependent": 13,
+            "relation": "amod"
+          },
+          {
+            "governor": 12,
+            "dependent": 14,
+            "relation": "obj"
+          },
+          {
+            "governor": 5,
+            "dependent": 15,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 11,
+            "end": 15,
+            "quote": "MUST",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "negation",
+            "label": "negation-marker",
+            "begin": 16,
+            "end": 19,
+            "quote": "NOT",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 43,
+            "end": 49,
+            "quote": "UNLESS",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "exception",
+            "label": "exception-marker",
+            "begin": 43,
+            "end": 49,
+            "quote": "UNLESS",
+            "status": "lexical-candidate"
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "begin": 91,
+        "end": 170,
+        "quote": "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 91,
+          "end": 170,
+          "quote": "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 91,
+            "end": 97,
+            "word": "Tenant",
+            "lemma": "tenant",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 98,
+            "end": 101,
+            "word": "may",
+            "lemma": "may",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 102,
+            "end": 108,
+            "word": "occupy",
+            "lemma": "occupy",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 109,
+            "end": 115,
+            "word": "unless",
+            "lemma": "unless",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 116,
+            "end": 120,
+            "word": "rent",
+            "lemma": "rent",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 121,
+            "end": 123,
+            "word": "is",
+            "lemma": "be",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 124,
+            "end": 127,
+            "word": "not",
+            "lemma": "not",
+            "pos": "RB",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 128,
+            "end": 131,
+            "word": "due",
+            "lemma": "due",
+            "pos": "JJ",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 131,
+            "end": 132,
+            "word": ",",
+            "lemma": ",",
+            "pos": ",",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 133,
+            "end": 136,
+            "word": "and",
+            "lemma": "and",
+            "pos": "CC",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 137,
+            "end": 141,
+            "word": "only",
+            "lemma": "only",
+            "pos": "RB",
+            "ner": "O"
+          },
+          {
+            "index": 12,
+            "begin": 142,
+            "end": 144,
+            "word": "if",
+            "lemma": "if",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 13,
+            "begin": 145,
+            "end": 148,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 14,
+            "begin": 149,
+            "end": 155,
+            "word": "permit",
+            "lemma": "permit",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 15,
+            "begin": 156,
+            "end": 163,
+            "word": "remains",
+            "lemma": "remain",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 16,
+            "begin": 164,
+            "end": 169,
+            "word": "valid",
+            "lemma": "valid",
+            "pos": "JJ",
+            "ner": "O"
+          },
+          {
+            "index": 17,
+            "begin": 169,
+            "end": 170,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 3,
+            "relation": "root"
+          },
+          {
+            "governor": 3,
+            "dependent": 1,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 3,
+            "dependent": 2,
+            "relation": "aux"
+          },
+          {
+            "governor": 8,
+            "dependent": 4,
+            "relation": "mark"
+          },
+          {
+            "governor": 8,
+            "dependent": 5,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 8,
+            "dependent": 6,
+            "relation": "cop"
+          },
+          {
+            "governor": 8,
+            "dependent": 7,
+            "relation": "advmod"
+          },
+          {
+            "governor": 3,
+            "dependent": 8,
+            "relation": "advcl:unless"
+          },
+          {
+            "governor": 8,
+            "dependent": 9,
+            "relation": "punct"
+          },
+          {
+            "governor": 8,
+            "dependent": 10,
+            "relation": "dep"
+          },
+          {
+            "governor": 15,
+            "dependent": 11,
+            "relation": "advmod"
+          },
+          {
+            "governor": 15,
+            "dependent": 12,
+            "relation": "mark"
+          },
+          {
+            "governor": 14,
+            "dependent": 13,
+            "relation": "det"
+          },
+          {
+            "governor": 15,
+            "dependent": 14,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 10,
+            "dependent": 15,
+            "relation": "dep"
+          },
+          {
+            "governor": 15,
+            "dependent": 16,
+            "relation": "xcomp"
+          },
+          {
+            "governor": 3,
+            "dependent": 17,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 98,
+            "end": 101,
+            "quote": "may",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 109,
+            "end": 115,
+            "quote": "unless",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "exception",
+            "label": "exception-marker",
+            "begin": 109,
+            "end": 115,
+            "quote": "unless",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "negation",
+            "label": "negation-marker",
+            "begin": 124,
+            "end": 127,
+            "quote": "not",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 137,
+            "end": 144,
+            "quote": "only if",
+            "status": "lexical-candidate"
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "begin": 172,
+        "end": 285,
+        "quote": "If written notice is received, the supplier shall deliver the records, except where a court prohibits disclosure.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 172,
+          "end": 285,
+          "quote": "If written notice is received, the supplier shall deliver the records, except where a court prohibits disclosure.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 172,
+            "end": 174,
+            "word": "If",
+            "lemma": "if",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 175,
+            "end": 182,
+            "word": "written",
+            "lemma": "write",
+            "pos": "VBN",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 183,
+            "end": 189,
+            "word": "notice",
+            "lemma": "notice",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 190,
+            "end": 192,
+            "word": "is",
+            "lemma": "be",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 193,
+            "end": 201,
+            "word": "received",
+            "lemma": "receive",
+            "pos": "VBN",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 201,
+            "end": 202,
+            "word": ",",
+            "lemma": ",",
+            "pos": ",",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 203,
+            "end": 206,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 207,
+            "end": 215,
+            "word": "supplier",
+            "lemma": "supplier",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 216,
+            "end": 221,
+            "word": "shall",
+            "lemma": "shall",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 222,
+            "end": 229,
+            "word": "deliver",
+            "lemma": "deliver",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 230,
+            "end": 233,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 12,
+            "begin": 234,
+            "end": 241,
+            "word": "records",
+            "lemma": "record",
+            "pos": "NNS",
+            "ner": "O"
+          },
+          {
+            "index": 13,
+            "begin": 241,
+            "end": 242,
+            "word": ",",
+            "lemma": ",",
+            "pos": ",",
+            "ner": "O"
+          },
+          {
+            "index": 14,
+            "begin": 243,
+            "end": 249,
+            "word": "except",
+            "lemma": "except",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 15,
+            "begin": 250,
+            "end": 255,
+            "word": "where",
+            "lemma": "where",
+            "pos": "WRB",
+            "ner": "O"
+          },
+          {
+            "index": 16,
+            "begin": 256,
+            "end": 257,
+            "word": "a",
+            "lemma": "a",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 17,
+            "begin": 258,
+            "end": 263,
+            "word": "court",
+            "lemma": "court",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 18,
+            "begin": 264,
+            "end": 273,
+            "word": "prohibits",
+            "lemma": "prohibit",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 19,
+            "begin": 274,
+            "end": 284,
+            "word": "disclosure",
+            "lemma": "disclosure",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 20,
+            "begin": 284,
+            "end": 285,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 10,
+            "relation": "root"
+          },
+          {
+            "governor": 5,
+            "dependent": 1,
+            "relation": "mark"
+          },
+          {
+            "governor": 3,
+            "dependent": 2,
+            "relation": "amod"
+          },
+          {
+            "governor": 5,
+            "dependent": 3,
+            "relation": "nsubj:pass"
+          },
+          {
+            "governor": 5,
+            "dependent": 4,
+            "relation": "aux:pass"
+          },
+          {
+            "governor": 10,
+            "dependent": 5,
+            "relation": "advcl:if"
+          },
+          {
+            "governor": 10,
+            "dependent": 6,
+            "relation": "punct"
+          },
+          {
+            "governor": 8,
+            "dependent": 7,
+            "relation": "det"
+          },
+          {
+            "governor": 10,
+            "dependent": 8,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 10,
+            "dependent": 9,
+            "relation": "aux"
+          },
+          {
+            "governor": 12,
+            "dependent": 11,
+            "relation": "det"
+          },
+          {
+            "governor": 10,
+            "dependent": 12,
+            "relation": "obj"
+          },
+          {
+            "governor": 10,
+            "dependent": 13,
+            "relation": "punct"
+          },
+          {
+            "governor": 18,
+            "dependent": 14,
+            "relation": "mark"
+          },
+          {
+            "governor": 18,
+            "dependent": 15,
+            "relation": "advmod"
+          },
+          {
+            "governor": 17,
+            "dependent": 16,
+            "relation": "det"
+          },
+          {
+            "governor": 18,
+            "dependent": 17,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 10,
+            "dependent": 18,
+            "relation": "advcl:except"
+          },
+          {
+            "governor": 18,
+            "dependent": 19,
+            "relation": "obj"
+          },
+          {
+            "governor": 10,
+            "dependent": 20,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 172,
+            "end": 174,
+            "quote": "If",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 216,
+            "end": 221,
+            "quote": "shall",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "exception",
+            "label": "exception-marker",
+            "begin": 243,
+            "end": 249,
+            "quote": "except",
+            "status": "lexical-candidate"
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "begin": 287,
+        "end": 351,
+        "quote": "Confidential Information means records described in Section 4.2.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 287,
+          "end": 351,
+          "quote": "Confidential Information means records described in Section 4.2.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 287,
+            "end": 299,
+            "word": "Confidential",
+            "lemma": "confidential",
+            "pos": "JJ",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 300,
+            "end": 311,
+            "word": "Information",
+            "lemma": "information",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 312,
+            "end": 317,
+            "word": "means",
+            "lemma": "mean",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 318,
+            "end": 325,
+            "word": "records",
+            "lemma": "record",
+            "pos": "NNS",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 326,
+            "end": 335,
+            "word": "described",
+            "lemma": "describe",
+            "pos": "VBN",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 336,
+            "end": 338,
+            "word": "in",
+            "lemma": "in",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 339,
+            "end": 346,
+            "word": "Section",
+            "lemma": "section",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 347,
+            "end": 350,
+            "word": "4.2",
+            "lemma": "4.2",
+            "pos": "CD",
+            "ner": "NUMBER"
+          },
+          {
+            "index": 9,
+            "begin": 350,
+            "end": 351,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 3,
+            "relation": "root"
+          },
+          {
+            "governor": 2,
+            "dependent": 1,
+            "relation": "amod"
+          },
+          {
+            "governor": 3,
+            "dependent": 2,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 3,
+            "dependent": 4,
+            "relation": "obj"
+          },
+          {
+            "governor": 4,
+            "dependent": 5,
+            "relation": "amod"
+          },
+          {
+            "governor": 7,
+            "dependent": 6,
+            "relation": "case"
+          },
+          {
+            "governor": 5,
+            "dependent": 7,
+            "relation": "obl:in"
+          },
+          {
+            "governor": 7,
+            "dependent": 8,
+            "relation": "nummod"
+          },
+          {
+            "governor": 3,
+            "dependent": 9,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "definition",
+            "label": "definition-marker",
+            "begin": 312,
+            "end": 317,
+            "quote": "means",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "cross-reference",
+            "label": "reference-marker",
+            "begin": 339,
+            "end": 350,
+            "quote": "Section 4.2",
+            "status": "lexical-candidate"
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "begin": 353,
+        "end": 426,
+        "quote": "The Montr\u00e9al office may retain the record \ud83e\udd89 until the audit is complete.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 353,
+          "end": 426,
+          "quote": "The Montr\u00e9al office may retain the record \ud83e\udd89 until the audit is complete.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 353,
+            "end": 356,
+            "word": "The",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 357,
+            "end": 365,
+            "word": "Montr\u00e9al",
+            "lemma": "Montr\u00e9al",
+            "pos": "NNP",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 366,
+            "end": 372,
+            "word": "office",
+            "lemma": "office",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 373,
+            "end": 376,
+            "word": "may",
+            "lemma": "may",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 377,
+            "end": 383,
+            "word": "retain",
+            "lemma": "retain",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 384,
+            "end": 387,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 388,
+            "end": 394,
+            "word": "record",
+            "lemma": "record",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 395,
+            "end": 397,
+            "word": "\ud83e\udd89",
+            "lemma": "\ud83e\udd89",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 398,
+            "end": 403,
+            "word": "until",
+            "lemma": "until",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 404,
+            "end": 407,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 408,
+            "end": 413,
+            "word": "audit",
+            "lemma": "audit",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 12,
+            "begin": 414,
+            "end": 416,
+            "word": "is",
+            "lemma": "be",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 13,
+            "begin": 417,
+            "end": 425,
+            "word": "complete",
+            "lemma": "complete",
+            "pos": "JJ",
+            "ner": "O"
+          },
+          {
+            "index": 14,
+            "begin": 425,
+            "end": 426,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 5,
+            "relation": "root"
+          },
+          {
+            "governor": 3,
+            "dependent": 1,
+            "relation": "det"
+          },
+          {
+            "governor": 3,
+            "dependent": 2,
+            "relation": "compound"
+          },
+          {
+            "governor": 5,
+            "dependent": 3,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 5,
+            "dependent": 4,
+            "relation": "aux"
+          },
+          {
+            "governor": 8,
+            "dependent": 6,
+            "relation": "det"
+          },
+          {
+            "governor": 8,
+            "dependent": 7,
+            "relation": "compound"
+          },
+          {
+            "governor": 5,
+            "dependent": 8,
+            "relation": "obj"
+          },
+          {
+            "governor": 13,
+            "dependent": 9,
+            "relation": "mark"
+          },
+          {
+            "governor": 11,
+            "dependent": 10,
+            "relation": "det"
+          },
+          {
+            "governor": 13,
+            "dependent": 11,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 13,
+            "dependent": 12,
+            "relation": "cop"
+          },
+          {
+            "governor": 5,
+            "dependent": 13,
+            "relation": "advcl:until"
+          },
+          {
+            "governor": 5,
+            "dependent": 14,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 373,
+            "end": 376,
+            "quote": "may",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 398,
+            "end": 403,
+            "quote": "until",
+            "status": "lexical-candidate"
+          }
+        ]
+      },
+      {
+        "index": 5,
+        "begin": 428,
+        "end": 490,
+        "quote": "An observer reported that the tenant must destroy the records.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 428,
+          "end": 490,
+          "quote": "An observer reported that the tenant must destroy the records.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 428,
+            "end": 430,
+            "word": "An",
+            "lemma": "a",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 431,
+            "end": 439,
+            "word": "observer",
+            "lemma": "observer",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 440,
+            "end": 448,
+            "word": "reported",
+            "lemma": "report",
+            "pos": "VBD",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 449,
+            "end": 453,
+            "word": "that",
+            "lemma": "that",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 454,
+            "end": 457,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 458,
+            "end": 464,
+            "word": "tenant",
+            "lemma": "tenant",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 465,
+            "end": 469,
+            "word": "must",
+            "lemma": "must",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 470,
+            "end": 477,
+            "word": "destroy",
+            "lemma": "destroy",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 478,
+            "end": 481,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 482,
+            "end": 489,
+            "word": "records",
+            "lemma": "record",
+            "pos": "NNS",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 489,
+            "end": 490,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 3,
+            "relation": "root"
+          },
+          {
+            "governor": 2,
+            "dependent": 1,
+            "relation": "det"
+          },
+          {
+            "governor": 3,
+            "dependent": 2,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 8,
+            "dependent": 4,
+            "relation": "mark"
+          },
+          {
+            "governor": 6,
+            "dependent": 5,
+            "relation": "det"
+          },
+          {
+            "governor": 8,
+            "dependent": 6,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 8,
+            "dependent": 7,
+            "relation": "aux"
+          },
+          {
+            "governor": 3,
+            "dependent": 8,
+            "relation": "ccomp"
+          },
+          {
+            "governor": 10,
+            "dependent": 9,
+            "relation": "det"
+          },
+          {
+            "governor": 8,
+            "dependent": 10,
+            "relation": "obj"
+          },
+          {
+            "governor": 3,
+            "dependent": 11,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 465,
+            "end": 469,
+            "quote": "must",
+            "status": "lexical-candidate"
+          }
+        ]
+      },
+      {
+        "index": 6,
+        "begin": 492,
+        "end": 578,
+        "quote": "Tenant may inspect the ledger provided that payment is received, subject to Section 7.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 492,
+          "end": 578,
+          "quote": "Tenant may inspect the ledger provided that payment is received, subject to Section 7.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 492,
+            "end": 498,
+            "word": "Tenant",
+            "lemma": "tenant",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 499,
+            "end": 502,
+            "word": "may",
+            "lemma": "may",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 503,
+            "end": 510,
+            "word": "inspect",
+            "lemma": "inspect",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 511,
+            "end": 514,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 515,
+            "end": 521,
+            "word": "ledger",
+            "lemma": "ledger",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 522,
+            "end": 530,
+            "word": "provided",
+            "lemma": "provide",
+            "pos": "VBD",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 531,
+            "end": 535,
+            "word": "that",
+            "lemma": "that",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 536,
+            "end": 543,
+            "word": "payment",
+            "lemma": "payment",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 544,
+            "end": 546,
+            "word": "is",
+            "lemma": "be",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 547,
+            "end": 555,
+            "word": "received",
+            "lemma": "receive",
+            "pos": "VBN",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 555,
+            "end": 556,
+            "word": ",",
+            "lemma": ",",
+            "pos": ",",
+            "ner": "O"
+          },
+          {
+            "index": 12,
+            "begin": 557,
+            "end": 564,
+            "word": "subject",
+            "lemma": "subject",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 13,
+            "begin": 565,
+            "end": 567,
+            "word": "to",
+            "lemma": "to",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 14,
+            "begin": 568,
+            "end": 575,
+            "word": "Section",
+            "lemma": "section",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 15,
+            "begin": 576,
+            "end": 577,
+            "word": "7",
+            "lemma": "7",
+            "pos": "CD",
+            "ner": "NUMBER"
+          },
+          {
+            "index": 16,
+            "begin": 577,
+            "end": 578,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 3,
+            "relation": "root"
+          },
+          {
+            "governor": 3,
+            "dependent": 1,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 3,
+            "dependent": 2,
+            "relation": "aux"
+          },
+          {
+            "governor": 5,
+            "dependent": 4,
+            "relation": "det"
+          },
+          {
+            "governor": 3,
+            "dependent": 5,
+            "relation": "obj"
+          },
+          {
+            "governor": 3,
+            "dependent": 6,
+            "relation": "dep"
+          },
+          {
+            "governor": 10,
+            "dependent": 7,
+            "relation": "mark"
+          },
+          {
+            "governor": 10,
+            "dependent": 8,
+            "relation": "nsubj:pass"
+          },
+          {
+            "governor": 10,
+            "dependent": 9,
+            "relation": "aux:pass"
+          },
+          {
+            "governor": 6,
+            "dependent": 10,
+            "relation": "ccomp"
+          },
+          {
+            "governor": 10,
+            "dependent": 11,
+            "relation": "punct"
+          },
+          {
+            "governor": 10,
+            "dependent": 12,
+            "relation": "dep"
+          },
+          {
+            "governor": 14,
+            "dependent": 13,
+            "relation": "case"
+          },
+          {
+            "governor": 12,
+            "dependent": 14,
+            "relation": "obl:to"
+          },
+          {
+            "governor": 14,
+            "dependent": 15,
+            "relation": "nummod"
+          },
+          {
+            "governor": 3,
+            "dependent": 16,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 499,
+            "end": 502,
+            "quote": "may",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 522,
+            "end": 535,
+            "quote": "provided that",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "qualification-marker",
+            "begin": 557,
+            "end": 567,
+            "quote": "subject to",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "cross-reference",
+            "label": "reference-marker",
+            "begin": 568,
+            "end": 577,
+            "quote": "Section 7",
+            "status": "lexical-candidate"
+          }
+        ]
+      },
+      {
+        "index": 7,
+        "begin": 580,
+        "end": 653,
+        "quote": "Notwithstanding Section 8, the agent shall preserve this original phrase.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 580,
+          "end": 653,
+          "quote": "Notwithstanding Section 8, the agent shall preserve this original phrase.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 580,
+            "end": 595,
+            "word": "Notwithstanding",
+            "lemma": "notwithstanding",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 596,
+            "end": 603,
+            "word": "Section",
+            "lemma": "section",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 604,
+            "end": 605,
+            "word": "8",
+            "lemma": "8",
+            "pos": "CD",
+            "ner": "NUMBER"
+          },
+          {
+            "index": 4,
+            "begin": 605,
+            "end": 606,
+            "word": ",",
+            "lemma": ",",
+            "pos": ",",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 607,
+            "end": 610,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 611,
+            "end": 616,
+            "word": "agent",
+            "lemma": "agent",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 617,
+            "end": 622,
+            "word": "shall",
+            "lemma": "shall",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 623,
+            "end": 631,
+            "word": "preserve",
+            "lemma": "preserve",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 632,
+            "end": 636,
+            "word": "this",
+            "lemma": "this",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 637,
+            "end": 645,
+            "word": "original",
+            "lemma": "original",
+            "pos": "JJ",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 646,
+            "end": 652,
+            "word": "phrase",
+            "lemma": "phrase",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 12,
+            "begin": 652,
+            "end": 653,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 8,
+            "relation": "root"
+          },
+          {
+            "governor": 2,
+            "dependent": 1,
+            "relation": "case"
+          },
+          {
+            "governor": 8,
+            "dependent": 2,
+            "relation": "obl:notwithstanding"
+          },
+          {
+            "governor": 2,
+            "dependent": 3,
+            "relation": "nummod"
+          },
+          {
+            "governor": 8,
+            "dependent": 4,
+            "relation": "punct"
+          },
+          {
+            "governor": 6,
+            "dependent": 5,
+            "relation": "det"
+          },
+          {
+            "governor": 8,
+            "dependent": 6,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 8,
+            "dependent": 7,
+            "relation": "aux"
+          },
+          {
+            "governor": 11,
+            "dependent": 9,
+            "relation": "det"
+          },
+          {
+            "governor": 11,
+            "dependent": 10,
+            "relation": "amod"
+          },
+          {
+            "governor": 8,
+            "dependent": 11,
+            "relation": "obj"
+          },
+          {
+            "governor": 8,
+            "dependent": 12,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "exception",
+            "label": "exception-marker",
+            "begin": 580,
+            "end": 595,
+            "quote": "Notwithstanding",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "cross-reference",
+            "label": "reference-marker",
+            "begin": 596,
+            "end": 605,
+            "quote": "Section 8",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 617,
+            "end": 622,
+            "quote": "shall",
+            "status": "lexical-candidate"
+          }
+        ]
+      }
+    ],
+    "counts": {
+      "sentences": 8,
+      "tokens": 114,
+      "dependencies": 114,
+      "markers": 24
+    },
+    "selection": {
+      "project": "english-proof",
+      "id": "agreement.txt",
+      "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+      "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+      "seq": 0
+    },
+    "source": {
+      "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+      "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+      "name": "agreement.txt",
+      "mediaType": "text/plain",
+      "correlation": "english-proof/agreement.txt@1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+      "metadata": {},
+      "category": "document",
+      "provenance": {
+        "extractionKind": "identity-utf8",
+        "reviewStatus": "unreviewed"
+      },
+      "project": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+        "seq": 0
+      },
+      "extraction": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+        "seq": 0
+      },
+      "anchors": [],
+      "unresolved": [
+        "page",
+        "folio",
+        "section",
+        "table",
+        "diagram",
+        "coordinates"
+      ]
+    },
+    "receiptCid": "sha256:84e7057649b023a1932c576f417e66130b0e90d0b861a43720f54c9e080740b8"
+  },
+  "partial": {
+    "schema": "trikeshed.english-inspection.v1",
+    "reviewStatus": "unreviewed",
+    "authority": "lexical-and-parser-observations-only",
+    "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+    "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+    "range": {
+      "begin": 91,
+      "end": 170,
+      "totalLength": 655,
+      "complete": false
+    },
+    "parser": {
+      "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+      "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+      "runtime": {
+        "module": "corenlp",
+        "profile": "syntax-v1",
+        "declared": "edu.stanford.nlp:stanford-corenlp:4.5.10,edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+        "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+        "jar": "stanford-corenlp-4.5.10.jar",
+        "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+        "packageVersion": "4.5.10",
+        "parserNormalization": "identity/1",
+        "sourceTextCid": "sha256:231a4fc58e5f4643cd41fda38a953fd5763bc48a391d504fd0e7eb9389e60456",
+        "parserInputCid": "sha256:231a4fc58e5f4643cd41fda38a953fd5763bc48a391d504fd0e7eb9389e60456",
+        "relationGlossSource": "parser-input"
+      },
+      "configuration": {
+        "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+        "threads": "1"
+      }
+    },
+    "coverage": {
+      "kind": "bounded-text-range",
+      "semantics": "not-established",
+      "markerMethod": "literal-word-and-phrase-candidates",
+      "scope": "sentence-token-dependency-observations",
+      "omitted": [
+        "constituency",
+        "coreference",
+        "openie",
+        "kbp",
+        "legal-interpretation"
+      ]
+    },
+    "sentences": [
+      {
+        "index": 0,
+        "begin": 91,
+        "end": 170,
+        "quote": "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+        "quotation": {
+          "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+          "begin": 91,
+          "end": 170,
+          "quote": "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+          "anchors": [],
+          "unresolved": [
+            "page",
+            "folio",
+            "section",
+            "table",
+            "diagram",
+            "coordinates"
+          ],
+          "category": "document",
+          "provenance": {
+            "extractionKind": "identity-utf8",
+            "reviewStatus": "unreviewed"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "tokens": [
+          {
+            "index": 1,
+            "begin": 91,
+            "end": 97,
+            "word": "Tenant",
+            "lemma": "tenant",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 2,
+            "begin": 98,
+            "end": 101,
+            "word": "may",
+            "lemma": "may",
+            "pos": "MD",
+            "ner": "O"
+          },
+          {
+            "index": 3,
+            "begin": 102,
+            "end": 108,
+            "word": "occupy",
+            "lemma": "occupy",
+            "pos": "VB",
+            "ner": "O"
+          },
+          {
+            "index": 4,
+            "begin": 109,
+            "end": 115,
+            "word": "unless",
+            "lemma": "unless",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 5,
+            "begin": 116,
+            "end": 120,
+            "word": "rent",
+            "lemma": "rent",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 6,
+            "begin": 121,
+            "end": 123,
+            "word": "is",
+            "lemma": "be",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 7,
+            "begin": 124,
+            "end": 127,
+            "word": "not",
+            "lemma": "not",
+            "pos": "RB",
+            "ner": "O"
+          },
+          {
+            "index": 8,
+            "begin": 128,
+            "end": 131,
+            "word": "due",
+            "lemma": "due",
+            "pos": "JJ",
+            "ner": "O"
+          },
+          {
+            "index": 9,
+            "begin": 131,
+            "end": 132,
+            "word": ",",
+            "lemma": ",",
+            "pos": ",",
+            "ner": "O"
+          },
+          {
+            "index": 10,
+            "begin": 133,
+            "end": 136,
+            "word": "and",
+            "lemma": "and",
+            "pos": "CC",
+            "ner": "O"
+          },
+          {
+            "index": 11,
+            "begin": 137,
+            "end": 141,
+            "word": "only",
+            "lemma": "only",
+            "pos": "RB",
+            "ner": "O"
+          },
+          {
+            "index": 12,
+            "begin": 142,
+            "end": 144,
+            "word": "if",
+            "lemma": "if",
+            "pos": "IN",
+            "ner": "O"
+          },
+          {
+            "index": 13,
+            "begin": 145,
+            "end": 148,
+            "word": "the",
+            "lemma": "the",
+            "pos": "DT",
+            "ner": "O"
+          },
+          {
+            "index": 14,
+            "begin": 149,
+            "end": 155,
+            "word": "permit",
+            "lemma": "permit",
+            "pos": "NN",
+            "ner": "O"
+          },
+          {
+            "index": 15,
+            "begin": 156,
+            "end": 163,
+            "word": "remains",
+            "lemma": "remain",
+            "pos": "VBZ",
+            "ner": "O"
+          },
+          {
+            "index": 16,
+            "begin": 164,
+            "end": 169,
+            "word": "valid",
+            "lemma": "valid",
+            "pos": "JJ",
+            "ner": "O"
+          },
+          {
+            "index": 17,
+            "begin": 169,
+            "end": 170,
+            "word": ".",
+            "lemma": ".",
+            "pos": ".",
+            "ner": "O"
+          }
+        ],
+        "dependencies": [
+          {
+            "governor": 0,
+            "dependent": 3,
+            "relation": "root"
+          },
+          {
+            "governor": 3,
+            "dependent": 1,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 3,
+            "dependent": 2,
+            "relation": "aux"
+          },
+          {
+            "governor": 8,
+            "dependent": 4,
+            "relation": "mark"
+          },
+          {
+            "governor": 8,
+            "dependent": 5,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 8,
+            "dependent": 6,
+            "relation": "cop"
+          },
+          {
+            "governor": 8,
+            "dependent": 7,
+            "relation": "advmod"
+          },
+          {
+            "governor": 3,
+            "dependent": 8,
+            "relation": "advcl:unless"
+          },
+          {
+            "governor": 8,
+            "dependent": 9,
+            "relation": "punct"
+          },
+          {
+            "governor": 8,
+            "dependent": 10,
+            "relation": "dep"
+          },
+          {
+            "governor": 15,
+            "dependent": 11,
+            "relation": "advmod"
+          },
+          {
+            "governor": 15,
+            "dependent": 12,
+            "relation": "mark"
+          },
+          {
+            "governor": 14,
+            "dependent": 13,
+            "relation": "det"
+          },
+          {
+            "governor": 15,
+            "dependent": 14,
+            "relation": "nsubj"
+          },
+          {
+            "governor": 10,
+            "dependent": 15,
+            "relation": "dep"
+          },
+          {
+            "governor": 15,
+            "dependent": 16,
+            "relation": "xcomp"
+          },
+          {
+            "governor": 3,
+            "dependent": 17,
+            "relation": "punct"
+          }
+        ],
+        "markers": [
+          {
+            "kind": "modal",
+            "label": "modal-marker",
+            "begin": 98,
+            "end": 101,
+            "quote": "may",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 109,
+            "end": 115,
+            "quote": "unless",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "exception",
+            "label": "exception-marker",
+            "begin": 109,
+            "end": 115,
+            "quote": "unless",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "negation",
+            "label": "negation-marker",
+            "begin": 124,
+            "end": 127,
+            "quote": "not",
+            "status": "lexical-candidate"
+          },
+          {
+            "kind": "condition",
+            "label": "condition-marker",
+            "begin": 137,
+            "end": 144,
+            "quote": "only if",
+            "status": "lexical-candidate"
+          }
+        ]
+      }
+    ],
+    "counts": {
+      "sentences": 1,
+      "tokens": 17,
+      "dependencies": 17,
+      "markers": 5
+    },
+    "selection": {
+      "project": "english-proof",
+      "id": "agreement.txt",
+      "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+      "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+      "seq": 0
+    },
+    "source": {
+      "originalCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+      "extractedTextCid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+      "name": "agreement.txt",
+      "mediaType": "text/plain",
+      "correlation": "english-proof/agreement.txt@1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+      "metadata": {},
+      "category": "document",
+      "provenance": {
+        "extractionKind": "identity-utf8",
+        "reviewStatus": "unreviewed"
+      },
+      "project": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+        "seq": 0
+      },
+      "extraction": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+        "seq": 0
+      },
+      "anchors": [],
+      "unresolved": [
+        "page",
+        "folio",
+        "section",
+        "table",
+        "diagram",
+        "coordinates"
+      ]
+    },
+    "receiptCid": "sha256:6c08454b5deba15f5c78987aacca1ffb17c4bb49a628988cd4f60f8398f81b8a"
+  },
+  "observations": {
+    "sentences": 8,
+    "tokens": 114,
+    "markers": 24
+  },
+  "partialObservations": {
+    "sentences": 1,
+    "tokens": 17,
+    "markers": 5
+  },
+  "guardProbe": {
+    "source": "TENANT MAY REMAIN UNLESS RENT IS NOT DUE.",
+    "documentText": "TENANT MAY REMAIN UNLESS RENT IS NOT DUE.",
+    "sourceEqual": true,
+    "conditionIssues": [
+      "NEGATED"
+    ],
+    "interpretedNormCount": 0,
+    "tokens": [
+      [
+        {
+          "word": "TENANT",
+          "lemma": "tenant",
+          "begin": 0,
+          "end": 6
+        },
+        {
+          "word": "MAY",
+          "lemma": "may",
+          "begin": 7,
+          "end": 10
+        },
+        {
+          "word": "REMAIN",
+          "lemma": "remain",
+          "begin": 11,
+          "end": 17
+        },
+        {
+          "word": "UNLESS",
+          "lemma": "unless",
+          "begin": 18,
+          "end": 24
+        },
+        {
+          "word": "RENT",
+          "lemma": "rent",
+          "begin": 25,
+          "end": 29
+        },
+        {
+          "word": "IS",
+          "lemma": "be",
+          "begin": 30,
+          "end": 32
+        },
+        {
+          "word": "NOT",
+          "lemma": "not",
+          "begin": 33,
+          "end": 36
+        },
+        {
+          "word": "DUE",
+          "lemma": "due",
+          "begin": 37,
+          "end": 40
+        },
+        {
+          "word": ".",
+          "lemma": ".",
+          "begin": 40,
+          "end": 41
+        }
+      ]
+    ],
+    "metadata": {
+      "module": "corenlp",
+      "profile": "syntax-v1",
+      "declared": "edu.stanford.nlp:stanford-corenlp:4.5.10,edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+      "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+      "jar": "stanford-corenlp-4.5.10.jar",
+      "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+      "packageVersion": "4.5.10",
+      "parserNormalization": "sentence-case/1",
+      "sourceTextCid": "sha256:6f64546fcb9d9b08f7b2fc96eeaeb34e0fa9748e9d41437a3e2b8be53c3ddb3c",
+      "parserInputCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+      "relationGlossSource": "parser-input"
+    },
+    "configuration": {
+      "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+      "threads": "1"
+    }
+  },
+  "graphProof": {
+    "namespace": "http://www.w3.org/2000/svg",
+    "edges": [
+      "0:5",
+      "2:1",
+      "5:2",
+      "5:3",
+      "5:4",
+      "7:6",
+      "5:7",
+      "12:8",
+      "10:9",
+      "12:10",
+      "12:11",
+      "5:12",
+      "14:13",
+      "12:14",
+      "5:15"
+    ],
+    "arrowDefinitions": 1,
+    "sourceLabels": [
+      "root",
+      "det",
+      "nsubj",
+      "aux",
+      "advmod",
+      "compound",
+      "obj",
+      "mark",
+      "det",
+      "nsubj",
+      "aux",
+      "advcl:unless",
+      "amod",
+      "obj",
+      "punct",
+      "0 \u00b7 ROOT",
+      "1 \u00b7 THE",
+      "DT",
+      "2 \u00b7 TENANT",
+      "NN",
+      "3 \u00b7 MUST",
+      "MD",
+      "4 \u00b7 NOT",
+      "RB",
+      "5 \u00b7 DISCLOSE",
+      "VB",
+      "6 \u00b7 CUSTOMER",
+      "NN",
+      "7 \u00b7 DATA",
+      "NNS",
+      "8 \u00b7 UNLESS",
+      "IN",
+      "9 \u00b7 THE",
+      "DT",
+      "10 \u00b7 CUSTOMER",
+      "NN",
+      "11 \u00b7 HAS",
+      "VBZ",
+      "12 \u00b7 GIVEN",
+      "VBN",
+      "13 \u00b7 WRITTEN",
+      "VBN",
+      "14 \u00b7 CONSENT",
+      "NN",
+      "15 \u00b7 .",
+      "."
+    ]
+  },
+  "coldInspectionMs": 15896,
+  "writes": [
+    {
+      "path": "/_project/english-proof/begin",
+      "query": "?kind=assets&intake=manual"
+    },
+    {
+      "path": "/_project/english-proof/putDocumentBatch",
+      "query": "?intake=manual"
+    },
+    {
+      "path": "/api/projects/english-proof/mine",
+      "query": ""
+    },
+    {
+      "path": "/api/documents/english",
+      "body": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+        "seq": 0,
+        "begin": 0,
+        "end": 655
+      }
+    },
+    {
+      "path": "/api/documents/english",
+      "body": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+        "seq": 0,
+        "begin": 91,
+        "end": 170
+      }
+    },
+    {
+      "path": "/api/documents/english",
+      "body": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:93ccb945d825416e129e44d77cb367c08039bb364e4aa76257f0fe559e2df45a",
+        "rev": "1-sha256:9c50b1dd72586b95be8d3af3c9ac65c9d9961caedcb2a44f72710d1abb453497",
+        "seq": 0,
+        "begin": 91,
+        "end": 170
+      }
+    },
+    {
+      "path": "/api/documents/english",
+      "body": {
+        "project": "english-proof",
+        "id": "agreement.txt",
+        "cid": "sha256:87b3c3e3a77146061d34375319e6ceb236d1b8c89a589bbaa5ed40c15db77b0d",
+        "rev": "2-sha256:4cb28cfdffc4ca8f93371de00b22f40af27254e099060ad7cdc9f57c04d587fc",
+        "seq": 2,
+        "begin": 0,
+        "end": 689
+      }
+    }
+  ],
+  "evidence": {
+    "originalRetained": true,
+    "receiptReadbacks": [
+      {
+        "receiptCid": "sha256:84e7057649b023a1932c576f417e66130b0e90d0b861a43720f54c9e080740b8",
+        "bytes": 20720,
+        "identityVerified": true
+      },
+      {
+        "receiptCid": "sha256:6c08454b5deba15f5c78987aacca1ffb17c4bb49a628988cd4f60f8398f81b8a",
+        "bytes": 5179,
+        "identityVerified": true
+      },
+      {
+        "receiptCid": "sha256:defaef1045257efbb9a327e50686fa59d86e2c998d770e95f0f0cbfafd7ab236",
+        "bytes": 21752,
+        "identityVerified": true
+      }
+    ],
+    "modelCalls": 0,
+    "configuredModelCount": 0,
+    "automaticIntake": 0,
+    "reviewIntakeCalls": 0,
+    "reteFacts": 0,
+    "beliefBagPresent": false,
+    "reviewOwnerPresent": false,
+    "htxPresent": false,
+    "uploadMining": {
+      "total": 0,
+      "extracted": 0,
+      "minted": 0,
+      "failed": 0,
+      "done": true
+    },
+    "networkDenyBefore": {
+      "tcpConnect": "Permission denied",
+      "udpSend": "Permission denied",
+      "result": "DENIED"
+    },
+    "networkDenyAfter": {
+      "tcpConnect": "Permission denied",
+      "udpSend": "Permission denied",
+      "result": "DENIED"
+    }
+  },
+  "browserErrors": [],
+  "externalBrowserRequests": [],
+  "publication": "Synthetic text and fixture metadata only; no supplied user-document content."
+}
