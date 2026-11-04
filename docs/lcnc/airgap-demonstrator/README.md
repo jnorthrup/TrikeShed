@@ -16,6 +16,14 @@ The [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) is the canonical scope/AB
 
 ## Reading routes
 
+The [owned scalar continuation](../../sulong-bitcode/README.md) now supplies
+three checked-in milestones: verified binary loading, queued Context ownership,
+and a real two-node MLIR/LCNC run with durable evidence reopening. The latest
+[D3M publication evidence](../../sulong-bitcode/evidence/2026-11-04/publication/verification.json)
+records 19 passing current regressions with external networking unavailable
+and compilation of all affected targets. This closes a bounded transport
+milestone; the full evaluator and visual acceptance gates remain as specified.
+
 | Reader or decision | Read first |
 |---|---|
 | Programme owner | [Charter](00-charter.md), [storyboard](13-demonstration-storyboard.md), [timeline and costs](15-timeline-and-costs.md) |
