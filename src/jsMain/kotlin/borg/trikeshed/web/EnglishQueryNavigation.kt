@@ -102,7 +102,7 @@ object EnglishQueryNavigation {
     }
     /** Decode percent octets as strict UTF-8; do not let browser replacement characters select a source. */
     private fun decode(raw: String): String {
-        require(raw.length <= 4096) { "English navigation component exceeds its budget" }
+        require(raw.length <= MAX_QUERY) { "English navigation component exceeds its budget" }
         val input = CharSeries(raw)
         val bytes = mutableListOf<Byte>()
         while (input.hasRemaining) {
@@ -120,7 +120,11 @@ object EnglishQueryNavigation {
     /** Recognition only. A malformed copular handoff must not fall through to scratch restoration. */
     fun requested(raw: String): Boolean = try {
         query(raw).let { it.english || it.invalid && it.copular }
-    } catch (_: Exception) { raw.contains("english") || raw.contains(PRESET) }
+    } catch (_: Exception) {
+        // A budget failure can hide a percent-encoded English key. Keep it inert rather
+        // than allowing URLSearchParams' get-first path to restore scratch or a preset.
+        true
+    }
 
     fun parse(raw: String): Selection {
         val query = query(raw)
