@@ -1,0 +1,624 @@
+{
+  "result": "PASS",
+  "source": "8486ae5f0547c49bf1013a472eda3f505d7c58ac",
+  "scope": "Actual immutable Documents bundle, native synthetic TXT upload, actual owned CoreNLP4.6 with exactly three explicit inspections, retained legal-candidate HTTP and typed LCNC owners, exact source/full-node/quantity evidence, stale/current versus snapshot, and navigation isolation under fixture-only outgoing syscall denial. No generative model, review, inference admission or legal-authority claim.",
+  "archive": {
+    "file": "browser-result.json.gz",
+    "rawSha256": "8a21e80ddb0c86a0ddb0fd43800dc849bde1d57c34270f73a62f2a0fdb92d822",
+    "rawBytes": 387024,
+    "compressedBytes": 31380,
+    "description": "Exact original browser result archive; decompress to result.json for the independent auditor."
+  },
+  "responses": [
+    {
+      "label": "inspectionA",
+      "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "schema": "trikeshed.english-inspection.v1",
+      "inspectionCid": null,
+      "mode": null
+    },
+    {
+      "label": "currentA",
+      "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "mode": "current"
+    },
+    {
+      "label": "repeated",
+      "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "mode": "current"
+    },
+    {
+      "label": "historicalA",
+      "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "mode": "snapshot"
+    },
+    {
+      "label": "inspectionB",
+      "receiptCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "schema": "trikeshed.english-inspection.v1",
+      "inspectionCid": null,
+      "mode": null
+    },
+    {
+      "label": "currentB",
+      "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "mode": "current"
+    },
+    {
+      "label": "inspectionCopy",
+      "receiptCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "schema": "trikeshed.english-inspection.v1",
+      "inspectionCid": null,
+      "mode": null
+    },
+    {
+      "label": "copyCandidates",
+      "receiptCid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "mode": "current"
+    },
+    {
+      "label": "lcncA",
+      "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "mode": "current",
+      "typeErrors": [],
+      "program": {
+        "nodes": [
+          {
+            "id": "receipt",
+            "type": "scope.in",
+            "params": {
+              "name": "receipt",
+              "kind": "id",
+              "default": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "mode",
+            "type": "text.value",
+            "params": {
+              "value": "current"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "patterns",
+            "type": "document.english.patterns",
+            "params": {},
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "derived",
+            "type": "scope.out",
+            "params": {
+              "name": "derived",
+              "kind": "id"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          }
+        ],
+        "wires": [
+          {
+            "from": [
+              "receipt",
+              "value"
+            ],
+            "to": [
+              "patterns",
+              "receiptCid"
+            ]
+          },
+          {
+            "from": [
+              "mode",
+              "value"
+            ],
+            "to": [
+              "patterns",
+              "mode"
+            ]
+          },
+          {
+            "from": [
+              "patterns",
+              "receiptCid"
+            ],
+            "to": [
+              "derived",
+              "value"
+            ]
+          }
+        ],
+        "controls": {
+          "humanOversight": true,
+          "matingPoints": []
+        },
+        "kanban": null,
+        "view": null,
+        "seq": 1
+      }
+    },
+    {
+      "label": "lcncHistorical",
+      "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "mode": "snapshot",
+      "typeErrors": [],
+      "program": {
+        "nodes": [
+          {
+            "id": "receipt",
+            "type": "scope.in",
+            "params": {
+              "name": "receipt",
+              "kind": "id",
+              "default": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "mode",
+            "type": "text.value",
+            "params": {
+              "value": "snapshot"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "patterns",
+            "type": "document.english.patterns",
+            "params": {},
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "derived",
+            "type": "scope.out",
+            "params": {
+              "name": "derived",
+              "kind": "id"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          }
+        ],
+        "wires": [
+          {
+            "from": [
+              "receipt",
+              "value"
+            ],
+            "to": [
+              "patterns",
+              "receiptCid"
+            ]
+          },
+          {
+            "from": [
+              "mode",
+              "value"
+            ],
+            "to": [
+              "patterns",
+              "mode"
+            ]
+          },
+          {
+            "from": [
+              "patterns",
+              "receiptCid"
+            ],
+            "to": [
+              "derived",
+              "value"
+            ]
+          }
+        ],
+        "controls": {
+          "humanOversight": true,
+          "matingPoints": []
+        },
+        "kanban": null,
+        "view": null,
+        "seq": 1
+      }
+    },
+    {
+      "label": "lcncB",
+      "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+      "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "mode": "current",
+      "typeErrors": [],
+      "program": {
+        "nodes": [
+          {
+            "id": "receipt",
+            "type": "scope.in",
+            "params": {
+              "name": "receipt",
+              "kind": "id",
+              "default": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "mode",
+            "type": "text.value",
+            "params": {
+              "value": "current"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "patterns",
+            "type": "document.english.patterns",
+            "params": {},
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "derived",
+            "type": "scope.out",
+            "params": {
+              "name": "derived",
+              "kind": "id"
+            },
+            "x": 0,
+            "y": 0,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          }
+        ],
+        "wires": [
+          {
+            "from": [
+              "receipt",
+              "value"
+            ],
+            "to": [
+              "patterns",
+              "receiptCid"
+            ]
+          },
+          {
+            "from": [
+              "mode",
+              "value"
+            ],
+            "to": [
+              "patterns",
+              "mode"
+            ]
+          },
+          {
+            "from": [
+              "patterns",
+              "receiptCid"
+            ],
+            "to": [
+              "derived",
+              "value"
+            ]
+          }
+        ],
+        "controls": {
+          "humanOversight": true,
+          "matingPoints": []
+        },
+        "kanban": null,
+        "view": null,
+        "seq": 1
+      }
+    }
+  ],
+  "counts": {
+    "parserCalls": 3,
+    "explicitInspections": 3,
+    "typedLcncComparisons": 3,
+    "uniqueReceipts": 7,
+    "sourceTokens": 70,
+    "fullParserNodes": 71
+  },
+  "copyObservation": {
+    "source": "The requirements for sellers and for buyers are clear.",
+    "copyNodes": [
+      {
+        "index": 2,
+        "begin": 4,
+        "end": 16,
+        "word": "requirements",
+        "lemma": "requirement",
+        "pos": "NNS",
+        "ner": "O",
+        "id": "2:3",
+        "copy": 3,
+        "kind": "copy"
+      }
+    ],
+    "parserNodeCount": 11,
+    "sourceTokenCount": 10,
+    "claim": "Reports actual observed SDK4.6 copy nodes; the proof does not inject or require copied modal roles."
+  },
+  "cases": {
+    "matching": {
+      "literal": "thirty (30)",
+      "integer": 30,
+      "unit": "day",
+      "modifier": "business",
+      "guard": "unless Owner consents",
+      "unresolved": [
+        "guard-scope-not-established",
+        "negation-scope-not-established"
+      ]
+    },
+    "conflicting": {
+      "literal": "thirty (60)",
+      "integer": null,
+      "forms": [
+        30,
+        60
+      ],
+      "unresolved": "conflicting-number-forms"
+    },
+    "roleSwap": [
+      "Tenant shall pay Owner.",
+      "Owner shall pay Tenant."
+    ],
+    "passiveSubject": "Rent",
+    "coordinated": {
+      "literal": "two",
+      "integer": 2,
+      "unit": "month",
+      "unresolved": "coordination-scope-not-established",
+      "convertedToDays": false
+    }
+  },
+  "currentRefusal": {
+    "error": "English observation source snapshot is stale or unavailable"
+  },
+  "evidence": {
+    "originalSourcesRetained": true,
+    "inspectionCount": 3,
+    "candidateResponses": 9,
+    "parserCalls": 3,
+    "retainedReadbacks": [
+      {
+        "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "schema": "trikeshed.english-inspection.v1",
+        "inspectionCid": null,
+        "bytes": 11648
+      },
+      {
+        "receiptCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "schema": "trikeshed.english-inspection.v1",
+        "inspectionCid": null,
+        "bytes": 13562
+      },
+      {
+        "receiptCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+        "schema": "trikeshed.english-inspection.v1",
+        "inspectionCid": null,
+        "bytes": 6433
+      },
+      {
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15084
+      },
+      {
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15084
+      },
+      {
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15084
+      },
+      {
+        "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15060
+      },
+      {
+        "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15060
+      },
+      {
+        "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15060
+      },
+      {
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "bytes": 18984
+      },
+      {
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "bytes": 18984
+      },
+      {
+        "receiptCid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+        "bytes": 5860
+      }
+    ],
+    "refusals": [
+      {
+        "path": "/api/documents/english/legal-patterns",
+        "status": 409,
+        "body": {
+          "error": "English observation source snapshot is stale or unavailable"
+        }
+      }
+    ],
+    "lcncCalls": 3,
+    "modelCalls": 0,
+    "configuredModelCount": 0,
+    "automaticIntake": 0,
+    "reviewIntakeCalls": 0,
+    "reteFacts": 0,
+    "beliefBagPresent": false,
+    "reviewOwnerPresent": false,
+    "htxPresent": false,
+    "uploadMining": {
+      "total": 0,
+      "extracted": 0,
+      "minted": 0,
+      "failed": 0,
+      "done": true
+    },
+    "networkDenyBefore": {
+      "tcpConnect": "Permission denied",
+      "udpSend": "Permission denied",
+      "result": "DENIED"
+    },
+    "networkDenyAfter": {
+      "tcpConnect": "Permission denied",
+      "udpSend": "Permission denied",
+      "result": "DENIED"
+    }
+  },
+  "candidateRequests": [
+    {
+      "path": "/api/documents/english/legal-patterns",
+      "body": {
+        "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "mode": "current"
+      }
+    },
+    {
+      "path": "/api/documents/english/legal-patterns",
+      "body": {
+        "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "mode": "current"
+      }
+    },
+    {
+      "path": "/api/documents/english/legal-patterns",
+      "body": {
+        "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "mode": "current"
+      }
+    },
+    {
+      "path": "/api/documents/english/legal-patterns",
+      "body": {
+        "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "mode": "snapshot"
+      }
+    },
+    {
+      "path": "/api/documents/english/legal-patterns",
+      "body": {
+        "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "mode": "snapshot"
+      }
+    },
+    {
+      "path": "/api/documents/english/legal-patterns",
+      "body": {
+        "receiptCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "mode": "current"
+      }
+    },
+    {
+      "path": "/api/documents/english/legal-patterns",
+      "body": {
+        "receiptCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+        "mode": "current"
+      }
+    }
+  ],
+  "browserErrors": [],
+  "externalBrowserRequests": []
+}

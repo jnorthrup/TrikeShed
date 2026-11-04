@@ -1,0 +1,17 @@
+{
+  "result": "PASS",
+  "scope": "Auditor negative controls only; immutable real proof files unchanged",
+  "controls": [
+    {
+      "mutation": "removed-complete-dependency-inventory",
+      "exitCode": 1,
+      "rejected": true
+    },
+    {
+      "mutation": "changed-retained-cbor-byte",
+      "exitCode": 1,
+      "rejected": true
+    }
+  ],
+  "temporaryCopiesRemoved": true
+}

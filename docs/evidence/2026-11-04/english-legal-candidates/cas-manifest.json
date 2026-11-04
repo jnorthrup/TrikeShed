@@ -1,0 +1,114 @@
+{
+  "uniqueReceipts": 7,
+  "readbacks": [
+    {
+      "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "schema": "trikeshed.english-inspection.v1",
+      "inspectionCid": null,
+      "bytes": 11648
+    },
+    {
+      "receiptCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "schema": "trikeshed.english-inspection.v1",
+      "inspectionCid": null,
+      "bytes": 13562
+    },
+    {
+      "receiptCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "schema": "trikeshed.english-inspection.v1",
+      "inspectionCid": null,
+      "bytes": 6433
+    },
+    {
+      "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 15084
+    },
+    {
+      "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 15084
+    },
+    {
+      "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 15084
+    },
+    {
+      "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 15060
+    },
+    {
+      "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 15060
+    },
+    {
+      "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 15060
+    },
+    {
+      "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "bytes": 18984
+    },
+    {
+      "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "bytes": 18984
+    },
+    {
+      "receiptCid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+      "schema": "trikeshed.english-legal-patterns.v1",
+      "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "bytes": 5860
+    }
+  ],
+  "files": [
+    {
+      "file": "cas-readbacks/0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23.cbor",
+      "cid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "bytes": 13562
+    },
+    {
+      "file": "cas-readbacks/0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759.cbor",
+      "cid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "bytes": 15060
+    },
+    {
+      "file": "cas-readbacks/0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb.cbor",
+      "cid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 11648
+    },
+    {
+      "file": "cas-readbacks/1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb.cbor",
+      "cid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+      "bytes": 18984
+    },
+    {
+      "file": "cas-readbacks/4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922.cbor",
+      "cid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+      "bytes": 5860
+    },
+    {
+      "file": "cas-readbacks/6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a.cbor",
+      "cid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "bytes": 6433
+    },
+    {
+      "file": "cas-readbacks/7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798.cbor",
+      "cid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "bytes": 15084
+    }
+  ]
+}

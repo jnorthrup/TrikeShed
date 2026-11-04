@@ -1,0 +1,82 @@
+// Independent read-only audit. Built-in Node APIs only; never starts a parser or writes the fixture.
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
+const root=path.resolve(process.argv[2]||'/workspace/library-files/documents-legal-candidates-proof');
+const result=JSON.parse(fs.readFileSync(path.join(root,'result.json'),'utf8'));
+const sha=bytes=>'sha256:'+crypto.createHash('sha256').update(bytes).digest('hex');
+const isCid=value=>typeof value==='string'&&/^sha256:[0-9a-f]{64}$/.test(value);
+function decode(bytes){
+ assert(bytes.length<=8*1024*1024);let at=0,items=0;
+ function take(n){assert(Number.isSafeInteger(n)&&n>=0&&at+n<=bytes.length);const out=bytes.subarray(at,at+n);at+=n;return out;}
+ function uint(n){let v=0n;for(const b of take(n))v=(v<<8n)|BigInt(b);assert(v<=BigInt(Number.MAX_SAFE_INTEGER));return Number(v);}
+ function read(depth=0){assert(depth<=32&&++items<=500000);const tag=uint(1),kind=tag>>5,ai=tag&31;assert(ai!==31,'indefinite CBOR is not accepted');
+  if(kind===7){if(ai===20)return false;if(ai===21)return true;if(ai===22)return null;if(ai===26)return take(4).readFloatBE(0);if(ai===27)return take(8).readDoubleBE(0);throw Error('Unsupported CBOR simple value '+ai);}
+  const n=ai<24?ai:ai===24?uint(1):ai===25?uint(2):ai===26?uint(4):ai===27?uint(8):NaN;assert(Number.isSafeInteger(n));
+  if(kind===0)return n;if(kind===1)return -1-n;if(kind===2)return {bytes:take(n).toString('hex')};
+  if(kind===3)return new TextDecoder('utf-8',{fatal:true}).decode(take(n));
+  if(kind===4)return Array.from({length:n},()=>read(depth+1));
+  if(kind===5){const map=Object.create(null);for(let i=0;i<n;i++){const key=read(depth+1);assert.equal(typeof key,'string');assert(!Object.hasOwn(map,key),'duplicate CBOR key');map[key]=read(depth+1);}return map;}
+  throw Error('Unsupported CBOR kind '+kind);
+ }
+ const value=read();assert.equal(at,bytes.length);return JSON.parse(JSON.stringify(value));
+}
+const checked=new Map(),retained=[];
+function retainedEqual(value){
+ assert(isCid(value.receiptCid));const file=path.join(root,'cas-readbacks',value.receiptCid.slice(7)+'.cbor'),bytes=fs.readFileSync(file);
+ assert.equal(sha(bytes),value.receiptCid);const decoded=decode(bytes),expected={...value};delete expected.receiptCid;
+ assert.deepEqual(decoded,expected,'HTTP/typed reply differs from retained CBOR');checked.set(value.receiptCid,{schema:value.schema,bytes:bytes.length});
+ retained.push(value.receiptCid);
+}
+const sources=new Map(result.meta.sources.map(s=>{assert.equal(sha(Buffer.from(s.text,'utf8')),s.cid);return [s.cid,s];}));
+const inspections=new Map();let totalTokens=0,totalNodes=0,totalModal=0,totalDuration=0,totalBindings=0;
+for(const key of ['inspectionA','inspectionB','inspectionCopy']){
+ const v=result[key],source=sources.get(v.originalCid);assert(source);assert.equal(v.extractedTextCid,source.cid);assert.equal(v.selection.project,result.meta.project);assert.equal(v.selection.id,source.id);assert.equal(v.selection.cid,source.cid);
+ assert.equal(v.schema,'trikeshed.english-inspection.v1');assert.equal(v.reviewStatus,'unreviewed');assert.equal(v.authority,'lexical-and-parser-observations-only');assert.equal(v.parser.runtime.packageVersion,'4.6.0');assert.equal(v.parser.runtime.manifestCid,result.meta.moduleManifestCid);
+ assert.deepEqual(v.range,{begin:0,end:source.text.length,totalLength:source.text.length,complete:true});
+ for(const sentence of v.sentences){assert.equal(sentence.quote,source.text.slice(sentence.begin,sentence.end));const originals=new Map(sentence.tokens.map(t=>[t.index,t]));assert.equal(originals.size,sentence.tokens.length);const nodes=new Map();
+  totalTokens+=originals.size;totalNodes+=sentence.nodes.length;
+  for(const token of originals.values()){assert(token.index>0);assert.equal(token.word,source.text.slice(token.begin,token.end));}
+  for(const node of sentence.nodes){assert.equal(node.id,node.index+':'+node.copy);assert(!nodes.has(node.id));nodes.set(node.id,node);assert.equal(node.kind,node.copy===0?'token':'copy');const original=originals.get(node.index);assert(original);for(const field of ['begin','end','word','lemma','pos','ner'])assert.equal(node[field],original[field]);}
+  assert.equal(sentence.nodes.filter(n=>n.copy===0).length,originals.size);
+  for(const edge of sentence.dependencies){assert.equal(edge.governorNode,edge.governor+':'+edge.governorCopy);assert.equal(edge.dependentNode,edge.dependent+':'+edge.dependentCopy);assert(edge.governorNode==='0:0'||nodes.has(edge.governorNode));assert(nodes.has(edge.dependentNode));}
+  for(const marker of sentence.markers)assert.equal(marker.quote,source.text.slice(marker.begin,marker.end));
+ }
+ retainedEqual(v);inspections.set(v.receiptCid,v);
+}
+function candidate(v,mode){
+ const inspection=inspections.get(v.inspectionCid),source=sources.get(v.originalCid);assert(inspection&&source);assert.equal(v.schema,'trikeshed.english-legal-patterns.v1');assert.equal(v.reviewStatus,'unreviewed');assert.equal(v.authority,'parser-role-and-quantity-candidates-only');assert.equal(v.producerAuthority,'not-established');assert.equal(v.parserExecution,'not-reverified');assert.equal(v.countsAreEvidenceConfidence,false);
+ assert.deepEqual(v.selection,inspection.selection);assert.equal(v.originalCid,inspection.originalCid);assert.equal(v.extractedTextCid,inspection.extractedTextCid);assert.deepEqual(v.range,inspection.range);assert.deepEqual(v.parser,inspection.parser);
+ assert.equal(v.source.receiptCid,v.inspectionCid);assert.equal(v.source.mode,mode);assert.equal(v.source.historical,mode==='snapshot');assert.equal(v.source.currentness,mode==='current'?'checked-before-and-after-inspection':'not-checked');assert.equal(v.source.semanticAuthority,'not-established');
+ for(const issue of ['parser-execution-not-reverified','producer-authority-not-established','legal-meaning-not-established'])assert(v.unresolved.includes(issue));
+ for(const field of ['facts','rules','approved','admitted','daysEquivalent'])assert(!Object.hasOwn(v,field));
+ assert.equal(v.sentences.length,inspection.sentences.length);let actions=0,durations=0,bindings=0;
+ v.sentences.forEach((s,i)=>{const original=inspection.sentences[i];for(const field of ['index','begin','end','quote','quotation','markers','nodes','dependencies'])assert.deepEqual(s[field],original[field],field+' must preserve full retained inventory');
+  const nodes=new Map(s.nodes.map(n=>[n.id,n])),edges=new Set(s.dependencies.map(e=>[e.governorNode,e.relation,e.dependentNode].join('\t')));
+  const node=n=>{assert(n&&nodes.has(n.id));assert.deepEqual(n,nodes.get(n.id));};
+  const binding=e=>{assert(edges.has([e.governorNode,e.relation,e.dependentNode].join('\t')));bindings++;};
+  for(const a of s.modalActions){actions++;assert.equal(a.status,'parser-role-candidate');node(a.modal);node(a.action);assert.equal(a.modalLiteral,a.modal.word);assert.equal(a.modalLemma,a.modal.lemma);binding(a.dependency);assert.equal(a.dependency.relation,'aux');assert.equal(a.dependency.governorNode,a.action.id);assert.equal(a.dependency.dependentNode,a.modal.id);
+   for(const role of ['subjects','objects'])for(const r of a[role]){node(r.node);binding(r.dependency);assert.equal(r.dependency.governorNode,a.action.id);assert.equal(r.dependency.dependentNode,r.node.id);assert.equal(r.dependency.relation,r.relation);assert((role==='subjects'?['nsubj','nsubj:pass']:['obj','dobj','iobj']).includes(r.relation));}
+   a.relatedDependencies.forEach(binding);assert(a.unresolved.includes('legal-force-not-established'));
+  }
+  for(const d of s.durations){durations++;assert.equal(d.quote,source.text.slice(d.begin,d.end));assert.equal(d.quantityLiteral,source.text.slice(d.quantityBegin,d.quantityEnd));assert.equal(d.quantityAuthority,'bounded-lexical-reading-only');assert(!Object.hasOwn(d,'daysEquivalent'));
+   if(d.integerValue===null)assert.equal(d.status,'unresolved-quantity-candidate');else assert(Number.isInteger(d.integerValue)&&d.integerValue>=0&&d.integerValue<=9999);
+   for(const r of d.numberReadings){assert.equal(r.quote,source.text.slice(r.begin,r.end));if(r.integerValue!==null)assert(Number.isInteger(r.integerValue)&&r.integerValue>=0&&r.integerValue<=9999);}
+   d.unitNodes.forEach(node);d.modifiers.forEach(node);if(d.temporalMarker)node(d.temporalMarker);for(const field of ['numberDependencies','markerDependencies','attachments'])d[field].forEach(binding);
+  }
+ });
+ assert.deepEqual(v.counts,{modalActions:actions,durations,dependencyBindings:bindings});totalModal+=actions;totalDuration+=durations;totalBindings+=bindings;retainedEqual(v);
+}
+for(const [key,mode] of [['currentA','current'],['repeated','current'],['historicalA','snapshot'],['currentB','current'],['copyCandidates','current']])candidate(result[key],mode);
+assert.deepEqual(result.repeated,result.currentA);assert.deepEqual(result.currentA.sentences,result.historicalA.sentences);assert.notEqual(result.currentA.receiptCid,result.historicalA.receiptCid);assert(!Object.hasOwn(result.stale,'receiptCid'));assert.match(result.stale.error,/stale|changed|current|revision/i);
+assert.notEqual(result.mutation.cid,result.inspectionA.selection.cid);assert.notEqual(result.mutation.rev,result.inspectionA.selection.rev);assert.notEqual(result.mutation.seq,result.inspectionA.selection.seq);
+const matching=result.currentA.sentences[0].durations.find(d=>d.quantityLiteral==='thirty (30)');assert(matching);assert.equal(matching.integerValue,30);assert.deepEqual(matching.numberReadings.map(r=>r.integerValue),[30,30]);assert(matching.modifiers.some(n=>n.word==='business'));assert(result.currentA.sentences[0].unresolved.includes('negation-scope-not-established'));assert(result.currentA.sentences[0].unresolved.includes('guard-scope-not-established'));
+const conflicting=result.currentB.sentences[0].durations.find(d=>d.quantityLiteral==='thirty (60)');assert(conflicting);assert.equal(conflicting.integerValue,null);assert.deepEqual(conflicting.numberReadings.map(r=>r.integerValue),[30,60]);assert(conflicting.unresolved.includes('conflicting-number-forms'));
+const copies=result.inspectionCopy.sentences.flatMap(s=>s.nodes.filter(n=>n.copy>0));assert.deepEqual(result.copyObservation.copyNodes,copies);assert.equal(result.copyObservation.parserNodeCount,result.inspectionCopy.sentences.reduce((n,s)=>n+s.nodes.length,0));assert.equal(result.copyObservation.sourceTokenCount,result.inspectionCopy.sentences.reduce((n,s)=>n+s.tokens.length,0));
+for(const [key,response,mode] of [['lcncA','currentA','current'],['lcncHistorical','historicalA','snapshot'],['lcncB','currentB','current']]){const typed=result[key];assert.deepEqual(typed.typeErrors,[]);assert.deepEqual(typed.output,result[response]);candidate(typed.output,mode);const program=typed.program;assert(program.nodes.some(n=>n.id==='patterns'&&n.type==='document.english.patterns'));assert.deepEqual(program.wires,[{from:['receipt','value'],to:['patterns','receiptCid']},{from:['mode','value'],to:['patterns','mode']},{from:['patterns','receiptCid'],to:['derived','value']}]);}
+for(const row of result.evidence.retainedReadbacks){assert(isCid(row.receiptCid));const bytes=fs.readFileSync(path.join(root,'cas-readbacks',row.receiptCid.slice(7)+'.cbor'));assert.equal(sha(bytes),row.receiptCid);assert.equal(bytes.length,row.bytes);const decoded=decode(bytes);assert.equal(decoded.schema,row.schema);if(row.inspectionCid!==null)assert.equal(decoded.inspectionCid,row.inspectionCid);}
+assert.equal(result.evidence.parserCalls,3);assert.equal(result.evidence.inspectionCount,3);assert.equal(result.evidence.lcncCalls,3);for(const field of ['modelCalls','configuredModelCount','automaticIntake','reviewIntakeCalls','reteFacts'])assert.equal(result.evidence[field],0);
+assert.deepEqual(result.browserErrors,[]);assert.deepEqual(result.externalBrowserRequests,[]);assert.equal(result.evidence.networkDenyBefore.result,'DENIED');assert.equal(result.evidence.networkDenyAfter.result,'DENIED');
+const writes=result.writes.filter(w=>w.path==='/api/documents/english');assert.equal(writes.length,3);assert.equal(new Set(writes.map(w=>w.body.cid)).size,3);
+for(const write of result.writes.filter(w=>w.path==='/api/documents/english/legal-patterns')){assert.deepEqual(Object.keys(write.body).sort(),['mode','receiptCid']);assert(inspections.has(write.body.receiptCid));assert(['current','snapshot'].includes(write.body.mode));}
+const report={result:'PASS',scope:'Independent built-in Node JSON/CBOR and SHA-256 comparator; no parser or production verifier reused',resultCid:sha(fs.readFileSync(path.join(root,'result.json'))),auditorCid:sha(fs.readFileSync(__filename)),uniqueRetainedReceipts:checked.size,exportedReadbacksCompared:result.evidence.retainedReadbacks.length,retainedResponsesCompared:retained.length,originalSourceTokens:totalTokens,fullParserNodes:totalNodes,candidateResponsesCompared:8,modalObservationsAcrossComparedResponses:totalModal,durationObservationsAcrossComparedResponses:totalDuration,dependencyBindingsAcrossComparedResponses:totalBindings,checks:['source UTF-8 hash and global UTF-16 quotation slices','original source tokens distinct from full index:copy nodes','exact sentence quotation, markers, nodes and complete dependencies','modal/subject/object directed bindings and full identities','number literal/forms/modifier/unit spans; no calendar conversion','HTTP and typed LCNC equality with retained CBOR bytes and receipt SHA-256','same-source repeat, current stale refusal, explicit historical replay','three explicit parser calls; zero model/review/Rete admission counters','candidate request fields and parent receipt ownership'],limits:['Independently verifies recorded outputs and retained byte identity, not parser authenticity beyond actual harness metadata','Does not recreate browser timing, prove general production airgap, authenticate legal meaning, or promote candidate authority']};
+process.stdout.write(JSON.stringify(report,null,2)+'\n');

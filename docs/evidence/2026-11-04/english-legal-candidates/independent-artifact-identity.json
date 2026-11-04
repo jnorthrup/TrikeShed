@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "source": "8486ae5f0547c49bf1013a472eda3f505d7c58ac",
+  "files": [
+    {
+      "file": "main.jar",
+      "sha256": "c0ad0df4cc9b7160f2776f467c4c8825ec187dc0fcfbb209fbd2c9642224d516"
+    },
+    {
+      "file": "documents.js",
+      "sha256": "eb6e4e9a78efb6eff64222ffa289987c52c41cb30a59ca6486a55faac4970497"
+    },
+    {
+      "file": "pages.js",
+      "sha256": "9388c8ab1cdffb4db3b86e3e99c92fada2fee91e91e69592678be2fb6f767a54"
+    },
+    {
+      "file": "spacegraph.js",
+      "sha256": "034a23cf78b9d8f2f8fbe0db2f32c35cb64b4585432c1a20fe5786327fd86cf0"
+    }
+  ]
+}
