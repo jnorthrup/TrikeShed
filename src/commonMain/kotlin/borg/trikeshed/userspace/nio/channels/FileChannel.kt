@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import borg.trikeshed.userspace.UringTrace
+import borg.trikeshed.lib.*
 
 /**
  * FileChannel wired behind UringFacade.
@@ -74,10 +75,17 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
         fun open(path: Path, vararg options: OpenOption): FileChannel = open(path, options.toSet())
         fun open(path: String, vararg options: OpenOption): FileChannel = open(path, options.toSet())
 
+        /** A regular-file reader can inspect the descriptor without blocking on a replaced FIFO. */
+        internal fun openReadNonblocking(path: String): FileChannel =
+            open(path, _s[StandardOpenOption.READ], extraFlags = UringOp.O_NONBLOCK) {
+                FunctionalUringFacade(256, openUserspaceChannelBackend(256))
+            }
+
         internal fun open(
             path: String,
             options: Set<OpenOption>,
             permissions: Int = 438,
+            extraFlags: Int = 0,
             channelFactory: () -> FunctionalUringFacade,
         ): FileChannel {
             val supported = setOf(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
@@ -92,6 +100,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
             if (StandardOpenOption.CREATE in options || StandardOpenOption.CREATE_NEW in options) flags = flags or 64
             if (StandardOpenOption.CREATE_NEW in options) flags = flags or 128
             if (StandardOpenOption.TRUNCATE_EXISTING in options) flags = flags or 512
+            flags = flags or extraFlags
             require(permissions in 0..511)
             val submission = Submissions.openat(path, flags, 0).copy(operationFlags = permissions)
             val channel = channelFactory()
