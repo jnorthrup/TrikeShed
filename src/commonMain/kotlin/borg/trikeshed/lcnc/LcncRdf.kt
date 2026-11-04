@@ -242,7 +242,7 @@ object LcncRdf {
 
     /**
      * The CAUSAL projection for the NAL crossing: every cable as `lcnc:causes`
-     * (KgNalBridge maps `causes` to IMPLICATION), every node as an instance of
+     * (KgNalBridge explicitly maps this owned IRI to IMPLICATION), every node as an instance of
      * its type (INHERITANCE). Ingested through /api/beliefs/kg this turns a
      * program into causal beliefs the belief bag and the causality rete can
      * reason over — the same IRIs the graph and the alignment use.
