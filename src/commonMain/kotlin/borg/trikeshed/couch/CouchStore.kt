@@ -363,6 +363,7 @@ object CouchStoreFactory {
             synchronization = synchronization,
             captureDocument = ::captureCanonicalBody,
         )
+<<<<<<< HEAD
         return CouchStore(ingress, head, changes, cas)
     }
 
@@ -374,6 +375,11 @@ object CouchStoreFactory {
             require(field.name != "_id" && names.add(field.name)) { "Couch body contains an ambiguous field identity" }
         }
         return Document(doc.id, fields)
+||||||| cc0b7feaa
+        return CouchStore(ingress, head, changes)
+=======
+        return CouchStore(ingress, head, changes, cas)
+>>>>>>> 11d3e572794981ddee9e2d2ae93a1cf3a49d02a4
     }
 
     /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */
