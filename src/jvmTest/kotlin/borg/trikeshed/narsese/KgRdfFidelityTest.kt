@@ -102,7 +102,27 @@ class KgRdfFidelityTest {
         assertFailsWith<IllegalArgumentException> { KgNalBridge.parseTurtle("<urn:s> <urn:p> " + many.view.joinToString(",") + " .") }
     }
 
-    @Test fun actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate() = runBlocking {
+    @Test fun structuralCommentLineEndingsPreserveAllTriplesAndLongLiteralContent() {
+        val expected = _l["<urn:a>", "<urn:b>"]
+        for (eol in s_["\r", "\r\n", "\n"].view) {
+            val input = "# header${eol}@prefix ex: <urn:> .${eol}" +
+                "ex:a ex:p ex:o . # middle${eol}ex:b ex:p ex:o ."
+            assertEquals(expected, KgNalBridge.parseTurtle(input).map { it.subject }, "Structural EOL must not swallow valid data")
+        }
+        val mixed = "# header\r@prefix ex: <urn:> .\r\nex:a ex:p ex:o . # middle\rex:b ex:p ex:o .\n"
+        assertEquals(expected, KgNalBridge.parseTurtle(mixed).map { it.subject })
+        val literal = "a\rb\r\nc\nd"
+        val long = "<urn:a> <urn:p> \"\"\"$literal\"\"\" . # tail\r<urn:b> <urn:p> <urn:o> ."
+        val rows = KgNalBridge.parseTurtle(long)
+        assertEquals(2, rows.size)
+        assertEquals(RdfTerm.Literal(literal), TurtleRdf.parseTerm(rows[0].obj), "Long literal CR/CRLF/LF must remain exact")
+        assertEquals("<urn:b>", rows[1].subject)
+        assertFailsWith<IllegalArgumentException> { KgNalBridge.parseTurtle("<urn:a> <urn:p> \"a\rb\" .") }
+        // Existing permissive readers retain their previous separate behavior.
+        assertEquals(1, TurtleRdf.parse("# header\r<urn:a> <urn:p> <urn:o> .").triples.size)
+    }
+
+    @Test fun actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate(): Unit = runBlocking {
         withTimeout(10_000) {
             val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
             try {
@@ -116,6 +136,14 @@ class KgRdfFidelityTest {
                 assertEquals(1, report["statements"])
                 val expected = KgNalBridge.map(KgNalBridge.parseTurtle(input).single()).signal(ContentId.of(input.encodeToByteArray()).value)
                 assertEquals(expected, bag.signalOf(expected.angular))
+                val twoKinds = "<urn:s> <urn:p> <urn:o> .\n<urn:s> <urn:p> \"urn:o\" ."
+                val source = ContentId.of(twoKinds.encodeToByteArray()).value
+                val signals = KgNalBridge.parseTurtle(twoKinds).map { KgNalBridge.map(it).signal(source) }
+                assertEquals(2, signals.map { it.angular }.distinct().size, "This concrete pair has distinct natural routing addresses")
+                assertEquals(2, bag.ingestKg(twoKinds)["statements"])
+                for (signal in signals) assertEquals(signal, bag.signalOf(signal.angular))
+                bag.ingestKg(twoKinds)
+                for (signal in signals) assertEquals(signal, bag.signalOf(signal.angular), "Exact source replay cannot add evidence")
                 bag.awaitProcessed(); assertTrue(bag.worker?.isActive == true)
             } finally { bag.drain(); assertTrue(bag.worker?.isCompleted == true && bag.supervisor.isCompleted) }
             // These are compatibility controls, not endorsements of the permissive parser's behavior.
