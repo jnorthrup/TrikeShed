@@ -1,0 +1,439 @@
+{
+  "result": "PASS",
+  "source": "a42f1dbdefadf7fe774247b4abfd589e6b4ecb73",
+  "observations": {
+    "legal-inner-thirty-days": {
+      "nodes": [
+        {
+          "type": "sparql.select",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": []
+        },
+        {
+          "type": "sparql.variable",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?quote",
+              "title": "?quote"
+            },
+            {
+              "value": "0",
+              "title": "0"
+            }
+          ]
+        },
+        {
+          "type": "sparql.variable",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?status",
+              "title": "?status"
+            },
+            {
+              "value": "1",
+              "title": "1"
+            }
+          ]
+        },
+        {
+          "type": "sparql.variable",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?sentence",
+              "title": "?sentence"
+            },
+            {
+              "value": "2",
+              "title": "2"
+            }
+          ]
+        },
+        {
+          "type": "sparql.variable",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?source",
+              "title": "?source"
+            },
+            {
+              "value": "3",
+              "title": "3"
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?d",
+              "title": "?d"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:kind>",
+              "title": "<urn:trikeshed:english:legal:kind>"
+            },
+            {
+              "value": "\"duration-language-candidate\"",
+              "title": "\"duration-language-candidate\""
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?d",
+              "title": "?d"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:integerValue>",
+              "title": "<urn:trikeshed:english:legal:integerValue>"
+            },
+            {
+              "value": "\"30\"^^<http://www.w3.org/2001/XMLSchema#integer>",
+              "title": "\"30\"^^<http://www.w3.org/2001/XMLSchema#integer>"
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?d",
+              "title": "?d"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:unitLemma>",
+              "title": "<urn:trikeshed:english:legal:unitLemma>"
+            },
+            {
+              "value": "\"day\"",
+              "title": "\"day\""
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?d",
+              "title": "?d"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:quote>",
+              "title": "<urn:trikeshed:english:legal:quote>"
+            },
+            {
+              "value": "?quote",
+              "title": "?quote"
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?d",
+              "title": "?d"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:status>",
+              "title": "<urn:trikeshed:english:legal:status>"
+            },
+            {
+              "value": "?status",
+              "title": "?status"
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?d",
+              "title": "?d"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:sentence>",
+              "title": "<urn:trikeshed:english:legal:sentence>"
+            },
+            {
+              "value": "?s",
+              "title": "?s"
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?s",
+              "title": "?s"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:quote>",
+              "title": "<urn:trikeshed:english:legal:quote>"
+            },
+            {
+              "value": "?sentence",
+              "title": "?sentence"
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sparql.pattern",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "?d",
+              "title": "?d"
+            },
+            {
+              "value": "<urn:trikeshed:english:legal:sourceText>",
+              "title": "<urn:trikeshed:english:legal:sourceText>"
+            },
+            {
+              "value": "?source",
+              "title": "?source"
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        }
+      ],
+      "laneFrames": 0,
+      "footer": "Inspection only \u00b7 Run and Live are disabled"
+    },
+    "sql-inspection-only": {
+      "nodes": [
+        {
+          "type": "sql.select",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "",
+              "title": ""
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        },
+        {
+          "type": "sql.itemStar",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "0",
+              "title": "0"
+            }
+          ]
+        },
+        {
+          "type": "sql.table",
+          "syntax": "1",
+          "label": "Query syntax \u00b7 Inspection only",
+          "warnings": [],
+          "decorations": 0,
+          "fields": [
+            {
+              "value": "retained_candidate_rows_with_a_long_source_descriptor_name",
+              "title": "retained_candidate_rows_with_a_long_source_descriptor_name"
+            },
+            {
+              "value": "",
+              "title": ""
+            }
+          ]
+        }
+      ],
+      "laneFrames": 0,
+      "footer": "Inspection only \u00b7 Run and Live are disabled"
+    },
+    "mixed": {
+      "syntaxNodes": 13,
+      "unboundExecutableWarning": "Unavailable: No runtime owner is bound",
+      "runDisabled": true
+    },
+    "unbound": {
+      "warning": "Unavailable: No runtime owner is bound",
+      "runDisabled": false
+    }
+  },
+  "outerRun": {
+    "status": "completed",
+    "receiptCid": "sha256:858da54575a8a27d562bd108b5b704c39dd2258b4b66d598ada634c81b12e75b",
+    "programCid": "sha256:4684fa8e026df3e94ca69ce9f07d58df3bed857411736c3eebdc4196d942cfb0",
+    "query": {
+      "dataset": "english-legal-candidate-observations",
+      "query": "SELECT ?quote ?status ?sentence ?source WHERE { ?d <urn:trikeshed:english:legal:kind> \"duration-language-candidate\" . ?d <urn:trikeshed:english:legal:integerValue> \"30\"^^<http://www.w3.org/2001/XMLSchema#integer> . ?d <urn:trikeshed:english:legal:unitLemma> \"day\" . ?d <urn:trikeshed:english:legal:quote> ?quote . ?d <urn:trikeshed:english:legal:status> ?status . ?d <urn:trikeshed:english:legal:sentence> ?s . ?s <urn:trikeshed:english:legal:quote> ?sentence . ?d <urn:trikeshed:english:legal:sourceText> ?source . }",
+      "results": {
+        "head": {
+          "vars": [
+            "quote",
+            "status",
+            "sentence",
+            "source"
+          ]
+        },
+        "results": {
+          "bindings": [
+            {
+              "quote": {
+                "type": "literal",
+                "value": "within thirty (30) business days"
+              },
+              "status": {
+                "type": "literal",
+                "value": "lexical-integer-candidate"
+              },
+              "sentence": {
+                "type": "literal",
+                "value": "Tenant shall not pay rent within thirty (30) business days unless Owner consents."
+              },
+              "source": {
+                "type": "uri",
+                "value": "urn:sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703"
+              }
+            }
+          ]
+        }
+      },
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "namedGraph": "urn:trikeshed:english:legal:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "originalCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "extractedTextCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "candidateCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "quads": 898,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      }
+    }
+  },
+  "parserCalls": 0,
+  "setupQueries": 0,
+  "authoredOuterRuns": 1,
+  "primarySafety": {
+    "reteFacts": 0,
+    "blackboardValues": 0,
+    "beliefBagPresent": false,
+    "reviewOwnerPresent": false,
+    "modelMuxConfigured": false,
+    "parserOwnerPresent": false,
+    "parserCalls": 0,
+    "extractCalls": 0,
+    "globalQuadStorePresent": false
+  },
+  "operationalPanelsScope": "Actual Panels and actual Kanban durable inline runs in a separate operational board context. Primary query Rete is independent.",
+  "browserErrors": [],
+  "externalBrowserRequests": [],
+  "archive": {
+    "file": "browser-result.json.gz",
+    "rawSha256": "67008a907645063ad8073c4b779aa271e50f1a5050c4ee6eb2e35cc90261eb9c",
+    "rawBytes": 254968,
+    "compressedBytes": 12870
+  }
+}
