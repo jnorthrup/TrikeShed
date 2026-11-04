@@ -1,0 +1,20 @@
+{
+  "scope": "Actual closed all-synthetic v70 source/CAS/project heads/reviewWAL AFTER deliberate source amendment. Old inspection96cf is retained but MUST fail current-source reopening; no historical-head rewind is asserted. Synthetic reviewer hash-only config is fixture data.",
+  "archiveSha256": "728a9927a8d98f05f4f615abd5bbfe5daf5b55ba2e587cd9495cc48849414fc8",
+  "files": {
+    "runtime/cas/pack": "cba12f57be2bdec245d4fd899b70034bdd466188c7537740a82026f069c30b38",
+    "runtime/files/english-taxonomy-reviewed-pilot/synthetic taxonomy review clauses.txt": "aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db",
+    "runtime/files/existing-documents/other.txt": "a3f27aacf5ef2e621194339dad5780f0199853e7260f6548bbc24bdf02a95e6b",
+    "runtime/owner/documents/review-principals.json": "449b2391b733d7b6ba48894390c6b7648e26f4cc0774176d319cfdbb6257ae2d",
+    "runtime/owner/documents/review.wal": "9530eb1e7dc10ced62f4e2a3c6fd95ddd953731db063a78ef4d6cd6f1150298c",
+    "runtime/project-couch/english-taxonomy-reviewed-pilot/.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runtime/project-couch/english-taxonomy-reviewed-pilot/HEAD": "48bee535f0115c291e92df03558dfdb0268da605d5a014e85dc76c0ed07d420d",
+    "runtime/project-couch/existing-documents/.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runtime/project-couch/existing-documents/HEAD": "7278d954f29767080099ce69b8bf36bed4f881689c2d9213d241a53ec0755fba",
+    "runtime/project-intake-policy/english-taxonomy-reviewed-pilot.guard": "7c03b50c68cea91c5ab9a7999779fb94273c9d1b3b19bd036aff5b2c8d09b6aa",
+    "runtime/project-intake-policy/existing-documents.guard": "1e6994916f3193b03050d8dfb5601b0c68447cb3c7c9203d6228e3cd9887d568",
+    "runtime/project-manifests/english-taxonomy-reviewed-pilot.tsv": "fab1dea806eff95f9960ce48da8df4ce12cf557bd1575a33776ce911be09bc88",
+    "runtime/project-manifests/existing-documents.tsv": "6de94dae622910a50db93ce21bbbdab28b5aa3ad8c0f020bcae8f0584eac94b6",
+    "runtime/projects.tsv": "d984d1036733a670d3d11c10a394733dccac83c51215e324f7c4049ce764df4e"
+  }
+}

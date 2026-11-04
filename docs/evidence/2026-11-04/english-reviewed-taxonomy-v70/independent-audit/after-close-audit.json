@@ -1,0 +1,36 @@
+{
+  "result": "PASS",
+  "scope": "Independent CRC32C/raw-WAL and retained-event audit after close, tied to the unchanged base audit and actual reopened-carrier verifier report. No new query, parser, decision, native execution or world admission. currentSource=false is tied to recorded native mutation/stale409, not a fresh after-close currentness query.",
+  "inputs": {
+    "review.wal": "sha256:9530eb1e7dc10ced62f4e2a3c6fd95ddd953731db063a78ef4d6cd6f1150298c",
+    "reopened-cas-wal.json": "sha256:15f0d42748a1e05e6a1764079e3cfbc7f5786849b819e86ba6b0e0bde49291f0",
+    "independent-audit/audit.cjs": "sha256:8190d6387f851cd0743a1fb5f8a46d449a41e0968371d8ba7bc424aa98e61d50",
+    "independent-audit/audit.json": "sha256:d33cd677b02f7a7c0e71bcaa74652c0172c668491d53fe69f8c50f37fe23f290"
+  },
+  "bytes": 194,
+  "frames": [
+    {
+      "sequence": 1,
+      "eventCid": "sha256:08277d5715cc036a0b4f00b5b2d1b59e0a1e713b59e42f4088ea87d54072fc77"
+    },
+    {
+      "sequence": 2,
+      "eventCid": "sha256:ee3df5915d036442e03ee09d0437bf2acbf1c82132016925bdbd64c97da002f3"
+    }
+  ],
+  "baseAudit": "PASS",
+  "negativeControls": [
+    {
+      "name": "wal-bit-flip",
+      "result": "REFUSED"
+    },
+    {
+      "name": "approval-replaced",
+      "result": "REFUSED"
+    },
+    {
+      "name": "currentness-promoted",
+      "result": "REFUSED"
+    }
+  ]
+}

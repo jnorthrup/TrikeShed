@@ -1,0 +1,62 @@
+package proof.englishtaxonomyreopen
+
+import borg.trikeshed.job.*
+import borg.trikeshed.lcnc.EnglishTaxonomyCarrier
+import borg.trikeshed.lib.*
+import borg.trikeshed.narsese.DocumentAppendLog
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import kotlinx.coroutines.*
+import java.io.File
+
+/** Reads immutable carrier/source and actual CRC-framed review WAL after all live owners closed. */
+fun main() = runBlocking {
+    val root = File(requireNotNull(java.lang.System.getenv("PROOF_ROOT")))
+    check(File(root, "fixture-attempt1.exit").readText().trim() == "0")
+    val result = reifyStrict(File(root, "browser-result.json").readText()) as Map<*, *>; check(result["result"] == "PASS")
+    val observed = result["observed"] as Map<*, *>; val prepared = observed["prepared"] as Map<*, *>
+    val approved = observed["approved"] as Map<*, *>; val inspection = observed["inspection"] as Map<*, *>
+    val files = JvmFileOperations(); val cas = PackCasStore(files, File(root, "runtime/cas").absolutePath)
+    val docs = File(root, "runtime/owner/documents"); val wal = File(docs, "review.wal"); val before = wal.readBytes()
+    val frames = mutableListOf<Map<String, Any?>>()
+    try {
+        val carrier = EnglishTaxonomyCarrier.verify(cas, ContentId(prepared["receiptCid"] as String))
+        check(reifyStrict(jsonOf(EnglishTaxonomyCarrier.projection(carrier))) == prepared)
+        check(carrier.built.snapshot.receiptCid.value == inspection["receiptCid"])
+        check(carrier.built.snapshot.source.text.encodeToByteArray().contentEquals(File(root, "source.txt").readBytes()))
+        val reread = EnglishObservationGraph.read(cas, ContentId(inspection["receiptCid"] as String))
+        check(reread.sourceSnapshots?.size == 1)
+        withContext(files) {
+            val log = DocumentAppendLog.open(wal.absolutePath, docs.absolutePath)
+            try { log.replay { sequence, payload ->
+                val cid = ContentId(payload.decodeToString(throwOnInvalidSequence = true))
+                val bytes = requireNotNull(cas.getBounded(cid, 1024 * 1024)); check(ContentId.of(bytes) == cid)
+                val event = CanonicalCbor.decodeMapBounded(bytes, 1024 * 1024, 16, 100_000)
+                check(event["snapshotCid"] == approved["snapshotCid"] && event["kind"] == "curation-review-event")
+                frames.add(_m["sequence" j sequence, "eventCid" j cid.value, "event" j event])
+            } } finally { log.close() }
+        }
+        check(frames.size == 2 && (frames.last()["event"] as Map<*, *>)["action"] == "approve")
+        check(frames.last()["eventCid"] == approved["decisionCid"])
+        check(wal.readBytes().contentEquals(before))
+        File(root, "review.wal").writeBytes(before)
+        val exported = (result["evidence"] as Map<*, *>)["retainedReadbacks"] as List<*>
+        for (raw in exported) {
+            val row = raw as Map<*, *>; val cid = ContentId(row["cid"] as String)
+            val bytes = requireNotNull(cas.getBounded(cid, 8 * 1024 * 1024)); check(ContentId.of(bytes) == cid)
+            val suffix = if (row["encoding"] == "canonical-cbor") "cbor" else "txt"
+            check(File(root, "cas-readbacks/${cid.hex}.$suffix").readBytes().contentEquals(bytes))
+        }
+        val report = _m["result" j "PASS", "scope" j "Exact closed PackCasStore, production EnglishTaxonomyCarrier verifier and CRC review WAL replay. No parser, new review decision, query, native execution or world admission. The current source was deliberately amended after the earlier conditional support result.",
+            "translationCid" j carrier.declarationCid.value, "derivedKifCid" j carrier.record.source.originalCid.value,
+            "receiptCid" j carrier.receiptCid.value, "inspectionCid" j reread.receiptCid.value,
+            "sourceSnapshots" j reread.sourceSnapshots?.map { it.toMap() }, "canonicalProjectionEqualsActualUiPreview" j true,
+            "retainedArtifactsUnchanged" j exported.size, "reviewWalBytes" j before.size, "reviewWalUnchangedByReplay" j true,
+            "reviewWalCid" j ContentId.of(before).value, "reviewFrames" j frames,
+            "currentSourceMatchesOldInspection" j false, "currentnessScope" j "Actual mutation and stale409 recorded by native pilot; immutable old receipts remain retained, not approved current data",
+            "codeSources" j _m["EnglishTaxonomyCarrier" j EnglishTaxonomyCarrier::class.java.protectionDomain.codeSource.location.toString(),
+                "DocumentAppendLog" j DocumentAppendLog::class.java.protectionDomain.codeSource.location.toString()]]
+        File(root, "reopened-cas-wal.json").writeText(jsonOf(report)); println(jsonOf(report))
+    } finally { cas.close() }
+}
