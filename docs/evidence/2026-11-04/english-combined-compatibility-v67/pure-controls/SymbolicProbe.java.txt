@@ -1,0 +1,34 @@
+import borg.trikeshed.kif.*;
+import borg.trikeshed.job.*;
+import java.util.*;
+import java.nio.charset.StandardCharsets;
+public class SymbolicProbe {
+  static KifSourceAssertion a(String id, String text, KifReview review) {
+    return new KifSourceAssertion(id,ContentId.Companion.of(text.getBytes(StandardCharsets.UTF_8)),"curated-v1",review,text);
+  }
+  static KifTaxonomySnapshot s(KifSourceAssertion... sources) {
+    return KifTaxonomySnapshot.Companion.create(1L,List.of(sources),new KifActivationLimits());
+  }
+  static void result(String name,KifTaxonomySnapshot s,String p,String subj,String obj,KifExplanationStatus expected) {
+    var r=s.explain(p,subj,obj); if(r.getStatus()!=expected)throw new AssertionError(name+": "+r);
+    System.out.println(name+": "+r);
+  }
+  public static void main(String[] args) {
+    var i=a("lease-1:tenant-person","(instance Tenant Person)",KifReview.APPROVED);
+    var c=a("ontology-1:person-agent","(subclass Person Agent)",KifReview.APPROVED);
+    var good=s(i,c);
+    var proof=good.explain("instance","Tenant","Agent").getProofs().get(0);
+    if(!proof.getAssertionIds().equals(List.of(i.getId(),c.getId())))throw new AssertionError("ordered source witnesses");
+    if(!good.assertion(i.getId()).getSource().equals(i)||!good.assertion(c.getId()).getSource().equals(c))throw new AssertionError("source metadata retention");
+    result("instance-inherits",good,"instance","Tenant","Agent",KifExplanationStatus.SUPPORTED);
+    result("instance-is-not-subclass",good,"subclass","Tenant","Agent",KifExplanationStatus.UNKNOWN);
+    result("reverse-is-not-proven",good,"instance","Agent","Tenant",KifExplanationStatus.UNKNOWN);
+    result("unreviewed-premise-excluded",s(i,a("unreviewed",c.getText(),KifReview.UNVERIFIED)),"instance","Tenant","Agent",KifExplanationStatus.UNKNOWN);
+    result("negated-premise-excluded",s(i,a("negative","(not (subclass Person Agent))",KifReview.APPROVED)),"instance","Tenant","Agent",KifExplanationStatus.UNKNOWN);
+    result("foreign-predicate-not-taxonomy",s(i,a("foreign","(urn:evil:subclass Person Agent)",KifReview.APPROVED)),"instance","Tenant","Agent",KifExplanationStatus.UNKNOWN);
+    result("repeated-source-is-alternative-support",s(i,c,a("copy-of-same-cid",c.getText(),KifReview.APPROVED)),"instance","Tenant","Agent",KifExplanationStatus.SUPPORTED);
+    var plan=good.activationPlan("instance","Tenant","Agent");
+    System.out.println("plan: frame="+plan.getFrameId()+" exportBytes="+plan.export().length);
+    result("explicitly-selected-source-union-is-allowed",s(a("graph-A:instance","(instance Tenant Person)",KifReview.APPROVED),a("graph-B:subclass","(subclass Person Agent)",KifReview.APPROVED)),"instance","Tenant","Agent",KifExplanationStatus.SUPPORTED);
+  }
+}

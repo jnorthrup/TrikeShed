@@ -1,0 +1,387 @@
+{
+  "result": "PASS",
+  "rawTokens": 94,
+  "defaultIncluded": 84,
+  "defaultTerms": 53,
+  "contentIncluded": 60,
+  "contentTerms": 47,
+  "policy": {
+    "revision": "reported-lemma/1",
+    "caseFold": false,
+    "stopWords": [
+      "be",
+      "do",
+      "have"
+    ],
+    "posPrefixes": [
+      "JJ",
+      "NN",
+      "VB"
+    ],
+    "protectLegalMarkers": true,
+    "lexical": "lemma contains a letter or digit"
+  },
+  "identities": {
+    "default": {
+      "receiptCid": "sha256:e8d647e3721824bed4141ca47abe52e6ac194152bda47dd59cb7b9e44cfa8476",
+      "corpusCid": "sha256:59d38e61db8a210fc41d74605d32ae809d89e95a1b300d8c58b01187f079d8b1",
+      "matrixCid": "sha256:aa4518d4e21385509189b2de68f729fa00467143dc8e5ecada8bba98a827f5be",
+      "topicCid": null
+    },
+    "all": {
+      "receiptCid": "sha256:f35edccbda454b33a08cb42c1cce61bb64dba2565e700d02242f9690e07e9991",
+      "corpusCid": "sha256:59d38e61db8a210fc41d74605d32ae809d89e95a1b300d8c58b01187f079d8b1",
+      "matrixCid": "sha256:aa4518d4e21385509189b2de68f729fa00467143dc8e5ecada8bba98a827f5be",
+      "topicCid": null
+    },
+    "content": {
+      "receiptCid": "sha256:fe63d03298456265930a919db4ea94cf7a66686f48d01fb112007d8f04a6cdcf",
+      "corpusCid": "sha256:ca1592d8fcd822882c9adda97e0a1aef4be77a3b389f01baf5c654cfeb960655",
+      "matrixCid": "sha256:26340a35c0d68e8239c3f408718a6deaba629bd68ba14b1c0aea4ccfd310fee7",
+      "topicCid": null
+    },
+    "lda": {
+      "receiptCid": "sha256:591f7125ef6a4d25ed53556a4820c2d5d0947f8eec28b95e598670bdb82b35f6",
+      "corpusCid": "sha256:ca1592d8fcd822882c9adda97e0a1aef4be77a3b389f01baf5c654cfeb960655",
+      "matrixCid": "sha256:26340a35c0d68e8239c3f408718a6deaba629bd68ba14b1c0aea4ccfd310fee7",
+      "topicCid": "sha256:8472ee730331f44f6a366d5a584cc24035280a4bc694d14f06b7a41f1c418af5"
+    }
+  },
+  "topicConfig": {
+    "topics": 2,
+    "iterations": 30,
+    "seed": 1,
+    "alpha": 0.1,
+    "beta": 0.01
+  },
+  "controls": [
+    {
+      "path": "/api/documents/english/corpus",
+      "view": null,
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content"
+      }
+    },
+    {
+      "path": "/api/documents/english/corpus",
+      "view": "unknown",
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content"
+      }
+    },
+    {
+      "path": "/api/documents/english/corpus",
+      "view": 0,
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content"
+      }
+    },
+    {
+      "path": "/api/documents/english/corpus",
+      "view": false,
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content"
+      }
+    },
+    {
+      "path": "LCNC",
+      "view": null,
+      "authored": "content",
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content",
+        "exception": "IllegalArgumentException"
+      }
+    },
+    {
+      "path": "LCNC",
+      "view": "unknown",
+      "authored": "content",
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content",
+        "exception": "IllegalArgumentException"
+      }
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "in-parameter-before-plain",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 200,
+      "expectedView": "content",
+      "receiptCid": "sha256:fe63d03298456265930a919db4ea94cf7a66686f48d01fb112007d8f04a6cdcf",
+      "exactResponseMatched": true
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "optional-alias-reaches-policy",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view?": "content"
+      },
+      "params": {
+        "view": "all-lexical"
+      },
+      "status": 200,
+      "expectedView": "content",
+      "receiptCid": "sha256:fe63d03298456265930a919db4ea94cf7a66686f48d01fb112007d8f04a6cdcf",
+      "exactResponseMatched": true
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "optional-alias-before-authored-defaults",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view?": "all-lexical"
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 200,
+      "expectedView": "all-lexical",
+      "receiptCid": "sha256:f35edccbda454b33a08cb42c1cce61bb64dba2565e700d02242f9690e07e9991",
+      "exactResponseMatched": true
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "normalized-before-optional-alias",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view": "all-lexical",
+        "view?": "content"
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 200,
+      "expectedView": "all-lexical",
+      "receiptCid": "sha256:f35edccbda454b33a08cb42c1cce61bb64dba2565e700d02242f9690e07e9991",
+      "exactResponseMatched": true
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "normalized-content-before-null-alias",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view": "content",
+        "view?": null
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 200,
+      "expectedView": "content",
+      "receiptCid": "sha256:fe63d03298456265930a919db4ea94cf7a66686f48d01fb112007d8f04a6cdcf",
+      "exactResponseMatched": true
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "optional-null-before-authored-defaults",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view?": null
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content",
+        "exception": "IllegalArgumentException"
+      }
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "optional-unknown-before-authored-defaults",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view?": "unknown"
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content",
+        "exception": "IllegalArgumentException"
+      }
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "normalized-null-before-valid-alias",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view": null,
+        "view?": "content"
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content",
+        "exception": "IllegalArgumentException"
+      }
+    },
+    {
+      "kind": "lcnc-view-precedence",
+      "name": "normalized-unknown-before-valid-alias",
+      "inputs": {
+        "receiptCids": [
+          "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+          "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+        ],
+        "mode": "current",
+        "topics": null,
+        "view": "unknown",
+        "view?": "content"
+      },
+      "params": {
+        "view": "all-lexical",
+        "in:view": "content"
+      },
+      "status": 409,
+      "response": {
+        "error": "English corpus view must be all-lexical or content",
+        "exception": "IllegalArgumentException"
+      }
+    },
+    {
+      "kind": "browser-response-tamper",
+      "field": "matrix.policy.caseFold",
+      "refused": true,
+      "error": "Corpus word selection differs from the requested view"
+    },
+    {
+      "kind": "browser-response-tamper",
+      "field": "view",
+      "refused": true,
+      "error": "Corpus view differs from the requested selection"
+    },
+    {
+      "kind": "late-response-after-native-navigation",
+      "resultAbsent": true,
+      "lateRouteOutcome": "fulfilled"
+    }
+  ],
+  "casReadbacks": [
+    {
+      "field": "receiptCid",
+      "cid": "sha256:e8d647e3721824bed4141ca47abe52e6ac194152bda47dd59cb7b9e44cfa8476",
+      "bytes": 34501,
+      "schema": "trikeshed.english-corpus.v1"
+    },
+    {
+      "field": "corpusCid",
+      "cid": "sha256:59d38e61db8a210fc41d74605d32ae809d89e95a1b300d8c58b01187f079d8b1",
+      "bytes": 32462,
+      "schema": "trikeshed.english-corpus.v1"
+    },
+    {
+      "field": "matrixCid",
+      "cid": "sha256:aa4518d4e21385509189b2de68f729fa00467143dc8e5ecada8bba98a827f5be",
+      "bytes": 1897,
+      "schema": "trikeshed.english-matrix.v1"
+    },
+    {
+      "field": "receiptCid",
+      "cid": "sha256:f35edccbda454b33a08cb42c1cce61bb64dba2565e700d02242f9690e07e9991",
+      "bytes": 34518,
+      "schema": "trikeshed.english-corpus.v1"
+    },
+    {
+      "field": "receiptCid",
+      "cid": "sha256:fe63d03298456265930a919db4ea94cf7a66686f48d01fb112007d8f04a6cdcf",
+      "bytes": 34208,
+      "schema": "trikeshed.english-corpus.v1"
+    },
+    {
+      "field": "corpusCid",
+      "cid": "sha256:ca1592d8fcd822882c9adda97e0a1aef4be77a3b389f01baf5c654cfeb960655",
+      "bytes": 32156,
+      "schema": "trikeshed.english-corpus.v1"
+    },
+    {
+      "field": "matrixCid",
+      "cid": "sha256:26340a35c0d68e8239c3f408718a6deaba629bd68ba14b1c0aea4ccfd310fee7",
+      "bytes": 1883,
+      "schema": "trikeshed.english-matrix.v1"
+    },
+    {
+      "field": "receiptCid",
+      "cid": "sha256:591f7125ef6a4d25ed53556a4820c2d5d0947f8eec28b95e598670bdb82b35f6",
+      "bytes": 38692,
+      "schema": "trikeshed.english-corpus.v1"
+    },
+    {
+      "field": "topicCid",
+      "cid": "sha256:8472ee730331f44f6a366d5a584cc24035280a4bc694d14f06b7a41f1c418af5",
+      "bytes": 4413,
+      "schema": "trikeshed.english-lda.v1"
+    }
+  ],
+  "sourceDigestsAndRawSpanRetention": true,
+  "entireOriginalDefaultResponsePreserved": true,
+  "seededLdaRepeatedAndCountConserved": true,
+  "browserConcordance": [
+    "THE TENANT MUST NOT DISCLOSE CUSTOMER DATA UNLESS THE CUSTOMER HAS GIVEN WRITTEN CONSENT.",
+    "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+    "The accountant must not post a duplicate payment."
+  ]
+}

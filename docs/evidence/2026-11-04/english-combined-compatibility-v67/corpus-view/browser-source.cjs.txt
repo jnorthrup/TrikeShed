@@ -1,0 +1,151 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const endpoint='/api/documents/english/corpus';
+const policy={revision:'reported-lemma/1',caseFold:false,stopWords:['be','do','have'],posPrefixes:['JJ','NN','VB'],protectLegalMarkers:true,lexical:'lemma contains a letter or digit'};
+const guards=new Set(['not','no','never','neither','nor','cannot',"n't",'n’t','unless','except','without','only','if','until','shall','must','may','can','will','would','should']);
+const sum=xs=>xs.reduce((a,b)=>a+b,0);
+const without=(o,keys)=>Object.fromEntries(Object.entries(o).filter(([k])=>!keys.includes(k)));
+function conserve(value){
+ const m=value.topics;assert.equal(m.matrixCid,value.matrixCid);assert.equal(m.corpusCid,value.corpusCid);assert.deepEqual(m.vocabulary,value.matrix.vocabulary);
+ assert.equal(sum(m.topicTotals),value.matrix.tokenCount);assert.equal(m.tokenCount,value.matrix.tokenCount);
+ for(let i=0;i<value.matrix.documents.length;i++)assert.equal(sum(m.documentTopicCounts[i]),value.matrix.documents[i].includedTokens);
+ for(let i=0;i<value.terms.length;i++)assert.equal(sum(m.topicWordCounts.map(t=>t[i])),value.terms[i].frequency);
+ for(let i=0;i<m.topicWordCounts.length;i++)assert.equal(sum(m.topicWordCounts[i]),m.topicTotals[i]);
+ assert.equal(m.authority,'descriptive-statistics-only');assert.equal(m.countsAreEvidenceConfidence,false);
+ for(const d of m.documentTopics)assert(Math.abs(sum(d.probabilities)-1)<1e-10);
+}
+module.exports.run=async function run({page,base,art}){
+ const outputs={},controls=[],readbacks=[];
+ const persist=()=>fs.writeFileSync(path.join(art,'corpus-view-progress.json'),JSON.stringify({outputs,controls,readbacks},null,2));
+ const request=async(url,body,expected=200)=>{
+  const r=await fetch(base+url,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+  const v=await r.json();assert.equal(r.status,expected,JSON.stringify({url,body,v}));return v;
+ };
+ const meta=await request('/_fixture/corpus-view/meta');
+ const saved=JSON.parse(fs.readFileSync(meta.sourceResult,'utf8'));
+ const receipts=meta.inspectionIds;
+ const body={receiptCids:receipts,mode:'current',topics:null};
+ outputs.default=await request(endpoint,body);
+ assert.deepEqual(outputs.default,saved.current,'omitted view must preserve original default fields and exact receipt identity');
+ assert.equal(outputs.default.corpusCid,meta.expectedCorpusCid);assert.equal(outputs.default.receiptCid,meta.expectedDefaultReceiptCid);
+ assert.equal(outputs.default.matrixCid,meta.expectedDefaultMatrixCid);assert.equal(outputs.default.rawTokenCount,94);
+ assert.equal(outputs.default.matrix.tokenCount,84);assert.equal(outputs.default.terms.length,53);assert(!('view' in outputs.default));
+ outputs.all=await request(endpoint,{...body,view:'all-lexical'});
+ assert.equal(outputs.all.view,'all-lexical');assert.equal(outputs.all.corpusCid,outputs.default.corpusCid);
+ assert.deepEqual(without(outputs.all,['view','receiptCid']),without(outputs.default,['receiptCid']));
+ outputs.content=await request(endpoint,{...body,view:'content'});
+ const content=outputs.content,raw=outputs.default;
+ assert.deepEqual(content.matrix.policy,policy);assert.equal(content.view,'content');assert.equal(content.rawTokenCount,94);
+ assert.equal(content.matrix.tokenCount,60);assert.equal(content.terms.length,47);assert.notEqual(content.matrixCid,raw.matrixCid);
+ assert.deepEqual(content.sentences,raw.sentences);assert.equal(content.occurrences.length,raw.occurrences.length);
+ for(let i=0;i<raw.occurrences.length;i++)assert.deepEqual(without(content.occurrences[i],['included']),without(raw.occurrences[i],['included']));
+ assert.equal(content.occurrences.filter(o=>o.included).length,60);assert.equal(content.occurrences.filter(o=>!o.included).length,34);
+ assert(content.occurrences.filter(o=>guards.has(o.term.toLowerCase())).every(o=>o.included));
+ assert(content.occurrences.filter(o=>['be','have','do','the','and','a','for'].includes(o.term)).every(o=>!o.included));
+ for(const t of content.terms){const occurrences=content.occurrences.filter(o=>o.included&&o.term===t.lemma);assert.equal(t.frequency,occurrences.length);assert.equal(t.documentFrequency,new Set(occurrences.map(o=>o.document)).size);}
+ assert.equal(content.countsAreEvidenceConfidence,false);assert.equal(content.authority,'statistics-of-reported-parser-observations');
+ for(const view of [null,'unknown',0,false]){
+  const refusal=await request(endpoint,{...body,view},409);assert.equal(typeof refusal.error,'string');assert(!('terms' in refusal)&&!('matrix' in refusal));controls.push({path:endpoint,view,status:409,response:refusal});
+ }
+ const config=meta.topicConfig;
+ outputs.lda=await request(endpoint,{...body,view:'content',topics:config});
+ outputs.repeated=await request(endpoint,{...body,receiptCids:[...receipts].reverse(),view:'content',topics:config});
+ assert.equal(outputs.lda.topicCid,outputs.repeated.topicCid);assert.equal(outputs.lda.receiptCid,outputs.repeated.receiptCid);
+ assert.deepEqual(outputs.lda.topics,outputs.repeated.topics);assert.deepEqual(outputs.lda.topics.config,config);conserve(outputs.lda);
+ const preliminary=JSON.parse(fs.readFileSync('/workspace/library-files/corpus-policy-v59/result.json','utf8'));
+ assert.deepEqual(outputs.lda.topics,preliminary.filteredTopics,'new artifact must reproduce the same explicit policy experiment over the exact old receipts');
+ const lcnc=async(inputs,params={},status=200)=>request('/_fixture/corpus-view/lcnc',{inputs,params},status);
+ outputs.lcncDefault=await lcnc(body);assert.deepEqual(outputs.lcncDefault,outputs.default);
+ outputs.lcncAuthored=await lcnc(body,{view:'content'});assert.deepEqual(outputs.lcncAuthored,content);
+ outputs.lcncOverride=await lcnc({...body,view:'all-lexical'},{view:'content'});assert.deepEqual(outputs.lcncOverride,outputs.all);
+ outputs.lcncTyped=await lcnc({...body,view:'content'});assert.deepEqual(outputs.lcncTyped,content);
+ for(const view of [null,'unknown']){
+  const refusal=await lcnc({...body,view},{view:'content'},409);assert.equal(refusal.exception,'IllegalArgumentException');assert.match(refusal.error,/corpus view/i);controls.push({path:'LCNC',view,authored:'content',status:409,response:refusal});
+ }
+ // v67 boundary: normalized input > optional-port alias > in: parameter > plain parameter.
+ const defaults={view:'all-lexical','in:view':'content'};
+ const precedence=[
+  {name:'in-parameter-before-plain',inputs:body,params:defaults,expected:content},
+  {name:'optional-alias-reaches-policy',inputs:{...body,'view?':'content'},params:{view:'all-lexical'},expected:content},
+  {name:'optional-alias-before-authored-defaults',inputs:{...body,'view?':'all-lexical'},params:defaults,expected:outputs.all},
+  {name:'normalized-before-optional-alias',inputs:{...body,view:'all-lexical','view?':'content'},params:defaults,expected:outputs.all},
+  {name:'normalized-content-before-null-alias',inputs:{...body,view:'content','view?':null},params:defaults,expected:content}
+ ];
+ outputs.lcncPrecedence={};
+ for(const test of precedence){
+  const value=await lcnc(test.inputs,test.params);assert.deepEqual(value,test.expected,test.name);
+  outputs.lcncPrecedence[test.name]=value;
+  controls.push({kind:'lcnc-view-precedence',name:test.name,inputs:test.inputs,params:test.params,status:200,expectedView:test.expected.view,receiptCid:value.receiptCid,exactResponseMatched:true});
+ }
+ for(const test of [
+  {name:'optional-null-before-authored-defaults',inputs:{...body,'view?':null}},
+  {name:'optional-unknown-before-authored-defaults',inputs:{...body,'view?':'unknown'}},
+  {name:'normalized-null-before-valid-alias',inputs:{...body,view:null,'view?':'content'}},
+  {name:'normalized-unknown-before-valid-alias',inputs:{...body,view:'unknown','view?':'content'}}
+ ]){
+  const refusal=await lcnc(test.inputs,defaults,409);assert.equal(refusal.exception,'IllegalArgumentException');assert.match(refusal.error,/corpus view/i);
+  assert(!('terms' in refusal)&&!('matrix' in refusal));controls.push({kind:'lcnc-view-precedence',name:test.name,inputs:test.inputs,params:defaults,status:409,response:refusal});
+ }
+ const seen=new Set();
+ for(const value of [outputs.default,outputs.all,content,outputs.lda]){
+  const expected={receiptCid:without(value,['receiptCid']),corpusCid:without(value,['receiptCid','corpusCid','receiptCids','topics','topicCid','source','view']),matrixCid:value.matrix,topicCid:value.topics};
+  for(const key of ['receiptCid','corpusCid','matrixCid','topicCid']){
+   const cid=value[key];if(cid===null||seen.has(cid))continue;seen.add(cid);
+   const block=await request('/_fixture/corpus-view/readback',{cid});assert.equal(block.cid,cid);assert.deepEqual(block.value,expected[key]);readbacks.push({field:key,cid,bytes:block.bytes,schema:block.value.schema});
+  }
+ }
+ persist();
+ // The shared fixture uses actual storage/navigation owners for these original TXT bytes,
+ // while corpus currentness checks use exact read-only inspection snapshot rows.
+ await page.evaluate(({project,ids})=>localStorage.setItem('forge.documents.englishCorpus.v1:'+encodeURIComponent(project),JSON.stringify(ids)),{project:meta.project,ids:receipts});
+ const finance=base+'/documents#'+encodeURIComponent(meta.project)+'/'+encodeURIComponent(meta.document);
+ await page.goto(finance,{waitUntil:'domcontentloaded'});
+ let corpus=page.locator('[data-english-corpus]');await corpus.waitFor({timeout:45000});
+ if(!await corpus.evaluate(el=>el.open))await corpus.locator(':scope > summary').click();
+ assert.equal(await corpus.locator('[data-corpus-selected-id]').count(),2);assert.equal(await corpus.locator('[data-corpus-view]').inputValue(),'all-lexical');
+ const build=async(accepted=true)=>{
+  const promise=page.waitForResponse(r=>new URL(r.url()).pathname===endpoint&&r.request().method()==='POST',{timeout:90000});
+  await corpus.locator('[data-corpus-build]').click();const response=await promise;assert.equal(response.status(),200);const v=await response.json();
+  if(accepted)await corpus.locator('[data-corpus-result]').waitFor({timeout:30000});else await corpus.locator('[role=status]').waitFor({timeout:30000});
+  return v;
+ };
+ outputs.browserDefault=await build();assert.equal(outputs.browserDefault.corpusCid,raw.corpusCid);assert.equal(outputs.browserDefault.matrix.tokenCount,84);assert(!('view' in outputs.browserDefault));
+ await corpus.locator('[data-corpus-view]').selectOption('content');assert.equal(await corpus.locator('[data-corpus-result]').count(),0);
+ outputs.browserContent=await build();assert.equal(outputs.browserContent.corpusCid,content.corpusCid);assert.deepEqual(outputs.browserContent.matrix.policy,policy);
+ const cloud=corpus.locator('[data-corpus-wordcloud]');assert.equal(await cloud.locator('[data-corpus-term="the"]').count(),0);assert.equal(await cloud.locator('[data-corpus-term="be"]').count(),0);assert.equal(await cloud.locator('[data-corpus-term="must"]').count(),1);assert.equal(await cloud.locator('[data-corpus-term="not"]').count(),1);
+ await cloud.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(art,'corpus-content-wordcloud.png'),fullPage:true});
+ await cloud.locator('[data-corpus-term="not"]').click();const concordance=corpus.locator('[data-corpus-concordance="not"]');await concordance.waitFor();const quotes=await concordance.locator('blockquote').allTextContents();
+ assert(quotes.some(q=>q.includes('MUST NOT DISCLOSE CUSTOMER DATA')));assert(quotes.some(q=>q.includes('unless rent is not due')));assert(quotes.some(q=>q.includes('must not post a duplicate payment')));
+ outputs.browserConcordance=quotes;await concordance.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(art,'corpus-content-exact-concordance.png'),fullPage:true});
+ await corpus.locator('[data-corpus-topics-enable]').check();assert.equal(await corpus.locator('[data-corpus-result]').count(),0);
+ outputs.browserLda=await build();assert.equal(outputs.browserLda.topicCid,outputs.lda.topicCid);conserve(outputs.browserLda);
+ await corpus.locator('[data-corpus-topics]').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(art,'corpus-content-seeded-topics.png'),fullPage:true});
+ await corpus.locator('[data-corpus-view]').selectOption('all-lexical');assert.equal(await corpus.locator('[data-corpus-result]').count(),0);assert.equal(await corpus.locator('[data-corpus-topics]').count(),0);
+ await corpus.locator('[data-corpus-view]').selectOption('content');assert.equal(await corpus.locator('[data-corpus-result]').count(),0);
+ // Tamper only the transported response, after the real owner completed and retained valid bytes.
+ const pattern='**'+endpoint;
+ const tamper=async(field,mutate)=>{
+  await page.route(pattern,async route=>{const response=await route.fetch();const value=await response.json();mutate(value);await route.fulfill({response,json:value});});
+  try{await build(false);const error=await corpus.locator('[role=status]').innerText();assert.match(error,/Corpus (word selection|view) differs/);assert.equal(await corpus.locator('[data-corpus-result]').count(),0);assert.equal(await corpus.locator('[data-corpus-wordcloud]').count(),0);controls.push({kind:'browser-response-tamper',field,refused:true,error});}
+  finally{await page.unroute(pattern);}
+ };
+ await tamper('matrix.policy.caseFold',v=>{v.matrix.policy.caseFold=true;});
+ await tamper('view',v=>{v.view='all-lexical';});
+ await page.screenshot({path:path.join(art,'corpus-content-policy-refused.png'),fullPage:true});
+ // Hold one completed real response across native source navigation. The old controller
+ // aborts its request; even a late fulfilled response must not paint the new controller.
+ let readyResolve,releaseResolve,handledResolve;
+ const ready=new Promise(r=>{readyResolve=r;}),release=new Promise(r=>{releaseResolve=r;}),handled=new Promise(r=>{handledResolve=r;});
+ let lateRouteOutcome;
+ await page.route(pattern,async route=>{try{const response=await route.fetch();readyResolve();await release;await route.fulfill({response});lateRouteOutcome='fulfilled';}catch(e){lateRouteOutcome='aborted-after-navigation';}finally{handledResolve();}});
+ try{
+  await corpus.locator('[data-corpus-build]').click();await ready;
+  await page.locator('[data-doc]').filter({hasText:'legal + duties.txt'}).first().click();
+  corpus=page.locator('[data-english-corpus]');await corpus.waitFor({timeout:30000});assert.equal(await corpus.locator('[data-corpus-result]').count(),0);
+  releaseResolve();await handled;await page.waitForTimeout(200);
+  assert(page.url().includes(encodeURIComponent('legal + duties.txt')));assert.equal(await corpus.locator('[data-corpus-result]').count(),0);assert.equal(await corpus.locator('[data-corpus-selected-id]').count(),2);
+  controls.push({kind:'late-response-after-native-navigation',resultAbsent:true,lateRouteOutcome});
+ }finally{releaseResolve();await page.unroute(pattern);}
+ const evidence=await request('/_fixture/corpus-view/evidence');assert.equal(evidence.parserCalls,0);
+ const result={result:'PASS',scope:'Exact recorded CoreNLP4.6 synthetic-source receipts replayed through the new immutable production corpus owner and same LCNC owner. Native Documents optional view, shared matrix/counts/concordance/topics, request/policy tamper refusal and late-controller isolation; no parser/providers/reasoning admission. Statistical projection only.',meta,outputs,controls,readbacks,evidence};
+ fs.writeFileSync(path.join(art,'corpus-view-result.json'),JSON.stringify(result,null,2));return {result:'PASS',rawTokens:94,defaultIncluded:84,contentIncluded:60,contentTerms:47,defaultReceiptIdentityPreserved:true,casReadbacks:readbacks.length,controls:controls.length,parserCalls:0};
+};
