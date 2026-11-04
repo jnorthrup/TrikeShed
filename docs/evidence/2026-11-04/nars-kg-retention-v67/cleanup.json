@@ -1,0 +1,34 @@
+{
+  "runs": {
+    "fixture": {
+      "exit": 0,
+      "seconds": 1.313
+    },
+    "api-cas": {
+      "exit": 0,
+      "seconds": 1.128
+    },
+    "pack-writer": {
+      "exit": 0,
+      "seconds": 1.358
+    },
+    "pack-reader": {
+      "exit": 0,
+      "seconds": 1.083
+    }
+  },
+  "allChildProcessesExitedZero": true,
+  "apiFixtureBagsDrained": true,
+  "packWriter": {
+    "processId": 47444,
+    "bagDrained": true,
+    "syncReturned": true,
+    "packCloseReturned": true
+  },
+  "packReader": {
+    "processId": 47474,
+    "packCloseReturned": true
+  },
+  "nativeAccessWarnings": "Actual Java25 FFM native-access warnings in both pack children retained; no suppression or alternate backend. Both exited0.",
+  "scope": "Observed explicit drains/sync/close and separate-process reopen only; no crash/powerfailure durability claim."
+}

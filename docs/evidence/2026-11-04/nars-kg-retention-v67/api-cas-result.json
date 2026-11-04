@@ -1,0 +1,259 @@
+{
+  "scope": "Actual immutable final JAR API/CAS synthetic fixtures; not a socket/browser, parser/model, source-authentication or legal-truth proof",
+  "productionCodeSources": {
+    "borg.trikeshed.narsese.KgNalBridge": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.KgRetention": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.BeliefBagElement": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.SignalCodec": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.forge.server.BeliefWire": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.litebike.JvmKanbanServer": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "cases": [
+    {
+      "format": "KIF",
+      "sourceQuote": "  (pays Tenant Landlord)\r\n",
+      "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+      "propositionCid": "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c",
+      "definition": {
+        "kind": "kg-source-proposition/1",
+        "copula": "PRODUCT",
+        "object": "Landlord",
+        "subject": "Tenant",
+        "relation": "MATCH",
+        "temporal": null,
+        "objectCid": null,
+        "predicate": "pays",
+        "subjectCid": null,
+        "sourceContext": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c"
+      },
+      "sourceAndDefinitionExactReadback": true,
+      "httpReport": {
+        "format": "KIF",
+        "statements": 1.0,
+        "minted": 1.0,
+        "copulas": {
+          "PRODUCT": 1.0
+        },
+        "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+        "propositionCids": [
+          "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c"
+        ],
+        "processedAssertions": 1.0,
+        "globalResidentCountAfterImport": 1.0,
+        "retention": {
+          "status": "sync-and-exact-bounded-readback-completed",
+          "storageDurability": "VOLATILE",
+          "durabilityGuarantee": "storage-dependent",
+          "sourceRepresentation": "exact-accepted-text-utf8",
+          "sourceAuthentication": "not-established",
+          "reviewAuthority": "not-established"
+        }
+      },
+      "lcncReport": {
+        "format": "KIF",
+        "statements": 1,
+        "minted": 1,
+        "copulas": {
+          "PRODUCT": 1
+        },
+        "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+        "propositionCids": [
+          "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c"
+        ],
+        "processedAssertions": 1,
+        "globalResidentCountAfterImport": 1,
+        "retention": {
+          "status": "sync-and-exact-bounded-readback-completed",
+          "storageDurability": "VOLATILE",
+          "durabilityGuarantee": "storage-dependent",
+          "sourceRepresentation": "exact-accepted-text-utf8",
+          "sourceAuthentication": "not-established",
+          "reviewAuthority": "not-established"
+        }
+      },
+      "httpIdentityReadback": true,
+      "replayAndArchiveEvidenceUnchanged": true
+    },
+    {
+      "format": "RDF",
+      "sourceQuote": " \r\n<urn:AgreementA> <urn:noticeLabel> \"Notice, required; 📚\"@en-US .\r\n",
+      "sourceCid": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+      "propositionCid": "sha256:ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070",
+      "definition": {
+        "kind": "kg-source-proposition/1",
+        "copula": "PRODUCT",
+        "object": "\"Notice, required; 📚\"@en-US",
+        "subject": "<urn:AgreementA>",
+        "relation": "MATCH",
+        "temporal": null,
+        "objectCid": null,
+        "predicate": "urn:noticeLabel",
+        "subjectCid": null,
+        "sourceContext": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881"
+      },
+      "sourceAndDefinitionExactReadback": true,
+      "httpReport": {
+        "format": "TURTLE",
+        "statements": 1.0,
+        "minted": 1.0,
+        "copulas": {
+          "PRODUCT": 1.0
+        },
+        "sourceCid": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+        "propositionCids": [
+          "sha256:ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070"
+        ],
+        "processedAssertions": 1.0,
+        "globalResidentCountAfterImport": 2.0,
+        "retention": {
+          "status": "sync-and-exact-bounded-readback-completed",
+          "storageDurability": "VOLATILE",
+          "durabilityGuarantee": "storage-dependent",
+          "sourceRepresentation": "exact-accepted-text-utf8",
+          "sourceAuthentication": "not-established",
+          "reviewAuthority": "not-established"
+        }
+      },
+      "lcncReport": {
+        "format": "TURTLE",
+        "statements": 1,
+        "minted": 1,
+        "copulas": {
+          "PRODUCT": 1
+        },
+        "sourceCid": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+        "propositionCids": [
+          "sha256:ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070"
+        ],
+        "processedAssertions": 1,
+        "globalResidentCountAfterImport": 2,
+        "retention": {
+          "status": "sync-and-exact-bounded-readback-completed",
+          "storageDurability": "VOLATILE",
+          "durabilityGuarantee": "storage-dependent",
+          "sourceRepresentation": "exact-accepted-text-utf8",
+          "sourceAuthentication": "not-established",
+          "reviewAuthority": "not-established"
+        }
+      },
+      "httpIdentityReadback": true,
+      "replayAndArchiveEvidenceUnchanged": true
+    }
+  ],
+  "missingCas": {
+    "status": 503,
+    "report": {
+      "error": "kg_retention_refused",
+      "processedAssertions": 0.0,
+      "retention": {
+        "status": "refused",
+        "issue": "MISSING_CAS"
+      }
+    },
+    "residentCount": 0,
+    "actorHealthy": true
+  },
+  "routeErrorsAfter": [
+    {
+      "name": "malformed-kif",
+      "observation": {
+        "kind": "HTTP-response",
+        "status": 400,
+        "body": {
+          "error": "invalid_kg_input"
+        }
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    },
+    {
+      "name": "malformed-rdf",
+      "observation": {
+        "kind": "HTTP-response",
+        "status": 400,
+        "body": {
+          "error": "invalid_kg_input"
+        }
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    },
+    {
+      "name": "unsupported",
+      "observation": {
+        "kind": "HTTP-response",
+        "status": 400,
+        "body": {
+          "error": "invalid_kg_input"
+        }
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    },
+    {
+      "name": "known-pid-collision-with-admitted-prefix",
+      "observation": {
+        "kind": "HTTP-response",
+        "status": 409,
+        "body": {
+          "error": "kg_admission_refused",
+          "admission": {
+            "status": "refused",
+            "issue": "PROPOSITION_MISMATCH"
+          },
+          "processing": "earlier-statements-may-have-been-processed"
+        }
+      },
+      "residentsAfterFailure": 1,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": true
+    },
+    {
+      "name": "truncated-json-string",
+      "observation": {
+        "kind": "HTTP-response",
+        "status": 400,
+        "body": {
+          "error": "invalid_kg_input"
+        }
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    },
+    {
+      "name": "truncated-json-escape",
+      "observation": {
+        "kind": "HTTP-response",
+        "status": 400,
+        "body": {
+          "error": "invalid_kg_input"
+        }
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    }
+  ],
+  "malformedHttpUtf8": {
+    "status": 400,
+    "dispatched": 0,
+    "routeInvocation": "actual JVM-public internal route via reflection"
+  },
+  "fixtureBagsDrained": true,
+  "modelCalls": 0,
+  "parserExecutions": 0,
+  "sourceAuthentication": "not-established",
+  "reviewAuthority": "not-established"
+}

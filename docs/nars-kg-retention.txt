@@ -75,3 +75,13 @@ or power-failure guarantee. The four historical route exceptions now return the
 expected 400/409 responses; the409 case retains its admitted prefix and retry
 does not increase evidence. Public synthetic evidence and exact artifact identity:
   evidence/2026-11-04/nars-kg-retention/method.txt
+
+The latest v67 artifact repeated those 13 methods, API/CAS/replay checks and the
+two-process production-pack reopen proof against its own fresh immutable JAR.
+Two additional truncated-JSON inputs inside the existing malformed-input method
+now return400 instead of escaping IllegalStateException. Their actual v66
+baseline is preserved separately from the unchanged original four-case v62
+comparison. All six observed error cases keep the correct0/1 resident counts,
+healthy actors and successful next requests; the409 retry does not add evidence.
+The v66 record remains historical evidence. Latest synthetic evidence:
+  evidence/2026-11-04/nars-kg-retention-v67/method.txt

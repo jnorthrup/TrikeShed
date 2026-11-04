@@ -1,0 +1,32 @@
+{
+  "scope": "Actual immutablev66 publicroute direct calls on2synthetictruncatedJSON inputs; no overlays/friend/socket/model/parser",
+  "productionCodeSources": {
+    "borg.trikeshed.forge.server.BeliefWire": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.KgNalBridge": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "fixtureBagsDrained": true,
+  "cases": [
+    {
+      "name": "truncated-json-string",
+      "observation": {
+        "kind": "escaped-exception",
+        "exceptionType": "java.lang.IllegalStateException"
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    },
+    {
+      "name": "truncated-json-escape",
+      "observation": {
+        "kind": "escaped-exception",
+        "exceptionType": "java.lang.IllegalStateException"
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    }
+  ]
+}
