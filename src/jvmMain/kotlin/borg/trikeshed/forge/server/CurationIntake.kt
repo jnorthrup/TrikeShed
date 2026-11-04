@@ -6,18 +6,24 @@ import borg.trikeshed.lcnc.LcncTrail
 import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.lcnc.ProjectCorpus
 import borg.trikeshed.lcnc.ProjectDoc
+import borg.trikeshed.lcnc.ProjectVisitUnavailable
 import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.lcnc.DocumentCurationLegos
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * By default every document an upload lands is read and curated with no one asking: extracted by the miner
@@ -76,16 +82,45 @@ class CurationIntake(
     }
 
     private val queue = Channel<Unit>(Channel.CONFLATED)
-    // Admission retains identifiers only. Fixed consumers bound decoded documents through join.
-    private val pending = ConcurrentLinkedQueue<Doc>()
+    // Input channels carry only document identities. Duplicate and replacement offers
+    // occupy conflated per-document mailboxes instead of accumulating notifications.
+    private val ingress = Channel<Doc>(Channel.UNLIMITED)
+    private val links = Channel<Doc>(Channel.UNLIMITED)
+    private val ingressDone = Job()
+    private val linksDone = Job()
+    init {
+        ingress.invokeOnClose { ingressDone.complete() }
+        links.invokeOnClose { linksDone.complete() }
+    }
+    private class Mail<T>(ingressDone: Job, linksDone: Job) {
+        val ingress = Channel<T>(Channel.CONFLATED)
+        val links = Channel<T>(Channel.CONFLATED)
+        private val ingressHandle = ingressDone.invokeOnCompletion { ingress.close() }
+        private val linksHandle = linksDone.invokeOnCompletion { links.close() }
+        fun close() {
+            ingressHandle.dispose(); linksHandle.dispose()
+            ingress.close(); links.close()
+        }
+    }
+    private data class Update(val serial: Long, val doc: Doc)
+    private class Group {
+        val active = HashSet<Doc>()
+        var mail: Mail<Update>? = null
+        var latest: Update? = null
+    }
+    private val pending = HashMap<Doc, Mail<Doc>?>()
+    private val groups = HashMap<Pair<String, String>, Group>()
     private val admission = Any()
+    private val children = HashSet<Job>()
+    // Jobs stay here through their final settlement, even if a cancelled owner
+    // can no longer attach a newly launched child to its completed worker.
+    private val jobs = HashSet<Job>()
+    private val grabCapacity = Semaphore(DOCUMENTS)
     private var admissionVersion = 0L
-    private val inFlight = ConcurrentHashMap.newKeySet<Doc>()
+    private var sourceTurn = 0
     private enum class Outcome { HELD, JOINED }
     // Successful in-flight outcomes remain observable until finish removes the admission.
     private val outcomes = HashMap<Doc, Outcome>()
-    // At most one latest follow-up per document; access only while holding admission.
-    private val followUps = HashMap<Pair<String, String>, Doc>()
     private val tallies = ConcurrentHashMap<String, Tally>()
     private val providerTallies = ConcurrentHashMap<Pair<String, DecisionProvider>, Tally>()
     /** Process-local observations at intake time, not live review state or a security gate. */
@@ -102,8 +137,19 @@ class CurationIntake(
                 for (unit in queue) {
                     while (true) {
                         // Coordinate the queued-versus-started decision with re-offer admission.
-                        val d = synchronized(admission) { pending.poll() } ?: break
-                        if (pending.isNotEmpty()) queue.trySend(Unit)
+                        val d = synchronized(admission) {
+                            val next = if ((sourceTurn++ and 1) == 0)
+                                ingress.tryReceive().getOrNull() ?: links.tryReceive().getOrNull()
+                            else links.tryReceive().getOrNull() ?: ingress.tryReceive().getOrNull()
+                            next?.let {
+                                check(pending.containsKey(it)) { "Missing pending admission" }
+                                pending.remove(it)?.let { mail ->
+                                    mail.ingress.tryReceive(); mail.links.tryReceive(); mail.close()
+                                }
+                            }
+                            if (pending.isNotEmpty()) queue.trySend(Unit)
+                            next
+                        } ?: break
                         read(d)
                     }
                 }
@@ -113,28 +159,59 @@ class CurationIntake(
 
     /** Finish admitted document readings before their sense encoder and stores are closed. */
     suspend fun drain() = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-        synchronized(admission) { queue.close() }
+        synchronized(admission) {
+            ingress.close()
+            closeIfIdle()
+        }
         worker.join()
+        while (true) {
+            val unfinished = synchronized(admission) { jobs.toList() }
+            if (unfinished.isEmpty()) break
+            for (job in unfinished) job.join()
+        }
         // Hard parent cancellation can stop every consumer with identifiers still
         // queued. The joined worker can no longer take ownership of those admissions.
         if (worker.isCancelled) settlement.withLock {
-            val settledCancelled = synchronized(admission) {
+            val idleVersion = synchronized(admission) {
                 var cleared = false
-                while (true) {
-                    val d = pending.poll() ?: break
-                    inFlight.remove(d)
+                for ((d, mail) in pending) {
+                    mail?.close()
+                    groups[d.project to d.id]?.active?.remove(d)
                     outcomes.remove(d)
                     if (removed.remove(d)) uncountQueued(d) else cancelled(d)
                     cleared = true
                 }
-                for (d in followUps.values) { cancelled(d); cleared = true }
-                followUps.clear()
-                cleared
+                pending.clear()
+                for (group in groups.values) {
+                    group.latest?.let { cancelled(it.doc); cleared = true }
+                    group.mail?.close()
+                    check(group.active.isEmpty()) { "Document curation stopped with active work" }
+                }
+                groups.clear()
+                links.close(); queue.close()
+                while (ingress.tryReceive().isSuccess) { }
+                while (links.tryReceive().isSuccess) { }
+                admissionVersion.takeIf { cleared && groups.isEmpty() && children.isEmpty() }
             }
-            if (settledCancelled && synchronized(admission) { inFlight.isEmpty() }) runCatching { settled() }
-                .onFailure { System.err.println("[INTAKE] inference release failed: ${it.message}") }
+            if (idleVersion != null) settleLocked(idleVersion)
         }
         check(tallies.values.all { it.pending == 0 }) { "Document curation stopped with unfinished admitted work" }
+    }
+
+    /** Called under admission after an external input has closed. */
+    private fun closeIfIdle() {
+        if (ingress.isClosedForSend && groups.isEmpty() && children.isEmpty()) {
+            links.close(); queue.close()
+        }
+    }
+
+    /** Called under settlement; admission is never held across release. */
+    private suspend fun settleLocked(version: Long) {
+        val idle = synchronized(admission) {
+            groups.isEmpty() && children.isEmpty() && admissionVersion == version
+        }
+        if (idle) runCatching { settled() }
+            .onFailure { System.err.println("[INTAKE] inference release failed: ${it.message}") }
     }
 
     fun status(): Map<String, Any?> = tallies.toSortedMap().mapValues { (project, tally) ->
@@ -145,17 +222,28 @@ class CurationIntake(
     }
 
     /** Every document of every mounted project: what a boot resumes. Curated documents pass through at once. */
-    suspend fun resume() {
+    suspend fun resume() = resume(false)
+
+    private suspend fun resume(link: Boolean) {
         for (p in corpus.projects()) {
+            currentCoroutineContext().ensureActive()
             if (!eligible(p.name)) continue
-            for (d in corpus.docs(p.name, limit = Int.MAX_VALUE)) offer(p.name, d.id)
+            try {
+                corpus.visit(p.name) { d ->
+                    currentCoroutineContext().ensureActive()
+                    if (link) offer(p.name, d.id, selectedProvider(p.name, d.id), null, true)
+                    else offer(p.name, d.id)
+                }
+            } catch (unavailable: ProjectVisitUnavailable) {
+                System.err.println("[INTAKE] ${unavailable.message}")
+            }
         }
     }
 
     /** A document removed from its upload: a queued reading of it is dropped, not failed. */
-    fun forget(project: String, id: String) {
+    fun forget(project: String, id: String, unverifiedOwnership: Boolean = false) {
         synchronized(admission) {
-            val affected = inFlight.filter { it.project == project && it.id == id }
+            val affected = groups[project to id]?.active.orEmpty()
             removed.addAll(affected)
             for (doc in affected) {
                 when (outcomes.remove(doc)) {
@@ -179,8 +267,17 @@ class CurationIntake(
                     null -> Unit
                 }
             }
-            followUps.remove(project to id)?.let { uncountQueued(it) }
+            groups[project to id]?.let { group ->
+                group.latest?.let { uncountQueued(it.doc) }
+                group.latest = null
+                group.mail?.let { it.ingress.tryReceive(); it.links.tryReceive() }
+            }
             clearObservations(project, id)
+            if (unverifiedOwnership) {
+                val tally = tallies.computeIfAbsent(project) { Tally() }
+                val note = "$id: derived membership may remain because ownership is unverified"
+                tally.note = if (tally.note.isBlank()) note else "${tally.note}; $note"
+            }
         }
     }
     private val removed = ConcurrentHashMap.newKeySet<Doc>()
@@ -224,13 +321,16 @@ class CurationIntake(
         }
     }
 
+    /** Mailbox inputs close with the owning input channels. */
+    private fun <T> mail(): Mail<T> = Mail(ingressDone, linksDone)
+
     /** Queue one landed document. PDFs and the miner's other formats curate; twins and the rest do not. */
     fun offer(project: String, id: String) {
         if (!eligible(project)) return
         offer(project, id, selectedProvider(project, id))
     }
 
-    fun offer(project: String, id: String, decisionProvider: DecisionProvider?) = offer(project, id, decisionProvider, null)
+    fun offer(project: String, id: String, decisionProvider: DecisionProvider?) { offer(project, id, decisionProvider, null) }
 
     /** Manual policy disables automatic intake; this explicit document action retains legacy curation. */
     fun offerSelected(selected: ProjectDoc, decisionProvider: DecisionProvider?) {
@@ -238,13 +338,19 @@ class CurationIntake(
         offer(selected.project, selected.id, decisionProvider, selected)
     }
 
-    private fun offer(project: String, id: String, decisionProvider: DecisionProvider?, selected: ProjectDoc?) {
-        if (!eligible(project)) return
-        if (ProjectNodes.twin(id)) return
-        if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return
+    private fun offer(project: String, id: String, decisionProvider: DecisionProvider?, selected: ProjectDoc?, link: Boolean = false): Boolean {
+        if (!eligible(project)) return false
+        if (ProjectNodes.twin(id)) return false
+        if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return false
         val selectedMode = mode(project, id)
-        if (selectedMode == Mode.Manual && selected == null) return
-        enqueue(project, id, decisionProvider, if (selectedMode == Mode.Manual) Mode.Legacy else selectedMode, selected)
+        if (selectedMode == Mode.Manual && selected == null) return false
+        enqueue(project, id, decisionProvider, if (selectedMode == Mode.Manual) Mode.Legacy else selectedMode, selected, link)
+        return true
+    }
+
+    /** An already admitted traversal lands its referenced document. */
+    internal fun offerLink(project: String, id: String, provider: DecisionProvider?) {
+        check(offer(project, id, provider, null, true)) { "Linked document was retained but not admitted by project policy: $project/$id" }
     }
 
     /** An operator selects this particular text document; it is never admitted by mount, upload or resume. */
@@ -259,25 +365,38 @@ class CurationIntake(
         enqueue(project, id, null, selectedMode, selected)
     }
 
-    private fun enqueue(project: String, id: String, decisionProvider: DecisionProvider?, selectedMode: Mode, expected: ProjectDoc? = null) {
+    private fun enqueue(project: String, id: String, decisionProvider: DecisionProvider?, selectedMode: Mode, expected: ProjectDoc? = null, link: Boolean = false) {
         val d = Doc(project, id, if (selectedMode != Mode.Legacy) null else decisionProvider, selectedMode, expected)
         synchronized(admission) {
-            check(!queue.isClosedForSend) { "Document curation intake is draining" }
-            val sameDocument = inFlight.filter { it.project == project && it.id == id }
             val key = project to id
+            val group = groups[key]
+            val sameDocument = group?.active.orEmpty()
             // Automatic admissions read the latest upload; explicit text retains its selected revision.
-            if (d in sameDocument && pending.contains(d) && d !in removed && !followUps.containsKey(key)) return
+            if (d in sameDocument && pending.containsKey(d) && d !in removed && group?.latest == null) {
+                val mailbox = pending[d] ?: mail<Doc>()
+                check((if (link) mailbox.links else mailbox.ingress).trySend(d).isSuccess) { "Document curation intake is draining" }
+                pending[d] = mailbox
+                return
+            }
             if (sameDocument.isNotEmpty() && (d in sameDocument || sameDocument.any { it in removed || it.mode != Mode.Legacy } ||
-                    d.mode != Mode.Legacy || followUps.containsKey(key))) {
-                followUps.put(key, d)?.let { uncountQueued(it) }
+                    d.mode != Mode.Legacy || group?.latest != null)) {
+                val holder = requireNotNull(group)
+                val update = Update(admissionVersion + 1, d)
+                val mailbox = holder.mail ?: mail<Update>()
+                check((if (link) mailbox.links else mailbox.ingress).trySend(update).isSuccess) { "Document curation intake is draining" }
+                holder.mail = mailbox
+                holder.latest?.let { uncountQueued(it.doc) }
+                holder.latest = update
                 clearObservations(project, id)
                 countQueued(d)
                 return
             }
-            if (!inFlight.add(d)) return
+            check((if (link) links else ingress).trySend(d).isSuccess) { "Document curation intake is draining" }
+            val holder = group ?: Group().also { groups[key] = it }
+            check(holder.active.add(d)) { "Document is already in flight" }
             clearObservations(project, id)
             countQueued(d)
-            pending.add(d)
+            pending[d] = null
             queue.trySend(Unit).getOrThrow()
         }
     }
@@ -289,6 +408,7 @@ class CurationIntake(
         var r = emptyMap<String, LcncNodeRunner>()
         val params = mapOf("constellation" to constellation) +
             (d.decisionProvider?.let { mapOf("decisionProvider" to it.id) } ?: emptyMap())
+        var permit: Semaphore? = null
         suspend fun selectedCurrent() {
             d.expected?.let { expected ->
                 val current = requireNotNull(corpus.document(d.project, d.id)) { "Selected document is unavailable" }
@@ -315,6 +435,10 @@ class CurationIntake(
             }
             if (d.mode is Mode.Blocked) error("Intake policy blocked: ${d.mode.reason}")
             selectedCurrent()
+            if (d.decisionProvider != null) {
+                grabCapacity.acquire()
+                permit = grabCapacity
+            }
             val root = constellations()
             // A removal observed before a later stage stops that stage.
             fun discarded(orphan: Boolean = false): Boolean = synchronized(admission) {
@@ -390,7 +514,7 @@ class CurationIntake(
                 require(book == bookName) { "book.curate returned a different book" }
                 val receipt = borg.trikeshed.job.ContentId(curated["curationReceiptCid"] as? String ?: error("book.curate returned no receipt"))
                 synchronized(admission) {
-                    if (removed.contains(d) || followUps.containsKey(d.project to d.id)) t.queued.decrementAndGet()
+                    if (removed.contains(d) || groups[d.project to d.id]?.latest != null) t.queued.decrementAndGet()
                     else {
                         awaiting[awaitingSequence.incrementAndGet()] = Awaiting(d, mapOf("document" to d.id, "book" to book,
                             "curationReceiptCid" to receipt.value, "ontologyCid" to d.mode.ontologyCid.value,
@@ -415,7 +539,10 @@ class CurationIntake(
                         LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to d.id)) }
                 } }
                 if (!completed(d.decisionProvider != null)) return
-                if (d.decisionProvider != null) grabbing(d)
+                if (d.decisionProvider != null) {
+                    grabbing(d, requireNotNull(permit))
+                    permit = null
+                }
                 return
             }
             val notes = corpus.read(d.project, d.id + ProjectNodes.NOTES_SUFFIX, 262_144)?.text
@@ -451,7 +578,10 @@ class CurationIntake(
             if (!completed(joinedNow = true)) return
             System.err.println("[INTAKE] ${d.project}/${d.id}: ${curated["statements"]} statements from ${curated["sections"]} sections")
             }
-            if (d.decisionProvider != null) grabbing(d)
+            if (d.decisionProvider != null) {
+                grabbing(d, requireNotNull(permit))
+                permit = null
+            }
         } catch (e: kotlinx.coroutines.CancellationException) {
             val ownerCancelled = !kotlinx.coroutines.currentCoroutineContext().isActive
             synchronized(admission) {
@@ -484,7 +614,7 @@ class CurationIntake(
                     }
                     uncountQueued(d)
                 }
-                else if (d.mode != Mode.Legacy && followUps.containsKey(d.project to d.id)) t.queued.decrementAndGet()
+                else if (d.mode != Mode.Legacy && groups[d.project to d.id]?.latest != null) t.queued.decrementAndGet()
                 else {
                     t.failed.incrementAndGet(); t.note = "${d.id}: ${e.message ?: e}"
                     providerTally?.let { it.failed.incrementAndGet(); it.note = t.note }
@@ -492,6 +622,7 @@ class CurationIntake(
                 }
             }
         } finally {
+            permit?.release()
             finish(d)
         }
         if (d.mode is Mode.Legacy && t.pending == 0) runCatching {
@@ -502,33 +633,92 @@ class CurationIntake(
     }
 
     /** A scored document's links are fetched beside the reading lane, never holding it. */
-    private fun grabbing(d: Doc) {
-        scope.launch { runCatching { grab(d) }.onFailure { System.err.println("[GRAB] ${d.project}/${d.id} failed: ${it.message ?: it}") } }
+    private suspend fun grabbing(d: Doc, permit: Semaphore) {
+        child(currentCoroutineContext(), onEnd = { permit.release() }) {
+            try { grab(d) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) {
+                if (!currentCoroutineContext().isActive) throw cancelled
+                System.err.println("[GRAB] ${d.project}/${d.id} failed: ${cancelled.message ?: cancelled}")
+            }
+            catch (failure: Throwable) { System.err.println("[GRAB] ${d.project}/${d.id} failed: ${failure.message ?: failure}") }
+        }
+    }
+
+    /** Boot discovery is a child of intake and can complete its admitted scan during drain. */
+    internal fun resumeOwned() {
+        child(scope.coroutineContext + worker) {
+            try { resume(true) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) {
+                if (!currentCoroutineContext().isActive) throw cancelled
+                System.err.println("[INTAKE] resume failed: ${cancelled.message ?: cancelled}")
+            }
+            catch (failure: Throwable) { System.err.println("[INTAKE] resume failed: ${failure.message ?: failure}") }
+        }
+    }
+
+    private fun child(context: kotlin.coroutines.CoroutineContext, onEnd: () -> Unit = {}, block: suspend () -> Unit) {
+        val admitted = CompletableDeferred<Unit>()
+        val child = CoroutineScope(context).launch(start = CoroutineStart.UNDISPATCHED) {
+            val job = requireNotNull(currentCoroutineContext()[Job])
+            try {
+                // Even a cancelled parent waits here until the child is registered.
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { admitted.await() }
+                currentCoroutineContext().ensureActive()
+                block()
+            }
+            finally {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    val idleVersion = synchronized(admission) {
+                        children.remove(job)
+                        closeIfIdle()
+                        admissionVersion.takeIf { it > 0 && groups.isEmpty() && children.isEmpty() }
+                    }
+                    onEnd()
+                    if (idleVersion != null) settlement.withLock { settleLocked(idleVersion) }
+                }
+            }
+        }
+        synchronized(admission) {
+            children.add(child)
+            jobs.add(child)
+            child.invokeOnCompletion { synchronized(admission) { jobs.remove(child) } }
+        }
+        admitted.complete(Unit)
     }
 
     private suspend fun finish(d: Doc) {
         val idleVersion = synchronized(admission) {
             removed.remove(d)
             outcomes.remove(d)
-            inFlight.remove(d)
             val key = d.project to d.id
-            if (inFlight.none { it.project == d.project && it.id == d.id }) {
-                followUps.remove(key)?.let { next ->
-                    check(inFlight.add(next)) { "Follow-up document is already in flight" }
-                    pending.add(next)
-                    // A draining worker is already active and will poll pending after this read.
-                    if (!queue.isClosedForSend) queue.trySend(Unit).getOrThrow()
+            val group = requireNotNull(groups[key])
+            check(group.active.remove(d)) { "Document is not in flight" }
+            if (group.active.isEmpty()) {
+                val a = group.mail?.ingress?.tryReceive()?.getOrNull()
+                val b = group.mail?.links?.tryReceive()?.getOrNull()
+                val next = when {
+                    a == null -> b
+                    b == null || a.serial > b.serial -> a
+                    else -> b
+                }
+                check(next == group.latest) { "Follow-up admission was not retained" }
+                group.latest = null
+                if (next != null) {
+                    val doc = next.doc
+                    check(group.active.add(doc)) { "Follow-up document is already in flight" }
+                    links.trySend(doc).getOrThrow()
+                    pending[doc] = null
+                    queue.trySend(Unit).getOrThrow()
+                } else {
+                    groups.remove(key)
+                    group.mail?.close()
                 }
             }
-            if (inFlight.isEmpty()) admissionVersion else null
+            closeIfIdle()
+            admissionVersion.takeIf { groups.isEmpty() && children.isEmpty() }
         }
         if (idleVersion != null) kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-            settlement.withLock {
-                if (synchronized(admission) { inFlight.isEmpty() && admissionVersion == idleVersion }) {
-                    runCatching { settled() }
-                        .onFailure { System.err.println("[INTAKE] inference release failed: ${it.message}") }
-                }
-            }
+            settlement.withLock { settleLocked(idleVersion) }
         }
     }
 
@@ -543,8 +733,9 @@ class CurationIntake(
          */
         fun install(nodes: ConstellationNodes, ctx: borg.trikeshed.module.ModuleContext, corpus: JvmProjectCorpus,
                     scopes: ProjectScopes, scope: CoroutineScope): CurationIntake {
-            val links = LinkGrab(nodes, corpus, scopes, ctx.muxContext)
-            val intake = CurationIntake(corpus, { ctx.lcncRunners }, { nodes }, scope, scopes::decisionProvider,
+            lateinit var intake: CurationIntake
+            val links = LinkGrab(nodes, corpus, scopes, ctx.muxContext) { p, id, provider -> intake.offerLink(p, id, provider) }
+            intake = CurationIntake(corpus, { ctx.lcncRunners }, { nodes }, scope, scopes::decisionProvider,
                 grab = { d -> links.grab(d.project, d.id, d.decisionProvider) },
                 retainedSource = { project, id ->
                     DocumentCurationLegos.projectSource(ctx.casStore, corpus,
@@ -553,8 +744,10 @@ class CurationIntake(
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
             scopes.onExplicitDocument = { selected, provider -> intake.offerSelected(selected, provider) }
             scopes.onTextForReview = { selected -> intake.offerTextForReview(selected) }
-            scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
-            scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
+            // A removed upload does not establish ownership of a same-named global book.
+            // Retain uncertain derived membership and expose it through intake status.
+            scopes.onRemoved = { project, id -> intake.forget(project, id, unverifiedOwnership = true) }
+            intake.resumeOwned()
             ctx.routes.claim("language", "/api/intake") { method, _, _, _ ->
                 if (method != "GET") borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 else borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, borg.trikeshed.parse.jsonOf(intake.status()))

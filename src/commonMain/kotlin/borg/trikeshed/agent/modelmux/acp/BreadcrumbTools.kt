@@ -33,10 +33,13 @@ class BreadcrumbToolDispatcher(val context: BreadcrumbContext, val budget: Bread
         } catch (_: IllegalArgumentException) { failure("invalid search arguments") }
         if (toolName == TOOL_RECALL) return try {
             require(args.keys.all { it in setOf("ref", "cid", "presence", "query") })
+            val presence = BreadcrumbPresence(requireNotNull(args["presence"]).toDouble())
             val result = context.index.recall(BreadcrumbRef(requireNotNull(args["ref"])), args["cid"]?.let(::ContentId),
-                BreadcrumbPresence(requireNotNull(args["presence"]).toDouble()), budget, args["query"] ?: "")
-            val resultId = if (result.isBlank()) null else (reifyStrict(result) as? Map<*, *>)?.get("id") as? String
-            if (resultId != null) context.access(BreadcrumbId(resultId))
+                presence, budget, args["query"] ?: "")
+            val envelope = if (result.isBlank()) null else reifyStrict(result) as? Map<*, *>
+            val resultId = envelope?.get("id") as? String
+            if (resultId != null && (envelope["selectedChars"] as? Number)?.toDouble()?.let { it > 0.0 } == true)
+                context.access(BreadcrumbId(resultId), presence = presence)
             result
         } catch (_: IllegalArgumentException) { failure("invalid recall arguments") }
         if (toolName != TOOL_BREADCRUMB) return null

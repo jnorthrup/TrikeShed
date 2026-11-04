@@ -1619,6 +1619,7 @@ object OroborosDaemon {
         // Step K: the context-assembly node family is host-composed like any module's
         // runners — webhook dispatch and program runs can mint real context receipts.
         moduleContext.lcncRunners.putAll(borg.trikeshed.memory.ace.AceContextNodes.registry(daemonBlackboard))
+        moduleContext.lcncRunners.putAll(borg.trikeshed.memory.ace.BreadcrumbContextNodes.registry(casStore, breadcrumbContexts))
         // P4: lawyer-bot reading seat. ONLY this runner calls BrainClient/ModelMux;
         // ConstructionReadingLoop owns deterministic CAS claim-check/fold/bag/Rete landing.
         beliefBag?.let { readingBag ->

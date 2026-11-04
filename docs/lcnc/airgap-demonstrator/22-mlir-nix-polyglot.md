@@ -6,6 +6,8 @@ Adopt JVM-hosted GraalVM LLVM/Sulong as the intended embedding route for compati
 
 This chapter revises the supplied “Pivot: Execute mlir-nix LLVM bitcode via GraalVM Polyglot API in TrikeShed” RFC. It retains dynamic module loading and direct host/guest interoperability, corrects the memory and lowering assumptions, and supplies the missing engineering gates. The programme remains documents-first. No Kotlin evaluator, upstream lowering pass or runtime dependency was added by this revision.
 
+This is the canonical decision chapter for P1–P3 deliverable scope, ABI selection and conditional expansion. The [Sulong bitcode companion](22-sulong-bitcode.md) supplies the historical scalar execution baseline and detailed build, transfer, ownership and commonMain lifecycle obligations. The [cost workbook](15-timeline-and-costs.md) owns reconciled arithmetic. No runtime execution is newly claimed by combining these documents.
+
 Inspected on 4 November 2026:
 
 - TrikeShed: `6875a72d633af94a1bcb74e95fc9c62a7ae94874`.
@@ -122,9 +124,9 @@ Extend the existing CMake/Nix build. A flake can be introduced if it solves a co
 
 ## Versioned evaluator boundary
 
-Prefer a small interop-aware wrapper around the chosen evaluator to exposing arbitrary C++ evaluator objects. First transport a bounded UTF-8 request/result envelope. This is an intentional conversion boundary whose copy cost must be measured. Host objects and typed buffers can be added later where they save enough work to justify stricter lifetime contracts.
+Prefer a small interop-aware wrapper around the chosen evaluator to exposing arbitrary C++ evaluator objects. Select **ABI A**, a bounded request-scoped polyglot-string envelope, for the initial path. This is an intentional UTF-8 conversion boundary whose copy cost must be measured. The [companion ownership contract](22-sulong-bitcode.md) describes **ABI B**, an alternative with explicit session/input/result handles and bounded byte transfer. Select B only if persistent state or bulk transfer has a demonstrated need and its lifetime/state-isolation obligations are accepted. Implement one selected ABI version; both proposed export sets are not mandatory. A later change of ABI is a versioned asset/adapter change, not an unchecked extra calling convention.
 
-The following names/signatures are proposed, not existing exports:
+The following ABI A names/signatures are proposed, not existing exports:
 
 ```c
 #include <stdint.h>
@@ -140,7 +142,7 @@ Version 1 accepts a Polyglot string containing a bounded request envelope. It re
 
 `polyglot_as_string` converts into a caller-supplied buffer; character count is not UTF-8 byte count. Use checked capacity arithmetic, an explicit UTF-8 encoding and tests for astral characters, combining characters, embedded NUL and invalid input. `polyglot_from_string_n` accepts an explicit byte length, avoiding accidental NUL truncation. The adapter must establish an owned host result before freeing its guest storage. These are wrapper obligations, not properties bestowed on `char *` by the Polyglot API. [Interop header](https://github.com/oracle/graal/blob/master/sulong/projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/polyglot.h)
 
-For P2, start with request-scoped evaluation state. If session reuse is later required, specify session IDs, context binding, allowed cache state, import-frame identity, serialization, reset and close behavior. Do not let state from one hypothetical legal frame become an unreported premise in the next.
+For P2, start with request-scoped evaluation state. ABI A's wrapper releases its native allocations after producing an independently owned managed result, including error results. Verify that independence before freeing storage; otherwise choose the explicit read/release contract of ABI B. If session reuse is later required, specify session IDs, context binding, allowed cache state, import-frame identity, serialization, reset and close behavior. Do not let state from one hypothetical legal frame become an unreported premise in the next.
 
 The result envelope separates execution status from semantic status. Successful evaluation can return a value; a solver can additionally return `SUPPORTED` or `UNKNOWN` under its declared fragment. Parse failure, unsupported capability, fuel exhaustion, output limit, interruption, module failure and native fault are not semantic `UNKNOWN`. Diagnostics and partial observations remain attributed to the failed invocation.
 
@@ -236,18 +238,20 @@ Freeze inputs, result consumption, module flags, evaluator JIT setting, hardware
 
 ## Work, costs and decision sequence
 
-Keep the programme's 25 ownership packages. Assign this work inside WP15 with WP02 contracts, WP09 lifecycle, WP11 observations, WP23 packaging and WP24 measurement. The original WP15 32–64-hour estimate covers the supervised existing solver path; it does not secretly include a full evaluator/compiler port.
+Keep the programme's 25 ownership packages. Assign this work inside WP15 with WP02 contracts, WP09 lifecycle, WP11 observations, WP23 packaging and WP24 measurement. The baseline WP15 **32–64-hour tranche** covers 8–16 hours of feasibility, 8–16 of minimal reproducible build/probes, and 16–32 of existing-adapter repair and focused integration evidence. It retains the current native solver and may establish the new transport seam; it does not fund the complete new Sulong production profile.
+
+After that review gate, a broader bounded P1 profile has the following **conditional incremental** estimate. These are remaining hours beyond the baseline, with baseline probes reused and charged once. The implementation owner must identify the accepted baseline artifacts and remaining work before activating an increment. If the feasibility result changes the scope, revise these assumptions rather than double-counting the same experiment.
 
 | Increment | Accountable owner | Dependency | Additional active hours, assumption |
 |---|---|---|---|
-| Compatibility and route experiment | WP15 Terra; Sol reviews semantic boundary | Frozen runtime/upstream identities | 16–32 |
-| Binary module and explicit ABI path | WP15 Terra with WP02 | Successful reader/primitive probe | 32–64 |
+| Remaining target/closure compatibility and route work | WP15 Terra; Sol reviews semantic boundary | Accepted baseline probes and frozen runtime/upstream identities | 16–32 |
+| Supported binary module and selected ABI implementation | WP15 Terra with WP02 | Accepted minimal build and reader/primitive probe | 32–64 |
 | Ownership, observations and cutover | WP09 Sol with WP11 | Agreed module/ABI path | 40–80 |
 | Platform, offline and benchmark evidence | WP23 Sol / WP24 Terra | Integrated bounded path | 24–48 |
 
 This is **112–224 additional active hours** for a bounded compatible-kernel path, not full Nix. With the programme's 50% effort reserve: **168–336 hours**. Applying the existing base Fast rate of $4.80/hour and separate 30% cost uncertainty gives **$1,048–$2,097**; the heavy $14.85/hour assumption gives **$3,243–$6,486**. These use the [cost workbook's assumptions](15-timeline-and-costs.md), not newly measured token consumption.
 
-At the initial six-lane capacity this work consumes about 1.8–3.6 days of aggregate capacity, but serial compatibility, ownership and target-machine validation make **4–10 calendar days** a planning range for the bounded path. Run the first 16–32-hour experiment before committing to the rest. A blocked reader or missing target machine is a reported gate, not an invitation to fabricate a successful smoke test.
+At the initial six-lane capacity this increment with effort reserve consumes about 1.8–3.6 days of aggregate capacity, but serial compatibility, ownership and target-machine validation make **4–10 additional calendar days** a planning range for the bounded expansion. Complete the baseline feasibility gate before selecting it, then verify the remaining 16–32-hour compatibility/closure increment before committing its downstream work. A blocked reader or missing target machine is a reported gate, not an invitation to fabricate a successful smoke test.
 
 P2 and P3 are **unestimated additional scope** until dependency closure or operation coverage is known. The bounded-kernel increment excludes rebuilding/porting MLIR dependencies, a complete Nix runtime, nested JIT support and comprehensive Nixpkgs compatibility. Do not quote the original 18–32-day demonstrator target as a promise of full in-process Nix. The demonstrator can retain the supervised existing solver while this preferred embedding route advances through its gates; every run names the backend actually used.
 

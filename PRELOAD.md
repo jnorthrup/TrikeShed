@@ -451,89 +451,120 @@ completion. This file is the implementation contract.
 
 ## Distributed 3way merge — D3M
 
-D3M is the endorsed integration technique for distributed branch work. Its goal
-is to preserve every branch's intent and conflict evidence, integrate sequentially
-through real common ancestry, then repair the combined result for maximum useful
-behaviour. A branch name, author, model, age, or position as "ours" or "theirs"
-does not grant its implementation priority.
+D3M is the endorsed integration technique for distributed branch work. Merge
+ascending history through real common ancestry, retain every conflict and its
+intent, commit each integration checkpoint, then resolve and fix the complete
+composition. Work is preserved in local commits, never in shelves or Git stash.
 
-0. **Commit, publish, then fetch locally.** Before integration on Jim's machine,
-   commit all task-authorized work in the current participating checkout and
-   push the current integrated work to remote master with a normal,
-   non-forced push. Include the D3M contract change in that checkpoint. Inspect
-   untracked files before staging; "all" does not authorize committing secrets,
-   private corpora, generated caches or unrelated work. If remote master has
-   advanced, preserve and integrate that ancestry before the push. Other
-   distributed branches must likewise have their intended work committed and
-   their exact branch tips published; do not flatten incompatible branch tips
-   onto master merely to transport them. Confirm the published OIDs, then fetch
-   the configured remotes in Jim's local TrikeShed checkout without pruning.
-   Only after this local fetch freeze the integration set below. A cloud push
-   is not proof that the local fetch happened. If local execution is unavailable,
-   report that boundary and retain the published checkpoint for continuation.
-1. **Freeze the integration set.** On the requested machine, inventory local
-   branches, remote-tracking branches, worktrees, dirty paths and existing merge
-   state. Record exact tip OIDs and the starting master/remote-master OIDs after
-   the distribution/fetch preflight. Freeze
-   a manifest of the requested branch set; collapse duplicate tips and explicitly
-   account for already-contained branches. Preserve uncommitted work without
-   resetting, cleaning or overwriting it. Do not substitute a cloud clone for a
-   requested local checkout.
-2. **Preserve recovery.** Retain the original master and every input tip with
-   backup refs or a verified Git bundle. Integrate in an isolated local worktree
-   and temporary branch. Keep an external-to-source conflict archive under the
-   repository's Git storage, with a session identifier and manifest. Source
-   branches and their worktrees remain intact.
-3. **Merge sequentially.** Record a reproducible order, initially lexical ref
-   order unless dependencies require another documented order. Merge one frozen
-   tip at a time with Git's ordinary three-way ancestry handling. Do not use
-   octopus integration, blanket ours/theirs strategies, `-Xours`, `-Xtheirs`,
-   union resolution, or an unreviewed rerere result to hide conflicts. Review
-   merge attributes and custom drivers before allowing them to resolve content.
-   An unrelated history is an explicit integration exception, not an excuse to
-   invent a common base silently.
-4. **Retain every conflict.** Before changing an unmerged path, save its stage-1
-   base, stage-2 accumulated side and stage-3 incoming side, including absent
-   stages, OIDs, modes, renames, deletes, symlinks and binary/type conflicts.
-   Retain the conflicted worktree representation and the complete Git diagnostic.
-   A conflict archive remains evidence after the working file is repaired.
-5. **Make intermediate state honest.** Git cannot start the next ordinary merge
-   with unresolved index entries. When semantic resolution is deferred until
-   all branches have been examined, use explicitly marked provisional commits
-   only on the temporary integration branch. Preserve text conflict carriers;
-   for binary, path or type conflicts use a manifest-backed neutral carrier and
-   preserve all original variants. These carriers are accounting devices, not
-   chosen implementations. Subsequent conflicts must retain their original tip
-   ancestry as well as the accumulated carrier. Never publish, deploy, or claim
-   build success for an unresolved checkpoint. If a carrier prevents meaningful
-   continuation, perform the minimum reviewed structural resolution needed and
-   retain the still-open semantic decision in the manifest.
-6. **Resolve intent across the complete set.** After the sequential pass, inspect
-   each branch's changes from its merge base, relevant design notes and current
-   callers. Review cleanly merged overlaps too. For every conflict record the
+### Unbiased means no automatic conflict choices
+
+No branch, author, model, age, timestamp, accumulated side, incoming side, "ours"
+or "theirs" has priority. Neither old patches nor new patches win by default.
+Do not sort or select diff hunks as "old first" or "new first", accept a side
+because it is newer, or restore it because it is older. Ascending history is an
+ancestry-preserving schedule for whole branch tips, not a resolution policy.
+
+Inspect the base and both sides, each branch's intended behaviour, current
+callers and the composed requirements before resolving a conflict. Preserve
+compatible intent and repair incompatible assumptions. Patch equivalence is
+supporting evidence to inspect, never an automatic instruction to discard a
+side. Record the reason for every retained, changed or omitted behaviour.
+Cleanly merged overlapping changes also require intent review; Git's ability to
+merge text is not approval of the resulting behaviour.
+
+### Required sequence
+
+0. **Fetch first.** In the requested local checkout, fetch every configured
+   remote without pruning. Do not substitute a cloud clone. Record the fetched
+   tip OIDs; fetch does not authorize changing or discarding working files.
+1. **Add everything and commit on the spot.** From the checkout root run
+   `git add .`, then commit all tracked changes and all non-ignored untracked
+   files locally before integration. `.gitignore` governs inclusion; do not
+   selectively leave working files behind or force-add ignored files. Commit
+   nested repository changes first, then their gitlinks in the parent. Include
+   the D3M contract update in the checkpoint. Do not wait for tests, cleanup,
+   task boundaries or permission to preserve work. A checkpoint makes no build
+   or completion claim. If unmerged index entries already exist, retain their
+   stages and conflict carriers as below, then commit the checkpoint.
+2. **Freeze and retain the inputs.** Inventory local branches, remote-tracking
+   branches, worktrees, dirty paths and merge state after the fetch/checkpoint.
+   Freeze exact OIDs and the starting local/remote master OIDs. Collapse duplicate
+   tips and explicitly account for already-contained branches. Retain every
+   original tip and starting master through recovery refs or a verified bundle.
+   Any newly discovered dirty work must likewise be committed locally on the
+   spot; never reset, clean, overwrite or defer it.
+3. **Order ascending history.** Merge full frozen branch tips sequentially in
+   ascending ancestry order: an ancestor precedes its descendants. For divergent
+   tips with no ancestry order, use ascending recorded commit time, breaking
+   equal timestamps by OID, and retain the exact schedule. Ancestry takes
+   precedence over clock skew. This deterministic scheduling gives neither
+   side semantic priority. Do not privilege remote master, a recent branch or
+   an old branch by merging it outside that schedule. Already-contained tips
+   receive an explicit disposition instead of an invented conflict or empty
+   merge. Do not rebase, squash, cherry-pick or flatten patches to evade a
+   three-way merge.
+4. **Perform each real three-way merge.** Use the actual common base and the
+   accumulated and incoming histories, one tip at a time. Retain diagnostics,
+   base OIDs, input OIDs and the resulting checkpoint OID. Do not use octopus,
+   blanket ours/theirs strategies, `-Xours`, `-Xtheirs`, union resolution,
+   automatic rerere acceptance, autostash or custom drivers that hide conflicts.
+   Review merge attributes and drivers first. Unrelated history is an explicit
+   exception requiring an intent decision, not an invented common base.
+5. **Retain maximum conflict and intent evidence.** Before editing any unmerged
+   path, retain its stage-1 base, stage-2 accumulated side and stage-3 incoming
+   side, including absent stages, modes, OIDs, renames, deletes, symlinks and
+   binary/type conflicts. Preserve the conflicted working representation with
+   base-inclusive markers and complete Git diagnostics. Retain each branch's
+   changes from its common base and its intent account, including clean overlaps.
+   Preserve every real conflict; never reduce the conflict set by accepting a
+   side, dropping a patch or hiding content. Maximum conflicts means maximum
+   exposure and retention of real disagreements for intent review, not fabricated
+   conflicts produced by damaging otherwise compatible code. Conflict evidence
+   remains after final repair.
+6. **Commit each merge checkpoint, then edit and fix.** Git cannot commit an
+   unmerged index. After archiving all stages, stage preserved text conflict
+   carriers and commit an explicitly provisional checkpoint with the merge
+   ancestry intact. Binary/path/type conflicts require a manifest-backed carrier
+   retaining all variants and an explicit open semantic decision; the carrier
+   must not silently choose an implementation. Every non-contained tip gets
+   its own committed checkpoint. Do not proceed with uncommitted working files.
+   Inspect and edit the conflicts in view of the entire set's intent, then
+   commit the resolutions and subsequent fixes on the spot. If structural
+   repair is necessary to continue, record the minimum repair and keep the
+   semantic decision open until the complete set has been reviewed. An archived
+   variant, temporary worktree or patch file never replaces a local commit.
+7. **Resolve the complete composition.** After the ascending pass, review every
+   conflict and cleanly merged overlap against all inputs and callers. Record
    competing requirements, retained benefits, incompatible assumptions and final
-   resolution. Compose compatible behaviour; repair shared contracts where
-   necessary. Do not equate retaining both text blocks with retaining both
-   behaviours. Do not resurrect obsolete behaviour merely because its branch
-   remains present. Any omitted intent needs an explicit technical reason.
-7. **Verify the integrated result.** Remove all provisional carriers and resolve
-   every conflict-manifest entry. Check for unresolved index stages and marker
-   artifacts, compile all affected targets without exclusions, and exercise the
-   composed production paths and meaningful regressions. Follow the current
-   test-standing and intent rules above. Record failures honestly and fix their
-   causes; do not weaken checks to manufacture a merge success.
-8. **Advance and publish master.** Commit the final repairs and integration
-   report. Verify every included tip is an ancestor of the result or has an
-   explicitly recorded equivalent/inapplicable disposition. Re-read local and
-   remote master before advancing; incorporate intervening commits with the same
-   method. Advance master only from the expected starting OID, respecting any
-   checked-out worktree and uncommitted work. Push the verified master normally,
-   never force-push over new remote work. Confirm the remote OID and retain the
-   conflict archive, backup refs and branch-disposition report.
+   repairs. Retaining both text blocks does not establish both behaviours.
+   Neither recency nor historical presence establishes correctness. Remove all
+   provisional carriers and close every intent/conflict-manifest entry before
+   publishing or claiming build success.
+8. **Apply test non-standing and fix the result.** Tests older than 30 days have
+   no standing as development guidance or merge-resolution authority. Do not
+   revert intended code merely to satisfy them. Read current intent, use current
+   evidence and exercise meaningful recent regressions. Compile all affected
+   targets without source or test exclusions, inspect the composed production
+   path, and fix causes rather than weakening checks. Preserve failures and the
+   reason for their disposition. A passing test count is not completion.
+9. **Commit and publish verified master.** Commit the integration report and all
+   repairs. Verify no unresolved index stages, conflict markers or provisional
+   carriers remain and every included tip is an ancestor or has an explicit
+   equivalent/inapplicable disposition. Re-fetch before publication and account
+   for intervening history with the same three-way method. Advance local master
+   while preserving any new working files through immediate commits. Push master
+   normally, never force-push over remote work, confirm the remote OID and retain
+   recovery refs, conflict evidence, the schedule and the intent/disposition report.
 
-D3M is sequential and therefore order-sensitive. "No bias" means no automatic
-side preference and an auditable review of all intents, not a false claim that
-merge order cannot affect conflicts. Conflicts remain preserved as evidence;
-the published master must contain the resolved, verified implementation.
+### No shelving or Git stash
 
+Never create an IDE shelf, run `git stash`, use `--autostash`, or park uncommitted
+files in another worktree as a substitute for a commit. Recover any pre-existing
+shelf belonging to the work being integrated into local commit history before
+merging it; retain its original identity and all variants. Do not discard it or
+create another shelf. Conflict archives and recovery refs supplement commits;
+they never replace committing all non-ignored working files on the spot.
 
+D3M is order-sensitive. "Unbiased" is an auditable absence of automatic side
+preference, not a claim that merge order cannot affect conflicts. The result is
+the repaired composition of intent, with the full conflict record preserved.

@@ -134,7 +134,7 @@ internal object DocumentsUpload {
             status.textContent = "Added $sent files to $actual. $parsing Content remains unreviewed. "
             val link = document.createElement("a")
             link.textContent = "Open uploaded project"
-            link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(actual)}#${WikiSurface.encode(actual)}")
+            link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(actual)}#${DocumentSurface.projectFragment(actual)}")
             status.appendChild(link)
         }
         fun submit(read: suspend () -> Join<List<Entry>, String>) {
@@ -196,7 +196,7 @@ internal object DocumentsUpload {
                 (transfer.getData("text/plain") as? String).orEmpty()
             })
             val links = raw.lineSequence().map { it.trim() }
-                .filter { it.startsWith("https://", true) || it.startsWith("http://", true) }.distinct().toList()
+                .filter { it.startsWith("https://", true) || it.startsWith("http://", true) }.distinct().take(MAX_FILES + 1).toList()
             val types: Array<dynamic> = js("Array.from(transfer.types || [])")
             val hasFiles = types.any { it == "Files" }
             if (!hasFiles && links.isEmpty()) return
@@ -204,11 +204,21 @@ internal object DocumentsUpload {
             if (pending || !present()) return
             panel.asDynamic().open = true
             if (!hasFiles) {
+                if (links.size > MAX_FILES) {
+                    message("Drop at most $MAX_FILES links at once. Nothing was sent.")
+                    return
+                }
                 pending = true; disable(true); abort = js("new AbortController()")
+                status.textContent = ""
+                val progress = document.createElement("span")
+                val projects = document.createElement("span")
+                status.appendChild(progress)
+                status.appendChild(projects)
+                fun linkMessage(value: String) { if (present()) progress.textContent = value }
                 scope.launch {
                     try {
                         for (url in links) {
-                            message("Fetching $url…")
+                            linkMessage("Fetching $url…")
                             val init = RequestInit(method = "POST", body = jsonOf(_m["url" j url, "manualIntake" j true]),
                                 headers = Headers().apply { append("Content-Type", "application/json") })
                             init.asDynamic().signal = abort.signal
@@ -216,20 +226,24 @@ internal object DocumentsUpload {
                             val value = reifyStrict(response.text().await()) as? Map<*, *> ?: error("Link response is unreadable")
                             require(response.ok && value["verdict"] == "ok") { (value["detail"] ?: value["error"] ?: "Link could not be fetched").toString() }
                             val project = value["name"] as? String ?: error("Link project identity is missing")
-                            message("Fetched $url; starting parsing…")
+                            val detail = document.createElement("span")
+                            if (present()) {
+                                projects.appendChild(document.createElement("br"))
+                                val link = document.createElement("a")
+                                link.textContent = "Open project $project"
+                                link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(project)}#${DocumentSurface.projectFragment(project)}")
+                                projects.appendChild(link)
+                                projects.appendChild(detail)
+                            }
+                            linkMessage("Fetched $url; starting parsing…")
                             val parsing = try { parse(project) }
                                 catch (cancelled: CancellationException) { throw cancelled }
                                 catch (failure: Throwable) { "Link was saved, but parsing could not start: ${failure.message ?: "unknown error"}." }
-                            if (present()) {
-                                status.textContent = "Added $url to $project. $parsing "
-                                val link = document.createElement("a")
-                                link.textContent = "Open project"
-                                link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(project)}#${WikiSurface.encode(project)}")
-                                status.appendChild(link)
-                            }
+                            if (present()) detail.textContent = " · $parsing"
                         }
+                        linkMessage("Added ${links.size} links. ")
                     } catch (cancelled: CancellationException) { throw cancelled }
-                    catch (failure: Throwable) { message("Link drop stopped: ${failure.message ?: "Unable to fetch"}") }
+                    catch (failure: Throwable) { linkMessage("Link drop stopped: ${failure.message ?: "Unable to fetch"}. The current link may have been partially saved. ") }
                     finally { pending = false; if (present()) disable(false) }
                 }
                 return

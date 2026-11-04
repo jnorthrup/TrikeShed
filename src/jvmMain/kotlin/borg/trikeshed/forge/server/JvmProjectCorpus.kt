@@ -6,6 +6,7 @@ import borg.trikeshed.lcnc.ProjectGlob
 import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.lcnc.ProjectRef
 import borg.trikeshed.lcnc.ProjectText
+import borg.trikeshed.lcnc.ProjectVisitUnavailable
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.BoundedCasReader
@@ -14,10 +15,15 @@ import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
+
+private const val EMPTY_CID = "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 /** An explicitly bound primary worktree, stored under a physical prefix in the daemon's main store. */
 data class PrimaryProjectBinding(val name: String, val prefix: String, val store: CouchStore,
@@ -122,7 +128,7 @@ class JvmProjectCorpus(
     private val extracting = ConcurrentHashMap<Pair<String, String>, Mutex>()
     private data class Backing(val project: String, val store: CouchStore, val gateway: CouchAttachmentGateway,
         val prefix: String, val primary: Boolean, val reader: BoundedCasReader? = null, val maxBytes: Int = 0)
-    private data class Stamp(val rev: String, val seq: Long)
+    private class EvidenceChanged : RuntimeException()
 
     private fun backing(project: String): Backing? {
         val binding = primary
@@ -140,18 +146,6 @@ class JvmProjectCorpus(
         return Backing(project, pdb.store, pdb.gateway, "", false)
     }
 
-    private fun stamp(backing: Backing, physical: String): Stamp? {
-        val head = backing.store.head
-        if (head.isDeleted(physical)) return null
-        val rev = head.getRev(physical) ?: return null
-        val seq = head.sequenceOf(physical) ?: return null
-        return Stamp(rev, seq)
-    }
-
-    /** Verify the per-document head did not change across the primary attachment read. */
-    private fun stillCurrent(b: Backing, physical: String, expected: Stamp): Boolean =
-        (!b.primary || backing(b.project) != null) && stamp(b, physical) == expected
-
     /** The reader, not attachment metadata, enforces the allocation bound and verifies the CID. */
     private fun primaryBytes(b: Backing, ref: borg.trikeshed.util.oroboros.OroborosAttachmentRef): ByteArray? {
         if (ref.length < 0 || ref.length > b.maxBytes) return null
@@ -162,28 +156,59 @@ class JvmProjectCorpus(
         return bytes?.takeIf { it.size <= b.maxBytes && it.size.toLong() == ref.length && ContentId.of(it) == ref.contentId }
     }
 
-    /** Do not treat missing or malformed declared lengths as a verified empty attachment. */
-    private fun primaryRef(b: Backing, physical: String): borg.trikeshed.util.oroboros.OroborosAttachmentRef? {
-        val ref = b.gateway.getAttachmentRef(physical) ?: return null
-        val declared = (b.store.get(physical)?.fields?.find { it.name == "length" }?.value as? String)?.toLongOrNull()
-        return ref.takeIf { declared != null && declared >= 0 && declared == it.length }
+    /** A source is returned only when its bytes and metadata still match one committed slot. */
+    private suspend fun verified(b: Backing, id: String): Pair<borg.trikeshed.couch.CouchHeadSlot, ByteArray>? {
+        currentCoroutineContext().ensureActive()
+        val physical = b.prefix + id
+        val slot = b.store.head.slot(physical) ?: return null
+        if (slot.deleted || slot.attachmentDeleted) return null
+        check(!slot.ambiguous) { "Ambiguous attachment metadata: ${b.project}/$id" }
+        val cid = ContentId(slot.contentId ?: return null)
+        val declared = slot.length?.toLongOrNull() ?: return null
+        if (declared < 0) return null
+        val bytes = if (b.primary) {
+            val ref = borg.trikeshed.util.oroboros.OroborosAttachmentRef(physical, slot.contentType.orEmpty(), declared, cid, "", "", slot.sequence)
+            val loaded = primaryBytes(b, ref)
+            currentCoroutineContext().ensureActive()
+            loaded ?: return null
+        } else {
+            val attachment = b.gateway.getAttachment(physical)
+            currentCoroutineContext().ensureActive()
+            val (ref, loaded) = attachment ?: return null
+            if (ref.contentId != cid || ref.contentType != slot.contentType.orEmpty()) return null
+            if (ref.length != declared || loaded.size.toLong() != declared) return null
+            if (ContentId.of(loaded) != cid) return null
+            loaded
+        }
+        currentCoroutineContext().ensureActive()
+        if (backing(b.project)?.store !== b.store || b.store.head.slot(physical) != slot) return null
+        return Pair(slot, bytes)
+    }
+
+    /** Missing extraction evidence may be mined; present but unverifiable evidence is an error. */
+    private suspend fun evidence(b: Backing, id: String): Pair<borg.trikeshed.couch.CouchHeadSlot, ByteArray>? {
+        val slot = b.store.head.slot(b.prefix + id) ?: return null
+        if (slot.deleted || slot.attachmentDeleted) return null
+        return verified(b, id) ?: error("Extraction evidence failed verification: ${b.project}/$id")
     }
 
     private fun document(backing: Backing, id: String, verifyBytes: Boolean = true): ProjectDoc? {
         val physical = backing.prefix + id
-        if (!backing.primary) {
-            if (backing.store.head.isDeleted(physical)) return null
-            val ref = backing.gateway.getAttachmentRef(physical) ?: return null
-            val head = backing.store.head
-            return ProjectDoc(backing.project, id, ref.contentId.value, head.getRev(physical).orEmpty(),
-                head.sequenceOf(physical) ?: -1L, ref.length, ref.contentType)
+        val slot = backing.store.head.slot(physical) ?: return null
+        if (slot.deleted || slot.attachmentDeleted) return null
+        check(!slot.ambiguous) { "Ambiguous attachment metadata: ${backing.project}/$id" }
+        val cid = ContentId(slot.contentId ?: return null)
+        val length = slot.length?.toLongOrNull() ?: 0L
+        val type = slot.contentType.orEmpty()
+        if (backing.primary && verifyBytes) {
+            val declared = slot.length?.toLongOrNull() ?: return null
+            if (declared < 0) return null
+            val ref = borg.trikeshed.util.oroboros.OroborosAttachmentRef(physical, type, declared, cid, "", "", slot.sequence)
+            if (primaryBytes(backing, ref) == null) return null
+            if (this.backing(backing.project)?.store !== backing.store || backing.store.head.slot(physical) != slot) return null
         }
-        val before = stamp(backing, physical) ?: return null
-        val ref = (if (verifyBytes) primaryRef(backing, physical) else backing.gateway.getAttachmentRef(physical)) ?: return null
-        if (verifyBytes && primaryBytes(backing, ref) == null) return null
-        if (!stillCurrent(backing, physical, before)) return null
-        return ProjectDoc(backing.project, id, ref.contentId.value, before.rev, before.seq, ref.length, ref.contentType,
-            contentStatus = if (verifyBytes) "verified-bytes" else "unchecked-metadata")
+        return ProjectDoc(backing.project, id, cid.value, slot.rev, slot.sequence, length, type,
+            contentStatus = if (backing.primary) (if (verifyBytes) "verified-bytes" else "unchecked-metadata") else null)
     }
 
     override suspend fun projects(): List<ProjectRef> = scopes.list().map {
@@ -192,70 +217,109 @@ class JvmProjectCorpus(
     }
 
     override suspend fun docs(project: String, prefix: String, glob: String, limit: Int): List<ProjectDoc> = withContext(Dispatchers.IO) {
+        require(limit >= 0) { "Requested element count $limit is less than zero." }
         val b = backing(project) ?: return@withContext emptyList()
-        val head = b.store.head
-        b.gateway.listAttachments(b.prefix + prefix).asSequence()
-            .filter { !head.isDeleted(it.path) && !ProjectNodes.twin(it.path.removePrefix(b.prefix)) && ProjectGlob.matches(glob, it.path.removePrefix(b.prefix)) }
-            .sortedBy { it.path }
-            .take(limit)
-            // seq is the store's own commit sequence (0-based, as `_changes` numbers it), never the
-            // attachment doc's `sequence` field, which writers stamp with a clock or a count. A listed
-            // document always has a head frame; -1 marks the impossible unknown rather than a lie.
-            .map {
-                val id = it.path.removePrefix(b.prefix)
-                if (b.primary) document(b, id, verifyBytes = false) ?: error("Primary document changed while listing: $project/$id")
-                else ProjectDoc(project, id, it.contentId.value, head.getRev(it.path).orEmpty(), head.sequenceOf(it.path) ?: -1L, it.length, it.contentType)
-            }
-            .toList()
+        val result = mutableListOf<Pair<String, borg.trikeshed.couch.CouchHeadSlot>>()
+        slots(b, { it.startsWith(prefix) && ProjectGlob.matches(glob, it) }) { id, slot ->
+            // The gateway validates all present CIDs before sorting/taking; a missing
+            // primary CID is rejected only if that row is selected.
+            ContentId(slot.contentId.orEmpty().ifEmpty { EMPTY_CID })
+            result.add(Pair(id, slot))
+        }
+        result.sortedBy { it.first }.take(limit).map { (id, slot) -> listed(b, id, slot) }
+    }
+
+    override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) {
+        val b = backing(project) ?: throw ProjectVisitUnavailable(project)
+        slots(b, { true }) { id, slot -> emit(listed(b, id, slot)) }
+    }
+
+    private fun listed(b: Backing, id: String, frame: borg.trikeshed.couch.CouchHeadSlot): ProjectDoc {
+        val declaredCid = frame.contentId
+        val rawCid = if (b.primary) (declaredCid ?: error("Primary document changed while listing: ${b.project}/$id"))
+            else declaredCid.orEmpty().ifEmpty { EMPTY_CID }
+        val cid = ContentId(rawCid)
+        return ProjectDoc(b.project, id, cid.value, frame.rev, frame.sequence, frame.length?.toLongOrNull() ?: 0L,
+            frame.contentType.orEmpty(), contentStatus = if (b.primary) "unchecked-metadata" else null)
+    }
+
+    private suspend fun slots(b: Backing, accepts: (String) -> Boolean,
+                              emit: suspend (String, borg.trikeshed.couch.CouchHeadSlot) -> Unit) {
+        val project = b.project
+        // Slots are stable by document id: updates/tombstones replace a slot, while
+        // new ids append beyond the captured count. Each frame is read atomically.
+        val slots = b.store.head.slots()
+        for (i in 0 until slots.a) {
+            currentCoroutineContext().ensureActive()
+            if ((i and 255) == 0) yield()
+            if (backing(project)?.store !== b.store) throw ProjectVisitUnavailable(project)
+            val frame = slots.b(i)
+            if (frame.deleted || !frame.docId.startsWith(b.prefix)) continue
+            val id = frame.docId.removePrefix(b.prefix)
+            if (ProjectNodes.twin(id) || !accepts(id)) continue
+            if (frame.attachmentDeleted) continue
+            check(!frame.ambiguous) { "Ambiguous attachment metadata: $project/$id" }
+            emit(id, frame)
+        }
+        currentCoroutineContext().ensureActive()
+        if (backing(project)?.store !== b.store) throw ProjectVisitUnavailable(project)
     }
 
     override suspend fun document(project: String, id: String): ProjectDoc? = withContext(Dispatchers.IO) {
         val b = backing(project) ?: return@withContext null
-        document(b, id)
+        val result = document(b, id)
+        currentCoroutineContext().ensureActive()
+        result
     }
 
     override suspend fun bytes(project: String, id: String): ByteArray? = withContext(Dispatchers.IO) {
         val b = backing(project) ?: return@withContext null
-        val physical = b.prefix + id
-        if (b.store.head.isDeleted(physical)) return@withContext null
-        val before = if (b.primary) stamp(b, physical) ?: return@withContext null else null
-        val bytes = if (b.primary) {
-            val ref = primaryRef(b, physical) ?: return@withContext null
-            primaryBytes(b, ref) ?: return@withContext null
-        } else b.gateway.getAttachment(physical)?.second ?: return@withContext null
-        if (before != null && !stillCurrent(b, physical, before)) return@withContext null
-        bytes
+        verified(b, id)?.second
     }
 
     override suspend fun read(project: String, id: String, maxChars: Int): ProjectText? = withContext(Dispatchers.IO) {
         val b = backing(project) ?: return@withContext null
         val physical = b.prefix + id
-        if (b.store.head.isDeleted(physical)) return@withContext null
-        val before = if (b.primary) stamp(b, physical) ?: return@withContext null else null
-        if (before != null) {
-            val metadata = b.gateway.getAttachmentRef(physical) ?: return@withContext null
-            if (!ProjectGlob.isTextual(metadata.contentType, id) || !stillCurrent(b, physical, before)) return@withContext null
-        }
-        val (ref, bytes) = if (b.primary) {
-            val ref = primaryRef(b, physical) ?: return@withContext null
-            Pair(ref, primaryBytes(b, ref) ?: return@withContext null)
-        } else b.gateway.getAttachment(physical) ?: return@withContext null
-        if (!ProjectGlob.isTextual(ref.contentType, id)) return@withContext null
+        val metadata = b.store.head.slot(physical) ?: return@withContext null
+        if (!ProjectGlob.isTextual(metadata.contentType.orEmpty(), id)) return@withContext null
+        val (slot, bytes) = verified(b, id) ?: return@withContext null
+        if (!ProjectGlob.isTextual(slot.contentType.orEmpty(), id)) return@withContext null
         // A text larger than asked for is read to its head, never refused: maxChars bounds the answer, not the document.
         val text = bytes.decodeToString(0, minOf(bytes.size.toLong(), 4L * maxChars).toInt())
+        currentCoroutineContext().ensureActive()
         // binary decodes to replacement chars at a high rate; OCR/extraction leaves a few unmapped glyphs
         if (text.count { it == '\uFFFD' } * 100 > text.length) return@withContext null
-        val head = b.store.head
-        if (before != null && !stillCurrent(b, physical, before)) return@withContext null
-        val result = ProjectText(project, id, ref.contentId.value, before?.rev ?: head.getRev(physical).orEmpty(),
-            before?.seq ?: head.sequenceOf(physical) ?: -1L, text.take(maxChars))
+        val result = ProjectText(project, id, requireNotNull(slot.contentId), slot.rev, slot.sequence, text.take(maxChars))
+        fun current(): Boolean = backing(project)?.store === b.store && b.store.head.slot(physical) == slot
+        if (!current()) return@withContext null
         // The primary miner and its completion/lineage validation are not wired here.
         if (b.primary) return@withContext result
         if (!id.endsWith(ProjectNodes.EXTRACT_SUFFIX)) return@withContext result
-        val lineageBytes = b.gateway.getAttachment(id.removeSuffix(ProjectNodes.EXTRACT_SUFFIX) + ProjectNodes.EXTRACTION_SUFFIX)?.second
-            ?: return@withContext result
-        val lineage = reifyStrict(lineageBytes.decodeToString(throwOnInvalidSequence = true)) as? Map<*, *> ?: return@withContext result
-        if (lineage["extractedTextCid"] != result.cid) return@withContext result
+        val lineageId = id.removeSuffix(ProjectNodes.EXTRACT_SUFFIX) + ProjectNodes.EXTRACTION_SUFFIX
+        val (lineageSlot, lineageBytes) = verified(b, lineageId) ?: return@withContext result.takeIf { current() }
+        val lineage = reifyStrict(lineageBytes.decodeToString(throwOnInvalidSequence = true)) as? Map<*, *>
+            ?: return@withContext result.takeIf { current() }
+        currentCoroutineContext().ensureActive()
+        if (lineage["extractedTextCid"] != result.cid) return@withContext result.takeIf { current() }
+        val sourceId = id.removeSuffix(ProjectNodes.EXTRACT_SUFFIX)
+        val sourcePhysical = b.prefix + sourceId
+        val sourceSlot = verified(b, sourceId)?.first ?: return@withContext result.takeIf { current() }
+        if (sourceSlot.deleted || sourceSlot.attachmentDeleted || sourceSlot.ambiguous ||
+            lineage["originalCid"] != sourceSlot.contentId || lineage["originalRev"] != sourceSlot.rev)
+            return@withContext result.takeIf { current() }
+        val originId = sourceId + ProjectNodes.EXTRACT_ORIGIN_SUFFIX
+        val (originSlot, originBytes) = verified(b, originId) ?: return@withContext result.takeIf { current() }
+        val origin = originBytes.decodeToString(throwOnInvalidSequence = true).split('\t')
+        if (origin.size != 2 || origin[0] != sourceSlot.contentId || origin[1] != slot.contentId)
+            return@withContext result.takeIf { current() }
+        val footnotesId = sourceId + ProjectNodes.FOOTNOTES_SUFFIX
+        val footnotes = if (sourceId.lowercase().endsWith(".pdf"))
+            verified(b, footnotesId) ?: return@withContext result.takeIf { current() } else null
+        if (footnotes != null && footnotes.second.isEmpty()) return@withContext result.takeIf { current() }
+        if (!current() ||
+            b.store.head.slot(b.prefix + lineageId) != lineageSlot || b.store.head.slot(sourcePhysical) != sourceSlot ||
+            b.store.head.slot(b.prefix + originId) != originSlot ||
+            (footnotes != null && b.store.head.slot(b.prefix + footnotesId) != footnotes.first)) return@withContext null
         result.copy(originalCid = lineage["originalCid"] as? String, originalRev = lineage["originalRev"] as? String,
             anchors = (lineage["anchors"] as? List<*>).orEmpty().map(DocumentAnchor::fromMap),
             unresolved = (lineage["unresolved"] as? List<*>)?.map { it as String } ?: result.unresolved)
@@ -267,29 +331,70 @@ class JvmProjectCorpus(
         // Reading the primary is supported; mining and curation admission remain separate capabilities.
         if (backing(project)?.primary == true) return@withLock null
         val original = document(project, id) ?: return@withLock null
-        if (ProjectGlob.isTextual(original.contentType, id) && id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE)
-            return@withLock read(project, id, maxChars)?.copy(
-            originalCid = original.cid, originalRev = original.rev)
+        if (ProjectGlob.isTextual(original.contentType, id) && id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) {
+            val text = read(project, id, maxChars) ?: return@withLock null
+            if (text.cid != original.cid || text.rev != original.rev || text.seq != original.seq) return@withLock null
+            val current = document(project, id) ?: return@withLock null
+            if (current.cid != original.cid || current.rev != original.rev || current.seq != original.seq) return@withLock null
+            return@withLock text.copy(originalCid = original.cid, originalRev = original.rev)
+        }
         val twin = id + ProjectNodes.EXTRACT_SUFFIX
         suspend fun current(): ProjectText? {
-            val pdb = registry.get(project) ?: return null
-            if (!ProjectMiner.currentExtraction(pdb, id)) return null
-            val completion = read(project, id + ProjectNodes.EXTRACTION_SUFFIX, Int.MAX_VALUE / 4) ?: return null
-            val lineage = reifyStrict(completion.text) as? Map<*, *> ?: return null
-            if (lineage["originalCid"] != original.cid || lineage["originalRev"] != original.rev) return null
-            val text = read(project, twin, maxChars) ?: return null
-            if (lineage["extractedTextCid"] != text.cid) return null
-            val source = document(project, id) ?: return null
-            if (source.cid != original.cid || source.rev != original.rev || !ProjectMiner.currentExtraction(pdb, id) ||
-                pdb.gateway.getAttachmentRef(twin)?.contentId?.value != text.cid) return null
-            return text.copy(originalCid = original.cid, originalRev = original.rev,
+            val b = backing(project) ?: return null
+            if (b.primary) return null
+            val source = verified(b, id)?.first ?: return null
+            if (source.contentId != original.cid || source.rev != original.rev || source.sequence != original.seq) return null
+            val originId = id + ProjectNodes.EXTRACT_ORIGIN_SUFFIX
+            val completionId = id + ProjectNodes.EXTRACTION_SUFFIX
+            val footnotesId = id + ProjectNodes.FOOTNOTES_SUFFIX
+            val isPdf = id.lowercase().endsWith(".pdf")
+            val head = b.store.head
+            val originBefore = head.slot(b.prefix + originId)
+            val completionBefore = head.slot(b.prefix + completionId)
+            val textBefore = head.slot(b.prefix + twin)
+            val notesBefore = if (isPdf) head.slot(b.prefix + footnotesId) else null
+            val originEvidence = evidence(b, originId)
+            val completionEvidence = evidence(b, completionId)
+            val textEvidence = evidence(b, twin)
+            val footnotes = if (isPdf) evidence(b, footnotesId) else null
+            fun unchanged(): Boolean = backing(project)?.store === b.store && head.slot(b.prefix + id) == source &&
+                head.slot(b.prefix + originId) == originBefore && head.slot(b.prefix + completionId) == completionBefore &&
+                head.slot(b.prefix + twin) == textBefore && (!isPdf || head.slot(b.prefix + footnotesId) == notesBefore)
+            fun incomplete(): ProjectText? {
+                if (!unchanged()) throw EvidenceChanged()
+                return null
+            }
+            if (!unchanged()) throw EvidenceChanged()
+            val (origin, originBytes) = originEvidence ?: return incomplete()
+            val (completion, completionBytes) = completionEvidence ?: return incomplete()
+            val (textSlot, textBytes) = textEvidence ?: return incomplete()
+            if (isPdf && (footnotes == null || footnotes.second.isEmpty())) return incomplete()
+            val originParts = originBytes.decodeToString(throwOnInvalidSequence = true).split('\t')
+            if (originParts.size != 2 || originParts[0] != original.cid || originParts[1] != textSlot.contentId) return incomplete()
+            val lineage = reifyStrict(completionBytes.decodeToString(throwOnInvalidSequence = true)) as? Map<*, *> ?: return incomplete()
+            if (lineage["originalCid"] != original.cid || lineage["originalRev"] != original.rev) return incomplete()
+            if (lineage["extractedTextCid"] != textSlot.contentId || !ProjectGlob.isTextual(textSlot.contentType.orEmpty(), twin)) return incomplete()
+            val text = textBytes.decodeToString(0, minOf(textBytes.size.toLong(), 4L * maxChars).toInt())
+            currentCoroutineContext().ensureActive()
+            if (text.count { it == '\uFFFD' } * 100 > text.length) return incomplete()
+            if (backing(project)?.store !== b.store || b.store.head.slot(b.prefix + id) != source ||
+                b.store.head.slot(b.prefix + originId) != origin || b.store.head.slot(b.prefix + completionId) != completion ||
+                b.store.head.slot(b.prefix + twin) != textSlot ||
+                (footnotes != null && b.store.head.slot(b.prefix + footnotesId) != footnotes.first)) throw EvidenceChanged()
+            return ProjectText(project, twin, requireNotNull(textSlot.contentId), textSlot.rev, textSlot.sequence, text.take(maxChars),
+                originalCid = original.cid, originalRev = original.rev,
                 anchors = (lineage["anchors"] as? List<*>).orEmpty().map(DocumentAnchor::fromMap),
                 unresolved = (lineage["unresolved"] as? List<*>)?.map { it as String }
                     ?: listOf("page", "folio", "section", "table", "diagram", "coordinates"))
         }
-        current()?.let { return@withLock it }
+        try { current()?.let { return@withLock it } } catch (_: EvidenceChanged) { return@withLock null }
+        val b = backing(project) ?: return@withLock null
+        val source = verified(b, id)?.first ?: return@withLock null
+        if (source.contentId != original.cid || source.rev != original.rev || source.sequence != original.seq) return@withLock null
         val mine = ingest ?: return@withLock null
+        currentCoroutineContext().ensureActive()
         mine(project, id)
-        current()
+        currentCoroutineContext().ensureActive()
+        try { current() } catch (_: EvidenceChanged) { null }
     }
 }

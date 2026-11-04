@@ -4,6 +4,7 @@ import borg.trikeshed.job.*
 import borg.trikeshed.kif.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.ontology.SumoOntology
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.rdf.*
 
 /**
@@ -189,14 +190,41 @@ object KgNalBridge {
     // ── format sniff ──────────────────────────────────────────────────
 
     fun sniff(text: String): KgFormat? {
-        val t = text.trimStart()
+        var offset = 0
+        while (offset < text.length) {
+            while (offset < text.length && text[offset].isWhitespace()) offset++
+            if (offset == text.length || text[offset] != '#') break
+            while (offset < text.length && text[offset] != '\n' && text[offset] != '\r') offset++
+        }
+        val t = text.substring(offset)
         return when {
             t.startsWith("(") -> KgFormat.KIF
-            KgFormat.TURTLE.marker in text -> KgFormat.TURTLE
-            KgFormat.RDF_XML.marker in text -> KgFormat.RDF_XML
-            KgFormat.JSON_LD.marker in text -> KgFormat.JSON_LD
-            KgFormat.TRIPLET_JSON.marker in text -> KgFormat.TRIPLET_JSON
-            KgFormat.N_TRIPLES.marker in text -> KgFormat.N_TRIPLES
+            t.startsWith(KgFormat.TURTLE.marker) -> KgFormat.TURTLE
+            t.startsWith("{") || t.startsWith("[") -> {
+                // Confix validates the complete JSON; only root-object keys select a format.
+                // Literal values and keys nested inside another property are source data.
+                val root = reifyStrict(t)
+                val objects = when (root) {
+                    is Map<*, *> -> s_[root]
+                    is List<*> -> root.toSeries() α { it as? Map<*, *> }
+                    else -> return null
+                }
+                when {
+                    objects.view.any { it?.containsKey("@context") == true } -> KgFormat.JSON_LD
+                    objects.view.any { it?.containsKey("subject") == true } -> KgFormat.TRIPLET_JSON
+                    else -> null
+                }
+            }
+            t.startsWith("<rdf:RDF>") -> try {
+                // This exact XML root spelling is also a valid absolute RDF subject IRI.
+                // Only complete strict RDF data selects Turtle; genuine XML keeps its format.
+                TurtleRdf.parseStrict(t)
+                KgFormat.TURTLE
+            } catch (_: IllegalArgumentException) { KgFormat.RDF_XML }
+            t.startsWith(KgFormat.RDF_XML.marker) && t.getOrNull(KgFormat.RDF_XML.marker.length)?.let {
+                it.isWhitespace() || it == '>' || it == '/'
+            } == true || t.startsWith("<?xml") && KgFormat.RDF_XML.marker in t -> KgFormat.RDF_XML
+            t.startsWith(KgFormat.N_TRIPLES.marker) -> KgFormat.N_TRIPLES
             Regex("""^\S+\s+\S+\s+.+\s*\.\s*$""", RegexOption.MULTILINE).containsMatchIn(t) -> KgFormat.TURTLE
             else -> null
         }

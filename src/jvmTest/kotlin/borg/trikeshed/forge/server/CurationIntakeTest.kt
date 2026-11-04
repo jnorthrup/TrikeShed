@@ -10,6 +10,7 @@ import borg.trikeshed.narsese.DocumentSource
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -33,7 +34,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CurationIntakeTest {
-    private class Corpus(private val documents: List<String> = emptyList()) : ProjectCorpus {
+    private open class Corpus(private val documents: List<String> = emptyList()) : ProjectCorpus {
         val extracted = mutableListOf<String>()
         override suspend fun projects(): List<ProjectRef> = if (documents.isEmpty()) emptyList() else
             listOf(ProjectRef("project", "assets", "@upload", documents.size))
@@ -44,6 +45,55 @@ class CurationIntakeTest {
             extracted.add(id)
             return ProjectText(project, id, ContentId.of(id.encodeToByteArray()).value, "1", 0, id)
         }
+    }
+
+    @Test
+    fun resumeVisitsDocumentsWithoutMaterializingTheCorpus(): Unit = runBlocking {
+        val doc = ProjectDoc("project", "book.pdf", ContentId.of("book".encodeToByteArray()).value, "1", 0, 4, "application/pdf")
+        val corpus = object : Corpus() {
+            override suspend fun projects(): List<ProjectRef> = _l[ProjectRef("project", "assets", "@upload", 1)]
+            override suspend fun docs(project: String, prefix: String, glob: String, limit: Int): List<ProjectDoc> =
+                error("the full corpus must not be materialized")
+            override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) { emit(doc) }
+        }
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(corpus, { runners }, { null }, this)
+        try {
+            intake.resume()
+            intake.drain()
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(1, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { intake.drain() }
+    }
+
+    @Test
+    fun resumeContinuesAfterAProjectBecomesUnavailable(): Unit = runBlocking {
+        val doc = ProjectDoc("good", "book.pdf", ContentId.of("book".encodeToByteArray()).value, "1", 0, 4, "application/pdf")
+        val corpus = object : Corpus() {
+            override suspend fun projects(): List<ProjectRef> = _l[
+                ProjectRef("gone", "assets", "@upload", 1), ProjectRef("good", "assets", "@upload", 1),
+            ]
+            override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) {
+                if (project == "gone") throw ProjectVisitUnavailable(project)
+                emit(doc)
+            }
+        }
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(corpus, { runners }, { null }, this)
+        try {
+            intake.resume()
+            intake.drain()
+            val status = intake.status().getValue("good") as Map<*, *>
+            assertEquals(1, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { intake.drain() }
     }
 
     @Test
@@ -556,6 +606,326 @@ class CurationIntakeTest {
         assertEquals(1, status["curated"])
         assertEquals(0, status["pending"])
         assertTrue((status["note"] as String).contains("provider timed out"))
+    }
+
+    @Test
+    fun drainWaitsForAdmittedDocumentLinkGrab(): Unit = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val releases = java.util.concurrent.atomic.AtomicInteger()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, this,
+            settled = { releases.incrementAndGet(); Unit },
+            grab = { started.complete(Unit); release.await() }, score = { _, _ -> })
+        try {
+            intake.offer("project", "book.pdf", DecisionProvider.JEV)
+            withTimeout(5_000) { started.await() }
+            val draining = async { intake.drain() }
+            val returned = withTimeoutOrNull(500) { draining.await(); true } ?: false
+            val releasedEarly = releases.get()
+            release.complete(Unit)
+            withTimeout(5_000) { draining.await() }
+            assertFalse(returned, "drain returned before the admitted link grab finished")
+            assertEquals(0, releasedEarly, "inference was released while the link grab was active")
+            assertEquals(1, releases.get())
+        } finally { release.complete(Unit) }
+    }
+
+    @Test
+    fun drainingRejectsExternalOffersAndFinishesRecursivelyLandedDocuments(): Unit = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val landed = CompletableDeferred<Unit>()
+        val cas = borg.trikeshed.job.CasStore.inMemory()
+        val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(cas)
+        val gateway = borg.trikeshed.util.oroboros.CouchAttachmentGateway(store, cas)
+        val index = borg.trikeshed.memory.CouchIndexBridge(gateway,
+            borg.trikeshed.memory.MemoryIndexLayer(borg.trikeshed.memory.MemoryStore(cas, store)))
+        val registry = ProjectDbRegistry("primary")
+        val home = Files.createTempDirectory("drain-link-intake").toFile()
+        val scopes = ProjectScopes(borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), gateway, index, cas, null,
+            projectDbs = registry, ledgerFile = File(home, "projects.tsv"), filesRoot = File(home, "files"))
+        val project = scopes.beginUpload("project").name
+        val corpus = Corpus()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, inputs -> _m["book" j inputs.getValue("text")] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        lateinit var intake: CurationIntake
+        intake = CurationIntake(corpus, { runners }, { null }, this, grab = { d ->
+            if (d.id == "root.pdf") {
+                started.complete(Unit)
+                release.await()
+                scopes.uploadPut(project, "child.pdf", "child".encodeToByteArray(), DecisionProvider.JEV,
+                    admit = { p, id, provider -> intake.offerLink(p, id, provider) })
+                landed.complete(Unit)
+            }
+        }, score = { _, _ -> })
+        scopes.onDocument = { p, id, provider -> intake.offer(p, id, provider) }
+        try {
+            intake.offer(project, "root.pdf", DecisionProvider.JEV)
+            withTimeout(5_000) { started.await() }
+            val draining = async { intake.drain() }
+            yield()
+            assertFailsWith<IllegalStateException> { intake.offer(project, "outside.pdf", DecisionProvider.JEV) }
+            release.complete(Unit)
+            withTimeout(5_000) { landed.await(); draining.await() }
+            val tally = intake.status().getValue(project) as Map<*, *>
+            assertEquals(2, tally["curated"])
+            assertEquals(0, tally["pending"])
+            assertEquals(0, tally["failed"])
+        } finally {
+            release.complete(Unit)
+            intake.drain()
+            scopes.unmount(project)
+            scopes.drain()
+            home.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun ownerCancellationCancelsAnAdmittedLinkGrab(): Unit = runBlocking {
+        val owner = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(owner + Dispatchers.Default)
+        val started = CompletableDeferred<Unit>()
+        val cancelled = CompletableDeferred<Unit>()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, scope, grab = {
+            started.complete(Unit)
+            try { awaitCancellation() } finally { cancelled.complete(Unit) }
+        }, score = { _, _ -> })
+        try {
+            intake.offer("project", "book.pdf", DecisionProvider.JEV)
+            withTimeout(5_000) { started.await() }
+            owner.cancel()
+            withTimeout(5_000) { intake.drain(); cancelled.await() }
+        } finally { owner.cancelAndJoin() }
+    }
+
+    @Test
+    fun grabsApplyBackpressureAtTheDocumentLimit(): Unit = runBlocking {
+        val started = Channel<Unit>(Channel.UNLIMITED)
+        val release = CompletableDeferred<Unit>()
+        val active = java.util.concurrent.atomic.AtomicInteger()
+        val maximum = java.util.concurrent.atomic.AtomicInteger()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, inputs -> _m["book" j inputs.getValue("text")] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, this, grab = {
+            val count = active.incrementAndGet()
+            maximum.updateAndGet { maxOf(it, count) }
+            started.send(Unit)
+            try { release.await() } finally { active.decrementAndGet() }
+        }, score = { _, _ -> })
+        try {
+            repeat(10) { intake.offer("project", "book-$it.pdf", DecisionProvider.JEV) }
+            repeat(CurationIntake.DOCUMENTS) { withTimeout(5_000) { started.receive() } }
+            val extra = withTimeoutOrNull(300) { started.receive(); true } ?: false
+            assertFalse(extra, "network work exceeded the grab capacity")
+            release.complete(Unit)
+            withTimeout(10_000) { intake.drain() }
+            assertEquals(CurationIntake.DOCUMENTS, maximum.get())
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(10, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { release.complete(Unit) }
+    }
+
+    @Test
+    fun ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount(): Unit = runBlocking {
+        val owner = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(owner + Dispatchers.Default)
+        val started = Channel<Unit>(Channel.UNLIMITED)
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, inputs -> _m["book" j inputs.getValue("text")] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(Corpus(), { runners }, { null }, scope,
+            grab = { started.send(Unit); awaitCancellation() }, score = { _, _ -> })
+        try {
+            repeat(CurationIntake.DOCUMENTS + 1) { intake.offer("project", "book-$it.pdf", DecisionProvider.JEV) }
+            repeat(CurationIntake.DOCUMENTS) { withTimeout(5_000) { started.receive() } }
+            owner.cancel()
+            withTimeout(5_000) { intake.drain() }
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(CurationIntake.DOCUMENTS + 1, status["queued"])
+            assertEquals(CurationIntake.DOCUMENTS, status["curated"])
+            assertEquals(1, status["failed"])
+            assertEquals(0, status["pending"])
+        } finally { owner.cancelAndJoin() }
+    }
+
+    @Test
+    fun drainWaitsForOwnedResumeAndCuratesItsDiscoveredDocuments(): Unit = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val corpus = object : Corpus() {
+            override suspend fun projects(): List<ProjectRef> {
+                started.complete(Unit); release.await()
+                return _l[ProjectRef("project", "assets", "@upload", 1)]
+            }
+            override suspend fun docs(project: String, prefix: String, glob: String, limit: Int): List<ProjectDoc> =
+                _l[ProjectDoc(project, "book.pdf", ContentId.of("book".encodeToByteArray()).value, "1", 0, 4, "application/pdf")]
+        }
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(corpus, { runners }, { null }, this)
+        try {
+            intake.resumeOwned()
+            withTimeout(5_000) { started.await() }
+            val draining = async { intake.drain() }
+            val returned = withTimeoutOrNull(300) { draining.await(); true } ?: false
+            release.complete(Unit)
+            withTimeout(5_000) { draining.await() }
+            assertFalse(returned, "drain returned while the resume scan was reading projects")
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(1, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { release.complete(Unit) }
+    }
+
+    @Test
+    fun cancelledOwnedResumeStopsEnumeratingDocuments(): Unit = runBlocking {
+        val owner = SupervisorJob(coroutineContext[Job])
+        val scope = CoroutineScope(owner + Dispatchers.Default)
+        val visited = java.util.concurrent.atomic.AtomicInteger()
+        val corpus = object : Corpus() {
+            override suspend fun projects(): List<ProjectRef> = _l[ProjectRef("project", "assets", "@upload", 10_000)]
+            override suspend fun docs(project: String, prefix: String, glob: String, limit: Int): List<ProjectDoc> =
+                object : AbstractList<ProjectDoc>() {
+                    override val size: Int = 10_000
+                    override fun get(index: Int): ProjectDoc {
+                        visited.incrementAndGet()
+                        if (index == 3) owner.cancel()
+                        return ProjectDoc(project, "book-$index.pdf", ContentId.of("book".encodeToByteArray()).value,
+                            "1", index.toLong(), 4, "application/pdf")
+                    }
+                }
+        }
+        val intake = CurationIntake(corpus, { emptyMap() }, { null }, scope)
+        try {
+            intake.resumeOwned()
+            withTimeout(5_000) { owner.join(); intake.drain() }
+            assertTrue(visited.get() <= 4, "cancelled resume enumerated ${visited.get()} documents")
+            val status = intake.status()["project"] as? Map<*, *>
+            if (status != null) assertEquals(0, status["pending"])
+        } finally { owner.cancelAndJoin() }
+    }
+
+    @Test
+    fun concurrentLinkIndexReadersShareAndRetryCancelledInitialization(): Unit = runBlocking {
+        val cas = borg.trikeshed.job.CasStore.inMemory()
+        val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(cas)
+        val gateway = borg.trikeshed.util.oroboros.CouchAttachmentGateway(store, cas)
+        val index = borg.trikeshed.memory.CouchIndexBridge(gateway,
+            borg.trikeshed.memory.MemoryIndexLayer(borg.trikeshed.memory.MemoryStore(cas, store)))
+        val registry = ProjectDbRegistry("primary")
+        val home = Files.createTempDirectory("link-index").toFile()
+        val scopes = ProjectScopes(borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), gateway, index, cas, null,
+            projectDbs = registry, ledgerFile = File(home, "projects.tsv"), filesRoot = File(home, "files"))
+        val started = Channel<Int>(Channel.UNLIMITED)
+        val scans = java.util.concurrent.atomic.AtomicInteger()
+        val corpus = object : Corpus() {
+            override suspend fun docs(project: String, prefix: String, glob: String, limit: Int): List<ProjectDoc> {
+                val number = scans.incrementAndGet()
+                started.send(number)
+                if (number == 1) awaitCancellation()
+                return emptyList()
+            }
+        }
+        val nodes = ConstellationNodes(home, ConfixBlackboard(), scope = this)
+        val links = LinkGrab(nodes, corpus, scopes, kotlin.coroutines.EmptyCoroutineContext)
+        try {
+            val first = async { links.grab("project", "first.pdf", DecisionProvider.JEV) }
+            assertEquals(1, withTimeout(5_000) { started.receive() })
+            val second = async(start = CoroutineStart.UNDISPATCHED) { links.grab("project", "second.pdf", DecisionProvider.JEV) }
+            val third = async(start = CoroutineStart.UNDISPATCHED) { links.grab("project", "third.pdf", DecisionProvider.JEV) }
+            assertEquals(1, scans.get(), "concurrent grabs started duplicate full-corpus scans")
+            first.cancelAndJoin()
+            assertEquals(2, withTimeout(5_000) { started.receive() })
+            withTimeout(5_000) { second.await(); third.await() }
+            assertEquals(2, scans.get(), "a cancelled scan should be retried once and shared")
+            var attempts = 0
+            val unavailable = object : Corpus() {
+                override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) {
+                    if (++attempts == 1) throw ProjectVisitUnavailable(project)
+                }
+            }
+            val retry = LinkGrab(nodes, unavailable, scopes, kotlin.coroutines.EmptyCoroutineContext)
+            assertFailsWith<ProjectVisitUnavailable> { retry.grab("project", "first.pdf", DecisionProvider.JEV) }
+            retry.grab("project", "second.pdf", DecisionProvider.JEV)
+            assertEquals(2, attempts, "an incomplete scan must be evicted instead of cached")
+        } finally {
+            nodes.drain()
+            scopes.drain()
+            home.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun repeatedFollowUpsRetainOneLatestAdmission(): Unit = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val extracted = java.util.concurrent.atomic.AtomicInteger()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val source = DocumentSource(ContentId.of("doc".encodeToByteArray()),
+            ContentId.of("doc".encodeToByteArray()), "doc", "book.pdf", "application/pdf", "test")
+        val intake = CurationIntake(Corpus(), { runners }, { null }, this, retainedSource = { _, _ ->
+            if (extracted.incrementAndGet() == 1) { started.complete(Unit); release.await() }
+            source
+        })
+        try {
+            intake.offer("project", "book.pdf")
+            withTimeout(5_000) { started.await() }
+            repeat(20_000) { intake.offer("project", "book.pdf") }
+            release.complete(Unit)
+            withTimeout(10_000) { intake.drain() }
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(2, extracted.get())
+            assertEquals(2, status["queued"])
+            assertEquals(2, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { release.complete(Unit) }
+    }
+
+    @Test
+    fun drainingRejectsFollowUpsForAnInFlightDocument(): Unit = runBlocking {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val source = DocumentSource(ContentId.of("doc".encodeToByteArray()),
+            ContentId.of("doc".encodeToByteArray()), "doc", "book.pdf", "application/pdf", "test")
+        val intake = CurationIntake(Corpus(), { runners }, { null }, this, retainedSource = { _, _ ->
+            started.complete(Unit); release.await(); source
+        })
+        try {
+            intake.offer("project", "book.pdf")
+            withTimeout(5_000) { started.await() }
+            val draining = async { intake.drain() }
+            yield()
+            assertFailsWith<IllegalStateException> { intake.offer("project", "book.pdf") }
+            release.complete(Unit)
+            withTimeout(5_000) { draining.await() }
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(1, status["queued"])
+            assertEquals(1, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { release.complete(Unit) }
     }
 
     @Test

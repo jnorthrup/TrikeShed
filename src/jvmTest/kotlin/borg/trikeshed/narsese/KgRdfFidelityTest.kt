@@ -154,4 +154,57 @@ class KgRdfFidelityTest {
             assertFailsWith<IllegalArgumentException> { KgNalBridge.parseKif("(not (pays Tenant Landlord))") }
         }
     }
+    @Test fun textConsumerTreatsInterchangeMarkersInsideRdfLiteralsAsData() = runBlocking {
+        withTimeout(10_000) {
+            val input = """# "@context" and <rdf:RDF are comment text
+                |<urn:s> <urn:label> "subject" .
+                |<urn:s> <urn:label> "@context" .
+                |<urn:s> <urn:label> "<rdf:RDF>" .
+                |<urn:s> <urn:label> "@prefix" .
+                |""".trimMargin()
+            assertEquals(KgFormat.TURTLE, KgNalBridge.sniff(input))
+            val jsonLd = """{"@context":{},"value":"subject"}"""
+            val tripletJson = """[{"subject":"s","predicate":"p","object":"@context"}]"""
+            assertEquals(KgFormat.JSON_LD, KgNalBridge.sniff(jsonLd))
+            assertEquals(KgFormat.TRIPLET_JSON, KgNalBridge.sniff(tripletJson))
+            assertEquals(KgFormat.JSON_LD, KgNalBridge.sniff("[$jsonLd]"))
+            assertNull(KgNalBridge.sniff("""{"value":"@context","nested":{"subject":"data"}}"""))
+            assertEquals(KgFormat.RDF_XML, KgNalBridge.sniff("""<rdf:RDF xmlns:rdf="urn:rdf"/>"""))
+            val xmlRoot = "<rdf:RDF></rdf:RDF>"
+            assertEquals(KgFormat.RDF_XML, KgNalBridge.sniff(xmlRoot))
+            val iriInput = "<rdf:RDF> <urn:p> <urn:o> ."
+            assertEquals(KgFormat.TURTLE, KgNalBridge.sniff(iriInput))
+            assertEquals(KgFormat.KIF, KgNalBridge.sniff("(pays Tenant Landlord)"))
+            val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
+            try {
+                for (unsupported in s_[jsonLd, tripletJson, xmlRoot].view)
+                    assertFailsWith<IllegalArgumentException> { bag.ingestKg(unsupported) }
+                assertFails { bag.ingestKg(tripletJson.dropLast(1)) }
+                assertEquals(0, bag.size, "Unsupported or malformed JSON must not mint beliefs")
+                assertFailsWith<IllegalArgumentException> {
+                    bag.ingestKg(input + "\n<urn:s> <urn:p> \"bad\"suffix .")
+                }
+                assertEquals(0, bag.size, "A malformed tail must not mint marker-looking literal prefixes")
+                val report = bag.ingestKg(input)
+                assertEquals(4, report["statements"])
+                val source = ContentId.of(input.encodeToByteArray())
+                val rows = KgNalBridge.parseTurtle(input)
+                assertEquals(_l["\"subject\"", "\"@context\"", "\"<rdf:RDF>\"", "\"@prefix\""], rows.map { it.obj })
+                val identities = rows.map { KgNalBridge.map(it).propositionCid(source.value) }
+                assertEquals(4, identities.distinct().size)
+                for (row in rows) {
+                    val expected = KgNalBridge.map(row).signal(source.value)
+                    assertEquals(expected, bag.signalOf(expected.angular))
+                }
+                assertEquals(1, bag.ingestKg(iriInput)["statements"])
+                val iri = KgNalBridge.parseTurtle(iriInput).single()
+                assertEquals("<rdf:RDF>", iri.subject)
+                val iriSource = ContentId.of(iriInput.encodeToByteArray())
+                val iriSignal = KgNalBridge.map(iri).signal(iriSource.value)
+                assertEquals(iriSignal, bag.signalOf(iriSignal.angular))
+                bag.awaitProcessed()
+            } finally { bag.drain() }
+        }
+    }
+
 }

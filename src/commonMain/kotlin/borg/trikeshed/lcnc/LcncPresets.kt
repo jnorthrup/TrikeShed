@@ -139,6 +139,13 @@ object LcncPresets {
             tweakFirst = "The timer's seconds.",
         ),
         LcncPresetInfo(
+            "preset-breadcrumb-context", "Recall local source evidence",
+            does = "Projects matching source passages and expands their retained original through a local breadcrumb context.",
+            needs = "Nothing — it runs as it is without a model provider.",
+            see = "The exact recalled source, its content identity and the retained passage ranges.",
+            tweakFirst = "The source text and question.",
+        ),
+        LcncPresetInfo(
             "preset-context", "Context assembly",
             does = "Folds a list of notes into one stable playbook, then builds the reusable context chain from it.",
             needs = "Nothing — it runs as it is.",
@@ -431,6 +438,7 @@ object LcncPresets {
         "preset-tribunal-case-v2" to tribunal(caseMode = true, repeatArgue = true),
         "preset-curator" to curator(),
         "preset-context" to context(),
+        "preset-breadcrumb-context" to breadcrumbContext(),
         "preset-kanban" to kanban(),
         "preset-ccek" to ccek(),
         "preset-scope" to scopeDemo(),
@@ -885,6 +893,27 @@ object LcncPresets {
     // Frames in change-frequency order; the fold is deterministic code (LLM
     // proposes bullets, never rewrites the base); running assemble mints
     // context-receipt/<chainHead> — the blackboard chunk pane's data.
+
+    fun breadcrumbContext(): String = LcncProgramConfix.toJson(LcncProgram(
+        name = "preset-breadcrumb-context",
+        nodes = s_[
+            LcncNode("source", "text.value", _m["value" j "Source receipts retain the exact original passage.\nA summary can omit context.\nRecall expands the original passage and preserves its content identity."], x = 30.0, y = 40.0),
+            LcncNode("question", "text.value", _m["value" j "original passage"], x = 30.0, y = 220.0),
+            LcncNode("context", "text.value", _m["value" j "offline-context"], x = 30.0, y = 400.0),
+            LcncNode("project", borg.trikeshed.memory.ace.BreadcrumbContextNodes.PROJECT, x = 350.0, y = 40.0),
+            LcncNode("recall", borg.trikeshed.memory.ace.BreadcrumbContextNodes.RECALL, x = 700.0, y = 40.0),
+            LcncNode("display", "display", x = 1050.0, y = 40.0),
+        ],
+        wires = s_[
+            LcncWire("source", "value", "project", "source"),
+            LcncWire("question", "value", "project", "question"),
+            LcncWire("context", "value", "project", "context"),
+            LcncWire("project", "sourceRef", "recall", "ref"),
+            LcncWire("project", "sourceCid", "recall", "cid"),
+            LcncWire("project", "context", "recall", "context"),
+            LcncWire("recall", "recall", "display", "x"),
+        ], seq = 6,
+    ))
 
     private fun context(): String {
         val program = LcncProgram(

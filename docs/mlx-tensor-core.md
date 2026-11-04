@@ -361,8 +361,10 @@ Gaps found against the strategy, each open unless stated:
 10. The affine Q4/Q8 path now validates integral quantization settings, supported mode, packed weight and scale/bias
     shapes and dtypes before quantized kernels, including embedding token bounds. It checks the selected matrices
     before weight materialization. A closed session also refuses new tensor allocations, and a lazy shape is captured
-    once before its storage size is checked and uploaded. Safetensors header structure, names and ranges are checked
-    before the native parser; these checks still do not protect every mlx-c entry point or isolate native crashes.
+    once before its storage size is checked and uploaded. Safetensors header structure, names, exact unsigned-integer
+    shape and offset lexemes, and ranges are checked before the native parser; these checks still do not protect every
+    mlx-c entry point or isolate native crashes. The local checkpoint's header has 3,183 unsigned integer fields;
+    this header-only inspection did not load its weights.
     The actual local checkpoint header has 201 quantized triples matching these layout checks; that metadata inspection
     does not execute the checkpoint or prove its values.
 

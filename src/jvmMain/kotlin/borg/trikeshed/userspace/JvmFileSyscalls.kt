@@ -61,6 +61,7 @@ internal object JvmFileSyscalls {
     private object Renameat { @JvmField val at = symbol("renameat") }
     private object Unlinkat { @JvmField val at = symbol("unlinkat") }
     private object Flock { @JvmField val at = symbol("flock") }
+    private object Fcntl { @JvmField val at = symbol("fcntl") }
     private object Geteuid { @JvmField val at = symbol("geteuid") }
     private object Syscall { @JvmField val at = symbol("syscall") }
     private object Getdirentries { @JvmField val at = symbol("__getdirentries64") }
@@ -72,6 +73,11 @@ internal object JvmFileSyscalls {
     }
 
     private val errnoState = ThreadLocal.withInitial { Arena.ofAuto().allocate(stateLayout) }
+    internal fun duplicate(fd: Int): Int {
+        check(posix) { "Descriptor duplication is unavailable" }
+        val state = errnoState.get()
+        return status(state, LibcDowncall.FCNTL.invokeExact(Fcntl.at, state, fd, if (linux) 1030 else 67, 0) as Int)
+    }
     private fun status(state: MemorySegment, result: Long): Int = if (result < 0) -errno(state.get(int, errnoOffset)) else result.toInt()
     private fun status(state: MemorySegment, result: Int): Int = status(state, result.toLong())
 

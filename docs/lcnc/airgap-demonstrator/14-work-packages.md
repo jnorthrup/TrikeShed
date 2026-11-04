@@ -26,7 +26,7 @@ Hours below are estimated active agent-hours for implementation and local verifi
 | WP12 | Sol/Terra scene integration | WP11 | 56–104 | Event-driven LCNC/Graal graph |
 | WP13 | Terra renderer/interaction | WP12 | 64–120 | Sparks, LOD, minimap, flyovers |
 | WP14 | Sol LCNC wizards | WP07, WP09, WP10 | 40–72 | Typed source/panel/production authoring |
-| WP15 | Terra native solver adapter | WP03, WP07 | 32–64 | Supervised pinned Horn execution |
+| WP15 | Terra native solver adapter; Sol review | WP03, WP07 | 32–64 | Pinned Horn execution and bounded Sulong feasibility; expansion conditional |
 | WP16 | Sol legal panel | WP08, WP10, WP15 | 40–80 | Issue/argument simulation and fixtures |
 | WP17 | Sol NARS boundary | WP07, WP08, WP15 | 48–96 | Exact attention/evidence integration |
 | WP18 | Terra learning evaluation | WP17 | 48–88 | Held-out empirical policy experiment |
@@ -94,11 +94,17 @@ Implement bounded particle/band rendering, timer visuals, minimap, level-of-deta
 
 Build source, panel, production and rescaffolding flows over host contracts. Show cardinality expansion, missing engine assets, semantic mismatches and affected-result previews. Acceptance includes an unknown node type, unsupported effect, hypothetical-to-global connection, optional model absence and scope reduction after pause. Preserve the user's existing graph when a suggested change is declined. Deliver three presets using the same authoring grammar. The wizard may propose a connection; host validation and existing authorization remain decisive.
 
-## WP15 Native positive Horn execution
+## WP15 Native positive Horn execution and Sulong review
 
-Wrap the pinned SUMO-Nix/native path in production deadline, output, memory and network controls. Bind input/frame CIDs, preserve sidecars across lowering, validate result/proof structure and emit engine events. Acceptance includes malformed output, timeout, unsupported formula, duplicate sources, first-proof reordering and fresh recomputation after source removal. Deliver actual execution through a production route, not only a command-line fixture. Keep taxonomy, reified review-record observations and world assertions as distinct scopes.
+Retain the pinned SUMO-Nix/native reference path and investigate the requested JVM Polyglot/Sulong direction. The baseline 32–64 hours form a bounded tranche: 8–16 for compiler/ABI feasibility, 8–16 for a minimal reproducible build/probe, and 16–32 for existing-adapter repair and focused integration evidence. This tranche can validate a transport seam and preserve the current solver; it does not fund the entire new Sulong production profile or a complete Nix compiler/runtime port.
 
-Own the subsequent [JVM Polyglot embedding direction](22-mlir-nix-polyglot.md), coordinating ABI with WP02, lifecycle with WP09, observations with WP11, offline deployment with WP23 and performance with WP24. First prove an actual bounded kernel using the selected runtime/toolchain. The table's 32–64 hours remain the original supervised-solver estimate; the pivot adds a separately accounted 112–224 hours for the bounded embedding path. Full evaluator compilation or complete Nix lowering remains additional scope requiring the experiment's dependency/coverage findings. Keep 25 ownership packages; these are increments within existing ownership, not new modules or an automatic agent launch.
+At the feasibility gate, Sol reviews Terra's exact supported computation, compiler seam, ABI choice, host profiles and missing runtime facilities. Select request-scoped ABI A from the [canonical Polyglot decision chapter](22-mlir-nix-polyglot.md), or justify handle-based ABI B using the [detailed bitcode ownership contract](22-sulong-bitcode.md). These are alternatives; no implementation must expose both sets of proposed exports.
+
+If the bounded Sulong path proceeds beyond the baseline tranche, budget a conditional **112–224 additional active hours** across existing WP15/WP02/WP09/WP11/WP23/WP24 ownership. This increment funds remaining compatibility/closure work, the supported binary/ABI implementation, owned execution/observations and cross-target offline/performance acceptance. Reuse baseline probes; charge completed work once. The [cost workbook](15-timeline-and-costs.md) owns the combined totals. Full evaluator compilation or general semantic lowering requires a new estimate after its dependency/coverage inventory; it is excluded from both ranges.
+
+Bind input/frame CIDs, preserve source sidecars, check certificates and recheck review currentness across either execution mechanism. Implement explicit UTF-8 ownership and release, compatible host profiles, commonMain channel admission/fan-in and drain for the selected scope. Preserve the ordinary restricted guest policy; native-capable in-process execution is an explicit trusted capability. Deadline, memory and network claims must follow the actual profile: arbitrary native calls inside the daemon do not acquire hard termination or OS isolation from Polyglot flags.
+
+Acceptance includes malformed output, timeout/budget outcomes, unsupported formulas, Unicode and allocation failures, duplicate sources, first-proof reordering, source withdrawal and repeated context cleanup. A transport pilot establishes transport only. Production Sulong promotion additionally requires an actual route with real events, equivalent proof semantics, sealed-bundle evidence and measurements. Keep taxonomy, reified review-record observations and world assertions as distinct scopes. Retain 25 ownership packages; the conditional expansion adds work inside them, not new modules or an automatic agent launch.
 
 ## WP16 Legal issue and panel simulation
 

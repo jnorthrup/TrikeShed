@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * A MOUNTED FOLDER IS A DOCUMENT SET A PROGRAM CAN WALK.
@@ -18,6 +19,14 @@ import kotlinx.coroutines.currentCoroutineContext
 interface ProjectCorpus {
     suspend fun projects(): List<ProjectRef>
     suspend fun docs(project: String, prefix: String = "", glob: String = "", limit: Int = 256): List<ProjectDoc>
+    /** Visit on the caller context, without a sort-order or global snapshot guarantee. The compatibility default materializes [docs]. */
+    suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) {
+        for (document in docs(project, limit = Int.MAX_VALUE)) {
+            currentCoroutineContext().ensureActive()
+            emit(document)
+        }
+        currentCoroutineContext().ensureActive()
+    }
     /** Null when the document is absent, binary, or over the character budget. */
     suspend fun read(project: String, id: String, maxChars: Int = 65_536): ProjectText?
     /** Exact original bytes for a source boundary; textual reads must never substitute for these. */
@@ -31,6 +40,9 @@ interface ProjectCorpus {
         read(project, id + ProjectNodes.EXTRACT_SUFFIX, maxChars)
             ?: read(project, id, maxChars)?.let { it.copy(originalCid = it.cid, originalRev = it.rev) }
 }
+
+/** A project disappeared or changed its backing before a visit could complete. */
+class ProjectVisitUnavailable(project: String) : IllegalStateException("Project backing changed or unavailable during visit: $project")
 
 /** One mounted project, as `project.list` reports it. */
 data class ProjectRef(val name: String, val kind: String, val path: String, val docs: Int) {

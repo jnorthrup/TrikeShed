@@ -15,6 +15,7 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.MouseEvent
 import org.w3c.dom.url.URL
 import org.w3c.dom.url.URLSearchParams
 import org.w3c.fetch.Headers
@@ -100,10 +101,19 @@ object DocumentSurfacePage {
         val projectOrCuration = decode(head)
         val selectedId = decode(tail)
         val query = URLSearchParams(window.location.search)
+        // Consume upload context so later navigation to the curator remains unambiguous.
+        val uploadProject = projectOrCuration == DocumentSurface.CURATION_HASH && query.get("uploadedProject") == DocumentSurface.CURATION_HASH
+        if (uploadProject) {
+            val url = URL(window.location.href)
+            url.searchParams.delete("uploadedProject")
+            val fragment = "#" + DocumentSurface.projectFragment(projectOrCuration) + if (tail.isEmpty()) "" else "/" + tail
+            window.history.replaceState(window.history.asDynamic().state, "", url.pathname + url.search + fragment)
+            window.dispatchEvent(Event("hashchange"))
+        }
         val passageRequested = query.has("passageReceipt") || query.has("passageProposal")
         val receipt = query.get("passageReceipt").orEmpty()
         val ordinal = query.get("passageProposal")?.let { if (Regex("^(0|[1-9][0-9]*)$").matches(it)) it.toIntOrNull() else null } ?: -1
-        if (projectOrCuration == DocumentSurface.CURATION_HASH) {
+        if (head == DocumentSurface.CURATION_HASH && !uploadProject) {
             openCuration(selectedId.ifEmpty { null }, keepLocation = true)
         } else if (projectOrCuration.isNotEmpty()) {
             if (passageRequested && selectedId.isNotEmpty()) openPassage(projectOrCuration, selectedId, receipt, ordinal)
@@ -120,22 +130,18 @@ object DocumentSurfacePage {
         }
     }
 
-    /** Remove passage state when leaving it without changing unrelated query or hash state. */
+    /** Clear the current selection; its URL remains in browser history for Back. */
     private fun clearPassage() {
         passageView = null
-        val url = URL(window.location.href)
-        val contextPresent = SourceSelection.keys.view.any { url.searchParams.has(it) }
-        if (!url.searchParams.has("passageReceipt") && !url.searchParams.has("passageProposal") && !contextPresent) return
-        for (key in SourceSelection.keys.view) url.searchParams.delete(key)
-        url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
-        window.history.replaceState(window.history.asDynamic().state, "", url.pathname + url.search + url.hash)
-        window.dispatchEvent(Event("hashchange"))
     }
 
     private fun onClick(e: Event) {
         val target = (e.target as? Element)
             ?.closest("[data-project],[data-doc],[data-source-project],[data-retain-source],[data-run-build],[data-run-rebuild],[data-view],[data-sort],[data-curate],[data-curate-open]")
             ?: return
+        val mouse = e as? MouseEvent
+        if (target.tagName.equals("a", ignoreCase = true) && mouse != null &&
+            (mouse.button.toInt() != 0 || mouse.metaKey || mouse.ctrlKey || mouse.shiftKey || mouse.altKey)) return
         e.preventDefault()
         if (target.hasAttribute("data-retain-source")) { MainScope().launch { retainSource() }; return }
         val p = target.getAttribute("data-project")
@@ -485,14 +491,20 @@ object DocumentSurfacePage {
             }
         } else DocumentsCorpus.clear()
         val p = project
-        val wanted = if (p == null) "" else "#" + encode(p) + (selectedId?.let { "/" + encode(it) } ?: "")
+        val wanted = if (p == null) "" else "#" + DocumentSurface.projectFragment(p) + (selectedId?.let { "/" + encode(it) } ?: "")
         if (!keepLocation) setHash(wanted)
         document.title = listOfNotNull(selectedId, project, "Documents").joinToString(" · ")
     }
 
     private fun setHash(wanted: String) {
-        if (window.location.hash == wanted) return
-        window.history.pushState(window.history.asDynamic().state, "", window.location.pathname + window.location.search + wanted)
+        val url = URL(window.location.href)
+        if (passageView == null) {
+            for (key in SourceSelection.keys.view) url.searchParams.delete(key)
+            url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
+        }
+        val next = url.pathname + url.search + wanted
+        if (next == window.location.pathname + window.location.search + window.location.hash) return
+        window.history.pushState(window.history.asDynamic().state, "", next)
         window.dispatchEvent(Event("hashchange"))
     }
 

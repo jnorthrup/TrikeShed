@@ -17,7 +17,7 @@ Choose an engine by the question it can answer and the evidence it returns. “A
 | Jeva | T2–T3 candidate choice, abstention, rubric score | Model decision | Installed runtime/layout and measured CPU cost |
 | Positive Horn/Datalog | T3 bounded deductive closure | Consequence relative to admitted theory | Fragment limits and proof provenance |
 | SUMO/Sigma ecosystem | T2–T3 ontology and broader formal reasoning | Typed ontology/theorem results by backend | Full KIF is broader than the current bridge |
-| SUMO-Nix and MLIR lowering | T3 native interchange and positive Horn execution | Pinned frame result and proof | First-proof coverage, runtime supervision |
+| SUMO-Nix and MLIR lowering | T3 native interchange and positive Horn execution; bounded Sulong pivot under review | Pinned frame result and proof | First-proof coverage, actual lowering, ABI ownership and execution profile |
 | GraalVM LLVM / Sulong | T1–T3 execution of compatible bitcode; later guarded production kernels | Result of the loaded module, under its declared ABI/fragment | Producer/reader compatibility, memory ownership, runtime mode and actual semantic coverage |
 | SAT/SMT/constraint solver | T3 finite consistency/resource constraints | Satisfiable/unsatisfiable/unknown | Encoding validity and backend-specific certificates |
 | Argumentation/defeasible rules | T3 conflicts and exceptions | Accepted/rejected/undecided under semantics | Explicit attack/priority semantics |
@@ -56,9 +56,13 @@ Use explicit subclass/instance rules in the input when their support must appear
 
 A later Soufflé comparison can measure larger Datalog workloads and provenance facilities. It should be an isolated benchmark adapter before any replacement decision. Its documented proof-tree interface is useful as a design reference, not evidence that TrikeShed already has those capabilities. [Soufflé provenance](https://souffle-lang.github.io/provenance)
 
-## Compatibility rules
+## JVM Sulong execution direction
 
-The [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) specifies JVM embedding, binary Sources, module exports, UTF-8 interop and lifecycle. Sulong is an execution backend, not a new inference semantics. The inspected upstream has guarded LLVM JIT paths and freestanding scanner IR, but no general `convert-nix-to-llvm` pass or exported string-evaluation ABI. Existing Polyglot/LLVM dependencies do not establish that the full evaluator runs. Preserve the current Horn frame/proof contract across any backend change.
+The requested pivot targets an immutable mlir-nix-produced LLVM bitcode artifact loaded through the JVM Polyglot API, replacing a proposed Native Image isolate/C API path for the next bounded slice. The repository already declares Polyglot/LLVM dependencies and retains a real scalar Sulong proof. That proof does not establish a compiled Nix evaluator or SUMO lane; normal restricted LLVM guests still refuse native access.
+
+WP15 must first identify an actual supported compiler seam and freeze its ABI. A Kotlin string is not automatically a native UTF-8 pointer, and native allocations do not acquire JVM garbage collection merely by loading bitcode. Explicit byte transfer, handle ownership, result release and target-specific dependency packaging are required. Native-capable in-process execution shares daemon authority and cannot promise hard termination of arbitrary native calls. Keep the current working native Horn path until equivalent proof/currentness semantics and the production route pass acceptance. The [Polyglot pivot](22-mlir-nix-polyglot.md) separates compatible kernels, evaluator compilation and further semantic lowering. The [Sulong bitcode contract](22-sulong-bitcode.md) adds the retained scalar-proof baseline, bounded transfer/handle ownership, commonMain drain and an ordered acceptance ladder. Both preserve the current Horn frame/proof contract; neither establishes a complete in-process Nix evaluator.
+
+## Compatibility rules
 
 | Producer → consumer | Allowed crossing | Required guard |
 |---|---|---|

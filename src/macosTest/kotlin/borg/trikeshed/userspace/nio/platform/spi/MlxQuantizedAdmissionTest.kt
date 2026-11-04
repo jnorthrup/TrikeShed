@@ -19,11 +19,12 @@ class MlxQuantizedAdmissionTest {
 
     @Test fun closedSessionRefusesNewAllocations() {
         val session = MlxMatrixOperations().open()
+        val mark = session.mark()
         session.close()
         assertFailsWith<IllegalStateException> { session.tensor(_a[1f], shapeOf(1)) }
         assertFailsWith<IllegalStateException> { session.zeros(1) }
         assertFailsWith<IllegalStateException> { session.mark() }
-        assertFailsWith<IllegalStateException> { session.settle(0) }
+        assertFailsWith<IllegalStateException> { session.settle(mark) }
         var entered = false
         assertFailsWith<IllegalStateException> { session.scoped { entered = true } }
         assertFalse(entered)

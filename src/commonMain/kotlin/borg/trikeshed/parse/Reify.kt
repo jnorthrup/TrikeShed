@@ -13,7 +13,10 @@ import borg.trikeshed.parse.confix.*
 fun reify(json: CharSequence): Any? = reify(utf8(json))
 
 /** [reify] over UTF-8 JSON bytes as they arrive off the wire; no text decode first. */
-fun reify(bytes: ByteArray): Any? {
+fun reify(bytes: ByteArray): Any? = reify(bytes) { it.toDoubleOrNull() }
+
+/** Reify with a caller-selected number representation while retaining the original JSON lexeme. */
+fun reify(bytes: ByteArray, number: (String) -> Any?): Any? {
     val src: Series<Byte> = bytes.size j { bytes[it] }
     val index = Syntax.JSON.scanIndex(src)
     val spans = index.facet(ConfixIndexK.Spans)
@@ -38,7 +41,7 @@ fun reify(bytes: ByteArray): Any? {
             }
             IOMemento.IoArray -> { val kids = childOf(k); List(kids.size) { value(kids[it]) } }
             IOMemento.IoString -> decodeTextSpan(src, span.a + 1, span.b - 1)
-            IOMemento.IoDouble -> bytes.decodeToString(span.a, span.b + 1).toDoubleOrNull()
+            IOMemento.IoDouble -> number(bytes.decodeToString(span.a, span.b + 1))
             IOMemento.IoBoolean -> bytes[span.a] == 't'.code.toByte()
             else -> null
         }
@@ -106,6 +109,12 @@ private fun objectOf(value: Any?): Map<String, Any?> {
 
 /** [reify], after checking [json] is exactly one complete JSON value (RFC 8259 grammar, nesting ≤ 256). */
 fun reifyStrict(json: CharSequence): Any? { conform(json); return reify(json) }
+
+/** Strict JSON validation with a caller-selected number representation. */
+fun reifyStrict(json: CharSequence, number: (String) -> Any?): Any? {
+    conform(json)
+    return reify(utf8(json), number)
+}
 
 private fun conform(src: CharSequence) {
     var offset = 0

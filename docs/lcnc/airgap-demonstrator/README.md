@@ -12,7 +12,7 @@ The planning configuration is six implementation/review lanes, averaging 65% act
 
 The first release must work with deterministic CPU methods and retained fixtures. Stanford parsing is an optional local statistical lane; BERT, Jeva and generative models are separately selectable local capabilities. Development may use connected frontier models while the delivered demonstrator runs offline from a sealed bundle.
 
-The subsequent [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) selects JVM-hosted Sulong as the intended embedding route for compatible bitcode. It separates bounded kernels from full Nix evaluation, corrects the supplied RFC's memory/interop assumptions, and adds an explicitly separate 112–224 active-hour kernel-path estimate. The original programme totals exclude that increment and any full evaluator/compiler port.
+The [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) is the canonical scope/ABI decision, supported by the [bitcode build and ownership contract](22-sulong-bitcode.md). The baseline already includes WP15's **32–64-hour feasibility/probe/adapter tranche**. A broader bounded Sulong profile, selected after that gate, adds a conditional **112–224 active hours** across the existing packages, reusing completed probes without double-counting. Including 50% effort reserve, the combined programme is **1,752–3,378 hours**; with the separate 30% model-cost contingency its model budget is **$10,932–$21,079 base** or **$33,822–$65,212 heavy**. The [cost workbook](15-timeline-and-costs.md) owns this arithmetic. Full Nix evaluator/compiler completion remains separately unestimated, and the original milestone windows do not promise it.
 
 ## Reading routes
 
@@ -20,7 +20,7 @@ The subsequent [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) selects JVM-ho
 |---|---|
 | Programme owner | [Charter](00-charter.md), [storyboard](13-demonstration-storyboard.md), [timeline and costs](15-timeline-and-costs.md) |
 | Runtime implementer | [Architecture](02-tier-architecture.md), [execution and control](06-execution-and-control.md), [wire contracts](19-wire-contracts.md) |
-| MLIR-Nix / JVM implementer | [Polyglot pivot and ABI](22-mlir-nix-polyglot.md), [engine atlas](08-engine-atlas.md), [WP15](14-work-packages.md) |
+| MLIR-Nix / JVM implementer | [Polyglot pivot and ABI](22-mlir-nix-polyglot.md), [Sulong build and ownership contract](22-sulong-bitcode.md), [engine atlas](08-engine-atlas.md), [WP15](14-work-packages.md) |
 | Graal and Spacegraph implementer | [Visualization](07-visualization.md), [storyboard](13-demonstration-storyboard.md), [acceptance](16-validation.md) |
 | Curator and ontology implementer | [Sources](03-source-intake-and-airgap.md), [evidence](04-evidence-rdf-and-memory.md), [engine atlas](08-engine-atlas.md) |
 | NARS and Rete implementer | [Consolidation](10-nars-rete-consolidation.md), [CPU plan](11-cpu-and-indexes.md), [contracts](19-wire-contracts.md) |
@@ -51,6 +51,7 @@ The subsequent [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) selects JVM-ho
 21. [Offline and development operating procedures](20-operating-procedures.md)
 22. [Requirement and acceptance traceability](21-traceability.md)
 23. [MLIR-Nix Polyglot pivot and implementation gates](22-mlir-nix-polyglot.md)
+24. [Sulong bitcode build ownership and acceptance contract](22-sulong-bitcode.md)
 
 ## Decisions that hold the design together
 

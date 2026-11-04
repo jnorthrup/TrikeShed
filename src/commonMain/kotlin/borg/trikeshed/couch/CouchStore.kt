@@ -65,11 +65,17 @@ interface CouchIngress {
  * - subscribe to mutations via MutableSeries observer
  * - flush/drain for durability hooks
  */
-class CouchStore(
+class CouchStore internal constructor(
     private val ingress: CouchIngress,
     val head: CouchHeadProjection,
-    val changes: CouchChangesProjection
+    val changes: CouchChangesProjection,
+    private val sourceCas: borg.trikeshed.job.CasStore?,
 ) {
+    /** Custom ingresses have no verified CAS owner. */
+    constructor(ingress: CouchIngress, head: CouchHeadProjection, changes: CouchChangesProjection) :
+        this(ingress, head, changes, null)
+
+    internal fun usesCas(cas: borg.trikeshed.job.CasStore): Boolean = sourceCas === cas
 
     sealed interface MutationEvent {
         data class Inserted(val doc: Document) : MutationEvent
@@ -304,8 +310,9 @@ object CouchStoreFactory {
             { frame -> head.applyCommit(frame); changes.applyCommit(frame) },
             { doc -> cas.put(canonicalBody(doc)) },
             synchronization = synchronization,
+            captureDocument = ::captureCanonicalBody,
         )
-        return CouchStore(ingress, head, changes)
+        return CouchStore(ingress, head, changes, cas)
     }
 
     /**
@@ -325,6 +332,7 @@ object CouchStoreFactory {
         require(commits.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
             "durableCasBacked requires a DURABLE commit store"
         }
+        require(commits.usesCas(cas)) { "Couch store and commit owner must share a CAS" }
         return committed(cas, commits.recoveredFrames, synchronization) { frame ->
             commits.commit(frame)
             frame
@@ -353,8 +361,54 @@ object CouchStoreFactory {
             { doc -> cas.put(canonicalBody(doc)) },
             initialSequence = maxSequence + 1,
             synchronization = synchronization,
+            captureDocument = ::captureCanonicalBody,
         )
-        return CouchStore(ingress, head, changes)
+        return CouchStore(ingress, head, changes, cas)
+    }
+
+    /** Own field identities and validate canonical traversal without changing nested types or aliases. */
+    private fun captureCanonicalBody(doc: Document): Document {
+        val fields = doc.fields.toList()
+        val names = HashSet<String>(fields.size)
+        val path = mutableListOf<Any>()
+        for (field in fields) {
+            require(field.name != "_id" && names.add(field.name)) { "Couch body contains an ambiguous field identity" }
+            captureValue(field.value, path, 0)
+        }
+        return Document(doc.id, fields)
+    }
+
+    private const val CAPTURE_DEPTH = 128
+
+    private inline fun <T> captureContainer(value: Any, path: MutableList<Any>, body: () -> T): T {
+        require(path.none { it === value }) { "Cyclic Couch value" }
+        path.add(value)
+        try { return body() } finally { path.removeAt(path.lastIndex) }
+    }
+
+    /** Follow only values traversed by canonical CBOR; coercion belongs to encoding, not the live head. */
+    private fun captureValue(value: Any?, path: MutableList<Any>, depth: Int) {
+        require(depth <= CAPTURE_DEPTH) { "Couch value exceeds capture depth $CAPTURE_DEPTH" }
+        when (value) {
+            is borg.trikeshed.collections.associative.Item.Tag -> captureContainer(value, path) {
+                captureValue(value.item, path, depth + 1)
+            }
+            is borg.trikeshed.collections.associative.Item.Arr -> captureContainer(value, path) {
+                for (item in value.items.view) captureValue(item, path, depth + 1)
+            }
+            is borg.trikeshed.collections.associative.Item.Map -> captureContainer(value, path) {
+                for (entry in value.entries.view) captureValue(entry.b, path, depth + 1)
+            }
+            is Array<*> -> captureContainer(value, path) {
+                for (item in value) captureValue(item, path, depth + 1)
+            }
+            is List<*> -> captureContainer(value, path) {
+                for (item in value) captureValue(item, path, depth + 1)
+            }
+            is Map<*, *> -> captureContainer(value, path) {
+                for (item in value.values) captureValue(item, path, depth + 1)
+            }
+        }
     }
 
     /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */

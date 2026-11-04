@@ -106,7 +106,10 @@ class MlxMatrixOperations(
  * the algebra; the graph is evaluated when a cell is first read. Float32, BFloat16 and Float16 arrays read as Float;
  * packed integer arrays (quantized weights) have no scalar cells and refuse to be read. The session owns the handle.
  */
-internal class MlxAllocation(internal var value: CValue<mlx_array_>?)
+internal class MlxAllocation(internal val sequence: Long, internal var value: CValue<mlx_array_>?)
+
+/** An allocation boundary owned by one matrix session. */
+class MlxMark internal constructor(internal val owner: Any, internal val sequence: Long)
 
 class MlxTensor internal constructor(
     private val session: MlxMatrixSession,
@@ -115,6 +118,10 @@ class MlxTensor internal constructor(
 ) : JevaWeight {
     internal val allocation = session.allocation(handle)
     internal val handle: CValue<mlx_array_> get() = checkNotNull(allocation.value) { "MLX tensor has been released" }
+    internal fun requireOwner(owner: MlxMatrixSession) {
+        require(session === owner) { "Tensor is not owned by this MLX session" }
+        checkNotNull(allocation.value) { "MLX tensor has been released" }
+    }
     override val a: Tensor = IntArray(shape.size) { shape[it] }.toSeries()
     override val size: Int = tensorSize(a)
     override val b: (Tensor) -> Float = { index ->
@@ -152,7 +159,7 @@ class MlxTensor internal constructor(
     }
 }
 
-/** One GPU stream and the arrays made on it; close frees every owned handle, then the stream. */
+/** One GPU stream and its arrays; callers serialize all operations, release and close. */
 class MlxMatrixSession internal constructor(
     private var stream: CValue<mlx_stream_>?,
     override val identity: String,
@@ -161,6 +168,8 @@ class MlxMatrixSession internal constructor(
 ) : MatrixSession {
     private var owner: Any? = owner
     private val owned = ArrayList<MlxAllocation>()
+    private val markOwner = Any()
+    private var sequence = 0L
     private val readers = ArrayList<Join<CValue<mlx_io_reader_>, MlxVerifiedReader>>()
     val fileIdentity: String get() { checkReaders(); return readers.single().b.identity }
     internal fun checkReaders() { for ((_, reader) in readers) reader.check() }
@@ -170,7 +179,14 @@ class MlxMatrixSession internal constructor(
         return checkNotNull(stream) { "Matrix session is closed" }
     }
 
-    private fun own(handle: CValue<mlx_array_>): CValue<mlx_array_> = handle.also { owned += MlxAllocation(it) }
+    private fun own(handle: CValue<mlx_array_>): CValue<mlx_array_> {
+        if (sequence == Long.MAX_VALUE) {
+            mlx_array_free(handle)
+            error("MLX allocation sequence exhausted")
+        }
+        owned += MlxAllocation(sequence++, handle)
+        return handle
+    }
 
     /** The latest owned result is the handle returned by the immediately preceding MLX call. */
     internal fun allocation(handle: CValue<mlx_array_>): MlxAllocation {
@@ -185,8 +201,11 @@ class MlxMatrixSession internal constructor(
         mlx_array_free(handle)
     }
 
-    /** Position in the owned handles; pair with [settle]. */
-    fun mark(): Int { gpu(); return owned.size }
+    /** Stable allocation boundary; pair with [settle] on this session. */
+    fun mark(): MlxMark { gpu(); return MlxMark(markOwner, sequence) }
+
+    /** Current number of owned array handles. */
+    val allocationCount: Int get() { gpu(); return owned.size }
 
     /** Release an evaluated tensor once no subsequent graph needs it. */
     internal fun release(tensor: MlxTensor) {
@@ -200,29 +219,34 @@ class MlxMatrixSession internal constructor(
      * Without it a long sequence keeps every intermediate of every step alive until the scope closes. Tensors made
      * since [mark] other than [keep] must not be used afterwards.
      */
-    fun settle(mark: Int, vararg keep: MlxTensor) {
+    fun settle(mark: MlxMark, vararg keep: MlxTensor) {
         gpu()
-        require(mark in 0..owned.size) { "Invalid MLX allocation mark" }
+        require(mark.owner === markOwner && mark.sequence in 0..sequence) { "Invalid MLX allocation mark" }
         for (tensor in keep) {
+            tensor.requireOwner(this)
             require(owned.any { it === tensor.allocation }) { "Tensor is not owned by this session" }
+        }
+        for (tensor in keep) {
             MlxMatrixOperations.status(mlx_array_eval(tensor.handle), "eval")
             checkReaders()
         }
         val kept = keep.map { tensor -> tensor.allocation }
-        val survivors = ArrayList<MlxAllocation>()
-        while (owned.size > mark) {
-            val allocation = owned.removeAt(owned.lastIndex)
-            if (kept.any { it === allocation }) survivors += allocation else free(allocation)
+        for (i in owned.lastIndex downTo 0) {
+            val allocation = owned[i]
+            if (allocation.sequence < mark.sequence) break
+            if (kept.none { it === allocation }) {
+                owned.removeAt(i)
+                free(allocation)
+            }
         }
-        owned.addAll(survivors.reversed())
     }
 
     /** Handles made inside [block] are freed when it returns; the result must be copied out of the device before then. */
     fun <R> scoped(block: () -> R): R {
         gpu()
-        val mark = owned.size
+        val mark = sequence
         try { return block() } finally {
-            while (owned.size > mark) free(owned.removeAt(owned.lastIndex))
+            while (owned.lastOrNull()?.sequence?.let { it >= mark } == true) free(owned.removeAt(owned.lastIndex))
         }
     }
 
@@ -326,10 +350,16 @@ class MlxMatrixSession internal constructor(
         }
     }
 
-    /** Complete verified CPU reads before a GPU graph can wait on the file reader. */
+    /** Capture this finite iterable, then complete verified CPU reads before a GPU graph can wait on the file reader. */
     fun materialize(tensors: Iterable<MlxTensor>, check: () -> Unit = {}) {
-        gpu()
+        val captured = ArrayList<MlxTensor>()
         for (tensor in tensors) {
+            check()
+            tensor.requireOwner(this)
+            captured.add(tensor)
+        }
+        gpu()
+        for (tensor in captured) {
             check()
             MlxMatrixOperations.status(mlx_array_eval(tensor.handle), "eval weight")
             checkReaders()
@@ -340,6 +370,7 @@ class MlxMatrixSession internal constructor(
     /** input [rows, in] against a packed weight [out, in * bits / 32] with its scales and biases: [rows, out]. */
     fun quantizedLinear(input: MlxTensor, weight: MlxTensor, scales: MlxTensor, biases: MlxTensor,
                         groupSize: Int, bits: Int): MlxTensor {
+        input.requireOwner(this)
         val width = quantizedWidth(weight, scales, biases, groupSize, bits)
         require(input.a.size > 0 && input.a[input.a.size - 1] == width) { "Quantized input width differs from weight" }
         val stream = gpu()
@@ -354,6 +385,7 @@ class MlxMatrixSession internal constructor(
     /** Check the affine packed layout before entering mlx-c, whose default handler can terminate the process. */
     internal fun quantizedWidth(weight: MlxTensor, scales: MlxTensor, biases: MlxTensor,
                                 groupSize: Int, bits: Int): Int {
+        weight.requireOwner(this); scales.requireOwner(this); biases.requireOwner(this)
         require(mlxAffine(groupSize, bits)) { "Unsupported affine quantization" }
         require(weight.a.size == 2 && scales.a.size == 2 && biases.a.size == 2 &&
             weight.a[0] > 0 && weight.a[1] > 0 && scales.a[1] > 0 &&
@@ -369,9 +401,12 @@ class MlxMatrixSession internal constructor(
         return width.toInt()
     }
 
-    internal fun floating(tensor: MlxTensor): Boolean = when (mlx_array_dtype(tensor.handle)) {
-        mlx_dtype.MLX_FLOAT32, mlx_dtype.MLX_FLOAT16, mlx_dtype.MLX_BFLOAT16 -> true
-        else -> false
+    internal fun floating(tensor: MlxTensor): Boolean {
+        tensor.requireOwner(this)
+        return when (mlx_array_dtype(tensor.handle)) {
+            mlx_dtype.MLX_FLOAT32, mlx_dtype.MLX_FLOAT16, mlx_dtype.MLX_BFLOAT16 -> true
+            else -> false
+        }
     }
 
     private fun derived(name: String, call: (CPointer<mlx_array_>) -> Int): MlxTensor {
@@ -407,6 +442,7 @@ class MlxMatrixSession internal constructor(
 
     /** Row-major [tokens, in] against a dense weight [out, in]: [tokens, out]. */
     fun dense(input: MlxTensor, weight: MlxTensor): MlxTensor {
+        input.requireOwner(this); weight.requireOwner(this)
         val stream = gpu()
         val transposed = make("transpose") { mlx_transpose(it, widened(weight.handle), stream) }
         return derived("matmul") { mlx_matmul(it, input.handle, transposed, stream) }
@@ -419,12 +455,14 @@ class MlxMatrixSession internal constructor(
 
     private fun binary(name: String, left: MlxTensor, right: MlxTensor,
                        op: (CPointer<mlx_array_>, CValue<mlx_array_>, CValue<mlx_array_>, CValue<mlx_stream_>) -> Int): MlxTensor {
+        left.requireOwner(this); right.requireOwner(this)
         val stream = gpu()
         return derived(name) { op(it, left.handle, right.handle, stream) }
     }
 
     private fun unary(name: String, input: MlxTensor,
                       op: (CPointer<mlx_array_>, CValue<mlx_array_>, CValue<mlx_stream_>) -> Int): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         return derived(name) { op(it, input.handle, stream) }
     }
@@ -435,34 +473,42 @@ class MlxMatrixSession internal constructor(
     fun negate(input: MlxTensor): MlxTensor = unary("negative", input) { r, a, s -> mlx_negative(r, a, s) }
 
     /** log(1 + e^x), stable for large x. */
-    fun softplus(input: MlxTensor): MlxTensor =
-        binary("logaddexp", input, zeros(*IntArray(input.a.size) { input.a[it] })) { r, a, b, s -> mlx_logaddexp(r, a, b, s) }
+    fun softplus(input: MlxTensor): MlxTensor {
+        input.requireOwner(this)
+        return binary("logaddexp", input, zeros(*IntArray(input.a.size) { input.a[it] })) { r, a, b, s -> mlx_logaddexp(r, a, b, s) }
+    }
 
     fun scale(input: MlxTensor, factor: Float): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         val scalar = own(mlx_array_new_float(factor))
         return derived("scale") { mlx_multiply(it, input.handle, scalar, stream) }
     }
 
     fun sum(input: MlxTensor, axis: Int): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         return derived("sum") { mlx_sum_axis(it, input.handle, axis, false, stream) }
     }
 
     /** Each element repeated consecutively along [axis]. */
     fun repeat(input: MlxTensor, repeats: Int, axis: Int): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         return derived("repeat") { mlx_repeat_axis(it, input.handle, repeats, axis, stream) }
     }
 
     /** Cells [from, until) along [axis]. */
     fun slice(input: MlxTensor, axis: Int, from: Int, until: Int): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         val rank = input.a.size
+        require(axis >= -rank && axis < rank) { "Slice axis is outside tensor rank" }
+        val dimension = if (axis < 0) axis + rank else axis
         return derived("slice") { out ->
             memScoped {
-                val start = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == axis) from else 0 }
-                val stop = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == axis) until else input.a[i] }
+                val start = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == dimension) from else 0 }
+                val stop = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == dimension) until else input.a[i] }
                 val strides = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = 1 }
                 mlx_slice(out, input.handle, start, rank.toULong(), stop, rank.toULong(), strides, rank.toULong(), stream)
             }
@@ -470,12 +516,14 @@ class MlxMatrixSession internal constructor(
     }
 
     fun concatenate(parts: List<MlxTensor>, axis: Int): MlxTensor {
+        val captured = parts.toList()
+        for (part in captured) part.requireOwner(this)
         val stream = gpu()
         return memScoped {
             val vector = alloc<mlx_vector_array_>()
             mlx_vector_array_new().place(vector.ptr)
             try {
-                for (part in parts) MlxMatrixOperations.status(mlx_vector_array_append_value(vector.readValue(), part.handle), "append")
+                for (part in captured) MlxMatrixOperations.status(mlx_vector_array_append_value(vector.readValue(), part.handle), "append")
                 derived("concatenate") { mlx_concatenate_axis(it, vector.readValue(), axis, stream) }
             } finally { mlx_vector_array_free(vector.readValue()) }
         }
@@ -483,12 +531,14 @@ class MlxMatrixSession internal constructor(
 
     /** 1-D convolution without padding: input [batch, length, channels], weight [channels, kernel, channels / groups]. */
     fun conv1d(input: MlxTensor, weight: MlxTensor, groups: Int): MlxTensor {
+        input.requireOwner(this); weight.requireOwner(this)
         val stream = gpu()
         return derived("conv1d") { mlx_conv1d(it, input.handle, widened(weight.handle), 1, 0, 1, groups, stream) }
     }
 
     /** Root-mean-square norm over the last axis with the stored weight used as-is (the checkpoint is pre-shifted). */
     fun rmsNorm(input: MlxTensor, weight: MlxTensor?, epsilon: Float): MlxTensor {
+        input.requireOwner(this); weight?.requireOwner(this)
         val stream = gpu()
         val none = cValue<mlx_array_> { ctx = null }
         return derived("rms_norm") {
@@ -499,11 +549,13 @@ class MlxMatrixSession internal constructor(
     fun silu(input: MlxTensor): MlxTensor = times(input, sigmoid(input))
 
     fun sigmoid(input: MlxTensor): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         return derived("sigmoid") { mlx_sigmoid(it, input.handle, stream) }
     }
 
     fun reshape(input: MlxTensor, vararg extents: Int): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         require(tensorSize(extents.toSeries()) == input.size) { "Reshape changes the cell count" }
         return derived("reshape") { out ->
@@ -515,12 +567,14 @@ class MlxMatrixSession internal constructor(
     }
 
     fun swapAxes(input: MlxTensor, first: Int, second: Int): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         return derived("swapaxes") { mlx_swapaxes(it, input.handle, first, second, stream) }
     }
 
     /** Equal parts along [axis]. */
     fun split(input: MlxTensor, parts: Int, axis: Int): List<MlxTensor> {
+        input.requireOwner(this)
         val stream = gpu()
         return memScoped {
             val vector = alloc<mlx_vector_array_>()
@@ -537,6 +591,7 @@ class MlxMatrixSession internal constructor(
 
     /** Rotary embedding of the leading [dimensions] of the last axis, positions counted from [offset] along axis -2. */
     fun rope(input: MlxTensor, dimensions: Int, base: Float, offset: Int = 0): MlxTensor {
+        input.requireOwner(this)
         val stream = gpu()
         val theta = cValue<mlx_optional_float_> { value = base; has_value = true }
         val none = cValue<mlx_array_> { ctx = null }
@@ -545,6 +600,7 @@ class MlxMatrixSession internal constructor(
 
     /** Causal scaled dot-product attention over [batch, heads, tokens, width]; key/value heads group the query heads. */
     fun attention(queries: MlxTensor, keys: MlxTensor, values: MlxTensor, scale: Float): MlxTensor {
+        queries.requireOwner(this); keys.requireOwner(this); values.requireOwner(this)
         val stream = gpu()
         val none = cValue<mlx_array_> { ctx = null }
         return derived("attention") {
@@ -553,6 +609,7 @@ class MlxMatrixSession internal constructor(
     }
 
     fun times(left: MlxTensor, right: MlxTensor): MlxTensor {
+        left.requireOwner(this); right.requireOwner(this)
         val stream = gpu()
         return derived("multiply") { mlx_multiply(it, left.handle, right.handle, stream) }
     }
