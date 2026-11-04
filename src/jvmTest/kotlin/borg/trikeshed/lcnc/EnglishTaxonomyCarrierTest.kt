@@ -85,6 +85,11 @@ class EnglishTaxonomyCarrierTest {
         assertNotNull(cas.get(prepared.declarationCid)); assertNull(checked.record.nlp)
         val candidate = EnglishTaxonomyCarrier.candidate(cas, prepared.receiptCid, selected(prepared))
         val evidence = assertNotNull(EnglishTaxonomyCarrier.evidence(cas, candidate))
+        val replayed = candidate.copy(selections = candidate.selections α {
+            it.copy(value = CanonicalCbor.decodeMap(CanonicalCbor.encodeMap(it.value)))
+        })
+        assertEquals(candidate.selections.view.toList(), replayed.selections.view.toList(), "Persisted nested integers keep their canonical equality")
+        assertNotNull(EnglishTaxonomyCarrier.evidence(cas, replayed))
         assertEquals(false, evidence["independentDocumentsOrNarsEvidence"])
         val witnesses = evidence["witnesses"] as List<*>
         assertEquals(2, witnesses.size)
@@ -178,5 +183,18 @@ class EnglishTaxonomyCarrierTest {
         assertNotEquals(candidate(first).family, candidate(other).family)
         assertEquals("unreviewed", EnglishTaxonomyCarrier.projection(first)["reviewStatus"])
         assertNull(EnglishTaxonomyCarrier.projection(first)["approvalCid"])
+    }
+
+    @Test fun deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound() {
+        val cas = BoundedMemory()
+        // A small valid CBOR map containing 256 nested arrays: byte limits alone do not bound depth.
+        val bytes = byteArrayOf(0xa1.toByte(), 0x61, 0x78) + ByteArray(256) { 0x81.toByte() } + byteArrayOf(0xf6.toByte())
+        val cid = cas.put(bytes)
+        val reads: List<() -> Any> = _l[
+            { EnglishTaxonomyCarrier.verify(cas, cid) }, { DocumentTaxonomyCandidate.record(cas, cid) }]
+        for (read in reads) {
+            val error = assertFailsWith<IllegalArgumentException> { read() }
+            assertTrue(error.message.orEmpty().contains("depth", ignoreCase = true), error.message)
+        }
     }
 }
