@@ -69,8 +69,8 @@ class LlvmScalarRunTest {
         try {
             first.open(bitcode)
             val program = LcncProgram("llvm-mlir-demo",
-                s_[LcncNode("sum", LlvmScalarContract.TYPE, _m["left" j "19", "right" j "23"]),
-                    LcncNode("total", LlvmScalarContract.TYPE, _m["right" j "-2"])],
+                s_[LcncNode("sum", LlvmScalarContract.TYPE, _m["left" j "19", "right" j "23"], x = 40.0, y = 80.0),
+                    LcncNode("total", LlvmScalarContract.TYPE, _m["right" j "-2"], x = 420.0, y = 80.0)],
                 s_[LcncWire("sum", "value", "total", "left?")])
             receipt = first.request("POST", "/api/lcnc/run", jsonOf(_m["name" j program.name,
                 "document" j reify(LcncProgramConfix.toJson(program))]))
@@ -92,7 +92,7 @@ class LlvmScalarRunTest {
             val command = first.request("GET", "/api/lcnc/content?cid=${receipt["receiptCid"]}")
             assertEquals(receipt["runId"], (command["lcncRun"] as Map<*, *>)["runId"])
             first.files.mkdirs("build/reports/sulong")
-            for ((name, field) in s_["receipt" j "receiptCid", "invocations" j "invocationsCid"].view) {
+            for ((name, field) in s_["program" j "programCid", "receipt" j "receiptCid", "invocations" j "invocationsCid"].view) {
                 val cid = ContentId(receipt[field] as String)
                 val retained = checkNotNull(first.cas.get(cid))
                 assertEquals(cid, ContentId.of(retained))
