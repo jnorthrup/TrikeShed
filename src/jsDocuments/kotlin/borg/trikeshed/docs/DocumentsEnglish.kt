@@ -53,7 +53,9 @@ internal object DocumentsEnglish {
         private var legalPending = false
         private var legalFailure: String? = null
         private var legalResult: Map<*, *>? = null
-        fun close() { abort?.abort(); resetLegal(); job.cancel() }
+        private var taxonomy: DocumentsEnglishTaxonomy? = null
+        private fun resetTaxonomy() { taxonomy?.close(); taxonomy = null }
+        fun close() { abort?.abort(); resetLegal(); resetTaxonomy(); job.cancel() }
         private fun present() = owner === this && job.isActive && current() && host.asDynamic().isConnected == true
         private fun splitScalar(at: Int) = at in 1 until preview.length && preview[at - 1].isHighSurrogate() && preview[at].isLowSurrogate()
         private fun text(parent: HTMLElement, tag: String, value: String, className: String? = null): HTMLElement =
@@ -138,6 +140,7 @@ internal object DocumentsEnglish {
         private fun inspect() {
             if (!validRange()) { failure = "Choose a nonempty range of at most 16,384 characters without splitting a character."; render(); return }
             val requestedBegin = begin; val requestedEnd = end
+            resetTaxonomy()
             resetLegal()
             pending = true; failure = null; render()
             scope.launch {
@@ -263,7 +266,9 @@ internal object DocumentsEnglish {
             input.type = "number"; input.min = "0"; input.step = "1"; input.value = value.toString()
             input.className = "ds-curate-name"; input.style.cssText = "width:110px;padding:7px 9px"
             input.disabled = pending; input.setAttribute(attribute, "1"); holder.appendChild(input)
-            input.addEventListener("input", { if (present() && !pending) assign(input.value.toIntOrNull() ?: -1) })
+            input.addEventListener("input", {
+                if (present() && !pending) { assign(input.value.toIntOrNull() ?: -1); resetTaxonomy() }
+            })
         }
         fun render() {
             if (!present()) return
@@ -304,6 +309,12 @@ internal object DocumentsEnglish {
             })
             corpusNotice?.let { text(section, "p", it, "ds-curate-label").setAttribute("role", "status") }
             legalControls(section, value)
+            if (!pending && number(range["begin"]) == begin && number(range["end"]) == end) {
+                val controller = taxonomy ?: DocumentsEnglishTaxonomy(value, scope).also { taxonomy = it }
+                controller.mount(text(section, "div", "")) {
+                    present() && !pending && result === value && number(range["begin"]) == begin && number(range["end"]) == end
+                }
+            }
             for (raw in value["sentences"] as List<*>) sentence(section, raw as Map<*, *>)
         }
         private fun legalControls(parent: HTMLElement, inspection: Map<*, *>) {
