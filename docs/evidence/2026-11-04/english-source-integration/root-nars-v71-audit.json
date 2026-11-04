@@ -1,0 +1,89 @@
+{
+  "result": "PASS",
+  "scope": "Independent recorded-data/raw-WAL audit, no new JVM execution or inference. Retained-byte integrity and declared roles only; source authentication, semantic entailment, evidence independence and crash/power-loss durability are not established.",
+  "source": "4bdcc227781fa68b07c0105655a19f3e0c11959f",
+  "mainJarSha256": "6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355",
+  "writerPid": "69494",
+  "readerPid": "69530",
+  "sourceCid": "sha256:11314aef9114346b08f0a79aa90e414eb1e3d282e35a2341a92f54a7cee29e0b",
+  "propositionCid": "sha256:fd450f0fd207a25206a870e5576e87c2e7614f58e6dbcb8e702e9a2512783e55",
+  "sourceBytes": 28,
+  "walBytes": 1499,
+  "walSha256": "b76086ee3dfbf56f6e50c29e93b5fbb7c06d571e62956cd12f0fc35b6e4be303",
+  "frames": [
+    {
+      "sequence": 1,
+      "kind": "R"
+    },
+    {
+      "sequence": 2,
+      "kind": "B"
+    },
+    {
+      "sequence": 3,
+      "kind": "A"
+    },
+    {
+      "sequence": 4,
+      "kind": "A"
+    },
+    {
+      "sequence": 5,
+      "kind": "R"
+    },
+    {
+      "sequence": 6,
+      "kind": "B"
+    },
+    {
+      "sequence": 7,
+      "kind": "A"
+    },
+    {
+      "sequence": 8,
+      "kind": "A"
+    },
+    {
+      "sequence": 9,
+      "kind": "D"
+    },
+    {
+      "sequence": 10,
+      "kind": "E"
+    },
+    {
+      "sequence": 11,
+      "kind": "R"
+    },
+    {
+      "sequence": 12,
+      "kind": "B"
+    }
+  ],
+  "expectedDecayedBudgetPacked": "1010815783981652377",
+  "unchangedEvidencePacked": "3865470566400",
+  "signalSha256": "55b0518f8237600fa471b06d0754bd31cb63fe8bbad589c66a303adf46e9a442",
+  "negativeControls": [
+    {
+      "name": "source-byte",
+      "refused": true
+    },
+    {
+      "name": "proposition-cid",
+      "refused": true
+    },
+    {
+      "name": "replayed-budget",
+      "refused": true
+    },
+    {
+      "name": "reopen-status",
+      "refused": true
+    },
+    {
+      "name": "wal-byte",
+      "refused": true
+    }
+  ],
+  "auditorSha256": "4af039ee1306381cd0d9bdd2ce64fb9e28392c33dfe5937925875e6474aaba9d"
+}
