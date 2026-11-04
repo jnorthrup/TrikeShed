@@ -36,6 +36,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
+import java.nio.charset.CharacterCodingException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files as NioFiles
 import java.nio.file.Paths
@@ -392,6 +393,20 @@ class JvmKanbanServer(
         val parts = firstLine.split(' ')
         val method = parts.getOrNull(0) ?: "GET"
         val path = parts.getOrNull(1) ?: "/"
+        // KG source identities must name the original body bytes, never UTF-8 replacement text.
+        if (method == "POST" && path.substringBefore('?') == "/api/beliefs/kg") {
+            val boundary = indexOfHeaderBoundary(payload, payload.size)
+            val lfBoundary = (0 until payload.lastIndex).firstOrNull {
+                payload[it] == '\n'.code.toByte() && payload[it + 1] == '\n'.code.toByte()
+            }
+            val bodyStart = if (boundary >= 0 && (lfBoundary == null || boundary < lfBoundary)) boundary + 4
+                else lfBoundary?.plus(2) ?: 0
+            try {
+                payload.decodeToString(bodyStart, payload.size, throwOnInvalidSequence = true)
+            } catch (_: CharacterCodingException) {
+                return HttpResponse(400, """{"error":"invalid_kg_utf8"}""")
+            }
+        }
         // ── dynamic module claims: exact-path, consulted before everything else ──
         moduleRoutes?.match(path)?.let { claim ->
             claim.route(method, path, text, null)?.let { return it }

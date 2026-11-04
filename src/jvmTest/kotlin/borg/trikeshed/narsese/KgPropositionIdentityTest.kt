@@ -133,7 +133,7 @@ class KgPropositionIdentityTest {
 
     @Test fun realTextAndCursorConsumersCannotCrossPredicatesOrPartiallyMintMalformedKif() = runBlocking {
         withTimeout(10_000) {
-            withBag { bag ->
+            withBag(cas = KgRetentionFixtureCas()) { bag ->
                 assertFailsWith<IllegalArgumentException> { bag.ingestKg("(pays Tenant Landlord) (not (pays Tenant Landlord))") }
                 assertEquals(0, bag.size)
                 val report = bag.ingestKg("(pays Tenant Landlord)")
