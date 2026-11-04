@@ -107,6 +107,7 @@ class Panels : PatchSurface {
     }
 
     fun laneOf(n: dynamic): dynamic {
+        if (querySyntax(n)) return null
         for (l in lanes) if (arr(l.match).any { pfx -> str(n.type).startsWith(str(pfx)) }) return l
         return lanes.firstOrNull { it.id == "fanout" } ?: lanes.lastOrNull()
     }
