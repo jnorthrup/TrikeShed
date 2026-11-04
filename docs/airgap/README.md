@@ -9,7 +9,7 @@ and D3M integration record. A planned gate is not a completed release.
 |---|---|---|
 | R1: owned scalar execution | Standard MLIR arithmetic through a pinned Sulong module, two wired LCNC nodes, durable receipt reopening | [Verified runbook](../sulong-bitcode/README.md); published master `26d5bf3db` |
 | R2: owned Confix scanning | Execute the real pinned upstream JSON/CBOR/YAML scanner, copy bounded rows, release native buffers, compare Kotlin results, retain a whole-program LCNC receipt | In progress; acceptance below |
-| R3: visible document traversal | Source intake to scanner/evidence nodes with measured wire activity, pause at supported boundaries and evidence flyovers | Planned; [visual acceptance](../lcnc/airgap-demonstrator/07-visualization.md) |
+| R3: visible document traversal | Source intake to scanner/evidence nodes with measured wire activity, pause at supported boundaries and evidence flyovers | Planned; [implementation handoff](03-visible-traversal.md) and [visual acceptance](../lcnc/airgap-demonstrator/07-visualization.md) |
 | R4: offline release closure | Reproducible packaged runtime, verified dependency closure and clean-machine startup without external networking | Planned; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 ## R2 acceptance
