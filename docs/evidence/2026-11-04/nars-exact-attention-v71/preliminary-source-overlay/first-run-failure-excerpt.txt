@@ -1,0 +1,10 @@
+Captured excerpt from the first preliminary source-overlay check (tool output, not a complete log):
+PASS exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes
+PASS httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409
+PASS lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity
+PASS mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers
+Exception in thread "main" org.opentest4j.AssertionFailedError: expected: <BudgetCoord(packed=518813577561872793)> but was: <BudgetCoord(packed=1037628034732628377)>
+at borg.trikeshed.narsese.PropositionAttentionTest$productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence$1$1$2.invokeSuspend(PropositionAttentionTest.kt:139)
+
+The persisted pre-decay priority was 0.9; the expected replayed priority was 0.45.
+Existing D: replay ignored decay while decayAll emitted no A: records for changed resident budgets.

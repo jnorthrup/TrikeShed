@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+attention_proof=/workspace/library-files/nars-exact-attention-v71-proof/contracts
+attention_snapshot=/workspace/library-files/english-retained-attention-v71-proof/snapshot
+attention_cp=$(cat "$attention_snapshot/classpath.txt")
+attention_compiler=$(rg --files --no-ignore /workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21 | rg '\.jar$' | head -n 1)
+mkdir -p "$attention_proof/classes" "$attention_proof/temporary"
+java -Xmx768m -cp "$attention_compiler:$attention_cp" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+ -no-stdlib -no-reflect -jvm-target 25 -classpath "$attention_cp" \
+ -d "$attention_proof/classes" \
+ "/workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/PropositionAttentionTest.kt" "$attention_proof/Run.kt"
+java -Xmx768m --enable-native-access=ALL-UNNAMED -cp "$attention_proof/classes:$attention_cp" RunKt \
+ "$attention_snapshot" "$attention_proof" \
+ 4bdcc227781fa68b07c0105655a19f3e0c11959f 6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355
