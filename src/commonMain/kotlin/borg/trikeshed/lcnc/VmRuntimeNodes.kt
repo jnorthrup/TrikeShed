@@ -157,16 +157,10 @@ object VmRuntimeNodes {
         return value
     }
 
-    internal fun value(node: LcncNode, inputs: Map<String, Any?>, key: String): Any? = when {
-        inputs.containsKey(key) -> inputs[key]
-        inputs.containsKey("$key?") -> inputs["$key?"]
-        else -> node.params["in:$key"] ?: node.params[key]
-    }
+    internal fun value(node: LcncNode, inputs: Map<String, Any?>, key: String): Any? = lcncInputValue(node, inputs, key)
 
     internal fun string(node: LcncNode, inputs: Map<String, Any?>, key: String, default: String? = null, allowBlank: Boolean = false): String {
-        val value = value(node, inputs, key) ?: default
-        require(value is String && (allowBlank || value.isNotBlank())) { "$key must be ${if (allowBlank) "" else "nonblank "}text" }
-        return value
+        return lcncInputText(node, inputs, key, default, allowBlank)
     }
 
     internal fun strings(node: LcncNode, inputs: Map<String, Any?>, key: String): List<String> = when (val value = value(node, inputs, key)) {

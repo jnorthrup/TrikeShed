@@ -31,9 +31,9 @@ object BreadcrumbContextNodes {
 
     fun registry(cas: CasStore, breadcrumbs: BreadcrumbElement): Map<String, LcncNodeRunner> = _m[
         PROJECT j LcncNodeRunner { node, inputs ->
-            val source = VmRuntimeNodes.string(node, inputs, "source")
+            val source = lcncInputText(node, inputs, "source")
             require(source.length <= BreadcrumbContext.CONTENT_LIMIT) { "Source exceeds breadcrumb capacity" }
-            val question = VmRuntimeNodes.string(node, inputs, "question")
+            val question = lcncInputText(node, inputs, "question")
             require(question.length <= 256) { "Question exceeds 256 characters" }
             val session = session(node, inputs)
             val name = node.params["name"] ?: "source.txt"
@@ -80,9 +80,9 @@ object BreadcrumbContextNodes {
         },
         RECALL j LcncNodeRunner { node, inputs ->
             val session = session(node, inputs)
-            val reference = VmRuntimeNodes.string(node, inputs, "ref")
-            val cid = VmRuntimeNodes.string(node, inputs, "cid")
-            val question = VmRuntimeNodes.string(node, inputs, "question", default = "", allowBlank = true)
+            val reference = lcncInputText(node, inputs, "ref")
+            val cid = lcncInputText(node, inputs, "cid")
+            val question = lcncInputText(node, inputs, "question", default = "", allowBlank = true)
             require(question.length <= 256) { "Question exceeds 256 characters" }
             val presence = node.params["presence"]?.toDoubleOrNull() ?: if ("presence" in node.params)
                 throw IllegalArgumentException("Presence must be a number from zero to one") else 1.0
@@ -117,7 +117,7 @@ object BreadcrumbContextNodes {
     ]
 
     private fun session(node: LcncNode, inputs: Map<String, Any?>): String =
-        VmRuntimeNodes.string(node, inputs, "context").also {
+        lcncInputText(node, inputs, "context").also {
             require(it.length <= 128 && SharedContextSettings.isScopeName(it)) { "Context must be 1..128 printable characters" }
         }
 

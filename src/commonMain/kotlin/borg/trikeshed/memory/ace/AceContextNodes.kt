@@ -58,10 +58,10 @@ object AceContextNodes {
 
         "context.assemble" to LcncNodeRunner { node, inputs ->
             val program = AceContextProgram.preset(
-                toolsSystem = (VmRuntimeNodes.value(node, inputs, "toolsSystem")?.toString() ?: "").encodeToByteArray(),
-                playbookBase = (VmRuntimeNodes.value(node, inputs, "playbook")?.toString() ?: "").encodeToByteArray(),
-                envelope = (VmRuntimeNodes.value(node, inputs, "envelope")?.toString() ?: "").encodeToByteArray(),
-                volatileTail = (VmRuntimeNodes.value(node, inputs, "tail")?.toString() ?: "").encodeToByteArray(),
+                toolsSystem = (lcncInputValue(node, inputs, "toolsSystem")?.toString() ?: "").encodeToByteArray(),
+                playbookBase = (lcncInputValue(node, inputs, "playbook")?.toString() ?: "").encodeToByteArray(),
+                envelope = (lcncInputValue(node, inputs, "envelope")?.toString() ?: "").encodeToByteArray(),
+                volatileTail = (lcncInputValue(node, inputs, "tail")?.toString() ?: "").encodeToByteArray(),
             )
             val toolNames = (node.params["tools"] ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }
             val config = AceContextProgram.Config(
