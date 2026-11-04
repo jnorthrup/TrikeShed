@@ -79,6 +79,39 @@ tasks.register("verifySulongDemoBitcode") {
     inputs.files(generated, retained)
     doLast { check(generated.readBytes().contentEquals(retained.readBytes())) { "Rebuilt LLVM fixture differs from retained bitcode" } }
 }
+val confixDir = file("src/jvmMain/llvm/confix")
+val compileConfixBridge = tasks.register<Exec>("compileConfixBridge") {
+    group = "verification"
+    val compiler = sulongLlvmBin?.let { File(it, "clang") }
+    inputs.file(File(confixDir, "bridge.c"))
+    inputs.property("compiler", compiler?.absolutePath ?: "clang")
+    compiler?.let { inputs.file(it) }
+    outputs.file(File(sulongDemoDir, "confix-bridge.bc"))
+    workingDir(projectDir)
+    doFirst { sulongDemoDir.mkdirs() }
+    commandLine(compiler?.absolutePath ?: "clang", "-target", "x86_64-unknown-linux-gnu", "-std=c11", "-O1",
+        "-emit-llvm", "-c", "-fno-builtin", "-fno-stack-protector", "-fno-ident",
+        "src/jvmMain/llvm/confix/bridge.c", "-o", File(sulongDemoDir, "confix-bridge.bc").absolutePath)
+}
+val buildConfixBitcode = tasks.register<Exec>("buildConfixBitcode") {
+    group = "verification"
+    dependsOn(compileConfixBridge)
+    val linker = sulongLlvmBin?.let { File(it, "llvm-link") }
+    inputs.files(File(confixDir, "confix.ll"), File(sulongDemoDir, "confix-bridge.bc"))
+    inputs.property("linker", linker?.absolutePath ?: "llvm-link")
+    linker?.let { inputs.file(it) }
+    outputs.file(File(sulongDemoDir, "confix.bc"))
+    commandLine(linker?.absolutePath ?: "llvm-link", File(sulongDemoDir, "confix-bridge.bc").absolutePath,
+        File(confixDir, "confix.ll").absolutePath, "-o", File(sulongDemoDir, "confix.bc").absolutePath)
+}
+tasks.register("verifyConfixBitcode") {
+    group = "verification"
+    dependsOn(buildConfixBitcode)
+    val generated = File(sulongDemoDir, "confix.bc")
+    val retained = file("src/jvmTest/resources/sulong/confix.bc")
+    inputs.files(generated, retained)
+    doLast { check(generated.readBytes().contentEquals(retained.readBytes())) { "Rebuilt Confix bitcode differs" } }
+}
 val requestFactoryVersion = "2.13.1"
 
 extra["versions.kotlinx-coroutines-core"] = "1.11.0"
