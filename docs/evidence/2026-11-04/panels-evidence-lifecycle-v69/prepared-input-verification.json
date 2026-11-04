@@ -1,0 +1,6 @@
+{
+  "result": "PASS",
+  "scope": "Private byte-identical extraction of the closed all-synthetic v68 runtime; no runtime or parser launched in this preparation.",
+  "producerArchiveSha256": "0584a6d921e660123071db695c7e7d29327c9067dafdde3369463ba1274ea5a8",
+  "files": 13
+}
