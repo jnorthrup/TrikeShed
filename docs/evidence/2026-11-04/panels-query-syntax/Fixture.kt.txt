@@ -1,0 +1,158 @@
+package proof.englishlegalquery
+
+import borg.trikeshed.forge.server.*
+import borg.trikeshed.couch.*
+import borg.trikeshed.dag.*
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.htx.HtxKey
+import borg.trikeshed.job.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.module.*
+import borg.trikeshed.narsese.*
+import borg.trikeshed.nlp.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.*
+import java.io.File
+import java.net.*
+import java.util.concurrent.*
+import java.util.concurrent.atomic.*
+
+fun fields(value: Any?) = value as Map<*, *>
+fun entries(value: Any?) = value as List<*>
+fun rows(value: Map<*, *>) = entries(fields(fields(value["results"])["results"])["bindings"])
+fun cell(value: Any?, name: String) = fields(fields(value)[name])["value"] as String
+fun predicate(name: String) = "<${EnglishLegalGraph.VOCAB}$name>"
+fun visual(variables: Series<String>, patterns: Series<Triple<String,String,String>>): Map<*, *> {
+    val nodes = mutableListOf(LcncNode("select", SparqlGraph.SELECT)); val wires = mutableListOf<LcncWire>()
+    for ((i, variable) in variables.view.withIndex()) {
+        nodes.add(LcncNode("v$i", SparqlGraph.VARIABLE, _m["name" j variable,"ord" j i.toString()])); wires.add(LcncWire("v$i","variable","select","variables"))
+    }
+    for ((i, pattern) in patterns.view.withIndex()) {
+        nodes.add(LcncNode("p$i",SparqlGraph.PATTERN,_m["subject" j pattern.first,"predicate" j pattern.second,"object" j pattern.third])); wires.add(LcncWire("p$i","pattern","select","patterns"))
+    }
+    return fields(reifyStrict(LcncProgramConfix.toJson(LcncProgram("Retained legal observation query",nodes.toSeries(),wires.toSeries(),controls=LcncConfixControls(inspectionOnly=true)))))
+}
+fun thirtyDays() = visual(s_["?quote","?status","?sentence","?source"],s_[
+    Triple("?d",predicate("kind"),"\"duration-language-candidate\""),
+    Triple("?d",predicate("integerValue"),"\"30\"^^<${RdfVocab.XSD}integer>"),Triple("?d",predicate("unitLemma"),"\"day\""),
+    Triple("?d",predicate("quote"),"?quote"),Triple("?d",predicate("status"),"?status"),
+    Triple("?d",predicate("sentence"),"?s"),Triple("?s",predicate("quote"),"?sentence"),Triple("?d",predicate("sourceText"),"?source")])
+fun unknownQuantities() = visual(s_["?quote","?reason"],s_[
+    Triple("?d",predicate("status"),"\"unresolved-quantity-candidate\""),Triple("?d",predicate("quote"),"?quote"),Triple("?d",predicate("unresolved"),"?reason")])
+fun copiedNodes() = visual(s_["?node","?word","?index","?copy"],s_[
+    Triple("?node",predicate("nodeKind"),"\"copy\""),Triple("?node",predicate("word"),"?word"),
+    Triple("?node",predicate("index"),"?index"),Triple("?node",predicate("copy"),"?copy")])
+
+/** Read-only replay of exact exported snapshot rows, with explicit reversible stale-source test control. */
+class ReplayCorpus(private val originalRows: List<ProjectDoc>, private val sourceBytes: Map<String,ByteArray>): ProjectCorpus {
+    private val current = java.util.concurrent.ConcurrentHashMap<String,ProjectDoc>().apply { for(row in originalRows) put(row.project+"\u0000"+row.id,row) }
+    val extractCalls = AtomicInteger(); var gate: Pair<CompletableDeferred<Unit>,CompletableDeferred<Unit>>? = null
+    private val once = AtomicBoolean()
+    override suspend fun projects() = originalRows.map { it.project }.distinct().map { ProjectRef(it,"retained-observation-replay","/readonly-replay/$it",originalRows.count { row->row.project==it }) }
+    override suspend fun docs(project:String,prefix:String,glob:String,limit:Int) = current.values.filter { it.project==project && it.id.startsWith(prefix) && ProjectGlob.matches(glob,it.id) }.sortedBy { it.id }.take(limit)
+    override suspend fun document(project:String,id:String):ProjectDoc? {
+        gate?.let { if(once.compareAndSet(false,true)) { it.first.complete(Unit); it.second.await() } }
+        return current[project+"\u0000"+id]
+    }
+    override suspend fun bytes(project:String,id:String) = document(project,id)?.let { sourceBytes[it.cid]?.copyOf() }
+    override suspend fun read(project:String,id:String,maxChars:Int):ProjectText? {
+        val row=document(project,id)?:return null;val text=sourceBytes[row.cid]?.decodeToString(throwOnInvalidSequence=true)?:return null
+        return if(text.length>maxChars)null else ProjectText(project,id,row.cid,row.rev,row.seq,text)
+    }
+    override suspend fun extract(project:String,id:String,maxChars:Int):ProjectText? { extractCalls.incrementAndGet(); error("Extraction/mining is forbidden in retained observation replay") }
+    fun mutate():Map<String,Any?> {
+        val old=originalRows.single { it.id=="synthetic matching duties.txt" };val replacement=(requireNotNull(sourceBytes[old.cid]).decodeToString()+"Explicit stale-source control.").encodeToByteArray()
+        val changed=old.copy(cid=ContentId.of(replacement).value,rev="replay-control-2",seq=old.seq+1000,length=replacement.size.toLong())
+        current[old.project+"\u0000"+old.id]=changed;return _m["scope" j "explicit-replay-row-control-not-ingestion","before" j old.toMap(),"after" j changed.toMap()]
+    }
+    fun reset():Map<String,Any?> { for(row in originalRows)current[row.project+"\u0000"+row.id]=row;return _m["scope" j "explicit-readonly-replay-reset","rows" j originalRows.map { it.toMap() }] }
+}
+
+fun main() = runBlocking {
+    val artifacts=File(requireNotNull(java.lang.System.getenv("PROOF_ROOT")));val snapshot=File(requireNotNull(java.lang.System.getenv("PROOF_SNAPSHOT")))
+    val manifest=fields(reifyStrict(File(artifacts,"manifest.json").readText()));val root=File(artifacts,"runtime").apply { require(!exists());mkdirs() }
+    val files=JvmFileOperations();val cas=PackCasStore(files,File(root,"cas").absolutePath)
+    val originalBytes=linkedMapOf<String,ByteArray>();val imports=mutableListOf<Map<String,Any?>>()
+    for(raw in entries(manifest["receipts"])+entries(manifest["sources"])) {
+        val item=fields(raw);val bytes=File(item["file"] as String).readBytes();val expected=ContentId(item["cid"] as String)
+        check(ContentId.of(bytes)==expected && bytes.size==(item["length"] as Number).toInt());check(cas.put(bytes)==expected)
+        originalBytes[expected.value]=bytes;imports.add(_m["cid" j expected.value,"bytes" j bytes.size])
+    };cas.sync()
+    val inspectionIds=fields(manifest["inspections"]).entries.associate { it.key as String to fields(it.value)["receiptCid"] as String }
+    val captured=inspectionIds.mapValues { EnglishObservationGraph.read(cas,ContentId(it.value)) }
+    val sourceRows=captured.values.flatMap { requireNotNull(it.sourceSnapshots) }.distinctBy { it.project+"\u0000"+it.id }
+    val corpus=ReplayCorpus(sourceRows,originalBytes)
+    val owners=mutableListOf<CompletableJob>()
+    fun context(name:String):ModuleContext {
+        val state=File(root,name).apply { mkdirs() };val owner=SupervisorJob(coroutineContext[Job]);owners.add(owner)
+        val store=CouchStoreFactory.casBacked(cas)
+        return ModuleContext(Couch(name,store,cas),ReteNetwork(),ReteProductionRegistry(),null,null,ConfixBlackboard.empty(),cas,
+            CouchAttachmentGateway(store,cas),ModuleRouteRegistry(),CoroutineScope(Dispatchers.IO+owner+files),{123L},state)
+    }
+    fun deniedNetwork():Map<String,Any?> {
+        fun denied(block:()->Unit):String=try {block();error("Outbound operation unexpectedly allowed")}catch(failure:java.net.SocketException){check(failure.message.orEmpty().contains("Permission denied",true));failure.message.orEmpty()}
+        val tcp=denied {Socket().use {it.connect(InetSocketAddress("127.0.0.1",9),1000)}}
+        val udp=denied {DatagramSocket().use {it.send(DatagramPacket(_a[1.toByte()],1,InetAddress.getByName("127.0.0.1"),9))}}
+        return _m["tcpConnect" j tcp,"udpSend" j udp,"result" j "DENIED"]
+    }
+    val denyBefore=deniedNetwork()
+    val ctx=context("query");val wire=EnglishLegalPatternsWire(ctx,corpus);wire.attach()
+    check(ctx.routes.match(DocumentEnglishWire.PATH)==null) // No parsing owner is constructed or callable.
+    val calls=java.util.Collections.synchronizedList(mutableListOf<Map<String,Any?>>());val exports=linkedMapOf<String,Map<String,Any?>>()
+    fun export(cid:ContentId) {
+        val bytes=requireNotNull(cas.getBounded(cid,8*1024*1024));check(ContentId.of(bytes)==cid)
+        val decoded=CanonicalCbor.decodeMapBounded(bytes,8*1024*1024,32,500_000)
+        File(artifacts,"cas-readbacks").apply { mkdirs() }.resolve(cid.hex+".cbor").writeBytes(bytes)
+        exports[cid.value]=_m["cid" j cid.value,"bytes" j bytes.size,"schema" j decoded["schema"],"inspectionCid" j decoded["inspectionCid"]]
+    }
+    suspend fun request(label:String,cid:String,mode:Any?="current",program:Map<*,*> = thirtyDays(),expected:Int=200):Map<*,*> {
+        val body=_m["inspectionCid" j cid,"mode" j mode,"program" j program]
+        val response=requireNotNull(requireNotNull(ctx.routes.match(EnglishLegalQueryWire.PATH)).route("POST",EnglishLegalQueryWire.PATH,jsonOf(body),null))
+        check(response.status==expected) { "$label: ${response.status} ${response.body}" };val value=fields(reifyStrict(response.body))
+        if(expected==200) {val source=fields(value["source"]);check(source["parserExecution"]=="not-reverified" && source["producerAuthority"]=="not-established" && source["reviewStatus"]=="unreviewed");export(ContentId(source["candidateCid"] as String))}
+        else check(!value.containsKey("results") && !value.containsKey("source")) { "Refusal leaked partial results" }
+        calls.add(_m["label" j label,"request" j body,"status" j response.status,"response" j value]);return value
+    }
+    val panelsCtx=context("panels");panelsCtx.lcncRunners.putAll(ctx.lcncRunners)
+    val panels=PanelsFixture(panelsCtx,root,snapshot,inspectionIds);panels.attach()
+    val finish=CountDownLatch(1);val executor=Executors.newFixedThreadPool(8)
+    fun primarySafety():Map<String,Any?> = runBlocking {
+        check(ctx.rete.snapshot().size==0 && ctx.blackboard.snapshot().values.isEmpty());check(ctx.beliefBag==null && ctx.documentReview==null && ctx.muxContext[HtxKey]==null)
+        check(corpus.extractCalls.get()==0 && ctx.routes.match(DocumentEnglishWire.PATH)==null)
+        _m["reteFacts" j 0,"blackboardValues" j 0,"beliefBagPresent" j false,"reviewOwnerPresent" j false,"modelMuxConfigured" j false,"parserOwnerPresent" j false,"parserCalls" j 0,"extractCalls" j 0,"globalQuadStorePresent" j false]
+    }
+    fun evidence():Map<String,Any?> {
+        for((cid,bytes) in originalBytes)check(cas.getBounded(ContentId(cid),bytes.size)?.contentEquals(bytes)==true)
+        for(cid in fields(manifest["expectedCurrentCandidates"]).values)export(ContentId(cid as String))
+        return _m["scope" j manifest["scope"],"imports" j imports,"sourceRows" j sourceRows.map {it.toMap()},
+            "networkDenyBefore" j denyBefore,"networkDenyAfter" j deniedNetwork(),"setupQueries" j 0,
+            "safety" j primarySafety(),"retainedReadbacks" j exports.values.toList(),"panels" j panels.evidence()]
+    }
+    File(artifacts,"startup-evidence.json").writeText(jsonOf(evidence()))
+    val server=HttpServer.create(InetSocketAddress("127.0.0.1",0),8);server.executor=executor
+    server.createContext("/") {exchange ->try {
+        val method=exchange.requestMethod;val path=exchange.requestURI.rawPath;val target=exchange.requestURI.toASCIIString();val body=exchange.requestBody.readBytes().decodeToString();var status=200;var mime="application/json; charset=utf-8"
+        val bytes=when {
+            path=="/_fixture/meta" -> jsonOf(_m["scope" j manifest["scope"],"inspections" j inspectionIds,"sourceRows" j sourceRows.map {it.toMap()},"panels" j panels.evidence(),"programs" j _m["thirtyDays" j thirtyDays(),"unknown" j unknownQuantities(),"copies" j copiedNodes()]]).encodeToByteArray()
+            path=="/_fixture/evidence" -> jsonOf(evidence()).encodeToByteArray()
+            path=="/_fixture/mutate" -> jsonOf(corpus.mutate()).encodeToByteArray()
+            path=="/_fixture/reset" -> jsonOf(corpus.reset()).encodeToByteArray()
+            path=="/_fixture/finish" -> {finish.countDown();"{}".encodeToByteArray()}
+            path.startsWith("/api/documents/english/") -> {
+                val response=runBlocking {ctx.routes.match(path)?.route(method,target,body,null)}
+                if(response==null){status=404;"{}".encodeToByteArray()}else{status=response.status;mime=response.contentType
+                    if(path==EnglishLegalQueryWire.PATH && method=="POST")synchronized(calls){calls.add(_m["label" j "http","request" j reifyStrict(body),"status" j status,"response" j reifyStrict(response.body)])}
+                    response.body.encodeToByteArray()}
+            }
+            else -> {val response=runBlocking {panels.route(method,target,body)};if(response==null){status=404;"{}".encodeToByteArray()}else{status=response.status;mime=response.contentType;response.body.encodeToByteArray()}}
+        }
+        exchange.responseHeaders.set("Content-Type",mime);exchange.sendResponseHeaders(status,bytes.size.toLong());exchange.responseBody.use {it.write(bytes)}
+    }catch(failure:Throwable){failure.printStackTrace();runCatching {val bytes=jsonOf(_m["error" j failure.toString()]).encodeToByteArray();exchange.sendResponseHeaders(500,bytes.size.toLong());exchange.responseBody.use {it.write(bytes)}}}finally{exchange.close()}}
+    try {server.start();println("ENGLISH_LEGAL_QUERY_PROOF_URL=http://127.0.0.1:${server.address.port}");check(withContext(Dispatchers.IO){finish.await(15,TimeUnit.MINUTES)})}
+    finally {server.stop(0);executor.shutdownNow();panels.drain();wire.drain();check(ctx.routes.match(EnglishLegalQueryWire.PATH)==null && EnglishLegalQueryWire.TYPE !in ctx.lcncRunners);for(owner in owners){owner.complete();owner.join()};cas.close();File(artifacts,"cleanup.json").writeText(jsonOf(_m["wireDrained" j true,"panelsDrained" j true,"allSupervisorsCompleted" j owners.all {it.isCompleted},"registryRemoved" j true,"safety" j primarySafety()]))}
+}
