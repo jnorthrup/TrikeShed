@@ -1,0 +1,149 @@
+{
+  "kind": "bounded-native-confix-audit",
+  "scanner_sha256": "7ba80066f3a8a1775f4a8390d38a8f347c498e5df560bb51b7c18c2fe4de2bc8",
+  "bridge_sha256": "c5900490c3c1c4660cf4c8680eafb3b895ac44a60bcc53da4ed42972f9355ad1",
+  "versions": {
+    "llvm": "22.1.8",
+    "gcc": "14.2.0",
+    "jdk": "GraalVM 25.3.4.1",
+    "kotlin_numeric_oracle": "2.4.21"
+  },
+  "coverage": {
+    "scanner": "ASan instrumentation added to every function attribute group, opt -passes=asan with explicit x86_64 Linux target; six report load/store symbol classes verified",
+    "bridge": "GCC ASan and UBSan",
+    "intra_allocation": "guards and logical-array alignment padding poisoned before scanner; guard equality checked after scan",
+    "positive_control": "deliberately corrupted test-only source length produces use-after-poison inside confix_scan_json",
+    "scanner_ubsan": false,
+    "sulong_execution": false
+  },
+  "successful_cases": {
+    "exact_fixtures": 23,
+    "uniform_and_biased_random": 120000,
+    "structured_yaml_mutations": 30000,
+    "max_input_capacity": 3
+  },
+  "limits": {
+    "random_input_bytes_max": 191,
+    "random_row_capacity_max": 256,
+    "structured_yaml_bytes_max": 255,
+    "maximum_fixture_input_bytes": 65536,
+    "maximum_fixture_rows": 16384,
+    "each_batch_timeout_seconds": 30
+  },
+  "results": {
+    "memory_violations": 0,
+    "guard_failures": 0,
+    "live_bytes_after_every_case": 0,
+    "batch_timeouts": 0
+  },
+  "semantic_disagreement": {
+    "input": "v: 1e++5",
+    "native_fault": 0,
+    "native_value_tag": 3,
+    "native_tag_name": "Double",
+    "kotlin_toDoubleOrNull": null,
+    "expected_current_jvm_scan_tag": "String",
+    "direct_full_kotlin_scanner_executed": false,
+    "input_utf8_hex": "763a2031652b2b35",
+    "native_rows": [
+      {
+        "open": 0,
+        "close": 7,
+        "tag": 5,
+        "depth": 0,
+        "children": [
+          1,
+          2
+        ]
+      },
+      {
+        "open": 0,
+        "close": 0,
+        "tag": 4,
+        "depth": 1,
+        "children": []
+      },
+      {
+        "open": 0,
+        "close": 7,
+        "tag": 3,
+        "depth": 1,
+        "children": []
+      }
+    ]
+  },
+  "bridge_caveats": [
+    "Invalid format returns -1 without clearing earlier successful rows.",
+    "Writing after run changes input without invalidating the existing result.",
+    "Handle freshness, single-owner lifecycle and exclusion between calls belong to the host; arbitrary stale/double-freed pointers are not rejected by C.",
+    "Canaries alone do not detect out-of-bounds reads or writes into alignment padding; this audit used ASan poisoning for both."
+  ],
+  "scope": "Bounded native safety testing, not exhaustive proof, full YAML semantic parity, actual offline Sulong execution, or malformed Kotlin-oracle execution.",
+  "commands": "reproduction.md",
+  "harness": "harness.c",
+  "repository_source_matches_snapshot": true,
+  "seeds": {
+    "fuzz": 2180457747,
+    "fuzz_second": 947126353,
+    "structured_yaml": 2180457747
+  },
+  "corpus_logs": {
+    "fixtures.log": {
+      "bytes": 2461,
+      "sha256": "37d1e93f68dca6454eacb52b6020482cef6bcff715867a73d4b724f3d1695fdb",
+      "gzip_bytes": 699,
+      "gzip_sha256": "b8274aea42789d04279072b2427cde16ec6bf4d12e7fe413ed8d3f3d6b549a20"
+    },
+    "fuzz.log": {
+      "bytes": 6659275,
+      "sha256": "df15034d99659566549dddeb934540a407d7847e4f2b5db04bc056dbe473632c",
+      "gzip_bytes": 3361246,
+      "gzip_sha256": "109d7ec963fbf81559314dc30595c9c21171367dd7aaa308ddd27cb1e7b3149b"
+    },
+    "fuzz-second.log": {
+      "bytes": 19985859,
+      "sha256": "e10d1f57d544bf8d8f0011cf733671ff1dab5dc624eb1334b8a877a34c970abb",
+      "gzip_bytes": 10078388,
+      "gzip_sha256": "65c25a809c3f16c36e669aecd1f62c4862dd4b708d6298f95c73d02cc9280fbf"
+    },
+    "structured.log": {
+      "bytes": 4793355,
+      "sha256": "2749d5bdd7628d0940db7ad44be5b9376979cc39acce37e690d1302e6250e358",
+      "gzip_bytes": 547597,
+      "gzip_sha256": "606e73485d0944ecee750518c356b7152fe441316dcef4b77f9c6ddc43a27098"
+    },
+    "max.log": {
+      "bytes": 131130,
+      "sha256": "414c4eb3c74da111f40177803d9b7b0e7c8c7aa7a760403ee124077deea5c5f3",
+      "gzip_bytes": 226,
+      "gzip_sha256": "46b0811ce00c3c8c4e56cec79c59f907081826f919d8492a470ee45943c22cf7"
+    },
+    "asan-positive-control.log": {
+      "bytes": 2701,
+      "sha256": "b4dd6c326ca558604a8a0a7c7ab5ceb0281b3f1c24fe35ae909421a6ebf120fb",
+      "gzip_bytes": 895,
+      "gzip_sha256": "bc89f08f0d81c97e8cfc467ae9d26f4ee7e0bd3ca8a1411886a470fbb321fdf1"
+    },
+    "numeric-native.log": {
+      "bytes": 168,
+      "sha256": "247be990239e0103a9f373f8f9b72df2eb9c6356a92b2c63119650a5513d3495",
+      "gzip_bytes": 119,
+      "gzip_sha256": "bb4382de63c7e22764458ba6d7d4807979ab22fc65ec11dd2f14ca9eddeaae93"
+    },
+    "numeric-jvm.log": {
+      "bytes": 93,
+      "sha256": "a7a9030607454689d015b93848097b73ec695d6dad193a8ab129de5b553bf021",
+      "gzip_bytes": 74,
+      "gzip_sha256": "9a8f2f3fb36c87b3e2c9af5c02215ca072e44e370d9225678753697d50101cfb"
+    }
+  },
+  "harness_sha256": "3a7e734e4e0cfb51ce4c9ceb82c7c573678956b3d257125ff55b4047d984326f",
+  "artifacts": {
+    "reproduce": "reproduce.sh",
+    "instructions": "reproduction.md",
+    "scanner_snapshot": "scanner-original.ll",
+    "wrapper_snapshot": "bridge-snapshot.c",
+    "harness": "harness.c",
+    "kotlin_numeric_oracle": "NumericOracle.java"
+  }
+}
