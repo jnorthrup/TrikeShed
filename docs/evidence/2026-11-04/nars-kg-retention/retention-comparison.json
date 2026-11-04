@@ -1,0 +1,24 @@
+{
+  "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+  "propositionCid": "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c",
+  "identityChanged": false,
+  "beforeSource": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "afterSource": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+  "before": {
+    "sourcePresentAfterIntake": false,
+    "definitionPresentAfterIntake": false,
+    "casPutsAfterIntake": [],
+    "signalArchivePresentAfterAttentionEviction": true,
+    "sourcePresentAfterSignalArchive": false,
+    "definitionPresentAfterSignalArchive": false,
+    "noCasIntakeAlsoSucceeds": true,
+    "noCasReportHasRetentionStatus": false
+  },
+  "after": {
+    "sourceAndDefinitionExactReadback": true,
+    "replayAndArchiveEvidenceUnchanged": true,
+    "missingCasHttpStatus": 503,
+    "missingCasResidentCount": 0
+  },
+  "scope": "Same synthetic KIF source and exact canonical definition CIDs. Own volatile fixture CAS, with separate productionPack close/reopen proof. No historical backfill, source authentication or legal meaning established."
+}

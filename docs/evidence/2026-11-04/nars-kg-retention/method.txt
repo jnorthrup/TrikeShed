@@ -1,0 +1,72 @@
+Exact-artifact KG source/definition retention proof, 2026-11-04
+
+The frozen v66 JAR retained the exact accepted KIF/RDF source bytes and full
+canonical proposition definitions under their existing CIDs. All 13 focused
+retention/error-route methods passed. Public HTTP/LCNC route calls returned
+retention identities and read back the same bytes. A separate production
+PackCasStore reader process reopened the writer's closed pack and verified all
+four source/definition blocks byte for byte and by SHA256.
+
+Frozen source: 61411d3617d5d6d4083ba2df42bd6c1500cb6d36
+Main JAR SHA256: e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397
+Only committed test fixtures and external harness classes were compiled. All
+recorded production CodeSources matched that immutable main JAR. Classpath
+entries were JARs; there were no production source overlays, friend paths,
+live build directories, Gradle runs, providers, models, or NLP parser calls.
+The first final-artifact attempt passed. Earlier source-overlay failures and
+historical counterexamples remain retained separately; they are not relabelled
+as final-artifact results.
+
+The volatile fixture proves retention ordering and refusal behavior: all source
+and definition puts, sync, bounded exact readbacks and digest checks precede the
+first imported Mint. Missing CAS or bounded-read capability, bad acknowledgement,
+sync failure, and absent/corrupt readback admit no imported assertions and leave
+the actor healthy. Limits and immutable channel admission are checked; drain
+waits for already admitted retention work. Source whitespace/CRLF and a
+language-tagged Unicode RDF literal survive. Confidence/evidence are outside proposition identity.
+Same-source replay and signal-archive revival preserve the exact signal bytes.
+
+The production pack proof is separate from the volatile controller fixture:
+  writer PID44062 used PackCasStore(JvmFileOperations(), own attempt directory);
+  it imported one KIF and one RDF source, checked exact source/definition bytes,
+  drained its bag, explicitly synced, closed the pack, published its expected
+  byte/digest manifest and exited0;
+  reader PID44092 started afterwards, reopened that same pack using production
+  PackCasStore, performed bounded reads, compared complete bytes and CIDs with
+  the writer's manifest, closed the pack and exited0. It did not re-ingest data.
+Backend DURABLE is recorded as storage metadata. This tests explicit process
+closure/reopen on the observed filesystem, not crash, power-loss or universal
+durability. Java25 FFM native-access warnings were retained; operations passed
+without warning suppression or a substitute backend.
+
+HTTP route observations repeat the exact four synthetic inputs from v62:
+  malformed KIF, malformed RDF and unsupported text: escaped exceptions become
+  fixed HTTP400 responses, with zero resident assertions;
+  pays/owes with the same attention address but different full proposition IDs:
+  the first statement remains admitted and the conflict returns HTTP409. The
+  response makes no zero-processed or rollback claim. Retrying does not increase
+  evidence. Every actor stays healthy and the next valid request returns200.
+Missing CAS returns503 and no assertions; size limits retain413. A raw malformed
+UTF8 request with an LF header and a later CRLF separator returns400 before any
+route dispatch. The actual JVM-public mangled internal route is invoked by
+reflection, without friend access; these are direct route calls, not a socket
+or browser proof. Cancellation remains cancellation.
+
+Historical v59 source/definition hashes were not resolvable even when the signal
+archive itself was retained. The final KIF case uses exactly those same source
+and proposition CIDs and now resolves both complete payloads. The before/after
+files retain that distinction. This change does not backfill old hash-only
+history or establish document authenticity, review authority, legal truth,
+semantic unification, learned linguistic competence, or general daemon airgap
+enforcement. All inputs are synthetic; no private PDF or corpus text was read.
+
+Files:
+  execution-identity.json: exact artifact, fixture/harness hashes and child exits
+  fixture-methods.txt: 9 retention plus4 route-error methods, all passed
+  api-cas-result.json: actual HTTP/LCNC, replay/archive and refusal observations
+  pack-writer.json / pack-reader.json: distinct-process expected/readback bytes
+  retention-gap-before-v59*.json / retention-comparison.json: same-CID gap/fix
+  route-errors-before-v62*.json / route-errors-comparison.json: exceptions/statuses
+  cleanup.json: drains, process exits and close scope
+  retained-artifact-hashes.json: hashes of original local reports and harnesses
+  sha256.json: hashes of these published synthetic evidence files

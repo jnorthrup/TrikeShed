@@ -1,0 +1,23 @@
+{
+  "scope": "Hashes of original retained local evidence/harness files; published pretty JSON is separately hashed by sha256.json. Only synthetic inputs were used.",
+  "files": {
+    "execution-identity.json": "8c2c7af4d383bd196277a6d4bf8f5e70a210b0e5c24d43f1c756367a0d03b150",
+    "api-cas-result.json": "c10675637ebc549a7f18700b65b12aea5169836629cc083dda4d9b376f39bca6",
+    "pack-attempt1/writer.json": "32179d845345668c8e8981a6b7ba250f3df1631bd3a9a2747e7be4ad53bd3dbd",
+    "pack-attempt1/reader.json": "5ad9e2dc695b4fb01b7353a7fd5e945996630e1c06a0c92992a7e7250ed26f45",
+    "fixture-attempt1.stdout": "a6fc7eca0e435f4fd0fb8c4d71981e07498f1b8dca47c0551c634d6fa4464c6b",
+    "fixture-attempt1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "api-cas-attempt1.stdout": "1efee448e840b194cdddb464378942f743e1b407c83b01d0f262f83cd3adb305",
+    "api-cas-attempt1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "pack-writer-attempt1.stdout": "ab4393b184af251e0aebcae5880a482f59886676162977b54ce8d4091f92e336",
+    "pack-writer-attempt1.stderr": "4c0dc951c91d5adb234f5e56dc47ea8d54bb3f5bb0bd0ae2d224d1f4bbec8904",
+    "pack-reader-attempt1.stdout": "2667651c4b10ffb1018adcfb7041aff310dea09235f6926af58529ddb057859c",
+    "pack-reader-attempt1.stderr": "4c0dc951c91d5adb234f5e56dc47ea8d54bb3f5bb0bd0ae2d224d1f4bbec8904",
+    "compile-attempt1.log": "9445c9f26e43a8aec96083ae50504ef0f98165065b665ec8b198c2071f2516a9",
+    "KgRetentionTest.kt": "9e7e1866577dde52d1209469847788b943335e71dc416b6226bfedc45d5693c6",
+    "KgRouteErrorTest.kt": "0b42176b365725ec9564d66040c9d8c3f299535218d51d7586044883a9d64e82",
+    "Probe.kt": "9da7e5d5da64f2e408ce53bc11985360d2d8fb0c6a2b5cfbb3ab5fde791df3dc",
+    "PackProbe.kt": "860c1fe95d09df3dc7e21511ac039f522964fef106e186e4b4fae6791301c617",
+    "Runner.kt": "833a178b2a515aa65107d492a6f9c94974f3939a49ab2786161e54c923426d3f"
+  }
+}
