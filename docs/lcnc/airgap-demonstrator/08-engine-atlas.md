@@ -18,6 +18,7 @@ Choose an engine by the question it can answer and the evidence it returns. “A
 | Positive Horn/Datalog | T3 bounded deductive closure | Consequence relative to admitted theory | Fragment limits and proof provenance |
 | SUMO/Sigma ecosystem | T2–T3 ontology and broader formal reasoning | Typed ontology/theorem results by backend | Full KIF is broader than the current bridge |
 | SUMO-Nix and MLIR lowering | T3 native interchange and positive Horn execution | Pinned frame result and proof | First-proof coverage, runtime supervision |
+| GraalVM LLVM / Sulong | T1–T3 execution of compatible bitcode; later guarded production kernels | Result of the loaded module, under its declared ABI/fragment | Producer/reader compatibility, memory ownership, runtime mode and actual semantic coverage |
 | SAT/SMT/constraint solver | T3 finite consistency/resource constraints | Satisfiable/unsatisfiable/unknown | Encoding validity and backend-specific certificates |
 | Argumentation/defeasible rules | T3 conflicts and exceptions | Accepted/rejected/undecided under semantics | Explicit attack/priority semantics |
 | NARS/NAL | T3–T4 attention, revisable empirical inference | Frequency/confidence and budget | Evidence dependence and limited resources |
@@ -56,6 +57,8 @@ Use explicit subclass/instance rules in the input when their support must appear
 A later Soufflé comparison can measure larger Datalog workloads and provenance facilities. It should be an isolated benchmark adapter before any replacement decision. Its documented proof-tree interface is useful as a design reference, not evidence that TrikeShed already has those capabilities. [Soufflé provenance](https://souffle-lang.github.io/provenance)
 
 ## Compatibility rules
+
+The [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) specifies JVM embedding, binary Sources, module exports, UTF-8 interop and lifecycle. Sulong is an execution backend, not a new inference semantics. The inspected upstream has guarded LLVM JIT paths and freestanding scanner IR, but no general `convert-nix-to-llvm` pass or exported string-evaluation ABI. Existing Polyglot/LLVM dependencies do not establish that the full evaluator runs. Preserve the current Horn frame/proof contract across any backend change.
 
 | Producer → consumer | Allowed crossing | Required guard |
 |---|---|---|

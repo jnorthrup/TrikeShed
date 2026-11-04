@@ -12,12 +12,15 @@ The planning configuration is six implementation/review lanes, averaging 65% act
 
 The first release must work with deterministic CPU methods and retained fixtures. Stanford parsing is an optional local statistical lane; BERT, Jeva and generative models are separately selectable local capabilities. Development may use connected frontier models while the delivered demonstrator runs offline from a sealed bundle.
 
+The subsequent [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) selects JVM-hosted Sulong as the intended embedding route for compatible bitcode. It separates bounded kernels from full Nix evaluation, corrects the supplied RFC's memory/interop assumptions, and adds an explicitly separate 112–224 active-hour kernel-path estimate. The original programme totals exclude that increment and any full evaluator/compiler port.
+
 ## Reading routes
 
 | Reader or decision | Read first |
 |---|---|
 | Programme owner | [Charter](00-charter.md), [storyboard](13-demonstration-storyboard.md), [timeline and costs](15-timeline-and-costs.md) |
 | Runtime implementer | [Architecture](02-tier-architecture.md), [execution and control](06-execution-and-control.md), [wire contracts](19-wire-contracts.md) |
+| MLIR-Nix / JVM implementer | [Polyglot pivot and ABI](22-mlir-nix-polyglot.md), [engine atlas](08-engine-atlas.md), [WP15](14-work-packages.md) |
 | Graal and Spacegraph implementer | [Visualization](07-visualization.md), [storyboard](13-demonstration-storyboard.md), [acceptance](16-validation.md) |
 | Curator and ontology implementer | [Sources](03-source-intake-and-airgap.md), [evidence](04-evidence-rdf-and-memory.md), [engine atlas](08-engine-atlas.md) |
 | NARS and Rete implementer | [Consolidation](10-nars-rete-consolidation.md), [CPU plan](11-cpu-and-indexes.md), [contracts](19-wire-contracts.md) |
@@ -47,6 +50,7 @@ The first release must work with deterministic CPU methods and retained fixtures
 20. [Proposed wire contracts and worked records](19-wire-contracts.md)
 21. [Offline and development operating procedures](20-operating-procedures.md)
 22. [Requirement and acceptance traceability](21-traceability.md)
+23. [MLIR-Nix Polyglot pivot and implementation gates](22-mlir-nix-polyglot.md)
 
 ## Decisions that hold the design together
 
