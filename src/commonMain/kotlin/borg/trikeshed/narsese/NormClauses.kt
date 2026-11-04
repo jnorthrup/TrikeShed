@@ -38,6 +38,7 @@ data class NormClause(
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 /** Unsupported norm interpretation; the exact sentence and parser observations remain available for review. */
 enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED, COPIED_NODE, UNREPORTED_IDENTITY }
 
@@ -45,6 +46,13 @@ enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, 
 =======
 /** A guarded sentence omitted from norm interpretation; its source remains available for review. */
 enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED }
+||||||| 095fa0d30
+/** A guarded sentence omitted from norm interpretation; its source remains available for review. */
+enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED }
+=======
+/** Unsupported norm interpretation; the exact sentence and parser observations remain available for review. */
+enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED, COPIED_NODE, UNREPORTED_IDENTITY }
+>>>>>>> 9b5a3881d62f25d4dcf34bfd3129f08bf91afe13
 
 >>>>>>> 5bfdb2d61b063f83a4cd37e2f6497d8e50598ab4
 object NormClauses {
@@ -284,8 +292,14 @@ object NormClauses {
 =======
             // Relation triples do not establish guard scope, even when a simple dependency norm is supported.
             // Never let an alternate OpenIE/KBP reading erase the sentence's qualification.
+<<<<<<< HEAD
             if (hasCondition(doc, s)) continue
 >>>>>>> 5bfdb2d61b063f83a4cd37e2f6497d8e50598ab4
+||||||| 095fa0d30
+            if (hasCondition(doc, s)) continue
+=======
+            if (doc.projectionIssue(s) != null || hasCondition(doc, s)) continue
+>>>>>>> 9b5a3881d62f25d4dcf34bfd3129f08bf91afe13
             if (s.relations.isEmpty() && s.kbp.isEmpty()) continue
             val tokens = s.tokens.values().associateBy { it.index }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
@@ -433,6 +447,11 @@ object NormClauses {
      */
     fun conditionIssue(doc: NlpDocument, sentence: NlpSentence,
                        parties: Map<String, PartyAliases.Party> = emptyMap()): NormConditionIssue? {
+        when (doc.projectionIssue(sentence)) {
+            NlpProjectionIssue.COPIED_NODE -> return NormConditionIssue.COPIED_NODE
+            NlpProjectionIssue.UNREPORTED_IDENTITY -> return NormConditionIssue.UNREPORTED_IDENTITY
+            null -> Unit
+        }
         val tokens = sentence.tokens.values().associateBy { it.index }
         val deps = sentence.dependencies.values()
         fun word(token: NlpToken) = token.word.lowercase().replace('’', '\'')
