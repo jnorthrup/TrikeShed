@@ -30,6 +30,8 @@ class CouchCommitStore(
     private val requireCompleteHistory: Boolean = false,
     val synchronization: Synchronization = Synchronization.MONITOR,
 ) : AutoCloseable {
+    internal fun usesCas(expected: CasStore): Boolean = cas === expected
+
     private val gate = synchronization.lock()
     private val rootPath: String?
     private var lease: FileLease? = null

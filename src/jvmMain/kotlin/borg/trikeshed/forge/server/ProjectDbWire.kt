@@ -29,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap
  * every project. This is the couch-shaped multiproject step past increment-1's
  * prefix scopes: each project is independently addressable at `/<name>/…` and
  * (later) independently replicable.
+ * Project stores must be created by a CAS-backed Couch factory with the same
+ * CAS as the gateway and Couch; unverified custom or non-CAS stores are refused.
  */
 class ProjectDb(
     val name: String,
@@ -39,6 +41,15 @@ class ProjectDb(
     val gateway: CouchAttachmentGateway,
     val router: CouchWireRouter,
 ) {
+    init {
+        require(db.name == name) { "Project and Couch names must match" }
+        require(db.store === store) { "Project Couch and store must share a backing store" }
+        require(store.usesCas(db.cas)) { "Project store and Couch must share a verified CAS" }
+        require(gateway.uses(store)) { "Project gateway and store must share a backing store" }
+        require(router.db === db) { "Project router and Couch must share a database" }
+        require(gateway.usesCas(db.cas)) { "Project gateway and Couch must share a CAS" }
+    }
+
     val docCount: Int get() = store.head.size
 }
 

@@ -65,11 +65,17 @@ interface CouchIngress {
  * - subscribe to mutations via MutableSeries observer
  * - flush/drain for durability hooks
  */
-class CouchStore(
+class CouchStore internal constructor(
     private val ingress: CouchIngress,
     val head: CouchHeadProjection,
-    val changes: CouchChangesProjection
+    val changes: CouchChangesProjection,
+    private val sourceCas: borg.trikeshed.job.CasStore?,
 ) {
+    /** Custom ingresses have no verified CAS owner. */
+    constructor(ingress: CouchIngress, head: CouchHeadProjection, changes: CouchChangesProjection) :
+        this(ingress, head, changes, null)
+
+    internal fun usesCas(cas: borg.trikeshed.job.CasStore): Boolean = sourceCas === cas
 
     sealed interface MutationEvent {
         data class Inserted(val doc: Document) : MutationEvent
@@ -305,7 +311,7 @@ object CouchStoreFactory {
             { doc -> cas.put(canonicalBody(doc)) },
             synchronization = synchronization,
         )
-        return CouchStore(ingress, head, changes)
+        return CouchStore(ingress, head, changes, cas)
     }
 
     /**
@@ -325,6 +331,7 @@ object CouchStoreFactory {
         require(commits.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
             "durableCasBacked requires a DURABLE commit store"
         }
+        require(commits.usesCas(cas)) { "Couch store and commit owner must share a CAS" }
         return committed(cas, commits.recoveredFrames, synchronization) { frame ->
             commits.commit(frame)
             frame
@@ -354,7 +361,7 @@ object CouchStoreFactory {
             initialSequence = maxSequence + 1,
             synchronization = synchronization,
         )
-        return CouchStore(ingress, head, changes)
+        return CouchStore(ingress, head, changes, cas)
     }
 
     /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */
