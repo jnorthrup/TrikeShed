@@ -225,7 +225,7 @@ class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, 
                         if (variable != null) for (other in slot + 1..3)
                             if (variables[other] == variable && values[other] != cell) continue@row
                     }
-                    val key = keySlots.joinToString("\u0000") { values[it] as String }
+                    val key = graphJoinKey(keySlots.size) { values[keySlots[it]] as String }
                     val count = (buckets[key] ?: 0) + 1
                     buckets[key] = count; fanout = maxOf(fanout, count)
                     for (slot in 0..3) variables[slot]?.let { name ->
