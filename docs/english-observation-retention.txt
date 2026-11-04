@@ -1,0 +1,23 @@
+Retained NLP observations
+
+DocumentCuratorCodec stores sentence OpenIE relations and KBP tuples, including
+all three inclusive token-index ranges, original glosses and finite confidence.
+Document mentions retain sentence, inclusive token span, text, chain and
+representative flag. Prompt rows declare and preserve the same fields.
+
+Empty ranges remain empty with their original endpoints. An implicit relation's
+gloss is an observation, not an invented source token or verified quotation.
+Neither a tuple, slot label, mention chain nor confidence establishes legal truth.
+
+Historical records omitted these fields. Their typed read-back uses empty lists
+for compatibility and preserves original metadata and reasons. This does not
+recover missing outputs or establish that the producer returned none. Inspect
+nlpRetentionCoverage on the original retained bytes to distinguish stored field
+presence; the helper reports presence only, not validity or annotator execution.
+Re-encoding an empty fallback creates present empty fields without recovering
+the historical observations. Keep the original receipt and its coverage result.
+
+New present fields with missing members, malformed ranges, wrong types or
+nonfinite confidence are refused. Range endpoints are checked as integer pairs;
+source-role and semantic validation remain separate. No inference, review
+approval or reasoning admission is added by this retention boundary.
