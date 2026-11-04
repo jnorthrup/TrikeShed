@@ -2,6 +2,7 @@ package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
 import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib._l
 import borg.trikeshed.web.patch.PatchKinds
 import kotlinx.browser.document
 import kotlinx.browser.localStorage
@@ -509,6 +510,7 @@ suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
             renderDocumentReview(n, out)
         }
         runners["nars.reteFire"]?.render = { n, out -> renderSimulation(n, out) }
+        for (type in _l["document.source", "confix.pickPath"]) runners[type]?.render = { n, out -> renderDocumentSource(n, out) }
         // result.confirm is a SINK whose server runner answers with a ready HTML card (x)
         val confirm = runners["result.confirm"]
         if (confirm != null && confirm.render == null) confirm.render = { n, out ->
