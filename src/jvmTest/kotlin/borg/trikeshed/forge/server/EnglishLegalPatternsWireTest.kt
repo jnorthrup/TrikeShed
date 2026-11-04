@@ -9,6 +9,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.module.*
 import borg.trikeshed.nlp.*
 import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.*
 import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
@@ -142,6 +143,99 @@ class EnglishLegalPatternsWireTest {
             assertEquals(true, (historical["source"] as Map<*, *>)["historical"])
             assertEquals(text, ((historical["sentences"] as List<*>).single() as Map<*, *>)["quote"])
             assertEquals(1, f.hooks.parserCalls)
+        } finally { close(f) }
+    }
+
+    private fun program(variables: Series<String>, patterns: Series<Triple<String, String, String>>): Map<*, *> {
+        val nodes = mutableListOf(LcncNode("select", SparqlGraph.SELECT)); val wires = mutableListOf<LcncWire>()
+        for ((i, variable) in variables.view.withIndex()) {
+            nodes.add(LcncNode("v$i", SparqlGraph.VARIABLE, _m["name" j variable, "ord" j i.toString()]))
+            wires.add(LcncWire("v$i", "variable", "select", "variables"))
+        }
+        for ((i, pattern) in patterns.view.withIndex()) {
+            nodes.add(LcncNode("p$i", SparqlGraph.PATTERN, _m["subject" j pattern.first,
+                "predicate" j pattern.second, "object" j pattern.third]))
+            wires.add(LcncWire("p$i", "pattern", "select", "patterns"))
+        }
+        return reifyStrict(LcncProgramConfix.toJson(LcncProgram("Legal language query", nodes.toSeries(), wires.toSeries(),
+            controls = LcncConfixControls(inspectionOnly = true)))) as Map<*, *>
+    }
+    private fun predicate(name: String) = "<${EnglishLegalGraph.VOCAB}$name>"
+    private fun thirtyDays() = program(s_["?quote", "?status", "?sentence", "?source"], s_[
+        Triple("?d", predicate("kind"), "\"duration-language-candidate\""),
+        Triple("?d", predicate("integerValue"), "\"30\"^^<${RdfVocab.XSD}integer>"), Triple("?d", predicate("unitLemma"), "\"day\""),
+        Triple("?d", predicate("quote"), "?quote"), Triple("?d", predicate("status"), "?status"),
+        Triple("?d", predicate("sentence"), "?s"), Triple("?s", predicate("quote"), "?sentence"), Triple("?d", predicate("sourceText"), "?source")])
+    private fun unknownQuantities() = program(s_["?quote", "?reason"], s_[
+        Triple("?d", predicate("status"), "\"unresolved-quantity-candidate\""), Triple("?d", predicate("quote"), "?quote"),
+        Triple("?d", predicate("unresolved"), "?reason")])
+    private suspend fun query(f: Fixture, cid: ContentId, value: Map<*, *> = thirtyDays(), mode: String = "current", status: Int = 200): Map<*, *> {
+        val route = assertNotNull(f.ctx.routes.match(EnglishLegalQueryWire.PATH))
+        val reply = assertNotNull(route.route("POST", EnglishLegalQueryWire.PATH,
+            jsonOf(_m["inspectionCid" j cid.value, "mode" j mode, "program" j value]), null))
+        assertEquals(status, reply.status, reply.body); return reifyStrict(reply.body) as Map<*, *>
+    }
+    private fun rows(result: Map<*, *>) = ((result["results"] as Map<*, *>)["results"] as Map<*, *>)["bindings"] as List<*>
+
+    @Test fun visualQuantityQueryReturnsExactSourceAndCandidateScopeThroughTheSameOwner(): Unit = runBlocking {
+        val f = fixture("legal-quantity-query", coroutineContext[Job])
+        try {
+            val inspection = inspect(f); val candidate = request(f, inspection)
+            val result = query(f, inspection); val row = rows(result).single() as Map<*, *>
+            fun value(key: String) = (row[key] as Map<*, *>)["value"] as String
+            assertEquals("within thirty (30) business days", value("quote")); assertEquals(text, value("sentence"))
+            assertEquals("lexical-integer-candidate", value("status"))
+            assertEquals("urn:sha256:" + (candidate["extractedTextCid"] as String).removePrefix("sha256:"), value("source"))
+            val source = result["source"] as Map<*, *>
+            assertEquals(candidate["receiptCid"], source["candidateCid"]); assertEquals(inspection.value, source["inspectionCid"])
+            assertEquals(EnglishLegalGraph.graph(ContentId(candidate["receiptCid"] as String)), source["namedGraph"])
+            assertEquals("unreviewed", source["reviewStatus"]); assertEquals("not-established", source["producerAuthority"])
+            assertEquals("cooccurrence-only-not-applicability", source["sameSentenceJoin"])
+            assertNotNull(f.cas.getBounded(ContentId(source["candidateCid"] as String), EnglishLegalPatternsWire.MAX_RESPONSE))
+            val runner = assertNotNull(f.ctx.lcncRunners[EnglishLegalQueryWire.TYPE])
+            val node = LcncNode("query", EnglishLegalQueryWire.TYPE, _m["inspectionCid" j inspection.value, "mode" j "snapshot", "program" j jsonOf(thirtyDays())])
+            assertEquals(1, rows(runner.run(node, emptyMap())).size)
+            assertFailsWith<IllegalArgumentException> { runner.run(node, _m["mode" j null]) }
+            assertEquals(1, f.hooks.parserCalls); assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
+        } finally { close(f) }
+        assertNull(f.ctx.routes.match(EnglishLegalQueryWire.PATH)); assertNull(f.ctx.lcncRunners[EnglishLegalQueryWire.TYPE])
+    }
+
+    @Test fun unknownQuantitiesHaveNoInventedIntegerAndStaleCurrentSourcesRefuse(): Unit = runBlocking {
+        val f = fixture("legal-unknown-query", coroutineContext[Job], quantityCopy = true)
+        try {
+            val inspection = inspect(f)
+            assertTrue(rows(query(f, inspection)).isEmpty(), "Unresolved quantities cannot acquire integerValue=30")
+            val unresolved = rows(query(f, inspection, unknownQuantities()))
+            assertTrue(unresolved.any { (((it as Map<*, *>)["reason"] as Map<*, *>)["value"] as String) == "copy-node-quantity-scope-not-established" })
+            f.corpus.put("legal", "agreement.txt", "Changed source.".encodeToByteArray())
+            query(f, inspection, unknownQuantities(), status = 409)
+            assertTrue(rows(query(f, inspection, unknownQuantities(), mode = "snapshot")).isNotEmpty())
+        } finally { close(f) }
+    }
+
+    @Test fun queryDrainCompletesAcceptedPatternWorkWithoutRecursiveAdmissionDeadlock(): Unit = runBlocking {
+        val f = fixture("legal-query-drain", coroutineContext[Job])
+        val entered = java.util.concurrent.CountDownLatch(1); val release = java.util.concurrent.CountDownLatch(1)
+        val once = java.util.concurrent.atomic.AtomicBoolean()
+        try {
+            val inspection = inspect(f)
+            f.hooks.lookup = { if (once.compareAndSet(false, true)) {
+                entered.countDown(); check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            } }
+            val pending = (0 until 4).map { async(start = CoroutineStart.UNDISPATCHED) { query(f, inspection) } }
+            withContext(Dispatchers.IO) { assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS)) }
+            val draining = async { f.english.drain() }; yield(); assertFalse(draining.isCompleted)
+            release.countDown(); for (query in pending) assertEquals(1, rows(query.await()).size); draining.await()
+        } finally { release.countDown(); close(f) }
+    }
+
+    @Test fun oversizedLegalGraphRefusesWithoutOmittingObservedFields(): Unit = runBlocking {
+        val f = fixture("legal-query-budget", coroutineContext[Job])
+        try {
+            val inspection = inspect(f, text + " filler".repeat(1200))
+            val result = query(f, inspection, status = 409)
+            assertTrue((result["error"] as String).contains("smaller text range"))
         } finally { close(f) }
     }
 }

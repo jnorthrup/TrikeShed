@@ -27,6 +27,7 @@ object EnglishLcncPreset {
         EnglishObservationContract.contract(),
         EnglishCorpusContract.contract(),
         EnglishLegalPatternsContract.contract(),
+        EnglishLegalQueryContract.contract(),
     ]
 
     fun registry(): Map<String, LcncNodeRunner> = _m[
