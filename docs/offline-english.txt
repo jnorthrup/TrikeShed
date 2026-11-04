@@ -1,0 +1,61 @@
+Local English inspection in Documents
+
+Open a project text document in Documents and choose Inspect English locally.
+The range controls select at most 16,384 UTF-16 units from the identified text
+revision. Results retain exact sentences and word spellings, lemmas, POS/NER
+tags, dependency edges and literal legal-language markers. Conditions,
+exceptions, negation, modals, definition phrases and cross-references remain
+visible as source-spanned candidates. Marker occurrence is not legal scope or
+interpretation. Partial ranges explicitly report their coverage.
+
+This operation uses installed local Stanford CoreNLP resources. It does not
+require a configured chat model or belief bag, invoke a generative model, run
+OCR/extraction, import network content, approve a proposal, publish facts or
+modify NARS/Rete evidence. Its canonical CBOR receipt retains parser identity,
+original/extracted source identities, project revision/sequence, exact quotations
+and available extraction anchors. Stale sources refuse publication. Navigation
+discards late browser results; accepted host work drains before the reader closes.
+
+TXT/MD inputs use checked original UTF-8 bytes. Binary documents require an
+already retained extraction with matching source, text, completion and origin
+records. An unavailable or stale extraction is refused rather than recreated.
+Primary project text uses the existing checked snapshot-retention boundary.
+Dropping a PDF still exposes PDF URI-link tools; English inspection requires its
+stored text preview. These are separate explicit operations.
+
+Parser behavior
+The separate syntax-v1 profile runs tokenize, ssplit, pos, lemma, depparse and ner.
+It omits OpenIE, KBP and coreference. The existing FULL and NO_KBP configurations
+are unchanged. These are statistical parser/tagger observations, not a claim
+that the English interpretation is correct. There is no constituency tree in
+this slice; the displayed dependency edges describe the parser's syntax graph.
+
+All-caps normalization is a parser-input view. Returned document text and token
+spellings now preserve the exact original source at checked scalar-safe UTF-16
+offsets. Runtime metadata records both input and source digests and normalization.
+Lemma/tag/dependency annotations and relation glosses remain parser observations.
+Relation glosses are not promoted into exact source quotations.
+
+Norm extraction conservatively excludes guarded structures that its narrow
+condition grammar cannot retain safely. Negated, modal, passive, coordinated or
+multiple guards must not turn into a different condition or an unconditional
+norm. Source-spanned inspection preserves their wording for review. This lowers
+automatic extraction recall deliberately; it does not establish their meaning.
+
+Limits and deployment
+GET /api/documents/english reports local availability and range limits without
+initializing the parser. POST requires project, id, cid, rev, seq, begin and end.
+No request may choose executable code or parser configuration. Input reads are
+bounded to 32 MiB original and 4 MiB extracted UTF-8 text; lineage is at most
+64 KiB and a retained receipt at most 8 MiB. The inventory also limits sentence,
+token, dependency and marker counts and validates every observed source span.
+
+CoreNLP runs synchronously and currently has no parser wall deadline. A character
+limit is not a time, native memory or OS isolation guarantee. The application
+Airgap setting governs model egress; deployment-level network isolation remains
+a separate control. Installed module manifests pin local JAR sizes and hashes;
+there is no parser runtime download fallback. Bundle the CoreNLP module before
+disconnecting; its existing provisioning command is:
+  ./gradlew -p utils/subvm installCorenlp
+Rebuild/restart the application and refresh Documents after updating the checkout.
+The standard utils/oroboros launcher has a 24 GiB maximum Java heap.
