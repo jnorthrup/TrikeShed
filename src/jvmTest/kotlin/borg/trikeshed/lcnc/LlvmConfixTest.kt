@@ -14,7 +14,7 @@ class LlvmConfixTest {
         fun profile(limit: Int = 65536) = LlvmConfixProfile(Path.of("/operator/add.bc"), ContentId.of(bytes()).hex, limit, 16384)
         fun hex(text: String) = text.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
         fun oracle(format: Syntax, source: ByteArray): List<Map<String, Any?>> {
-            val series = source.size j { source[it] }
+            val series = source.size j { index: Int -> source[index] }
             val flat = when (format) {
                 Syntax.JSON -> format.scan0(series).b
                 Syntax.CBOR -> format.scanCbor0(series).b
@@ -63,7 +63,7 @@ class LlvmConfixTest {
                 val result = scanner.scan(Syntax.CBOR, source)
                 assertEquals(false, result["ok"])
                 assertEquals(code, (result["fault"] as Map<*, *>)["code"])
-                assertEquals(emptyList(), result["rows"])
+                assertEquals(emptyList<Map<String, Any?>>(), result["rows"])
                 assertEquals(0L, (result["runtime"] as Map<*, *>)["liveBytesAfter"])
             }
             val room = scanner.scan(Syntax.JSON, "[1,2]".encodeToByteArray(), rowCapacity = 1)
