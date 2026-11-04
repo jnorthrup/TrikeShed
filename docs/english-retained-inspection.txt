@@ -74,3 +74,11 @@ actual CoreNLP run. No actual parser, model, Gradle, production friend access or
 browser execution was used for those checks. Final coordinated JVM/common-JS and
 native Documents opener/late-response validation remain pending. These changes do
 not relabel the already published v70 build, fresh-parser pilot or screenshots.
+
+Exact v71 JVM checkpoint
+-----------------------
+Integrated source 4bdcc227 passed all six original public-route methods against
+immutable main JAR 6ae17af7. Only the test and harness were compiled, with no
+production overlay, friend access, actual parser, model, Gradle or browser. See
+docs/evidence/2026-11-04/english-retained-inspection-v71/summary.txt and identities.
+Native Documents layout and late-response proof remains separately scoped.
