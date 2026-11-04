@@ -1,6 +1,7 @@
 package borg.trikeshed.userspace.nio.file.spi
 
 import kotlinx.coroutines.Dispatchers
+import borg.trikeshed.userspace.execute
 import kotlin.coroutines.CoroutineContext
 
 import borg.trikeshed.lib.Join
@@ -30,7 +31,7 @@ import java.util.zip.ZipFile
  * JVM userspace.nio adapter — pure [java.nio.file] / NIO channels.
  * No java.io.File. Platform filesystem is only this adapter layer.
  */
-class JvmFileOperations : FileOperations, BoundedFileReader {
+class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader {
 
     override val durability: StorageDurability get() = StorageDurability.DURABLE
 
@@ -130,6 +131,38 @@ class JvmFileOperations : FileOperations, BoundedFileReader {
             bytes
         }
     }
+
+    override fun readChunks(path: String, limit: Long, consume: (ByteArray, Int) -> Unit): Long =
+        borg.trikeshed.userspace.nio.channels.FileChannel.openReadNonblocking(path).use { input ->
+            require(limit >= 0)
+            val opened = input as? borg.trikeshed.userspace.nio.channels.UringFileChannel
+                ?: throw UnsupportedOperationException("Opened file identity is unavailable")
+            val identity = opened.identity()
+            val buffer = borg.trikeshed.userspace.nio.ByteBuffer.allocate(64 * 1024)
+            var total = 0L
+            while (true) {
+                val remaining = limit - total
+                val request = if (remaining >= buffer.array().size) buffer.array().size else (remaining + 1).toInt()
+                buffer.clear()
+                buffer.limit(request)
+                val count = input.read(buffer)
+                if (count < 0) break
+                check(count > 0) { "File read stalled" }
+                total += count
+                consume(buffer.array(), count)
+                if (total > limit) break
+            }
+            val ring = borg.trikeshed.userspace.nio.channels.UringChannels.open()
+            val pathIdentity = try {
+                val op = borg.trikeshed.userspace.UringOp.Companion.Submissions.statx(
+                    borg.trikeshed.userspace.UringOp.AT_FDCWD, path, 0, borg.trikeshed.userspace.UringOp.STATX_BASIC_STATS, 0)
+                val result = ring.execute(op)
+                if (result != 0) throw borg.trikeshed.userspace.nio.UringIOException(borg.trikeshed.userspace.UringOp.STATX, result)
+                borg.trikeshed.userspace.nio.channels.fileIdentity(borg.trikeshed.userspace.Statx.of(op))
+            } finally { ring.closeNow() }
+            if (opened.identity() != identity || pathIdentity != identity) throw FileChangedException()
+            total
+        }
 
     override fun readString(filename: String): String =
         NioFiles.readString(pathOf(filename), StandardCharsets.UTF_8)

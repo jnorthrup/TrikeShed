@@ -108,6 +108,15 @@ internal class UringFileChannel(
         return Statx.of(statx).stx_size.toLong().also { if (it < 0) throw IOException("File size unavailable") }
     }
 
+    /** Snapshot of the opened descriptor, not its pathname. */
+    internal fun identity(): FileStamp {
+        checkOpen()
+        val submission = UringOp.Companion.Submissions.statx(file.id, "", UringOp.AT_EMPTY_PATH, UringOp.STATX_BASIC_STATS, nextToken++)
+        val result = channel.execute(submission)
+        if (result != 0) throw UringIOException(UringOp.STATX, result)
+        return fileIdentity(Statx.of(submission))
+    }
+
     override fun truncate(size: Long): FileChannel {
         checkOpen()
         if (!writable) throw NonWritableChannelException()
@@ -212,4 +221,17 @@ internal class UringFileChannel(
     override fun tryLock(position: Long, size: Long, shared: Boolean): FileLock? =
         throw UnsupportedOperationException("File locking is not implemented")
     override fun tryLock(): FileLock? = tryLock(0, Long.MAX_VALUE, false)
+}
+
+internal data class FileStamp(
+    val major: UInt, val minor: UInt, val inode: ULong, val size: ULong,
+    val modified: Long, val modifiedNanos: Int, val changed: Long, val changedNanos: Int,
+)
+
+/** Require identity and timestamps; the comparison does not freeze an external writer. */
+internal fun fileIdentity(stat: Statx): FileStamp {
+    check(stat.buffer.getInt(0) and 0x3c3 == 0x3c3 && stat.stx_ino != 0uL) { "File identity unavailable" }
+    check(stat.stx_mode and 0xf000 == 0x8000) { "Source is not a regular file" }
+    return FileStamp(stat.stx_dev_major, stat.stx_dev_minor, stat.stx_ino, stat.stx_size,
+        stat.buffer.getLong(0x70), stat.buffer.getInt(0x78), stat.buffer.getLong(0x60), stat.buffer.getInt(0x68))
 }
