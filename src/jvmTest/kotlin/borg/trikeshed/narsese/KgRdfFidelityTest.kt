@@ -102,7 +102,27 @@ class KgRdfFidelityTest {
         assertFailsWith<IllegalArgumentException> { KgNalBridge.parseTurtle("<urn:s> <urn:p> " + many.view.joinToString(",") + " .") }
     }
 
-    @Test fun actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate() = runBlocking {
+    @Test fun structuralCommentLineEndingsPreserveAllTriplesAndLongLiteralContent() {
+        val expected = _l["<urn:a>", "<urn:b>"]
+        for (eol in s_["\r", "\r\n", "\n"].view) {
+            val input = "# header${eol}@prefix ex: <urn:> .${eol}" +
+                "ex:a ex:p ex:o . # middle${eol}ex:b ex:p ex:o ."
+            assertEquals(expected, KgNalBridge.parseTurtle(input).map { it.subject }, "Structural EOL must not swallow valid data")
+        }
+        val mixed = "# header\r@prefix ex: <urn:> .\r\nex:a ex:p ex:o . # middle\rex:b ex:p ex:o .\n"
+        assertEquals(expected, KgNalBridge.parseTurtle(mixed).map { it.subject })
+        val literal = "a\rb\r\nc\nd"
+        val long = "<urn:a> <urn:p> \"\"\"$literal\"\"\" . # tail\r<urn:b> <urn:p> <urn:o> ."
+        val rows = KgNalBridge.parseTurtle(long)
+        assertEquals(2, rows.size)
+        assertEquals(RdfTerm.Literal(literal), TurtleRdf.parseTerm(rows[0].obj), "Long literal CR/CRLF/LF must remain exact")
+        assertEquals("<urn:b>", rows[1].subject)
+        assertFailsWith<IllegalArgumentException> { KgNalBridge.parseTurtle("<urn:a> <urn:p> \"a\rb\" .") }
+        // Existing permissive readers retain their previous separate behavior.
+        assertEquals(1, TurtleRdf.parse("# header\r<urn:a> <urn:p> <urn:o> .").triples.size)
+    }
+
+    @Test fun actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate(): Unit = runBlocking {
         withTimeout(10_000) {
             val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
             try {

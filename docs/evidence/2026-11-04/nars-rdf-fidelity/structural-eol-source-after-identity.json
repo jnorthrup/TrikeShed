@@ -1,0 +1,10 @@
+{
+  "scope": "Post-fix actual source overlay against immutable v59 dependencies, not final artifact proof",
+  "overlayDirectory": "/workspace/library-files/nars-rdf-fidelity-fix-proof/classes-attempt5",
+  "overlayTurtleClassSha256": "917566df531e365e30d4e138e75bfe14eca1cc17527c5e564dfe40af6e6f79c4",
+  "overlayExecutionIdentitySha256": "29bf790028acd24bfcbd3d997a9ec9d04205f1c1cc6f81d7af04c843065cff8c",
+  "friendPaths": false,
+  "productionSourceOverlays": true,
+  "runtimeSeconds": 0.24686624500100152,
+  "sameExactBeforeInputs": true
+}

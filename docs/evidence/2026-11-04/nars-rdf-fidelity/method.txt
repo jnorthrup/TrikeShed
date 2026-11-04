@@ -21,3 +21,13 @@ preserving valid raw TAB. This is not a full Turtle conformance benchmark.
 These files are unchanged BEFORE observations. Focused new-source regressions
 are pre-integration checks, not evidence that a coordinated new JAR passed.
 Final AFTER comparison against a fresh root-selected artifact remains pending.
+
+CR-only structural/comment follow-up: the structural-eol-source-before/after
+files are deliberately SOURCE-OVERLAY observations over immutable v59 dependencies,
+not results from a frozen production artifact. The exact same header-CR,
+body-comment-CR and CRLF inputs changed from [0,1,1] actual rows to [1,2,1]. The new
+regression additionally checks mixed structural endings and exact long-literal
+CR/CRLF/LF values. The annotated coroutine test now has an explicit Unit/void
+return; the source driver checks that discovery contract before invocation.
+v61 compiled but ran 160 instead of 161 methods and is incomplete, not GREEN.
+Final coordinated artifact evidence will be appended only after a new valid run.
