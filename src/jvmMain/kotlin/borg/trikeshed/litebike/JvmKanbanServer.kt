@@ -396,11 +396,11 @@ class JvmKanbanServer(
         // KG source identities must name the original body bytes, never UTF-8 replacement text.
         if (method == "POST" && path.substringBefore('?') == "/api/beliefs/kg") {
             val boundary = indexOfHeaderBoundary(payload, payload.size)
-            val bodyStart = if (boundary >= 0) boundary + 4 else {
-                (0 until payload.lastIndex).firstOrNull {
-                    payload[it] == '\n'.code.toByte() && payload[it + 1] == '\n'.code.toByte()
-                }?.plus(2) ?: 0
+            val lfBoundary = (0 until payload.lastIndex).firstOrNull {
+                payload[it] == '\n'.code.toByte() && payload[it + 1] == '\n'.code.toByte()
             }
+            val bodyStart = if (boundary >= 0 && (lfBoundary == null || boundary < lfBoundary)) boundary + 4
+                else lfBoundary?.plus(2) ?: 0
             try {
                 payload.decodeToString(bodyStart, payload.size, throwOnInvalidSequence = true)
             } catch (_: CharacterCodingException) {

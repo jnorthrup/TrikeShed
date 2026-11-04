@@ -17,6 +17,7 @@ class KgHttpUtf8Test {
             _a[0xe2.toByte(), 0x82.toByte()],
             _a[0xed.toByte(), 0xa0.toByte(), 0x80.toByte()],
             _a[0xc0.toByte(), 0xaf.toByte()],
+            _a[0xff.toByte()] + "\r\n\r\n(pays Tenant Landlord)".encodeToByteArray(),
         ]
         for (bytes in malformed.view) {
             for (boundary in s_["\r\n", "\n"].view) {
