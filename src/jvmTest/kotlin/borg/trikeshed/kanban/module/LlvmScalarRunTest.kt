@@ -92,8 +92,13 @@ class LlvmScalarRunTest {
             val command = first.request("GET", "/api/lcnc/content?cid=${receipt["receiptCid"]}")
             assertEquals(receipt["runId"], (command["lcncRun"] as Map<*, *>)["runId"])
             first.files.mkdirs("build/reports/sulong")
-            first.files.write("build/reports/sulong/receipt.json", jsonOf(receipt).encodeToByteArray())
-            first.files.write("build/reports/sulong/invocations.json", jsonOf(evidence).encodeToByteArray())
+            for ((name, field) in s_["receipt" j "receiptCid", "invocations" j "invocationsCid"].view) {
+                val cid = ContentId(receipt[field] as String)
+                val retained = checkNotNull(first.cas.get(cid))
+                assertEquals(cid, ContentId.of(retained))
+                first.files.write("build/reports/sulong/$name.json", retained)
+            }
+            first.files.write("build/reports/sulong/response-preview.json", jsonOf(receipt).encodeToByteArray())
         } finally { first.close() }
 
         val second = Session(directory, coroutineContext)
