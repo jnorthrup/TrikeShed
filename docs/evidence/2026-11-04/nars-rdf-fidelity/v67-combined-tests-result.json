@@ -1,0 +1,212 @@
+{
+  "result": "PASS",
+  "tests": [
+    {
+      "name": "KgRdfFidelityTest.actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 244642270
+    },
+    {
+      "name": "KgRdfFidelityTest.iriLiteralAndBlankNodeKindsDoNotCollapseInTheSameSourceContext",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 3325809
+    },
+    {
+      "name": "KgRdfFidelityTest.languageDatatypeAndLexicalSpellingRemainPartOfTheTerm",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 4860090
+    },
+    {
+      "name": "KgRdfFidelityTest.prefixesShorthandAndPredicateIriMappingRemainExplicit",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 3342734
+    },
+    {
+      "name": "KgRdfFidelityTest.punctuationEscapesAndUnicodeRemainOneCompleteLiteral",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 7889778
+    },
+    {
+      "name": "KgRdfFidelityTest.structuralCommentLineEndingsPreserveAllTriplesAndLongLiteralContent",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 4643669
+    },
+    {
+      "name": "KgRdfFidelityTest.unsupportedAndMalformedInputNeverYieldsAValidPrefix",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 39328625
+    },
+    {
+      "name": "KgPropositionIdentityTest.codecKeepsHistoricalNullBytesAndReadsTenElevenAndTwelveFields",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 3760256
+    },
+    {
+      "name": "KgPropositionIdentityTest.identityPreservesPredicateOrderedRolesTemporalAndDeclaredContextButExcludesEvidence",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 6259936
+    },
+    {
+      "name": "KgPropositionIdentityTest.knownIdentitySurvivesCasAndWalAndRefusalsDoNotRewriteHistory",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 18075112
+    },
+    {
+      "name": "KgPropositionIdentityTest.knownUnknownMixingCannotUpgradeOrEraseIdentityInEitherDirection",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 5465641
+    },
+    {
+      "name": "KgPropositionIdentityTest.naturalPredicateCollisionRefusesBeforeSameReceiptReplayAndKeepsActorHealthy",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 3911640
+    },
+    {
+      "name": "KgPropositionIdentityTest.realTextAndCursorConsumersCannotCrossPredicatesOrPartiallyMintMalformedKif",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 41645354
+    },
+    {
+      "name": "KgPropositionIdentityTest.strictKifRetainsBinaryGroundLiteralsAndRejectsScopedOrLossyForms",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 4890676
+    },
+    {
+      "name": "BeliefAdmissionTest.lcncReinforcementRequiresSourceFieldsAndReportsOnlyProcessedCommands",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 68738504
+    },
+    {
+      "name": "BeliefAdmissionTest.onlyNonemptyDisjointExactLeavesIncreaseEvidence",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 11682239
+    },
+    {
+      "name": "BeliefAdmissionTest.receiptArchivedAfterPlacementRejectionCannotBeCountedAgain",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 12072222
+    },
+    {
+      "name": "BeliefAdmissionTest.reinforcementCannotBypassUnknownAncestryAfterLegacyAdmissionOrWalReplay",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 6775106
+    },
+    {
+      "name": "BeliefAdmissionTest.reinforcementRequiresReceiptsAndNeverTurnsRepeatedSourcesIntoNewEvidence",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 8925840
+    },
+    {
+      "name": "BeliefAdmissionTest.replayPreservesHistoryButDoesNotInventLostExactAncestry",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 4797989
+    },
+    {
+      "name": "BeliefAdmissionTest.spillRevivalChecksPriorIdentityAndRevisesExactlyOnce",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 4197645
+    },
+    {
+      "name": "BeliefAdmissionTest.structureRefusalPreservesResidentAndMetadataAndTheActorKeepsWorking",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 4161053
+    },
+    {
+      "name": "BeliefAdmissionTest.unavailableHistoryCannotBeResetByAnIncomingObservation",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 6367122
+    },
+    {
+      "name": "BeliefAdmissionTest.unknownEmptyAndLegacyAncestryCannotBecomeIndependentSupport",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 3309064
+    },
+    {
+      "name": "HermesMemoryFeedbackTest.deletingRetrievedMemoryDemotesAttentionWithoutRefutingItsProposition",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 21666909
+    },
+    {
+      "name": "KifSemanticTest.connectivesFunctionsAndQuotedSyntaxStayStructured",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 166751131
+    },
+    {
+      "name": "KifSemanticTest.malformedAndOversizedInputsFailBeforeRecursiveDecode",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 2455585
+    },
+    {
+      "name": "KifSemanticTest.malformedUtf16IsRejectedAndNonBmpSyntaxRoundTrips",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 1023418
+    },
+    {
+      "name": "KifSemanticTest.modalityAndHigherOrderFormsAreRetainedWithoutExecution",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 3702607
+    },
+    {
+      "name": "KifSemanticTest.repeatedQuotationPreservesNestedSyntaxAndDoesNotCaptureVariables",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 5889606
+    },
+    {
+      "name": "KifSemanticTest.shadowedBindersAreDistinctAndAlphaSafe",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 3485702
+    },
+    {
+      "name": "PropositionReadbackTest.cursorLcncAndHttpExposeOptionalIdentityWithoutChangingEvidence",
+      "status": "PASS",
+      "jvmReturnType": "void",
+      "runtimeNanos": 23299133
+    }
+  ],
+  "productionCodeSources": {
+    "BeliefBagElement": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "KgNalBridge": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "TurtleRdf": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "SignalCodec": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "SemanticSignal": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "KifSemantic": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "BeliefWire": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "KgBeliefIntakeKt": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar"
+  },
+  "allAnnotatedMethodsVoid": true,
+  "productionOverlays": false,
+  "friendPaths": false,
+  "modelCalls": 0,
+  "liveBagAccess": false
+}

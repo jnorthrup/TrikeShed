@@ -113,3 +113,11 @@ Tests/drivers only were compiled, with production CodeSource/JAR checks and no
 overlays/friends. v62 remains an intermediate historical result; this combined
 result is separately named v66-combined in the evidence directory. Source/role
 reasoning, authentication and coexistence limits above still apply.
+
+The subsequent combined v67 checkpoint also passes the same 32 fixed methods and
+RDF/CR comparisons against source 78322850881924d6cfbee3b9c216f937e6dabc64,
+JAR SHA256 39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4.
+All test/driver/helper source hashes are identical to the executed v66 proof;
+only the selected production artifact changes. New evidence is separately named
+v67-combined. Earlier source/JAR identities and declared reasoning limits remain
+unchanged. No future copular-template behavior is included in this checkpoint.
