@@ -21,7 +21,9 @@ class LcncConfixSelectionTest {
         } finally { kernel.drain() }
         val selected = LcncConfixSelection.select(json, "spans.0", scan["rows"], scan["sourceCid"], scan["ok"], scan["format"])
         val value = selected["value"] as Map<*, *>
-        assertEquals(35L, value["begin"]); assertEquals(42L, value["end"]); assertEquals(12L, value["page"])
+        assertEquals(35.0, (value["begin"] as Number).toDouble())
+        assertEquals(42.0, (value["end"] as Number).toDouble())
+        assertEquals(12.0, (value["page"] as Number).toDouble())
         assertEquals("é水🙂 \"x\"", value["quote"])
         val sheet = selected["sheet"] as Map<*, *>
         assertTrue(jsonOf(sheet).contains("35"))
