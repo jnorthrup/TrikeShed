@@ -76,11 +76,13 @@ object PiPage {
     private var sessionId: String? = null
     private var state = "closed"
     private var lastResult = ""
+    private var contextId = URLSearchParams(window.location.search).get("context")?.take(128).orEmpty()
+    private var contextUnavailable = false
     private val project = URLSearchParams(window.location.search).get("project")?.take(256).orEmpty()
     private val storagePrefix = "trikeshed.pi." + project + "."
     private fun token() = byId("pi-token") as HTMLInputElement
     private fun model() = byId("pi-model") as HTMLSelectElement
-    private fun breadcrumb() = byId("pi-breadcrumb") as HTMLInputElement
+    private fun breadcrumb() = byId("pi-breadcrumb") as HTMLSelectElement
     private fun prompt() = byId("pi-prompt") as HTMLTextAreaElement
     private fun button(id: String) = byId(id) as HTMLButtonElement
     private fun status(message: String) { byId("pi-status").textContent = message }
@@ -93,10 +95,15 @@ object PiPage {
         token().disabled = busy
         button("pi-refresh").disabled = busy || !hasToken
         model().disabled = busy || !verified || sessionId != null
-        breadcrumb().disabled = busy || sessionId != null
-        button("pi-start").disabled = busy || !verified || sessionId != null || model().value.isBlank()
+        breadcrumb().disabled = busy || !verified || sessionId != null
+        button("pi-start").disabled = busy || !verified || sessionId != null || model().value.isBlank() || contextUnavailable
         button("pi-close").disabled = busy || !verified || sessionId == null || state == "closing"
         button("pi-send").disabled = busy || !verified || sessionId == null || state != "ready" || prompt().value.isBlank()
+    }
+    private fun contextLink(id: String) {
+        val link = byId("pi-context")
+        link.hidden = id.isBlank()
+        if (id.isNotBlank()) link.setAttribute("href", "/modelmux?context=" + js("encodeURIComponent")(id))
     }
     private suspend fun request(path: String, body: dynamic = null): dynamic {
         val headers = jsonHeaders(); headers.Authorization = "Bearer " + token().value
@@ -172,9 +179,7 @@ object PiPage {
                 if (page.closing || ticket != revision || sessionId != id) return@submit
                 state = strOrEmpty(value.state).ifBlank { "unknown" }
                 val context = strOrEmpty(value.contextId)
-                val contextLink = byId("pi-context")
-                contextLink.hidden = context.isBlank() || value.contextRetained != true
-                if (context.isNotBlank()) contextLink.setAttribute("href", "/modelmux?context=" + js("encodeURIComponent")(context))
+                contextLink(if (value.contextRetained == true) context else "")
                 if (jsTypeOf(value.model) == "string") model().value = str(value.model)
                 if (js("Array").isArray(value.workspaceFiles) as Boolean && jsArray(value.workspaceFiles).isNotEmpty()) {
                     byId("pi-project").hidden = false
@@ -205,7 +210,6 @@ object PiPage {
     }
     fun mount() {
         terminalWrite("Pi · xterm-256color\r\n")
-        breadcrumb().value = URLSearchParams(window.location.search).get("context")?.take(128).orEmpty()
         if (project.isNotEmpty()) {
             byId("pi-project").hidden = false
             byId("pi-project").textContent = "Project navigation context: $project. It is not automatically attached to this session."
@@ -236,6 +240,12 @@ object PiPage {
                 status("Refresh models to authenticate this Pi token."); controls()
             })
             page.on(model(), "change", { controls() })
+            page.on(breadcrumb(), "change", {
+                contextId = breadcrumb().value; contextUnavailable = false
+                contextLink(contextId)
+                status(if (contextId.isBlank()) "Pi will start with a new breadcrumb context." else "Pi will use the selected retained context.")
+                controls()
+            })
             page.on(prompt(), "input", { remember("draft", prompt().value); controls() })
             page.on(prompt(), "keydown", { event: dynamic ->
                 if (event.key == "Enter" && event.shiftKey != true && event.isComposing != true) {
@@ -254,8 +264,27 @@ object PiPage {
                         for (entry in jsArray(value.models)) if (jsTypeOf(entry?.id) == "string" && str(entry.id).isNotBlank()) {
                             val option = window.document.createElement("option").asDynamic(); option.value = str(entry.id); option.textContent = str(entry.id); model().appendChild(option)
                         }
+                        breadcrumb().textContent = ""
+                        val fresh = window.document.createElement("option").asDynamic(); fresh.value = ""; fresh.textContent = "New context"; breadcrumb().appendChild(fresh)
+                        contextUnavailable = contextId.isNotBlank()
+                        for (entry in jsArray(value.contexts)) if (jsTypeOf(entry?.context) == "string" && str(entry.context).isNotBlank()) {
+                            val id = str(entry.context)
+                            val option = window.document.createElement("option").asDynamic()
+                            option.value = id
+                            option.textContent = strOrEmpty(entry.model).ifBlank { "Retained context" } + " · " + strOrEmpty(entry.records) + " records · " + id
+                            breadcrumb().appendChild(option)
+                            if (id == contextId) contextUnavailable = false
+                        }
+                        if (contextUnavailable) {
+                            val missing = window.document.createElement("option").asDynamic()
+                            missing.value = contextId; missing.textContent = "Unavailable context · " + contextId; missing.disabled = true
+                            breadcrumb().appendChild(missing)
+                        }
+                        breadcrumb().value = contextId
+                        contextLink(if (contextUnavailable) "" else contextId)
                         verified = true
-                        status(if (value.available == true && model().options.length > 1) "Select a model to start Pi." else "No Pi models are available from this host.")
+                        status(if (contextUnavailable) "The selected breadcrumb context is unavailable. Choose another context or New context."
+                            else if (value.available == true && model().options.length > 1) "Select a model to start Pi." else "No Pi models are available from this host.")
                         sessionId?.let { poll(ticket, it) }
                     } catch (e: Throwable) { if (!page.closing && ticket == revision) status(e.message ?: "Pi is unavailable") }
                     finally { if (!page.closing && ticket == revision) { busy = false; controls() } }

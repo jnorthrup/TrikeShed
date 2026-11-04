@@ -47,6 +47,7 @@ class CamelDispatchOwnershipTest {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             val waiter = async { runner.run(node, emptyMap()) }
 ||||||| 0b5584266
             val waiter = async { runner.run(node, _m[]) }
@@ -98,6 +99,11 @@ class CamelDispatchOwnershipTest {
 =======
             val waiter = async { runner.run(node, _m.get()) }
 >>>>>>> d7216e115738f2b8df4295c93c32fbb15c1be3e0
+||||||| a39e91f9e
+            val waiter = async { runner.run(node, _m[]) }
+=======
+            val waiter = async { runner.run(node, _m.get()) }
+>>>>>>> e4affdace595940b8e99b54ecb6c37e898cf4015
             assertSame(owner, withTimeout(5000) { entered.await() })
             waiter.cancelAndJoin()
             val drain = async { owner.drain() }
@@ -108,6 +114,7 @@ class CamelDispatchOwnershipTest {
             withTimeout(5000) { drain.await() }
             assertTrue(finished.isCompleted)
             assertTrue(owner.closed.isCompleted)
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -169,6 +176,11 @@ class CamelDispatchOwnershipTest {
 =======
             assertFailsWith<IllegalStateException> { runner.run(node, _m.get()) }
 >>>>>>> d7216e115738f2b8df4295c93c32fbb15c1be3e0
+||||||| a39e91f9e
+            assertFailsWith<IllegalStateException> { runner.run(node, _m[]) }
+=======
+            assertFailsWith<IllegalStateException> { runner.run(node, _m.get()) }
+>>>>>>> e4affdace595940b8e99b54ecb6c37e898cf4015
         } finally {
             release.complete(Unit)
             withContext(NonCancellable) { owner.drain(); root.cancelAndJoin() }

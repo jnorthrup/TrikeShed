@@ -604,6 +604,12 @@ class XtermTerminal(
                 scrollbackRows.clear(); scrollbackRowIds.clear(); revision++
             }
         }
+<<<<<<< HEAD
+||||||| a39e91f9e
+        if (mode == 3) scrollbackRows.clear()
+=======
+        if (mode == 3) { scrollbackRows.clear(); scrollbackRowIds.clear() }
+>>>>>>> e4affdace595940b8e99b54ecb6c37e898cf4015
     }
 
     private fun eraseLine(mode: Int) = when (mode) {
