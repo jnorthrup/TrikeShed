@@ -1,0 +1,86 @@
+{
+  "publicApiIdentical": {
+    "edu.stanford.nlp.pipeline.StanfordCoreNLP": true,
+    "edu.stanford.nlp.pipeline.CoreDocument": true,
+    "edu.stanford.nlp.pipeline.CoreSentence": true,
+    "edu.stanford.nlp.ling.IndexedWord": true,
+    "edu.stanford.nlp.semgraph.SemanticGraph": true,
+    "edu.stanford.nlp.semgraph.SemanticGraphEdge": true
+  },
+  "changedApi": {},
+  "syntaxWeightResources": [
+    {
+      "path": "edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger",
+      "4.5.10": {
+        "bytes": 13547114,
+        "sha256": "25d3f63ba8b7e6c83156ac3869f5ef611df4398c44434775f284c1984484868c"
+      },
+      "4.6.0": {
+        "bytes": 13547114,
+        "sha256": "25d3f63ba8b7e6c83156ac3869f5ef611df4398c44434775f284c1984484868c"
+      },
+      "identical": true
+    },
+    {
+      "path": "edu/stanford/nlp/models/parser/nndep/english_UD.gz",
+      "4.5.10": {
+        "bytes": 13653968,
+        "sha256": "b6ddc3f9bdfde9cb30d03ec51d656e5313b1939c1017324d5b9c4dcb65ee6c62"
+      },
+      "4.6.0": {
+        "bytes": 13653968,
+        "sha256": "b6ddc3f9bdfde9cb30d03ec51d656e5313b1939c1017324d5b9c4dcb65ee6c62"
+      },
+      "identical": true
+    },
+    {
+      "path": "edu/stanford/nlp/models/parser/nndep/english_SD.gz",
+      "4.5.10": {
+        "bytes": 13666012,
+        "sha256": "74e12b542eaa89f1ba49c51ed0a86be01245d46e9b74d260cde8d7ac4166c921"
+      },
+      "4.6.0": {
+        "bytes": 13666012,
+        "sha256": "74e12b542eaa89f1ba49c51ed0a86be01245d46e9b74d260cde8d7ac4166c921"
+      },
+      "identical": true
+    },
+    {
+      "path": "edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz",
+      "4.5.10": {
+        "bytes": 32340590,
+        "sha256": "b474b216183022f4d24f6006e4b8e084642f645525337378e5582f0e8768a9fe"
+      },
+      "4.6.0": {
+        "bytes": 32340590,
+        "sha256": "b474b216183022f4d24f6006e4b8e084642f645525337378e5582f0e8768a9fe"
+      },
+      "identical": true
+    },
+    {
+      "path": "edu/stanford/nlp/models/ner/english.muc.7class.distsim.crf.ser.gz",
+      "4.5.10": {
+        "bytes": 18196091,
+        "sha256": "ad7cc40d1483edc9109ff9b7185143c56f71d265ec027bc25bc5dfc80a8b4321"
+      },
+      "4.6.0": {
+        "bytes": 18196091,
+        "sha256": "ad7cc40d1483edc9109ff9b7185143c56f71d265ec027bc25bc5dfc80a8b4321"
+      },
+      "identical": true
+    },
+    {
+      "path": "edu/stanford/nlp/models/ner/english.conll.4class.distsim.crf.ser.gz",
+      "4.5.10": {
+        "bytes": 17906276,
+        "sha256": "f3c0e0eaa51e9f5b846214a10c31876fd626ddc812472603f6cde2b2f112e0c2"
+      },
+      "4.6.0": {
+        "bytes": 17906276,
+        "sha256": "f3c0e0eaa51e9f5b846214a10c31876fd626ddc812472603f6cde2b2f112e0c2"
+      },
+      "identical": true
+    }
+  ],
+  "jpmsDescribeReturn": 0
+}
