@@ -193,6 +193,7 @@ internal object DocumentsEnglish {
             for (value in values.view) text(row, "td", value).style.cssText = "padding:6px 8px;border-bottom:1px solid var(--rule);vertical-align:top"
         }
         private fun syntax(parent: HTMLElement, sentence: Map<*, *>) {
+            DocumentsSyntaxGraph.mount(parent, sentence)
             val tokens = (sentence["tokens"] as List<*>).map { it as Map<*, *> }
             val tokenTable = table(parent, s_["#", "Source word", "Lemma", "POS", "Entity tag", "Text range"])
             for (token in tokens) cells(tokenTable, s_[token["index"].toString(), token["word"].toString(), token["lemma"].toString(),
