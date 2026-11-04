@@ -22,6 +22,7 @@ class KgRouteErrorTest {
                 "<urn:s> <urn:p> \"unterminated .",
                 "<urn:valid> <urn:p> <urn:o> .\n<urn:s> <urn:p> \"hello\"suffix .",
                 "unrecognized prose", "{\"@context\":{},\"value\":\"private\"}",
+                "{\"value\":\"private", "{\"value\":\"private" + "\\",
                 "(labels Tenant \"\uD800\")",
             ]
             for (input in invalid.view) owner(KgRetentionFixtureCas()) { bag, wire ->
