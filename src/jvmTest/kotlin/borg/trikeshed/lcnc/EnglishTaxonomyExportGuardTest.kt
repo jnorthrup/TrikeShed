@@ -79,7 +79,7 @@ class EnglishTaxonomyExportGuardTest {
         }
     }
 
-    @Test fun singleCarrierPlanRequiresAuthenticationAndPersistedCurrentApproval(): Unit = runBlocking {
+    @Test fun persistedCarrierReadDoesNotSupplyMissingTranslationProvenance(): Unit = runBlocking {
         val f = Fixture(directory)
         val candidate = f.candidate("english", "(subclass A B)\n(subclass B C)", "englishTaxonomyCarrier")
         val approved = f.ledger(this) { review ->
@@ -103,14 +103,14 @@ class EnglishTaxonomyExportGuardTest {
             withContext(f.actor) {
                 val read = review.taxonomyRead(approved.snapshotCid, approved.revision)
                 assertEquals(2, read.candidate.selections.size)
+                assertEquals(approved.snapshotCid, read.snapshotCid)
                 assertEquals(f.actor.id, read.reviewer)
                 assertTrue(read.synthetic)
-                val plan = ReviewedTaxonomyPlan.report(review, f.cas, approved.snapshotCid, approved.revision,
-                    "subclass", "A", "C")
-                assertEquals("SUPPORTED", plan["status"])
-                assertEquals(true, plan["positivePathProven"])
-                assertEquals(read.approvalCid.value, plan["approvalCid"])
-                assertEquals(2, (plan["selected"] as List<*>).size)
+                // A host-owned marker exercises admission policy but cannot stand in for D/I/K/R evidence.
+                assertFailsWith<IllegalArgumentException> {
+                    ReviewedTaxonomyPlan.report(review, f.cas, approved.snapshotCid, approved.revision,
+                        "subclass", "A", "C")
+                }
                 f.current = false
                 val stale = assertFailsWith<IllegalArgumentException> {
                     review.taxonomyRead(approved.snapshotCid, approved.revision)
