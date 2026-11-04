@@ -1,0 +1,61 @@
+{
+  "result": "PASS",
+  "scope": "Pure public API controls: selected source facts and exact retained CoreNLP4.6 observations; no native solver/parser/providers or production overlays. No network API invoked; no independent kernel network sandbox claimed.",
+  "executedSource": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "snapshot": "/workspace/library-files/english-combined-v67-proof/snapshot",
+  "mainJarSha256": "39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4",
+  "classpathSha256": "58c6623ac789e9ebb6f73e4edf072cefd4587c8b0c4fb097da0477df80a259b1",
+  "productionCodeSources": {
+    "borg.trikeshed.kif.KifTaxonomySnapshot": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.nlp.EnglishCorpus": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.nlp.EnglishLdaResult": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.nlp.EnglishCorpusView": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.forge.server.EnglishCorpusWire": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.job.ContentId": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+    "borg.trikeshed.parse.ReifyKt": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar"
+  },
+  "sources": {
+    "ArtifactOrigins.java": "0f92fad11bf5d2e94860a7dff7b306cbcbe516abc8ab0ccf538307b7f20de5de",
+    "CorpusPolicyProbe.java": "715acb6cf48ae3069c924a3d8b21c227aa2a754b9c83f51d0ad0525664c4e272",
+    "SymbolicProbe.java": "f5c514b563b8e549bb250efb596721c20e61f473a9ece89c256d741920b850e5"
+  },
+  "runnerSha256": "e86945ebd668c87063f501d1ca3c03bb0fb7c71377941bb0a67c5d78d03fc065",
+  "outputs": {
+    "code-sources.json": "fe1abe6060ab570b6fc9a9dee1f6a8ae2babf2915bc1223ca621f968bdc7dff2",
+    "taxonomy-result.txt": "2203cfa393eb68714dc88c8e456575b32260f5f304de7b97fe03a0e7bbc23137",
+    "corpus-policy-result.json": "63c645154899745736fd99705798df542ffbd6c1fc16a88bdc68ed98d4c0f8ea"
+  },
+  "authorization": {
+    "rootGreenGo": true,
+    "executedSource": "78322850881924d6cfbee3b9c216f937e6dabc64",
+    "mainJarSha256": "39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4"
+  },
+  "priorV66Comparison": {
+    "taxonomyOutputBytesUnchanged": true,
+    "corpusOutputBytesUnchanged": true,
+    "priorExecutedSource": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36"
+  },
+  "sharedExecution": "../shared/verification.json",
+  "corpusViewExecution": "../corpus-view/verification.json",
+  "publication": {
+    "corpusOutput": {
+      "stored": "corpus-policy-result.json.gz",
+      "uncompressedSha256": "63c645154899745736fd99705798df542ffbd6c1fc16a88bdc68ed98d4c0f8ea",
+      "storedSha256": "4989a77e78acfaee89ff81b963e88f7b27ccb2ada0d79104781c3f7f701f21a8"
+    },
+    "taxonomyOutput": "taxonomy-result.txt",
+    "sourceSuffix": ".java.txt and .py.txt retain external harness source, not production overlays or executable repository scripts"
+  },
+  "files": {
+    "ArtifactOrigins.java.txt": "0f92fad11bf5d2e94860a7dff7b306cbcbe516abc8ab0ccf538307b7f20de5de",
+    "CorpusPolicyProbe.java.txt": "715acb6cf48ae3069c924a3d8b21c227aa2a754b9c83f51d0ad0525664c4e272",
+    "README.txt": "71ff63ebd286349146940b653fa016479d6b3e66757837b488c06fd4cc855ffe",
+    "SymbolicProbe.java.txt": "f5c514b563b8e549bb250efb596721c20e61f473a9ece89c256d741920b850e5",
+    "authorized-artifacts.json": "ba1ad577267078d0f4cb0ee72dbb13a4bae139fbb3f23da9f35ff68132d4f896",
+    "code-sources.json": "fe1abe6060ab570b6fc9a9dee1f6a8ae2babf2915bc1223ca621f968bdc7dff2",
+    "corpus-policy-result.json.gz": "4989a77e78acfaee89ff81b963e88f7b27ccb2ada0d79104781c3f7f701f21a8",
+    "readtrace.json": "6ca32aacadb4a33900d984e3317ce9e5369fec6db9fea40908ab4fc11ce9de3f",
+    "run.py.txt": "e86945ebd668c87063f501d1ca3c03bb0fb7c71377941bb0a67c5d78d03fc065",
+    "taxonomy-result.txt": "2203cfa393eb68714dc88c8e456575b32260f5f304de7b97fe03a0e7bbc23137"
+  }
+}

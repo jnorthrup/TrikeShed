@@ -1,0 +1,32 @@
+{
+  "result": "SOURCE_TRACE_ONLY",
+  "executedSource": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "claim": "An unwired optional view port is absent; it is not injected as explicit null. No production source change. Actual whole-engine corpus graph control delegated to shared fixture.",
+  "chain": [
+    {
+      "path": "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncRunner.kt",
+      "line": 378,
+      "finding": "gather creates input entries only for actual fed wires and source outputs containing fromPort; absent output remains absent."
+    },
+    {
+      "path": "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncRunner.kt",
+      "line": 541,
+      "finding": "The gathered map is captured by the invocation ledger and later passed unchanged to registered runner.run."
+    },
+    {
+      "path": "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncNodeElement.kt",
+      "line": 76,
+      "finding": "The typed invocation calls runner.execute(node, inputs) on its stored map; no optional-input normalization or null fill."
+    },
+    {
+      "path": "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishCorpusContract.kt",
+      "line": 8,
+      "finding": "view? is optional; required input readiness does not manufacture an entry."
+    },
+    {
+      "path": "src/jvmMain/kotlin/borg/trikeshed/forge/server/EnglishCorpusWire.kt",
+      "line": 24,
+      "finding": "Request view is added only when normalized/optional-alias input or in:view/plain authored parameter exists."
+    }
+  ]
+}
