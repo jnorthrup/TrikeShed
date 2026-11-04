@@ -42,3 +42,12 @@ Synthetic helper evidence is in:
 It records the first actual CoreNLP 4.6 helper miss, a narrowly corrected replay
 of unchanged annotations, and later standalone JVM portability checks. Host/API,
 UI, commonJS, and final release behavior require their own coordinated proofs.
+
+Documents and LCNC
+After Inspect English locally, choose Inspect legal roles and quantities beside the corpus action. Current-source mode is the default; retained historical snapshot mode is explicit. The result preserves parent inspection and derived receipt identities, exact sentence/quantity wording, full copied-node identities, all reported modal/action subject/object roles, and unresolved conditions. A new English inspection invalidates the earlier candidate request; navigation ignores aborted or late responses.
+
+POST /api/documents/english/legal-patterns requires exactly receiptCid and mode (current or snapshot). document.english.patterns is the registered typed LCNC equivalent. Both use the existing bounded receipt/source verifier and the same owned request path, recheck currentness around derivation and retention, and retain/read back canonical candidate bytes. They do not rerun NLP or approve/admit facts.
+
+Coordinated v58 at8486ae5f0547c49bf1013a472eda3f505d7c58ac passed137 selected JVM checks with zero failures/errors/skips and built Documents, Pages and Spacegraph. The prior v57 commonJS build correctly rejected a JVM-only regex capture range; portable source offsets and Unicode/CRLF/tab regressions replaced it without excluding targets.
+
+Actual new-bundle browser verification passed under an external fixture outbound-denial filter using local CoreNLP4.6.0. Three native uploaded synthetic texts required exactly three explicit parses. Later role/quantity requests and three typed LCNC procedures reused retained observations; twelve CAS readbacks covered seven unique exact receipts. An independent Node/CBOR/SHA auditor checked complete directed dependencies,70 original tokens versus71 parser nodes, quantities and source spans, current409/historical modes, and negative tamper controls. All owners drained. One actual copy node occurred in a separate static phrase; this is not coverage of copied modal-action interpretation. Public synthetic evidence: docs/evidence/2026-11-04/english-legal-candidates. General English/legal accuracy and a production-wide OS air gap remain unestablished.
