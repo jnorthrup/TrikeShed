@@ -1,0 +1,3 @@
+(=> (and (assignedTo ?operator ?resource) (authorized ?operator Access)) (mayRead ?operator ?resource))
+(assignedTo Harbor Lark)
+(authorized Lark Access)

@@ -1,0 +1,1446 @@
+{
+  "kind": "invented-symbolic-inputs/1",
+  "cases": [
+    {
+      "id": "S1",
+      "title": "Explicit ground membership",
+      "englishCid": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+      "kifCid": "sha256:bee8bef51ff67e088cf05d1c6bdb226628c932a1580dd8134e6c6c2960fd4b2c",
+      "contextIri": "urn:fixture:legal:S1",
+      "declaredSorts": {
+        "Mira": "individual",
+        "Tenant": "class"
+      },
+      "records": [
+        {
+          "id": "S1:p1",
+          "kif": "(instance urn:fixture:legal:S1:Mira urn:fixture:legal:S1:Tenant)",
+          "quote": "Mira is a Tenant.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+            "begin": 0,
+            "end": 17,
+            "quote": "Mira is a Tenant.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:bee8bef51ff67e088cf05d1c6bdb226628c932a1580dd8134e6c6c2960fd4b2c",
+            "begin": 0,
+            "end": 64,
+            "quote": "(instance urn:fixture:legal:S1:Mira urn:fixture:legal:S1:Tenant)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+            "begin": 0,
+            "end": 17
+          }
+        }
+      ],
+      "question": "(instance urn:fixture:legal:S1:Mira urn:fixture:legal:S1:Tenant)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:44529a492ace2f628c89e784e6c1ab9612f36677a59b2ba82f04afaf725f0317",
+      "sourceDependenceGroup": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+      "termIdentities": {
+        "Mira": "urn:fixture:legal:S1:Mira",
+        "Tenant": "urn:fixture:legal:S1:Tenant"
+      }
+    },
+    {
+      "id": "S2",
+      "title": "Two-hop subclass chain",
+      "englishCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+      "kifCid": "sha256:72e305996ef8120aef14bac405b781f64ba776d9e0c2ed1953c9bc8756533ce9",
+      "contextIri": "urn:fixture:legal:S2",
+      "declaredSorts": {
+        "Finch": "class",
+        "Agent": "class",
+        "Entity": "class"
+      },
+      "records": [
+        {
+          "id": "S2:p1",
+          "kif": "(subclass urn:fixture:legal:S2:Finch urn:fixture:legal:S2:Agent)",
+          "quote": "A Finch is an Agent.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+            "begin": 0,
+            "end": 20,
+            "quote": "A Finch is an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:72e305996ef8120aef14bac405b781f64ba776d9e0c2ed1953c9bc8756533ce9",
+            "begin": 0,
+            "end": 64,
+            "quote": "(subclass urn:fixture:legal:S2:Finch urn:fixture:legal:S2:Agent)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+            "begin": 0,
+            "end": 20
+          }
+        },
+        {
+          "id": "S2:p2",
+          "kif": "(subclass urn:fixture:legal:S2:Agent urn:fixture:legal:S2:Entity)",
+          "quote": "An Agent is an Entity.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+            "begin": 21,
+            "end": 43,
+            "quote": "An Agent is an Entity.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:72e305996ef8120aef14bac405b781f64ba776d9e0c2ed1953c9bc8756533ce9",
+            "begin": 65,
+            "end": 130,
+            "quote": "(subclass urn:fixture:legal:S2:Agent urn:fixture:legal:S2:Entity)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+            "begin": 21,
+            "end": 43
+          }
+        }
+      ],
+      "question": "(subclass urn:fixture:legal:S2:Finch urn:fixture:legal:S2:Entity)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:23c4e736a46519b185968c677f1a5bbdf4eb9ca0fa07c75ceb40c0b7aa123c86",
+      "sourceDependenceGroup": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+      "termIdentities": {
+        "Finch": "urn:fixture:legal:S2:Finch",
+        "Agent": "urn:fixture:legal:S2:Agent",
+        "Entity": "urn:fixture:legal:S2:Entity"
+      }
+    },
+    {
+      "id": "S3",
+      "title": "Instance followed by subclass",
+      "englishCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+      "kifCid": "sha256:e954e44fcfba981616b3b07a0792ca443c0c1db9dfd6e2d38524d826a660bff7",
+      "contextIri": "urn:fixture:legal:S3",
+      "declaredSorts": {
+        "Mira": "individual",
+        "Tenant": "class",
+        "Agent": "class"
+      },
+      "records": [
+        {
+          "id": "S3:p1",
+          "kif": "(instance urn:fixture:legal:S3:Mira urn:fixture:legal:S3:Tenant)",
+          "quote": "Mira is a Tenant.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+            "begin": 0,
+            "end": 17,
+            "quote": "Mira is a Tenant.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:e954e44fcfba981616b3b07a0792ca443c0c1db9dfd6e2d38524d826a660bff7",
+            "begin": 0,
+            "end": 64,
+            "quote": "(instance urn:fixture:legal:S3:Mira urn:fixture:legal:S3:Tenant)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+            "begin": 0,
+            "end": 17
+          }
+        },
+        {
+          "id": "S3:p2",
+          "kif": "(subclass urn:fixture:legal:S3:Tenant urn:fixture:legal:S3:Agent)",
+          "quote": "A Tenant is an Agent.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+            "begin": 18,
+            "end": 39,
+            "quote": "A Tenant is an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:e954e44fcfba981616b3b07a0792ca443c0c1db9dfd6e2d38524d826a660bff7",
+            "begin": 65,
+            "end": 130,
+            "quote": "(subclass urn:fixture:legal:S3:Tenant urn:fixture:legal:S3:Agent)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+            "begin": 18,
+            "end": 39
+          }
+        }
+      ],
+      "question": "(instance urn:fixture:legal:S3:Mira urn:fixture:legal:S3:Agent)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:0f9ce6573124655b3a3efe2cac697125aa2c81b692f5e52ef2bff885f7fcf04d",
+      "sourceDependenceGroup": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+      "termIdentities": {
+        "Mira": "urn:fixture:legal:S3:Mira",
+        "Tenant": "urn:fixture:legal:S3:Tenant",
+        "Agent": "urn:fixture:legal:S3:Agent"
+      }
+    },
+    {
+      "id": "S4",
+      "title": "Instance and subclass remain different",
+      "englishCid": "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd",
+      "kifCid": "sha256:45b647fcc61460e79c556e6e8ddbfded5dcade42a11c005ff7cbbf6402c5ac8f",
+      "contextIri": "urn:fixture:legal:S4",
+      "declaredSorts": {
+        "Beacon": "individual",
+        "Device": "class"
+      },
+      "records": [
+        {
+          "id": "S4:p1",
+          "kif": "(instance urn:fixture:legal:S4:Beacon urn:fixture:legal:S4:Device)",
+          "quote": "Beacon is a Device.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd",
+            "begin": 0,
+            "end": 19,
+            "quote": "Beacon is a Device.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:45b647fcc61460e79c556e6e8ddbfded5dcade42a11c005ff7cbbf6402c5ac8f",
+            "begin": 0,
+            "end": 66,
+            "quote": "(instance urn:fixture:legal:S4:Beacon urn:fixture:legal:S4:Device)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd",
+            "begin": 0,
+            "end": 19
+          }
+        }
+      ],
+      "question": "(subclass urn:fixture:legal:S4:Beacon urn:fixture:legal:S4:Device)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:4bce2142fa8bd8f9df3c52bcbbf878ba88c70231e97e10eb229b8f5a73d0b7a8",
+      "sourceDependenceGroup": "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd",
+      "termIdentities": {
+        "Beacon": "urn:fixture:legal:S4:Beacon",
+        "Device": "urn:fixture:legal:S4:Device"
+      }
+    },
+    {
+      "id": "S5",
+      "title": "Ordered Horn roles",
+      "englishCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+      "kifCid": "sha256:0a1ab3d15d9e8e453e7467ba5ae170defded7244bdca7b4047d414773706bf9f",
+      "contextIri": "urn:fixture:legal:S5",
+      "declaredSorts": {
+        "Lark": "individual",
+        "Harbor": "resource",
+        "Access": "permission-token"
+      },
+      "records": [
+        {
+          "id": "S5:r1",
+          "kif": "(=> (and (assignedTo ?operator ?resource) (authorized ?operator Access)) (mayRead ?operator ?resource))",
+          "quote": "An authorized operator assigned to a resource may read it.",
+          "role": "rule",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+            "begin": 0,
+            "end": 58,
+            "quote": "An authorized operator assigned to a resource may read it.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:0a1ab3d15d9e8e453e7467ba5ae170defded7244bdca7b4047d414773706bf9f",
+            "begin": 0,
+            "end": 103,
+            "quote": "(=> (and (assignedTo ?operator ?resource) (authorized ?operator Access)) (mayRead ?operator ?resource))",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+            "begin": 0,
+            "end": 58
+          }
+        },
+        {
+          "id": "S5:p1",
+          "kif": "(assignedTo Harbor Lark)",
+          "quote": "The ordered assignment is Harbor then Lark.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+            "begin": 59,
+            "end": 102,
+            "quote": "The ordered assignment is Harbor then Lark.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:0a1ab3d15d9e8e453e7467ba5ae170defded7244bdca7b4047d414773706bf9f",
+            "begin": 104,
+            "end": 128,
+            "quote": "(assignedTo Harbor Lark)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+            "begin": 59,
+            "end": 102
+          }
+        },
+        {
+          "id": "S5:p2",
+          "kif": "(authorized Lark Access)",
+          "quote": "Lark is authorized for Access.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+            "begin": 103,
+            "end": 133,
+            "quote": "Lark is authorized for Access.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:0a1ab3d15d9e8e453e7467ba5ae170defded7244bdca7b4047d414773706bf9f",
+            "begin": 129,
+            "end": 153,
+            "quote": "(authorized Lark Access)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+            "begin": 103,
+            "end": 133
+          }
+        }
+      ],
+      "question": "(mayRead Lark Harbor)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:01b30c1c6900ab852912756ae13c519588ada3cba2f7d08635b56e8bb0c571b0",
+      "sourceDependenceGroup": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+      "termIdentities": {
+        "Lark": "Lark",
+        "Harbor": "Harbor",
+        "Access": "Access"
+      }
+    },
+    {
+      "id": "S6",
+      "title": "Missing authorization",
+      "englishCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+      "kifCid": "sha256:5427aad52ecd1e911128a54c00021bbaa7bce382d240e83698815a48501180e3",
+      "contextIri": "urn:fixture:legal:S6",
+      "declaredSorts": {
+        "Lark": "individual",
+        "Harbor": "resource",
+        "Access": "permission-token"
+      },
+      "records": [
+        {
+          "id": "S6:r1",
+          "kif": "(=> (and (assignedTo ?operator ?resource) (authorized ?operator Access)) (mayRead ?operator ?resource))",
+          "quote": "An authorized operator assigned to a resource may read it.",
+          "role": "rule",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+            "begin": 0,
+            "end": 58,
+            "quote": "An authorized operator assigned to a resource may read it.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:5427aad52ecd1e911128a54c00021bbaa7bce382d240e83698815a48501180e3",
+            "begin": 0,
+            "end": 103,
+            "quote": "(=> (and (assignedTo ?operator ?resource) (authorized ?operator Access)) (mayRead ?operator ?resource))",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+            "begin": 0,
+            "end": 58
+          }
+        },
+        {
+          "id": "S6:p1",
+          "kif": "(assignedTo Lark Harbor)",
+          "quote": "Lark is assigned to Harbor.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+            "begin": 59,
+            "end": 86,
+            "quote": "Lark is assigned to Harbor.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:5427aad52ecd1e911128a54c00021bbaa7bce382d240e83698815a48501180e3",
+            "begin": 104,
+            "end": 128,
+            "quote": "(assignedTo Lark Harbor)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+            "begin": 59,
+            "end": 86
+          }
+        }
+      ],
+      "question": "(mayRead Lark Harbor)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:928f71e5c822017e18bcc86f46472ffb4ef2d33e7fef446d7d0a7548649f9de4",
+      "sourceDependenceGroup": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+      "termIdentities": {
+        "Lark": "Lark",
+        "Harbor": "Harbor",
+        "Access": "Access"
+      }
+    },
+    {
+      "id": "S7",
+      "title": "Guarded norm",
+      "englishCid": "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc",
+      "kifCid": "sha256:9af34f4c23742f05f97cd14a9635113d683bfda5fba986191a7655d9ab9cb86c",
+      "contextIri": "urn:fixture:legal:S7",
+      "declaredSorts": {
+        "Clerk": "individual",
+        "Report": "resource"
+      },
+      "records": [
+        {
+          "id": "S7:r1",
+          "kif": "(=> (received Clerk Report) (mustFile Clerk Report))",
+          "quote": "If Clerk receives Report, Clerk must file Report.",
+          "role": "guarded-norm",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc",
+            "begin": 0,
+            "end": 49,
+            "quote": "If Clerk receives Report, Clerk must file Report.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:9af34f4c23742f05f97cd14a9635113d683bfda5fba986191a7655d9ab9cb86c",
+            "begin": 0,
+            "end": 52,
+            "quote": "(=> (received Clerk Report) (mustFile Clerk Report))",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc",
+            "begin": 0,
+            "end": 49
+          }
+        }
+      ],
+      "question": "(mustFile Clerk Report)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:0807932838f6cc4cc6b6585b2ce1c0616417257e501936d27734ebf782b9eff7",
+      "sourceDependenceGroup": "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc",
+      "termIdentities": {
+        "Clerk": "Clerk",
+        "Report": "Report"
+      }
+    },
+    {
+      "id": "S8",
+      "title": "Unresolved exception",
+      "englishCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+      "kifCid": "sha256:177a3751d903b67fd7f75a8e802477cf0d819972cbd617b0bc9797eee11c6fe0",
+      "contextIri": "urn:fixture:legal:S8",
+      "declaredSorts": {
+        "Clerk": "individual",
+        "Record": "resource"
+      },
+      "records": [
+        {
+          "id": "S8:r1",
+          "kif": "(=> (and (requested Clerk Record) (not (sealed Record))) (mayRead Clerk Record))",
+          "quote": "Clerk may read Record unless Record is sealed.",
+          "role": "exception-rule",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+            "begin": 0,
+            "end": 46,
+            "quote": "Clerk may read Record unless Record is sealed.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:177a3751d903b67fd7f75a8e802477cf0d819972cbd617b0bc9797eee11c6fe0",
+            "begin": 0,
+            "end": 80,
+            "quote": "(=> (and (requested Clerk Record) (not (sealed Record))) (mayRead Clerk Record))",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+            "begin": 0,
+            "end": 46
+          }
+        },
+        {
+          "id": "S8:p1",
+          "kif": "(requested Clerk Record)",
+          "quote": "Clerk requests Record.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+            "begin": 47,
+            "end": 69,
+            "quote": "Clerk requests Record.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:177a3751d903b67fd7f75a8e802477cf0d819972cbd617b0bc9797eee11c6fe0",
+            "begin": 81,
+            "end": 105,
+            "quote": "(requested Clerk Record)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+            "begin": 47,
+            "end": 69
+          }
+        }
+      ],
+      "question": "(mayRead Clerk Record)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:cd30cdd0e86784ea48343dd953172bc0ae72fb6f439758d63b8d2c3b823d1ca9",
+      "sourceDependenceGroup": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+      "termIdentities": {
+        "Clerk": "Clerk",
+        "Record": "Record"
+      }
+    },
+    {
+      "id": "S9",
+      "title": "Explicit negation differs from absence",
+      "englishCid": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+      "kifCid": "sha256:6d5c95f1bf3656db5b17b4f755e080dd8b96da0f32f6f2c6d5b4ae5de2228e37",
+      "contextIri": "urn:fixture:legal:S9",
+      "declaredSorts": {
+        "Device": "individual",
+        "Agent": "class"
+      },
+      "records": [
+        {
+          "id": "S9:p1",
+          "kif": "(not (instance urn:fixture:legal:S9:Device urn:fixture:legal:S9:Agent))",
+          "quote": "Device is not an Agent.",
+          "role": "negative-assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+            "begin": 0,
+            "end": 23,
+            "quote": "Device is not an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:6d5c95f1bf3656db5b17b4f755e080dd8b96da0f32f6f2c6d5b4ae5de2228e37",
+            "begin": 0,
+            "end": 71,
+            "quote": "(not (instance urn:fixture:legal:S9:Device urn:fixture:legal:S9:Agent))",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+            "begin": 0,
+            "end": 23
+          }
+        }
+      ],
+      "question": "(instance urn:fixture:legal:S9:Device urn:fixture:legal:S9:Agent)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:2a1d9626531acb3239e01ac26b36c1b2b61272d2d1381a279dc81049c3f9f41f",
+      "sourceDependenceGroup": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+      "termIdentities": {
+        "Device": "urn:fixture:legal:S9:Device",
+        "Agent": "urn:fixture:legal:S9:Agent"
+      }
+    },
+    {
+      "id": "S10",
+      "title": "Agreement-specific context",
+      "englishCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+      "kifCid": "sha256:95f05a07506f2fccba57e293797827d4737530b98571f1b1e0d3ab7ecacf89cf",
+      "contextIri": "urn:fixture:legal:S10",
+      "declaredSorts": {
+        "Finch": "class",
+        "Agent": "class",
+        "Entity": "class"
+      },
+      "records": [
+        {
+          "id": "S10:p1",
+          "kif": "(ist urn:fixture:agreement:A (subclass Finch Agent))",
+          "quote": "Agreement A says a Finch is an Agent.",
+          "role": "assertion",
+          "frame": "urn:fixture:agreement:A",
+          "englishQuotation": {
+            "excerptCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+            "begin": 0,
+            "end": 37,
+            "quote": "Agreement A says a Finch is an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:95f05a07506f2fccba57e293797827d4737530b98571f1b1e0d3ab7ecacf89cf",
+            "begin": 0,
+            "end": 52,
+            "quote": "(ist urn:fixture:agreement:A (subclass Finch Agent))",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+            "begin": 0,
+            "end": 37
+          }
+        },
+        {
+          "id": "S10:p2",
+          "kif": "(ist urn:fixture:agreement:B (subclass Agent Entity))",
+          "quote": "Agreement B says an Agent is an Entity.",
+          "role": "assertion",
+          "frame": "urn:fixture:agreement:B",
+          "englishQuotation": {
+            "excerptCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+            "begin": 38,
+            "end": 77,
+            "quote": "Agreement B says an Agent is an Entity.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:95f05a07506f2fccba57e293797827d4737530b98571f1b1e0d3ab7ecacf89cf",
+            "begin": 53,
+            "end": 106,
+            "quote": "(ist urn:fixture:agreement:B (subclass Agent Entity))",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+            "begin": 38,
+            "end": 77
+          }
+        }
+      ],
+      "question": "(ist urn:fixture:agreement:A (subclass Finch Entity))",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:0a397a8b220526d05417c8d88c06129271bebaf6c813bb321d406d79d691814c",
+      "sourceDependenceGroup": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+      "termIdentities": {
+        "Finch": "Finch",
+        "Agent": "Agent",
+        "Entity": "Entity"
+      }
+    },
+    {
+      "id": "S11",
+      "title": "Unreviewed alignment guess",
+      "englishCid": "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44",
+      "kifCid": "sha256:73d36c23f8b584bf00369c318e4cafb0b646852669f45123cbf979182df7666f",
+      "contextIri": "urn:fixture:legal:S11",
+      "declaredSorts": {
+        "consideration": "unresolved-lexical-token",
+        "FinancialTransaction": "suggested-class"
+      },
+      "records": [
+        {
+          "id": "S11:proposal",
+          "kif": "(suggestedMapping consideration FinancialTransaction)",
+          "quote": "A suggestion maps the word consideration to FinancialTransaction.",
+          "role": "suggestion-only",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44",
+            "begin": 0,
+            "end": 65,
+            "quote": "A suggestion maps the word consideration to FinancialTransaction.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:73d36c23f8b584bf00369c318e4cafb0b646852669f45123cbf979182df7666f",
+            "begin": 0,
+            "end": 53,
+            "quote": "(suggestedMapping consideration FinancialTransaction)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44",
+            "begin": 0,
+            "end": 65
+          }
+        }
+      ],
+      "question": null,
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:b2d57bbcc53abe2536b5461e7f121cfbe09604e5747b8ec3c5e63d5f1ca22730",
+      "sourceDependenceGroup": "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44",
+      "termIdentities": {
+        "consideration": "consideration",
+        "FinancialTransaction": "FinancialTransaction"
+      }
+    },
+    {
+      "id": "S12",
+      "title": "Weak induction and held-out claim",
+      "englishCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+      "kifCid": "sha256:61d3f04eac0d0248c146ecdedbdf336da8290b8fa2c3a258e885c64c9e49d0e8",
+      "contextIri": "urn:fixture:legal:S12",
+      "declaredSorts": {
+        "ALPHA": "synthetic-proposition-term",
+        "BETA": "synthetic-proposition-term",
+        "GAMMA": "synthetic-proposition-term",
+        "DELTA": "synthetic-proposition-term",
+        "EPSILON": "synthetic-proposition-term"
+      },
+      "records": [
+        {
+          "id": "S12:p1",
+          "kif": "(=> ALPHA BETA)",
+          "quote": "ALPHA implies BETA.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 0,
+            "end": 19,
+            "quote": "ALPHA implies BETA.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:61d3f04eac0d0248c146ecdedbdf336da8290b8fa2c3a258e885c64c9e49d0e8",
+            "begin": 0,
+            "end": 15,
+            "quote": "(=> ALPHA BETA)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 0,
+            "end": 19
+          }
+        },
+        {
+          "id": "S12:p2",
+          "kif": "(=> BETA GAMMA)",
+          "quote": "BETA implies GAMMA.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 20,
+            "end": 39,
+            "quote": "BETA implies GAMMA.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:61d3f04eac0d0248c146ecdedbdf336da8290b8fa2c3a258e885c64c9e49d0e8",
+            "begin": 16,
+            "end": 31,
+            "quote": "(=> BETA GAMMA)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 20,
+            "end": 39
+          }
+        },
+        {
+          "id": "S12:p3",
+          "kif": "(=> EPSILON GAMMA)",
+          "quote": "EPSILON implies GAMMA.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 40,
+            "end": 62,
+            "quote": "EPSILON implies GAMMA.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:61d3f04eac0d0248c146ecdedbdf336da8290b8fa2c3a258e885c64c9e49d0e8",
+            "begin": 32,
+            "end": 50,
+            "quote": "(=> EPSILON GAMMA)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 40,
+            "end": 62
+          }
+        },
+        {
+          "id": "S12:p4",
+          "kif": "(=> EPSILON DELTA)",
+          "quote": "EPSILON implies DELTA.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 63,
+            "end": 85,
+            "quote": "EPSILON implies DELTA.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:61d3f04eac0d0248c146ecdedbdf336da8290b8fa2c3a258e885c64c9e49d0e8",
+            "begin": 51,
+            "end": 69,
+            "quote": "(=> EPSILON DELTA)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 63,
+            "end": 85
+          }
+        },
+        {
+          "id": "S12:p5",
+          "kif": "(=> ALPHA BETA)",
+          "quote": "ALPHA implies BETA.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 86,
+            "end": 105,
+            "quote": "ALPHA implies BETA.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:61d3f04eac0d0248c146ecdedbdf336da8290b8fa2c3a258e885c64c9e49d0e8",
+            "begin": 70,
+            "end": 85,
+            "quote": "(=> ALPHA BETA)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "begin": 86,
+            "end": 105
+          }
+        }
+      ],
+      "question": "(=> DELTA GAMMA)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:4c80b77457c7a76e0f6d28f00a3db5bb74bfbf1553530cb673b7cfb2e2068101",
+      "sourceDependenceGroup": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+      "termIdentities": {
+        "ALPHA": "ALPHA",
+        "BETA": "BETA",
+        "GAMMA": "GAMMA",
+        "DELTA": "DELTA",
+        "EPSILON": "EPSILON"
+      }
+    },
+    {
+      "id": "C1",
+      "title": "Repeated same-source occurrence",
+      "englishCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+      "kifCid": "sha256:4942943068dae6a766cacd6d6436868f22aa73f00d19fff3b74531387b38348e",
+      "contextIri": "urn:fixture:legal:C1",
+      "declaredSorts": {
+        "Finch": "class",
+        "Agent": "class"
+      },
+      "records": [
+        {
+          "id": "C1:p1",
+          "kif": "(subclass urn:fixture:legal:C1:Finch urn:fixture:legal:C1:Agent)",
+          "quote": "A Finch is an Agent.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+            "begin": 0,
+            "end": 20,
+            "quote": "A Finch is an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:4942943068dae6a766cacd6d6436868f22aa73f00d19fff3b74531387b38348e",
+            "begin": 0,
+            "end": 64,
+            "quote": "(subclass urn:fixture:legal:C1:Finch urn:fixture:legal:C1:Agent)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+            "begin": 0,
+            "end": 20
+          }
+        },
+        {
+          "id": "C1:p2",
+          "kif": "(subclass urn:fixture:legal:C1:Finch urn:fixture:legal:C1:Agent)",
+          "quote": "A Finch is an Agent.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+            "begin": 21,
+            "end": 41,
+            "quote": "A Finch is an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:4942943068dae6a766cacd6d6436868f22aa73f00d19fff3b74531387b38348e",
+            "begin": 65,
+            "end": 129,
+            "quote": "(subclass urn:fixture:legal:C1:Finch urn:fixture:legal:C1:Agent)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+            "begin": 21,
+            "end": 41
+          }
+        }
+      ],
+      "question": "(subclass urn:fixture:legal:C1:Finch urn:fixture:legal:C1:Agent)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:dfeb7b40a5be47290a35b4141c70b3987309fb070f49fbeb22d56e4d9818acd6",
+      "sourceDependenceGroup": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+      "termIdentities": {
+        "Finch": "urn:fixture:legal:C1:Finch",
+        "Agent": "urn:fixture:legal:C1:Agent"
+      }
+    },
+    {
+      "id": "C2",
+      "title": "Natural same-angular contrast",
+      "englishCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+      "kifCid": "sha256:856e48302ec7ce9e8db378cad6244b49c8510d80376b914c95c37a811420ba05",
+      "contextIri": "urn:fixture:legal:C2",
+      "declaredSorts": {
+        "Tenant": "individual",
+        "Landlord": "individual"
+      },
+      "records": [
+        {
+          "id": "C2:p1",
+          "kif": "(pays Tenant Landlord)",
+          "quote": "Tenant pays Landlord.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+            "begin": 0,
+            "end": 21,
+            "quote": "Tenant pays Landlord.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:856e48302ec7ce9e8db378cad6244b49c8510d80376b914c95c37a811420ba05",
+            "begin": 0,
+            "end": 22,
+            "quote": "(pays Tenant Landlord)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+            "begin": 0,
+            "end": 21
+          }
+        },
+        {
+          "id": "C2:p2",
+          "kif": "(owes Tenant Landlord)",
+          "quote": "Tenant owes Landlord.",
+          "role": "assertion",
+          "frame": null,
+          "englishQuotation": {
+            "excerptCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+            "begin": 22,
+            "end": 43,
+            "quote": "Tenant owes Landlord.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:856e48302ec7ce9e8db378cad6244b49c8510d80376b914c95c37a811420ba05",
+            "begin": 23,
+            "end": 45,
+            "quote": "(owes Tenant Landlord)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+            "begin": 22,
+            "end": 43
+          }
+        }
+      ],
+      "question": "(pays Tenant Landlord)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:d875f1e4538b64b88c897221fd52d3ce9cdb78b55c89d1b1b70b87a7132139e9",
+      "sourceDependenceGroup": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+      "termIdentities": {
+        "Tenant": "Tenant",
+        "Landlord": "Landlord"
+      }
+    },
+    {
+      "id": "C3",
+      "title": "Explicit manual context union",
+      "englishCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+      "kifCid": "sha256:7434d23ee764e496132f7d88dda6ed878ab51616e69e81d3f57745b65a0113fe",
+      "contextIri": "urn:fixture:legal:C3",
+      "declaredSorts": {
+        "Finch": "class",
+        "Agent": "class",
+        "Entity": "class"
+      },
+      "records": [
+        {
+          "id": "C3:p1",
+          "kif": "(subclass Finch Agent)",
+          "quote": "A Finch is an Agent.",
+          "role": "assertion",
+          "frame": "urn:fixture:agreement:A",
+          "englishQuotation": {
+            "excerptCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+            "begin": 99,
+            "end": 119,
+            "quote": "A Finch is an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:7434d23ee764e496132f7d88dda6ed878ab51616e69e81d3f57745b65a0113fe",
+            "begin": 0,
+            "end": 22,
+            "quote": "(subclass Finch Agent)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+            "begin": 99,
+            "end": 119
+          }
+        },
+        {
+          "id": "C3:p2",
+          "kif": "(subclass Agent Entity)",
+          "quote": "An Agent is an Entity.",
+          "role": "assertion",
+          "frame": "urn:fixture:agreement:B",
+          "englishQuotation": {
+            "excerptCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+            "begin": 120,
+            "end": 142,
+            "quote": "An Agent is an Entity.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:7434d23ee764e496132f7d88dda6ed878ab51616e69e81d3f57745b65a0113fe",
+            "begin": 23,
+            "end": 46,
+            "quote": "(subclass Agent Entity)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+            "begin": 120,
+            "end": 142
+          }
+        }
+      ],
+      "question": "(subclass Finch Entity)",
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:65cc7710d63801b9fd92c028ea94d70a8e8b9337b7158a17780c4681378bca95",
+      "sourceDependenceGroup": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+      "termIdentities": {
+        "Finch": "Finch",
+        "Agent": "Agent",
+        "Entity": "Entity"
+      }
+    },
+    {
+      "id": "C4",
+      "title": "Review and source correction",
+      "englishCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+      "kifCid": "sha256:d024aad6d4c34084646d28ef5713761690291c39b74a560bde7a6b2dfa21382b",
+      "contextIri": "urn:fixture:legal:C4",
+      "declaredSorts": {
+        "Finch": "class",
+        "Agent": "class",
+        "Device": "class"
+      },
+      "records": [
+        {
+          "id": "C4:v1",
+          "kif": "(subclass Finch Agent)",
+          "quote": "Revision one says a Finch is an Agent.",
+          "role": "historical-revision",
+          "frame": "urn:fixture:revision:one",
+          "englishQuotation": {
+            "excerptCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+            "begin": 0,
+            "end": 38,
+            "quote": "Revision one says a Finch is an Agent.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:d024aad6d4c34084646d28ef5713761690291c39b74a560bde7a6b2dfa21382b",
+            "begin": 0,
+            "end": 22,
+            "quote": "(subclass Finch Agent)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+            "begin": 0,
+            "end": 38
+          }
+        },
+        {
+          "id": "C4:v2",
+          "kif": "(subclass Finch Device)",
+          "quote": "Revision two replaces that claim with a Finch is a Device.",
+          "role": "replacement-revision",
+          "frame": "urn:fixture:revision:two",
+          "englishQuotation": {
+            "excerptCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+            "begin": 39,
+            "end": 97,
+            "quote": "Revision two replaces that claim with a Finch is a Device.",
+            "offsetUnit": "utf16-code-units"
+          },
+          "kifQuotation": {
+            "sourceCid": "sha256:d024aad6d4c34084646d28ef5713761690291c39b74a560bde7a6b2dfa21382b",
+            "begin": 23,
+            "end": 46,
+            "quote": "(subclass Finch Device)",
+            "offsetUnit": "utf16-code-units"
+          },
+          "sourceBasis": [
+            "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74"
+          ],
+          "occurrenceKey": {
+            "sourceCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+            "begin": 39,
+            "end": 97
+          }
+        }
+      ],
+      "question": null,
+      "syntheticAuthority": "declared-fixture-assumptions-only",
+      "review": {
+        "snapshotCid": null,
+        "approvalCid": null,
+        "reviewer": null
+      },
+      "originalLineage": "authored-identity-UTF8-no-extraction",
+      "formalAdmission": "not-run",
+      "caseCid": "sha256:6491db669b29223b265f8eb8a4583d3972e08af1419f001f8d92d532da545bd8",
+      "sourceDependenceGroup": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+      "termIdentities": {
+        "Finch": "Finch",
+        "Agent": "Agent",
+        "Device": "Device"
+      }
+    }
+  ],
+  "scope": "Authored translation assumptions; inert data, no parser output, review, admission or independent evidence.",
+  "identityPolicy": {
+    "defaultProfile": "Each case is isolated; contextIri declares its local interpretation. Bare KIF constants are global only inside that separately selected case.",
+    "entityEquality": "Only exact declared term identity within the selected profile; never subjectCid == sourceCid as a fallback.",
+    "englishCarrier": "A later reviewed English carrier must enforce one context, current single snapshot, and class/individual sort consistency. These JSON declarations are not that carrier.",
+    "manualKif": "Pure taxonomy does not enforce class/individual disjointness. Explicit manual global union/punning requires declared assumptions; C3 intentionally combines global names.",
+    "sortInterpretation": {
+      "class": "class",
+      "individual": "individual",
+      "resource": "individual with fixture resource role",
+      "permission-token": "individual with fixture permission role",
+      "synthetic-proposition-term": "offline NAL term, outside taxonomy sorts",
+      "unresolved-lexical-token": "unresolved; no approved identity",
+      "suggested-class": "unreviewed suggestion, no approved class assertion"
+    }
+  },
+  "predicateRoles": {
+    "instance": [
+      "individual",
+      "class"
+    ],
+    "subclass": [
+      "subclass",
+      "superclass"
+    ],
+    "assignedTo": [
+      "operator",
+      "resource"
+    ],
+    "authorized": [
+      "operator",
+      "permission"
+    ],
+    "mayRead": [
+      "operator",
+      "resource"
+    ],
+    "received": [
+      "recipient",
+      "resource"
+    ],
+    "mustFile": [
+      "obligated-party",
+      "resource"
+    ],
+    "requested": [
+      "requester",
+      "resource"
+    ],
+    "sealed": [
+      "resource"
+    ],
+    "suggestedMapping": [
+      "lexical-token",
+      "suggested-target"
+    ],
+    "pays": [
+      "payer",
+      "payee"
+    ],
+    "owes": [
+      "debtor",
+      "creditor"
+    ],
+    "=>": [
+      "antecedent",
+      "consequent"
+    ],
+    "ist": [
+      "context",
+      "scoped-formula"
+    ]
+  },
+  "sourceDependencePolicy": "English and KIF companions are authored representations of one fixture, not independent observations. Different source hashes, offsets, exports and receipts do not establish independence; no independence decisions or evidence units are asserted."
+}

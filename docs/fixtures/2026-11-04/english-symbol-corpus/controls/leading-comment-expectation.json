@@ -1,0 +1,7 @@
+{
+  "execution": "NOT_RUN_IN_THIS_SLICE",
+  "expectedHttpStatus": 400,
+  "expectedError": "invalid_kg_input",
+  "knownV71Observation": "docs/evidence/2026-11-04/nars-exact-attention-v71/history/http-records-attempt3.json",
+  "scope": "Existing leading-semicolon format detector limitation; no fix or compatibility claim."
+}

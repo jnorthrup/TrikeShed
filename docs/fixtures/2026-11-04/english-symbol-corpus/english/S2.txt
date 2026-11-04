@@ -1,0 +1,1 @@
+A Finch is an Agent. An Agent is an Entity.

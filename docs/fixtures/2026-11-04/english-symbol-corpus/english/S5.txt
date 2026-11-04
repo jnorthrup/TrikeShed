@@ -1,0 +1,1 @@
+An authorized operator assigned to a resource may read it. The ordered assignment is Harbor then Lark. Lark is authorized for Access.

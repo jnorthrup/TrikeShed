@@ -1,0 +1,23 @@
+{
+  "kind": "legal-eval-predictions/1",
+  "predictions": [
+    {
+      "propositionCid": "sha256:23c4e736a46519b185968c677f1a5bbdf4eb9ca0fa07c75ceb40c0b7aa123c86",
+      "label": "SUPPORTED",
+      "witnesses": [
+        {
+          "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+          "begin": 0,
+          "end": 20,
+          "quote": "A Finch is an Agent.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "propositionCid": "sha256:928f71e5c822017e18bcc86f46472ffb4ef2d33e7fef446d7d0a7548649f9de4",
+      "label": "UNKNOWN",
+      "witnesses": []
+    }
+  ]
+}
