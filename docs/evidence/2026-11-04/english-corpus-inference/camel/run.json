@@ -1,0 +1,434 @@
+{
+  "runId": "09300fd6-e529-4416-b509-58bbbb5239cb",
+  "program": "english-camel-proof",
+  "programKey": null,
+  "programCid": "sha256:e9296609211d01fabade9a86dbd1336c3def1f600b5d95342d93978ce18979d0",
+  "inputs": {},
+  "status": "completed",
+  "queuedAtMs": 123,
+  "queueNamed": false,
+  "queueDeclaredSubnet": null,
+  "queueRequest": {
+    "timeoutMs": 120000,
+    "maxNodes": 10000,
+    "subnet": "local"
+  },
+  "queueDurability": "DURABLE",
+  "executionFamily": "lcnc/run/09300fd6-e529-4416-b509-58bbbb5239cb",
+  "parentRunId": null,
+  "versionPolicy": "root-at-queue,subprogram-at-first-use",
+  "budgets": {
+    "timeoutMs": 120000,
+    "maxNodes": 10000,
+    "maxPayloadChars": 131072
+  },
+  "jobId": "lcnc/run/09300fd6-e529-4416-b509-58bbbb5239cb",
+  "sequence": 3,
+  "timelineRevision": 3,
+  "receiptCid": "sha256:d959743cf0ea180c33460465bb1e27c98cba10520c503d44172a57b72a2316b4",
+  "workgroup": "lcnc/program/english-camel-proof@sha256:e9296609211d01fabade9a86dbd1336c3def1f600b5d95342d93978ce18979d0",
+  "claimId": 1,
+  "subnet": "local",
+  "claimedAtSubnet": "local",
+  "claimLineage": [
+    {
+      "workgroup": "lcnc/program/english-camel-proof@sha256:e9296609211d01fabade9a86dbd1336c3def1f600b5d95342d93978ce18979d0",
+      "claimId": 1
+    }
+  ],
+  "parentWorkgroup": null,
+  "parentClaimId": null,
+  "startedAtMs": 123,
+  "programVersions": {},
+  "previousReceiptCid": "sha256:776662471bbe9f3919a057205a8ef6044bdf09264d8354bfa8b998fddf028c85",
+  "returns": {
+    "dataset": "english-receipt-observations",
+    "results": {
+      "head": {
+        "vars": [
+          "marker",
+          "quote"
+        ]
+      },
+      "results": {
+        "bindings": [
+          {
+            "marker": {
+              "type": "uri",
+              "value": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53/sentence/0/marker/3"
+            },
+            "quote": {
+              "type": "literal",
+              "value": "not"
+            }
+          }
+        ]
+      }
+    },
+    "source": {
+      "selected": "english-receipt-observations",
+      "receiptCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+      "namedGraph": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+      "originalCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+      "extractedTextCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+      "mode": "snapshot",
+      "historical": true,
+      "reviewStatus": "unreviewed",
+      "scope": "recorded-lexical-and-parser-claims",
+      "semanticAuthority": "not-established",
+      "producerAuthority": "not-established",
+      "parserExecution": "not-reverified",
+      "dependencyNodeIdentity": "recorded-index-and-copy",
+      "parserDependencyNodeIdentity": null,
+      "parserNodeIdentityReported": false,
+      "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+      "quads": 244,
+      "currentness": "not-checked"
+    }
+  },
+  "outputs": {
+    "receipt": {
+      "value": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+    },
+    "plan": {
+      "route": {
+        "from": "direct:english-evidence",
+        "steps": [
+          {
+            "setHeader": {
+              "name": "EvidenceCid",
+              "value": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+            }
+          },
+          {
+            "setBody": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+          },
+          {
+            "to": "mock:english-evidence"
+          }
+        ]
+      }
+    },
+    "dispatch": {
+      "routed": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+      "ok": true,
+      "error": "",
+      "receipt": {
+        "status": "Started",
+        "routes": [
+          "lcnc:36d6f27a-0eb6-494c-8a96-6727234aebd4"
+        ],
+        "from": "direct:english-evidence",
+        "reply": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+        "headers": {
+          "EvidenceCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+        },
+        "plan": {
+          "from": "direct:english-evidence",
+          "steps": [
+            {
+              "setHeader": {
+                "name": "EvidenceCid",
+                "value": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+              }
+            },
+            {
+              "setBody": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+            },
+            {
+              "to": "mock:english-evidence"
+            }
+          ]
+        }
+      },
+      "text": "{\"status\":\"Started\", \"routes\":[\"lcnc:36d6f27a-0eb6-494c-8a96-6727234aebd4\"], \"from\":\"direct:english-evidence\", \"reply\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\", \"headers\":{\"EvidenceCid\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}, \"plan\":{\"from\":\"direct:english-evidence\", \"steps\":[{\"setHeader\":{\"name\":\"EvidenceCid\", \"value\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}}, {\"setBody\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}, {\"to\":\"mock:english-evidence\"}]}}"
+    },
+    "verify": {
+      "receiptCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+    },
+    "mode": {
+      "value": "snapshot"
+    },
+    "query-pattern": {
+      "value": {
+        "nodes": [
+          {
+            "id": "select",
+            "type": "sparql.select",
+            "params": {},
+            "x": 640,
+            "y": 120,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "marker",
+            "type": "sparql.variable",
+            "params": {
+              "name": "?marker",
+              "ord": "0"
+            },
+            "x": 40,
+            "y": 40,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "quote",
+            "type": "sparql.variable",
+            "params": {
+              "name": "?quote",
+              "ord": "1"
+            },
+            "x": 40,
+            "y": 160,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "kind",
+            "type": "sparql.pattern",
+            "params": {
+              "subject": "?marker",
+              "predicate": "<urn:trikeshed:english:observation:markerKind>",
+              "object": "\"negation\""
+            },
+            "x": 300,
+            "y": 280,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          },
+          {
+            "id": "quotation",
+            "type": "sparql.pattern",
+            "params": {
+              "subject": "?marker",
+              "predicate": "<urn:trikeshed:english:observation:quote>",
+              "object": "?quote"
+            },
+            "x": 300,
+            "y": 450,
+            "width": null,
+            "height": null,
+            "collapsed": false,
+            "subprogram": null,
+            "children": []
+          }
+        ],
+        "wires": [
+          {
+            "from": [
+              "marker",
+              "variable"
+            ],
+            "to": [
+              "select",
+              "variables"
+            ]
+          },
+          {
+            "from": [
+              "quote",
+              "variable"
+            ],
+            "to": [
+              "select",
+              "variables"
+            ]
+          },
+          {
+            "from": [
+              "kind",
+              "pattern"
+            ],
+            "to": [
+              "select",
+              "patterns"
+            ]
+          },
+          {
+            "from": [
+              "quotation",
+              "pattern"
+            ],
+            "to": [
+              "select",
+              "patterns"
+            ]
+          }
+        ],
+        "controls": {
+          "humanOversight": true,
+          "matingPoints": [],
+          "inspectionOnly": true
+        },
+        "kanban": null,
+        "view": null,
+        "seq": 1
+      }
+    },
+    "query": {
+      "dataset": "english-receipt-observations",
+      "query": "SELECT ?marker ?quote WHERE { ?marker <urn:trikeshed:english:observation:markerKind> \"negation\" . ?marker <urn:trikeshed:english:observation:quote> ?quote . }",
+      "results": {
+        "head": {
+          "vars": [
+            "marker",
+            "quote"
+          ]
+        },
+        "results": {
+          "bindings": [
+            {
+              "marker": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53/sentence/0/marker/3"
+              },
+              "quote": {
+                "type": "literal",
+                "value": "not"
+              }
+            }
+          ]
+        }
+      },
+      "source": {
+        "selected": "english-receipt-observations",
+        "receiptCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+        "namedGraph": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+        "originalCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+        "extractedTextCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+        "mode": "snapshot",
+        "historical": true,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-lexical-and-parser-claims",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": null,
+        "parserNodeIdentityReported": false,
+        "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+        "quads": 244,
+        "currentness": "not-checked"
+      }
+    },
+    "bindings": {
+      "x": {
+        "head": {
+          "vars": [
+            "marker",
+            "quote"
+          ]
+        },
+        "results": {
+          "bindings": [
+            {
+              "marker": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53/sentence/0/marker/3"
+              },
+              "quote": {
+                "type": "literal",
+                "value": "not"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "source": {
+      "x": {
+        "selected": "english-receipt-observations",
+        "receiptCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+        "namedGraph": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+        "originalCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+        "extractedTextCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+        "mode": "snapshot",
+        "historical": true,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-lexical-and-parser-claims",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": null,
+        "parserNodeIdentityReported": false,
+        "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+        "quads": 244,
+        "currentness": "not-checked"
+      }
+    },
+    "transport": {
+      "x": {
+        "status": "Started",
+        "routes": [
+          "lcnc:36d6f27a-0eb6-494c-8a96-6727234aebd4"
+        ],
+        "from": "direct:english-evidence",
+        "reply": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+        "headers": {
+          "EvidenceCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+        },
+        "plan": {
+          "from": "direct:english-evidence",
+          "steps": [
+            {
+              "setHeader": {
+                "name": "EvidenceCid",
+                "value": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+              }
+            },
+            {
+              "setBody": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+            },
+            {
+              "to": "mock:english-evidence"
+            }
+          ]
+        }
+      }
+    },
+    "dataset-out": {},
+    "results-out": {},
+    "source-out": {}
+  },
+  "bindings": [
+    {
+      "nodeId": "receipt",
+      "path": [],
+      "name": "receiptCid",
+      "type": "id",
+      "source": "default",
+      "ownerDepth": null,
+      "depth": 0,
+      "value": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+      "status": "resolved"
+    }
+  ],
+  "bindingsTruncated": false,
+  "promptVersions": {},
+  "consumed": [],
+  "consumedTruncated": false,
+  "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "rootStateCid": "sha256:2a5fb03f1d7fedfc7b6ad06254fac5257d2b579d55210ddc298ae76fe961b1b1",
+  "rootStateFormat": "cbor",
+  "ok": true,
+  "finishedAtMs": 123,
+  "invocationsCid": "sha256:f3ca618879950fa0217c3fe3ae3a2b7b602b12733c6ef35341e218164174710f",
+  "oroborosCid": "sha256:1e238a1d4f7865b5241ae1aa0234a6fbec03c2d17df6f5aba39f3a6fe6871e97",
+  "invocationsAttempted": 14,
+  "invocationsDropped": 0
+}

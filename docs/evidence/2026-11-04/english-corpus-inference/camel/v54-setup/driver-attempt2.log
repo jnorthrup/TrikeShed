@@ -1,0 +1,5 @@
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert(displayProof.bindings.includes('not'))
+
+    at main (/workspace/library-files/english-camel-browser-proof/driver.cjs:35:129)

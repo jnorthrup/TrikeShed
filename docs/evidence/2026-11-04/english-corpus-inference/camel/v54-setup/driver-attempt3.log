@@ -1,0 +1,5 @@
+locator.evaluate: TypeError: Cannot read properties of null (reading '1')
+    at eval (eval at evaluate (:311:30), <anonymous>:1:56)
+    at UtilityScript.evaluate (<anonymous>:313:16)
+    at UtilityScript.<anonymous> (<anonymous>:1:44)
+    at main (/workspace/library-files/english-camel-browser-proof/driver.cjs:36:75)
