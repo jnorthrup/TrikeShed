@@ -21,12 +21,25 @@ class ProductionCouchIngress(
     private val contentIdFn: (Document) -> ContentId,
     initialSequence: Long = 0,
     val synchronization: Synchronization = Synchronization.MONITOR,
+    private val captureDocument: (Document) -> Document = { it },
 ) : CouchIngress {
     private var sequence: Long = initialSequence
 
     // Shared writers serialize revision selection, sequence allocation and publication together.
     // NONE requires the caller to own that same boundary, including all replicated mutations.
     private val commitLock = synchronization.lock()
+
+    /** Own the field list before hashing; a store-specific capture may also own compound values. */
+    private fun capture(doc: Document): Document {
+        val fields = doc.fields.toList()
+        val names = HashSet<String>(fields.size)
+        for (field in fields) require(field.name != "_id" && names.add(field.name)) {
+            "Couch body contains an ambiguous field identity"
+        }
+        val owned = captureDocument(Document(doc.id, fields))
+        require(owned.id == doc.id) { "Captured Couch body identity changed" }
+        return owned
+    }
 
     override fun putIntent(doc: Document, expectedRev: String?): Boolean = synchronize(commitLock) {
         val existingRev = head.getRev(doc.id)
@@ -48,10 +61,11 @@ class ProductionCouchIngress(
         val gen = existingRev?.substringBefore("-")?.toIntOrNull() ?: 0
         val nextGen = gen + 1
 
-        val cid = contentIdFn(doc)
+        val owned = capture(doc)
+        val cid = contentIdFn(owned)
         val newRev = "$nextGen-${cid.value}"
 
-        val frame = CouchCommittedFrame(sequence++, doc.id, newRev, false, doc)
+        val frame = CouchCommittedFrame(sequence++, owned.id, newRev, false, owned)
         commitBoundary(frame)
 
         return true // Success for both inserts and updates
@@ -62,7 +76,8 @@ class ProductionCouchIngress(
         if (existingRev == rev) return true // already the head: idempotent
         if (existingRev != null && !revWins(rev, existingRev)) return false
         require(deleted || (doc != null && doc.id == docId)) { "replicated frame needs a document" }
-        val frame = CouchCommittedFrame(sequence++, docId, rev, deleted, if (deleted) null else doc)
+        val owned = if (deleted) null else capture(requireNotNull(doc))
+        val frame = CouchCommittedFrame(sequence++, docId, rev, deleted, owned)
         commitBoundary(frame)
         return true
     }

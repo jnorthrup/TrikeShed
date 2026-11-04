@@ -3,6 +3,8 @@ package borg.trikeshed.forge.server
 import borg.trikeshed.agent.keymux.KeyMux
 import borg.trikeshed.agent.modelmux.ModelMux
 import borg.trikeshed.couch.CouchStoreFactory
+import borg.trikeshed.couch.Document
+import borg.trikeshed.couch.Field
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.PackCasStore
@@ -150,6 +152,11 @@ class PrimaryProjectCorpusTest {
             assertNull(rig.registry.get(binding.name), "the primary remains in the main store")
             assertEquals(_s[binding.name, mounted.name], corpus.projects().map { it.name }.toSet())
             assertEquals(_s[id, "readme.md", "scan.pdf"], corpus.docs(binding.name).map { it.id }.toSet())
+            rig.store.put(Document(binding.prefix + "marked.pdf", _l[Field("deleted", "true"), Field("contentId", "invalid")]))
+            val visited = mutableListOf<borg.trikeshed.lcnc.ProjectDoc>()
+            corpus.visit(binding.name) { visited.add(it) }
+            assertEquals(_s[id, "readme.md", "scan.pdf"], visited.map { it.id }.toSet())
+            assertTrue(visited.all { it.contentStatus == "unchecked-metadata" })
             assertEquals(_l[id], corpus.docs(binding.name, prefix = "notes/", glob = "*.txt").map { it.id })
             assertEquals(emptyList(), corpus.docs(binding.name, prefix = "secret"), "prefix-neighbor data is not in the project")
             assertEquals(emptyList(), corpus.docs("unknown"))
@@ -219,6 +226,43 @@ class PrimaryProjectCorpusTest {
             assertNull(corpus.bytes(binding.name, id))
             assertFalse(corpus.docs(binding.name).any { it.id == id })
             assertEquals(404, get(wire, base + "/" + enc(id)).status)
+        } finally { rig.scopes.drain() }
+    }
+
+    @Test fun primaryVisitorRejectsMissingCidLikeTheListing(): Unit = runBlocking {
+        val rig = Rig(directory.toFile())
+        val primary = File(directory.toFile(), "primary").apply { mkdirs() }
+        File(primary, "valid.pdf").writeText("document")
+        val binding = rig.register(primary)
+        val corpus = rig.corpus(binding)
+        try {
+            rig.store.put(Document(binding.prefix + "no-cid.pdf", _l[Field("contentType", "application/pdf")]))
+            assertFailsWith<IllegalStateException> { corpus.docs(binding.name) }
+            assertFailsWith<IllegalStateException> { corpus.visit(binding.name) { } }
+        } finally { rig.scopes.drain() }
+    }
+
+    @Test fun primaryDocumentKeepsItsVerifiedIdentityAfterHeadBodyMutation(): Unit = runBlocking {
+        val rig = Rig(directory.toFile())
+        val primary = File(directory.toFile(), "primary").apply { mkdirs() }
+        File(primary, "valid.txt").writeText("verified source")
+        val binding = rig.register(primary)
+        val corpus = rig.corpus(binding)
+        try {
+            val original = assertNotNull(corpus.document(binding.name, "valid.txt"))
+            assertEquals("verified-bytes", original.contentStatus)
+            val body = assertNotNull(rig.store.get(binding.prefix + "valid.txt"))
+            @Suppress("UNCHECKED_CAST")
+            (body.fields as? MutableList<Field>)?.let { fields ->
+                val index = fields.indexOfFirst { it.name == "contentId" }
+                assertTrue(index >= 0)
+                runCatching { fields[index] = Field("contentId", ContentId.of("replacement".encodeToByteArray()).value) }
+            }
+            val after = assertNotNull(corpus.document(binding.name, "valid.txt"))
+            assertEquals(original.cid, after.cid)
+            assertEquals(original.rev, after.rev)
+            assertEquals(original.seq, after.seq)
+            assertEquals("verified-bytes", after.contentStatus)
         } finally { rig.scopes.drain() }
     }
 

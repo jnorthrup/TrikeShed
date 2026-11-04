@@ -6,6 +6,7 @@ import borg.trikeshed.lcnc.LcncTrail
 import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.lcnc.ProjectCorpus
 import borg.trikeshed.lcnc.ProjectDoc
+import borg.trikeshed.lcnc.ProjectVisitUnavailable
 import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.narsese.DocumentSource
@@ -227,10 +228,14 @@ class CurationIntake(
         for (p in corpus.projects()) {
             currentCoroutineContext().ensureActive()
             if (!eligible(p.name)) continue
-            for (d in corpus.docs(p.name, limit = Int.MAX_VALUE)) {
-                currentCoroutineContext().ensureActive()
-                if (link) offer(p.name, d.id, selectedProvider(p.name, d.id), null, true)
-                else offer(p.name, d.id)
+            try {
+                corpus.visit(p.name) { d ->
+                    currentCoroutineContext().ensureActive()
+                    if (link) offer(p.name, d.id, selectedProvider(p.name, d.id), null, true)
+                    else offer(p.name, d.id)
+                }
+            } catch (unavailable: ProjectVisitUnavailable) {
+                System.err.println("[INTAKE] ${unavailable.message}")
             }
         }
     }

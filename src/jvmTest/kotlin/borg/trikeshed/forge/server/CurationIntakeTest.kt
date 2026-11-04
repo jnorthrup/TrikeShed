@@ -48,6 +48,55 @@ class CurationIntakeTest {
     }
 
     @Test
+    fun resumeVisitsDocumentsWithoutMaterializingTheCorpus(): Unit = runBlocking {
+        val doc = ProjectDoc("project", "book.pdf", ContentId.of("book".encodeToByteArray()).value, "1", 0, 4, "application/pdf")
+        val corpus = object : Corpus() {
+            override suspend fun projects(): List<ProjectRef> = _l[ProjectRef("project", "assets", "@upload", 1)]
+            override suspend fun docs(project: String, prefix: String, glob: String, limit: Int): List<ProjectDoc> =
+                error("the full corpus must not be materialized")
+            override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) { emit(doc) }
+        }
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(corpus, { runners }, { null }, this)
+        try {
+            intake.resume()
+            intake.drain()
+            val status = intake.status().getValue("project") as Map<*, *>
+            assertEquals(1, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { intake.drain() }
+    }
+
+    @Test
+    fun resumeContinuesAfterAProjectBecomesUnavailable(): Unit = runBlocking {
+        val doc = ProjectDoc("good", "book.pdf", ContentId.of("book".encodeToByteArray()).value, "1", 0, 4, "application/pdf")
+        val corpus = object : Corpus() {
+            override suspend fun projects(): List<ProjectRef> = _l[
+                ProjectRef("gone", "assets", "@upload", 1), ProjectRef("good", "assets", "@upload", 1),
+            ]
+            override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) {
+                if (project == "gone") throw ProjectVisitUnavailable(project)
+                emit(doc)
+            }
+        }
+        val runners = _m[
+            ConstellationNodes.CURATE j LcncNodeRunner { _, _ -> _m["book" j "book"] },
+            ConstellationNodes.JOIN j LcncNodeRunner { _, _ -> emptyMap() },
+        ]
+        val intake = CurationIntake(corpus, { runners }, { null }, this)
+        try {
+            intake.resume()
+            intake.drain()
+            val status = intake.status().getValue("good") as Map<*, *>
+            assertEquals(1, status["curated"])
+            assertEquals(0, status["pending"])
+        } finally { intake.drain() }
+    }
+
+    @Test
     fun reviewIntakeSharesReducedProfileBookIdentityWithHostNodes(): Unit = runBlocking {
         val home = Files.createTempDirectory("profile-review-intake").toFile()
         val nodes = ConstellationNodes(home, ConfixBlackboard(), scope = this,
@@ -805,6 +854,16 @@ class CurationIntakeTest {
             assertEquals(2, withTimeout(5_000) { started.receive() })
             withTimeout(5_000) { second.await(); third.await() }
             assertEquals(2, scans.get(), "a cancelled scan should be retried once and shared")
+            var attempts = 0
+            val unavailable = object : Corpus() {
+                override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) {
+                    if (++attempts == 1) throw ProjectVisitUnavailable(project)
+                }
+            }
+            val retry = LinkGrab(nodes, unavailable, scopes, kotlin.coroutines.EmptyCoroutineContext)
+            assertFailsWith<ProjectVisitUnavailable> { retry.grab("project", "first.pdf", DecisionProvider.JEV) }
+            retry.grab("project", "second.pdf", DecisionProvider.JEV)
+            assertEquals(2, attempts, "an incomplete scan must be evicted instead of cached")
         } finally {
             nodes.drain()
             scopes.drain()

@@ -65,11 +65,17 @@ interface CouchIngress {
  * - subscribe to mutations via MutableSeries observer
  * - flush/drain for durability hooks
  */
-class CouchStore(
+class CouchStore internal constructor(
     private val ingress: CouchIngress,
     val head: CouchHeadProjection,
-    val changes: CouchChangesProjection
+    val changes: CouchChangesProjection,
+    private val sourceCas: borg.trikeshed.job.CasStore?,
 ) {
+    /** Custom ingresses have no verified CAS owner. */
+    constructor(ingress: CouchIngress, head: CouchHeadProjection, changes: CouchChangesProjection) :
+        this(ingress, head, changes, null)
+
+    internal fun usesCas(cas: borg.trikeshed.job.CasStore): Boolean = sourceCas === cas
 
     sealed interface MutationEvent {
         data class Inserted(val doc: Document) : MutationEvent
@@ -304,8 +310,9 @@ object CouchStoreFactory {
             { frame -> head.applyCommit(frame); changes.applyCommit(frame) },
             { doc -> cas.put(canonicalBody(doc)) },
             synchronization = synchronization,
+            captureDocument = ::captureCanonicalBody,
         )
-        return CouchStore(ingress, head, changes)
+        return CouchStore(ingress, head, changes, cas)
     }
 
     /**
@@ -325,6 +332,7 @@ object CouchStoreFactory {
         require(commits.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
             "durableCasBacked requires a DURABLE commit store"
         }
+        require(commits.usesCas(cas)) { "Couch store and commit owner must share a CAS" }
         return committed(cas, commits.recoveredFrames, synchronization) { frame ->
             commits.commit(frame)
             frame
@@ -353,8 +361,77 @@ object CouchStoreFactory {
             { doc -> cas.put(canonicalBody(doc)) },
             initialSequence = maxSequence + 1,
             synchronization = synchronization,
+            captureDocument = ::captureCanonicalBody,
         )
-        return CouchStore(ingress, head, changes)
+        return CouchStore(ingress, head, changes, cas)
+    }
+
+    /**
+     * Capture supported containers and CBOR Items before hashing. Other object types
+     * use their string representation, as the canonical encoder does. Cyclic values
+     * and values nested beyond [CAPTURE_DEPTH] are rejected before publication.
+     */
+    private fun captureCanonicalBody(doc: Document): Document {
+        val path = mutableListOf<Any>()
+        return Document(doc.id, doc.fields.map { Field(it.name, requireNotNull(captureValue(it.value, path, 0))) })
+    }
+
+    private const val CAPTURE_DEPTH = 128
+
+    private inline fun <T> captureContainer(value: Any, path: MutableList<Any>, body: () -> T): T {
+        require(path.none { it === value }) { "Cyclic Couch value" }
+        path.add(value)
+        try { return body() } finally { path.removeAt(path.lastIndex) }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun captureValue(value: Any?, path: MutableList<Any>, depth: Int): Any? {
+        require(depth <= CAPTURE_DEPTH) { "Couch value exceeds capture depth $CAPTURE_DEPTH" }
+        return when (value) {
+            null, is String, is Boolean, is Byte, is Short, is Int, is Long, is Float, is Double,
+            is Char, is UByte, is UShort, is UInt, is ULong -> value
+            is ByteArray -> value.copyOf()
+            is borg.trikeshed.collections.associative.Item.Bin -> borg.trikeshed.collections.associative.Item.Bin(value.value.copyOf())
+            is borg.trikeshed.collections.associative.Item.Tag -> captureContainer(value, path) {
+                borg.trikeshed.collections.associative.Item.Tag(value.tag,
+                    captureValue(value.item, path, depth + 1) as borg.trikeshed.collections.associative.Item)
+            }
+            is borg.trikeshed.collections.associative.Item.Arr -> captureContainer(value, path) {
+                val values = Array(value.items.a) { i ->
+                    captureValue(value.items.b(i), path, depth + 1) as borg.trikeshed.collections.associative.Item
+                }
+                borg.trikeshed.collections.associative.Item.Arr(values.size j { values[it] })
+            }
+            is borg.trikeshed.collections.associative.Item.Map -> captureContainer(value, path) {
+                val entries = Array(value.entries.a) { i ->
+                    val entry = value.entries.b(i)
+                    entry.a j (captureValue(entry.b, path, depth + 1) as borg.trikeshed.collections.associative.Item)
+                }
+                borg.trikeshed.collections.associative.Item.Map(entries.size j { entries[it] })
+            }
+            is borg.trikeshed.collections.associative.Item -> value
+            is Array<*> -> captureContainer(value, path) {
+                val copy = value.copyOf() as Array<Any?>
+                for (i in value.indices) copy[i] = captureValue(value[i], path, depth + 1)
+                copy
+            }
+            is List<*> -> captureContainer(value, path) { value.map { captureValue(it, path, depth + 1) } }
+            is Map<*, *> -> captureContainer(value, path) {
+                val copy = linkedMapOf<Any?, Any?>()
+                for ((key, item) in value) {
+                    // Canonical CBOR stringifies map keys. Preserve ordinary scalar
+                    // key types, and freeze other key representations before hashing.
+                    val ownedKey = when (key) {
+                        null, is String, is Boolean, is Byte, is Short, is Int, is Long,
+                        is Float, is Double, is Char, is UByte, is UShort, is UInt, is ULong -> key
+                        else -> key.toString()
+                    }
+                    copy[ownedKey] = captureValue(item, path, depth + 1)
+                }
+                copy
+            }
+            else -> value.toString()
+        }
     }
 
     /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */
