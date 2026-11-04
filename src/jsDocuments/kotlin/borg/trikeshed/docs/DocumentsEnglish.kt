@@ -353,7 +353,7 @@ internal object DocumentsEnglish {
             val parser = value["parser"] as? Map<*, *>
             text(resultSection, "p", "Reader: ${parser?.get("processor") ?: "not reported"}. Markers are literal word and phrase candidates; their scope and legal effect require review.", "ds-curate-label")
             val coverage = value["coverage"] as? Map<*, *>
-            if (coverage?.get("parserNodeIdentityReported") != true || coverage["parserDependencyNodeIdentity"] != "token-index+copy-count/1")
+            if (coverage?.get("parserNodeIdentityReported") != true || coverage?.get("parserDependencyNodeIdentity") != "token-index+copy-count/1")
                 text(resultSection, "p", "Full parser node identity was not reported. Token indices and displayed syntax do not establish that enhanced copy identities were captured.", "ds-curate-label")
             val use = text(resultSection, "button", "Use this inspection in corpus", "ds-curate-submit")
             use.setAttribute("type", "button"); use.setAttribute("data-corpus-use-inspection", "1"); use.asDynamic().disabled = pending
