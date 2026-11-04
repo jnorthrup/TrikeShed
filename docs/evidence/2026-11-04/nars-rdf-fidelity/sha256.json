@@ -1,0 +1,7 @@
+{
+  "method.txt": "d6a94b147ed7da2fc357dff18459b2773d02604d081eca46e18836d3a6b2e3be",
+  "baseline-v59-short-literal-result.json": "be5478621494b05561f897bcf274864c15d3d064390c3f28c38835dc80460578",
+  "baseline-v59-result.json": "af0f19ef4d45f4f52f70b49632b6a59e03802802dbf5718e4b34e16f93ea0bed",
+  "baseline-v59-identity.json": "790cdd24593d208bdff061799e65557c5941451a67525eccbd68df9bd352c04b",
+  "baseline-v59-short-literal-identity.json": "2f12354d823650e54242a405614244cc42b7d8d00038c82d5280f1b4e0bfe82f"
+}

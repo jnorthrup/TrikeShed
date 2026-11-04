@@ -4,6 +4,7 @@ import borg.trikeshed.job.*
 import borg.trikeshed.kif.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.ontology.SumoOntology
+import borg.trikeshed.rdf.*
 
 /**
  * KgNalBridge — minimize the gap between interchange KR (Turtle/RDF, KIF, …)
@@ -210,113 +211,20 @@ object KgNalBridge {
 
     // ── Turtle-lite ───────────────────────────────────────────────────
 
-    fun parseTurtle(text: String, confidence: Float = 0.9f): List<KgTriplet> {
-        val prefixes = HashMap<String, String>()
-        val out = ArrayList<KgTriplet>()
-        // strip comments, gather prefixes
-        val body = StringBuilder()
-        for (line in text.lines()) {
-            val l = stripComment(line).trim()
-            if (l.isEmpty()) continue
-            val prefixMatch = Regex("""@prefix\s+(\S*):\s*<([^>]*)>\s*\.""").find(l)
-            if (prefixMatch != null) {
-                prefixes[prefixMatch.groupValues[1]] = prefixMatch.groupValues[2]
-                continue
-            }
-            body.append(l).append(' ')
+    fun parseTurtle(text: String, confidence: Float = 0.9f): List<KgTriplet> =
+        TurtleRdf.parseStrict(text).triples.map { triple ->
+            // Predicate remains its expanded IRI for copula mapping. Role terms retain their
+            // RDF kind, language/datatype and lexical value in a canonical Turtle spelling.
+            KgTriplet(canonicalTerm(triple.s), triple.p.iri, canonicalTerm(triple.o), confidence = confidence)
         }
-        fun term(raw: String): String {
-            val r = raw.trim()
-            if (r.startsWith('<') && r.endsWith('>')) return r.substring(1, r.length - 1)
-            if (r.startsWith('"')) return r.trim('"')
-            val colon = r.indexOf(':')
-            if (colon > -1) {
-                val pre = r.substring(0, colon)
-                prefixes[pre]?.let { return it + r.substring(colon + 1) }
-            }
-            return r
-        }
-        for (statement in body.toString().split(Regex("""\.\s""")).map { it.trim() }.filter { it.isNotEmpty() }) {
-            var subject: String? = null
-            for (clause in statement.split(';').map { it.trim() }.filter { it.isNotEmpty() }) {
-                val tokens = tokenize(clause)
-                if (subject == null) {
-                    if (tokens.size < 3) break
-                    subject = term(tokens[0])
-                    emitObjects(out, subject, term(expandA(tokens[1])), tokens.drop(2), ::term, confidence)
-                } else {
-                    if (tokens.size < 2) continue
-                    emitObjects(out, subject, term(expandA(tokens[0])), tokens.drop(1), ::term, confidence)
-                }
-            }
-        }
-        return out
-    }
 
-    private fun expandA(p: String): String = if (p == "a") "rdf:type" else p
-
-    /**
-     * A `#` starts a comment only OUTSIDE an IRI or a literal. Hash IRIs are
-     * the common case (`<https://trikeshed.borg/lcnc#n1>`, `rdf:type` itself
-     * is `…22-rdf-syntax-ns#type`), and `substringBefore('#')` chopped every
-     * such line at its first fragment — the LCNC causal projection bridged to
-     * zero statements while the sniff said TURTLE.
-     */
-    private fun stripComment(line: String): String {
-        var inIri = false; var inLit = false; var i = 0
-        while (i < line.length) {
-            val c = line[i]
-            when {
-                inLit -> { if (c == '\\') i++ else if (c == '"') inLit = false }
-                inIri -> if (c == '>') inIri = false
-                c == '<' -> inIri = true
-                c == '"' -> inLit = true
-                c == '#' -> return line.substring(0, i)
-            }
-            i++
+    private fun canonicalTerm(term: RdfTerm): String {
+        val lexical = buildString {
+            for (ch in term.toTurtle()) if (ch.code < 32)
+                append("\\u").append(ch.code.toString(16).padStart(4, '0')) else append(ch)
         }
-        return line
-    }
-
-    private fun emitObjects(
-        out: MutableList<KgTriplet>,
-        subject: String,
-        predicate: String,
-        objectTokens: List<String>,
-        term: (String) -> String,
-        confidence: Float,
-    ) {
-        for (objRaw in objectTokens.joinToString(" ").split(',').map { it.trim() }.filter { it.isNotEmpty() }) {
-            out.add(KgTriplet(subject, predicate, term(objRaw), confidence = confidence))
-        }
-    }
-
-    private fun tokenize(clause: String): List<String> {
-        val tokens = ArrayList<String>()
-        var i = 0
-        val n = clause.length
-        while (i < n) {
-            when {
-                clause[i].isWhitespace() -> i++
-                clause[i] == '"' -> {
-                    val end = clause.indexOf('"', i + 1).let { if (it < 0) n - 1 else it }
-                    tokens.add(clause.substring(i, minOf(end + 1, n)))
-                    i = end + 1
-                }
-                clause[i] == '<' -> {
-                    val end = clause.indexOf('>', i).let { if (it < 0) n - 1 else it }
-                    tokens.add(clause.substring(i, minOf(end + 1, n)))
-                    i = end + 1
-                }
-                else -> {
-                    var j = i
-                    while (j < n && !clause[j].isWhitespace()) j++
-                    tokens.add(clause.substring(i, j))
-                    i = j
-                }
-            }
-        }
-        return tokens
+        require(TurtleRdf.parseTerm(lexical) == term) { "RDF term cannot round-trip without loss" }
+        return lexical
     }
 
     // ── KIF-lite ──────────────────────────────────────────────────────
