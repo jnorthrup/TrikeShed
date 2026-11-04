@@ -29,6 +29,7 @@ class ProductionCouchIngress(
     // NONE requires the caller to own that same boundary, including all replicated mutations.
     private val commitLock = synchronization.lock()
 
+<<<<<<< HEAD
     /** A store-specific capture may own or validate the body before hashing. */
     private fun capture(doc: Document): Document {
         val owned = captureDocument(doc)
@@ -36,6 +37,21 @@ class ProductionCouchIngress(
         return owned
     }
 
+||||||| cc0b7feaa
+=======
+    /** Own the field list before hashing; a store-specific capture may also own compound values. */
+    private fun capture(doc: Document): Document {
+        val fields = doc.fields.toList()
+        val names = HashSet<String>(fields.size)
+        for (field in fields) require(field.name != "_id" && names.add(field.name)) {
+            "Couch body contains an ambiguous field identity"
+        }
+        val owned = captureDocument(Document(doc.id, fields))
+        require(owned.id == doc.id) { "Captured Couch body identity changed" }
+        return owned
+    }
+
+>>>>>>> 3e949429ed73e8d92ead483d51e68fc9ac4d3332
     override fun putIntent(doc: Document, expectedRev: String?): Boolean = synchronize(commitLock) {
         val existingRev = head.getRev(doc.id)
         val isDeleted = head.isDeleted(doc.id)

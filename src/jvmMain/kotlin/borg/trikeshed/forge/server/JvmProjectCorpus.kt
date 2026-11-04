@@ -265,6 +265,34 @@ class JvmProjectCorpus(
         if (backing(project)?.store !== b.store) throw ProjectVisitUnavailable(project)
     }
 
+    override suspend fun visit(project: String, emit: suspend (ProjectDoc) -> Unit) {
+        val b = backing(project) ?: throw ProjectVisitUnavailable(project)
+        // Slots are stable by document id: updates/tombstones replace a slot, while
+        // new ids append beyond the captured count. Each frame is read atomically.
+        val slots = b.store.head.slots()
+        for (i in 0 until slots.a) {
+            currentCoroutineContext().ensureActive()
+            if ((i and 255) == 0) yield()
+            if (backing(project)?.store !== b.store) throw ProjectVisitUnavailable(project)
+            val frame = slots.b(i)
+            if (frame.deleted || !frame.docId.startsWith(b.prefix)) continue
+            val id = frame.docId.removePrefix(b.prefix)
+            if (ProjectNodes.twin(id)) continue
+            if (frame.attachmentDeleted) continue
+            check(!frame.ambiguous) { "Ambiguous attachment metadata: $project/$id" }
+            val declaredCid = frame.contentId
+            val rawCid = if (b.primary) (declaredCid ?: error("Primary document changed while listing: $project/$id"))
+                else declaredCid.orEmpty().ifEmpty { "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" }
+            val cid = ContentId(rawCid)
+            val length = frame.length?.toLongOrNull() ?: 0L
+            val type = frame.contentType.orEmpty()
+            emit(ProjectDoc(project, id, cid.value, frame.rev, frame.sequence, length, type,
+                contentStatus = if (b.primary) "unchecked-metadata" else null))
+        }
+        currentCoroutineContext().ensureActive()
+        if (backing(project)?.store !== b.store) throw ProjectVisitUnavailable(project)
+    }
+
     override suspend fun document(project: String, id: String): ProjectDoc? = withContext(Dispatchers.IO) {
         val b = backing(project) ?: return@withContext null
         val result = document(b, id)

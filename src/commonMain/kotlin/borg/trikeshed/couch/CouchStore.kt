@@ -364,6 +364,7 @@ object CouchStoreFactory {
             captureDocument = ::captureCanonicalBody,
         )
 <<<<<<< HEAD
+<<<<<<< HEAD
         return CouchStore(ingress, head, changes, cas)
     }
 
@@ -380,6 +381,79 @@ object CouchStoreFactory {
 =======
         return CouchStore(ingress, head, changes, cas)
 >>>>>>> 11d3e572794981ddee9e2d2ae93a1cf3a49d02a4
+||||||| cc0b7feaa
+        return CouchStore(ingress, head, changes)
+=======
+        return CouchStore(ingress, head, changes, cas)
+    }
+
+    /**
+     * Capture supported containers and CBOR Items before hashing. Other object types
+     * use their string representation, as the canonical encoder does. Cyclic values
+     * and values nested beyond [CAPTURE_DEPTH] are rejected before publication.
+     */
+    private fun captureCanonicalBody(doc: Document): Document {
+        val path = mutableListOf<Any>()
+        return Document(doc.id, doc.fields.map { Field(it.name, requireNotNull(captureValue(it.value, path, 0))) })
+    }
+
+    private const val CAPTURE_DEPTH = 128
+
+    private inline fun <T> captureContainer(value: Any, path: MutableList<Any>, body: () -> T): T {
+        require(path.none { it === value }) { "Cyclic Couch value" }
+        path.add(value)
+        try { return body() } finally { path.removeAt(path.lastIndex) }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun captureValue(value: Any?, path: MutableList<Any>, depth: Int): Any? {
+        require(depth <= CAPTURE_DEPTH) { "Couch value exceeds capture depth $CAPTURE_DEPTH" }
+        return when (value) {
+            null, is String, is Boolean, is Byte, is Short, is Int, is Long, is Float, is Double,
+            is Char, is UByte, is UShort, is UInt, is ULong -> value
+            is ByteArray -> value.copyOf()
+            is borg.trikeshed.collections.associative.Item.Bin -> borg.trikeshed.collections.associative.Item.Bin(value.value.copyOf())
+            is borg.trikeshed.collections.associative.Item.Tag -> captureContainer(value, path) {
+                borg.trikeshed.collections.associative.Item.Tag(value.tag,
+                    captureValue(value.item, path, depth + 1) as borg.trikeshed.collections.associative.Item)
+            }
+            is borg.trikeshed.collections.associative.Item.Arr -> captureContainer(value, path) {
+                val values = Array(value.items.a) { i ->
+                    captureValue(value.items.b(i), path, depth + 1) as borg.trikeshed.collections.associative.Item
+                }
+                borg.trikeshed.collections.associative.Item.Arr(values.size j { values[it] })
+            }
+            is borg.trikeshed.collections.associative.Item.Map -> captureContainer(value, path) {
+                val entries = Array(value.entries.a) { i ->
+                    val entry = value.entries.b(i)
+                    entry.a j (captureValue(entry.b, path, depth + 1) as borg.trikeshed.collections.associative.Item)
+                }
+                borg.trikeshed.collections.associative.Item.Map(entries.size j { entries[it] })
+            }
+            is borg.trikeshed.collections.associative.Item -> value
+            is Array<*> -> captureContainer(value, path) {
+                val copy = value.copyOf() as Array<Any?>
+                for (i in value.indices) copy[i] = captureValue(value[i], path, depth + 1)
+                copy
+            }
+            is List<*> -> captureContainer(value, path) { value.map { captureValue(it, path, depth + 1) } }
+            is Map<*, *> -> captureContainer(value, path) {
+                val copy = linkedMapOf<Any?, Any?>()
+                for ((key, item) in value) {
+                    // Canonical CBOR stringifies map keys. Preserve ordinary scalar
+                    // key types, and freeze other key representations before hashing.
+                    val ownedKey = when (key) {
+                        null, is String, is Boolean, is Byte, is Short, is Int, is Long,
+                        is Float, is Double, is Char, is UByte, is UShort, is UInt, is ULong -> key
+                        else -> key.toString()
+                    }
+                    copy[ownedKey] = captureValue(item, path, depth + 1)
+                }
+                copy
+            }
+            else -> value.toString()
+        }
+>>>>>>> 3e949429ed73e8d92ead483d51e68fc9ac4d3332
     }
 
     /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */
