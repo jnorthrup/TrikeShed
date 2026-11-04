@@ -29,7 +29,7 @@ class MlxRecurrenceTest {
                 session.tensor(FloatArray(34 * 4) { if (it % 4 == 3) 1f else 0f }, shapeOf(34, 4, 1)),
                 session.zeros(1), session.zeros(1), session.tensor(FloatArray(32) { 1f }, shapeOf(32)),
                 1, 1, 1, 32, 4, 1f,
-            ) { counts += session.mark() }
+            ) { counts += session.allocationCount }
             assertEquals(3, counts.size)
             // Full and partial chunks each retain one evaluated output and no obsolete state.
             assertEquals(1, counts[1] - counts[0])

@@ -116,7 +116,7 @@ internal fun mlxBackboneShapes(config: JevaBackboneConfig, plain: (String, IntAr
 }
 
 /** Complete a layer before releasing the preceding hidden state borrowed by its graph. */
-internal fun MlxMatrixSession.settleLayer(mark: Int, previous: MlxTensor, next: MlxTensor) {
+internal fun MlxMatrixSession.settleLayer(mark: MlxMark, previous: MlxTensor, next: MlxTensor) {
     settle(mark, next)
     release(previous)
 }
