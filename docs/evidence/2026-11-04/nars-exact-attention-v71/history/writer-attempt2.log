@@ -1,0 +1,13 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/workspace/.trikeshed-cloud/home -Djavax.net.ssl.trustStore=/workspace/.trikeshed-cloud/trust/cacerts
+Exception in thread "main" java.lang.IllegalStateException: Required value was null.
+	at proof.nars.attention.ProofKt.identity(Proof.kt:46)
+	at proof.nars.attention.ProofKt$main$1.invokeSuspend(Proof.kt:268)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at proof.nars.attention.ProofKt.main(Proof.kt:264)

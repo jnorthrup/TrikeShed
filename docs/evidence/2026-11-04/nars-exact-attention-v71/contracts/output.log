@@ -1,0 +1,19 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/workspace/.trikeshed-cloud/home -Djavax.net.ssl.trustStore=/workspace/.trikeshed-cloud/trust/cacerts
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by org.jetbrains.kotlin.org.fusesource.jansi.internal.JansiLoader in an unnamed module (file:/workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21/3cd9c37c505fb9879e03ebeaf91d9c9500ab6eca/kotlin-compiler-embeddable-2.4.21.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::invokeCleaner has been called by org.jetbrains.kotlin.cli.jvm.compiler.jarfs.FastJarFileSystemKt (file:/workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21/3cd9c37c505fb9879e03ebeaf91d9c9500ab6eca/kotlin-compiler-embeddable-2.4.21.jar)
+WARNING: Please consider reporting this to the maintainers of class org.jetbrains.kotlin.cli.jvm.compiler.jarfs.FastJarFileSystemKt
+WARNING: sun.misc.Unsafe::invokeCleaner will be removed in a future release
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/workspace/.trikeshed-cloud/home -Djavax.net.ssl.trustStore=/workspace/.trikeshed-cloud/trust/cacerts
+ARTIFACT_IDENTITY_OK source=4bdcc227781fa68b07c0105655a19f3e0c11959f main=6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355 frozenJars=120 productionClasses=26
+PASS exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes
+PASS httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409
+PASS lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity
+PASS mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers
+PASS productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence
+PASS sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer
+EXACT_V71_JAR_TESTS 6 passed; 0 failed; no production overlays or friend paths
