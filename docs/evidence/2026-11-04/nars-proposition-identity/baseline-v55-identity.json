@@ -1,0 +1,13 @@
+{
+  "source": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+  "jarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+  "jar": "/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+  "productionCodeSource": "file:/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+  "harnessSha256": "81fc07754373289e1ec0ec73930d176e4c9f9c5c814dc4631016d902b3e87352",
+  "productionOverlays": false,
+  "friendPaths": false,
+  "runtimeSeconds": 0.2503113069997198,
+  "childHeap": "256m",
+  "wallTimeoutSeconds": 20,
+  "bagOperations": 0
+}

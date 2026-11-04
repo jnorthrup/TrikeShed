@@ -41,6 +41,13 @@ data class KifDecoded(
 
 object KifSemantic {
     fun decode(text: String, limits: KifDecodeLimits = KifDecodeLimits()): KifDecoded {
+        val forms = decodeAll(text, limits)
+        require(forms.size == 1) { "Exactly one KIF formula required" }
+        return forms.single()
+    }
+
+    /** Bounds apply to the complete input, not separately to each accepted statement. */
+    fun decodeAll(text: String, limits: KifDecodeLimits = KifDecodeLimits()): List<KifDecoded> {
         require(text.length <= limits.maxChars) { "KIF input exceeds character bound" }
         // Refuse lossy UTF-16 replacement before syntax/source identities can be hashed.
         text.encodeToByteArray(throwOnInvalidSequence = true)
@@ -94,8 +101,7 @@ object KifSemantic {
         }
         require(!quoted && depth == 0) { "Truncated KIF expression" }
         val forms = KifExpr.parseAll(text, strict = true)
-        require(forms.size == 1) { "Exactly one KIF formula required" }
-        val syntax = forms.single()
+        require(forms.isNotEmpty()) { "At least one KIF formula required" }
         var nodes = 0
         fun count(e: KifExpr, level: Int) {
             require(++nodes <= limits.maxNodes && level <= limits.maxDepth) { "KIF syntax exceeds bound" }
@@ -105,7 +111,7 @@ object KifSemantic {
                 else -> Unit
             }
         }
-        count(syntax, 0)
+        forms.forEach { count(it, 0) }
         fun variableNames(e: KifExpr) {
             when (e) {
                 is KifExpr.Var -> require(e.name.length > 1) { "KIF variable requires a name after ?" }
@@ -114,8 +120,8 @@ object KifSemantic {
                 else -> Unit
             }
         }
-        variableNames(syntax)
-        return Decoder().decode(syntax)
+        forms.forEach(::variableNames)
+        return forms.map { Decoder().decode(it) }
     }
 
     private class Decoder {
