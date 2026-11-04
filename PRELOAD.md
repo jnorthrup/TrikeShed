@@ -457,12 +457,16 @@ through real common ancestry, then repair the combined result for maximum useful
 behaviour. A branch name, author, model, age, or position as "ours" or "theirs"
 does not grant its implementation priority.
 
-0. **Commit, publish, then fetch locally.** Before integration on Jim's machine,
-   commit all task-authorized work in the current participating checkout and
-   push the current integrated work to remote master with a normal,
-   non-forced push. Include the D3M contract change in that checkpoint. Inspect
-   untracked files before staging; "all" does not authorize committing secrets,
-   private corpora, generated caches or unrelated work. If remote master has
+0. **Commit on the spot, publish, then fetch locally.** Immediately commit all
+   tracked changes and all non-ignored untracked files in the current checkout
+   with `git add -A` and a local commit before fetching, switching branches or
+   starting integration. `.gitignore` governs untracked-file inclusion; do not
+   selectively leave files behind or force-add ignored files. Commit changes in
+   nested repositories first, then commit their gitlinks in the parent. Include
+   the D3M contract change in this checkpoint. A checkpoint preserves work; it
+   does not claim that unfinished code builds or passes verification. Push the
+   current integrated work to remote master with a normal, non-forced push.
+   If remote master has
    advanced, preserve and integrate that ancestry before the push. Other
    distributed branches must likewise have their intended work committed and
    their exact branch tips published; do not flatten incompatible branch tips
@@ -476,8 +480,8 @@ does not grant its implementation priority.
    state. Record exact tip OIDs and the starting master/remote-master OIDs after
    the distribution/fetch preflight. Freeze
    a manifest of the requested branch set; collapse duplicate tips and explicitly
-   account for already-contained branches. Preserve uncommitted work without
-   resetting, cleaning or overwriting it. Do not substitute a cloud clone for a
+   account for already-contained branches. Commit any newly discovered dirty
+   work locally on the spot; never reset, clean or overwrite it. Do not substitute a cloud clone for a
    requested local checkout.
 2. **Preserve recovery.** Retain the original master and every input tip with
    backup refs or a verified Git bundle. Integrate in an isolated local worktree
@@ -536,4 +540,19 @@ side preference and an auditable review of all intents, not a false claim that
 merge order cannot affect conflicts. Conflicts remain preserved as evidence;
 the published master must contain the resolved, verified implementation.
 
+### No shelving or Git stash
+
+Shelving and Git stash are forbidden. Never create an IDE shelf, run `git stash`,
+use `--autostash`, or park uncommitted files in another worktree as a substitute
+for a commit. All non-ignored working files must be committed locally on the
+spot before D3M proceeds. Do not wait for tests, cleanup, task boundaries or
+permission to preserve the work in a local commit.
+
+Recover any pre-existing shelf that belongs to the work being integrated into
+local commit history before merging it. Preserve its original identity and all
+variants; do not discard it or create another shelf. Resolve unmerged index
+entries after retaining their three stages, then commit immediately. Conflict
+archives and recovery refs preserve evidence in addition to commits; they never
+replace committing working files. This rule supersedes earlier instructions to
+leave work uncommitted.
 
