@@ -74,7 +74,7 @@ internal object DocumentsEnglish {
                 range["complete"] == (requestedBegin == 0 && requestedEnd == total)) { "Inspection coverage differs from the requested range" }
             val sentences = value["sentences"] as? List<*> ?: error("Inspection sentences are unavailable")
             require(sentences.size <= 512) { "Inspection exceeds the sentence display bound" }
-            var tokenCount = 0; var dependencyCount = 0; var markerCount = 0
+            var tokenCount = 0; var nodeCount = 0; var dependencyCount = 0; var markerCount = 0
             for (raw in sentences) {
                 val sentence = raw as? Map<*, *> ?: error("Invalid inspected sentence")
                 val lo = number(sentence["begin"]); val hi = number(sentence["end"])
@@ -94,10 +94,36 @@ internal object DocumentsEnglish {
                 }
                 val indices = tokens.map { number((it as Map<*, *>)["index"]) }.toSet()
                 require(indices.size == tokens.size && 0 !in indices) { "Ambiguous token identity" }
+                val originals = tokens.associateBy { number((it as Map<*, *>)["index"]) }
+                val nodes = DocumentsSyntaxGraph.nodes(sentence)
+                nodeCount += nodes.size
+                require(nodeCount <= 16_384) { "Inspection exceeds the parser node display bound" }
+                val nodeIds = mutableSetOf<String>()
+                val originalNodes = mutableSetOf<Int>()
+                for (node in nodes) {
+                    val index = number(node["index"]); val copy = number(node["copy"])
+                    val original = originals[index] as? Map<*, *> ?: error("Parser node has no source token")
+                    val id = node["id"] as? String ?: error("Parser node identity is unavailable")
+                    require(copy <= 1024 && id == "$index:$copy" && nodeIds.add(id) && node["kind"] == if (copy == 0) "token" else "copy") {
+                        "Ambiguous parser node identity"
+                    }
+                    require(s_["begin", "end", "word", "lemma", "pos", "ner"].view.all { node[it] == original[it] }) {
+                        "Parser copy differs from its original source token"
+                    }
+                    if (copy == 0) originalNodes.add(index)
+                }
+                require(originalNodes == indices) { "Parser node inventory omits an original source token" }
                 for (item in dependencies) {
                     val edge = item as? Map<*, *> ?: error("Invalid syntax observation")
                     val governor = number(edge["governor"]); val dependent = number(edge["dependent"])
-                    require((governor == 0 || governor in indices) && dependent in indices && edge["relation"] is String) { "Syntax observation has an unknown token" }
+                    val governorCopy = edge["governorCopy"]?.let(::number) ?: 0
+                    val dependentCopy = edge["dependentCopy"]?.let(::number) ?: 0
+                    val governorNode = DocumentsSyntaxGraph.nodeId(edge, "governor")
+                    val dependentNode = DocumentsSyntaxGraph.nodeId(edge, "dependent")
+                    require(governorCopy <= 1024 && dependentCopy <= 1024 &&
+                        governorNode == "$governor:$governorCopy" && dependentNode == "$dependent:$dependentCopy" &&
+                        (governorNode == "0:0" || governorNode in nodeIds) && dependentNode in nodeIds &&
+                        governorNode != dependentNode && edge["relation"] is String) { "Syntax observation has an unknown parser node" }
                 }
             }
         }
@@ -200,12 +226,19 @@ internal object DocumentsEnglish {
                 token["pos"].toString(), token["ner"].toString(), "${token["begin"]}–${token["end"]}"])
             text(parent, "h4", "Parser dependencies")
             text(parent, "p", "These edges describe the parser's syntax reading, not established legal relationships.", "ds-curate-label")
-            val byIndex = tokens.associateBy { number(it["index"]) }
-            fun word(index: Int) = if (index == 0) "ROOT" else byIndex[index]?.get("word")?.toString() ?: "?"
+            val nodes = DocumentsSyntaxGraph.nodes(sentence)
+            val byNode = nodes.associateBy { it["id"] as String }
+            if (nodes.any { number(it["copy"]) != 0 }) text(parent, "p",
+                "Parser copies reuse the original word and source span to represent enhanced syntax. They are not additional words in the document.", "ds-curate-label")
+            fun word(id: String): String {
+                if (id == "0:0") return "ROOT"
+                val node = byNode[id] ?: return "?"
+                return node["word"].toString() + if (number(node["copy"]) == 0) "" else " [parser copy]"
+            }
             val dependencyTable = table(parent, s_["Governor", "Relation", "Dependent"])
             for (raw in sentence["dependencies"] as List<*>) {
                 val edge = raw as Map<*, *>
-                val governor = number(edge["governor"]); val dependent = number(edge["dependent"])
+                val governor = DocumentsSyntaxGraph.nodeId(edge, "governor"); val dependent = DocumentsSyntaxGraph.nodeId(edge, "dependent")
                 cells(dependencyTable, s_["$governor · ${word(governor)}", edge["relation"].toString(), "$dependent · ${word(dependent)}"])
             }
         }
