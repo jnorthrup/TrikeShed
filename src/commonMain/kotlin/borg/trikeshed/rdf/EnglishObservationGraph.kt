@@ -24,6 +24,8 @@ object EnglishObservationGraph {
             "scope" j "recorded-lexical-and-parser-claims", "semanticAuthority" j "not-established",
             "producerAuthority" j "not-established", "parserExecution" j "not-reverified",
             "dependencyNodeIdentity" j if (legacyIdentity) "legacy-unreported" else "recorded-index-and-copy",
+            "parserDependencyNodeIdentity" j map(inventory["coverage"])["parserDependencyNodeIdentity"],
+            "parserNodeIdentityReported" j (map(inventory["coverage"])["parserNodeIdentityReported"] == true),
             "bindingProvenance" j "receipt-named-resources-and-exact-source-spans"]
     }
 
@@ -204,7 +206,7 @@ object EnglishObservationGraph {
                 map(edge) - _s["governorCopy", "dependentCopy", "governorNode", "dependentNode"]
             }]
         }, "counts" j (map(inventory["counts"]) - "nodes"),
-        "coverage" j (map(inventory["coverage"]) - "dependencyNodeIdentity")]
+        "coverage" j (map(inventory["coverage"]) - _s["dependencyNodeIdentity", "parserDependencyNodeIdentity", "parserNodeIdentityReported"])]
 
     @Suppress("UNCHECKED_CAST")
     internal fun map(value: Any?): Map<String, Any?> {

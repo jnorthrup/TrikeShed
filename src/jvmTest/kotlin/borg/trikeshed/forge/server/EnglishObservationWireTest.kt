@@ -114,7 +114,7 @@ class EnglishObservationWireTest {
             val injection = program(s_["?x"], s_[Triple("?x", term("kind") + " . ?x ?p ?o", "\"marker\"")])
             request(wire, cid, injection, status = 400)
             val legacy = (f.receipt - "sourceSnapshots") + _m["counts" j ((f.receipt["counts"] as Map<*, *>) - "nodes"),
-                "coverage" j ((f.receipt["coverage"] as Map<*, *>) - "dependencyNodeIdentity"),
+                "coverage" j ((f.receipt["coverage"] as Map<*, *>) - _s["dependencyNodeIdentity", "parserDependencyNodeIdentity", "parserNodeIdentityReported"]),
                 "sentences" j (f.receipt["sentences"] as List<*>).map { raw -> val row = raw as Map<*, *>
                     (row - "nodes") + _m["dependencies" j (row["dependencies"] as List<*>).map { edge ->
                         (edge as Map<*, *>) - _s["governorCopy", "dependentCopy", "governorNode", "dependentNode"]
@@ -162,5 +162,33 @@ class EnglishObservationWireTest {
             val refused = request(bounded, cid, markerProgram("negation"), status = 409)
             assertTrue((refused["error"] as String).contains("smaller text range"))
         } finally { bounded.drain(); large.owner.complete(); large.owner.join() }
+    }
+
+    @Test fun publishedPhaseOneReceiptRemainsHistoricalWithUnreportedCopyIdentity(): Unit = runBlocking {
+        val f = fixture("published-phase-one", coroutineContext[Job], copies = false)
+        val wire = EnglishObservationWire(f.ctx, f.corpus)
+        try {
+            val published = reifyStrict(Path.of("docs/evidence/2026-11-04/offline-english/browser-result.json").toFile().readText()) as Map<*, *>
+            val original = (published["meta"] as Map<*, *>)["originalText"] as String
+            // The published HTTP JSON export has only integer numeric fields; restore their CBOR
+            // integer type rather than converting its JSON parser's doubles into floating CBOR.
+            fun exported(value: Any?): Any? = when (value) {
+                is Map<*, *> -> value.entries.associate { (it.key as String j exported(it.value)).pair }
+                is List<*> -> value.map(::exported)
+                is Number -> value.toDouble().let { number ->
+                    require(number.isFinite() && number % 1.0 == 0.0); number.toLong()
+                }
+                else -> value
+            }
+            @Suppress("UNCHECKED_CAST")
+            val inventory = exported(published["inventory"]) as Map<String, Any?>
+            assertEquals(inventory["originalCid"], f.cas.put(original.encodeToByteArray()).value)
+            val cid = f.cas.put(CanonicalCbor.encodeMap(inventory - "receiptCid"))
+            assertEquals(inventory["receiptCid"], cid.value)
+            val result = request(wire, cid, program(s_["?marker"], s_[Triple("?marker", term("markerKind"), "\"negation\"")]))
+            assertEquals("legacy-unreported", (result["source"] as Map<*, *>)["dependencyNodeIdentity"])
+            assertTrue(bindings(result).isNotEmpty())
+            request(wire, cid, markerProgram("negation"), "current", 409)
+        } finally { wire.drain(); f.owner.complete(); f.owner.join() }
     }
 }
