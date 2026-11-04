@@ -1,0 +1,14 @@
+{
+  "productionSourceFilesCompiled": [],
+  "friendPaths": false,
+  "classFiles": {
+    "proof/nars/attention/ProofMarker.class": "757ea8cc1cd06df8f22a133e02d3614938f242ba87174866fe7246a95ee9954e",
+    "proof/nars/attention/ProofKt$writer$2.class": "32e1a4d320a5f94921099e978fda3493f3b3382b38b2b13cfe3a822d1147e597",
+    "proof/nars/attention/ProofKt$main$1.class": "fd466afa24047c702adf5e464a2b2686972a249883bbebd9eca800a94f055091",
+    "proof/nars/attention/Transport.class": "9260ae95a439299624d8b751c708bcce402feca80e2e53514ab3951f2c44c680",
+    "proof/nars/attention/Reply.class": "a9ec84720ecceec193b5c8209c0c78560fdca01be7dfe3563be5f1504baf6a1e",
+    "proof/nars/attention/ProofKt$reopener$2.class": "6463c95a68c223860aaf39e26caa51e0d0c1229210d76e4af3d68d396d7b84b2",
+    "proof/nars/attention/ProofKt.class": "8ad342a6d5669db405ff22711fb9b887b4f4257e6e2751e9a5bb29361e4d35b3",
+    "proof/nars/attention/Transport$1$response$1.class": "0ad1f5f7911400477e1804604ce1650e142e26b9374bcbc51164f71a22ec430f"
+  }
+}

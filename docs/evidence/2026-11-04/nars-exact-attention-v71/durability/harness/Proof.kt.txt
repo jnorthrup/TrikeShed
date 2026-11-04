@@ -1,0 +1,275 @@
+package proof.nars.attention
+
+import borg.trikeshed.cursor.BudgetCoord
+import borg.trikeshed.forge.server.BeliefWire
+import borg.trikeshed.job.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.narsese.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.*
+import java.net.InetSocketAddress
+import java.lang.System
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.Base64
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
+const val SOURCE_HEAD = "4bdcc227781fa68b07c0105655a19f3e0c11959f"
+const val MAIN_SHA = "6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355"
+val snapshot: Path = Path.of("/workspace/library-files/english-retained-attention-v71-proof/snapshot")
+val sourceText = "  \r\n(pays Tenant Landlord)\r\n"
+val archiveText = "(labels Archive Note)\r\n"
+fun hash(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+fun b64(bytes: ByteArray): String = Base64.getEncoder().encodeToString(bytes)
+fun unb64(text: String): ByteArray = Base64.getDecoder().decode(text)
+fun write(path: Path, value: Any?) = Files.writeString(path, jsonOf(value) + "\n")
+fun exact(cas: PackCasStore, cid: ContentId, bytes: ByteArray): Boolean {
+    val read = checkNotNull(cas.getBounded(cid, bytes.size))
+    check(read.contentEquals(bytes) && ContentId.of(read) == cid)
+    return true
+}
+
+fun identity(mode: String, output: Path): Map<String, Any?> {
+    check(Files.readString(snapshot.resolve("source-head.txt")).trim() == SOURCE_HEAD)
+    val main = snapshot.resolve("main.jar").toRealPath()
+    check(hash(Files.readAllBytes(main)) == MAIN_SHA)
+    val frozen = Files.readString(snapshot.resolve("classpath.txt")).trim().split(':').map { Path.of(it).toRealPath() }
+    check(frozen.size == 120 && frozen.first() == main && frozen.all { it.toString().endsWith(".jar") })
+    val manifest = reifyMap(Files.readString(snapshot.resolve("sha256.json")))
+    val dependencies = manifest["dependencies"] as Map<*, *>
+    check(dependencies.size == 119)
+    for (jar in frozen.drop(1)) check(hash(Files.readAllBytes(jar)) == dependencies[jar.toString()])
+    val actual = checkNotNull(System.getProperty("java.class.path")).split(':').map { Path.of(it).toRealPath() }
+    val observer = Path.of(ProofMarker::class.java.protectionDomain.codeSource.location.toURI()).toRealPath()
+    check(actual == listOf(observer) + frozen)
+    val sources = listOf(BeliefBagElement::class.java, BeliefIntake.Attend::class.java, BeliefAttention::class.java,
+        BeliefAttentionRequest::class.java, BeliefsNodes::class.java, BeliefWire::class.java, KgRetention::class.java,
+        KgNalBridge::class.java, SemanticSignal::class.java, SignalCodec::class.java, AttentionEconomy::class.java,
+        DocumentAppendLog::class.java, PackCasStore::class.java, JvmFileOperations::class.java, ContentId::class.java,
+        LcncNode::class.java, TurnReviewElement::class.java, AngularCodec::class.java).associate { cls ->
+        val path = Path.of(cls.protectionDomain.codeSource.location.toURI()).toRealPath()
+        check(path == main) { "Production overlay: ${cls.name} from $path" }
+        cls.name to path.toString()
+    }
+    val result = mapOf("mode" to mode, "pid" to ProcessHandle.current().pid().toString(),
+        "sourceHead" to SOURCE_HEAD, "mainSha256" to MAIN_SHA, "frozenJars" to frozen.size, "dependencyHashesVerified" to 119,
+        "runtimeClasspath" to actual.map { it.toString() }, "productionCodeSources" to sources,
+        "observerCodeSource" to observer.toString(), "overlays" to false, "friends" to false)
+    write(output.resolve("$mode-identity.json"), result)
+    return result
+}
+class ProofMarker
+
+data class Reply(val status: Int, val body: Map<String, Any?>)
+
+/** Observer HTTP transport only; every /api/beliefs handler is the production frozen-JAR BeliefWire. */
+class Transport(val wire: BeliefWire) {
+    val records = mutableListOf<Map<String, Any?>>()
+    val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 8)
+    val executor = Executors.newSingleThreadExecutor()
+    val client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).build()
+    init {
+        server.executor = executor
+        server.createContext("/api/beliefs") { exchange ->
+            try {
+                val method = exchange.requestMethod
+                val path = exchange.requestURI.toASCIIString()
+                val body = exchange.requestBody.readBytes().decodeToString(throwOnInvalidSequence = true)
+                val response = runBlocking { checkNotNull(wire.route(method, path,
+                    "$method $path HTTP/1.1\r\n\r\n$body", null)) }
+                val bytes = response.body.encodeToByteArray()
+                exchange.responseHeaders.set("Content-Type", "application/json; charset=utf-8")
+                exchange.sendResponseHeaders(response.status, bytes.size.toLong())
+                exchange.responseBody.use { it.write(bytes) }
+            } catch (failure: Throwable) {
+                val bytes = jsonOf(mapOf("observerFailure" to failure.toString())).encodeToByteArray()
+                exchange.sendResponseHeaders(500, bytes.size.toLong())
+                exchange.responseBody.use { it.write(bytes) }
+            } finally { exchange.close() }
+        }
+        server.start()
+    }
+    fun post(path: String, body: String, expected: Int = 200): Reply {
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:${server.address.port}$path"))
+            .header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body)).build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        val value = reifyMap(response.body())
+        records.add(mapOf("method" to "POST", "path" to path, "request" to body,
+            "status" to response.statusCode(), "response" to value))
+        check(response.statusCode() == expected) { "$path expected $expected: ${response.body()}" }
+        return Reply(response.statusCode(), value)
+    }
+    fun close() {
+        server.stop(0)
+        executor.shutdown()
+        check(executor.awaitTermination(10, TimeUnit.SECONDS))
+        client.close()
+    }
+}
+
+suspend fun writer(root: Path): Unit = coroutineScope {
+    val runtime = root.resolve("runtime")
+    check(!Files.exists(runtime)) { "Writer requires a fresh private runtime" }
+    Files.createDirectories(runtime)
+    Files.write(runtime.resolve("manual-source.kif"), sourceText.encodeToByteArray())
+    val files = JvmFileOperations()
+    val cas = PackCasStore(files, runtime.resolve("cas").toString())
+    val log = DocumentAppendLog.open(runtime.resolve("beliefs.wal").toString(), runtime.toString())
+    val bag = BeliefBagElement(cas = cas, wal = log, flushEvery = 1000, priorityFloor = .001f,
+        decayFn = { AttentionEconomy.decay(it) }, parentJob = currentCoroutineContext()[Job])
+    bag.open()
+    val review = TurnReviewElement(bag); review.open()
+    val transport = Transport(BeliefWire(bag, review, null))
+    var result: Map<String, Any?>? = null
+    try {
+        val imported = transport.post("/api/beliefs/kg", sourceText).body
+        val source = ContentId(imported["sourceCid"] as String)
+        check(source == ContentId.of(sourceText.encodeToByteArray()))
+        val pid = ContentId((imported["propositionCids"] as List<*>).single() as String)
+        val mapping = KgNalBridge.bridge(sourceText).single()
+        check(mapping.propositionCid(source.value) == pid)
+        val definition = mapping.propositionBytes(source.value)
+        val original = checkNotNull(bag.signalOf(mapping.signal(source.value).angular))
+        val originalBytes = SignalCodec.encode(original)
+        check(exact(cas, source, sourceText.encodeToByteArray()) && exact(cas, pid, definition))
+        val angular = original.angular
+        fun attention(p: Float) = jsonOf(mapOf("angular" to angular.toString(), "propositionCid" to pid.value, "p" to p))
+        val attended = transport.post("/api/beliefs/attend", attention(.9f)).body["attended"] as Map<*, *>
+        check(attended["processed"] == true && attended["sourceContext"] == source.value &&
+            attended["sourceContextStatus"] == "verified-retained-kg")
+        check(bag.budgetOf(angular)?.p == BudgetCoord(.9f, 0f, 0f).p)
+        val lcnc = BeliefsNodes.attendRunner(bag).run(LcncNode("exact-attention", "nal.attend",
+            mapOf("d" to ".6", "q" to ".35")), mapOf("angular?" to angular.toString(), "propositionCid?" to pid.value))["attended"] as Map<*, *>
+        check(lcnc["processed"] == true && lcnc["identityScope"] == "exact-resident-proposition")
+        check(lcnc["sourceContext"] == source.value && lcnc["sourceContextStatus"] == "verified-retained-kg")
+        val beforeDecay = checkNotNull(bag.budgetOf(angular))
+        check(beforeDecay == BudgetCoord(.9f, .6f, .35f))
+        val unchanged = transport.post("/api/beliefs/attend", attention(.9f)).body["attended"] as Map<*, *>
+        check(unchanged["processed"] == true && unchanged["changed"] == false)
+        check(SignalCodec.encode(checkNotNull(bag.signalOf(angular))).contentEquals(originalBytes))
+
+        val wrong = ContentId.of("not the resident proposition".encodeToByteArray())
+        val wrongReply = transport.post("/api/beliefs/attend", jsonOf(mapOf("angular" to angular.toString(), "propositionCid" to wrong.value, "p" to 1)), 409)
+        check(wrongReply.body["issue"] == "PROPOSITION_MISMATCH" && wrongReply.body["processed"] == false)
+        var absent = Long.MIN_VALUE
+        while (bag.signalOf(absent) != null) absent++
+        val missing = transport.post("/api/beliefs/attend", jsonOf(mapOf("angular" to absent.toString(), "propositionCid" to pid.value, "p" to 1)), 409)
+        check(missing.body["issue"] == "RESIDENT_REQUIRED" && bag.signalOf(absent) == null)
+        for (k in listOf(0, -1, Int.MAX_VALUE, 1.25)) {
+            check(transport.post("/api/beliefs/resonate", jsonOf(mapOf("goal" to "Tenant", "k" to k)), 400).body["error"] == "invalid_resonance_limit")
+            transport.post("/api/beliefs/resonate", jsonOf(mapOf("goal" to "Tenant", "k" to 8)))
+        }
+        for (mode in listOf("hamming", "whitened")) {
+            val rows = transport.post("/api/beliefs/resonate", jsonOf(mapOf("goal" to "Tenant", "mode" to mode))).body
+            val all = (rows["synonymPeaks"] as List<*>) + (rows["antonymPeaks"] as List<*>)
+            check(all.any { (it as Map<*, *>)["propositionCid"] == pid.value && it["sourceContext"] == source.value })
+            val node = BeliefsNodes.resonateRunner(bag).run(LcncNode("resonance", "beliefs.resonate", mapOf("goal" to "Tenant", "mode" to mode)), emptyMap())
+            check(((node["synonyms"] as List<*>) + (node["antonyms"] as List<*>)).any {
+                (it as Map<*, *>)["propositionCid"] == pid.value && it["sourceContext"] == source.value
+            })
+        }
+        val archived = transport.post("/api/beliefs/kg", archiveText).body
+        val archivedSource = ContentId(archived["sourceCid"] as String)
+        val archivedPid = ContentId((archived["propositionCids"] as List<*>).single() as String)
+        val archivedSignal = KgNalBridge.bridge(archiveText).single().signal(archivedSource.value)
+        transport.post("/api/beliefs/attend", jsonOf(mapOf("angular" to archivedSignal.angular.toString(), "propositionCid" to archivedPid.value, "p" to 0)))
+        transport.post("/api/beliefs/tick", "{}")
+        bag.awaitProcessed() // /tick is queued; this existing FIFO fence supplies processing, not a flush claim.
+        val decayed = checkNotNull(bag.budgetOf(angular))
+        check(decayed == AttentionEconomy.decay(beforeDecay) && decayed.p < beforeDecay.p)
+        check(bag.signalOf(archivedSignal.angular) == null)
+        val noRevive = transport.post("/api/beliefs/attend", jsonOf(mapOf("angular" to archivedSignal.angular.toString(), "propositionCid" to archivedPid.value, "p" to 1)), 409)
+        check(noRevive.body["issue"] == "RESIDENT_REQUIRED" && bag.signalOf(archivedSignal.angular) == null)
+        val collision = transport.post("/api/beliefs/kg", "(pays Clerk Owner) (owes Clerk Owner)", 409)
+        check((collision.body["admission"] as Map<*, *>)["issue"] == "PROPOSITION_MISMATCH")
+        val recovery = bag.attendProposition(angular, pid)
+        check(!recovery.changed && recovery.budget == decayed)
+        check(bag.worker?.isActive == true)
+        check(SignalCodec.encode(checkNotNull(bag.signalOf(angular))).contentEquals(originalBytes))
+        check(exact(cas, source, sourceText.encodeToByteArray()) && exact(cas, pid, definition))
+        val archivedBytes = SignalCodec.encode(archivedSignal)
+        check(exact(cas, ContentId.of(archivedBytes), archivedBytes))
+        result = mapOf("status" to "PASS", "pid" to ProcessHandle.current().pid().toString(), "sourceHead" to SOURCE_HEAD,
+            "mainSha256" to MAIN_SHA, "sourceCid" to source.value, "propositionCid" to pid.value, "angular" to angular.toString(),
+            "sourceBase64" to b64(sourceText.encodeToByteArray()), "definitionBase64" to b64(definition), "signalBase64" to b64(originalBytes),
+            "evidencePacked" to original.evidence.packed.toString(), "preDecayBudgetPacked" to beforeDecay.packed.toString(),
+            "budgetPacked" to decayed.packed.toString(), "sourceSha256" to hash(sourceText.encodeToByteArray()),
+            "definitionSha256" to hash(definition), "signalSha256" to hash(originalBytes),
+            "archivedAngular" to archivedSignal.angular.toString(), "archivedPid" to archivedPid.value,
+            "archivedSignalBase64" to b64(archivedBytes), "httpProcessed" to attended, "lcncProcessed" to lcnc,
+            "wrongPidRefused" to true, "unknownResidentRefused" to true, "archivedNotRevived" to true,
+            "collision409Preserved" to true, "invalidResonanceCountsRefused" to true, "actorRecovered" to true,
+            "tickProcessing" to "queued tick followed by existing FIFO processing fence",
+            "semanticScope" to "manual declared KG; attention only; source authentication, review and world truth not established")
+    } finally {
+        transport.close()
+        review.drain()
+        bag.drain()
+        check(bag.worker?.isCompleted == true && bag.supervisor.isCompleted)
+        cas.sync(); log.flush()
+        log.close(); cas.close()
+        write(root.resolve("http-records.json"), transport.records)
+    }
+    write(root.resolve("writer-result.json"), checkNotNull(result) + mapOf("ownersDrained" to true,
+        "packSynced" to true, "walFlushReturned" to true, "packAndWalClosed" to true,
+        "durabilityScope" to "clean separate-process close and reopen; not a crash or power-loss experiment"))
+    println("WRITER_PASS ${ProcessHandle.current().pid()}")
+}
+
+suspend fun reopener(root: Path): Unit = coroutineScope {
+    val expected = reifyMap(Files.readString(root.resolve("writer-result.json")))
+    check(expected["status"] == "PASS" && expected["pid"] != ProcessHandle.current().pid().toString())
+    val runtime = root.resolve("runtime")
+    val files = JvmFileOperations()
+    val cas = PackCasStore(files, runtime.resolve("cas").toString())
+    val log = DocumentAppendLog.open(runtime.resolve("beliefs.wal").toString(), runtime.toString())
+    val bag = BeliefBagElement(cas = cas, wal = log, priorityFloor = .001f,
+        decayFn = { AttentionEconomy.decay(it) }, parentJob = currentCoroutineContext()[Job])
+    bag.open()
+    try {
+        val angular = (expected["angular"] as String).toLong()
+        val pid = ContentId(expected["propositionCid"] as String)
+        val source = ContentId(expected["sourceCid"] as String)
+        val signal = checkNotNull(bag.signalOf(angular))
+        check(signal.propositionCid == pid.value && signal.evidence.packed.toString() == expected["evidencePacked"])
+        check(SignalCodec.encode(signal).contentEquals(unb64(expected["signalBase64"] as String)))
+        check(bag.budgetOf(angular)?.packed.toString() == expected["budgetPacked"])
+        check(exact(cas, source, unb64(expected["sourceBase64"] as String)))
+        check(exact(cas, pid, unb64(expected["definitionBase64"] as String)))
+        check(bag.signalOf((expected["archivedAngular"] as String).toLong()) == null)
+        val archivedBytes = unb64(expected["archivedSignalBase64"] as String)
+        check(exact(cas, ContentId.of(archivedBytes), archivedBytes))
+        val metadata = bag.sourceContexts()(signal)
+        check(metadata["sourceContext"] == source.value && metadata["sourceContextStatus"] == "verified-retained-kg")
+        val noChange = bag.attendProposition(angular, pid)
+        check(!noChange.changed && noChange.report()["processed"] == true)
+    } finally {
+        bag.drain()
+        check(bag.worker?.isCompleted == true && bag.supervisor.isCompleted)
+        cas.sync(); log.flush(); log.close(); cas.close()
+    }
+    write(root.resolve("reopen-result.json"), mapOf("status" to "PASS", "pid" to ProcessHandle.current().pid().toString(),
+        "writerPid" to expected["pid"], "sourceHead" to SOURCE_HEAD, "mainSha256" to MAIN_SHA,
+        "exactPidPreserved" to true, "signalBytesPreserved" to true, "evidencePackedPreserved" to true,
+        "sourceAndDefinitionBytesPreserved" to true, "decayedBudgetReplayed" to true, "archiveNotRevived" to true,
+        "ownersDrained" to true, "packSynced" to true, "walFlushReturned" to true, "packAndWalClosed" to true,
+        "durabilityScope" to "clean separate-process close and reopen; no crash/power-loss claim"))
+    println("REOPEN_PASS ${ProcessHandle.current().pid()}")
+}
+
+fun main(args: Array<String>) = runBlocking(JvmFileOperations()) {
+    check(args.size == 2)
+    val mode = args[0]; val root = Path.of(args[1]).toAbsolutePath()
+    Files.createDirectories(root)
+    identity(mode, root)
+    when (mode) { "writer" -> writer(root); "reopen" -> reopener(root); else -> error("writer or reopen required") }
+}
