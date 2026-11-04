@@ -1,0 +1,26 @@
+{
+  "scope": "Two actual fresh CoreNLP4.6.0 FULL producer runs and production codec retention checks, synthetic inputs only",
+  "v54": {
+    "source": "46da66cdb28e650e71490ae48741e6f5dcfa0563",
+    "openieProducedAndRetained": 7
+  },
+  "v55": {
+    "source": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+    "openieProducedAndRetained": 7,
+    "mainJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+    "sameJvmJarAsV56": true
+  },
+  "sameCaseReceiptCidsAcrossActualRuns": true,
+  "caseReceiptCids": {
+    "v54": {
+      "positive-if": "sha256:f0bfd21d19442a80f6361bf236eec1251133d284a33d8522240fc4cb45318829",
+      "named-negated-exception": "sha256:020ce1028e52d01fd717be63e78055969e45af87d802f97f8a30736afe0227d0"
+    },
+    "v55": {
+      "positive-if": "sha256:f0bfd21d19442a80f6361bf236eec1251133d284a33d8522240fc4cb45318829",
+      "named-negated-exception": "sha256:020ce1028e52d01fd717be63e78055969e45af87d802f97f8a30736afe0227d0"
+    }
+  },
+  "nonemptyKbpOrMentionProducerCoverage": false,
+  "publication": "Synthetic source text, recorded parser observations, CBOR receipts, prompts and hashes only; no user-supplied book content or raw logs."
+}
