@@ -62,11 +62,12 @@ class DocumentEnglishWire(
         catch (failure: Exception) { json(_m["error" j (failure.message ?: "English inspection refused")], 409) }
     }
 
-    private suspend fun current(expected: ProjectDoc) {
+    private suspend fun current(expected: ProjectDoc): ProjectDoc {
         val row = corpus.document(expected.project, expected.id)
         require(row != null && row.cid == expected.cid && row.rev == expected.rev && row.seq == expected.seq) {
             "Selected source revision changed or is unavailable"
         }
+        return row
     }
 
     private fun bounded(row: ProjectDoc, limit: Int): ByteArray {
@@ -80,8 +81,7 @@ class DocumentEnglishWire(
     private data class Source(val value: DocumentSource, val revisions: Series<ProjectDoc>)
 
     private suspend fun source(expected: ProjectDoc): Source {
-        current(expected)
-        val original = requireNotNull(corpus.document(expected.project, expected.id))
+        val original = current(expected)
         require(original.length in 0..MAX_ORIGINAL.toLong()) { "Original source exceeds 32MiB" }
         val identityText = original.id.substringAfterLast('.', "").lowercase() in _s["txt", "md"]
         require(!identityText || original.length <= MAX_TEXT) { "Source text exceeds 4MiB" }
@@ -150,6 +150,7 @@ class DocumentEnglishWire(
         val readback = requireNotNull((ctx.casStore as BoundedCasReader).getBounded(cid, MAX_RECEIPT)) { "English inspection receipt unavailable" }
         require(readback.contentEquals(bytes) && ContentId.of(readback) == cid) { "English inspection receipt retention failed" }
         for (row in retained.revisions.view) current(row)
+        current(expected)
         return json(receipt + _m["receiptCid" j cid.value])
     }
 

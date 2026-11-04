@@ -132,4 +132,43 @@ class DocumentEnglishWireTest {
             request(wire, input(row, 0, text.length), 409); assertEquals(1, calls); assertEquals(0, mines)
         } finally { wire.drain(); f.owner.complete(); f.owner.join() }
     }
+
+    @Test fun aHeadChangeBetweenSelectionCheckAndSourceLookupCannotSubstituteNewExtraction(): Unit = runBlocking {
+        val f = fixture("english-refetch", coroutineContext[Job]); var reads = 0; var calls = 0
+        val id = "agreement.pdf"; val text = "Tenant must pay rent."
+        put(f, id, "%PDF-old-source".encodeToByteArray(), "application/pdf")
+        val selected = assertNotNull(f.corpus.document("legal", id))
+        val extractedCid = put(f, id + ProjectNodes.EXTRACT_SUFFIX, text.encodeToByteArray())
+        fun completion(cid: String, rev: String) = jsonOf(_m["version" j 1, "originalCid" j cid,
+            "originalRev" j rev, "extractedTextCid" j extractedCid, "anchors" j _l[_m["begin" j 0, "end" j text.length, "page" j 1]],
+            "unresolved" j _l["table", "diagram"]]).encodeToByteArray()
+        put(f, id + ProjectNodes.EXTRACT_ORIGIN_SUFFIX, "${selected.cid}\t$extractedCid".encodeToByteArray())
+        put(f, id + ProjectNodes.EXTRACTION_SUFFIX, completion(selected.cid, selected.rev))
+        val replacement = "%PDF-new-source".encodeToByteArray(); val replacementCid = ContentId.of(replacement)
+        val newOrigin = "${replacementCid.value}\t$extractedCid".encodeToByteArray()
+        val newCompletion = completion(replacementCid.value, "2-${replacementCid.hex.take(8)}")
+        // Preload the replacement blobs. The racing corpus changes only its head, so any new CAS
+        // file created by the request would be a wrongly published inspection receipt.
+        for (bytes in s_[replacement, newOrigin, newCompletion].view) f.cas.put(bytes)
+        val casRoot = directory.resolve("english-refetch").toFile()
+        fun retainedFiles() = casRoot.walkTopDown().filter { it.isFile }.map { it.relativeTo(casRoot).path }.toSet()
+        val before = retainedFiles()
+        val corpus = object : ProjectCorpus by f.corpus {
+            override suspend fun document(project: String, doc: String): ProjectDoc? {
+                if (doc == id && ++reads == 2) {
+                    f.corpus.put(project, id, replacement, "application/pdf")
+                    f.corpus.put(project, id + ProjectNodes.EXTRACT_ORIGIN_SUFFIX, newOrigin)
+                    f.corpus.put(project, id + ProjectNodes.EXTRACTION_SUFFIX, newCompletion)
+                }
+                return f.corpus.document(project, doc)
+            }
+        }
+        val wire = DocumentEnglishWire(f.ctx, corpus) { NlpReader { calls++; parsed(it) } }
+        try {
+            val response = request(wire, input(selected, 0, text.length), 409)
+            assertTrue((response["error"] as String).contains("revision changed"))
+            assertNull(response["receiptCid"]); assertEquals(0, calls)
+            assertEquals(before, retainedFiles())
+        } finally { wire.drain(); f.owner.complete(); f.owner.join() }
+    }
 }
