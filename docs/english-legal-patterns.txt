@@ -1,0 +1,44 @@
+English legal-language candidates
+
+EnglishLegalPatterns.inspect(source, parsed, begin, end) is a pure, bounded
+common helper. It requires parsed.text to exactly equal the selected source
+substring and reuses EnglishInspection source/CID, Unicode, graph, and quotation
+validation. Returned spans are global UTF16 offsets into that same extracted
+text. It calls no model, parser, reasoner, network, or world-fact store.
+
+The output authority is parser-role-and-quantity-candidates-only and its review
+status is unreviewed. A modal/action candidate retains the literal modal, its
+lemma, the actual dependency edge, and all observed subject/object role nodes.
+Enhanced++ node IDs include token index and copy count; copies retain their
+original source anchor without inventing extra occurrences of a word.
+
+Duration-language candidates preserve their exact source quotation, number
+forms, unit, business/calendar/working modifiers, temporal-marker observations,
+and dependency direction. A bounded lexical grammar can read ASCII digits or
+ordinary English cardinals from 0 through 9999. Matching thirty (30) may yield
+the lexical integer 30; conflicting thirty (60), unsupported number language,
+and copied quantity scope remain unresolved. Month/year units are never turned
+into days. This is not a legal deadline or a calendar computation.
+
+Every sentence and its lexical guard/exception/negation markers remain visible.
+Parser roles, numeric readings, and SUMO/NARS legal facts are different claims:
+this helper does not admit facts or establish an obligation, legal force,
+negation/exception application, coordination scope, cross-sentence scope, or
+parser accuracy. Existing copied/legacy-node inference gates are unchanged.
+
+Additional bounds: 1024 modal candidates, 1024 duration candidates, 32768 emitted
+dependency binding references, 24 number-language tokens, 8192 aggregate quoted
+layout-anchor references, and 4 MiB canonical CBOR output. EnglishInspection's
+source/token/node/edge bounds apply first. Invalid source identities or graphs
+are refused; a missing candidate is not evidence that a clause has no effect.
+
+Synthetic helper evidence is in:
+  evidence/2026-11-04/english-legal-patterns/helper/method.txt
+  evidence/2026-11-04/english-legal-patterns/helper/eight-cases.json
+  evidence/2026-11-04/english-legal-patterns/helper/numeric-head-counterexample.json
+  evidence/2026-11-04/english-legal-patterns/helper/execution-identity.json
+  evidence/2026-11-04/english-legal-patterns/helper/fixture-verification.json
+
+It records the first actual CoreNLP 4.6 helper miss, a narrowly corrected replay
+of unchanged annotations, and later standalone JVM portability checks. Host/API,
+UI, commonJS, and final release behavior require their own coordinated proofs.

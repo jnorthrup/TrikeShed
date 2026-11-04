@@ -1,0 +1,251 @@
+{
+  "schema": "trikeshed.english-legal-patterns.numeric-head-counterexample.v1",
+  "syntheticOnly": true,
+  "sourceCid": "sha256:e7e5d6f75d7c58d4d376ab35ccf939dbe5f79b53f2f9cf9be012fffe94134126",
+  "range": {
+    "begin": 0,
+    "end": 87
+  },
+  "quote": "Tenant must give notice within thirty (30) business days unless notice is not received.",
+  "parser": {
+    "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+    "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+    "runtime": {
+      "module": "corenlp",
+      "profile": "syntax-v1",
+      "dependencyGraph": "enhanced-plus-plus",
+      "dependencyNodeIdentity": "token-index+copy-count/1",
+      "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+      "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+      "jar": "stanford-corenlp-4.6.0.jar",
+      "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+      "packageVersion": "4.6.0",
+      "parserNormalization": "identity/1",
+      "sourceTextCid": "sha256:e7e5d6f75d7c58d4d376ab35ccf939dbe5f79b53f2f9cf9be012fffe94134126",
+      "parserInputCid": "sha256:e7e5d6f75d7c58d4d376ab35ccf939dbe5f79b53f2f9cf9be012fffe94134126",
+      "relationGlossSource": "parser-input"
+    },
+    "configuration": {
+      "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+      "threads": "1"
+    }
+  },
+  "nodeIdentity": "token-index+copy-count/1; virtual root 0:0 is not a text token",
+  "nodes": {
+    "columns": [
+      "index",
+      "begin",
+      "end",
+      "word",
+      "lemma",
+      "pos",
+      "ner",
+      "id",
+      "copy",
+      "kind"
+    ],
+    "rows": [
+      [1, 0, 6, "Tenant", "tenant", "NN", "O", "1:0", 0, "token"],
+      [2, 7, 11, "must", "must", "MD", "O", "2:0", 0, "token"],
+      [3, 12, 16, "give", "give", "VB", "O", "3:0", 0, "token"],
+      [4, 17, 23, "notice", "notice", "NN", "O", "4:0", 0, "token"],
+      [5, 24, 30, "within", "within", "IN", "O", "5:0", 0, "token"],
+      [6, 31, 37, "thirty", "thirty", "CD", "NUMBER", "6:0", 0, "token"],
+      [7, 38, 39, "(", "(", "-LRB-", "O", "7:0", 0, "token"],
+      [8, 39, 41, "30", "30", "CD", "NUMBER", "8:0", 0, "token"],
+      [9, 41, 42, ")", ")", "-RRB-", "O", "9:0", 0, "token"],
+      [10, 43, 51, "business", "business", "NN", "DATE", "10:0", 0, "token"],
+      [11, 52, 56, "days", "day", "NNS", "DATE", "11:0", 0, "token"],
+      [12, 57, 63, "unless", "unless", "IN", "O", "12:0", 0, "token"],
+      [13, 64, 70, "notice", "notice", "NN", "O", "13:0", 0, "token"],
+      [14, 71, 73, "is", "be", "VBZ", "O", "14:0", 0, "token"],
+      [15, 74, 77, "not", "not", "RB", "O", "15:0", 0, "token"],
+      [16, 78, 86, "received", "receive", "VBN", "O", "16:0", 0, "token"],
+      [17, 86, 87, ".", ".", ".", "O", "17:0", 0, "token"]
+    ]
+  },
+  "dependencies": {
+    "columns": [
+      "governor",
+      "dependent",
+      "relation",
+      "governorCopy",
+      "dependentCopy",
+      "governorNode",
+      "dependentNode"
+    ],
+    "rows": [
+      [0, 3, "root", 0, 0, "0:0", "3:0"],
+      [3, 1, "nsubj", 0, 0, "3:0", "1:0"],
+      [3, 2, "aux", 0, 0, "3:0", "2:0"],
+      [3, 4, "obj", 0, 0, "3:0", "4:0"],
+      [6, 5, "case", 0, 0, "6:0", "5:0"],
+      [3, 6, "obl:within", 0, 0, "3:0", "6:0"],
+      [8, 7, "punct", 0, 0, "8:0", "7:0"],
+      [6, 8, "dep", 0, 0, "6:0", "8:0"],
+      [8, 9, "punct", 0, 0, "8:0", "9:0"],
+      [11, 10, "compound", 0, 0, "11:0", "10:0"],
+      [6, 11, "obl:npmod", 0, 0, "6:0", "11:0"],
+      [16, 12, "mark", 0, 0, "16:0", "12:0"],
+      [16, 13, "nsubj:pass", 0, 0, "16:0", "13:0"],
+      [16, 14, "aux:pass", 0, 0, "16:0", "14:0"],
+      [16, 15, "advmod", 0, 0, "16:0", "15:0"],
+      [3, 16, "advcl:unless", 0, 0, "3:0", "16:0"],
+      [3, 17, "punct", 0, 0, "3:0", "17:0"]
+    ]
+  },
+  "markers": [
+    {
+      "kind": "modal",
+      "label": "modal-marker",
+      "begin": 7,
+      "end": 11,
+      "quote": "must",
+      "status": "lexical-candidate"
+    },
+    {
+      "kind": "condition",
+      "label": "condition-marker",
+      "begin": 57,
+      "end": 63,
+      "quote": "unless",
+      "status": "lexical-candidate"
+    },
+    {
+      "kind": "exception",
+      "label": "exception-marker",
+      "begin": 57,
+      "end": 63,
+      "quote": "unless",
+      "status": "lexical-candidate"
+    },
+    {
+      "kind": "negation",
+      "label": "negation-marker",
+      "begin": 74,
+      "end": 77,
+      "quote": "not",
+      "status": "lexical-candidate"
+    }
+  ],
+  "firstHelper": {
+    "head": "7e384b49c11a9ca4fb16a5e7d24aabf17c7623c4",
+    "durationExpectationMet": false,
+    "durations": [],
+    "unresolved": [
+      "legal-force-not-established",
+      "cross-sentence-and-paragraph-scope-not-established",
+      "guard-scope-not-established",
+      "negation-scope-not-established"
+    ],
+    "modalRoleSummary": [
+      {
+        "modalLiteral": "must",
+        "modalLemma": "must",
+        "modalNode": "2:0",
+        "actionNode": "3:0",
+        "actionLiteral": "give",
+        "subjects": [
+          {
+            "node": "1:0",
+            "word": "Tenant",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "node": "4:0",
+            "word": "notice",
+            "relation": "obj"
+          }
+        ],
+        "unresolved": [
+          "legal-force-not-established",
+          "cross-sentence-and-paragraph-scope-not-established",
+          "guard-scope-not-established",
+          "negation-scope-not-established"
+        ]
+      }
+    ]
+  },
+  "cause": "The actual graph has obl:npmod(6:0 thirty,11:0 days), case(6:0 thirty,5:0 within), and no nummod(days,thirty). The first helper did not cover this numeric-head unit structure.",
+  "correction": {
+    "head": "d5035d5c4131821bf423f6c51c3aa62a052fcf7c",
+    "scope": "Accept inverse obl:npmod/nmod:npmod numeric-head unit support only when the observed head is POS CD or NER NUMBER; preserve its direction and marker attachment. No annotation rewrite.",
+    "sourceQuoteUnchanged": true,
+    "nodesUnchanged": true,
+    "fullDependencyIdsUnchanged": true,
+    "newParserExecutions": 0,
+    "durationExpectationMet": true,
+    "durations": [
+      {
+        "status": "lexical-integer-candidate",
+        "begin": 24,
+        "end": 56,
+        "quote": "within thirty (30) business days",
+        "quantityLiteral": "thirty (30)",
+        "quantityBegin": 31,
+        "quantityEnd": 42,
+        "integerValue": 30,
+        "quantityAuthority": "bounded-lexical-reading-only",
+        "numberReadings": [
+          {
+            "begin": 31,
+            "end": 37,
+            "quote": "thirty",
+            "integerValue": 30
+          },
+          {
+            "begin": 39,
+            "end": 41,
+            "quote": "30",
+            "integerValue": 30
+          }
+        ],
+        "unitLiteral": "days",
+        "unitLemma": "day",
+        "unitNodes": [
+          "11:0"
+        ],
+        "modifiers": [
+          "10:0"
+        ],
+        "temporalMarker": "5:0",
+        "numberDependencies": [
+          {
+            "governorNode": "6:0",
+            "dependentNode": "11:0",
+            "relation": "obl:npmod"
+          }
+        ],
+        "markerDependencies": [
+          {
+            "governorNode": "6:0",
+            "dependentNode": "5:0",
+            "relation": "case"
+          }
+        ],
+        "attachments": [
+          {
+            "governorNode": "6:0",
+            "dependentNode": "11:0",
+            "relation": "obl:npmod"
+          }
+        ],
+        "unresolved": [
+          "legal-force-not-established",
+          "cross-sentence-and-paragraph-scope-not-established",
+          "guard-scope-not-established",
+          "negation-scope-not-established"
+        ]
+      }
+    ],
+    "unresolved": [
+      "legal-force-not-established",
+      "cross-sentence-and-paragraph-scope-not-established",
+      "guard-scope-not-established",
+      "negation-scope-not-established"
+    ]
+  },
+  "projection": "Complete actual nodes and dependency tuples with lossless column framing; remaining fields are selected helper outputs, not a retained receipt."
+}
