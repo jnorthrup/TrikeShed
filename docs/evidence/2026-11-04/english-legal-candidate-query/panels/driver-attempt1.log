@@ -1,0 +1,6 @@
+locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('region', { name: 'Workspace facets' }).getByRole('button', { name: 'Inspect receipt', exact: true })[22m
+
+    at execute (/workspace/library-files/legal-candidate-query-panels-proof/driver.cjs:21:385)
+    at async main (/workspace/library-files/legal-candidate-query-panels-proof/driver.cjs:27:18)

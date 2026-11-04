@@ -1,0 +1,38 @@
+{
+  "result": "PASS",
+  "scope": "Independent auditor tamper controls only; immutable actual API/Panels/receipt/source artifacts unchanged",
+  "auditorCid": "sha256:ad28a749faba902258cdac29ef2812a68bc2b729d7b2bd2ac9a9db65389c79ed",
+  "controls": [
+    {
+      "mutation": "wrong-named-graph",
+      "exitCode": 1,
+      "rejected": true
+    },
+    {
+      "mutation": "invented-integer-on-unresolved-duration",
+      "exitCode": 1,
+      "rejected": true
+    },
+    {
+      "mutation": "wrong-copy-source-begin",
+      "exitCode": 1,
+      "rejected": true
+    },
+    {
+      "mutation": "changed-candidate-cbor-byte",
+      "exitCode": 1,
+      "rejected": true
+    },
+    {
+      "mutation": "wrong-durable-source-binding",
+      "exitCode": 1,
+      "rejected": true
+    },
+    {
+      "mutation": "changed-durable-json-byte",
+      "exitCode": 1,
+      "rejected": true
+    }
+  ],
+  "temporaryCopiesRemoved": true
+}
