@@ -1,11 +1,11 @@
 {
   "kind": "sulong-lcnc-milestone/1",
   "testedCommit": "a42b35616ce4262ae2ff03e82351b66cb238cb02",
-  "targetVerificationCommit": "d06103eb7",
+  "targetVerificationCommit": "d06103eb75c4784d6faf2e3a06112b8b21d7645b",
   "targetSourceEquivalence": "No diff in common, JS, Wasm, Native, POSIX, Linux source sets or build.gradle.kts versus testedCommit",
   "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
   "machine": "x86_64",
-  "jdk": "GraalVM Community 25.0.4.1+1.1",
+  "jdk": "OpenJDK 25.0.4.1+1-jvmci-25.3-b22",
   "engineVersion": "25.3.4.1",
   "llvmVersion": "22.1.8",
   "gradleVersion": "9.8.2",
@@ -108,5 +108,11 @@
     "No native memory isolation or hard native cancellation",
     "LLVM internal progress unobserved",
     "No browser animation acceptance or Apple Silicon execution claimed"
-  ]
+  ],
+  "vm": "GraalVM CE 25.3.4.1+1.1",
+  "compilerSha256": {
+    "llvm-as": "2b89d57e9f4f7b6a0d069dfc60770bac8ab289cf22c390bf5a0139d2bb1d0a5d",
+    "mlir-opt": "45092a31bf61175e2917ce59e12e71f8e287a73bb6bb241142b362f2c1e03850",
+    "mlir-translate": "d7b45c78ebde8830f3951f5f7845b9c584d33dcafebc93aafdc32ae53168fb65"
+  }
 }
