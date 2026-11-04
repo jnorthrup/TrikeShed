@@ -91,6 +91,9 @@ object ReviewedKifUnion {
         require(constant(subject) && constant(obj)) { "Goal requires two exact ground KIF constants" }
         val reads = review.taxonomyReads(references)
         check()
+        require(reads.none { EnglishTaxonomyCarrier.isCarrier(it.candidate) }) {
+            "English taxonomy carriers are not supported by KIF union export"
+        }
         val count = reads.sumOf { it.candidate.selections.size }
         require(count <= 4096) { "Reviewed KIF selection limit" }
         val reader = cas as? BoundedCasReader ?: error("Bounded CAS reads are required")

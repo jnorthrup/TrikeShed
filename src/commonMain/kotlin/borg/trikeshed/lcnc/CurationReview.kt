@@ -206,7 +206,7 @@ class CurationReview(
         }
         return submit {
           val families = mutableSetOf<String>()
-          references.map { reference ->
+          val reads = references.map { reference ->
             val snapshotCid = reference.snapshotCid
             val expectedRevision = reference.revision
             val (candidate, head) = requireHead(snapshotCid, expectedRevision)
@@ -227,6 +227,10 @@ class CurationReview(
             CurationTaxonomyRead(candidate, snapshotCid, approval, decision, expectedRevision,
                 string(issued, "reviewer"), issued["synthetic"] == true, readCid, clock())
           }
+          require(references.size == 1 || reads.none { EnglishTaxonomyCarrier.isCarrier(it.candidate) }) {
+              "English taxonomy carriers require a single reviewed snapshot"
+          }
+          reads
         }
     }
 
