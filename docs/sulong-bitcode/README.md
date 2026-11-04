@@ -274,3 +274,12 @@ valid and malformed input cases; capacity and truncation failures; Unicode and
 integer-boundary cases; leak/drain evidence; and a whole-program LCNC receipt
 whose copied rows agree with the Kotlin scanner. Only then extend the module
 catalog or start a comparable scanner benchmark.
+
+## Completed scanner continuation
+
+The handoff above is now implemented as [R2: owned Confix scanning](../airgap/02-confix.md).
+Its unchanged upstream scanner runs through a distinct bounded ABI and owned
+seat. The [exact release packet](../airgap/evidence/r2-20261104/verification.json)
+retains whole-program execution/reopening, native allocation release, offline
+checks and the measured YAML disagreement. The scalar milestone's historical
+evidence remains unchanged. Neither milestone is a general Nix evaluator.
