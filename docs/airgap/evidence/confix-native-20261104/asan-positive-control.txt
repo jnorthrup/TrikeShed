@@ -1,0 +1,48 @@
+=================================================================
+==15652==ERROR: AddressSanitizer: use-after-poison on address 0x515000000161 at pc 0x000000408cef bp 0x7fff947e46d0 sp 0x7fff947e46c8
+READ of size 1 at 0x515000000161 thread T0
+    #0 0x408cee in confix_scan_json (/workspace/confix-native-audit/audit+0x408cee) (BuildId: cd0265b58ba5ee553041d4b886b7ef67c5126ed5)
+    #1 0x4038e5 in confix_run /workspace/confix-native-audit/bridge-snapshot.c:78
+    #2 0x406130 in main /workspace/confix-native-audit/harness.c:71
+    #3 0x7f496a397ca7  (/lib/x86_64-linux-gnu/libc.so.6+0x29ca7) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+
+0x515000000161 is located 225 bytes inside of 504-byte region [0x515000000080,0x515000000278)
+allocated by thread T0 here:
+    #0 0x7f496ac69610 in calloc ../../../../src/libsanitizer/asan/asan_malloc_linux.cpp:77
+    #1 0x402e0e in confix_open /workspace/confix-native-audit/bridge-snapshot.c:48
+    #2 0x4060e0 in main /workspace/confix-native-audit/harness.c:71
+    #3 0x7f496a397ca7  (/lib/x86_64-linux-gnu/libc.so.6+0x29ca7) (BuildId: 5e5b51f4c39af9ac589408c1dc432ba390a273cc)
+
+SUMMARY: AddressSanitizer: use-after-poison (/workspace/confix-native-audit/audit+0x408cee) (BuildId: cd0265b58ba5ee553041d4b886b7ef67c5126ed5) in confix_scan_json
+Shadow bytes around the buggy address:
+  0x514ffffffe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x514fffffff00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x514fffffff80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x515000000000: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x515000000080: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+=>0x515000000100: 00 00 00 00 00 00 00 00 00 00 00 f7[01]f7 f7 00
+  0x515000000180: 00 00 00 f7 f7 04 f7 f7 00 00 f7 f7 00 00 04 f7
+  0x515000000200: f7 00 00 f7 f7 00 00 00 00 00 00 00 00 00 f7 fa
+  0x515000000280: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x515000000300: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+  0x515000000380: fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa fa
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07 
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==15652==ABORTING

@@ -130,7 +130,7 @@ object LcncContracts {
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
      *  is invisible to drag-to-empty-space. */
-    fun all(): List<LcncPortContract> = SqlGraph.contracts() + SparqlGraph.contracts() + HeadhunterWorkflow.contracts() + EnglishLcncPreset.contracts() + borg.trikeshed.memory.ace.BreadcrumbContextNodes.contracts() + listOf(
+    fun all(): List<LcncPortContract> = SqlGraph.contracts() + SparqlGraph.contracts() + HeadhunterWorkflow.contracts() + EnglishLcncPreset.contracts() + borg.trikeshed.memory.ace.BreadcrumbContextNodes.contracts() + _l[LlvmScalarContract.contract(), LlvmConfixContract.contract()] + listOf(
         // ── §4: concentric scope — the call, the binding, the return ──
         // A scope's REAL ports are declared by its child (`scope.in`/`scope.out`
         // names); the generic args?/returns pair is the declared wire spelling —

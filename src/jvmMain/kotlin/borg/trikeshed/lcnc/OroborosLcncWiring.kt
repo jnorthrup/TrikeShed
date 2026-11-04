@@ -5,6 +5,8 @@ import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.withContext
+import borg.trikeshed.kernel.*
+import borg.trikeshed.lib.*
 
 /**
  * JVM wiring for the daemon's LCNC store legos (PromptNodes/PromptStore/
@@ -14,6 +16,68 @@ import kotlinx.coroutines.withContext
  * Called from the daemon with resolved jvm values.
  */
 object OroborosLcncWiring {
+    suspend fun vmLegos(context: ModuleContext, ownCleanup: (suspend () -> Unit) -> Unit): KernelElement? {
+        val confixConfig = HostSystem.getenv("TRIKESHED_LLVM_CONFIX_PROFILE")
+        val owned = llvm(context)
+        val kernel = owned?.a ?: confixConfig?.let { KernelElement(context.scope.coroutineContext, KernelId("llvm")) }
+        kernel?.let { ownCleanup { it.drain() } }
+        val scanner = kernel?.let { confix(context, it, confixConfig) }
+        SubVmLegos.register(context, owned?.b?.runner(), scanner?.runner(context.casStore))
+        UringLegos.register(context)
+        CamelRouteLegos.register(context)
+        return kernel
+    }
+
+    /** Bootstrap extraction keeps the daemon's coroutine below the JVM method-size limit. */
+    suspend fun codingAgents(context: ModuleContext, enabled: Set<String>, repo: java.io.File,
+                             home: java.io.File, args: Array<String>): borg.trikeshed.forge.server.AgentWire {
+        val roster = borg.trikeshed.agent.AgentCliProbe.probe(enabled, borg.trikeshed.agent.AgentRegistry.KNOWN)
+        val runner = borg.trikeshed.agent.JvmAgentRunner(roster, repoDir = repo, forgeHome = home,
+            cas = context.casStore, attachments = context.attachments, blackboard = context.blackboard)
+        context.agentRuns = runner
+        context.lcncRunners.putAll(AgentNodes.registry(runner) { borg.trikeshed.platform.randomUuid().toString() })
+        val wire = borg.trikeshed.forge.server.AgentWire(runner, context.blackboard,
+            probedAtMs = HostSystem.currentTimeMillis(),
+            enabledBy = if ("--agents" in args) "--agents" else if (HostSystem.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default")
+        HostSystem.err("[OROBOROS] coding agents: " + roster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
+        return wire
+    }
+
+    /** Optional trusted scalar backend; caller retains the root until all LCNC consumers drain. */
+    internal suspend fun llvm(context: ModuleContext,
+                              config: String? = HostSystem.getenv("TRIKESHED_LLVM_SCALAR_PROFILE")): Join<KernelElement, LlvmScalar>? {
+        if (config == null) return null
+        require(config.isNotBlank() && java.nio.file.Path.of(config).isAbsolute) {
+            "TRIKESHED_LLVM_SCALAR_PROFILE requires an absolute operator configuration path"
+        }
+        val files = checkNotNull(context.scope.coroutineContext[FileOperations])
+        val profile = withContext(fileIoContext) {
+            LlvmScalarProfile.parse(LlvmScalarProfile.read(files, files.canonicalPath(config), 16 * 1024)
+                .decodeToString(throwOnInvalidSequence = true))
+        }
+        val kernel = KernelElement(context.scope.coroutineContext, KernelId("llvm"))
+        try { return kernel j LlvmScalar.open(kernel, KernelId("scalar"), profile, files) }
+        catch (failure: Throwable) {
+            try { kernel.drain() } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+            throw failure
+        }
+    }
+
+    /** Opens a second serial evaluation seat under the same LLVM root. */
+    internal suspend fun confix(context: ModuleContext, kernel: KernelElement,
+                               config: String? = HostSystem.getenv("TRIKESHED_LLVM_CONFIX_PROFILE")): LlvmConfix? {
+        if (config == null) return null
+        require(config.isNotBlank() && java.nio.file.Path.of(config).isAbsolute) {
+            "TRIKESHED_LLVM_CONFIX_PROFILE requires an absolute operator configuration path"
+        }
+        val files = checkNotNull(context.scope.coroutineContext[FileOperations])
+        val profile = withContext(fileIoContext) {
+            LlvmConfixProfile.parse(LlvmScalarProfile.read(files, files.canonicalPath(config), 16 * 1024)
+                .decodeToString(throwOnInvalidSequence = true))
+        }
+        return LlvmConfix.open(kernel, KernelId("confix"), profile, files)
+    }
+
     /** Only the operator's startup environment selects native code; request bodies cannot. */
     suspend fun documentReview(
         context: ModuleContext,
@@ -44,7 +108,9 @@ object OroborosLcncWiring {
         promptStore: borg.trikeshed.lcnc.PromptStore,
         snapshotService: borg.trikeshed.forge.server.WorkspaceSnapshotService,
         projectCorpus: borg.trikeshed.forge.server.JvmProjectCorpus,
-    ) {
+        ownCleanup: (suspend () -> Unit) -> Unit,
+    ): KernelElement? {
+        val kernel = vmLegos(moduleContext, ownCleanup)
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
         promptStore.register(moduleContext)
         snapshotService.register(moduleContext)
@@ -55,5 +121,6 @@ object OroborosLcncWiring {
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.FinanceNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { borg.trikeshed.platform.HostSystem.currentTimeMillis() })
+        return kernel
     }
 }
