@@ -138,7 +138,7 @@ object EnglishLcncPreset {
         if (receiptCid.isNotEmpty()) cid(receiptCid)
         require(mode in _s["snapshot", "current"]) { "Choose explicit current or snapshot English source mode" }
         return LcncProgram(COPULAR_NAME, s_[
-            LcncNode("instructions", "note", _m["text" j "Choose an exact retained English inspection and source mode, then Run explicitly. This query reports copular syntax observations only: negated, modal and conditional sentences can match. It does not choose instance versus subclass, assert positive force, resolve guard scope or approve legal meaning. Full parser node IDs retain copies; repeated word labels are not additional source occurrences. The eight-pattern result contains source words, not the complete sentence. Open the retained inspection for exact quotations, source spans, markers and qualifications. Edit the inspection-only diagram separately to learn its structure."], x = 40.0, y = 20.0),
+            LcncNode("instructions", "note", _m["text" j "Choose a retained English inspection and source mode, then Run. Matches are syntax only: negated, modal and conditional sentences can match. The word result is not the complete sentence; open the inspection for exact quotations and markers. Copied grammar nodes are not additional source occurrences."], x = 40.0, y = 20.0, width = 640.0, height = 165.0),
             LcncNode("receipt", LcncContracts.SCOPE_IN, _m["name" j "receiptCid", "kind" j "id", "default" j receiptCid], x = 40.0, y = 230.0),
             LcncNode("mode", "text.value", _m["value" j mode], x = 40.0, y = 430.0),
             LcncNode("query-pattern", "json.value", _m["value" j LcncProgramConfix.toJson(copularPattern())], x = 370.0, y = 230.0),
