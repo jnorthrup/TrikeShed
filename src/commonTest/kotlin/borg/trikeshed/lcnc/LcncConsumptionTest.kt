@@ -180,7 +180,7 @@ class LcncConsumptionTest {
         val report = ledger.snapshot()
         val events = consumed(ledger)
         assertEquals(8, events.size)
-        assertEquals((292 until 300).toList(), events.map { map(it["selection"])["position"] })
+        assertEquals(_l[292, 293, 294, 295, 296, 297, 298, 299], events.map { map(it["selection"])["position"] })
         assertEquals(292L, report["observationsDropped"])
         val summary = map(report["observationSummary"])
         assertEquals(300L, summary["attempted"])
@@ -221,7 +221,7 @@ class LcncConsumptionTest {
             assertEquals(intervention["sequence"], event["interventionSequence"])
             assertEquals(rows(ledger.snapshot()["observations"]), rows(snapshot["observations"]))
             val events = rows(snapshot["observations"])
-            assertEquals((1L..events.size.toLong()).toList(), events.map { it["sequence"] })
+            events.forEachIndexed { index, observed -> assertEquals(index.toLong() + 1, observed["sequence"]) }
             assertTrue(events.zipWithNext().all { (a, b) -> (a["elapsedNanos"] as Long) <= (b["elapsedNanos"] as Long) })
             assertEquals("walk-start", map(snapshot["observationSummary"])["clockOrigin"])
         } finally { debug.close() }

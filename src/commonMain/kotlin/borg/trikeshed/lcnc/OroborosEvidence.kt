@@ -1,5 +1,6 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.*
 
 /** Fit retained evidence to the existing content reader, including JSON escaping and UTF-8 expansion. */
@@ -47,11 +48,11 @@ fun oroborosEvidence(runId: String, programCid: String, debug: OroborosState): B
         val rows = state["observations"] as? List<*> ?: return
         if (attempted < rows.size) return
         state["observationsDropped"] = attempted - rows.size
-        state["observationSummary"] = previous + mapOf(
-            "retained" to rows.size, "omitted" to attempted - rows.size,
-            "firstSequence" to (rows.firstOrNull() as? Map<*, *>)?.get("sequence"),
-            "lastSequence" to (rows.lastOrNull() as? Map<*, *>)?.get("sequence"),
-            "coverage" to if (attempted == rows.size.toLong()) "complete" else "partial")
+        state["observationSummary"] = previous + _m[
+            "retained" j rows.size, "omitted" j attempted - rows.size,
+            "firstSequence" j (rows.firstOrNull() as? Map<*, *>)?.get("sequence"),
+            "lastSequence" j (rows.lastOrNull() as? Map<*, *>)?.get("sequence"),
+            "coverage" j if (attempted == rows.size.toLong()) "complete" else "partial"]
     }
 
     while (true) {

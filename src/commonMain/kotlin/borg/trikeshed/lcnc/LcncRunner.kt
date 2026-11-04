@@ -392,30 +392,30 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
             if (!many) selected.removeAll { it["port"] == port }
             counts[port] = if (many) (counts[port] ?: 0) + 1 else 1
             if (selected.size == 128) selected.removeAt(0)
-            selected.add(fields + mapOf("port" to port, "many" to many, "position" to counts.getValue(port) - 1))
+            selected.add(fields + _m["port" j port, "many" j many, "position" j counts.getValue(port) - 1])
         }
 
-        fun wire(index: Int, wire: LcncWire, owner: LcncScopeFrame, many: Boolean) = add(wire.toPort, many, mapOf(
-            "origin" to "wire", "producer" to owner.outputInvocations[wire.fromNode],
-            "wire" to mapOf("index" to index, "fromNode" to wire.fromNode, "fromPort" to wire.fromPort,
-                "toNode" to wire.toNode, "toPort" to wire.toPort)))
+        fun wire(index: Int, wire: LcncWire, owner: LcncScopeFrame, many: Boolean) = add(wire.toPort, many, _m[
+            "origin" j "wire", "producer" j owner.outputInvocations[wire.fromNode],
+            "wire" j _m["index" j index, "fromNode" j wire.fromNode, "fromPort" j wire.fromPort,
+                "toNode" j wire.toNode, "toPort" j wire.toPort]])
 
         fun intervene(patch: LcncDebug.Patch) {
-            for (port in patch.inputs.keys) add(port, false, mapOf("origin" to "intervention",
-                "interventionSequence" to patch.sequence))
+            for (port in patch.inputs.keys) add(port, false, _m["origin" j "intervention",
+                "interventionSequence" j patch.sequence])
         }
 
         fun observations(location: Map<String, Any?>, ports: Set<String>? = null): Join<List<Map<String, Any?>>, Int> {
             val rows = selected.filter { ports == null || it["port"] in ports }.map { row ->
                 val port = row["port"] as String
                 val count = counts.getValue(port)
-                location + (row - setOf("port", "many", "position")) + mapOf(
-                    "phase" to "consumed", "status" to "delivered",
-                    "selection" to mapOf("port" to port,
-                        "cardinality" to if (row["origin"] == "intervention") "replacement" else if (row["many"] == true) "many" else "one",
-                        "position" to row["position"], "count" to count,
-                        "representation" to if (row["origin"] == "intervention") "replacement" else if (row["many"] == true && count > 1) "list" else "scalar"),
-                    "evidence" to mapOf("status" to "unavailable", "reason" to "value_identity_not_recorded"))
+                location + (row - _s["port", "many", "position"]) + _m[
+                    "phase" j "consumed", "status" j "delivered",
+                    "selection" j _m["port" j port,
+                        "cardinality" j if (row["origin"] == "intervention") "replacement" else if (row["many"] == true) "many" else "one",
+                        "position" j row["position"], "count" j count,
+                        "representation" j if (row["origin"] == "intervention") "replacement" else if (row["many"] == true && count > 1) "list" else "scalar"],
+                    "evidence" j _m["status" j "unavailable", "reason" j "value_identity_not_recorded"]]
             }
             return rows j (counts.filterKeys { ports == null || it in ports }.values.sum() - rows.size)
         }
@@ -510,11 +510,11 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
 
             val ordinal = executedNodes
             val invocation = invocations?.begin(ordinal, node, pathNames, parentInvocation, iteration)
-            invocation?.values?.putAll(mapOf("frameId" to frame.observationId,
-                "documentName" to state.documentName, "documentCid" to state.documentCid))
-            val location = if (observationLedger == null) emptyMap() else mapOf("invocationOrdinal" to ordinal, "nodeId" to node.id, "type" to node.type,
-                "path" to pathNames.toList(), "parent" to parentInvocation, "iteration" to iteration,
-                "frameId" to frame.observationId, "documentName" to state.documentName, "documentCid" to state.documentCid)
+            invocation?.values?.putAll(_m["frameId" j frame.observationId,
+                "documentName" j state.documentName, "documentCid" j state.documentCid])
+            val location = if (observationLedger == null) emptyMap() else _m["invocationOrdinal" j ordinal, "nodeId" j node.id, "type" j node.type,
+                "path" j pathNames.toList(), "parent" j parentInvocation, "iteration" j iteration,
+                "frameId" j frame.observationId, "documentName" j state.documentName, "documentCid" j state.documentCid]
             var status = "completed"
             var reason: String? = null
             var observedOutputs: Map<String, Any?>? = null
@@ -585,8 +585,8 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                                 }
                                 owner.bindingInterventions[name]?.let { sequence ->
                                     frame.outputInvocations[node.id]?.let { produced ->
-                                        frame.outputInvocations[node.id] = produced + mapOf("interventionSequence" to sequence,
-                                            "bindingName" to name, "bindingFrameId" to owner.observationId)
+                                        frame.outputInvocations[node.id] = produced + _m["interventionSequence" j sequence,
+                                            "bindingName" j name, "bindingFrameId" j owner.observationId]
                                     }
                                 }
                             }
@@ -650,7 +650,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                         if (name != null) {
                             returns[name] = inputs["value"] ?: inputs["value?"]
                             val port = if (inputs["value"] != null || "value?" !in inputs) "value" else "value?"
-                            consumed(setOf(port))
+                            consumed(_s[port])
                             projection {
                                 if (port in retainedInputs && !LcncPulse.event(state.kind(node, "in", "value").kind)) {
                                     frame.retainedReturns[name] = retainedInputs[port]

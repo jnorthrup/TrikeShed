@@ -1,5 +1,6 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.ValueBudget
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reify
@@ -60,8 +61,8 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
             (scope?.let { path.size >= it.size && path.take(it.size) == it } ?: true)
 
     private fun observe(fields: Map<String, Any?>) {
-        observationLedger.observe(fields.filterKeys { it in setOf("nodeId", "type", "path", "invocationOrdinal",
-            "parent", "iteration", "phase", "status", "reason", "frameId", "documentCid", "documentName", "locationOmitted") })
+        observationLedger.observe(fields.filterKeys { it in _s["nodeId", "type", "path", "invocationOrdinal",
+            "parent", "iteration", "phase", "status", "reason", "frameId", "documentCid", "documentName", "locationOmitted"] })
     }
 
     internal suspend fun observeWith(ledger: LcncInvocationLedger) = gate.withLock {
@@ -248,9 +249,9 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
                     (reify(jsonOf(observation)) as Map<String, Any?>)
                 } else mapOf("observationOmitted" to "payload_limit")
                 val before = site.orEmpty()
-                site = data + mapOf("kind" to "source", "nodeId" to nodeId, "invocationOrdinal" to at,
-                    "path" to site?.get("path"), "phase" to "source", "frameId" to site?.get("frameId"),
-                    "documentCid" to site?.get("documentCid"), "documentName" to site?.get("documentName"))
+                site = data + _m["kind" j "source", "nodeId" j nodeId, "invocationOrdinal" j at,
+                    "path" j site?.get("path"), "phase" j "source", "frameId" j site?.get("frameId"),
+                    "documentCid" j site?.get("documentCid"), "documentName" j site?.get("documentName")]
                 val path = (site?.get("path") as? List<*>)?.filterIsInstance<String>().orEmpty()
                 mutationMonitor.observe(path.joinToString("/"), nodeId, "source", before, site.orEmpty())
                 observe(site.orEmpty())

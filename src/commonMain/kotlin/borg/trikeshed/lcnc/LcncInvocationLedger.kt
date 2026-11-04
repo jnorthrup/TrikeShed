@@ -1,5 +1,6 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.ValueBudget
 import kotlin.time.TimeSource
 import kotlin.coroutines.AbstractCoroutineContextElement
@@ -50,7 +51,7 @@ class LcncInvocationLedger(val limit: Int = 128, val observationLimit: Int = 128
 
     /** One walk owns this clock and sequence, including all of its nested frames. No values are inferred. */
     internal fun observe(fields: Map<String, Any?>) {
-        val event = fields + mapOf("sequence" to ++sequence, "elapsedNanos" to started.elapsedNow().inWholeNanoseconds)
+        val event = fields + _m["sequence" j ++sequence, "elapsedNanos" j started.elapsedNow().inWholeNanoseconds]
         try {
             if (ValueBudget(maxNodes = 256, maxChars = 4096, maxDepth = 12).violation(event) != null) return
             @Suppress("UNCHECKED_CAST") val copied = copy(event) as Map<String, Any?>
@@ -62,17 +63,17 @@ class LcncInvocationLedger(val limit: Int = 128, val observationLimit: Int = 128
     /** Selected inputs beyond the bounded selection suffix remain an explicit gap, never invented rows. */
     internal fun omitObservations(count: Int) { require(count >= 0); sequence += count }
 
-    private fun summary(rows: List<Map<String, Any?>>): Map<String, Any?> = mapOf(
-        "clockOrigin" to "walk-start", "attempted" to sequence, "retained" to rows.size,
-        "omitted" to sequence - rows.size, "firstSequence" to rows.firstOrNull()?.get("sequence"),
-        "lastSequence" to rows.lastOrNull()?.get("sequence"), "lastObservedSequence" to sequence,
-        "coverage" to if (sequence == rows.size.toLong()) "complete" else "partial",
-    )
+    private fun summary(rows: List<Map<String, Any?>>): Map<String, Any?> = _m[
+        "clockOrigin" j "walk-start", "attempted" j sequence, "retained" j rows.size,
+        "omitted" j sequence - rows.size, "firstSequence" j rows.firstOrNull()?.get("sequence"),
+        "lastSequence" j rows.lastOrNull()?.get("sequence"), "lastObservedSequence" j sequence,
+        "coverage" j if (sequence == rows.size.toLong()) "complete" else "partial",
+    ]
 
     internal fun observationSnapshot(): Map<String, Any?> {
         val rows = observations.toMutableList()
-        fun report() = mapOf("observationSchema" to OBSERVATION_SCHEMA, "observations" to rows.toList(),
-            "observationsDropped" to sequence - rows.size, "observationSummary" to summary(rows))
+        fun report() = _m["observationSchema" j OBSERVATION_SCHEMA, "observations" j rows.toList(),
+            "observationsDropped" j sequence - rows.size, "observationSummary" j summary(rows)]
         val budget = ValueBudget(maxNodes = 4096, maxChars = 32768, maxMillis = 250)
         while (rows.isNotEmpty() && budget.violation(report()) != null) rows.removeAt(0)
         return report()
@@ -93,10 +94,10 @@ class LcncInvocationLedger(val limit: Int = 128, val observationLimit: Int = 128
     fun snapshot(): Map<String, Any?> {
         val rows = entries.mapTo(ArrayList()) { it.values.toMap() }
         val events = observations.toMutableList()
-        fun report() = mapOf("entries" to rows.toList(), "attempted" to attempted,
-            "dropped" to attempted - rows.size, "truncated" to (attempted != rows.size),
-            "observationSchema" to OBSERVATION_SCHEMA, "observations" to events.toList(),
-            "observationsDropped" to sequence - events.size, "observationSummary" to summary(events))
+        fun report() = _m["entries" j rows.toList(), "attempted" j attempted,
+            "dropped" j attempted - rows.size, "truncated" j (attempted != rows.size),
+            "observationSchema" j OBSERVATION_SCHEMA, "observations" j events.toList(),
+            "observationsDropped" j sequence - events.size, "observationSummary" j summary(events)]
         // Reserve room for the run identity envelope and keep this independently readable by /lcnc/content.
         val budget = ValueBudget(maxNodes = 4096, maxChars = 65536, maxMillis = 250)
         while (budget.violation(report()) != null) {
