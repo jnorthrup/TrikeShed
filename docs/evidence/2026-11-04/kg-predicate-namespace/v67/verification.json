@@ -1,0 +1,36 @@
+{
+  "result": "PASS",
+  "source": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "mainJarSha256": "39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4",
+  "coordinatedBuild": {
+    "selectedTests": 326,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "bundles": {
+      "documents.js": "526c383cd65f96a7821fc267a1d2ccb3f7e5610194a21e5356ec574d4e2ee460",
+      "pages.js": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+      "spacegraph.js": "aa0215de9396bca523b72004739030b53c8c36e969ca1d7ba3a8a6bfecd1b279"
+    }
+  },
+  "independentJunit": {
+    "found": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "aborted": 0
+  },
+  "mappingObservations": 22,
+  "rdfCrossings": 7,
+  "ruleCandidates": 5,
+  "namespaceObservationsIdenticalToV66": true,
+  "previousEvidence": "../verification.json",
+  "attempt": 1,
+  "productionCodeSourcesVerified": true,
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "modelOrNlpRun": false,
+  "bagOrLiveReteAdmission": false,
+  "ownedChildrenExited": true,
+  "copularNextSliceIncluded": false
+}
