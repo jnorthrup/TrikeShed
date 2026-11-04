@@ -2,7 +2,6 @@
   "kind": "english-combined-checkpoint/71",
   "at": "2026-11-04T23:25:35.343659+00:00",
   "testedSource": "4bdcc227781fa68b07c0105655a19f3e0c11959f",
-  "publicationProductionChangesAfterTestedSource": [],
   "sourceRefFreeze": {
     "refs": 619,
     "ordinaryThreeWayMerges": 3,
@@ -12,7 +11,7 @@
   "publicationRefFreeze": {
     "refs": 626,
     "uncontained": 0,
-    "inventorySha256": "9249a4272f98fa22f2f31ae2b334269f2a6a460a73e5bde2e1df82c01af9c2b7"
+    "inventorySha256": "0fb7bfe50dea3f05b9bb1b537a3be3f149b22a112cbfe0b19223ae706215ec30"
   },
   "build": {
     "selectedJvmTests": 389,
@@ -125,8 +124,28 @@
     "Manual receipt-ID transfer into the query preset remains; automatic typed source handoff and full visual SPARQL grammar roundtrip are separate work."
   ],
   "activeNextSlices": [
+    "Verify newer R3a LCNC consumption/traversal and fence late activity callbacks before next native handoff proof.",
     "Explicit Documents-to-Panels English inspection handoff with validated source context, inert preset and explicitRun.",
     "Gold semantic corpus separating identity/admission, complete typed proof premises and recall/hypothesis metrics.",
     "Bounded KIF format sniffing for leading semicolon comments without dropping original source bytes."
-  ]
+  ],
+  "laterAlreadyPublishedProductionBase": "fb4d976bb7147f84f36945c519f84708dc9a106e",
+  "upstreamProductionFilesAfterTestedSource": [
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncRunner.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncScopeFrame.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/OroborosEvidence.kt",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/LcncConsumptionTest.kt",
+    "src/jsMain/kotlin/borg/trikeshed/web/PanelsPage.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsBlip.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsLlvm.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt"
+  ],
+  "newProductionChangesRelativeToConcurrentMaster": [],
+  "publicationScope": "Evidence-only publication relative to concurrent master. All v71 runtime proofs used frozen4bdcc227/main6ae17af7. Later R3a LCNC traversal is preserved from already-published master and is not claimed as executed by these v71 proofs."
 }
