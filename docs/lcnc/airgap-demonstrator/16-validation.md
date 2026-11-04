@@ -33,6 +33,9 @@ Acceptance follows an actual UI-to-host-to-engine-to-retained-result path. Unit 
 | V23 | CPU/UI contention | Bounded memory and target interaction responsiveness | WP24 |
 | V24 | Domain switch | Same mechanics; no cross-domain fact leakage | WP21 |
 | V25 | Long run and recovery | Retention bounds, restart reconstruction and valid dependencies | WP25 |
+| V26 | MLIR-Nix Polyglot embedding | Actual binary module/ABI execution, correct ownership and truthful capability scope | WP15/WP09/WP23/WP24 |
+
+V26 expands into P00–P08 in the [Polyglot pivot](22-mlir-nix-polyglot.md). A scalar or scanner success is evidence for that module only. Full Nix/Horn promotion additionally requires the same semantic fixtures as the current solver, explicit runtime/dependency identity, real pause/cleanup behavior and offline evidence on each claimed target. No Sulong runtime acceptance was executed by the blueprint revision.
 
 ## Semantic reference corpus
 

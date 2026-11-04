@@ -12,6 +12,8 @@ The subsequent fetch found upstream master `7e7998042`, containing PR 1086's cop
 
 ## Available foundations
 
+The later [Polyglot revision](22-mlir-nix-polyglot.md) inspects the embedding surfaces at TrikeShed `6875a72d6`, after the corpus/inference work in PR 1087, and upstream `mlir-nix` at `571b57d3`. Its scoped inventory supersedes assumptions that LLVM dependencies or a general Nix-to-LLVM export need only boilerplate. The table below remains the original programme inventory; this follow-up is not a new verification of every subsystem or a rerun of PR 1087's evidence.
+
 Paths below are repository-relative so the document survives checkout relocation.
 
 | Area | Inspected seam | Existing substance | Required extension |

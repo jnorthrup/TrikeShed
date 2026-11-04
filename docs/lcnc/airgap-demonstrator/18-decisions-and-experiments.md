@@ -16,6 +16,7 @@
 | A10 Sources | Original plus inert derivative | Fidelity and display safety remain separable | New format needs another declared transformation |
 | A11 Distribution | Sealed offline bundle | Availability and egress are testable | Deployment explicitly permits another connectivity profile |
 | A12 Integration | D3M contract in PRELOAD | Preserves distributed intent and conflict evidence | The user changes the repository integration policy |
+| A13 MLIR-Nix embedding | JVM Polyglot/Sulong for compatible bitcode, with explicit ABI and ownership | Requested dynamic in-process embedding direction | Actual producer/runtime or required containment evidence blocks the selected profile |
 
 ## Risk register
 
@@ -64,6 +65,10 @@ Question: which unsupported construct blocks a real domain question? Select one:
 ## Experiment E08 Airgap portability
 
 Question: does a clean target machine run the selected workflow without hidden cache/network dependencies? Install the sealed bundle on the named hardware, deny egress, remove optional assets in controlled variants and run the storyboard. Track browser and descendant processes. A process-only network filter result is recorded at that scope; it does not become a physical-airgap certificate.
+
+## Experiment E09 MLIR-Nix bitcode compatibility
+
+Question: can the pinned JVM LLVM runtime execute a useful upstream module under an explicit ABI on the deployment targets? Spend an initial 16–32 active hours on runtime identity, a primitive export, a real bounded kernel, dependency inspection and retained success/failure diagnostics. Compare current upstream LLVM producer output with what the actual selected reader accepts. Do not infer full Nix support from a kernel smoke test. The [pivot chapter](22-mlir-nix-polyglot.md) specifies P1 kernels, P2 evaluator compilation, P3 semantic lowering, ownership and P00–P08 acceptance. Use the findings to choose and estimate the evaluator route; retain the current solver until a replacement earns promotion.
 
 ## Remaining owner decisions
 
