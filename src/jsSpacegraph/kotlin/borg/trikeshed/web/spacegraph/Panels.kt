@@ -58,6 +58,7 @@ class Panels : PatchSurface {
     val cases by lazy { PanelsCases(this) }
     val workgroups by lazy { PanelsWorkgroups(this) }
     val debugger by lazy { PanelsDebug(this) }
+    val trace by lazy { PanelsTrace(this) }
     val sourceEditor by lazy { PanelsSource(this) }
     val sprites by lazy { PanelsSprites(this) }
     val shakeOwner by lazy { PanelsShakeOwner(this) }
@@ -457,6 +458,7 @@ class Panels : PatchSurface {
             if (a == null || b == null) return@forEachIndexed
             ends.add(a); ends.add(b)
             val path = svg("path")
+            path.setAttribute("data-wire-index", str(idx))
             PatchNavigation.wireCurve(path, a, b, viewport, view); path.classList.add("live")
             val srcN = node(wr.from[0])
             val tc = PatchKinds.kindColor[if (srcN != null && resolve != null)

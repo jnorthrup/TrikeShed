@@ -188,6 +188,7 @@ class PanelsDebug(private val panels: Panels) {
                     val newPause = snapshot.state == "paused" && (state?.state != "paused" || state?.ordinal != snapshot.ordinal)
                     if (snapshot.state == "paused" && snapshot.site != null) observedPause = true
                     state = snapshot
+                    panels.trace.observe(str(snapshot.runId), str(snapshot.programCid), snapshot)
                     val source = snapshot.site?.kind == "source"
                     sourceView(resetLine = newPause)
                     if (newPause || restored) panel.querySelector("[data-debug-error]").textContent =
@@ -217,6 +218,7 @@ class PanelsDebug(private val panels: Panels) {
             catch (e: dynamic) {
                 if (!current()) return
                 available = false; buttons()
+                panels.trace.unavailable("Observation unavailable; last activity is recorded")
                 panel.querySelector("[data-debug-error]").textContent = "Observation unavailable; controls disabled, snapshot not live: " + failureText(e)
             }
             delay(300)
@@ -278,6 +280,7 @@ class PanelsDebug(private val panels: Panels) {
             evidenceError = "Retained evidence refused: " + failureText(e)
         }
         ended = true; available = false
+        panels.trace.unavailable("Observation ended; remaining activity is recorded")
         state = null
         buttons()
         val accepted = retained && evidenceError.isEmpty()

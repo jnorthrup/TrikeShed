@@ -54,6 +54,7 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
         val base = selected.baseReceipt
         if (!isPulse) stopSources()
         val sourceEpoch = sourceRevision
+        trace.start(program)
         val request = JSON.stringify(objOf {
             it.name = name; it.document = JSON.parse(document); it.inputs = obj()
             if (isPulse) { it.baseReceiptCid = base; it.pulse = pulse }
@@ -87,7 +88,14 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
                     pulseReceipt = str(result.receiptCid); pulseProgram = program
                 }
                 var displayError = ""
-                try { if (current) programOutputs(result, JSON.stringify(toConfix())) }
+                try { if (current) {
+                    programOutputs(result, JSON.stringify(toConfix()))
+                    if (result.invocationsCid != null) try {
+                        val retained = fetchJson("/api/lcnc/content?cid=" + encodeURIComponent(str(result.invocationsCid)))
+                        require(retained.runId == result.runId && retained.programCid == result.programCid) { "Invocation identity changed" }
+                        trace.observe(str(result.runId), str(result.programCid), retained, replay = true)
+                    } catch (e: CancellationException) { throw e } catch (_: dynamic) { trace.unavailable("Recorded activity unavailable; inspect the retained receipt") }
+                } }
                 catch (e: CancellationException) { throw e }
                 catch (e: dynamic) { displayError = " · canvas output display failed: " + failureText(e) }
                 facets.selectedReceipt = result
