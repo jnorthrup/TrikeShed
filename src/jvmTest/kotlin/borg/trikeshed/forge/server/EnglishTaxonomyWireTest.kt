@@ -57,6 +57,7 @@ class EnglishTaxonomyWireTest {
         val wire: DocumentReviewWire, val books: ConstellationNodes, val owner: CompletableJob,
         val inspection: Map<String, Any?>, val reads: Reads, val wal: Path) {
         val inspectionCid: String get() = inspection["receiptCid"] as String
+        val initialBoard = ctx.blackboard.snapshot()
     }
 
     private suspend fun fixture(name: String, parent: Job?): Fixture {
@@ -175,7 +176,8 @@ class EnglishTaxonomyWireTest {
                 assertContains(exported, "kif-taxonomy/v1/instance-subclass")
                 assertEquals("UNKNOWN", query(f, approved, "urn:agreement:pilot:class:Missing")["status"])
                 assertEquals(walSize, Files.size(f.wal), "Reading support must not append decisions or consume approval")
-                assertEquals(1, f.reads.count); assertNull(f.ctx.beliefBag); assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
+                assertEquals(1, f.reads.count); assertNull(f.ctx.beliefBag)
+                assertEquals(f.initialBoard, f.ctx.blackboard.snapshot(), "Translation review and support reads must leave setup facts unchanged")
             } finally { close(f) }
         }
     }
