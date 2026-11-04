@@ -12,7 +12,7 @@ The planning configuration is six implementation/review lanes, averaging 65% act
 
 The first release must work with deterministic CPU methods and retained fixtures. Stanford parsing is an optional local statistical lane; BERT, Jeva and generative models are separately selectable local capabilities. Development may use connected frontier models while the delivered demonstrator runs offline from a sealed bundle.
 
-The subsequent [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) selects JVM-hosted Sulong as the intended embedding route for compatible bitcode. It separates bounded kernels from full Nix evaluation, corrects the supplied RFC's memory/interop assumptions, and adds an explicitly separate 112–224 active-hour kernel-path estimate. The original programme totals exclude that increment and any full evaluator/compiler port.
+The [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) is the canonical scope/ABI decision, supported by the [bitcode build and ownership contract](22-sulong-bitcode.md). The baseline already includes WP15's **32–64-hour feasibility/probe/adapter tranche**. A broader bounded Sulong profile, selected after that gate, adds a conditional **112–224 active hours** across the existing packages, reusing completed probes without double-counting. Including 50% effort reserve, the combined programme is **1,752–3,378 hours**; with the separate 30% model-cost contingency its model budget is **$10,932–$21,079 base** or **$33,822–$65,212 heavy**. The [cost workbook](15-timeline-and-costs.md) owns this arithmetic. Full Nix evaluator/compiler completion remains separately unestimated, and the original milestone windows do not promise it.
 
 ## Reading routes
 

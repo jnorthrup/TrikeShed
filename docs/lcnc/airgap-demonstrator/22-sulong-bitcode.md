@@ -8,6 +8,8 @@ The initial target is a bounded positive Horn computation or an independently us
 
 This chapter refines the supplied pivot RFC into a build, memory, lifecycle and acceptance contract. It is a blueprint. No new runtime adapter, compiler pass or bitcode artifact is delivered by this chapter.
 
+The [Polyglot decision chapter](22-mlir-nix-polyglot.md) is canonical for deliverable levels P1–P3, the ABI selection gate and programme budget. This companion supplies detailed retained-proof, build, transfer and ownership obligations. The [cost workbook](15-timeline-and-costs.md) owns arithmetic. The two ABI designs below are alternatives selected at one gate, not cumulative required exports.
+
 ## What the current code actually establishes
 
 | Surface | Observed baseline | Consequence for the pivot |
@@ -80,7 +82,9 @@ The sealed runtime bundle includes bitcode, native dependency closure, ABI manif
 
 ## Export and memory ownership contract
 
-Design a small versioned ABI before implementing a Kotlin convenience wrapper. `evaluate(String): String` may be the user-facing shape, but it hides allocation, limits and errors unless backed by an explicit contract. The initial interface should use fixed-width integers, bounded byte transfers and context-local opaque numeric handles. Never expose evaluator object layouts, JVM addresses or host pointers in retained receipts.
+Design a small versioned ABI before implementing a Kotlin convenience wrapper. The initial request-scoped **ABI A** is the explicit polyglot-string envelope proposed in the [canonical chapter](22-mlir-nix-polyglot.md): the guest wrapper validates and converts input, owns the request arena, materializes an independently owned polyglot result, and releases its native input/result/error storage on every recoverable return path. `evaluate(String): String` alone does not establish those obligations. Never expose evaluator object layouts, JVM addresses or host pointers in retained receipts.
+
+The following **ABI B** is an alternative for demonstrated persistent-session or bulk-transfer needs. It uses fixed-width integers, bounded byte transfers and context-local opaque numeric handles. Adopt it only after a review of lifetime/state isolation and measured benefit; do not add its exports to ABI A by default.
 
 | Operation family | Proposed obligation |
 |---|---|
@@ -92,13 +96,13 @@ Design a small versioned ABI before implementing a Kotlin convenience wrapper. `
 | Input/result release | Release allocations exactly once while their owning session and context are live |
 | Session close | Release remaining handles and evaluator state after admitted work finishes |
 
-These are proposed export families, not existing mlir-nix symbols. The implementation owner must freeze actual names, integer widths, error codes and generation checks at the review gate. Zero or another reserved token denotes allocation failure; stale, wrong-session and released handles are rejected. Handles retained beyond one call include a generation so a recycled slot cannot identify a different allocation.
+These are proposed ABI B export families, not existing mlir-nix symbols or mandatory ABI A methods. The implementation owner must freeze the selected alternative, actual names, integer widths, error codes and generation checks at the review gate. Zero or another reserved token denotes allocation failure; stale, wrong-session and released handles are rejected. Handles retained beyond one call include a generation so a recycled slot cannot identify a different allocation.
 
 Use strict UTF-8 encoding with explicit byte length. Kotlin source offsets remain UTF-16 coordinates in their existing source maps; an adapter records the conversion instead of treating byte offsets as character offsets. Include non-BMP characters, combining marks and embedded NUL. If the Nix parser forbids NUL, return a parser error at its exact position rather than silently truncating the input. Reject malformed UTF-8 and unpaired UTF-16 surrogates rather than substituting characters unnoticed.
 
 A minimal transfer adapter can read a bounded polyglot byte array element by element into guest-owned memory. A measured bulk-buffer path may replace it when the selected runtime supports the needed access contract. Merely passing a JVM `ByteArray` to a function declared `const char*` does not define either adapter. A string-based shim must explicitly accept a polyglot value and perform the documented conversion. Preserve the exact input bytes used for the frame CID.
 
-For output, read exact result bytes before releasing the result handle; decode strictly and then construct host-owned records. A shim may return a polyglot string using an explicit byte length, but the adapter still owns and releases the native result allocation. Define ownership separately for success, domain error, malformed output, exception and interrupted evaluation. Every path releases input/result handles in `finally`; session cleanup accounts for a result whose handle could not be returned because evaluation failed partway through.
+For ABI B output, read exact result bytes before releasing the result handle; decode strictly and then construct host-owned records. Every recoverable path releases input/result handles in `finally`; session cleanup accounts for allocations made before a handle could be returned. For ABI A, no native result handle crosses to Kotlin: the guest wrapper must establish that its polyglot string is independent of the native storage before releasing that storage. A borrowed view cannot be advertised as this owning string contract; select ABI B if independent conversion cannot be established. Define and verify cleanup separately for success, domain error, malformed output, exception and interruption. Unacknowledged native execution retains its borrowed resources until actual completion.
 
 No `Value`, foreign pointer, lazy iterator or callback capturing a context may escape into the journal, UI or ordinary result cache. Cache host-owned canonical bytes plus the artifact/profile/frame identity. A context's close operation is necessary cleanup, but it is not a substitute for the evaluator's explicit allocator contract.
 
@@ -110,7 +114,7 @@ Native-capable execution still belongs to the daemon's OS process. A network res
 
 All asynchronous admission, bounded channels, result fan-in and drain remain in commonMain, composed through singleton typed `CoroutineContext.Key` identities under owning SupervisorJobs. The JVM Polyglot call is a synchronous target implementation invoked through the existing userspace boundary; it must not create a second coroutine runtime. Respect PRELOAD's rule that genuine target SPI differences belong at userspace NIO, rather than adding `expect`/`actual` declarations in an engine package.
 
-One worker owns each context and its foreign handles. Requests enter a bounded channel; channel send is admission. The worker validates frame/profile, transfers input, evaluates, copies and validates output, releases handles, then completes the admitted result. Parent composition joins every admitted branch, including failed ones. Separate contexts permit bounded parallelism only after measuring their shared runtime/native dependencies and memory use.
+One worker owns each context and, for ABI B, its foreign handles. Requests enter a bounded channel; channel send is admission. The worker validates frame/profile, transfers input, evaluates, copies and validates output, completes the selected ABI cleanup, then completes the admitted result. Parent composition joins every admitted branch, including failed ones. Separate contexts permit bounded parallelism only after measuring their shared runtime/native dependencies and memory use.
 
 Drain closes input, processes accepted requests, releases session/context state, joins workers, and completes/joins the supervisor. Do not use a lifecycle enum or a check-then-send admission flag. A context pool's capacity and worker jobs govern ownership; replacement after an engine failure is an explicit failed result and new owner, not silent reuse of potentially corrupted state.
 
@@ -147,8 +151,8 @@ The small transport pilot cannot waive later steps. Runtime-native policy refusa
 
 ## Ownership and review gate
 
-WP15 retains 32–64 active agent-hours, split into 8–16 hours for compiler/ABI feasibility, 8–16 for a reproducible bitcode build, and 16–32 for the bounded adapter and meaningful production verification. These are planning allocations within the existing package, not a promise that a full Nix compiler/runtime port fits 64 hours.
+WP15 retains a baseline **32–64-hour tranche**: 8–16 for compiler/ABI feasibility, 8–16 for a minimal reproducible build/probe, and 16–32 for existing-adapter repair and focused integration evidence. It can establish a transport seam while retaining the current solver. It does not include the complete new Sulong production profile. If that broader bounded path proceeds, its remaining work is the conditional **112–224-hour increment** specified in the [canonical decision chapter](22-mlir-nix-polyglot.md) and [cost workbook](15-timeline-and-costs.md). Reuse and charge baseline probes once. A full Nix compiler/runtime port remains unestimated scope.
 
-At the end of feasibility, Sol reviews Terra's exact supported computation, compiler seam, ownership model, host profiles and missing runtime facilities. Approve the bounded path only when the remaining work is concrete. If a generic Nix-to-LLVM compiler, substantial C++ runtime port or new proof backend is required, record a scope/estimate change before consuming the remaining allocation. Keep the existing native route available and mark the Sulong capability experimental until the intended acceptance level is met.
+At the end of feasibility, Sol reviews Terra's exact supported computation, compiler seam, selected ABI, ownership model, host profiles and missing runtime facilities. Select the bounded expansion only when the remaining work and incremental accounting are concrete. If a generic Nix-to-LLVM compiler, substantial C++ runtime port or new proof backend is required, record a separate scope/estimate change; the kernel increment does not conceal that work. Keep the existing native route available and mark the Sulong capability experimental until the intended acceptance level is met.
 
 WP23 owns final dependency closure and offline enforcement; WP24 owns cross-engine measurements; WP09 owns truthful pause semantics; WP17/WP19 own evidence and production dependencies. WP15 supplies artifacts and capabilities to those owners without creating another work package, changing the 25-task structure, or asserting a shorter critical path merely because Native Image has been removed.
