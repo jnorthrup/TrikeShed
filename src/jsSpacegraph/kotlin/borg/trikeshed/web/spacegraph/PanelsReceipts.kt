@@ -1,6 +1,7 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
+import borg.trikeshed.lcnc.*
 import kotlinx.browser.document
 import kotlinx.coroutines.CancellationException
 
@@ -161,6 +162,23 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                             "Retained in entry order, with parent invocation and zero-based iteration. " +
                             "Inputs and outputs are boundary snapshots; omission markers are not empty values. " +
                             "This is execution evidence, not breakpoint control or proof of external effects.", target)
+                        if (evidence.observationSchema == "lcnc-observations/1") {
+                            button("Replay recorded wire activity", {
+                                panels.launchJs {
+                                    try {
+                                        val frozen = content(str(run.programCid))
+                                        if (!current(ticket)) return@launchJs
+                                        val program = LcncProgramConfix.fromJson(str(run.program), JSON.stringify(frozen))
+                                        val canvas = LcncProgramConfix.fromJson(str(panels.panelName().value).ifBlank { "canvas" }, JSON.stringify(panels.toConfix()))
+                                        require(LcncProgramConfix.sameDefinition(program, canvas)) { "Load the frozen program before replaying its wire activity" }
+                                        panels.trace.start(program)
+                                        panels.trace.observe(str(run.runId), str(run.programCid), evidence, replay = true)
+                                    } catch (e: CancellationException) { throw e }
+                                    catch (e: dynamic) { if (current(ticket)) text("Activity replay unavailable: " + failureText(e), target) }
+                                }
+                            }, target)
+                            text("Display only; no nodes execute. Motion duration is presentation policy, not engine duration.", target)
+                        }
                         // Filtering must not renumber the immutable ledger's Confix paths.
                         val entries = arr(evidence.entries).withIndex().filter { nodeId == null || str(it.value.nodeId) == nodeId }
                         text("${entries.size} matching retained invocations" + (nodeId?.let { " for $it" } ?: "") +

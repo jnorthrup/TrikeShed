@@ -108,16 +108,19 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
                     " · receipt in Evidence" + (if (pulseReceipt == null) " · no resumable frame; sources stopped" else "") + displayError)
             } else {
                 stopSources()
+                trace.unavailable("No completed receipt; execution outcome is unconfirmed")
                 status("Request returned HTTP " + str(response.status) + " without a receipt: " +
                     str(result?.error ?: result?.detail ?: "unrecognized response") + ". No automatic retry.")
             }
             return result
         } catch (e: CancellationException) {
             pulseReceipt = null; pulseProgram = null; stopSources()
+            trace.unavailable("Response interrupted; execution outcome is unconfirmed")
             status("Response interrupted; daemon outcome is unknown. Inspect run records before retrying.")
             throw e
         } catch (e: dynamic) {
             pulseReceipt = null; pulseProgram = null; stopSources()
+            trace.unavailable("Response unavailable; execution outcome is unconfirmed")
             status("Response unavailable; daemon outcome is unknown: " + failureText(e) +
                 ". Inspect run records before retrying; no automatic retry.")
         } finally {

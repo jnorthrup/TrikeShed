@@ -1,6 +1,7 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.web.*
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -10,6 +11,7 @@ class PanelsTrace(private val panels: Panels) {
     private class Spark(val index: Int, val wire: dynamic, var count: Int, var sequence: Int,
                         var elapsed: Double, var began: Double = -1.0, var dot: dynamic = null,
                         var label: dynamic = null)
+    private val releases = mutableListOf<() -> Unit>()
     private val pending = mutableListOf<Spark>()
     private val visible = mutableListOf<Spark>()
     private var definition: LcncProgram? = null
@@ -32,7 +34,8 @@ class PanelsTrace(private val panels: Panels) {
     init { panels.page.own { clear() } }
 
     fun clear() {
-        window.cancelAnimationFrame(frame); frame = 0
+        panels.page.cancelFrame(frame); frame = 0
+        while (releases.isNotEmpty()) releases.removeAt(releases.lastIndex).invoke()
         for (spark in visible) { spark.dot?.remove(); spark.label?.remove() }
         pending.clear(); visible.clear()
         for (n in panels.nodes()) n.el?.removeAttribute("data-observed-phase")
@@ -51,13 +54,15 @@ class PanelsTrace(private val panels: Panels) {
         val controls = document.createElement("div").asDynamic(); banner.appendChild(controls)
         val label = document.createElement("label").asDynamic(); label.textContent = "Display speed "; controls.appendChild(label)
         val rate = document.createElement("select").asDynamic(); rate.setAttribute("aria-label", "Activity display speed")
-        for (value in arrayOf("0.25", "1", "4")) {
+        for (value in s_["0.25", "1", "4"].view) {
             val option = document.createElement("option").asDynamic(); option.value = value; option.textContent = value + "×"; rate.appendChild(option)
         }
         rate.value = "1"; label.appendChild(rate); speed = 1.0
-        panels.page.on(rate, "change", { speed = num(rate.value).coerceIn(.25, 4.0) })
+        val changeRate: (dynamic) -> Unit = { speed = num(rate.value).coerceIn(.25, 4.0) }
+        panels.page.on(rate, "change", changeRate); releases.add { panels.page.off(rate, "change", changeRate) }
         val stop = document.createElement("button").asDynamic(); stop.textContent = "Hide activity"; controls.appendChild(stop)
-        panels.page.on(stop, "click", { clear() })
+        val hide: (dynamic) -> Unit = { clear() }
+        panels.page.on(stop, "click", hide); releases.add { panels.page.off(stop, "click", hide) }
         val style = document.createElement("style").asDynamic()
         style.textContent = ".node[data-observed-phase=executing]{outline:2px solid #ffb02e;box-shadow:0 0 18px #ffb02e40}.node[data-observed-phase=before]{outline:2px solid #57d3ff}"
         banner.appendChild(style); document.body!!.appendChild(banner)
@@ -118,7 +123,7 @@ class PanelsTrace(private val panels: Panels) {
             else omitted++
         }
         for (n in panels.nodes()) n.el?.removeAttribute("data-observed-phase")
-        if (!replay && snapshot.state in arrayOf("running", "paused", "pause-requested", "cancel-requested")) {
+        if (!replay && str(snapshot.state) in _s["running", "paused", "pause-requested", "cancel-requested"]) {
             val site = snapshot.activeSite ?: snapshot.site
             if (site != null) {
                 val node = panels.node(site.nodeId)
