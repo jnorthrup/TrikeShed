@@ -131,4 +131,32 @@ class LlvmScalarTest {
         assertFails { LlvmScalarProfile.parse(jsonOf(fields + _m["abi" j "pointer"])) }
         assertFails { LlvmScalarProfile.parse(jsonOf(fields).dropLast(1) + ",\"export\":\"other\"}") }
     }
+
+    @Test fun cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot(): Unit = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val observer = object : KernelPointcut {
+            override fun dispatch(turn: KernelTurn) {
+                if (turn.name == "llvm.call") { entered.complete(Unit); check(release.await(15, TimeUnit.SECONDS)) }
+            }
+            override fun complete(receipt: KernelReceipt) = Unit
+            override fun close() = Unit
+        }
+        val kernel = KernelElement(coroutineContext + Dispatchers.Default, KernelId("llvm-test"))
+        try {
+            val evaluator = LlvmScalar.open(kernel, KernelId("scalar"), profile(), files(bytes()), observer)
+            val invocation = LcncInvocationLedger.Invocation(mutableMapOf())
+            val caller = async(invocation) { evaluator.evaluate(20, 22) }
+            withTimeout(15_000) { entered.await() }
+            caller.cancel()
+            yield()
+            assertFalse(caller.isCompleted)
+            assertFalse("runtime" in invocation.values)
+            release.countDown()
+            assertFailsWith<CancellationException> { caller.await() }
+            caller.join()
+            assertEquals(ContentId.of(bytes()).value, (invocation.values["runtime"] as Map<*, *>)["moduleCid"])
+            assertEquals(42, evaluator.evaluate(19, 23)["value"])
+        } finally { release.countDown(); kernel.drain() }
+    }
 }
