@@ -1,0 +1,3 @@
+/source.txt -text -diff
+/cas-readbacks/*.cbor -text -diff
+/cas-readbacks/*.txt -text -diff

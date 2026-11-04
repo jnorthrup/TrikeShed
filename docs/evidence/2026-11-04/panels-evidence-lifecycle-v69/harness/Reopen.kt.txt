@@ -1,0 +1,43 @@
+package proof.evidencelifecyclereopen
+
+import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import kotlinx.coroutines.runBlocking
+import java.io.File
+
+/** Exact closed-store reader after all live proof owners drained. No parser, graph or query run. */
+fun main() = runBlocking {
+    val root = File(requireNotNull(java.lang.System.getenv("PROOF_ROOT")))
+    check(File(root, "fixture-attempt1.exit").readText().trim() == "0")
+    val cleanup = reifyStrict(File(root, "cleanup.json").readText()) as Map<*, *>
+    check(cleanup["allSupervisorsCompleted"] == true && (cleanup["parserCalls"] as Number).toInt() == 0)
+    val inputs = reifyStrict(File(root, "inputs.json").readText()) as Map<*, *>
+    val cas = PackCasStore(JvmFileOperations(), File(root, "runtime/cas").absolutePath)
+    val rows = mutableListOf<Map<String, Any?>>()
+    try {
+        val original = reifyStrict(File(root, "query-progress.json").readText()) as Map<*, *>
+        val observations = original["observations"] as Map<*, *>
+        for ((key, prior) in _m["runReceiptCid" j observations["durable"], "programCid" j observations["program"],
+                "invocationsCid" j observations["invocations"], "previousReceiptCid" j null]) {
+            val cid = ContentId(inputs[key] as String); val bytes = requireNotNull(cas.getBounded(cid, 4 * 1024 * 1024))
+            check(ContentId.of(bytes) == cid && File(root, "cas-readbacks/${cid.hex}.json").readBytes().contentEquals(bytes))
+            val value = reifyStrict(bytes.decodeToString(throwOnInvalidSequence = true)) as Map<*, *>
+            if (prior != null) check(value == prior) { "Actual v68 raw content differs after v69 read-only inspection" }
+            val run = value["lcncRun"] as? Map<*, *>
+            rows.add(_m["kind" j key, "cid" j cid.value, "bytes" j bytes.size, "matchesActualRetainedBytesBeforeBrowser" j true,
+                "status" j run?.get("status"), "runId" j run?.get("runId")])
+        }
+        val cid = ContentId(inputs["inspectionCid"] as String); val source = EnglishObservationGraph.read(cas, cid)
+        check(source.source.originalCid.value == inputs["sourceCid"] && source.source.text.encodeToByteArray().contentEquals(File(root, "source.txt").readBytes()))
+        val receipt = requireNotNull(cas.getBounded(cid, 8 * 1024 * 1024)); check(ContentId.of(receipt) == cid)
+        check(File(root, "cas-readbacks/${cid.hex}.cbor").readBytes().contentEquals(receipt))
+        val report = _m["result" j "PASS", "scope" j "Read-only actual closed PackCasStore reopening after the v69 UI race controls. Reuses the actual v68 parser/source/run; no fresh parser, query, execution or approval.",
+            "storedJsonReadbacks" j rows, "inspectionCid" j cid.value, "sourceCid" j source.source.originalCid.value,
+            "sourceSnapshots" j source.sourceSnapshots?.map { it.toMap() }, "newParserCalls" j 0,
+            "codeSource" j EnglishObservationGraph::class.java.protectionDomain.codeSource.location.toString()]
+        File(root, "reopened-cas-readbacks.json").writeText(jsonOf(report)); println(jsonOf(report))
+    } finally { cas.close() }
+}

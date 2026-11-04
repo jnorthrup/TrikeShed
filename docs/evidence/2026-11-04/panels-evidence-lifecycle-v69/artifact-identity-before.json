@@ -1,0 +1,12 @@
+{
+  "source": "d891ec320090cf1804a722ee9dcbefcfded0e5d5",
+  "mainJarSha256": "236775cffa83486dddc3ccdb4c73f2a04a2fcba44b49ee97f30798d208491e59",
+  "spacegraphJsSha256": "10d58a2b7b4e09d284b9a1dea4ee02e91850247f20f44bc26153d7a96c942c03",
+  "documentsJsSha256": "fb3176bc9b4b6c64060be7fe811380b1cb9092ad9c8f8d9a3f39b23d6accb522",
+  "pagesJsSha256": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+  "frozenSnapshotAndImmutableDependenciesVerified": true,
+  "ownClassNamespaceOnly": true,
+  "fixtureSha256": "6c70c7bfb6e26fe975c03bf08b691f6b0a85579d3709924d115a2231bc6b35cf",
+  "driverSha256": "8a7890665d27c9617e18bfcca7c0f4ecc74e8b309b1956e7f9786a80340a46ac",
+  "sourceScope": "Read-only v68 actual source/inspection/run replay with new v69 client; no new parser, query or graph run"
+}
