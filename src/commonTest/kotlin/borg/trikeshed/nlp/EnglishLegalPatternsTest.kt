@@ -3,6 +3,7 @@ package borg.trikeshed.nlp
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.narsese.DocumentAnchor
 import kotlin.test.*
 
 /** Explicit graph fixtures verify source retention and conservative reading, not parser accuracy or legal effect. */
@@ -155,6 +156,19 @@ class EnglishLegalPatternsTest {
         val graph = NlpDocument(text, s_[NlpSentence(0, 0, text.length, tokens, edges)])
         val failure = assertFailsWith<IllegalArgumentException> { EnglishLegalPatterns.inspect(source(text), graph, 0, text.length) }
         assertTrue(failure.message.orEmpty().contains("binding limit"))
+    }
+
+
+    @Test fun overlappingLayoutAnchorsCannotMultiplyWithoutBoundAcrossQuantityQuotes() {
+        val text = "Tenant must give notice within 30 days before 40 weeks."
+        val plain = parsed(text, "30")
+        val sentence = plain.sentences[0]
+        val extra = NlpDependency(10, 9, "nummod")
+        val graph = plain.copy(sentences = s_[sentence.copy(dependencies = (sentence.dependencies.size + 1) j { index: Int ->
+            if (index < sentence.dependencies.size) sentence.dependencies[index] else extra })])
+        val original = source(text).copy(anchors = ((0 until 4096).toSeries() α { DocumentAnchor(0, text.length, page = 1) }).toList())
+        val failure = assertFailsWith<IllegalArgumentException> { EnglishLegalPatterns.inspect(original, graph, 0, text.length) }
+        assertTrue(failure.message.orEmpty().contains("quotation anchor limit"))
     }
 
 }
