@@ -1,0 +1,396 @@
+{
+  "scope": "Actual production Panels bundle, module routes and LLVM runtimes; synthetic JSON transport fixture",
+  "cases": {
+    "liveTransfer": {
+      "result": "PASS",
+      "first": {
+        "x": "281.3630676269531",
+        "y": "211.76202392578125",
+        "count": "1"
+      },
+      "second": {
+        "x": "295.19012451171875",
+        "y": "210.77105712890625"
+      },
+      "caption": "OBSERVED TRANSFERS\nObserved execution · delayed display · 749402a8-0d82-4bd9-924c-aad4a59a3d4e 1 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    },
+    "durableTransfers": {
+      "result": "PASS",
+      "runId": "749402a8-0d82-4bd9-924c-aad4a59a3d4e",
+      "programCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+      "transfers": [
+        {
+          "invocationOrdinal": 2,
+          "nodeId": "summary",
+          "type": "vm.llvm.scalar",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-visible-confix",
+          "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 1,
+            "nodeId": "source",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-visible-confix",
+            "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 0,
+            "fromNode": "source",
+            "fromPort": "rowCount",
+            "toNode": "summary",
+            "toPort": "left?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "left?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 4,
+          "elapsedNanos": 682899756
+        },
+        {
+          "invocationOrdinal": 3,
+          "nodeId": "confirm",
+          "type": "vm.llvm.scalar",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-visible-confix",
+          "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 2,
+            "nodeId": "summary",
+            "type": "vm.llvm.scalar",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-visible-confix",
+            "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 1,
+            "fromNode": "summary",
+            "fromPort": "value",
+            "toNode": "confirm",
+            "toPort": "left?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "left?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 7,
+          "elapsedNanos": 1215389143
+        }
+      ],
+      "summary": {
+        "clockOrigin": "walk-start",
+        "attempted": 8,
+        "retained": 8,
+        "omitted": 0,
+        "firstSequence": 1,
+        "lastSequence": 8,
+        "lastObservedSequence": 8,
+        "coverage": "complete"
+      }
+    },
+    "nativeInspection": {
+      "result": "PASS",
+      "text": "CONFIX & FACETS\nRefresh ✕\nInspected this canvas · blackboard revision 7\nUse cases\nWorkgroups\nCases\nConfix & facets\nLow code\nEvidence\n\nProgram identity: sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378\n\nNode inspection · last attempt in this tab. Refresh after running. These observations are not durable run receipts.\n\nsource · vm.llvm.confix\nsummary · vm.llvm.scalar\nconfirm · vm.llvm.scalar\n\nNo attempt recorded in this tab.\n\nBindings identify dispatch owners, not readiness. Inputs and named scope bodies are checked when run.\n\nsource · vm.llvm.confix · KOTLIN\nContext: LcncNodeKey.VM_LLVM_CONFIX\n\nsummary · vm.llvm.scalar · KOTLIN\nContext: LcncNodeKey.VM_LLVM_SCALAR\n\nconfirm · vm.llvm.scalar · KOTLIN\nContext: LcncNodeKey.VM_LLVM_SCALAR\n\nRecent recorded runs · up to eight immutable receipts. A matching program version does not mean its inputs or dependencies are still current.\n\nInspect receipt\n\nLatest explicit program run in this page\n\ncompleted · 749402a8-0d82-4bd9-924c-aad4a59a3d4e\n\nAn inline run label does not establish named-program membership. Refreshing or reopening this view re-inspects the retained response snapshot.\n\nInspect latest explicit run\n\nInline run · not saved-program history · completed · 749402a8-0d82-4bd9-924c-aad4a59a3d4e · this version\n\nInspect 749402a8-0d82-4bd9-924c-aad4a59a3d4e\n\nairgap-visible-confix · 749402a8-0d82-4bd9-924c-aad4a59a3d4e · completed\n\nReceipt: sha256:ed93c38b9fa4f988f664b8b5926dd2db74c200ac448d260cc62a9bd92e18487b\nProgram: sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378\nSame program version as the captured canvas inspection.\n\nCaptured canvas program: sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378. Refresh to compare with the current canvas.\n\nStarted: 1793833241495 · finished: 1793833242772 (epoch ms)\n\nImmutable receipt JSON\nReceipt as Confix sheets\nInspect receipt in Confix\nInvocation inputs (root inputs, not per-node input snapshots)\nExecution budgets and version policy\nReturned values\n\nRecorded node outputs · 3 nodes. Missing outputs are not proof that a node did not run; truncation markers remain visible.\n\nsource\nInspect output source in Confix\nsummary\nInspect output summary in Confix\nconfirm\nInspect output confirm in Confix\nNode invocations · sha256:2d8ddaabba2e9024399b6a565d0b4d1d221f8c298d21aeb55f02d4f0df1f5bfa\nImmutable JSON\nConfix sheets\nInspect Node invocations in Confix\n\n3 node entries · 0 omitted. Retained in entry order, with parent invocation and zero-based iteration. Inputs and outputs are boundary snapshots; omission markers are not empty values. This is execution evidence, not breakpoint control or proof of external effects.\n\nReplay recorded wire activity\n\nDisplay only; no nodes execute. Motion duration is presentation policy, not engine duration.\n\n3 matching retained invocations. No match is not proof of non-execution; the ledger may omit entries.\n\n#1 · source · vm.llvm.confix · completed\n\nScope path: [] · parent: root · iteration: none\n\nRecorded LLVM observation · confix.flat/1\n\nModule: sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3\n\nGraalVM 25.3.4.1 · LLVM 22.1.8\n\nQueue 622.957 µs · call 77.792 ms · load 69.796 ms\n\nInternal progress: unobserved · pause: between-scans\n\nScanner 32.260 ms · row capacity 16384\n\nOwned native allocation 541064 bytes · after release 0 bytes\n\nBuffer guards: verified\n\nAllocation counters cover the bridge buffer, not the VM heap. Scanner success is not strict validation.\n\nRetained measurements, not a live VM. No native-memory isolation or hard native cancellation is established.\n\nMeasured LLVM runtime\nInvocation boundary JSON\nInspect invocation #1 in Confix\n#2 · summary · vm.llvm.scalar · completed\n#3 · confirm · vm.llvm.scalar · completed\nConsumed evidence and runtime bindings\nFrozen program at invocation · sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378\nPinned subprogram versions\nStored prompt versions\nPrevious state receipt\nRun records\nShared blackboard\n\nPointcuts · latest recorded value per site, daemon-wide. This is not the full trace, a breakpoint, or proof that this canvas executed.\n\nInspect pointcuts\nGraal workspace · VM terminals · Hermes\nDocument evidence and tuple sheets"
+    },
+    "replay": {
+      "result": "PASS",
+      "postRuns": 1,
+      "caption": "OBSERVED TRANSFERS\nObservation ended; remaining activity is recorded · 749402a8-0d82-4bd9-924c-aad4a59a3d4e 2 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    },
+    "reducedMotion": {
+      "result": "PASS",
+      "position": [
+        "409",
+        "181.78125"
+      ]
+    },
+    "nativeFlyover": {
+      "result": "PASS",
+      "text": "vm.llvm.confix\nsource\nLAST DISPLAYED RUN · RECORDED LLVM EVIDENCE\nRecorded LLVM observation · confix.flat/1\nModule: sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3\nGraalVM 25.3.4.1 · LLVM 22.1.8\nQueue 622.957 µs · call 77.792 ms · load 69.796 ms\nInternal progress: unobserved · pause: between-scans\nScanner 32.260 ms · row capacity 16384\nOwned native allocation 541064 bytes · after release 0 bytes\nBuffer guards: verified\nAllocation counters cover the bridge buffer, not the VM heap. Scanner success is not strict validation.\nRetained measurements, not a live VM. No native-memory isolation or hard native cancellation is established.\nsource\nsha256:ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573\ncopied rows\n7\nnot_found"
+    },
+    "editedDefinition": {
+      "result": "PASS",
+      "staleActivityCleared": true
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":4.489874638379945,\"y\":136.27000964320155,\"z\":1.4503375120540019}},\"inputs\":{},\"debugToken\":\"5613be0c-0079-47dc-8883-97bf47a73591\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"5613be0c-0079-47dc-8883-97bf47a73591\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"749402a8-0d82-4bd9-924c-aad4a59a3d4e\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"5613be0c-0079-47dc-8883-97bf47a73591\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"749402a8-0d82-4bd9-924c-aad4a59a3d4e\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"5613be0c-0079-47dc-8883-97bf47a73591\",\"ordinal\":3,\"action\":\"continue\",\"runId\":\"749402a8-0d82-4bd9-924c-aad4a59a3d4e\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":4.489874638379945,\"y\":136.27000964320155,\"z\":1.4503375120540019}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":4.489874638379945,\"y\":136.27000964320155,\"z\":1.4503375120540019}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":4.489874638379945,\"y\":136.27000964320155,\"z\":1.4503375120540019}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    }
+  ],
+  "errors": [],
+  "responses": [
+    {
+      "runId": "749402a8-0d82-4bd9-924c-aad4a59a3d4e",
+      "program": "airgap-visible-confix",
+      "programKey": null,
+      "programCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+      "inputs": {},
+      "status": "completed",
+      "queuedAtMs": 1793833241205,
+      "queueNamed": false,
+      "queueDeclaredSubnet": null,
+      "queueRequest": {
+        "debugToken": "5613be0c-0079-47dc-8883-97bf47a73591",
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "subnet": "local"
+      },
+      "queueDurability": "DURABLE",
+      "executionFamily": "lcnc/run/749402a8-0d82-4bd9-924c-aad4a59a3d4e",
+      "parentRunId": null,
+      "versionPolicy": "root-at-queue,subprogram-at-first-use",
+      "budgets": {
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "maxPayloadChars": 131072
+      },
+      "jobId": "lcnc/run/749402a8-0d82-4bd9-924c-aad4a59a3d4e",
+      "sequence": 3,
+      "timelineRevision": 3,
+      "receiptCid": "sha256:ed93c38b9fa4f988f664b8b5926dd2db74c200ac448d260cc62a9bd92e18487b",
+      "workgroup": "lcnc/program/airgap-visible-confix@sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+      "claimId": 1,
+      "subnet": "local",
+      "claimedAtSubnet": "local",
+      "claimLineage": [
+        {
+          "workgroup": "lcnc/program/airgap-visible-confix@sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+          "claimId": 1
+        }
+      ],
+      "parentWorkgroup": null,
+      "parentClaimId": null,
+      "startedAtMs": 1793833241495,
+      "programVersions": {},
+      "previousReceiptCid": "sha256:b142991fabe42f5829afd88e61ec7331c06c310e40f7cf8709ba7a5004893fb0",
+      "returns": {},
+      "outputs": {
+        "source": {
+          "ok": true,
+          "format": "JSON",
+          "sourceCid": "sha256:ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573",
+          "sourceBytes": 52,
+          "rowCount": 7,
+          "observedRows": 7,
+          "rows": [
+            {
+              "open": 0,
+              "close": 51,
+              "tag": "IoObject",
+              "depth": 0,
+              "children": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            {
+              "open": 1,
+              "close": 11,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 13,
+              "close": 22,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 24,
+              "close": 33,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 35,
+              "close": 36,
+              "tag": "IoDouble",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 38,
+              "close": 45,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 47,
+              "close": 50,
+              "tag": "IoBoolean",
+              "depth": 1,
+              "children": []
+            }
+          ],
+          "fault": {
+            "code": 0,
+            "name": "none",
+            "at": 0,
+            "atKind": "none"
+          },
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
+            "abi": "confix.flat/1",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-scans",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 69796287,
+            "semanticProfile": "mlir-nix-confix-571b57d3",
+            "strictValidation": false,
+            "copyTransport": "packed-i32",
+            "scanNanos": 32260477,
+            "allocatedBytes": 541064,
+            "rowCapacity": 16384,
+            "guardsVerified": true,
+            "liveBytesAfter": 0,
+            "queueNanos": 622957,
+            "callNanos": 77791986
+          },
+          "sourceRetained": true
+        },
+        "summary": {
+          "value": 107,
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b",
+            "export": "add",
+            "abi": "i32(i32,i32)",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-calls",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 828508850,
+            "queueNanos": 555996,
+            "callNanos": 1646478
+          }
+        },
+        "confirm": {
+          "value": 108,
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b",
+            "export": "add",
+            "abi": "i32(i32,i32)",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-calls",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 828508850,
+            "queueNanos": 302209,
+            "callNanos": 204014
+          }
+        }
+      },
+      "bindings": [],
+      "bindingsTruncated": false,
+      "promptVersions": {},
+      "consumed": [],
+      "consumedTruncated": false,
+      "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rootStateCid": "sha256:f341fd04a4363df38da908980464d4c8aa43aaee47d4ae4e9425f27f838dec62",
+      "rootStateFormat": "cbor",
+      "ok": true,
+      "finishedAtMs": 1793833242772,
+      "invocationsCid": "sha256:2d8ddaabba2e9024399b6a565d0b4d1d221f8c298d21aeb55f02d4f0df1f5bfa",
+      "oroborosCid": "sha256:e62b499c244a8cecc080859dca9726cf85a9d4f9426f936d7e45dcdd3c1fa33b",
+      "invocationsAttempted": 3,
+      "invocationsDropped": 0
+    }
+  ],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "d0077d675d01c3ef6e65032ad837ce2427d27d91dff8776d9bf9f922ce7a0a9b",
+    "bytes": 1767359
+  },
+  "failure": "apiRequestContext.post: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:18763/__proof/reopen\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\n    at /workspace/airgap-r3-proof/driver.cjs:71:65"
+}

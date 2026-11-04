@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.collections._m
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -160,6 +161,8 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
     }
     var maxNodeExecutions: Int = 10000
     private var executedNodes: Int = 0
+    private var observationLedger: LcncInvocationLedger? = null
+    private var frameSequence = 0
     private val argumentBindings = ArrayList<Map<String, Any?>>()
     private var bindingsTruncated = false
     private val retainedProjections = ArrayList<() -> Unit>()
@@ -272,7 +275,10 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
         activePulse = pulse?.let { it.copy(outputs = it.outputs.toMap(), definitions = it.definitions.toMap()) }
         pulseRoots = activePulse?.roots(program, registry.keys, pureRunnerTypes) ?: emptySet()
         executedNodes = 0
-        invocations?.reset()
+        val debug = currentCoroutineContext()[LcncDebug]
+        observationLedger = invocations ?: debug?.observationLedger
+        if (debug != null) debug.observeWith(checkNotNull(observationLedger)) else observationLedger?.reset()
+        frameSequence = 0
         trail?.let { trailProgram = program.name; trailRun = it.run(program.name) }
         argumentBindings.clear()
         bindingsTruncated = false
@@ -283,7 +289,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
         cachedValues.clear()
         cachedOrigins = emptyMap()
         bindingTerms = if (activePulse == null || activePulse?.retained?.origins != null) LcncBindingTerms() else null
-        val state = WalkState(program)
+        val state = walkState(program)
         val rootBindings = activePulse?.retained?.bindings ?: args
         val root = LcncScopeFrame(bindings = rootBindings, chain = FrameIdChain.root(ROOT_SCOPE), bindingSources = rootBindings.keys.associateWith { "invocation" })
         bindingTerms?.let { terms ->
@@ -347,10 +353,14 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
 
     /** Per-document walk state: the node universe, each node's ring path,
      *  wires by target, and the authored sweep's visited set. */
-    private class WalkState(program: LcncProgram) {
+    private fun walkState(program: LcncProgram) = WalkState(program, if (observationLedger == null) null
+        else ContentId.of(LcncProgramConfix.toJson(program).encodeToByteArray()).value)
+
+    private class WalkState(program: LcncProgram, val documentCid: String? = null) {
+        val documentName = program.name
         val index = HashMap<String, LcncNode>()
         val ringPath = HashMap<String, List<String>>()
-        val wiresTo = HashMap<String, MutableList<LcncWire>>()
+        val wiresTo = HashMap<String, MutableList<Join<Int, LcncWire>>>()
         val visited = HashSet<String>()
         private val contracts = LcncContracts.all().associateBy { it.type }
         val kind = LcncTypeCheck.portKindResolver(program, contracts, LcncFacts.of(contracts.values))
@@ -364,8 +374,8 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                 }
             }
             walk(program.nodes, emptyList())
-            for (w in program.wires.view) {
-                wiresTo.getOrPut(w.toNode) { mutableListOf() }.add(w)
+            for ((index, w) in program.wires.view.withIndex()) {
+                wiresTo.getOrPut(w.toNode) { mutableListOf() }.add(index j w)
             }
         }
     }
@@ -373,14 +383,52 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
     private fun isPrefix(a: List<String>, b: List<String>): Boolean =
         a.size <= b.size && a.indices.all { a[it] == b[it] }
 
+    /** Bounded suffix of the wires actually selected by gather, independent of retained-value budgets. */
+    private class InputConsumption {
+        private val selected = ArrayList<Map<String, Any?>>()
+        private val counts = LinkedHashMap<String, Int>()
+
+        private fun add(port: String, many: Boolean, fields: Map<String, Any?>) {
+            if (!many) selected.removeAll { it["port"] == port }
+            counts[port] = if (many) (counts[port] ?: 0) + 1 else 1
+            if (selected.size == 128) selected.removeAt(0)
+            selected.add(fields + _m["port" j port, "many" j many, "position" j counts.getValue(port) - 1])
+        }
+
+        fun wire(index: Int, wire: LcncWire, owner: LcncScopeFrame, many: Boolean) = add(wire.toPort, many, _m[
+            "origin" j "wire", "producer" j owner.outputInvocations[wire.fromNode],
+            "wire" j _m["index" j index, "fromNode" j wire.fromNode, "fromPort" j wire.fromPort,
+                "toNode" j wire.toNode, "toPort" j wire.toPort]])
+
+        fun intervene(patch: LcncDebug.Patch) {
+            for (port in patch.inputs.keys) add(port, false, _m["origin" j "intervention",
+                "interventionSequence" j patch.sequence])
+        }
+
+        fun observations(location: Map<String, Any?>, ports: Set<String>? = null): Join<List<Map<String, Any?>>, Int> {
+            val rows = selected.filter { ports == null || it["port"] in ports }.map { row ->
+                val port = row["port"] as String
+                val count = counts.getValue(port)
+                location + (row - _s["port", "many", "position"]) + _m[
+                    "phase" j "consumed", "status" j "delivered",
+                    "selection" j _m["port" j port,
+                        "cardinality" j if (row["origin"] == "intervention") "replacement" else if (row["many"] == true) "many" else "one",
+                        "position" j row["position"], "count" j count,
+                        "representation" j if (row["origin"] == "intervention") "replacement" else if (row["many"] == true && count > 1) "list" else "scalar"],
+                    "evidence" j _m["status" j "unavailable", "reason" j "value_identity_not_recorded"]]
+            }
+            return rows j (counts.filterKeys { ports == null || it in ports }.values.sum() - rows.size)
+        }
+    }
+
     /** Gather a node's inputs through the frame chain — the warm base: an
      *  enclosing ring's outputs reach an inner consumer with zero plumbing. */
     private fun gather(node: LcncNode, state: WalkState, frame: LcncScopeFrame,
                        retained: MutableMap<String, Any?>,
-                       origins: MutableMap<String, LcncBindingOrigins>): LinkedHashMap<String, Any?> {
+                       origins: MutableMap<String, LcncBindingOrigins>, consumed: InputConsumption?): LinkedHashMap<String, Any?> {
         val gathered = LinkedHashMap<String, MutableList<Any?>>()
         val feeders = ArrayList<Join<LcncWire, LcncScopeFrame>>()
-        for (wire in state.wiresTo[node.id].orEmpty()) {
+        for ((index, wire) in state.wiresTo[node.id].orEmpty()) {
             val srcNode = state.index[wire.fromNode] ?: continue // stale wire from a deleted node: tolerated
             val srcPath = state.ringPath.getValue(srcNode.id)
             val dstPath = state.ringPath.getValue(node.id)
@@ -395,6 +443,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
             }
             if (fromOut.containsKey(wire.fromPort)) {
                 gathered.getOrPut(wire.toPort) { mutableListOf() }.add(fromOut[wire.fromPort])
+                consumed?.wire(index, wire, checkNotNull(owner), isManyInput(node.type, wire.toPort))
                 if (projectionWork()) feeders.add(wire j checkNotNull(owner)) else feeders.clear()
             }
         }
@@ -449,6 +498,8 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
         iteration: Int? = null,
     ): Map<String, Any?> {
         val returns = LinkedHashMap<String, Any?>()
+        frame.observationDocumentCid = state.documentCid
+        frame.observationDocumentName = state.documentName
 
         for (node in nodes.view) {
             // Cooperative cancellation between statements: ABORT stops the walk
@@ -459,6 +510,11 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
 
             val ordinal = executedNodes
             val invocation = invocations?.begin(ordinal, node, pathNames, parentInvocation, iteration)
+            invocation?.values?.putAll(_m["frameId" j frame.observationId,
+                "documentName" j state.documentName, "documentCid" j state.documentCid])
+            val location = if (observationLedger == null) emptyMap() else _m["invocationOrdinal" j ordinal, "nodeId" j node.id, "type" j node.type,
+                "path" j pathNames.toList(), "parent" j parentInvocation, "iteration" j iteration,
+                "frameId" j frame.observationId, "documentName" j state.documentName, "documentCid" j state.documentCid]
             var status = "completed"
             var reason: String? = null
             var observedOutputs: Map<String, Any?>? = null
@@ -469,6 +525,13 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                 value.filterKeys { !LcncPulse.event(node, it, state.kind(node, "out", it).kind) }
             }) {
                 frame.outputs[node.id] = value
+                if (observationLedger != null) frame.outputInvocations[node.id] =
+                    if (activePulse != null && pathNames.isEmpty() && node.id !in pulseRoots) {
+                        // The retained frame proves the value, not its original producing invocation.
+                        // This walk's ordinal identifies reuse; it must not pose as fresh production.
+                        (location - "invocationOrdinal") + _m["origin" j "retained",
+                            "reuseInvocationOrdinal" j ordinal, "productionObserved" j false]
+                    } else location + _m["origin" j "executed"]
                 observedOutputs = value
                 projection {
                     val projected = retained()
@@ -497,7 +560,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                     invocation?.capture("inputs", emptyMap<String, Any?>())
                     debug?.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, emptyMap(),
                         frame = frame, apply = { patch ->
-                            frame.intervene(patch.bindings)
+                            frame.intervene(patch.bindings, patch.sequence)
                             retainedUnavailable = true
                             retainedReason = "debug_intervention"
                             retainedProjections.clear()
@@ -514,10 +577,18 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                     when {
                         name != null && owner != null -> {
                             if (event != null && owner.parent == null && eventBinding) skip("expired_binding")
-                            else publish(_m["value" j frame.binding(name)], origins = {
-                                mapOf("value" to (owner.retainedBindingOrigins[name] ?: emptySeriesOf()))
-                            }) {
-                                if (name in owner.retainedBindings) _m["value" j owner.retainedBindings[name]] else emptyMap()
+                            else {
+                                publish(_m["value" j frame.binding(name)], origins = {
+                                    mapOf("value" to (owner.retainedBindingOrigins[name] ?: emptySeriesOf()))
+                                }) {
+                                    if (name in owner.retainedBindings) _m["value" j owner.retainedBindings[name]] else emptyMap()
+                                }
+                                owner.bindingInterventions[name]?.let { sequence ->
+                                    frame.outputInvocations[node.id]?.let { produced ->
+                                        frame.outputInvocations[node.id] = produced + _m["interventionSequence" j sequence,
+                                            "bindingName" j name, "bindingFrameId" j owner.observationId]
+                                    }
+                                }
                             }
                         }
                         node.params.containsKey("default") ->
@@ -538,7 +609,14 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
 
                 val retainedInputs = LinkedHashMap<String, Any?>()
                 val inputOrigins = LinkedHashMap<String, LcncBindingOrigins>()
-                var inputs: Map<String, Any?> = gather(node, state, frame, retainedInputs, inputOrigins)
+                val consumption = observationLedger?.let { InputConsumption() }
+                var inputs: Map<String, Any?> = gather(node, state, frame, retainedInputs, inputOrigins, consumption)
+                suspend fun consumed(ports: Set<String>? = null) {
+                    val (rows, omitted) = consumption?.observations(location, ports) ?: return
+                    if (debug != null) debug.consumed(rows, omitted) else observationLedger?.let { ledger ->
+                        ledger.omitObservations(omitted); rows.forEach(ledger::observe)
+                    }
+                }
                 // Annotation-only nodes are not debugger stops. Rings and binding/yield nodes are:
                 // stepping enters their real nested walk, including each/carry iterations.
                 var sourceStep = false
@@ -550,7 +628,8 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                             sourceDebugging = registry[node.type]?.sourceDebugging(node, inputs) == true,
                             frame = frame, apply = { patch ->
                                 inputs = inputs + patch.inputs
-                                frame.intervene(patch.bindings)
+                                consumption?.intervene(patch)
+                                frame.intervene(patch.bindings, patch.sequence)
                                 retainedUnavailable = true
                                 retainedReason = "debug_intervention"
                                 retainedProjections.clear()
@@ -571,6 +650,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                         if (name != null) {
                             returns[name] = inputs["value"] ?: inputs["value?"]
                             val port = if (inputs["value"] != null || "value?" !in inputs) "value" else "value?"
+                            consumed(_s[port])
                             projection {
                                 if (port in retainedInputs && !LcncPulse.event(state.kind(node, "in", "value").kind)) {
                                     frame.retainedReturns[name] = retainedInputs[port]
@@ -626,7 +706,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                         val doc = definitions[subName] ?: loader?.invoke(subName!!) ?: throw LcncUnknownNodeType(subName!!)
                         require(!doc.controls.inspectionOnly) { "Inspection-only wiring specimen: $subName" }
                         bodyNodes = doc.nodes
-                        bodyState = WalkState(doc)
+                        bodyState = walkState(doc)
                         bodyDoc = doc
                     }
 
@@ -685,6 +765,8 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                     // `each`, the item name is bound per iteration.
                     if (requiredScopeIns(bodyNodes).view.any { !bound.containsKey(it) && !frame.hasBinding(it) && !(eachFed && it == itemName) }) { skip("unbound"); continue }
 
+                    consumed()
+
                     val childChain = FrameIdChain.append(frame.chain, ringName)
                     if (eachFed) {
                         val eachPort = if (inputs.containsKey("each")) "each" else "each?"
@@ -705,8 +787,9 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                             val iterBound = LinkedHashMap(bound).also { it[itemName] = element }
                             val iterSources = LinkedHashMap(sources).also { it[itemName] = "each" }
                             // Every execution gets its own binding owner, including identical-valued items.
-                            val iterState = if (inline) state else WalkState(bodyDoc!!)
+                            val iterState = if (inline) state else WalkState(bodyDoc!!, bodyState.documentCid)
                             val iterFrame = LcncScopeFrame(bindings = iterBound, chain = childChain, parent = frame, bindingSources = iterSources)
+                                .also { it.observationId = ++frameSequence }
                             projection {
                                 val values = LinkedHashMap(retainedBound)
                                 val origins = LinkedHashMap(boundOrigins)
@@ -787,10 +870,11 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                             turns++
                             mark(LcncTrail.Kind.TURN, pathNames, node, "turn $turns")
                             val iterFrame = LcncScopeFrame(bindings = LinkedHashMap(carried), chain = childChain, parent = frame, bindingSources = LinkedHashMap(carriedSources))
+                                .also { it.observationId = ++frameSequence }
                             projection { iterFrame.retainBindings(retainedCarried, carriedOrigins) }
                             onScopeEnter?.invoke(pathNames + ringName, childChain)
                             val next = lcncContext(iterFrame) {
-                                runRing(bodyNodes, if (inline) state else WalkState(bodyDoc!!), iterFrame, pathNames + ringName, ordinal, turns - 1)
+                                runRing(bodyNodes, if (inline) state else WalkState(bodyDoc!!, bodyState.documentCid), iterFrame, pathNames + ringName, ordinal, turns - 1)
                             }
                             val fixed = turns > 1 && next == yielded
                             yielded = next
@@ -820,6 +904,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                         continue
                     }
                     val childFrame = LcncScopeFrame(bindings = bound, chain = childChain, parent = frame, bindingSources = sources)
+                        .also { it.observationId = ++frameSequence }
                     projection { childFrame.retainBindings(retainedBound, boundOrigins) }
                     onScopeEnter?.invoke(pathNames + ringName, childChain)
                     // Ring entry IS withContext: any suspend runner in the subtree
@@ -842,10 +927,11 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
 
                 // Readiness: every REQUIRED input must be fed (silent degrade).
                 val required = requiredInputs(node.type)
-                    ?: state.wiresTo[node.id].orEmpty().map { it.toPort }.filterNot { it.endsWith("?") }.toSet()
+                    ?: state.wiresTo[node.id].orEmpty().map { it.b.toPort }.filterNot { it.endsWith("?") }.toSet()
                 if (required.any { req -> inputs[req] == null }) { skip("unfed"); mark(LcncTrail.Kind.SKIP, pathNames, node, "unfed"); continue }
 
                 val runner = registry[node.type] ?: throw LcncUnknownNodeType(node.type)
+                consumed()
                 mark(LcncTrail.Kind.BEGIN, pathNames, node)
                 val produced = try {
                     if (invocation == null && !sourceStep) runner.run(node, inputs)

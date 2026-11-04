@@ -102,6 +102,15 @@ class PanelsBlip(private val p: Panels) {
         fun none(cls: String, txt: String) = row("$cls none", esc(txt))
         val boardName = p.board.name
         var h = "<div class=\"bt\">${esc(n.type)}<i>${esc(n.id)}${if (!boardName.isNullOrEmpty()) " · " + esc(boardName) else ""}</i></div>"
+        val recorded = n._lastOut?.runtime
+        if (recorded?.backend == "graalvm-llvm") {
+            h += "<h6 class=\"graal\">last displayed run · recorded LLVM evidence</h6>"
+            for (line in llvmObservation(recorded, compact = true)) h += row("g", esc(line))
+            val out = n._lastOut
+            if (out.sourceCid != null) h += row("g", "<b>source</b> " + esc(out.sourceCid))
+            if (out.rowCount != null) h += row("g", "<b>copied rows</b> " + esc(out.rowCount) +
+                if (out.ok == false) " · scanner fault " + esc(out.fault?.name ?: "unavailable") else "")
+        }
         if (truthy(r.error)) { show(h + row("i refused", esc(r.error))); return }
         // asserted
         val a = if (truthy(r.asserted)) r.asserted else obj(); val af = arr(a.facts)

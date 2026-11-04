@@ -1,0 +1,16 @@
+apiRequestContext.post: Timeout 30000ms exceeded.
+Call log:
+[2m  - → POST http://127.0.0.1:18763/__proof/reopen[22m
+[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36[22m
+[2m    - accept: */*[22m
+[2m    - accept-encoding: gzip,deflate,br[22m
+
+    at /workspace/airgap-r3-proof/driver.cjs:71:65 {
+  log: [
+    '  - → POST http://127.0.0.1:18763/__proof/reopen',
+    '    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36',
+    '    - accept: */*',
+    '    - accept-encoding: gzip,deflate,br'
+  ],
+  name: 'TimeoutError'
+}
