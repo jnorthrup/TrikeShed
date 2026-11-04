@@ -8,10 +8,13 @@ import borg.trikeshed.lib.j
  * SemanticSignal — one extraction event as a typed Narsese payload.
  *
  * This is the T-RESUME-SIGNALS-3 shape: signals are data, not objects with
- * behavior. A signal is one row in the manifold — identity by angular
- * coordinate, attention by budget, belief by evidence.
+ * behavior. Angular coordinates route attention in the manifold; they do not
+ * establish complete proposition identity. Resident revision also checks the
+ * available ordered roles, relation and temporal qualification, with exact
+ * ancestry required for independent support. This payload is not a complete
+ * English predicate/context representation or a symbolic unification engine.
  *
- * @param angular Long bitfield identity coordinate (hamming = semantic distance)
+ * @param angular Long bitfield routing coordinate (hamming = approximate distance)
  * @param evidence raw evidence counts; truth is derived, never stored
  * @param relation the reducer-emitted relation kind
  * @param subjectCid ContentId of the subject (CAS-anchored, never fabricated)
