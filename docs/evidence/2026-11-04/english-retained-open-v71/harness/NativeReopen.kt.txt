@@ -1,0 +1,44 @@
+package proof.englishretainedreopen
+
+import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import kotlinx.coroutines.runBlocking
+import java.io.File
+
+/** Exact retained bytes after live opener/query owners close; no parser or new execution. */
+fun main() = runBlocking {
+    val root = File(requireNotNull(java.lang.System.getenv("PROOF_ROOT")))
+    check(File(root, "fixture-attempt1.exit").readText().trim() == "0")
+    val cleanup = reifyStrict(File(root, "cleanup.json").readText()) as Map<*, *>
+    check(cleanup["allSupervisorsCompleted"] == true && cleanup["listenerStopped"] == true && (cleanup["freshInspectionPosts"] as Number).toInt() == 0)
+    val result = reifyStrict(File(root, "browser-result.json").readText()) as Map<*, *>; check(result["result"] == "PASS")
+    val meta = result["meta"] as Map<*, *>; val observations = result["observed"] as Map<*, *>
+    val cas = PackCasStore(JvmFileOperations(), File(root, "runtime/cas").absolutePath)
+    try {
+        val receipt = ContentId(meta["inspectionCid"] as String)
+        val snapshot = EnglishObservationGraph.read(cas, receipt)
+        val encoded = requireNotNull(cas.getBounded(receipt, 8 * 1024 * 1024)); check(ContentId.of(encoded) == receipt)
+        val rows = mutableListOf<Map<String, Any?>>()
+        val blocks = (result["evidence"] as Map<*, *>)["retainedReadbacks"] as List<*>
+        for (raw in blocks) {
+            val row = raw as Map<*, *>; val cid = ContentId(row["cid"] as String); val kind = row["encoding"] as String
+            val bytes = requireNotNull(cas.getBounded(cid, 8 * 1024 * 1024)); check(ContentId.of(bytes) == cid)
+            check(File(root, "cas-readbacks/${cid.hex}.$kind").readBytes().contentEquals(bytes))
+            rows.add(_m["cid" j cid.value, "bytes" j bytes.size, "encoding" j kind, "unchangedAfterClose" j true])
+        }
+        val run = observations["run"] as? Map<*, *>
+        if (run != null) for ((key, expected) in _m["receiptCid" j observations["durable"], "programCid" j observations["program"], "invocationsCid" j observations["invocations"]]) {
+            val cid = ContentId(run[key] as String); val bytes = requireNotNull(cas.getBounded(cid, 4 * 1024 * 1024))
+            check(ContentId.of(bytes) == cid && reifyStrict(bytes.decodeToString(throwOnInvalidSequence = true)) == expected)
+        }
+        val output = _m["result" j "PASS", "scope" j "Production bounded PackCasStore and EnglishObservationGraph canonical/source verification after full live-owner drain. No parser, new query, new receipt, reauthenticated producer or current-head rewind.",
+            "inspectionCid" j receipt.value, "originalSourceCid" j snapshot.source.originalCid.value,
+            "recordedSourceSnapshots" j snapshot.sourceSnapshots?.map { it.toMap() }, "retainedBlocks" j rows,
+            "authoredRunPresent" j (run != null), "authoredRunCid" j run?.get("receiptCid"), "currentnessScope" j "Actual startup current/stale row checks and independently unchanged original project heads, not inferred from hashes alone",
+            "EnglishObservationGraphCodeSource" j EnglishObservationGraph::class.java.protectionDomain.codeSource.location.toString()]
+        File(root, "native-reopened-cas.json").writeText(jsonOf(output)); println(jsonOf(output))
+    } finally { cas.close() }
+}

@@ -1,0 +1,41 @@
+{
+  "scope": "Positive retained-opener input: exact actual closed, never-mutated 41-byte v68 producer source/receipt/project heads. Archive copy only; no parser/query/runtime run and no invented or restored document rows. Negative amended v70 archive remains separate.",
+  "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+  "sourceCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+  "selection": {
+    "project": "english-taxonomy-fresh-profile-proof",
+    "id": "synthetic taxonomy copular clauses.txt",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+    "seq": 0
+  },
+  "sourceSnapshots": [
+    {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+      "seq": 0,
+      "length": 41,
+      "contentType": "text/plain"
+    }
+  ],
+  "range": {
+    "begin": 0,
+    "end": 41,
+    "totalLength": 41,
+    "complete": true
+  },
+  "runtimeArchiveSha256": "51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc",
+  "runtimeFiles": {
+    "runtime/cas/pack": "01f0df36f2adee2ce62da583d3c1d3cf3f95128db95884f341d05884e7522886",
+    "runtime/files/english-taxonomy-fresh-profile-proof/synthetic taxonomy copular clauses.txt": "efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "runtime/project-couch/english-taxonomy-fresh-profile-proof/.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runtime/project-couch/english-taxonomy-fresh-profile-proof/HEAD": "42c214d75cb1cf24c02a73ecc7d3d040380d169a04a25ca76a2b463591e42e9c",
+    "runtime/project-intake-policy/english-taxonomy-fresh-profile-proof.guard": "ea6faf550466382954e93ee1604d23e3e9db4dd1cf730d538433181e10eb6a84",
+    "runtime/project-manifests/english-taxonomy-fresh-profile-proof.tsv": "311e47263ef040fe1db194cbad68efc1d921592130e878154f8898e98b7f9a66",
+    "runtime/projects.tsv": "291e03d44ca59f946ed2516a4b2d87291f2cea968bb500c4c09c06f45fa36f5b"
+  },
+  "negativeStaleArchive": "../documents-english-taxonomy-final-proof/closed-runtime-after-mutation.tar.gz",
+  "negativeStaleInspectionCid": "sha256:96cf4246c2ac61240d6f1f5ef24c53a6243cbdca65a11f98225ec02618586919"
+}
