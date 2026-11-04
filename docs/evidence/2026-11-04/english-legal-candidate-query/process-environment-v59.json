@@ -1,0 +1,1 @@
+{"result":"PASS","scope":"Actual frozen production environment policy, controlled names only; no host environment read","mainJarSHA256":"b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89","sslBlocked":true,"socksBlockedCaseInsensitive":true,"proxyBlocked":true,"benignNameNotBlocked":true,"curatedKeysOnly":["TERM","LANG"]}

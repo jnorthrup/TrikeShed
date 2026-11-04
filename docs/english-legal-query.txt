@@ -1,0 +1,29 @@
+Source-linked legal-candidate queries
+
+Retain an English inspection in Documents, then use the LCNC node document.english.patterns.query. Supply inspectionCid, explicit current or snapshot mode, and an inspection-only visual SPARQL program. POST /api/documents/english/legal-patterns/query exposes that same owner with exactly those three fields. It reconstructs the verified retained observations and derives the candidate receipt without rerunning NLP or a generative model.
+
+Each query receives a fresh private QuadStore. Its named graph is urn:trikeshed:english:legal:<candidate-hash>; resources carry the candidate receipt, parent inspection, source text and sentence. Modal/action and subject/object roles are reified parser observations. Quantity rows retain literal forms, unit and modifier nodes, exact source spans, status and unresolved reasons. They are not asserted obligations, deadlines, agents or world predicates. Same-sentence joins mean co-occurrence only.
+
+For example, construct these seven patterns in the visual query grammar and select quantity, status and quote. This is the equivalent query text, not a separate text-query endpoint:
+
+SELECT ?quantity ?status ?quote WHERE {
+  ?d <urn:trikeshed:english:legal:kind> "duration-language-candidate" .
+  ?d <urn:trikeshed:english:legal:integerValue> "30"^^<http://www.w3.org/2001/XMLSchema#integer> .
+  ?d <urn:trikeshed:english:legal:unitLemma> "day" .
+  ?d <urn:trikeshed:english:legal:quantityLiteral> ?quantity .
+  ?d <urn:trikeshed:english:legal:status> ?status .
+  ?d <urn:trikeshed:english:legal:sentence> ?sentence .
+  ?sentence <urn:trikeshed:english:legal:quote> ?quote .
+}
+
+Constrain kind and unit when asking about quantities. A conflicting thirty(60) duration has no integerValue triple, while its separate number-form resources still retain lexical30 and60. Absence of an integer triple means unresolved or unrepresented; it is not a negative legal answer. Business/calendar modifiers remain recorded and months/years are not converted to days.
+
+Current mode checks every captured source row around derivation/retention and again around query execution. Snapshot mode is explicitly historical and does not certify current revisions. The result identifies the selected dataset, parent and candidate CIDs, named graph, source/range, unresolved semantic scope and producer/execution status. Byte/source consistency does not authenticate the parser producer or establish legal force.
+
+The existing visual-query subset and bounds apply: at most8 BGP patterns,128 syntax nodes,100000 intermediate joined rows and900000 response bytes. Projection refuses beyond20000 quads. There is no truncation or partial result promoted as complete. False inspection-only controls and unsupported syntax refuse. A stale HTTP query refuses; a failed LCNC procedure retains its failed execution receipt and returns its existing HTTP400 execution response.
+
+The pattern and query channels have separate owners. Accepted query work drains before pattern admission closes, avoiding a recursive request-actor deadlock. Analysis does not update the global quad store, NARS, review approval or legal Rete productions. Retaining candidate bytes and operational LCNC/Kanban receipts are explicit local writes; these do not assert the candidate as a world fact.
+
+Verification is recorded under evidence/2026-11-04/english-legal-candidate-query. It replays exact v58 actual CoreNLP4.6 receipts/source bytes through the fresh v59 query runtime, with readonly source rows reconstructed from the unchanged captured snapshots. It is not a fresh document ingest or a new parser run. The actual Panels graph and inner inspection-only BGP diagrams use five explicit run gestures: four completed durable runs and one expected stale failure. Raw programs and durable JSON receipts are reopened and verified by content identity after shutdown. An independent auditor checks source joins, quantities, actual copy2:3 anchors, named graphs and tamper controls.
+
+Coordinated v59 source5548a842517e98f47f83aebfa30387dc2cc820b4 passed155 selected JVM checks, zero failures/errors/skips, and built Documents/Pages/Spacegraph. This includes the combined exact-proposition NARS schema and all JVM callers. The same frozen main JAR SHA256 is b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89. Component proofs retain their original run identities; overlapping checks are not summed into an accuracy claim.

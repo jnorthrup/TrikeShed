@@ -1,0 +1,36 @@
+{
+  "runtimeSource": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "publishedMasterBase": "fdc1ef489a33b5b9468d114200a58b67cf93f160",
+  "sourceInputsPreservedByOrdinaryMerge": [
+    "3417e9722f8ffc57b93d9532a50f77166a392a32",
+    "49c9f13db1cf4d099e160279314f153f28dd70db",
+    "54c28c78c6565cb2ce460c0ac3d7236940076bce"
+  ],
+  "allSourceInputsAncestors": true,
+  "conflicts": 0,
+  "sourceChangesSinceTestedRuntime": [],
+  "build": "v59",
+  "selectedTests": 155,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "mainJarSHA256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "actualProofs": [
+    "API and typed legal candidate queries",
+    "five authored Panels runs with four completed and one expected stale failed durable receipt",
+    "24 exact-proposition and compatibility methods",
+    "one proposition readback method",
+    "controlled child-environment policy probe"
+  ],
+  "independentQueryAudit": {
+    "queryOutputComparisons": 22,
+    "bindings": 29,
+    "explicitRefusals": 7,
+    "durableReceipts": 5,
+    "uniquePrograms": 4,
+    "tamperControls": 6
+  },
+  "parserSource": "Unchanged actual CoreNLP4.6 v58 observations replayed; zero new parser calls",
+  "scope": "Unreviewed source/parser candidates; no legal force, general symbolic unification, angular-slot coexistence, source retraction or production-wide isolation claim",
+  "machineBoundary": "GitHub and cloud /workspace checkout; local Mac fetch/execution not established"
+}
