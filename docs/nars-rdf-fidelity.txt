@@ -1,0 +1,75 @@
+Bounded RDF term fidelity at KG intake
+
+The immutable v59 public-method probe confirmed two concrete losses: <urn:o> and
+"urn:o" became identical object strings, angular coordinates and proposition IDs
+in the same declared context; "Smith, Jones" became two invented KG objects.
+Semicolon/period punctuation and escaped quotes also lost content, language tags
+were flattened into text, and malformed literal suffixes were accepted. The
+existing permissive Turtle parser preserved some of these cases but silently
+omitted other valid inputs and discarded unknown escape backslashes. The KG
+crossing therefore does not simply substitute that permissive parser.
+
+TurtleRdf.parseStrict is an explicit bounded data profile, not full Turtle or
+TriG. It reuses the existing SPARQL tokenizer and constant-term reader without
+executing any query/update or changing that engine. A small data-only grammar
+requires complete subject/predicate/object statements, ending dots, and explicit
+semicolon/comma lists. Only leading own-line @prefix declarations are accepted;
+predefined project prefixes also remain available. Absolute IRIs, simple ASCII
+blank-node labels and quoted literals with language/datatype are supported.
+Relative/base IRIs, graphs, collections, variables, bare numeric tokens, unknown
+prefixes, malformed tails and unsupported syntax refuse. Numeric values can be
+represented by explicitly typed quoted literals. The complete source is bounded
+to 65536 UTF-16 characters, 8192 body tokens, 2048 triples and 128 prefix declarations.
+
+Strict decoding preserves literal lexical value, complete language tag, expanded
+datatype IRI, escaped quotes/backslashes and punctuation. ECHAR and four/eight-digit
+Unicode scalar escapes are checked, with malformed/surrogate/out-of-range escapes
+refused. Source text and decoded literal strings must encode as exact UTF-8.
+The original spelling is checked before token normalization: raw CR/LF inside
+short quotes refuse, raw TAB preserves its value, and long literals can retain
+line breaks. Prefix-looking text inside later literal content is not stripped.
+All syntax is checked before a parsed graph/tuple list is returned. An invalid
+suffix or unsupported tail does not return or mint the valid prefix. This does
+not make subsequent multi-statement bag admission transactional.
+
+KgNalBridge.parseTurtle uses canonical Turtle spellings for subject/object terms,
+including their IRI/literal/blank-node kind. Literal controls are escaped without
+changing their value, and the canonical term is parsed back for an exact term
+comparison. The predicate remains its full expanded IRI so the existing copula
+mapping still recognizes rdf:type and other declared mappings. Datatype lexical
+forms such as "01" and "1" are preserved rather than normalized into one value.
+This is term fidelity, not RDF entailment, entity identity, legal authority or
+original-source authenticity. Source context remains declared, not authenticated.
+
+Text KG intake now explicitly refuses an unsupported interchange format before
+minting instead of returning a zero-row success. A recognized prefix-only Turtle
+source can still validly report zero statements. Generic KgNalBridge probe
+behavior for unsupported formats remains separate. The strict positive binary
+KIF lane and its scoped-form refusal are unchanged. No source review, evidence,
+confidence, routing-capacity or retraction policy is added.
+
+Compatibility is deliberate: Turtle-derived role strings, coordinates and
+proposition IDs change from flattened lexical values to typed canonical term
+spellings. Existing historical signals/rules/CAS/WAL are not rewritten or merged
+with the new representation, and there is no automatic migration or replay.
+Known mismatched proposition identities retain their existing fail-closed guard.
+The strict KIF representation and SignalCodec schema are unchanged. Other users
+of permissive TurtleRdf.parse/parseTerm retain their previous API and behavior;
+this slice does not repair every Turtle reader such as QuadStore.load or LCNC
+RDF import. Cursor KG intake retains its separate caller-supplied tuple contract.
+
+Six synthetic RDF methods cover actual IRI/literal/blank-node distinctions,
+punctuation and escapes, language/datatype fidelity, namespaces/copula mapping,
+unsupported/malformed input and real text intake. Existing identity, admission,
+KIF and readback regressions remain separate controls. Standalone source-overlay
+checks are pre-integration evidence; only a later coordinated immutable-JAR run
+can establish the final artifact result. No model calls, private corpus, live bag
+or live history are used by these checks.
+
+Pre-integration source check: all 31 methods pass (six new RDF methods and 25
+existing identity/admission/KIF/readback controls), 0.864852492s. Only changed
+production sources plus unchanged RdfModel were compiled over immutable v59
+dependencies, with the matching Kotlin/Compose compiler and no friend access.
+RdfModel was included because the standalone module boundary prevents an existing
+smart cast in emit; its production behavior was not changed. This is explicitly
+a source-overlay check, not a final coordinated-artifact result.

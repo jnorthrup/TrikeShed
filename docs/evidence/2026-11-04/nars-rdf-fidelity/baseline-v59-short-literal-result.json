@@ -1,0 +1,32 @@
+{
+  "scope": "Synthetic immutable-v59 original literal-spelling observations; no bag/model/query execution",
+  "cases": [
+    {
+      "name": "rawCR",
+      "input": "<urn:s> <urn:p> \"a\rb\" .",
+      "kgObjects": [
+        "a b"
+      ],
+      "donorObjects": [
+        "\"a\\nb\""
+      ],
+      "tokenizerStringTokens": [
+        "\"a\\rb\""
+      ]
+    },
+    {
+      "name": "rawTAB",
+      "input": "<urn:s> <urn:p> \"a\tb\" .",
+      "kgObjects": [
+        "a\tb"
+      ],
+      "donorObjects": [
+        "\"a\\tb\""
+      ],
+      "tokenizerStringTokens": [
+        "\"a\\tb\""
+      ]
+    }
+  ],
+  "productionCodeSource": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar"
+}

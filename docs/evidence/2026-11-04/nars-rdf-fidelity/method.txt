@@ -1,0 +1,23 @@
+Synthetic immutable-v59 RDF BEFORE evidence
+
+The public-method probes use source 5548a842517e98f47f83aebfa30387dc2cc820b4,
+main.jar SHA256 b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89.
+Only unique external test drivers were compiled. Actual production CodeSources
+were checked; no overlays, friends, query execution, models or bags were used.
+All supplied inputs are synthetic, with no private corpus/document text.
+
+The same declared source context yields identical old KG tuple/object, angular
+and proposition ID for IRI <urn:o> versus literal "urn:o". The comma literal
+"Smith, Jones" becomes two invented objects. Other rows record observed punctuation,
+escape/language/datatype/prefix/suffix behavior in BOTH KgNalBridge and the existing
+permissive TurtleRdf parser; they do not assume the donor parser is conformant.
+
+A separate exact raw-CR/valid raw-TAB probe records original spelling. Old KG
+intake turns the raw CR into a space, the permissive parser changes it to newline,
+and the shared tokenizer normalizes it before later validation. The strict repair
+must check original short-literal spelling before that normalization while
+preserving valid raw TAB. This is not a full Turtle conformance benchmark.
+
+These files are unchanged BEFORE observations. Focused new-source regressions
+are pre-integration checks, not evidence that a coordinated new JAR passed.
+Final AFTER comparison against a fresh root-selected artifact remains pending.

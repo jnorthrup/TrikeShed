@@ -12,8 +12,107 @@ package borg.trikeshed.rdf
  * a *node* (row) — one subject block with many predicate-object pairs maps 1:1 to a
  * RowVec (columns → predicates, cells → objects). Quads add graph as TrikeShed subject
  * domain (forge board, jules surface, etc.).
+ * [parseStrict] is the separately bounded KG data profile; the default APIs remain permissive.
  */
 object TurtleRdf {
+
+    /**
+     * Bounded KG data profile, not full Turtle: absolute IRIs, simple blank labels, quoted
+     * literals, ;/, lists and leading own-line @prefix declarations. Relative/base IRIs,
+     * graphs, collections, variables and bare numeric tokens refuse. No query is executed.
+     * The existing permissive [parse] and [parseTerm] entry points retain their behavior.
+     */
+    fun parseStrict(turtle: String): RdfGraph {
+        require(turtle.length <= 65536) { "Strict Turtle input exceeds 65536 characters" }
+        turtle.encodeToByteArray(throwOnInvalidSequence = true)
+        literalLines(turtle)
+        val prefixes = defaultPrefixes().toMutableMap()
+        val directive = Regex("""@prefix\s+([A-Za-z_][A-Za-z0-9_-]*)?:\s*<([^<>]*)>\s*\.\s*(?:#.*)?""")
+        var at = 0
+        var declarations = 0
+        // Only header lines are removed: @prefix-looking text inside later literals is data.
+        while (at < turtle.length) {
+            val end = turtle.indexOf('\n', at).let { if (it < 0) turtle.length else it }
+            val line = turtle.substring(at, end).trim()
+            if (line.isNotEmpty() && !line.startsWith('#') && !line.startsWith("@prefix")) break
+            if (line.startsWith("@prefix")) {
+                require(++declarations <= 128) { "Strict Turtle prefix limit" }
+                val match = requireNotNull(directive.matchEntire(line)) { "Use a complete own-line @prefix declaration" }
+                val namespace = requireNotNull(readTerm("<${match.groupValues[2]}>", prefixes, true) as? RdfTerm.Iri) {
+                    "Prefix namespace must be an absolute IRI"
+                }
+                prefixes[match.groupValues[1]] = namespace.iri
+            }
+            at = if (end == turtle.length) end else end + 1
+        }
+        val parser = SparqlParser(turtle.substring(at))
+        require(parser.tokens.size <= 8192) { "Strict Turtle token limit" }
+        parser.prefixes.putAll(prefixes)
+        fun constant(): RdfTerm {
+            val token = parser.peek()
+            require(token.kind != SparqlTokenKind.VAR && token.kind != SparqlTokenKind.NUMBER) {
+                "Variables and bare numeric tokens are outside strict Turtle data"
+            }
+            require(token.kind != SparqlTokenKind.WORD || token.text == "true" || token.text == "false") {
+                "Expected an RDF constant, not ${token.text}"
+            }
+            val value = requireNotNull(parser.term()) { "Expected a complete RDF term" }
+            return requireNotNull(readTerm(value.text, parser.prefixes, true)) { "Invalid RDF term" }
+        }
+        val triples = mutableListOf<RdfTriple>()
+        while (parser.peek().kind != SparqlTokenKind.EOF) {
+            val subject = constant()
+            require(subject is RdfTerm.Iri || subject is RdfTerm.BlankNode) { "RDF subject cannot be a literal" }
+            while (true) {
+                val predicate = if (parser.peek().kind == SparqlTokenKind.WORD && parser.peek().text == "a") {
+                    parser.next(); RdfVocab.rdf("type")
+                } else requireNotNull(constant() as? RdfTerm.Iri) { "RDF predicate must be an IRI" }
+                do {
+                    require(triples.size < 2048) { "Strict Turtle triple limit" }
+                    triples.add(RdfTriple(subject, predicate, constant()))
+                } while (parser.take(","))
+                if (!parser.take(";")) break
+                if (parser.punct(".")) break
+            }
+            parser.expectPunct(".")
+        }
+        return RdfGraph(triples)
+    }
+
+    /** The shared tokenizer normalizes CR/tab; reject illegal short-string line breaks first. */
+    private fun literalLines(text: String) {
+        var quote: Char? = null
+        var long = false
+        var escaped = false
+        var iri = false
+        var comment = false
+        var at = 0
+        while (at < text.length) {
+            val ch = text[at]
+            val q = quote
+            when {
+                comment -> { if (ch == '\n' || ch == '\r') comment = false; at++ }
+                iri -> { if (ch == '>') iri = false; at++ }
+                q != null -> {
+                    require(long || ch != '\r' && ch != '\n') { "Raw CR/LF is invalid in a short RDF literal" }
+                    when {
+                        escaped -> { escaped = false; at++ }
+                        ch == '\\' -> { escaped = true; at++ }
+                        long && text.startsWith("$q$q$q", at) -> { quote = null; at += 3 }
+                        !long && ch == q -> { quote = null; at++ }
+                        else -> at++
+                    }
+                }
+                ch == '#' -> { comment = true; at++ }
+                ch == '<' -> { iri = true; at++ }
+                ch == '\'' || ch == '"' -> {
+                    quote = ch; long = text.startsWith("$ch$ch$ch", at)
+                    at += if (long) 3 else 1
+                }
+                else -> at++
+            }
+        }
+    }
 
     /** Emit graph as Turtle. */
     fun emit(graph: RdfGraph, prefixes: Map<String, String> = defaultPrefixes()): String = buildString {
@@ -128,11 +227,22 @@ object TurtleRdf {
      * `"lex"^^prefix:local`, `prefix:local` (expanded through [prefixes], kept as written when the
      * prefix is unknown), else a bare IRI. Null for an unterminated literal.
      */
-    fun parseTerm(raw: String, prefixes: Map<String, String> = emptyMap()): RdfTerm? {
+    fun parseTerm(raw: String, prefixes: Map<String, String> = emptyMap()): RdfTerm? = readTerm(raw, prefixes, false)
+
+    private fun readTerm(raw: String, prefixes: Map<String, String>, strict: Boolean): RdfTerm? {
         val t = raw.trim()
         return when {
-            t.startsWith("<") && t.endsWith(">") -> RdfTerm.Iri(t.removePrefix("<").removeSuffix(">"))
-            t.startsWith("_:") -> RdfTerm.BlankNode(t.removePrefix("_:"))
+            t.startsWith("<") && t.endsWith(">") -> {
+                val iri = t.removePrefix("<").removeSuffix(">")
+                if (strict) require(Regex("[A-Za-z][A-Za-z0-9+.-]*:.*").matches(iri) &&
+                    iri.none { it.code <= 32 || it in "<>\"{}|^`\\" }) { "Expected an absolute supported IRI" }
+                RdfTerm.Iri(iri)
+            }
+            t.startsWith("_:") -> {
+                val id = t.removePrefix("_:")
+                if (strict) require(Regex("[A-Za-z0-9_](?:[A-Za-z0-9._-]*[A-Za-z0-9_-])?").matches(id)) { "Unsupported blank-node label" }
+                RdfTerm.BlankNode(id)
+            }
             t.startsWith("\"") -> {
                 // literal with optional lang/datatype: find the closing quote
                 // past any escapes, then unescape in ONE pass — sequential
@@ -148,36 +258,60 @@ object TurtleRdf {
                         ch == '\\' && i + 1 < t.length -> {
                             when (val e = t[i + 1]) {
                                 'n' -> sb.append('\n'); 't' -> sb.append('\t'); 'r' -> sb.append('\r')
-                                'u' -> if (i + 5 < t.length) { sb.append(t.substring(i + 2, i + 6).toInt(16).toChar()); i += 4 } else sb.append(e)
-                                else -> sb.append(e)
+                                'b', 'f' -> if (strict) sb.append(if (e == 'b') '\b' else '\u000c') else sb.append(e)
+                                'u', 'U' -> if (!strict) {
+                                    if (e == 'u' && i + 5 < t.length) { sb.append(t.substring(i + 2, i + 6).toInt(16).toChar()); i += 4 }
+                                    else sb.append(e)
+                                } else {
+                                    val count = if (e == 'u') 4 else 8
+                                    require(i + count + 1 < t.length) { "Truncated RDF Unicode escape" }
+                                    val digits = t.substring(i + 2, i + count + 2)
+                                    require(digits.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) { "Invalid RDF Unicode escape" }
+                                    val code = digits.toLongOrNull(16)
+                                    require(code != null && code in 0..0x10ffff && code !in 0xd800..0xdfff) { "RDF escape must name a Unicode scalar" }
+                                    if (code <= 0xffff) sb.append(code.toInt().toChar()) else {
+                                        val rest = code.toInt() - 0x10000
+                                        sb.append((0xd800 + (rest ushr 10)).toChar()).append((0xdc00 + (rest and 1023)).toChar())
+                                    }
+                                    i += count
+                                }
+                                else -> { require(!strict || e in "\"'\\") { "Unsupported RDF escape" }; sb.append(e) }
                             }
                             i += 2; continue
                         }
-                        else -> sb.append(ch)
+                        else -> { require(!strict || ch.code >= 32) { "Unescaped RDF control character" }; sb.append(ch) }
                     }
                     i++
                 }
                 if (!closed) return null
                 val lex = sb.toString()
+                if (strict) lex.encodeToByteArray(throwOnInvalidSequence = true)
                 val rest = t.substring(i + 1).trim()
                 when {
-                    rest.startsWith("@") -> RdfTerm.Literal(lex, lang = rest.removePrefix("@"))
+                    rest.startsWith("@") -> {
+                        val language = rest.removePrefix("@")
+                        require(!strict || Regex("[A-Za-z]+(?:-[A-Za-z0-9]+)*").matches(language)) { "Invalid RDF language tag" }
+                        RdfTerm.Literal(lex, lang = language)
+                    }
                     rest.startsWith("^^") -> {
                         val dt = rest.removePrefix("^^")
-                        val datatype = if (dt.startsWith("<")) dt.removeSurrounding("<", ">")
+                        val datatype = if (strict) requireNotNull((readTerm(dt, prefixes, true) as? RdfTerm.Iri)?.iri) {
+                            "RDF datatype must be an absolute IRI"
+                        }
+                        else if (dt.startsWith("<")) dt.removeSurrounding("<", ">")
                         else if (':' in dt) dt.split(":", limit = 2).let { (pfx, local) -> prefixes[pfx]?.let { ns -> ns + local } ?: dt }
                         else dt
                         RdfTerm.Literal(lex, datatype = datatype)
                     }
-                    else -> RdfTerm.Literal(lex)
+                    else -> { require(!strict || rest.isEmpty()) { "Invalid RDF literal suffix" }; RdfTerm.Literal(lex) }
                 }
             }
             t.contains(":") -> {
                 val (pfx, local) = t.split(":", limit = 2)
-                val ns = prefixes[pfx] ?: return RdfTerm.Iri(t)
-                RdfTerm.Iri(ns + local)
+                val ns = prefixes[pfx] ?: run { require(!strict) { "Undefined RDF prefix" }; return RdfTerm.Iri(t) }
+                if (strict) readTerm("<$ns$local>", prefixes, true) else RdfTerm.Iri(ns + local)
             }
-            else -> RdfTerm.Iri(t)
+            else -> { require(!strict) { "Expected an explicit RDF IRI" }; RdfTerm.Iri(t) }
         }
     }
 }

@@ -9,6 +9,10 @@ suspend fun BeliefBagElement.ingestKg(
     gloss: (Long, String) -> Unit = { _, _ -> },
 ): Map<String, Any?> {
     require(text.isNotBlank()) { "kg.ingest: empty body" }
+    val format = KgNalBridge.sniff(text)
+    require(format == KgFormat.KIF || format == KgFormat.TURTLE || format == KgFormat.N_TRIPLES) {
+        "kg.ingest: unsupported interchange format"
+    }
     val sourceCid = ContentId.of(text.encodeToByteArray())
     val mapped = KgNalBridge.bridge(text)
     for (statement in mapped) {
@@ -21,7 +25,7 @@ suspend fun BeliefBagElement.ingestKg(
     // Legacy wire field: processed assertions, not the number of new resident cells.
     // Same-source replay revises idempotently; the bounded bag may evict older cells.
     return linkedMapOf(
-        "format" to KgNalBridge.sniff(text)?.name,
+        "format" to format.name,
         "statements" to mapped.size,
         "minted" to mapped.size,
         "copulas" to mapped.groupingBy { it.copula.name }.eachCount(),
