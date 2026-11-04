@@ -5,12 +5,7 @@ import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Twin
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CompletableJob
@@ -47,8 +42,10 @@ sealed class BeliefIntake {
     data class Reinforce(val angular: Long, val delta: EvidenceCoord, val receiptCid: ContentId? = null,
         val evidenceBasis: EvidenceBasis? = null, val completion: CompletableDeferred<Unit>? = null) : BeliefIntake()
 
-    /** Attention change only: rekey to the new budget; evidence untouched. */
-    data class Attend(val angular: Long, val budget: BudgetCoord) : BeliefIntake()
+    /** Legacy angular-only calls retain their no-op behavior for an absent resident. */
+    data class Attend(val angular: Long, val budget: BudgetCoord? = null,
+        val propositionCid: ContentId? = null, val p: Float? = null, val d: Float? = null, val q: Float? = null,
+        val completion: CompletableDeferred<BeliefAttention>? = null) : BeliefIntake()
 
     /** Curation pulse: decay every budget via the element's decayFn, then evict below floor. */
     data object DecayTick : BeliefIntake()
@@ -69,7 +66,16 @@ sealed class BeliefEvent {
 }
 
 enum class BeliefAdmissionIssue { STRUCTURE_MISMATCH, UNRESOLVED_BASIS, ARCHIVE_UNAVAILABLE, RECEIPT_REQUIRED, RESIDENT_REQUIRED,
-    PROPOSITION_MISMATCH, UNRESOLVED_PROPOSITION }
+    PROPOSITION_MISMATCH, UNRESOLVED_PROPOSITION, INVALID_BUDGET }
+
+/** Captured by the existing writer after attention processing; no evidence or flush authority. */
+data class BeliefAttention(val angular: Long, val identity: Map<String, Any?>,
+    val budget: BudgetCoord?, val changed: Boolean) {
+    fun report(): Map<String, Any?> = identity + _m["angular" j angular.toString(),
+        "p" j budget?.pf, "d" j budget?.df, "q" j budget?.qf,
+        "resident" j (budget != null), "changed" j changed, "processed" j true,
+        "durability" j "processing-only-no-flush-requested"]
+}
 
 /** Per-command refusal; unlike a failed WAL append, this does not stop the owning intake worker. */
 class BeliefAdmissionRefused(val angular: Long, val issue: BeliefAdmissionIssue, cause: Throwable? = null) :
@@ -181,11 +187,19 @@ class BeliefBagElement(
                         is BeliefIntake.Reinforce -> cmd.completion
                         is BeliefIntake.Fence -> cmd.completion
                         is BeliefIntake.RetainKg -> cmd.completion
+                        is BeliefIntake.Attend -> cmd.completion
                         else -> null
                     }
                     try {
-                        handle(cmd)
-                        completion?.complete(Unit)
+                        val attended = handle(cmd)
+                        when (cmd) {
+                            is BeliefIntake.Attend -> cmd.completion?.complete(checkNotNull(attended))
+                            is BeliefIntake.Mint -> cmd.completion?.complete(Unit)
+                            is BeliefIntake.Reinforce -> cmd.completion?.complete(Unit)
+                            is BeliefIntake.Fence -> cmd.completion.complete(Unit)
+                            is BeliefIntake.RetainKg -> cmd.completion?.complete(Unit)
+                            else -> Unit
+                        }
                     } catch (refused: BeliefAdmissionRefused) {
                         lastAdmissionRefusal = refused
                         completion?.completeExceptionally(refused)
@@ -214,6 +228,7 @@ class BeliefBagElement(
                         is BeliefIntake.Reinforce -> pending.completion
                         is BeliefIntake.Fence -> pending.completion
                         is BeliefIntake.RetainKg -> pending.completion
+                        is BeliefIntake.Attend -> pending.completion
                         else -> null
                     }
                     completion?.completeExceptionally(stopped)
@@ -237,6 +252,21 @@ class BeliefBagElement(
         intake.send(cmd.copy(completion = completion))
         completion.await()
     }
+
+    suspend fun submit(cmd: BeliefIntake.Attend): BeliefAttention {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<BeliefAttention>()
+        intake.send(cmd.copy(completion = completion))
+        return completion.await()
+    }
+
+    /** A current resident identity is checked inside the writer; archived beliefs are never revived. */
+    suspend fun attendProposition(angular: Long, propositionCid: ContentId,
+        p: Float? = null, d: Float? = null, q: Float? = null): BeliefAttention =
+        submit(BeliefIntake.Attend(angular, propositionCid = propositionCid, p = p, d = d, q = q))
+
+    /** Bounded per-response source verification, shared by HTTP and LCNC resonance. */
+    fun sourceContexts(): (SemanticSignal?) -> Map<String, Any?> = KgRetention.sourceContexts(cas)
 
     /** The same channel owns CAS writes, acknowledgements, refusals, and drain as the belief work. */
     suspend fun retainKg(artifacts: KgRetention.Batch): borg.trikeshed.userspace.nio.file.spi.StorageDurability {
@@ -334,17 +364,18 @@ class BeliefBagElement(
 
     // ── intake processing (single consumer: the bag's serial spine) ────
 
-    private suspend fun handle(cmd: BeliefIntake) {
-        when (cmd) {
-            is BeliefIntake.Mint -> mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis, cmd.gloss)
-            is BeliefIntake.Reinforce -> reinforce(cmd)
-            is BeliefIntake.Attend -> attend(cmd.angular, cmd.budget)
-            BeliefIntake.DecayTick -> decayAll()
-            is BeliefIntake.Fence -> return
-            is BeliefIntake.RetainKg -> { KgRetention.retain(cas, cmd.artifacts); return }
+    private suspend fun handle(cmd: BeliefIntake): BeliefAttention? {
+        val attended = when (cmd) {
+            is BeliefIntake.Mint -> { mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis, cmd.gloss); null }
+            is BeliefIntake.Reinforce -> { reinforce(cmd); null }
+            is BeliefIntake.Attend -> attend(cmd)
+            BeliefIntake.DecayTick -> { decayAll(); null }
+            is BeliefIntake.Fence -> return null
+            is BeliefIntake.RetainKg -> { KgRetention.retain(cas, cmd.artifacts); return null }
         }
         momentsDirty = true
         maybeFlush()
+        return attended
     }
 
     private fun mint(
@@ -465,12 +496,31 @@ class BeliefBagElement(
         mint(existing.signal.copy(evidence = command.delta, provenanceCid = receipt.value), existing.budget, receipt, basis)
     }
 
-    private fun attend(angular: Long, budget: BudgetCoord) {
-        val existing = hijack.get(angular) ?: return
-        if (existing.budget.packed == budget.packed) return
-        hijack.put(HijackBeliefBag.Slot(angular, budget, existing.signal)) { _, inc -> inc }
-        walAppend("A:$angular:${budget.packed}")
-        _events.tryEmit(BeliefEvent.Attended(angular, budget))
+    private fun attend(command: BeliefIntake.Attend): BeliefAttention {
+        val angular = command.angular
+        val parts = _l[command.p, command.d, command.q]
+        if (parts.any { it != null && !it.isFinite() } || command.budget != null && parts.any { it != null })
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.INVALID_BUDGET)
+        val existing = hijack.get(angular)
+        if (command.propositionCid != null) {
+            if (existing == null) throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.RESIDENT_REQUIRED)
+            if (existing.signal.propositionCid == null)
+                throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.UNRESOLVED_PROPOSITION)
+            if (existing.signal.propositionCid != command.propositionCid.value)
+                throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.PROPOSITION_MISMATCH)
+        }
+        val identity = sourceContexts()(existing?.signal) + _m[
+            "identityScope" j if (command.propositionCid == null) "legacy-angular" else "exact-resident-proposition"]
+        if (existing == null) return BeliefAttention(angular, identity, null, false)
+        val base = existing.budget
+        val budget = command.budget ?: BudgetCoord(command.p ?: base.pf, command.d ?: base.df, command.q ?: base.qf)
+        val changed = base.packed != budget.packed
+        if (changed) {
+            hijack.put(HijackBeliefBag.Slot(angular, budget, existing.signal)) { _, inc -> inc }
+            walAppend("A:$angular:${budget.packed}")
+            _events.tryEmit(BeliefEvent.Attended(angular, budget))
+        }
+        return BeliefAttention(angular, identity, budget, changed)
     }
 
     private fun decayAll() {

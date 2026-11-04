@@ -98,6 +98,7 @@ object BeliefsNodes {
             taxonomyKey = node.params["taxonomy"],
             subjectTerm = goal,
         )
+        val identity = bag.sourceContexts()
         val (syn, ant) = if (mode == "whitened") {
             val r = bag.resonateWhitened(centroid, k)
             fun wrow(pk: MomentField.Peak) = mapOf(
@@ -108,7 +109,7 @@ object BeliefsNodes {
                 "pri" to pk.pri,
                 "frequency" to pk.freq,
                 "level" to bag.levelOf(pk.angular),
-            )
+            ) + identity(bag.signalOf(pk.angular))
             r.synonyms.map(::wrow) to r.antonyms.map(::wrow)
         } else {
             val r = bag.resonate(centroid, k)
@@ -120,7 +121,7 @@ object BeliefsNodes {
                 "pri" to s.pri,
                 "level" to bag.levelOf(s.angular),
                 "relation" to s.signal.relation.name,
-            )
+            ) + identity(s.signal)
             r.synonyms.map(::row) to r.antonyms.map(::row)
         }
         mapOf(
@@ -183,25 +184,17 @@ object BeliefsNodes {
 
     /**
      * `nal.attend` — [BeliefIntake.Attend] as a lego: rekey an angular to a
-     * new budget, evidence untouched. Unsupplied p/d/q components keep the
-     * resident budget's value (0.5 when the angular is not resident — the
-     * bag's Attend on a non-resident angular is a no-op anyway).
+     * new budget, evidence untouched. The writer resolves missing components
+     * and acknowledges processing. A supplied propositionCid requires that
+     * exact current resident; angular-only legacy calls retain their absent no-op.
      */
     fun attendRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
-        val angular = parseAngular(port(inputs, "angular") ?: node.params["angular"])
-            ?: return@boundLcnc mapOf("attended" to mapOf("error" to "angular required"))
-        val base = bag.budgetOf(angular)
-        val p = node.params["p"]?.toFloatOrNull() ?: base?.pf ?: 0.5f
-        val d = node.params["d"]?.toFloatOrNull() ?: base?.df ?: 0.5f
-        val q = node.params["q"]?.toFloatOrNull() ?: base?.qf ?: 0.5f
-        bag.intake.send(BeliefIntake.Attend(angular, BudgetCoord(p, d, q)))
-        mapOf(
-            "attended" to mapOf(
-                "angular" to angular.toString(),
-                "p" to p, "d" to d, "q" to q,
-                "resident" to (base != null),
-            ),
-        )
+        val request = mutableMapOf<String, Any?>()
+        for (name in s_["angular", "propositionCid", "p", "d", "q"].view)
+            (port(inputs, name) ?: node.params[name]?.takeIf { it.isNotBlank() })?.let { request[name] = it }
+        if ("angular" !in request) return@boundLcnc _m["attended" j _m["error" j "angular required"]]
+        val attended = bag.submit(BeliefAttentionRequest.parse(request, requireProposition = false))
+        _m["attended" j attended.report()]
     }
 
     /**

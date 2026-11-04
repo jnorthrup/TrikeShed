@@ -59,6 +59,58 @@ object KgRetention {
         return Batch(source, definitions.values.toSeries())
     }
 
+    /** Per-response metadata only: at most 64 definitions and 4MiB of unique bounded CAS reads. */
+    fun sourceContexts(cas: CasStore?): (SemanticSignal?) -> Map<String, Any?> {
+        val reader = cas as? BoundedCasReader
+        var remaining = MAX_TOTAL_BYTES
+        var inspected = 0
+        var limited = false
+        val blobs = mutableMapOf<ContentId, ByteArray?>()
+        val sources = mutableMapOf<ContentId, Map<ContentId, KgNalBridge.NalMapped>>()
+        fun read(cid: ContentId): ByteArray {
+            if (cid in blobs) return requireNotNull(blobs[cid])
+            if (remaining <= 0) { limited = true; error("Source inspection limit") }
+            val cap = minOf(MAX_ARTIFACT_BYTES, remaining)
+            // Charge the requested bound even when a reader refuses an unavailable or oversized object.
+            remaining -= cap
+            blobs[cid] = null
+            val bytes = requireNotNull(reader?.getBounded(cid, cap))
+            require(bytes.size <= cap && ContentId.of(bytes) == cid)
+            blobs[cid] = bytes
+            remaining += cap - bytes.size
+            return bytes
+        }
+        return inspect@{ signal ->
+            val pid = signal?.propositionCid
+            fun result(status: String, source: String? = null): Map<String, Any?> = _m[
+                "propositionCid" j pid, "sourceContext" j source, "sourceContextStatus" j status]
+            if (signal == null) return@inspect result("resident-unavailable")
+            if (pid == null) return@inspect result("legacy-unresolved")
+            if (reader == null) return@inspect result("unavailable-or-unverified")
+            if (inspected++ >= 64) return@inspect result("inspection-limit")
+            try {
+                val proposition = ContentId(pid)
+                val bytes = read(proposition)
+                val definition = CanonicalCbor.decodeMapBounded(bytes, MAX_ARTIFACT_BYTES, 16, 4096)
+                if (definition["kind"] != "kg-source-proposition/1") return@inspect result("not-retained-kg")
+                val source = ContentId(definition["sourceContext"] as? String ?: error("Source context missing"))
+                val mapped = sources.getOrPut(source) {
+                    val text = read(source).decodeToString(throwOnInvalidSequence = true)
+                    require(text.length <= MAX_SOURCE_CHARS)
+                    val statements = KgNalBridge.bridge(text)
+                    require(statements.size <= MAX_DEFINITIONS)
+                    statements.associateBy { it.propositionCid(source.value) }
+                }[proposition] ?: error("Proposition is not in its retained source")
+                require(mapped.propositionBytes(source.value).contentEquals(bytes))
+                val expected = mapped.signal(source.value)
+                require(signal.angular == expected.angular && signal.subjectCid == expected.subjectCid &&
+                    signal.objectCid == expected.objectCid && signal.relation == expected.relation && signal.temporal == expected.temporal)
+                result("verified-retained-kg", source.value)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { result(if (limited) "inspection-limit" else "unavailable-or-unverified") }
+        }
+    }
+
     /** Called only by the bag's existing single writer, before its retention acknowledgement. */
     fun retain(cas: CasStore?, batch: Batch): StorageDurability {
         val store = cas ?: throw KgRetentionRefused(KgRetentionIssue.MISSING_CAS)

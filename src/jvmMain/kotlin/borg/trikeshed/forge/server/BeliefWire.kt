@@ -11,6 +11,7 @@ import borg.trikeshed.narsese.GroupCoherenceEnactment
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
 import borg.trikeshed.narsese.BeliefAdmissionRefused
+import borg.trikeshed.narsese.BeliefAttentionRequest
 import borg.trikeshed.narsese.KgRetentionIssue
 import borg.trikeshed.narsese.KgRetentionRefused
 import borg.trikeshed.narsese.ingestKg
@@ -222,6 +223,7 @@ class BeliefWire(
                     taxonomyKey = req["taxonomy"]?.toString(),
                     subjectTerm = goal,
                 )
+                val identity = bag.sourceContexts()
                 if (req["mode"]?.toString() == "whitened") {
                     // NAL-9 path: Mahalanobis over the moment field, β from the temperature seam
                     val r = bag.resonateWhitened(centroid, k)
@@ -233,7 +235,7 @@ class BeliefWire(
                         "pri" to pk.pri,
                         "frequency" to pk.freq,
                         "level" to bag.levelOf(pk.angular),
-                    )
+                    ) + identity(bag.signalOf(pk.angular))
                     return json(mapOf(
                         "mode" to "whitened",
                         "synonymPeaks" to r.synonyms.map(::wrow),
@@ -249,11 +251,26 @@ class BeliefWire(
                     "pri" to s.pri,
                     "level" to bag.levelOf(s.angular),
                     "relation" to s.signal.relation.name,
-                )
+                ) + identity(s.signal)
                 json(mapOf(
                     "synonymPeaks" to r.synonyms.map(::row),
                     "antonymPeaks" to r.antonyms.map(::row),
                 ))
+            }
+
+            method == "POST" && p == "/api/beliefs/attend" -> {
+                try {
+                    val body = rawBody(text)
+                    require(body.length <= 4096 && body.encodeToByteArray().size <= 4096) { "Attention request exceeds 4KiB" }
+                    val request = DocumentReviewWire.taxonomyRequest(body).entries.associate {
+                        (it.key as String) to it.value
+                    }
+                    json(_m["attended" j bag.submit(BeliefAttentionRequest.parse(request)).report()])
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (refused: BeliefAdmissionRefused) {
+                    json(_m["error" j "attention_refused", "issue" j refused.issue.name, "processed" j false], 409)
+                } catch (_: IllegalArgumentException) { json(_m["error" j "invalid_attention_request"], 400) }
+                catch (_: IllegalStateException) { json(_m["error" j "invalid_attention_request"], 400) }
             }
 
             // NAL-9 introspection: the system's beliefs about its own belief field
