@@ -23,6 +23,23 @@ data class EnglishCorpusPolicy(val caseFold: Boolean = false, val stopWords: Set
         "protectLegalMarkers" j protectLegalMarkers, "lexical" j "lemma contains a letter or digit"]
 }
 
+/** Bounded display/matrix projections; neither changes the retained parser observations. */
+enum class EnglishCorpusView(val wire: String) {
+    ALL_LEXICAL("all-lexical"), CONTENT("content");
+
+    fun policy(): EnglishCorpusPolicy = when (this) {
+        ALL_LEXICAL -> EnglishCorpusPolicy()
+        CONTENT -> EnglishCorpusPolicy(caseFold = false, stopWords = _s["be", "have", "do"],
+            posPrefixes = _s["NN", "VB", "JJ"], protectLegalMarkers = true)
+    }
+
+    companion object {
+        /** Only omission selects the default at the request boundary; explicit null is invalid. */
+        fun parse(value: Any?): EnglishCorpusView = entries.singleOrNull { it.wire == value }
+            ?: throw IllegalArgumentException("English corpus view must be all-lexical or content")
+    }
+}
+
 data class EnglishCorpusRange(val receiptCid: ContentId, val begin: Int, val end: Int,
     val selection: DocumentRevision?) {
     fun toMap(): Map<String, Any?> = _m["receiptCid" j receiptCid.value, "begin" j begin,

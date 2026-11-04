@@ -154,7 +154,7 @@ class KgRdfFidelityTest {
             assertFailsWith<IllegalArgumentException> { KgNalBridge.parseKif("(not (pays Tenant Landlord))") }
         }
     }
-    @Test fun textConsumerTreatsInterchangeMarkersInsideRdfLiteralsAsData() = runBlocking {
+    @Test fun textConsumerTreatsInterchangeMarkersInsideRdfLiteralsAsData(): Unit = runBlocking {
         withTimeout(10_000) {
             val input = """# "@context" and <rdf:RDF are comment text
                 |<urn:s> <urn:label> "subject" .
@@ -175,7 +175,7 @@ class KgRdfFidelityTest {
             val iriInput = "<rdf:RDF> <urn:p> <urn:o> ."
             assertEquals(KgFormat.TURTLE, KgNalBridge.sniff(iriInput))
             assertEquals(KgFormat.KIF, KgNalBridge.sniff("(pays Tenant Landlord)"))
-            val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
+            val bag = BeliefBagElement(cas = KgRetentionFixtureCas(), parentJob = currentCoroutineContext()[Job]); bag.open()
             try {
                 for (unsupported in s_[jsonLd, tripletJson, xmlRoot].view)
                     assertFailsWith<IllegalArgumentException> { bag.ingestKg(unsupported) }
