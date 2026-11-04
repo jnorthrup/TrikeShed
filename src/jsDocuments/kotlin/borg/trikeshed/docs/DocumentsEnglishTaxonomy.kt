@@ -72,40 +72,60 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
         (document.createElement(tag) as HTMLElement).also {
             it.textContent = value; if (attribute != null) it.setAttribute(attribute, "1"); parent.appendChild(it)
         }
+    private fun fields(parent: HTMLElement, minimum: String = "220px"): HTMLElement = text(parent, "div", "").also {
+        it.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,$minimum),1fr));gap:12px 16px;margin:12px 0;min-width:0"
+    }
+    private fun actions(parent: HTMLElement): HTMLElement = text(parent, "div", "").also {
+        it.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0"
+    }
+    private fun code(parent: HTMLElement, value: String): HTMLElement = text(parent, "pre", value).also {
+        it.className = "ds-cid"
+        it.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0;padding:12px 14px;background:var(--side);border:1px solid var(--rule);border-radius:5px"
+    }
     private fun evidence(parent: HTMLElement, title: String, value: Any?) {
-        val details = text(parent, "details", ""); text(details, "summary", title)
+        val details = text(parent, "details", ""); details.className = "ds-curate-source"
+        text(details, "summary", title)
         text(details, "pre", jsonOf(value)).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto"
     }
     private fun witness(parent: HTMLElement, value: Map<*, *>) {
         val english = value["englishQuotation"] as Map<*, *>
         val kif = value["kifQuotation"] as Map<*, *>
-        text(parent, "blockquote", english["quote"] as String).style.whiteSpace = "pre-wrap"
-        text(parent, "pre", kif["quote"] as String).style.whiteSpace = "pre-wrap"
+        text(parent, "p", "English source").className = "ds-curate-label"
+        text(parent, "blockquote", english["quote"] as String).also {
+            it.className = "ds-curate-quote"; it.style.whiteSpace = "pre-wrap"
+        }
+        text(parent, "p", "Declared KIF translation").className = "ds-curate-label"
+        code(parent, kif["quote"] as String)
         evidence(parent, "Exact source spans, declared mappings and full parser bindings", value)
     }
     private fun button(parent: HTMLElement, label: String, disabled: Boolean = false, action: () -> Unit): HTMLElement =
         text(parent, "button", label).also {
+            it.className = "ds-curate-submit"
+            it.style.cssText = "margin:0;max-width:100%;white-space:normal;text-align:left"
             it.setAttribute("type", "button"); it.asDynamic().disabled = disabled || pending
             it.addEventListener("click", { if (present() && !pending) action() })
         }
     private fun input(parent: HTMLElement, label: String, value: String, password: Boolean = false, change: (String) -> Unit): HTMLInputElement {
-        val holder = text(parent, "label", label + " ")
+        val holder = text(parent, "label", label)
+        holder.className = "ds-curate-label"; holder.style.cssText = "display:flex;flex-direction:column;gap:6px;min-width:0;margin:0"
         val field = document.createElement("input") as HTMLInputElement
         field.type = if (password) "password" else "text"; field.value = value
         field.maxLength = if (password) 4096 else 256; field.disabled = pending
         field.setAttribute("aria-label", label); field.autocomplete = "off"
-        field.style.cssText = "max-width:100%;margin:6px 8px;padding:6px"
+        field.className = "ds-curate-name"; field.style.cssText = "width:100%;min-width:0;box-sizing:border-box"
         holder.appendChild(field); field.addEventListener("input", { if (present()) change(field.value) })
         return field
     }
     private fun choice(parent: HTMLElement, label: String, value: String, options: Series<String>, change: (String) -> Unit) {
-        val holder = text(parent, "label", label + " ")
+        val holder = text(parent, "label", label)
+        holder.className = "ds-curate-label"; holder.style.cssText = "display:flex;flex-direction:column;gap:6px;min-width:0;margin:0"
         val field = document.createElement("select") as HTMLSelectElement
         for (option in (s_[""] + options).view) {
             val element = document.createElement("option")
             element.setAttribute("value", option); element.textContent = if (option.isEmpty()) "Choose…" else option
             field.appendChild(element)
         }
+        field.className = "ds-curate-name"; field.style.cssText = "width:100%;min-width:0;box-sizing:border-box;min-height:40px"
         field.value = value; field.disabled = pending; field.setAttribute("aria-label", label); holder.appendChild(field)
         field.addEventListener("change", { if (present()) change(field.value) })
     }
@@ -287,62 +307,76 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
         if (!present()) return
         host.textContent = ""
         val section = text(host, "section", "", "data-english-taxonomy-review")
-        section.style.cssText = "margin:24px 0;padding:18px;border:1px solid var(--rule);overflow-wrap:anywhere"
-        text(section, "h3", "Review taxonomy translation")
-        text(section, "p", "Declare how selected sentences should be represented as classes and individuals. These are your explicit translation choices. No model is called and no world facts are published.")
-        text(section, "p", "instance links an individual to a class; subclass links two classes. Use the same exact class IRI only when you intend the same class. Every relation and sort must be chosen explicitly.")
-        text(section, "p", "Inspection: $inspectionCid", "data-taxonomy-inspection")
-        input(section, "Reviewer credential", "", password = true) {
+        section.className = "ds-curate-proposal"
+        section.style.cssText = "margin:24px 0;padding:20px;min-width:0;overflow-wrap:anywhere"
+        text(section, "h3", "Review taxonomy translation").also { it.className = "ds-curate-h3"; it.style.marginTop = "0" }
+        text(section, "p", "Declare how selected sentences should be represented as classes and individuals. These are your explicit translation choices. No model is called and no world facts are published.").className = "ds-curate-dest"
+        text(section, "p", "instance links an individual to a class; subclass links two classes. Use the same exact class IRI only when you intend the same class. Every relation and sort must be chosen explicitly.").className = "ds-curate-dest"
+        text(section, "p", "Inspection: $inspectionCid", "data-taxonomy-inspection").className = "ds-cid"
+        input(fields(section), "Reviewer credential", "", password = true) {
             credential = it.trim(); reviewer = null; invalidate()
             host.querySelector("[data-taxonomy-reviewer]")?.textContent = "Credential changed; authenticate before preparing a translation."
             val prepare = host.querySelector("[data-taxonomy-prepare]")
             if (prepare != null) prepare.asDynamic().disabled = true
         }
         text(section, "p", reviewer?.let { (if (syntheticReviewer) "Synthetic validation reviewer: " else "Authenticated reviewer: ") + it }
-            ?: "Authenticate to inspect eligible sentences and prepare a translation.", "data-taxonomy-reviewer")
-        button(section, "Authenticate reviewer and inspect candidates") { loadCandidates() }
-        button(section, "Forget credential") { credential = ""; reviewer = null; invalidate(); render() }
-        input(section, "Declared context IRI", contextIri) { contextIri = it; invalidate() }
+            ?: "Authenticate to inspect eligible sentences and prepare a translation.", "data-taxonomy-reviewer").className = "ds-curate-status"
+        val authentication = actions(section)
+        button(authentication, "Authenticate reviewer and inspect candidates") { loadCandidates() }
+        button(authentication, "Forget credential") { credential = ""; reviewer = null; invalidate(); render() }
+        input(fields(section), "Declared context IRI", contextIri) { contextIri = it; invalidate() }
         candidates?.let { value ->
-            text(section, "p", "Eligibility: ${value["eligible"]} · profile ${value["profile"]}")
-            if (rows(value["sentences"], 512).size > 32) text(section, "p", "The source exceeds this profile. Only the first 32 sentence observations are shown; no translation can be prepared.")
+            text(section, "p", "Eligibility: ${value["eligible"]} · profile ${value["profile"]}").className = "ds-curate-status"
+            if (rows(value["sentences"], 512).size > 32) text(section, "p", "The source exceeds this profile. Only the first 32 sentence observations are shown; no translation can be prepared.").className = "ds-curate-warn"
             evidence(section, "Source and eligibility reasons", _m["source" j value["source"], "exclusionReasons" j value["exclusionReasons"]])
             for (row in declarations) {
-                val card = text(section, "fieldset", ""); text(card, "legend", "Sentence ${row.candidate["sentenceIndex"]}")
-                text(card, "blockquote", row.candidate["quote"] as String).style.whiteSpace = "pre-wrap"
+                val card = text(section, "fieldset", ""); card.className = "ds-curate-proposal"
+                card.style.cssText = "min-width:0;margin:18px 0;padding:16px"
+                text(card, "legend", "Sentence ${row.candidate["sentenceIndex"]}").className = "ds-curate-label"
+                text(card, "blockquote", row.candidate["quote"] as String).also { it.className = "ds-curate-quote"; it.style.whiteSpace = "pre-wrap" }
                 evidence(card, "Source quotation and full parser bindings", row.candidate)
-                val selectLabel = text(card, "label", "Select this translation ")
+                val selectLabel = text(card, "label", "")
+                selectLabel.style.cssText = "display:flex;align-items:center;gap:10px;margin:14px 0;font-size:13.5px"
                 val select = document.createElement("input") as HTMLInputElement
                 select.type = "checkbox"; select.checked = row.selected; select.disabled = pending || row.candidate["eligible"] != true
+                select.style.cssText = "margin:0;accent-color:var(--accent)"
                 select.setAttribute("aria-label", "Select ${row.id}"); selectLabel.appendChild(select)
+                text(selectLabel, "span", "Select this translation")
                 select.addEventListener("change", { if (present()) { row.selected = select.checked; invalidate() } })
-                choice(card, "Relation for ${row.id}", row.relation, s_["instance", "subclass"]) { row.relation = it; invalidate() }
-                text(card, "p", "Source subject: ${row.candidate["subjectWord"] ?: "unavailable"} · nominal head: ${row.candidate["predicateWord"] ?: "unavailable"}")
-                input(card, "Subject IRI for ${row.id}", row.subjectIri) { row.subjectIri = it; invalidate() }
-                choice(card, "Subject sort for ${row.id}", row.subjectSort, s_["individual", "class"]) { row.subjectSort = it; invalidate() }
-                input(card, "Object IRI for ${row.id}", row.objectIri) { row.objectIri = it; invalidate() }
-                choice(card, "Object sort for ${row.id}", row.objectSort, s_["class"]) { row.objectSort = it; invalidate() }
+                text(card, "p", "Source subject: ${row.candidate["subjectWord"] ?: "unavailable"} · nominal head: ${row.candidate["predicateWord"] ?: "unavailable"}").className = "ds-curate-dest"
+                val roles = fields(card, "160px")
+                choice(roles, "Relation for ${row.id}", row.relation, s_["instance", "subclass"]) { row.relation = it; invalidate() }
+                choice(roles, "Subject sort for ${row.id}", row.subjectSort, s_["individual", "class"]) { row.subjectSort = it; invalidate() }
+                choice(roles, "Object sort for ${row.id}", row.objectSort, s_["class"]) { row.objectSort = it; invalidate() }
+                val terms = fields(card)
+                input(terms, "Subject IRI for ${row.id}", row.subjectIri) { row.subjectIri = it; invalidate() }
+                input(terms, "Object IRI for ${row.id}", row.objectIri) { row.objectIri = it; invalidate() }
             }
-            button(section, "Prepare translation preview", reviewer == null || value["eligible"] != true) { prepare() }.setAttribute("data-taxonomy-prepare", "1")
+            button(actions(section), "Prepare translation preview", reviewer == null || value["eligible"] != true) { prepare() }.setAttribute("data-taxonomy-prepare", "1")
         }
-        results = text(section, "div", ""); renderResults(requireNotNull(results))
+        results = text(section, "div", "").also { it.className = "ds-curate-result"; it.style.maxWidth = "none" }
+        renderResults(requireNotNull(results))
     }
     private fun renderResults(parent: HTMLElement) {
         parent.textContent = ""
-        if (pending) text(parent, "p", "Checking the exact source and review…").setAttribute("role", "status")
-        message?.let { text(parent, "p", it).setAttribute("role", "status") }
+        if (pending) text(parent, "p", "Checking the exact source and review…").also { it.className = "ds-retain-status"; it.setAttribute("role", "status") }
+        message?.let { text(parent, "p", it).also { row -> row.className = "ds-retain-status"; row.setAttribute("role", "status") } }
         val translation = prepared
-        if (translation == null) { text(parent, "p", "No approved support · UNKNOWN. Complete explicit declarations and review before querying."); return }
-        text(parent, "h4", "Unreviewed translation preview")
-        text(parent, "p", "Context: ${translation["contextIri"]}\nDeclaration: ${translation["translationCid"]}\nDerived KIF: ${translation["derivedKifCid"]}").style.whiteSpace = "pre-wrap"
-        text(parent, "pre", translation["kif"] as String).style.whiteSpace = "pre-wrap"
+        if (translation == null) { text(parent, "p", "No approved support · UNKNOWN. Complete explicit declarations and review before querying.").className = "ds-curate-status"; return }
+        text(parent, "h4", "Unreviewed translation preview").className = "ds-curate-h3"
+        text(parent, "p", "Context: ${translation["contextIri"]}\nDeclaration: ${translation["translationCid"]}\nDerived KIF: ${translation["derivedKifCid"]}").also { it.className = "ds-cid"; it.style.whiteSpace = "pre-wrap" }
+        code(parent, translation["kif"] as String)
         for (selection in rows(translation["selections"])) {
             val id = selection["id"] as String
-            witness(parent, selection)
-            val label = text(parent, "label", "Freeze this exact translation ")
+            val card = text(parent, "section", ""); card.className = "ds-curate-proposal"
+            witness(card, selection)
+            val label = text(card, "label", "")
+            label.style.cssText = "display:flex;align-items:center;gap:10px;margin:14px 0;font-size:13.5px"
             val checkbox = document.createElement("input") as HTMLInputElement
             checkbox.type = "checkbox"; checkbox.checked = id in selectedKif; checkbox.disabled = pending
+            checkbox.style.cssText = "margin:0;accent-color:var(--accent)"
             checkbox.setAttribute("aria-label", "Freeze $id"); label.appendChild(checkbox)
+            text(label, "span", "Freeze this exact translation")
             checkbox.addEventListener("change", {
                 if (present() && !pending) {
                     if (checkbox.checked) selectedKif.add(id) else selectedKif.remove(id)
@@ -350,30 +384,41 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
                 }
             })
         }
-        button(parent, "Freeze selected translations for review", selectedKif.isEmpty() || reviewer == null) { freeze() }
+        button(actions(parent), "Freeze selected translations for review", selectedKif.isEmpty() || reviewer == null) { freeze() }
         val frozen = review ?: return
-        text(parent, "h4", "Analyst review · ${frozen["state"]}")
-        if (reviewUncertain) text(parent, "p", "Review or source status was not confirmed. Refresh before any further decision or query.")
-        text(parent, "p", "Snapshot: ${frozen["snapshotCid"]} · revision ${frozen["revision"]} · source current: ${frozen["sourceCurrent"]}")
+        text(parent, "h4", "Analyst review · ${frozen["state"]}").className = "ds-curate-h3"
+        if (reviewUncertain) text(parent, "p", "Review or source status was not confirmed. Refresh before any further decision or query.").className = "ds-curate-warn"
+        text(parent, "p", "Snapshot: ${frozen["snapshotCid"]} · revision ${frozen["revision"]} · source current: ${frozen["sourceCurrent"]}").className = "ds-cid"
         evidence(parent, "Frozen source, declarations and evidence", frozen["snapshot"])
+        val noteLabel = text(parent, "label", "Review decision note"); noteLabel.className = "ds-curate-label"
+        noteLabel.style.cssText = "display:flex;flex-direction:column;gap:6px;margin:14px 0"
         val noteField = document.createElement("textarea") as HTMLTextAreaElement
         noteField.value = note; noteField.maxLength = 4096; noteField.disabled = pending; noteField.setAttribute("aria-label", "Review decision note")
-        parent.appendChild(noteField); noteField.addEventListener("input", { note = noteField.value })
+        noteField.className = "ds-curate-text"; noteField.rows = 3; noteField.style.cssText = "width:100%;box-sizing:border-box"
+        noteLabel.appendChild(noteField); noteField.addEventListener("input", { note = noteField.value })
+        val decisions = actions(parent)
         for ((label, action) in s_["Save draft" j "draft", "Approve exact selection" j "approve", "Reject selection" j "reject", "Correct / withdraw approval" j "correct"].view)
-            button(parent, label, reviewer == null || reviewUncertain || frozen["current"] != true) { decide(action) }
-        button(parent, "Refresh review", reviewer == null) { refresh() }
-        if (reviewUncertain || frozen["state"] != "approve" || frozen["current"] != true) { text(parent, "p", "No confirmed current approval; no positive support is displayed."); return }
+            button(decisions, label, reviewer == null || reviewUncertain || frozen["current"] != true) { decide(action) }
+        button(decisions, "Refresh review", reviewer == null) { refresh() }
+        if (reviewUncertain || frozen["state"] != "approve" || frozen["current"] != true) { text(parent, "p", "No confirmed current approval; no positive support is displayed.").className = "ds-curate-status"; return }
         fun goalChanged() { epoch++; abort?.abort(); pending = false; report = null; parent.querySelector("[data-taxonomy-query-result]")?.remove() }
-        choice(parent, "Goal predicate", goalPredicate, s_["instance", "subclass"]) { goalPredicate = it; goalChanged() }
-        input(parent, "Goal subject IRI", goalSubject) { goalSubject = it; goalChanged() }
-        input(parent, "Goal object IRI", goalObject) { goalObject = it; goalChanged() }
-        button(parent, "Inspect reviewed support", reviewer == null) { query() }
+        text(parent, "h4", "Read reviewed support").className = "ds-curate-h3"
+        choice(fields(parent), "Goal predicate", goalPredicate, s_["instance", "subclass"]) { goalPredicate = it; goalChanged() }
+        val goalTerms = fields(parent)
+        input(goalTerms, "Goal subject IRI", goalSubject) { goalSubject = it; goalChanged() }
+        input(goalTerms, "Goal object IRI", goalObject) { goalObject = it; goalChanged() }
+        button(actions(parent), "Inspect reviewed support", reviewer == null) { query() }
         report?.let { value ->
             val result = text(parent, "section", "", "data-taxonomy-query-result")
-            text(result, "h4", "Reviewed taxonomy support: ${value["status"]}")
-            text(result, "p", "Applies to the selected approved translation assumptions in this context. UNKNOWN is not a refutation; bounded or unavailable results do not establish absence. No approval is consumed.")
+            result.className = "ds-curate-proposal"; result.style.cssText = "margin-top:20px;padding:16px;min-width:0"
+            text(result, "h4", "Reviewed taxonomy support: ${value["status"]}").also { it.className = "ds-curate-h3"; it.style.marginTop = "0" }
+            val goal = value["goal"] as Map<*, *>
+            text(result, "p", "Queried goal: (${goal["predicate"]} ${goal["subject"]} ${goal["object"]})", "data-taxonomy-query-goal").also {
+                it.className = "ds-cid"; it.style.cssText = "margin:8px 0 14px;padding:10px 12px;background:var(--side);border-radius:5px;overflow-wrap:anywhere"
+            }
+            text(result, "p", "Applies to the selected approved translation assumptions in this context. UNKNOWN is not a refutation; bounded or unavailable results do not establish absence. No approval is consumed.").className = "ds-curate-dest"
             if (value["status"] != "UNAVAILABLE") {
-                text(result, "p", "Context: $contextIri · approval ${value["approvalCid"]}")
+                text(result, "p", "Context: $contextIri · approval ${value["approvalCid"]}").className = "ds-cid"
                 for (origin in rows(value["englishWitnesses"])) witness(result, origin)
             }
             evidence(result, "Approval, context, English/KIF witnesses and proof", value)

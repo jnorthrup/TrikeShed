@@ -11,7 +11,7 @@ internal object DocumentsSyntaxGraph {
     private const val EDGE_LIMIT = 128
     private var ordinal = 0
 
-    /** Old receipts have token nodes only; nonzero copies must never be reconstructed as tokens. */
+    /** Old receipts expose token indices only; derived display labels never establish absent copies. */
     fun nodes(sentence: Map<*, *>): List<Map<*, *>> {
         val explicit = sentence["nodes"]
         if (explicit != null) return (explicit as List<*>).map { it as Map<*, *> }
@@ -66,7 +66,10 @@ internal object DocumentsSyntaxGraph {
         val description = document.createElement("p") as HTMLElement
         description.className = "ds-curate-label"
         description.setAttribute("data-english-graph-counts", "1")
-        description.textContent = "Dependency graph: ${shown.size}/${nodes.size} parser nodes (${tokens.size} source tokens; ${nodes.size - tokens.size} parser copies), ${visible.size}/${edges.size} edges, plus ROOT. " +
+        val identity = if (sentence["nodes"] == null)
+            "${shown.size}/${nodes.size} derived legacy display nodes (${tokens.size} source tokens; parser copy identities unreported)"
+        else "${shown.size}/${nodes.size} parser nodes (${tokens.size} source tokens; ${nodes.size - tokens.size} parser copies)"
+        description.textContent = "Dependency graph: $identity, ${visible.size}/${edges.size} edges, plus ROOT. " +
             if (shown.size != nodes.size || visible.size != edges.size) "Display limited; full observations remain in the tables below." else "Arrows run from governor to dependent. This is a dependency graph, not a constituency tree."
         parent.appendChild(description)
         val scroll = document.createElement("div") as HTMLElement
