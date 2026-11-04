@@ -1,0 +1,59 @@
+{
+  "publicationScope": "Synthetic observations and isolated bags only; no supplied legal documents or private corpus text",
+  "baseline": {
+    "source": "095fa0d305c55362b4656fb661cc2cb088772e84",
+    "mainJarSha256": "7de155422c32eaff00d01f322b84521300f355002e44e1333d350bbb25b07c40",
+    "cases": 9,
+    "supported": 4,
+    "failures": 3,
+    "unsupported": 2
+  },
+  "verifiedV54": {
+    "source": "46da66cdb28e650e71490ae48741e6f5dcfa0563",
+    "mainJarSha256": "c753a967ff83be0652c219b010d7100fcc50d34bcae0132ab7a8a11ff4421361",
+    "sameNineCases": {
+      "originalFailuresFixedByExplicitRefusal": 3,
+      "supportedControlsRetained": 4,
+      "unsupportedStillExplicit": 2,
+      "supportedRegressions": 0,
+      "missingCases": 0
+    },
+    "separateAdditionalControls": 4,
+    "combinedExperiment": {
+      "supported": 11,
+      "failures": 0,
+      "unsupported": 2,
+      "runtimeSeconds": 0.6293896829993173
+    },
+    "separateFocusedTests": {
+      "pass": 11,
+      "fail": 0,
+      "runtimeSeconds": 1.1266312160005327,
+      "compiledProductionOverlays": false,
+      "friendPaths": false
+    }
+  },
+  "limits": [
+    "Current-schema ordered subject/object/relation/temporal guard; not complete English predicate/context identity or semantic role unification",
+    "Forced equal angular address is a routing counterexample, not an observed natural hash/encoder collision",
+    "Exact basis leaves are declared ancestry, not authenticated source independence or legal authority",
+    "Legacy unknown ancestry is retained and refuses new revisions; no retroactive rollback or source retraction",
+    "Semantic role query/variable binding and source retraction remain UNSUPPORTED",
+    "WAL control replays actual bag frames through in-memory DurableAppendLog; no disk/CRC/process-restart durability claim",
+    "Configured capacity4096/intake256 with at most2 resident observations in main experiment is not a pressure benchmark; separate test uses capacity4 placement rejection",
+    "512m Java heap and45s child bound are not a native memory limit or network sandbox",
+    "No models, provider calls, corpus training, mass seeding, or live bag/WAL changes"
+  ],
+  "failedPreparationAttempt": {
+    "scope": "External test-driver compilation only",
+    "attempt": 1,
+    "issues": [
+      "Closing bracket typo in external driver",
+      "Moved memory test lacked original-package text extension import"
+    ],
+    "productionFailure": false,
+    "logsRetainedExternally": true,
+    "successfulAttempt": 2
+  },
+  "finalV55Revalidation": "Pending final immutable artifact; this evidence records v54 exactly and is not relabeled as v55"
+}

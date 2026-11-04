@@ -1,0 +1,17 @@
+{
+  "source": "095fa0d305c55362b4656fb661cc2cb088772e84",
+  "mainJar": "/workspace/library-files/english-inspection-browser-proof/snapshot/main.jar",
+  "mainJarSha256": "7de155422c32eaff00d01f322b84521300f355002e44e1333d350bbb25b07c40",
+  "frozenSnapshotManifestSha256": "e644ba9ce019a0dff60d9e7659dec813496756f6c48a50c84f7abe701d707e1d",
+  "classpathSha256": "79cc7050ee74da19346e6ca571b785daedb0a6c50c7b50a736fd7cb76299d6a5",
+  "harnessSha256": "ccb09db5a0cf460ff5e68aab37d303d4c57b510d0c8324e51125c4987b44f204",
+  "productionClassOverlays": false,
+  "friendPaths": false,
+  "syntheticOnly": true,
+  "runtimeSeconds": 0.3666405779999877,
+  "runtimeExit": 0,
+  "wallTimeoutSeconds": 45,
+  "maximumHeap": "512m",
+  "nativeMemoryLimit": false,
+  "run": "attempt2; adds zero-leaf basis control and actual production class source"
+}
