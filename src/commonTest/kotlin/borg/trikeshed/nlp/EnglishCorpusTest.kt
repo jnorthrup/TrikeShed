@@ -84,6 +84,24 @@ class EnglishCorpusTest {
         assertEquals(0, unprotected.tokenCount)
     }
 
+    @Test fun aggregateTokenAndVocabularyBudgetsRefuseAcrossReceipts() {
+        val tooManyTokens = mutableListOf<EnglishObservationReceipt>()
+        for (document in 0..20) {
+            val words = mutableListOf<String>()
+            repeat(1000) { words.add("pay") }; words.add("doc$document")
+            tooManyTokens.add(receipt(words.joinToString(" "), salt = "tokens-$document"))
+        }
+        val tokenFailure = assertFailsWith<IllegalArgumentException> { EnglishCorpus.build(tooManyTokens.toSeries()) }
+        assertTrue(tokenFailure.message.orEmpty().contains("token", true))
+        val tooManyTerms = mutableListOf<EnglishObservationReceipt>()
+        for (document in 0..2) {
+            val text = (document * 1500 until (document + 1) * 1500).joinToString(" ") { "term$it" }
+            tooManyTerms.add(receipt(text, salt = "vocabulary-$document"))
+        }
+        val vocabularyFailure = assertFailsWith<IllegalArgumentException> { EnglishCorpus.build(tooManyTerms.toSeries()) }
+        assertTrue(vocabularyFailure.message.orEmpty().contains("4096"))
+    }
+
     @Test fun sourceAndTokenBudgetsRefuseBeforeTopicWork() {
         val source = receipt("pay")
         assertFailsWith<IllegalArgumentException> { EnglishCorpus.build(emptySeriesOf()) }

@@ -89,6 +89,8 @@ class EnglishCorpusSnapshot internal constructor(val policy: EnglishCorpusPolicy
         "authority" j "statistics-of-reported-parser-observations", "legalMeaning" j "not-established",
         "countsAreEvidenceConfidence" j false, "coverage" j "explicitly-selected-source-ranges-only",
         "matrixCid" j matrixCid.value, "matrix" j matrix(), "rawTokenCount" j rawTokenCount,
+        "retrieval" j _m["unit" j "included-lexical-sentence", "method" j index.params.method.name,
+            "idfMethod" j index.params.idfMethod.name, "k1" j index.params.k1, "b" j index.params.b, "delta" j index.params.delta],
         "terms" j (terms α { it.toMap() }).toList(), "sentences" j (sentences α { it.toMap() }).toList(),
         "occurrences" j (occurrences α { it.toMap() }).toList()]
 
@@ -115,7 +117,7 @@ object EnglishCorpus {
     const val MAX_TEXT_UNITS = 8 * 1024 * 1024
     const val MAX_BYTES = 32 * 1024 * 1024
     private val protected = _s["not", "no", "never", "neither", "nor", "cannot", "n't", "unless", "except",
-        "without", "only", "if", "until", "shall", "must", "may", "can", "will", "would", "should"]
+        "n’t", "without", "only", "if", "until", "shall", "must", "may", "can", "will", "would", "should"]
 
     fun build(receipts: Series<EnglishObservationReceipt>, policy: EnglishCorpusPolicy = EnglishCorpusPolicy()): EnglishCorpusSnapshot {
         require(receipts.size in 1..MAX_RECEIPTS) { "Select 1..256 English inspection receipts" }
@@ -220,4 +222,135 @@ object EnglishCorpus {
     private fun boundary(text: String, offset: Int) {
         require(!(offset > 0 && offset < text.length && text[offset - 1].isHighSurrogate() && text[offset].isLowSurrogate())) { "Corpus span splits a Unicode scalar" }
     }
+}
+
+/** Symmetric Dirichlet priors and an explicit finite sampler budget, never a language generator. */
+data class EnglishLdaConfig(val topics: Int = 4, val iterations: Int = 50, val seed: Int = 1,
+    val alpha: Double = .1, val beta: Double = .01) {
+    fun toMap(): Map<String, Any?> = _m["topics" j topics, "iterations" j iterations,
+        "seed" j seed, "alpha" j alpha, "beta" j beta]
+}
+
+/** Frozen count matrices and posterior mixtures; topic labels have no inferred legal meaning. */
+class EnglishLdaResult internal constructor(val corpusCid: ContentId, val matrixCid: ContentId,
+    val config: EnglishLdaConfig, val vocabulary: Series<String>, val tokenCount: Int,
+    private val topicWords: Array<IntArray>, private val documentTopics: Array<IntArray>,
+    private val totals: IntArray, private val documentLengths: IntArray) {
+    val topicWordCounts: Series<Series<Int>> = topicWords.size j { topicWords[it].toSeries() }
+    val documentTopicCounts: Series<Series<Int>> = documentTopics.size j { documentTopics[it].toSeries() }
+    val topicTotals: Series<Int> = totals.toSeries()
+    val conditionalWeights: Long get() = tokenCount.toLong() * config.iterations * config.topics
+    val cid: ContentId by lazy { ContentId.of(CanonicalCbor.encodeMap(toMap())) }
+    private val termIndices = vocabulary.view.withIndex().associate { (it.value j it.index).pair }
+
+    /** Closed-vocabulary posterior predictive probability; unknown terms are explicitly absent. */
+    fun wordProbability(topic: Int, term: String): Double? {
+        require(topic in 0 until config.topics) { "Topic index outside model" }
+        val index = termIndices[term] ?: return null
+        return (topicWords[topic][index] + config.beta) / (totals[topic] + vocabulary.size * config.beta)
+    }
+    fun documentProbabilities(document: Int): Series<Double> {
+        require(document in documentTopics.indices) { "Document index outside model" }
+        val counts = documentTopics[document]
+        val divisor = documentLengths[document] + config.topics * config.alpha
+        return counts.size j { (counts[it] + config.alpha) / divisor }
+    }
+    fun topicTerms(topic: Int, limit: Int = 32): Series<Map<String, Any?>> {
+        require(topic in 0 until config.topics && limit in 1..128) { "Topic display limit" }
+        val order = (0 until vocabulary.size).sortedWith(compareByDescending<Int> { topicWords[topic][it] }.thenBy { it }).take(limit)
+        return order.map { word -> _m["index" j word, "lemma" j vocabulary[word], "count" j topicWords[topic][word],
+            "probability" j wordProbability(topic, vocabulary[word])] }.toSeries()
+    }
+    fun toMap(): Map<String, Any?> = _m["schema" j "trikeshed.english-lda.v1", "corpusCid" j corpusCid.value,
+        "matrixCid" j matrixCid.value, "config" j config.toMap(), "algorithm" j "collapsed-gibbs-symmetric-dirichlet/1",
+        "random" j "splitmix64/1", "order" j "canonical-documents-then-vocabulary-then-occurrences",
+        "reviewStatus" j "unreviewed", "authority" j "descriptive-statistics-only", "legalMeaning" j "not-established",
+        "countsAreEvidenceConfidence" j false, "tokenCount" j tokenCount,
+        "conditionalWeights" j conditionalWeights, "vocabulary" j vocabulary.toList(),
+        "topicWordCounts" j (topicWordCounts α { it.toList() }).toList(),
+        "documentTopicCounts" j (documentTopicCounts α { it.toList() }).toList(), "topicTotals" j topicTotals.toList(),
+        "documentTopics" j documentTopics.indices.map { document -> _m["document" j document,
+            "tokens" j documentLengths[document], "priorOnly" j (documentLengths[document] == 0),
+            "probabilities" j documentProbabilities(document).toList()] },
+        "topics" j (0 until config.topics).map { topic -> _m["topic" j topic, "tokens" j totals[topic],
+            "terms" j topicTerms(topic).toList()] }]
+}
+
+/** Deterministic bounded collapsed Gibbs LDA over the same source-pinned integer matrix. */
+fun EnglishCorpusSnapshot.lda(config: EnglishLdaConfig = EnglishLdaConfig()): EnglishLdaResult {
+    require(config.topics in 1..16 && config.iterations in 1..100) { "LDA supports 1..16 topics and 1..100 iterations" }
+    require(config.alpha.isFinite() && config.alpha in 1e-9..1000.0 && config.beta.isFinite() && config.beta in 1e-9..1000.0) { "Finite positive LDA priors required" }
+    require(documents.size in 1..EnglishCorpus.MAX_DOCUMENTS && terms.size in 1..EnglishCorpus.MAX_VOCABULARY && tokenCount in 1..EnglishCorpus.MAX_TOKENS) { "LDA requires a nonempty bounded lexical matrix" }
+    val work = tokenCount.toLong() * config.iterations * config.topics
+    require(work <= 20_000_000L) { "LDA exceeds 20000000 conditional weights" }
+    val vocabulary = terms α { it.lemma }
+    val words = IntArray(tokenCount)
+    val sources = IntArray(tokenCount)
+    val lengths = IntArray(documents.size)
+    var at = 0
+    for (document in documents.view) {
+        require(document.index in 0 until documents.size && document.counts.size == terms.size) { "Malformed corpus matrix" }
+        var length = 0
+        for (word in 0 until terms.size) {
+            val count = document.counts[word]
+            require(count >= 0 && count <= tokenCount - at) { "Malformed corpus token count" }
+            repeat(count) { words[at] = word; sources[at] = document.index; at++ }
+            length += count
+        }
+        require(length == document.includedTokens) { "Document count conservation failed" }
+        lengths[document.index] = length
+    }
+    check(at == tokenCount) { "Corpus count conservation failed" }
+    val rng = EnglishLdaRandom(config.seed)
+    val assignments = IntArray(tokenCount)
+    val documentTopics = Array(documents.size) { IntArray(config.topics) }
+    val topicWords = Array(config.topics) { IntArray(terms.size) }
+    val topicTotals = IntArray(config.topics)
+    for (i in words.indices) {
+        val topic = rng.nextInt(config.topics)
+        assignments[i] = topic
+        documentTopics[sources[i]][topic]++; topicWords[topic][words[i]]++; topicTotals[topic]++
+    }
+    val weights = DoubleArray(config.topics)
+    repeat(config.iterations) {
+        for (i in words.indices) {
+            val word = words[i]; val document = sources[i]; val old = assignments[i]
+            documentTopics[document][old]--; topicWords[old][word]--; topicTotals[old]--
+            var sum = 0.0
+            for (topic in 0 until config.topics) {
+                val weight = (documentTopics[document][topic] + config.alpha) *
+                    (topicWords[topic][word] + config.beta) / (topicTotals[topic] + terms.size * config.beta)
+                check(weight.isFinite() && weight > 0) { "Invalid LDA conditional weight" }
+                weights[topic] = weight; sum += weight
+            }
+            val threshold = rng.nextDouble() * sum
+            var cumulative = 0.0
+            var topic = config.topics - 1
+            for (candidate in 0 until config.topics) {
+                cumulative += weights[candidate]
+                if (threshold < cumulative) { topic = candidate; break }
+            }
+            assignments[i] = topic
+            documentTopics[document][topic]++; topicWords[topic][word]++; topicTotals[topic]++
+        }
+    }
+    check(topicTotals.sum() == tokenCount)
+    for (document in documentTopics.indices) check(documentTopics[document].all { it >= 0 } && documentTopics[document].sum() == lengths[document])
+    for (topic in topicWords.indices) check(topicWords[topic].all { it >= 0 } && topicWords[topic].sum() == topicTotals[topic])
+    for (word in 0 until terms.size) check(topicWords.sumOf { it[word] } == terms[word].frequency)
+    return EnglishLdaResult(cid, matrixCid, config, vocabulary, tokenCount, topicWords, documentTopics, topicTotals, lengths)
+}
+
+/** Explicit algorithm revision avoids depending on a platform or Kotlin-version RNG. */
+private class EnglishLdaRandom(seed: Int) {
+    private var state = seed.toLong()
+    private fun nextLong(): Long {
+        state += -7046029254386353131L
+        var value = state
+        value = (value xor (value ushr 30)) * -4658895280553007687L
+        value = (value xor (value ushr 27)) * -7723592293110705685L
+        return value xor (value ushr 31)
+    }
+    fun nextInt(bound: Int): Int = ((nextLong() ushr 1) % bound.toLong()).toInt()
+    fun nextDouble(): Double = (nextLong() ushr 11).toDouble() / 9_007_199_254_740_992.0
 }
