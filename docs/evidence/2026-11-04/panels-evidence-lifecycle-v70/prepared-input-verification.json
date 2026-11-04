@@ -1,0 +1,12 @@
+{
+  "result": "VERIFIED_BEFORE_COMPILE",
+  "snapshot": "/workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot",
+  "source": "243db15b73636742e57d4319f01ef8db3230c657",
+  "mainAndDependencyJars": 120,
+  "dependenciesVerified": 119,
+  "closedArchiveSha256": "0584a6d921e660123071db695c7e7d29327c9067dafdde3369463ba1274ea5a8",
+  "archiveFileCount": 13,
+  "privateArchiveCopyVerified": true,
+  "producerJsonByteExact": true,
+  "noNewParserOrQuery": "No DocumentEnglishWire or parser owner constructed; fixture transport refuses accidental execution requests, unchangedproductionowners otherwise"
+}

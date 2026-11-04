@@ -1,0 +1,26 @@
+package proof.identity;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+/** External reflection only. No production class definition or initialization. */
+public class Identity {
+  public static void main(String[] args) throws Exception {
+    String expected=new File(args[0],"main.jar").getCanonicalPath();
+    String[] names={"borg.trikeshed.forge.server.DocumentEnglishWire","borg.trikeshed.forge.server.EnglishObservationWire",
+      "borg.trikeshed.forge.server.EnglishCorpusWire","borg.trikeshed.forge.server.EnglishLegalPatternsWire",
+      "borg.trikeshed.forge.server.EnglishLegalQueryWire","borg.trikeshed.forge.server.ProjectDbWire",
+      "borg.trikeshed.forge.server.ProjectScopes","borg.trikeshed.forge.server.PatchWire","borg.trikeshed.forge.server.JvmProjectCorpus",
+      "borg.trikeshed.lcnc.LcncInputsKt","borg.trikeshed.lcnc.LcncRunner","borg.trikeshed.lcnc.EnglishLcncPreset",
+      "borg.trikeshed.lcnc.CamelRouteLegos","borg.trikeshed.lcnc.SubVmLegos","borg.trikeshed.kanban.module.KanbanModule",
+      "borg.trikeshed.forge.server.DocumentReviewWire","borg.trikeshed.lcnc.EnglishTaxonomyCarrier","borg.trikeshed.lcnc.LlvmScalar","borg.trikeshed.lcnc.LlvmScalarContract","borg.trikeshed.job.PackCasStore","borg.trikeshed.job.CanonicalCbor"};
+    var rows=new ArrayList<String>();
+    for(String name:names){
+      Class<?> type=Class.forName(name,false,Identity.class.getClassLoader());
+      String actual=new File(type.getProtectionDomain().getCodeSource().getLocation().toURI()).getCanonicalPath();
+      if(!actual.equals(expected))throw new IllegalStateException(name+" loaded from "+actual);
+      rows.add("{\"class\":\""+name+"\",\"codeSource\":\""+actual+"\"}");
+    }
+    Files.writeString(Path.of(args[1]),"{\"result\":\"PASS\",\"classInitialization\":false,\"productionOverlays\":false,\"classes\":["+String.join(",",rows)+"]}\n");
+  }
+}

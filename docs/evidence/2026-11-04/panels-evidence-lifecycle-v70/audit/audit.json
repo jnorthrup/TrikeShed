@@ -1,0 +1,66 @@
+{
+  "result": "PASS",
+  "scope": "Retained data audit (adapted from the v69 independent decoder/audit) of five actual new-client response-hold cases using retained old v68 source/inspection/run. No new parser, query, authored run, model or live inference is asserted.",
+  "resultCid": "sha256:92fe43611456d6c5b9aa1b743b610a4f3447d41dda089c20a413b35713bb048a",
+  "inputsCid": "sha256:54b22cec57cbccbf867c5230dea4ff22f73eab78992a08c8c0cb99b2d7c7c858",
+  "startupEvidenceCid": "sha256:6f6ea290e7468349c12b29469536aaca288d5789c641ebfcd889bcaf979306d0",
+  "cleanupCid": "sha256:6ccca2a7abccb586d154a17896c507f7bc46073d3a62a1aa5d95b3d0aff44648",
+  "afterCloseReopenCid": "sha256:cf946a131855aa1aedf715a5eef07c27f4ef0e0fec02eed33508016f79e301a4",
+  "counterEvidence": "Actual post-drain cleanup and startup metadata; /_fixture/evidence was not called in this attempt",
+  "productionCodeSources": 21,
+  "dependencyJars": 119,
+  "clientSource": "243db15b73636742e57d4319f01ef8db3230c657",
+  "mainJarSha256": "77b02c2619ee94ad74de7fc0584a45e7b3d3d50701287d7104cd5d6913d4632a",
+  "panelsJsSha256": "da3e49e994744b5dbb8981ff7436e20527c8569d0794b2d5e9445985bc8300a5",
+  "oldProducerSource": "e3057178652b433421832003417478a98ffce304",
+  "oldInspectionCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+  "oldSourceCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+  "sourceBytes": 228,
+  "sourceTokens": 42,
+  "fullParserNodes": 43,
+  "retainedCopularRows": 3,
+  "heldWorkspaceResponses": 1,
+  "heldActualCompletedReceiptResponses": 4,
+  "rawJsonCasBlocksCompared": 4,
+  "oldProducerParserReads": 1,
+  "newParserReads": 0,
+  "newQueryOrRunPosts": 0,
+  "fiveOwnershipCasesVerified": true,
+  "nativeFitShadowSaveRecordsVerified": true,
+  "workspaceComputedCidRetainedPromise": false,
+  "allRecordedOwnersDrained": true,
+  "limits": [
+    "Uses a partial local fixture and recorded actual browser outcomes; this audit does not run the UI or establish universal lifecycle correctness",
+    "Old v68 annotations and run receipts are reused exactly; this is not a fresh NLP or query-execution proof",
+    "Workspace response programCid is a computed document identity, not an automatic retained-CAS promise",
+    "The workspace transport digest is recorded by the browser; only held content digests can independently be recomputed from retained raw bytes here",
+    "Native Fit and lcnc:shadow-update observations are source-bound recorded browser signals, not a new execution or proof of an exact wall-time interval",
+    "Copied nodes and guarded rent/due syntax remain observations, not positive legal force or class assertions",
+    "Source-head preservation compares recorded after-run digests with the original producer manifest; runtime-file readback belongs to the recorder",
+    "Fixture outgoing denial is separate evidence; no OS-wide airgap or parser-authority authentication is claimed"
+  ],
+  "auditorCid": "sha256:034d36c5f06a9e1d0eb9daa1dacc56f054eb1c0f66756be6bb0da6d67bab65c5",
+  "negativeControls": [
+    {
+      "mutation": "wrong-held-receipt-cid",
+      "rejected": true
+    },
+    {
+      "mutation": "forbidden-execution-post",
+      "rejected": true
+    },
+    {
+      "mutation": "stale-workspace-overwrites",
+      "rejected": true
+    },
+    {
+      "mutation": "late-receipt-overwrites-tab",
+      "rejected": true
+    },
+    {
+      "mutation": "wrong-new-cid-selection",
+      "rejected": true
+    }
+  ],
+  "negativeControlScope": "In-memory copies only; actual proof bytes and old v68 proof files remain unchanged"
+}
