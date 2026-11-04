@@ -17,7 +17,9 @@ object EnglishObservationGraph {
         val inventory: Map<String, Any?>, val selection: DocumentRevision,
         val sourceSnapshots: List<ProjectDoc>?, val legacyIdentity: Boolean,
         /** Reconstructed and source-checked observations, not a newly executed parser result. */
-        val parsed: NlpDocument) {
+        val parsed: NlpDocument,
+        /** The exact verified payload preserves optional fields and legacy spellings on reopen. */
+        internal val retainedReceipt: Map<String, Any?>) {
         val graph: String get() = "urn:trikeshed:english:${receiptCid.hex}"
         fun descriptor(mode: String): Map<String, Any?> = _m["selected" j "english-receipt-observations",
             "receiptCid" j receiptCid.value, "namedGraph" j graph,
@@ -96,15 +98,12 @@ object EnglishObservationGraph {
         else require(source.originalCid == source.extractedTextCid || source.provenance["extractionLineageCid"]?.let { lineage ->
             validateLineage(source, json(bytes(ContentId(lineage), 65_536))); true
         } == true) { "Historical extraction lineage unavailable" }
-        return Snapshot(cid, source, regenerated, selection, snapshots, legacy, parsed)
+        return Snapshot(cid, source, regenerated, selection, snapshots, legacy, parsed, receipt)
     }
 
-    /** Reassemble the exact retained payload, including legacy identity spelling, without reparsing. */
+    /** Return the exact verified payload, including legacy identity spelling, without reparsing. */
     fun retained(snapshot: Snapshot): Map<String, Any?> {
-        val inventory = if (snapshot.legacyIdentity) legacy(snapshot.inventory) else snapshot.inventory
-        val receipt = inventory + _m["source" j (DocumentCuratorCodec.source(snapshot.source) - "text"),
-            "selection" j snapshot.selection.toMap()] +
-            (snapshot.sourceSnapshots?.let { _m["sourceSnapshots" j it.map(ProjectDoc::toMap)] } ?: emptyMap())
+        val receipt = snapshot.retainedReceipt
         require(ContentId.of(CanonicalCbor.encodeMap(receipt)) == snapshot.receiptCid) { "Reopened English receipt identity differs" }
         return receipt
     }
