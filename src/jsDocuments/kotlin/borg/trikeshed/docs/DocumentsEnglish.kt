@@ -309,7 +309,7 @@ internal object DocumentsEnglish {
             val requestedBegin = number(range["begin"]); val requestedEnd = number(range["end"])
             val receipt = inspection["receiptCid"] as? String ?: return
             val ticket = inspectionEpoch
-            fun selected() = present() && !pending && result === inspection && ticket == inspectionEpoch &&
+            fun selected() = present() && parent.asDynamic().isConnected == true && !pending && result === inspection && ticket == inspectionEpoch &&
                 retainedCid == receipt && begin == requestedBegin && end == requestedEnd && validRange()
             if (!selected()) return
             val href = runCatching {
