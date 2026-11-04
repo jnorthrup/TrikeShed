@@ -26,7 +26,7 @@ Hours below are estimated active agent-hours for implementation and local verifi
 | WP12 | Sol/Terra scene integration | WP11 | 56–104 | Event-driven LCNC/Graal graph |
 | WP13 | Terra renderer/interaction | WP12 | 64–120 | Sparks, LOD, minimap, flyovers |
 | WP14 | Sol LCNC wizards | WP07, WP09, WP10 | 40–72 | Typed source/panel/production authoring |
-| WP15 | Terra native solver adapter | WP03, WP07 | 32–64 | Supervised pinned Horn execution |
+| WP15 | Terra native solver adapter; Sol review | WP03, WP07 | 32–64 | Pinned Horn execution and gated JVM Sulong slice |
 | WP16 | Sol legal panel | WP08, WP10, WP15 | 40–80 | Issue/argument simulation and fixtures |
 | WP17 | Sol NARS boundary | WP07, WP08, WP15 | 48–96 | Exact attention/evidence integration |
 | WP18 | Terra learning evaluation | WP17 | 48–88 | Held-out empirical policy experiment |
@@ -94,9 +94,13 @@ Implement bounded particle/band rendering, timer visuals, minimap, level-of-deta
 
 Build source, panel, production and rescaffolding flows over host contracts. Show cardinality expansion, missing engine assets, semantic mismatches and affected-result previews. Acceptance includes an unknown node type, unsupported effect, hypothetical-to-global connection, optional model absence and scope reduction after pause. Preserve the user's existing graph when a suggested change is declined. Deliver three presets using the same authoring grammar. The wizard may propose a connection; host validation and existing authorization remain decisive.
 
-## WP15 Native positive Horn execution
+## WP15 Native positive Horn execution and Sulong review
 
-Wrap the pinned SUMO-Nix/native path in production deadline, output, memory and network controls. Bind input/frame CIDs, preserve sidecars across lowering, validate result/proof structure and emit engine events. Acceptance includes malformed output, timeout, unsupported formula, duplicate sources, first-proof reordering and fresh recomputation after source removal. Deliver actual execution through a production route, not only a command-line fixture. Keep taxonomy, reified review-record observations and world assertions as distinct scopes.
+Retain the pinned SUMO-Nix/native reference path and evaluate the requested JVM Polyglot/Sulong direction through [the bitcode contract](22-sulong-bitcode.md). Allocate the existing 32–64 hours as 8–16 for compiler/ABI feasibility, 8–16 for reproducible bitcode production, and 16–32 for the bounded adapter and production verification. Sol reviews the exact supported computation, lowering, memory ownership and missing runtime facilities after feasibility. A general Nix-to-LLVM compiler or substantial runtime port requires an explicit scope/estimate revision; it is not assumed to fit this allocation.
+
+Bind input/frame CIDs, preserve source sidecars, check certificates and recheck review currentness across either execution mechanism. Implement real bitcode production, explicit UTF-8 input/result ownership and release, compatible host profiles, commonMain channel admission/fan-in and drain. Preserve the ordinary restricted guest policy; native-capable in-process execution is an explicit trusted capability. Deadline, memory and network claims must follow the actual profile: arbitrary native calls inside the daemon do not acquire hard termination or OS isolation from Polyglot flags.
+
+Acceptance includes malformed output, timeout/budget outcomes, unsupported formulas, Unicode and allocation failures, duplicate sources, first-proof reordering, source withdrawal and repeated context cleanup. Deliver actual execution through a production route with real engine events, then cross-engine measurements and sealed-bundle evidence through WP24/WP23. A scalar or scanner pilot establishes transport only. Keep taxonomy, reified review-record observations and world assertions as distinct scopes; promote the Sulong lane only at the intended proof-producing acceptance level.
 
 ## WP16 Legal issue and panel simulation
 
