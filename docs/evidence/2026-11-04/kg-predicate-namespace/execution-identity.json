@@ -1,0 +1,44 @@
+{
+  "result": "PASS",
+  "source": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+  "mainJarSha256": "e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397",
+  "compiledSources": {
+    "proof/namespacemapactual/KgPredicateNamespaceTest.kt": "f08c8dfdb951f33ad4a079c3784300573868c1d3720eb2e2202106836bdfe228",
+    "proof/namespacemapactual/NamespaceActual.kt": "3eadb1b05b49b567f2339788e33586f3041b5508adda202823435d6e1e2555fe"
+  },
+  "externalClassSha256": {
+    "proof/namespacemapactual/KgPredicateNamespaceTest.class": "e5d3461f80d1effa06e2b80c058f29bfe7503b2dd64001f2343c241669fd1687",
+    "proof/namespacemapactual/NamespaceActualKt.class": "ce842acf9251e7cffbe67a24d8d522983f93edf801ab92d78f710698b2e0fa9d"
+  },
+  "testSourceIdentity": {
+    "commit": "82c749b378733066cce732df18910853af68506c",
+    "repositorySource": "src/jvmTest/kotlin/borg/trikeshed/narsese/KgPredicateNamespaceTest.kt",
+    "sourceSha256": "b23fbf11b99ebd0812dc0693e4834f5787778a03801a1b595ae584b462c746f0",
+    "externalCopySha256": "f08c8dfdb951f33ad4a079c3784300573868c1d3720eb2e2202106836bdfe228",
+    "transformation": "Only package changed to proof.namespacemapactual and import borg.trikeshed.narsese.* added; all six method bodies unchanged",
+    "productionImplementationCopied": false,
+    "friendAccess": false,
+    "scope": "External copied-test source provenance only; authorized immutable-artifact execution is recorded separately"
+  },
+  "copiedTestSourceIdentityVerified": true,
+  "productionClassLocationsVerified": true,
+  "jarOnlyDependencies": true,
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "testsFound": 6,
+  "testsPassed": 6,
+  "failed": 0,
+  "skipped": 0,
+  "aborted": 0,
+  "compileExit": 0,
+  "testExit": 0,
+  "ownedChildrenExited": true,
+  "parserModelBagOrLiveReteConstructed": false,
+  "beforeSource": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "beforeMainJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "limits": [
+    "Exact immutable JAR proof; compiler inputs contain only observer and copied test methods",
+    "Network isolation is not exercised by this small no-network harness",
+    "Existing persisted beliefs and PIDs are not migrated or backfilled"
+  ]
+}

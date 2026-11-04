@@ -1,0 +1,10 @@
+{
+  "commit": "82c749b378733066cce732df18910853af68506c",
+  "repositorySource": "src/jvmTest/kotlin/borg/trikeshed/narsese/KgPredicateNamespaceTest.kt",
+  "sourceSha256": "b23fbf11b99ebd0812dc0693e4834f5787778a03801a1b595ae584b462c746f0",
+  "externalCopySha256": "f08c8dfdb951f33ad4a079c3784300573868c1d3720eb2e2202106836bdfe228",
+  "transformation": "Only package changed to proof.namespacemapactual and import borg.trikeshed.narsese.* added; all six method bodies unchanged",
+  "productionImplementationCopied": false,
+  "friendAccess": false,
+  "scope": "External copied-test source provenance only; authorized immutable-artifact execution is recorded separately"
+}

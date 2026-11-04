@@ -1,0 +1,46 @@
+{
+  "result": "PASS",
+  "source": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+  "repairCommit": "82c749b378733066cce732df18910853af68506c",
+  "mainJarSha256": "e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397",
+  "coordinatedBuild": {
+    "selectedTests": 326,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "bundles": {
+      "documents.js": "526c383cd65f96a7821fc267a1d2ccb3f7e5610194a21e5356ec574d4e2ee460",
+      "pages.js": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+      "spacegraph.js": "290e51a94a54fecbcc98559898b8b093579b50f5cf182580087e8229c784b286"
+    }
+  },
+  "independentJunit": {
+    "found": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "aborted": 0
+  },
+  "mappingObservations": 22,
+  "rdfCrossings": 7,
+  "ruleCandidates": 5,
+  "productionCodeSourcesVerified": true,
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "modelOrNlpRun": false,
+  "bagOrLiveReteAdmission": false,
+  "ownedChildrenExited": true,
+  "attempts": [
+    {
+      "attempt": 1,
+      "result": "OBSERVER_COMPILE_FAILED",
+      "productionCallsExecuted": false,
+      "reason": "External harness System shadow and closing literal bracket; preserved outside repository"
+    },
+    {
+      "attempt": 2,
+      "result": "PASS"
+    }
+  ],
+  "copularNextSliceIncluded": false
+}
