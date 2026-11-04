@@ -103,6 +103,7 @@ import kotlinx.coroutines.*
 class EnglishObservationWire(private val ctx: ModuleContext, private val corpus: ProjectCorpus) {
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     private val statistics = EnglishCorpusWire(ctx, corpus)
+    private val legalPatterns = EnglishLegalPatternsWire(ctx, corpus)
     private val runner = LcncNodeRunner { node, inputs ->
         fun parameter(key: String): Any? = if (key in inputs) inputs[key] else node.params[key]?.let { raw ->
             if (key != "program") raw else {
@@ -121,11 +122,13 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
         ctx.routes.claim(OWNER, PATH, route = ::route)
         ctx.lcncRunners[TYPE] = runner
         statistics.attach()
+        legalPatterns.attach()
     }
 
     suspend fun drain() {
         ctx.routes.release(OWNER)
         statistics.drain()
+        legalPatterns.drain()
         if (ctx.lcncRunners[TYPE] === runner) ctx.lcncRunners.remove(TYPE)
         requests.drain()
     }
