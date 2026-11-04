@@ -76,8 +76,15 @@ object EnglishLegalPatterns {
                 val qualifierTokens = mutableListOf<NlpToken>()
                 while (numberEnd >= 0 && tokens[numberEnd].lemma.lowercase() in modifiers) qualifierTokens.add(tokens[numberEnd--])
                 if (numberEnd < 0) continue
-                val supported = edges.filter { it.governor == unit.index && it.relation == "nummod" }
-                val positions = supported.mapNotNull { tokenPositions[it.dependent] }.filter { it in 0..numberEnd }
+                val direct = edges.filter { it.governor == unit.index && it.relation == "nummod" }
+                // CoreNLP may head a parenthesized quantity at its number, with the unit as npmod.
+                val inverse = edges.filter { edge -> edge.dependent == unit.index &&
+                    edge.relation in _s["obl:npmod", "nmod:npmod"] && tokenPositions[edge.governor]?.let { position ->
+                        tokens[position].tag == "CD" || tokens[position].ner == "NUMBER"
+                    } == true }
+                val supported = direct + inverse
+                val positions = supported.mapNotNull { tokenPositions[if (it.relation == "nummod") it.dependent else it.governor] }
+                    .filter { it in 0..numberEnd }
                 val numericNer = tokens[numberEnd].ner in _s["NUMBER", "DURATION"] &&
                     (tokens[numberEnd].tag == "CD" || tokens[numberEnd].lemma.lowercase() in numberWords)
                 if (positions.isEmpty() && !numericNer) {
@@ -113,8 +120,9 @@ object EnglishLegalPatterns {
                 val numberBindings = supported.map(::binding)
                 val copiedQuantity = supported.any { it.governorCopy != 0 || it.dependentCopy != 0 }
                 if (copiedQuantity) issues.add("copy-node-quantity-scope-not-established")
+                val markerHeads = unitNodes.map { it["id"] as String }.toSet() + inverse.map(::governor)
                 val markerBindings = marker?.let { selected -> edges.filter {
-                    it.governor == unit.index && it.dependent == selected.index && it.relation == "case"
+                    governor(it) in markerHeads && it.dependent == selected.index && it.relation == "case"
                 }.map(::binding) }.orEmpty()
                 if (marker != null && markerBindings.isEmpty()) issues.add("temporal-marker-attachment-not-established")
                 durations.add(_m["status" j if (number.value == null || modifierLemmas.size > 1 || copiedQuantity) "unresolved-quantity-candidate" else "lexical-integer-candidate",
