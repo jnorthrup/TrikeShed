@@ -1,0 +1,18 @@
+import borg.trikeshed.kif.KifTaxonomySnapshot;
+import borg.trikeshed.nlp.*;
+import borg.trikeshed.forge.server.EnglishCorpusWire;
+import borg.trikeshed.job.ContentId;
+import borg.trikeshed.parse.ReifyKt;
+import java.nio.file.*;
+import java.util.*;
+public class ArtifactOrigins {
+ public static void main(String[] args)throws Exception {
+  Path expected=Path.of(args[0]).toRealPath();var origins=new LinkedHashMap<String,Object>();
+  for(Class<?> c:List.of(KifTaxonomySnapshot.class,EnglishCorpus.class,EnglishLdaResult.class,EnglishCorpusView.class,EnglishCorpusWire.class,ContentId.class,ReifyKt.class)) {
+   var p=Path.of(c.getProtectionDomain().getCodeSource().getLocation().toURI()).toRealPath();
+   if(!p.equals(expected))throw new AssertionError(c.getName()+" came from "+p);
+   origins.put(c.getName(),p.toString());
+  }
+  System.out.println(ReifyKt.jsonOf(origins));
+ }
+}

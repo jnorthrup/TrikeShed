@@ -1,0 +1,5 @@
+The grant requires documented costs and a reconciled ledger.
+The accountant must not post a duplicate payment.
+If the invoice is unpaid, the ledger shall retain an exception.
+Debit balances and credit balances must reconcile.
+The Montréal office shall retain receipts until the audit is complete.
