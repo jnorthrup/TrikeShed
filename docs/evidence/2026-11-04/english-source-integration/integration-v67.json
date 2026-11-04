@@ -1,0 +1,122 @@
+{
+  "kind": "english-source-integration/1",
+  "verifiedSource": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "latestIntegratedMaster": "b5173f52f56a2192254afb54f8ba92a095185508",
+  "artifacts": {
+    "main.jar": "39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4",
+    "documents.js": "526c383cd65f96a7821fc267a1d2ccb3f7e5610194a21e5356ec574d4e2ee460",
+    "spacegraph.js": "aa0215de9396bca523b72004739030b53c8c36e969ca1d7ba3a8a6bfecd1b279",
+    "pages.js": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c"
+  },
+  "componentEqualityWithV66": {
+    "main.jar": false,
+    "documents.js": true,
+    "spacegraph.js": false,
+    "pages.js": true
+  },
+  "coordinatedBuild": {
+    "selectedTests": 326,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "allJvmTestSourcesCompiled": true,
+    "browserApps": [
+      "documents",
+      "spacegraph",
+      "pages"
+    ],
+    "sourceOrTestExclusions": false
+  },
+  "actualProofs": {
+    "rdfIdentityCompatibility": {
+      "methods": 32,
+      "originalRdfShortLiteralStructuralCases": "PASS",
+      "productionClassSource": "frozen-main-jar",
+      "docs": "../nars-rdf-fidelity"
+    },
+    "predicateNamespaces": {
+      "methods": 6,
+      "mappingObservations": 22,
+      "rdfCrossings": 7,
+      "ruleCandidates": 5,
+      "status": "PASS",
+      "docs": "../kg-predicate-namespace/v67"
+    },
+    "retentionAndHttp": {
+      "methods": 13,
+      "httpCases": 6,
+      "sourceAndDefinitionReadbacks": "PASS",
+      "sameSourceReplayAndArchive": "PASS",
+      "productionPackSeparateProcessReopen": "PASS",
+      "status": "PASS",
+      "docs": "../nars-kg-retention-v67"
+    },
+    "corpusAndReasoning": {
+      "rawOccurrences": 94,
+      "defaultIncludedTokens": 84,
+      "contentIncludedTokens": 60,
+      "defaultTerms": 53,
+      "contentTerms": 47,
+      "defaultEntireResponseAndReceiptPreserved": true,
+      "derivedCasReadbacks": 9,
+      "nativeAndApiControls": 18,
+      "seededLdaConservationAndRepeat": "PASS",
+      "sourceQuotationsAndSpans": "PASS",
+      "pureKifOrderedPremiseWitnessesAndExclusions": "PASS",
+      "docs": "../english-combined-compatibility-v67/corpus-view"
+    },
+    "sharedWorkflow": {
+      "actualCamel": "local direct/mock with exact body/header/reply CID",
+      "actualLegalQuery": "named retained candidate dataset and source/evidence navigation",
+      "authoredCorpusGraph": "two real corpus nodes; omitted view and wired view? content, full outputs equal APIs",
+      "durableRunReceipts": 3,
+      "invocationLedgerInputsVerified": true,
+      "newBrowserBundleLoaded": "PASS",
+      "browserPageErrors": 0,
+      "externalBrowserRequests": 0,
+      "docs": "../english-combined-compatibility-v67/shared"
+    }
+  },
+  "executionBoundaries": {
+    "productionSourceOverlays": false,
+    "friendPaths": false,
+    "liveBuildClassDirectories": false,
+    "freshParserExecutions": 0,
+    "configuredModelProviders": 0,
+    "reasoningAdmissionFromStatistics": false,
+    "globalAnalysisQuadStoreOrBeliefBagOrReviewOwner": false,
+    "operationalKanbanRecords": "explicit separate run bookkeeping",
+    "networkEnforcement": "controlled workflow fixture and descendants used outbound-denying seccomp with self-probes; not a production-wide air-gap claim",
+    "nativeUpload": "real storage-only batch path saved revisions and honestly reported missing-miner 503; not a fresh extraction or curation proof",
+    "historicalReceipts": "exact earlier CoreNLP4.6 synthetic receipts and source blocks; currentness fixture rows explicitly reconstructed read-only",
+    "packPersistence": "explicit drain/sync/close and separate process reopen, not crash or power-failure durability",
+    "sourceAuthority": "CID integrity and exact quotations do not authenticate producer/source or grant legal authority",
+    "parserQuality": "no new general English, OCR or legal accuracy claim",
+    "platform": "cloud Linux/JVM/browser; user Mac fetch and daemon restart not established"
+  },
+  "priorFailuresRetained": [
+    {
+      "version": "v61",
+      "finding": "Jupiter omitted a non-Unit intake test; incomplete160of161, noGREENclaim"
+    },
+    {
+      "version": "v63",
+      "finding": "upstream context pure lookup retained Node vm in browser; webpack failed; no JVM tests"
+    },
+    {
+      "version": "v64",
+      "finding": "new corpus test chained an Iterator into Iterable predicates; production compiled but tests did not"
+    },
+    {
+      "version": "v65",
+      "finding": "326executed,2failures: new breadcrumb preset inventory and missing camera; source viewport repaired without dropping preset"
+    }
+  ],
+  "remainingGoalWork": [
+    "Retain explicit class-versus-individual declarations and reviewed English-to-KIF translation decisions before formal taxonomy admission.",
+    "Evaluate NARS full proposition coexistence and structured activation; natural attention-coordinate collisions still refuse conflicting admission.",
+    "Continue visual grammar/source-query integration; the separate copular syntax template is not part of this verified source.",
+    "Continue full project blackboard continuity, document extraction quality and contained Hermes/Pi deployment verification."
+  ],
+  "masterPublication": "pending final ordinary evidence integration and non-forced expected-ancestry push"
+}
