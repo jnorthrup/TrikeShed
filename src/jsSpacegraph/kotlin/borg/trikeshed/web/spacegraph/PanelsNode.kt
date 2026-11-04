@@ -2,6 +2,8 @@ package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.landscape.LandscapeNavigation
 import borg.trikeshed.lcnc.LcncPortContract
+import borg.trikeshed.lcnc.SparqlGraph
+import borg.trikeshed.lcnc.SqlGraph
 import borg.trikeshed.web.*
 import borg.trikeshed.web.patch.PatchKinds
 import kotlinx.browser.document
@@ -9,6 +11,11 @@ import kotlinx.browser.window
 import kotlinx.coroutines.CancellationException
 
 private fun types(e: dynamic): List<String> = arr(js("Array.from(e.dataTransfer.types)")).map { str(it) }
+
+private val querySyntaxTypes = (SqlGraph.TYPES + SparqlGraph.contracts().map { it.type }).toSet()
+
+/** Grammar nodes are data when their construction explicitly disables procedure execution. */
+fun Panels.querySyntax(n: dynamic): Boolean = truthy(graph.controls?.inspectionOnly) && str(n.type) in querySyntaxTypes
 
 /** Render the served ports and this ring's immediate formals, never a nested ring's locals. */
 fun Panels.renderPorts(n: dynamic) {
@@ -47,6 +54,7 @@ fun Panels.renderPorts(n: dynamic) {
 /** Build a node's DOM: header, ring window or lane captions, ports, param editors, drag handle. */
 fun Panels.buildNode(n: dynamic) {
     val t = contract(n.type) ?: return // vocabulary is server-owned
+    val syntax = querySyntax(n)
     val el = document.createElement("div").asDynamic(); el.className = "node"; el.dataset.id = n.id; el.dataset.type = n.type; n.el = el
     // CONCENTRIC CONTEXT: a scope node IS a ring square; its children render INSIDE it.
     val isScope = n.type == "scope" || (truthy(n.children) && num(n.children.length) > 0)
@@ -61,19 +69,28 @@ fun Panels.buildNode(n: dynamic) {
     hd.title = str(t.title) + " · " + str(n.id)
     el.appendChild(hd)
     val readiness = t.context?.readiness
-    if (readiness != null && readiness.available == false) {
+    if (syntax) {
+        el.dataset.querySyntax = "1"
+        val label = document.createElement("div").asDynamic()
+        label.className = "query-syntax-status"
+        label.textContent = "Query syntax · Inspection only"
+        label.style.cssText = "font-size:10px;padding:4px 8px;color:var(--dim)"
+        el.appendChild(label)
+    } else if (readiness != null && readiness.available == false) {
         val unavailable = document.createElement("div").asDynamic()
         unavailable.className = "runtime-status"
         unavailable.textContent = "Unavailable: " + str(readiness.reason ?: "No runtime owner is bound")
         unavailable.title = arr(readiness.prerequisites).joinToString(" · ") { str(it) }
         el.appendChild(unavailable)
     }
-    sprites.attach(n, hd)
-    // the hover blip: asserted / inferred / graal for THIS node, from the daemon
-    on(el, "pointerenter", { e -> blip.enter(n, e) })
-    on(el, "pointerleave", { e -> blip.leave(e) })
-    on(el, "pointermove", { e -> blip.move(e) })
-    on(el, "pointerdown", { e -> blip.leave(e) })
+    if (!syntax) {
+        sprites.attach(n, hd)
+        // the hover blip: asserted / inferred / graal for THIS node, from the daemon
+        on(el, "pointerenter", { e -> blip.enter(n, e) })
+        on(el, "pointerleave", { e -> blip.leave(e) })
+        on(el, "pointermove", { e -> blip.move(e) })
+        on(el, "pointerdown", { e -> blip.leave(e) })
+    }
     val collapse = hd.querySelectorAll("s")[0]
     fun collapseState() {
         collapse.setAttribute("aria-expanded", (!truthy(n.collapsed)).toString())
@@ -122,7 +139,7 @@ fun Panels.buildNode(n: dynamic) {
             view.x = (vp.width - w * num(view.z)) / 2 - x * num(view.z); view.y = (vp.height - h * num(view.z)) / 2 - y * num(view.z)
             applyView(); camera.saveCameraSoon()
         })
-    } else {
+    } else if (!syntax) {
         // leaf nodes name their Key factory's upstream state and hand-off
         val lane = laneOf(n)
         if (lane != null) el.dataset.lane = lane.id
@@ -190,9 +207,11 @@ fun Panels.buildNode(n: dynamic) {
         } else {
             inp = document.createElement("input").asDynamic(); if (truthy(def.ph) && str(def.ph).startsWith("secret:")) inp.type = "password"; inp.value = n.params[k] ?: ""
         }
+        if (syntax) inp.title = str(n.params[k] ?: "")
         if (truthy(def.ph)) inp.placeholder = if (str(def.ph).startsWith("secret:")) str(def.ph).substring(7) else def.ph
         fun paramChanged() {
             n.params[k] = inp.value
+            if (syntax) inp.title = str(inp.value)
             if ((n.type == "scope.in" || n.type == "scope.out") && (k == "name" || k == "kind")) {
                 renderPorts(n)
                 if (truthy(n._parentScope)) refreshRingChrome(n._parentScope)

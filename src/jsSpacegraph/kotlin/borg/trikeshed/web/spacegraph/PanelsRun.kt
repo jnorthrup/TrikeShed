@@ -201,7 +201,11 @@ suspend fun Panels.programOutputs(run: dynamic, document: String) {
 /** Capture one page-owned observation; commonMain selects and executes its downstream frame. */
 fun Panels.runAll(fromId: String?, automatic: Boolean = false) {
     if (fromId == null) {
-        if (automatic) { status("Loaded for review · choose Run or Live to execute"); return }
+        if (automatic) {
+            status(if (truthy(graph.controls?.inspectionOnly)) "Inspection only · Run and Live are disabled"
+                else "Loaded for review · choose Run or Live to execute")
+            return
+        }
         admitProgram(live = true)
     } else admitPulse(fromId)
 }
