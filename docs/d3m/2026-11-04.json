@@ -1,6 +1,6 @@
 {
   "date": "2026-11-04",
-  "verifiedSource": "9fc4883931c0e111d96ab31a1079c3b7a317d7c4",
+  "verifiedSource": "5a2c8bf45042049bcc9c6381609c1d2a200a2ec6",
   "start": "61ebdc4d43e93311330ff9e04b81f1a78c3ce23e",
   "frozenOrigin": "fdc1ef489a33b5b9468d114200a58b67cf93f160",
   "order": "Parent-before-child topological order; among ready commits ascending committer timestamp then OID; duplicate-tip refs lexical.",
@@ -2584,6 +2584,41 @@
       "ref": "refs/remotes/origin/evidence/legal-candidate-query-panels-20261104",
       "oid": "ae0b98c5a69612ebb3d7de78b37d44e3e067f052",
       "disposition": "ancestor of verified source"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-legal-query-evidence-20261104",
+      "oid": "96ae1d6163edfd693262c4a0a75376d2115556db",
+      "disposition": "ancestor of verified source"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-verified-master-20261104",
+      "oid": "11432f989fbb7c20080be5aa36b97d5849e04864",
+      "disposition": "ancestor of verified source"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/panels-query-syntax-labels-20261104",
+      "oid": "b8585c9203298691ebf88209374a725844f4d839",
+      "disposition": "ancestor of verified source"
+    },
+    {
+      "ref": "refs/remotes/origin/evidence/panels-query-syntax-20261104",
+      "oid": "a8528ddc74e6fcbbb651a38ac7577bac7a4ba5a9",
+      "disposition": "ancestor of verified source"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/nars-rdf-fidelity-20261104",
+      "oid": "6e09626e81bbfbf005d8821d08ed398a9da31bf4",
+      "disposition": "ancestor of verified source"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-quad-fidelity-20261104",
+      "oid": "295217eaba1b0d7d59cfb8344c44c44a653afccb",
+      "disposition": "ancestor of verified source"
+    },
+    {
+      "ref": "refs/remotes/origin/master",
+      "oid": "295217eaba1b0d7d59cfb8344c44c44a653afccb",
+      "disposition": "ancestor of verified source"
     }
   ],
   "merges": [
@@ -3362,6 +3397,101 @@
       "head": "9747152900eb9393e3def1ec86632b595ef1be76",
       "outcome": "clean",
       "conflicts": []
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-legal-query-evidence-20261104",
+      "oid": "96ae1d6163edfd693262c4a0a75376d2115556db",
+      "contained": false,
+      "publicationRound": 3,
+      "ordinal": 52,
+      "before": "9b3f50a8d147deb1ea5eed300a3ef6fc56b691b0",
+      "bases": [
+        "5548a842517e98f47f83aebfa30387dc2cc820b4"
+      ],
+      "head": "4602c92b4fe42abecdcb0a366c602cb65af184a7",
+      "outcome": "clean",
+      "conflicts": []
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-verified-master-20261104",
+      "oid": "11432f989fbb7c20080be5aa36b97d5849e04864",
+      "contained": false,
+      "publicationRound": 3,
+      "ordinal": 53,
+      "before": "4602c92b4fe42abecdcb0a366c602cb65af184a7",
+      "bases": [
+        "96ae1d6163edfd693262c4a0a75376d2115556db",
+        "ae0b98c5a69612ebb3d7de78b37d44e3e067f052",
+        "4b9e87275b7f4bf571ba5c7810fff15b02f66c24"
+      ],
+      "head": "55401e3f3e806c6d19b6bec59480eacbb8ab4853",
+      "outcome": "clean",
+      "conflicts": []
+    },
+    {
+      "ref": "refs/remotes/origin/fix/panels-query-syntax-labels-20261104",
+      "oid": "b8585c9203298691ebf88209374a725844f4d839",
+      "contained": false,
+      "publicationRound": 3,
+      "ordinal": 54,
+      "before": "55401e3f3e806c6d19b6bec59480eacbb8ab4853",
+      "bases": [
+        "5548a842517e98f47f83aebfa30387dc2cc820b4"
+      ],
+      "head": "1e074bd877fc18c09a92dc8ea6434069fc0d0614",
+      "outcome": "clean",
+      "conflicts": []
+    },
+    {
+      "ref": "refs/remotes/origin/evidence/panels-query-syntax-20261104",
+      "oid": "a8528ddc74e6fcbbb651a38ac7577bac7a4ba5a9",
+      "contained": false,
+      "publicationRound": 3,
+      "ordinal": 55,
+      "before": "1e074bd877fc18c09a92dc8ea6434069fc0d0614",
+      "bases": [
+        "b8585c9203298691ebf88209374a725844f4d839",
+        "11432f989fbb7c20080be5aa36b97d5849e04864"
+      ],
+      "head": "3cbf2e9bd769a4a60500ce40a42ca4f39b63b16e",
+      "outcome": "clean",
+      "conflicts": []
+    },
+    {
+      "ref": "refs/remotes/origin/codex/nars-rdf-fidelity-20261104",
+      "oid": "6e09626e81bbfbf005d8821d08ed398a9da31bf4",
+      "contained": false,
+      "publicationRound": 3,
+      "ordinal": 56,
+      "before": "3cbf2e9bd769a4a60500ce40a42ca4f39b63b16e",
+      "bases": [
+        "5548a842517e98f47f83aebfa30387dc2cc820b4"
+      ],
+      "head": "16b0fa824b60ac7ff314840732480351f4fd6c81",
+      "outcome": "clean",
+      "conflicts": []
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-quad-fidelity-20261104",
+      "oid": "295217eaba1b0d7d59cfb8344c44c44a653afccb",
+      "contained": false,
+      "publicationRound": 3,
+      "ordinal": 57,
+      "before": "16b0fa824b60ac7ff314840732480351f4fd6c81",
+      "bases": [
+        "a8528ddc74e6fcbbb651a38ac7577bac7a4ba5a9"
+      ],
+      "head": "3775ce3f153f589f32c397dec117990e0be814bc",
+      "outcome": "clean",
+      "conflicts": []
+    },
+    {
+      "ref": "refs/remotes/origin/master",
+      "oid": "295217eaba1b0d7d59cfb8344c44c44a653afccb",
+      "contained": false,
+      "publicationRound": 3,
+      "ordinal": 58,
+      "outcome": "contained"
     }
   ],
   "verification": {
@@ -3382,6 +3512,8 @@
       "compileTestKotlinMacos",
       "jsBrowserDocumentsProductionWebpack",
       "jsBrowserPagesProductionWebpack",
+      "compileSpacegraphKotlinJs",
+      "jsBrowserSpacegraphProductionWebpack",
       "jvmTest",
       "--tests",
       "borg.trikeshed.memory.ace.BreadcrumbContextNodesTest",
@@ -3441,6 +3573,8 @@
       "borg.trikeshed.terminal.XtermTerminalRowIdentityTest",
       "--tests",
       "borg.trikeshed.forge.server.CurationInstalledLinkTest",
+      "--tests",
+      "borg.trikeshed.narsese.KgRdfFidelityTest",
       "macosTest",
       "--tests",
       "borg.trikeshed.userspace.nio.platform.spi.MlxBackboneAdmissionTest",
@@ -3465,7 +3599,7 @@
     ],
     "results": {
       "jvmTest": {
-        "tests": 208,
+        "tests": 214,
         "failures": 0,
         "errors": 0,
         "skipped": 0
