@@ -111,4 +111,28 @@ class SparqlVisualBoundsTest {
         assertTrue(result.body.contains("urn:before")); assertFalse(result.body.contains("urn:after"))
         assertEquals(2, reads, "Raw live cursor is sampled for metadata and values, then guard and executor use only the captured snapshot")
     }
+
+    @Test fun acceptedNulContainingTermsCannotCollideInBoxedOrVisualJoinKeys(): Unit = runBlocking {
+        // These identifiers are accepted by the existing RDF model/parser; this is not a strict Turtle grammar claim.
+        val a = RdfTerm.BlankNode("a"); val bc = RdfTerm.BlankNode("b\u0000_:c")
+        val ab = RdfTerm.BlankNode("a\u0000_:b"); val c = RdfTerm.BlankNode("c")
+        assertEquals(ab, TurtleRdf.parseTerm(ab.toTurtle()))
+        val store = QuadStore().add(RdfTriple(a, RdfTerm.Iri("urn:left"), bc))
+            .add(RdfTriple(ab, RdfTerm.Iri("urn:right"), c))
+        val query = SparqlQuery.parse("SELECT ?x ?y WHERE { ?x <urn:left> ?y . ?x <urn:right> ?y . }")
+        val snapshot = store.scan()
+        val boxed = snapshot.size j { row: Int -> snapshot.b(row) }
+        assertEquals(0, query.plan(snapshot).size)
+        assertEquals(0, query.plan(boxed).size, "Distinct shared-variable tuples must not alias on an embedded NUL")
+        val visual = program(s_["?x", "?y"], s_[
+            _m["subject" j "?x", "predicate" j "<urn:left>", "object" j "?y"],
+            _m["subject" j "?x", "predicate" j "<urn:right>", "object" j "?y"]])
+        val before = execute(SparqlWire(SparqlSurface(store)), visual)
+        assertEquals(200, before.status, before.body); assertEquals(0, bindings(before.body).size)
+        store.add(RdfTriple(a, RdfTerm.Iri("urn:right"), bc))
+        val after = execute(SparqlWire(SparqlSurface(store)), visual)
+        assertEquals(200, after.status, after.body); assertEquals(1, bindings(after.body).size)
+        assertEquals(3, store.size, "No source term is rejected, normalized or removed to avoid the collision")
+    }
+
 }
