@@ -89,49 +89,60 @@ class BertPythonSleeve private constructor(
         }
     })
 
-    override suspend fun encode(tokens: Series<BertToken>): Series<BertVector> = gate.withLock {
-        check(!closed) { "BERT sleeve is closed" }
-        require(tokens.size <= 1024) { "BERT request exceeds 1024 targets" }
-        for (token in tokens.view) {
-            require(token.lemma.isNotBlank() && token.lemma.length <= 128 && token.sentence.length <= 16_384)
-            require((token.start == null && token.end == null) || (token.start != null && token.end != null &&
-                token.start >= 0 && token.end > token.start && token.end <= token.sentence.length))
-        }
-        try {
-            val result = ArrayList<BertVector>(tokens.size)
-            var offset = 0
-            while (offset < tokens.size) {
-                // A guest crossing owns at most one sentence's inference and sixteen target projections.
-                var end = offset + 1
-                while (end < minOf(offset + 16, tokens.size) && tokens[end].sentence == tokens[offset].sentence) end++
-                val request = jsonOf((offset until end).map { i -> tokens[i].let { token ->
-                    buildMap<String, Any> {
-                        put("lemma", token.lemma); put("sentence", token.sentence)
-                        token.start?.let { put("start", it); put("end", token.end!!) }
-                    }
-                } })
-                val reply = withContext(Dispatchers.IO) {
-                    port.evalInVm("import json\njson.dumps(_bert_encoder.encode(json.loads(${pythonString(request)})), allow_nan=False)",
-                        "bert-encode.py") as Teleported.Str
-                }
-                val rows = reify(reply.v) as? List<*> ?: error("BERT sleeve omitted vectors")
-                check(rows.size == end - offset) { "BERT sleeve omitted targets" }
-                for ((i, value) in rows.withIndex()) {
-                    val row = value as Map<*, *>
-                    val span = BertSpan.valueOf(row["span"] as String)
-                    val values = (row["values"] as? List<*>)?.let { floats ->
-                        FloatArray(floats.size) { d -> (floats[d] as Number).toFloat().also { check(it.isFinite()) } }
-                    }
-                    check((values != null) == (span in setOf(BertSpan.Exact, BertSpan.Stem, BertSpan.Explicit)))
-                    result.add(BertVector(tokens[offset + i], span, values))
-                }
-                offset = end
+    override suspend fun encode(tokens: Series<BertToken>): Series<BertVector> {
+        val caller = currentCoroutineContext()
+        caller.ensureActive()
+        val count = tokens.size
+        require(count in 0..1024) { "BERT request exceeds 1024 targets" }
+        // Series are caller-owned oracles; capture before waiting for the guest or its gate.
+        val retained = Array(count) { i ->
+            caller.ensureActive()
+            tokens[i].also { token ->
+                require(token.lemma.isNotBlank() && token.lemma.length <= 128 && token.sentence.length <= 16_384)
+                require((token.start == null && token.end == null) || (token.start != null && token.end != null &&
+                    token.start >= 0 && token.end > token.start && token.end <= token.sentence.length))
             }
-            if (tokens.size > 0) record(emptyList())
-            result.toSeries()
-        } catch (failure: Throwable) {
-            if (failure !is CancellationException) red("encode", failure)
-            throw failure
+        }
+        caller.ensureActive()
+        return gate.withLock {
+            caller.ensureActive()
+            check(!closed) { "BERT sleeve is closed" }
+            try {
+                val result = ArrayList<BertVector>(count)
+                var offset = 0
+                while (offset < count) {
+                    // A guest crossing owns at most one sentence's inference and sixteen target projections.
+                    var end = offset + 1
+                    while (end < minOf(offset + 16, count) && retained[end].sentence == retained[offset].sentence) end++
+                    val request = jsonOf((offset until end).map { i -> retained[i].let { token ->
+                        buildMap<String, Any> {
+                            put("lemma", token.lemma); put("sentence", token.sentence)
+                            token.start?.let { put("start", it); put("end", token.end!!) }
+                        }
+                    } })
+                    val reply = withContext(Dispatchers.IO) {
+                        port.evalInVm("import json\njson.dumps(_bert_encoder.encode(json.loads(${pythonString(request)})), allow_nan=False)",
+                            "bert-encode.py") as Teleported.Str
+                    }
+                    val rows = reify(reply.v) as? List<*> ?: error("BERT sleeve omitted vectors")
+                    check(rows.size == end - offset) { "BERT sleeve omitted targets" }
+                    for ((i, value) in rows.withIndex()) {
+                        val row = value as Map<*, *>
+                        val span = BertSpan.valueOf(row["span"] as String)
+                        val values = (row["values"] as? List<*>)?.let { floats ->
+                            FloatArray(floats.size) { d -> (floats[d] as Number).toFloat().also { check(it.isFinite()) } }
+                        }
+                        check((values != null) == (span in setOf(BertSpan.Exact, BertSpan.Stem, BertSpan.Explicit)))
+                        result.add(BertVector(retained[offset + i], span, values))
+                    }
+                    offset = end
+                }
+                if (count > 0) record(emptyList())
+                result.toSeries()
+            } catch (failure: Throwable) {
+                if (failure !is CancellationException) red("encode", failure)
+                throw failure
+            }
         }
     }
 
