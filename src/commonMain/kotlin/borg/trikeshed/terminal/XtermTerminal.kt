@@ -599,9 +599,11 @@ class XtermTerminal(
         when (mode) {
             0 -> { eraseRange(row, column, columns); for (r in row + 1 until rows) eraseRange(r, 0, columns) }
             1 -> { for (r in 0 until row) eraseRange(r, 0, columns); eraseRange(row, 0, column + 1) }
-            2, 3 -> for (r in 0 until rows) eraseRange(r, 0, columns)
+            2 -> for (r in 0 until rows) eraseRange(r, 0, columns)
+            3 -> if (!alternateScreen && scrollbackRows.isNotEmpty()) {
+                scrollbackRows.clear(); scrollbackRowIds.clear(); revision++
+            }
         }
-        if (mode == 3) { scrollbackRows.clear(); scrollbackRowIds.clear() }
     }
 
     private fun eraseLine(mode: Int) = when (mode) {
