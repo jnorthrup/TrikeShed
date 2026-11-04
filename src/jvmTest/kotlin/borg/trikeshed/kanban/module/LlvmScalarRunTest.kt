@@ -21,7 +21,7 @@ import kotlin.test.*
 class LlvmScalarRunTest {
     @org.junit.jupiter.api.io.TempDir lateinit var directory: Path
 
-    class Session(directory: Path, parent: CoroutineContext) {
+    class Session(val directory: Path, parent: CoroutineContext) {
         val files = JvmFileOperations()
         val cas = FileCasStore(files, directory.resolve("cas").toString())
         val owner = SupervisorJob(parent[Job])
@@ -30,12 +30,23 @@ class LlvmScalarRunTest {
         val ctx = ModuleContext(Couch("llvm-demo", store, cas), ReteNetwork(), ReteProductionRegistry(),
             null, null, ConfixBlackboard.empty(), cas, CouchAttachmentGateway(store, cas),
             ModuleRouteRegistry(), scope, { System.currentTimeMillis() }, directory.toFile())
-        val kernel = KernelElement(scope.coroutineContext, KernelId("llvm-demo"))
+        var kernel: KernelElement? = null
         var handle: ModuleHandle? = null
         suspend fun open(bitcode: ByteArray? = null) {
-            if (bitcode != null) ctx.lcncRunners[LlvmScalarContract.TYPE] = LlvmScalar.open(kernel,
-                KernelId("scalar"), LlvmScalarTest.profile(bitcode), LlvmScalarTest.files(bitcode)).runner()
+            if (bitcode != null) {
+                val owned = checkNotNull(OroborosLcncWiring.llvm(ctx, profile(bitcode)))
+                kernel = owned.a
+                ctx.lcncRunners[LlvmScalarContract.TYPE] = owned.b.runner()
+            }
             handle = KanbanModule().open(ctx)
+        }
+        fun profile(bitcode: ByteArray, hash: String = ContentId.of(bitcode).hex): String {
+            val path = directory.resolve("module.bc").toString()
+            val config = directory.resolve("llvm-profile.json").toString()
+            files.write(path, bitcode)
+            files.write(config, jsonOf(_m["module" j path, "sha256" j hash, "export" j "add",
+                "abi" j LlvmScalarProfile.ABI]).encodeToByteArray())
+            return config
         }
         suspend fun request(method: String, path: String, body: String = ""): Map<String, Any?> {
             val response = withTimeout(30_000) {
@@ -46,7 +57,7 @@ class LlvmScalarRunTest {
         }
         suspend fun close() = withContext(NonCancellable) {
             try { handle?.drain(); handle?.close() }
-            finally { try { kernel.drain() } finally { owner.cancelAndJoin() } }
+            finally { try { kernel?.drain() } finally { owner.cancelAndJoin() } }
         }
     }
 
@@ -96,5 +107,17 @@ class LlvmScalarRunTest {
             val command = second.request("GET", "/api/lcnc/content?cid=${receipt["receiptCid"]}")
             assertEquals("completed", (command["lcncRun"] as Map<*, *>)["status"])
         } finally { second.close() }
+    }
+
+    @Test fun failedConfiguredBootstrapReleasesItsRootOwner(): Unit = runBlocking {
+        val session = Session(directory, coroutineContext)
+        try {
+            assertNull(OroborosLcncWiring.llvm(session.ctx, null))
+            val children = session.owner.children.count()
+            assertFails { OroborosLcncWiring.llvm(session.ctx, "relative.json") }
+            assertFails { OroborosLcncWiring.llvm(session.ctx, session.profile(LlvmScalarTest.bytes(), "0".repeat(64))) }
+            assertEquals(children, session.owner.children.count())
+            assertFalse(LlvmScalarContract.TYPE in session.ctx.lcncRunners)
+        } finally { session.close() }
     }
 }
