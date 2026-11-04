@@ -65,7 +65,8 @@ sealed class BeliefEvent {
     data class Contradicted(val angular: Long, val subjectCid: String) : BeliefEvent()
 }
 
-enum class BeliefAdmissionIssue { STRUCTURE_MISMATCH, UNRESOLVED_BASIS, ARCHIVE_UNAVAILABLE, RECEIPT_REQUIRED, RESIDENT_REQUIRED }
+enum class BeliefAdmissionIssue { STRUCTURE_MISMATCH, UNRESOLVED_BASIS, ARCHIVE_UNAVAILABLE, RECEIPT_REQUIRED, RESIDENT_REQUIRED,
+    PROPOSITION_MISMATCH, UNRESOLVED_PROPOSITION }
 
 /** Per-command refusal; unlike a failed WAL append, this does not stop the owning intake worker. */
 class BeliefAdmissionRefused(val angular: Long, val issue: BeliefAdmissionIssue, cause: Throwable? = null) :
@@ -339,6 +340,14 @@ class BeliefBagElement(
         val prior = resident?.signal ?: archivedSignal(angular)
         if (prior == null && counted[angular]?.isNotEmpty() == true)
             throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.ARCHIVE_UNAVAILABLE)
+        // Validate exact identity before receipt replay can renew or revise resident/archive state.
+        // Both-null legacy signals retain only the available structural checks below; replay never
+        // upgrades that historical identity. The CID declares context, not source/review authority.
+        if (prior != null && prior.propositionCid != incoming.propositionCid) {
+            val issue = if (prior.propositionCid == null || incoming.propositionCid == null)
+                BeliefAdmissionIssue.UNRESOLVED_PROPOSITION else BeliefAdmissionIssue.PROPOSITION_MISMATCH
+            throw BeliefAdmissionRefused(angular, issue)
+        }
         // Angular is an attention-routing coordinate, not a complete proposition identity. This
         // checks only structure available in the current signal schema, not English predicate/context unification.
         if (prior != null && (prior.subjectCid != incoming.subjectCid || prior.objectCid != incoming.objectCid ||
