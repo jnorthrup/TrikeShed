@@ -115,6 +115,9 @@ object RouteManifest {
         ("EnglishCorpusWire" j _l[
             RouteEntry("POST", "/api/documents/english/corpus", "source-bound lexical counts, concordance and explicitly requested local topics"),
         ]).pair,
+        ("EnglishLegalPatternsWire" j _l[
+            RouteEntry("POST", "/api/documents/english/legal-patterns", "source-bound modal roles and quantity-language candidates from a retained English inspection; no legal admission"),
+        ]).pair,
         "DocumentPdfLinksWire" to listOf(
             RouteEntry("POST", "/api/documents/pdf-links", "retain unreviewed URI annotation candidates from an exact current PDF revision; no fetch or model"),
             RouteEntry("POST", "/api/documents/pdf-links/collect", "collect selected host-issued PDF links under existing egress policy into the same manual project; source-linked and unreviewed"),
