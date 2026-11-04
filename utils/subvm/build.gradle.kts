@@ -35,8 +35,8 @@ val guestModules: Map<String, List<String>> = mapOf(
     // The curator lane: tokenize/pos/lemma/depparse/ner behind vm.corenlp.
     // GPL v3 or later — see src/commonMain/resources/nlp/lemma/en/ATTRIBUTION.md.
     "corenlp" to listOf(
-        "edu.stanford.nlp:stanford-corenlp:4.5.10",
-        "edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+        "edu.stanford.nlp:stanford-corenlp:4.6.0",
+        "edu.stanford.nlp:stanford-corenlp:4.6.0:models",
     ),
     // The dispatch fabric: routes, components and the DefaultCamelContext lifecycle.
     // This is the SPINE, not the whole of Camel — it carries the EIP engine and the 22
