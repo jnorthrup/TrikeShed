@@ -1,0 +1,346 @@
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as configuration cache cannot be reused because environment variable 'CODEX_TOOL_CALL_ID' has changed.
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: ⚠️ Unused Kotlin Source Sets
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+Solution: You can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.
+See https://kotl.in/connecting-source-sets
+
+
+> Task :compileConfixBridge UP-TO-DATE
+> Task :buildConfixBitcode UP-TO-DATE
+> Task :verifyConfixBitcode
+> Task :buildJvmKernels UP-TO-DATE
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :generateForgeAssets UP-TO-DATE
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :fetchSumoCorpus UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+> Task :jvmMainClasses UP-TO-DATE
+> Task :jvmJar UP-TO-DATE
+
+> Task :compileTestKotlinJvm
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:73:39 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:74:47 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:156:58 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:168:36 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+
+> Task :compileJvmTestJava NO-SOURCE
+> Task :hotswapAgentJar UP-TO-DATE
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+> Task :jvmTestClasses
+
+> Task :jvmTest
+WARNING: package jdk.internal.classfile.instruction not in java.base
+WARNING: package jdk.internal.classfile.constantpool not in java.base
+WARNING: package jdk.internal.classfile not in java.base
+
+EnglishObservationWireTest[jvm] > currentQueriesRecheckAfterEvaluationAndOversizedGraphsRefuseWithoutOmittingNodes()[jvm] STARTED
+
+EnglishObservationWireTest[jvm] > currentQueriesRecheckAfterEvaluationAndOversizedGraphsRefuseWithoutOmittingNodes()[jvm] PASSED
+
+EnglishObservationWireTest[jvm] > publishedPhaseOneReceiptRemainsHistoricalWithUnreportedCopyIdentity()[jvm] STARTED
+
+EnglishObservationWireTest[jvm] > publishedPhaseOneReceiptRemainsHistoricalWithUnreportedCopyIdentity()[jvm] PASSED
+
+EnglishObservationWireTest[jvm] > explicitlyWiredNullInputsCannotFallBackToAuthoredSnapshotParameters()[jvm] STARTED
+
+EnglishObservationWireTest[jvm] > explicitlyWiredNullInputsCannotFallBackToAuthoredSnapshotParameters()[jvm] PASSED
+
+EnglishObservationWireTest[jvm] > malformedClaimsInjectionAndLegacyCurrentnessRefuse()[jvm] STARTED
+
+EnglishObservationWireTest[jvm] > malformedClaimsInjectionAndLegacyCurrentnessRefuse()[jvm] PASSED
+
+EnglishObservationWireTest[jvm] > literalControlsRoundTripAndWrongBytesCannotImpersonateAReceipt()[jvm] STARTED
+
+EnglishObservationWireTest[jvm] > literalControlsRoundTripAndWrongBytesCannotImpersonateAReceipt()[jvm] PASSED
+
+EnglishObservationWireTest[jvm] > sourceSpannedNegationAndExceptionAreQueryableWithoutLegalTruthOrGlobalMutation()[jvm] STARTED
+
+EnglishObservationWireTest[jvm] > sourceSpannedNegationAndExceptionAreQueryableWithoutLegalTruthOrGlobalMutation()[jvm] PASSED
+
+EnglishTaxonomyWireTest[jvm] > authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses()[jvm] STARTED
+
+EnglishTaxonomyWireTest[jvm] > authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses()[jvm] PASSED
+
+EnglishTaxonomyWireTest[jvm] > staleEnglishRefusesAnExistingCarrierAtFreezeApprovalAndQuery()[jvm] STARTED
+
+EnglishTaxonomyWireTest[jvm] > staleEnglishRefusesAnExistingCarrierAtFreezeApprovalAndQuery()[jvm] PASSED
+
+EnglishTaxonomyWireTest[jvm] > prepareDoesNotSupersedeApprovalButSameContextFreezeDoesAndOtherContextsStaySeparate()[jvm] STARTED
+
+EnglishTaxonomyWireTest[jvm] > prepareDoesNotSupersedeApprovalButSameContextFreezeDoesAndOtherContextsStaySeparate()[jvm] PASSED
+
+ReviewedKifWireTest[jvm] > reviewedKifRetainsExactEvidenceAndInvalidatesOnSourceRevision()[jvm] STARTED
+
+ReviewedKifWireTest[jvm] > reviewedKifRetainsExactEvidenceAndInvalidatesOnSourceRevision()[jvm] PASSED
+
+ReviewedKifWireTest[jvm] > reviewedKifRunsThroughPinnedNativeSolver()[jvm] STARTED
+
+ReviewedKifWireTest[jvm] > reviewedKifRunsThroughPinnedNativeSolver()[jvm] SKIPPED
+
+ReviewedTaxonomyWireTest[jvm] > authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit()[jvm] STARTED
+
+ReviewedTaxonomyWireTest[jvm] > authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit()[jvm] PASSED
+
+ReviewedTaxonomyWireTest[jvm] > configuredNativeEndpointRunsActualReviewedQuery()[jvm] STARTED
+
+ReviewedTaxonomyWireTest[jvm] > configuredNativeEndpointRunsActualReviewedQuery()[jvm] SKIPPED
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] STARTED
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/home/agent/.gradle/caches/modules-2/files-2.1/org.graalvm.truffle/truffle-runtime/25.3.4.1/5f9818cd0413f63bdf1fe52ba4f2fc2786f4cbb7/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+
+> Task :jvmTest
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] STARTED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] PASSED
+
+LlvmScalarRunTest[jvm] > mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm] STARTED
+
+LlvmScalarRunTest[jvm] > mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm] PASSED
+
+LlvmScalarRunTest[jvm] > failedConfiguredBootstrapReleasesItsRootOwner()[jvm] STARTED
+
+LlvmScalarRunTest[jvm] > failedConfiguredBootstrapReleasesItsRootOwner()[jvm] PASSED
+
+CurationReviewedReadTest[jvm] > realRetainedBookReadDoesNotAppendOrSpendRelease()[jvm] STARTED
+
+CurationReviewedReadTest[jvm] > realRetainedBookReadDoesNotAppendOrSpendRelease()[jvm] PASSED
+
+CurationReviewedReadTest[jvm] > authenticationRevisionAndCurrentnessCannotBeSuppliedByCaller()[jvm] STARTED
+
+CurationReviewedReadTest[jvm] > authenticationRevisionAndCurrentnessCannotBeSuppliedByCaller()[jvm] PASSED
+
+EnglishCopularPresetExecutionTest[jvm] > actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm] STARTED
+
+EnglishCopularPresetExecutionTest[jvm] > actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm] PASSED
+
+EnglishCopularPresetExecutionTest[jvm] > currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm] STARTED
+
+EnglishCopularPresetExecutionTest[jvm] > currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm] PASSED
+
+EnglishCopularPresetExecutionTest[jvm] > forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm] STARTED
+
+EnglishCopularPresetExecutionTest[jvm] > forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm] PASSED
+
+EnglishCopularPresetTest[jvm] > sharedFullGovernorQueryFitsTheExistingEightPatternGrammar()[jvm] STARTED
+
+EnglishCopularPresetTest[jvm] > sharedFullGovernorQueryFitsTheExistingEightPatternGrammar()[jvm] PASSED
+
+EnglishCopularPresetTest[jvm] > offeredDiagramAndReceiptQueryRetainTypedWiringViewportAndCaveats()[jvm] STARTED
+
+EnglishCopularPresetTest[jvm] > offeredDiagramAndReceiptQueryRetainTypedWiringViewportAndCaveats()[jvm] PASSED
+
+EnglishCopularPresetTest[jvm] > constructionNeverChoosesAnUnrequestedDatasetOrSourceMode()[jvm] STARTED
+
+EnglishCopularPresetTest[jvm] > constructionNeverChoosesAnUnrequestedDatasetOrSourceMode()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > manualKifRetainsSingleAndMultipleSnapshotExports()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > manualKifRetainsSingleAndMultipleSnapshotExports()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm] PASSED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] STARTED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] PASSED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] STARTED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] STARTED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] PASSED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] STARTED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] PASSED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] PASSED
+
+LlvmScalarTest[jvm] > nativeDeniedControlStillRefusesLlvm()[jvm] STARTED
+
+LlvmScalarTest[jvm] > nativeDeniedControlStillRefusesLlvm()[jvm] PASSED
+
+LlvmScalarTest[jvm] > cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm] STARTED
+
+LlvmScalarTest[jvm] > cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm] PASSED
+
+LlvmScalarTest[jvm] > drainSettlesAcceptedQueueBeforeClosingContext()[jvm] STARTED
+
+LlvmScalarTest[jvm] > drainSettlesAcceptedQueueBeforeClosingContext()[jvm] PASSED
+
+LlvmScalarTest[jvm] > runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm] STARTED
+
+LlvmScalarTest[jvm] > runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm] PASSED
+
+LlvmScalarTest[jvm] > invalidModuleOpenReleasesSeatForRetry()[jvm] STARTED
+
+LlvmScalarTest[jvm] > invalidModuleOpenReleasesSeatForRetry()[jvm] PASSED
+
+LlvmScalarTest[jvm] > profileIsStrictOperatorConfiguration()[jvm] STARTED
+
+LlvmScalarTest[jvm] > profileIsStrictOperatorConfiguration()[jvm] PASSED
+
+LlvmScalarTest[jvm] > verifiedBinaryExecutesAndCopiesHostScalars()[jvm] STARTED
+
+LlvmScalarTest[jvm] > verifiedBinaryExecutesAndCopiesHostScalars()[jvm] PASSED
+
+NativeHornProfileTest[jvm] > trustedReadChecksSizeBeforeReading()[jvm] STARTED
+
+NativeHornProfileTest[jvm] > trustedReadChecksSizeBeforeReading()[jvm] PASSED
+
+NativeHornProfileTest[jvm] > strictPureOperatorProfile()[jvm] STARTED
+
+NativeHornProfileTest[jvm] > strictPureOperatorProfile()[jvm] PASSED
+
+NativeHornProfileTest[jvm] > missingFileCapabilityRefuses()[jvm] STARTED
+
+NativeHornProfileTest[jvm] > missingFileCapabilityRefuses()[jvm] PASSED
+
+NativeHornProfileTest[jvm] > growthBetweenSizeAndReadRemainsBounded()[jvm] STARTED
+
+NativeHornProfileTest[jvm] > growthBetweenSizeAndReadRemainsBounded()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > everyPresetNodeTypeIsContractDeclared()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > everyPresetNodeTypeIsContractDeclared()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > tribunalCarriesBoundedLoopAbortEdgesAndValidates()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > tribunalCarriesBoundedLoopAbortEdgesAndValidates()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > everyPresetWireConnectsPortsWithMatchingKinds()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > everyPresetWireConnectsPortsWithMatchingKinds()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > presetsAreOfferedNotInstalled()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > presetsAreOfferedNotInstalled()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > allOfferedPresetsExistAndRoundTrip()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > allOfferedPresetsExistAndRoundTrip()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > presetsCarryViewportGeometryForRoundTripping()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > presetsCarryViewportGeometryForRoundTripping()[jvm] PASSED
+
+ReviewedKifCancellationTest[jvm] > taxonomyWallLimitIncludesReviewedSourcePreparation()[jvm] STARTED
+
+ReviewedKifCancellationTest[jvm] > taxonomyWallLimitIncludesReviewedSourcePreparation()[jvm] PASSED
+
+ReviewedKifCancellationTest[jvm] > unionWallLimitIncludesReviewedSourcePreparation()[jvm] STARTED
+
+ReviewedKifCancellationTest[jvm] > unionWallLimitIncludesReviewedSourcePreparation()[jvm] PASSED
+
+ReviewedKifCancellationTest[jvm] > canceledReadStopsBeforeFetchingTheNextReviewedSource()[jvm] STARTED
+
+ReviewedKifCancellationTest[jvm] > canceledReadStopsBeforeFetchingTheNextReviewedSource()[jvm] PASSED
+
+ReviewedTaxonomyPlanPageTest[jvm] > approvedSelectionCanBeInspectedInRevisionBoundPages()[jvm] STARTED
+
+ReviewedTaxonomyPlanPageTest[jvm] > approvedSelectionCanBeInspectedInRevisionBoundPages()[jvm] PASSED
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 30s
+18 actionable tasks: 5 executed, 13 up-to-date
+Configuration cache entry stored.

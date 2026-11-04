@@ -1,0 +1,58 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: compileKotlinJs compileDocumentsKotlinJs compileSpacegraphKotlinJs compileKotlinWasmJs compileKotlinWasmWasi compileKotlinLinuxX64
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:267:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:271:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:276:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:428:40: 'val foundation: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:429:40: 'val material3: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:430:40: 'val materialIconsExtended: String' is deprecated. This artifact is pinned to version 1.7.3 and will not receive updates. Either use this version explicitly or migrate to Material Symbols (vector resources). See https://kotlinlang.org/docs/multiplatform/whats-new-compose-180.html.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:431:40: 'val ui: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:725:13: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed-target-checks/build.gradle.kts:743:13: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: ⚠️ Unused Kotlin Source Sets
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+Solution: You can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.
+See https://kotl.in/connecting-source-sets
+
+
+1 problem was found storing the configuration cache.
+- Task `:unpackSkikoWasmRuntime` of type `org.jetbrains.compose.web.tasks.UnpackSkikoWasmRuntimeTask`: error writing value of type 'org.gradle.api.internal.artifacts.configurations.DefaultLegacyConfiguration'
+
+See the complete report at file:///workspace/TrikeShed-target-checks/build/reports/configuration-cache/6bv004wv9sncei7q77j1vybfi/947bawhyjkc74mrhlp1p32d4g/configuration-cache-report.html
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed-target-checks/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Configuration cache state could not be cached: field `skikoRuntimeFiles` of task `:unpackSkikoWasmRuntime` of type `org.jetbrains.compose.web.tasks.UnpackSkikoWasmRuntimeTask`: error writing value of type 'org.gradle.api.internal.artifacts.configurations.DefaultLegacyConfiguration'
+> Could not resolve all files for configuration ':COMPOSE_SKIKO_JS_WASM_RUNTIME'.
+   > Could not resolve org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2.
+     Required by:
+         root project 'TrikeShed'
+      > No cached version of org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2 available for offline mode.
+      > No cached version of org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2 available for offline mode.
+      > No cached version of org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2 available for offline mode.
+      > No cached version of org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2 available for offline mode.
+      > No cached version of org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2 available for offline mode.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 15s
+Configuration cache entry discarded due to serialization error.

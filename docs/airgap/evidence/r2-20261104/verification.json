@@ -1,0 +1,574 @@
+{
+  "kind": "airgap-confix-release/1",
+  "release": "R2",
+  "testedSourceCommit": "0fcfd00d202ca1b6612ebed97a7dae88c00afccc",
+  "targetVerificationCommit": "f91da5d6e2765debe3c85c0b2bcd081b5e7c90ea",
+  "targetSourceEquivalence": "Only four JVM test files changed after the target-build commit. Production source and build configuration are identical.",
+  "sourceEquivalence": "Later publication changes are documentation and retained evidence only; src and build configuration diff verified empty.",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "jdk": "OpenJDK 25.0.4.1+1-jvmci-25.3-b22",
+  "vm": "GraalVM CE 25.3.4.1+1.1",
+  "llvmVersion": "22.1.8",
+  "kotlinVersion": "2.4.21",
+  "gradleVersion": "9.8.2",
+  "module": {
+    "abi": "confix.flat/1",
+    "sha256": "25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
+    "bytes": 31488,
+    "upstreamRevision": "571b57d3ebdcdabe7ac76765b2875de7b98b9dab",
+    "upstreamPath": "lib/Confix/confix.ll"
+  },
+  "offline": {
+    "boundary": "Linux user/network namespace, same uid, loopback only, no external route",
+    "gradleMode": "--offline",
+    "wholeProgramAndReopen": true,
+    "freshNativeRebuild": true,
+    "freshNativeRebuildLog": "confix-offline-rebuild.txt",
+    "dependencyState": "Previously staged compiler/runtime/dependency caches; not clean-machine sealed-distribution proof"
+  },
+  "verifiedTargets": [
+    "JVM main and all test sources",
+    "JS main",
+    "Documents JS application",
+    "Spacegraph JS application",
+    "Wasm-JS main",
+    "Wasm-WASI main",
+    "Linux x64 main"
+  ],
+  "targetBuild": {
+    "network": "Connected build to stage existing Skiko dependency in separate cache; JVM execution was isolated",
+    "initialAttempt": "The separate target cache lacked org.jetbrains.skiko:skiko-js-wasm-runtime:0.150.2. Retained failed log; no source exclusion or code change."
+  },
+  "testSuites": [
+    {
+      "name": "EnglishObservationWireTest[jvm]",
+      "timestamp": "2026-11-04T22:24:55.233Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "currentQueriesRecheckAfterEvaluationAndOversizedGraphsRefuseWithoutOmittingNodes()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "publishedPhaseOneReceiptRemainsHistoricalWithUnreportedCopyIdentity()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "explicitlyWiredNullInputsCannotFallBackToAuthoredSnapshotParameters()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "malformedClaimsInjectionAndLegacyCurrentnessRefuse()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "literalControlsRoundTripAndWrongBytesCannotImpersonateAReceipt()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "sourceSpannedNegationAndExceptionAreQueryableWithoutLegalTruthOrGlobalMutation()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "EnglishTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-04T22:24:56.482Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "staleEnglishRefusesAnExistingCarrierAtFreezeApprovalAndQuery()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "prepareDoesNotSupersedeApprovalButSameContextFreezeDoesAndOtherContextsStaySeparate()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "ReviewedKifWireTest[jvm]",
+      "timestamp": "2026-11-04T22:24:57.346Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "cases": [
+        {
+          "name": "reviewedKifRetainsExactEvidenceAndInvalidatesOnSourceRevision()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "reviewedKifRunsThroughPinnedNativeSolver()[jvm]",
+          "skipped": true
+        }
+      ]
+    },
+    {
+      "name": "ReviewedTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-04T22:24:57.637Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "cases": [
+        {
+          "name": "authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "configuredNativeEndpointRunsActualReviewedQuery()[jvm]",
+          "skipped": true
+        }
+      ]
+    },
+    {
+      "name": "LlvmConfixRunTest[jvm]",
+      "timestamp": "2026-11-04T22:24:57.750Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "sourceGeometryAndScalarSummarySurviveReopening()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "LlvmScalarRunTest[jvm]",
+      "timestamp": "2026-11-04T22:25:01.085Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "failedConfiguredBootstrapReleasesItsRootOwner()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "CurationReviewedReadTest[jvm]",
+      "timestamp": "2026-11-04T22:25:02.157Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "realRetainedBookReadDoesNotAppendOrSpendRelease()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "authenticationRevisionAndCurrentnessCannotBeSuppliedByCaller()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "EnglishCopularPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-04T22:25:02.211Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "EnglishCopularPresetTest[jvm]",
+      "timestamp": "2026-11-04T22:25:02.454Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "sharedFullGovernorQueryFitsTheExistingEightPatternGrammar()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "offeredDiagramAndReceiptQueryRetainTypedWiringViewportAndCaveats()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "constructionNeverChoosesAnUnrequestedDatasetOrSourceMode()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "EnglishTaxonomyCarrierTest[jvm]",
+      "timestamp": "2026-11-04T22:25:02.483Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "EnglishTaxonomyExportGuardTest[jvm]",
+      "timestamp": "2026-11-04T22:25:02.579Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "manualKifRetainsSingleAndMultipleSnapshotExports()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "LlvmConfixTest[jvm]",
+      "timestamp": "2026-11-04T22:25:02.643Z",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "upstreamScannersMatchRetainedKotlinGeometry()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "admittedCancellationSettlesBeforeEvidenceAndClose()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "strictProfilesAndFailedOpeningLeaveNoSeat()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "copiedGeometryRemainsReadableAfterContextClose()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "admissionBoundsAndOperatorAuthorityAreEnforced()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "LlvmScalarTest[jvm]",
+      "timestamp": "2026-11-04T22:25:03.157Z",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "nativeDeniedControlStillRefusesLlvm()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "drainSettlesAcceptedQueueBeforeClosingContext()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "invalidModuleOpenReleasesSeatForRetry()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "profileIsStrictOperatorConfiguration()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "verifiedBinaryExecutesAndCopiesHostScalars()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "NativeHornProfileTest[jvm]",
+      "timestamp": "2026-11-04T22:25:03.334Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "trustedReadChecksSizeBeforeReading()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "strictPureOperatorProfile()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "missingFileCapabilityRefuses()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "growthBetweenSizeAndReadRemainsBounded()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "PresetAssemblyTest[jvm]",
+      "timestamp": "2026-11-04T22:25:03.341Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "everyPresetNodeTypeIsContractDeclared()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "tribunalCarriesBoundedLoopAbortEdgesAndValidates()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "everyPresetWireConnectsPortsWithMatchingKinds()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "presetsAreOfferedNotInstalled()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "allOfferedPresetsExistAndRoundTrip()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "presetsCarryViewportGeometryForRoundTripping()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "ReviewedKifCancellationTest[jvm]",
+      "timestamp": "2026-11-04T22:25:03.841Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "taxonomyWallLimitIncludesReviewedSourcePreparation()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "unionWallLimitIncludesReviewedSourcePreparation()[jvm]",
+          "skipped": false
+        },
+        {
+          "name": "canceledReadStopsBeforeFetchingTheNextReviewedSource()[jvm]",
+          "skipped": false
+        }
+      ]
+    },
+    {
+      "name": "ReviewedTaxonomyPlanPageTest[jvm]",
+      "timestamp": "2026-11-04T22:25:05.059Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        {
+          "name": "approvedSelectionCanBeInspectedInRevisionBoundPages()[jvm]",
+          "skipped": false
+        }
+      ]
+    }
+  ],
+  "conditionalSkips": "Two pre-existing reviewed native Horn endpoint tests require trikeshed.native.mlnix, which is not configured. Their pure reviewed paths execute; no exclusions were added.",
+  "testTotals": {
+    "tests": 63,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 2
+  },
+  "artifacts": {
+    "program": {
+      "cid": "sha256:e03d1513ea606e6fb7fdb9df0965e9865c7a30fc2077b115e2b88be0835ed4b6",
+      "bytes": 587
+    },
+    "receipt": {
+      "cid": "sha256:f5a6c98d1937e92d2ca41dd663bb559398a7e494acfbfca70b111d22d338ec4c",
+      "bytes": 4058
+    },
+    "invocations": {
+      "cid": "sha256:afbcc39ef12d23dfd1c40f0d3b8b95358ec2b7585384120248eaf5a4f84194db",
+      "bytes": 2127
+    },
+    "source": {
+      "cid": "sha256:ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573",
+      "bytes": 52
+    }
+  },
+  "preview": "response-preview.json is parsed HTTP response evidence, not the exact bytes identified by receiptCid.",
+  "sourceSha256": {
+    "build.gradle.kts": "2fc7fd4209cf811e450c152618c10bc9546830a91500d88b0801ceb8ba875089",
+    "src/commonMain/kotlin/borg/trikeshed/kernel/KernelElement.kt": "828afbb02f02ff40728eb4961dba5c40ac56336bf0bb42c7766d5c74daa1a100",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/CurationReview.kt": "5951395b67dc11c1b3799452dc9be61e455e25de83f30a560713f5a255f7932b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/DocumentTaxonomyCandidate.kt": "496d4e21e48f8be749b8def7c98c3abe11943fbe6d7b2b8e054b22dd5a5ce692",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishLcncPreset.kt": "8b4a879afc77bde3f1c54d6000d9ba81f6efec78f8b277edfd72ed27ff294cd7",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrier.kt": "ffaa6a9f5aaa3f3440a13165817c105f5f14a557780bfbc5b15f6d320a000ace",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "9acbd39a30c08d3cf29649d9d1dcb67bd923bb14b8ca3752150e5f8d63346168",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncNodeKey.kt": "d9fd9c512c6a120c0f05892379d3708bbd97c23029121b74bc83676a4a6962be",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncPresets.kt": "a39510a974d370f7e2f4de67edc48a16e55eba572cc349ec5326c768f8591a57",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LlvmConfixContract.kt": "6000bc6076b9c86130e2d44bb05a1b74b6bc23460239012221d3cbe530a67f1b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedKifHornPlan.kt": "4bb2981a38a7510e68ee02a07e919d014a044b88a69c4674799579c4f2925159",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedKifUnion.kt": "fde6fa9510c67b9120bbcae1c64e9383d6a40be1fdffa2b83481ea5deb9cb09f",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyPlan.kt": "09fe4d4cd247ff394af336bc08fb293cd68b5f2a9487f357f4fdb4171f2cea56",
+    "src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/KernelSeat.kt": "123486927780069e2cf157f43201398d868a16d66999af717c8ff2b7e20eb36c",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/EnglishCopularPresetTest.kt": "9e502e9cd863a681760be10e20dd174ce171eb3795b96284cd3015fa8906e92f",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt": "35057fbc05bb6bd1f1c535df9fcedbf89185d81f9e71920e6b785b15f2591835",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsCorpus.kt": "80b76194fb6c6f54c8c2ff01a2ba73c642a761ac061b7c106938b428562b5048",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt": "99c8ba26ec8a68b1462d024dc3291494f58a99539a5bb9ec23295ec2402fadd5",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglishTaxonomy.kt": "1ebb4c484aaebdba0d10a2e36fd9bad27d6db0e68a9c5c8b5844e8c2b4e6bf5b",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsFacets.kt": "e213c6d70722443d9372298eb7ba16349d691f56e279f7ad9a37f03c6679b89a",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt": "dbef591206d0c0fc337d86b9910fb1d5bddb86c2ce443e3b348b5fa50ae64d62",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt": "59c84cd22db8423a05cb9172fffdbed1c04cf41c6d08717f928e13cc2847cc9d",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/LlvmConfix.kt": "c33fdff50f069dac58cb15bedef2d2a78bfed7a974166e8e05a98b0681c28ddd",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/OroborosLcncWiring.kt": "5dac8b1d2d35a786439dd4f3ae59e4398ad7939b87f7ec2f7d66e4da58ac10d8",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/SubVmLegos.kt": "f199a59909d2b4cdc608563b49db6f43fea5619011a1348bea3b79454861aada",
+    "src/jvmMain/llvm/confix/bridge.c": "c5900490c3c1c4660cf4c8680eafb3b895ac44a60bcc53da4ed42972f9355ad1",
+    "src/jvmMain/llvm/confix/confix.ll": "7ba80066f3a8a1775f4a8390d38a8f347c498e5df560bb51b7c18c2fe4de2bc8",
+    "src/jvmMain/llvm/confix/provenance.json": "b9018e5de7a5279db8074e9eb9a18f7aaacd63cf2f093195cb0637213265175e",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishTaxonomyWireTest.kt": "ee02c1cdb408a10bbb3c0e852042a5a056d702354c8c16e7e0cf072eeb9ec014",
+    "src/jvmTest/kotlin/borg/trikeshed/kanban/module/LlvmConfixRunTest.kt": "18653e4521c3d7647382168581e1f6ea71e03c81db35fa4c5320f8b5dd4f7f67",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishCopularPresetExecutionTest.kt": "60b7333f720844b00706f3ab09335ed50a107ffa472c28e95cefdecb5559d165",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt": "52606a19357a052348bc076bd69f7a5ad4891c2f465d008e97262c6d6619b13e",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyExportGuardTest.kt": "62d91daf41dac50965b0e9edae10a0ab5fb3bc2e381bcfd7e4053dfb14c347b1",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyTestFixtures.kt": "369356a20e329370e1a4bd33d84e2725785ce3b800fc76ccc5b09dd3ee6516cb",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/LlvmConfixTest.kt": "e7c48df27d0b46a15a2d8bc781833a713c5017424783239e966beda2de3e4982",
+    "src/jvmTest/resources/english-copular/.gitattributes": "9dd9b4fbaa8968c99c1c3497458f6ed9c74850c5a6545435e64a582adc747362",
+    "src/jvmTest/resources/english-copular/README.txt": "12a9d9d5d40b8ad438f827c7e123b18a4226c00fee9a9a1222a5bd5c7e4651c4",
+    "src/jvmTest/resources/english-copular/inspection.cbor": "311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+    "src/jvmTest/resources/english-copular/source.txt": "1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+    "src/jvmTest/resources/sulong/add-mlir.bc": "75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b",
+    "src/jvmTest/resources/sulong/confix.bc": "25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3"
+  },
+  "logs": {
+    "gradle-confix-d3m-offline.txt": {
+      "sha256": "9459dbcdd8a0f8398341c0f067134045236f434d1f39f35639490cffcc78c645",
+      "bytes": 18001
+    },
+    "gradle-confix-d3m-targets-staged.txt": {
+      "sha256": "2b09455812534e1dbe34fb7281b3030f70ada67a192db24aca69a31528e7cf70",
+      "bytes": 466064
+    },
+    "confix-offline-rebuild.txt": {
+      "sha256": "d8920dee86c0e223e99d95dc4e7c68004586a72c94f89ec135ff46727a09558c",
+      "bytes": 367
+    },
+    "gradle-confix-d3m-targets.txt": {
+      "sha256": "0d942d2f9a4a7ac84d61aa34cbaacda516d4a9ccc5de0ec36dd3f636547967e3",
+      "bytes": 4857
+    },
+    "gradle-confix-d3m-offline-before-test-update.txt": {
+      "sha256": "0c2076cc36112873019da6102213bf2ce9639c2e0f97af53816fd38073ffea94",
+      "bytes": 144993
+    }
+  },
+  "nativeAudit": {
+    "evidence": "../confix-native-20261104/report.json",
+    "passingCases": 150026,
+    "scope": "Scanner ASan and bridge ASan/UBSan, bounded corpus/random/structured cases; separate from Sulong execution, not exhaustive memory-safety proof"
+  },
+  "d3m": "../../../d3m/2026-11-04-airgap-r2.md",
+  "limits": [
+    "Real JSON/CBOR/YAML scanner, no general Nix evaluator",
+    "Explicit copies and native free; no unified-GC or zero-copy claim",
+    "Known native/JVM YAML numeric-tag disagreement retained",
+    "Scanner success is not strict input validation",
+    "No native-memory isolation or hard native cancellation",
+    "Internal LLVM progress unobserved; pause between scans",
+    "No speedup, Apple Silicon, final browser animation or clean-machine distribution acceptance claimed",
+    "Incoming English taxonomy final browser verification remains open; historical v68/v69 evidence retains its original artifact scope"
+  ]
+}

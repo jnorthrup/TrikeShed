@@ -43,9 +43,10 @@ object SubVmLegos {
      * Register every lego into the daemon's [ModuleContext.lcncRunners]. Called from
      * the daemon after ModuleContext assembly; no other site registers vm.* runners.
      */
-    fun register(ctx: borg.trikeshed.module.ModuleContext, llvmScalar: LcncNodeRunner? = null) {
+    fun register(ctx: borg.trikeshed.module.ModuleContext, llvmScalar: LcncNodeRunner? = null, llvmConfix: LcncNodeRunner? = null) {
         val host = borg.trikeshed.vm.VmSupervisor.current
         llvmScalar?.let { ctx.lcncRunners[LlvmScalarContract.TYPE] = it }
+        llvmConfix?.let { ctx.lcncRunners[LlvmConfixContract.TYPE] = it }
         ctx.lcncRunners.putAll(VmRuntimeNodes.runners(host))
         ctx.lcncRunners[TIKA] = tika(host)
         ctx.lcncRunners[CORENLP] = corenlp(host)

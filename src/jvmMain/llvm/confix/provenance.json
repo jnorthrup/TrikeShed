@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/jnorthrup/mlir-nix",
+  "revision": "571b57d3ebdcdabe7ac76765b2875de7b98b9dab",
+  "path": "lib/Confix/confix.ll",
+  "sha256": "7ba80066f3a8a1775f4a8390d38a8f347c498e5df560bb51b7c18c2fe4de2bc8",
+  "bytes": 84381,
+  "sourceModification": "None; bridge.c is a separate TrikeShed ownership adapter",
+  "abi": "confix.flat/1",
+  "target": "x86_64-unknown-linux-gnu",
+  "producer": "LLVM 22.1.8",
+  "semanticScope": "Permissive Confix scanning; no strict JSON/YAML/CBOR validation or Nix evaluation"
+}

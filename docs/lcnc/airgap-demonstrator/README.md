@@ -24,6 +24,15 @@ records 19 passing current regressions with external networking unavailable
 and compilation of all affected targets. This closes a bounded transport
 milestone; the full evaluator and visual acceptance gates remain as specified.
 
+The [airgap release index](../../airgap/README.md) now continues through R2:
+the actual upstream Confix JSON/CBOR/YAML scanner, bounded native ownership,
+Kotlin geometry comparisons and a durable scanner-to-scalar run. Its
+[combined-source evidence](../../airgap/evidence/r2-20261104/verification.json)
+records 61 passing selected regressions under external-network isolation, two
+conditional native-solver skips and affected-target compilation. The
+[R3 handoff](../../airgap/03-visible-traversal.md) maps the next visible-transfer
+mechanics; final animation and sealed distribution remain open gates.
+
 | Reader or decision | Read first |
 |---|---|
 | Programme owner | [Charter](00-charter.md), [storyboard](13-demonstration-storyboard.md), [timeline and costs](15-timeline-and-costs.md) |

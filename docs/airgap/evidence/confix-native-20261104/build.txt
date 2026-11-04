@@ -1,0 +1,10 @@
+In file included from /workspace/confix-native-audit/harness.c:8:
+/workspace/TrikeShed/src/jvmMain/llvm/confix/bridge.c:11:9: warning: "offsetof" redefined
+   11 | #define offsetof(type, field) __builtin_offsetof(type, field)
+      |         ^~~~~~~~
+In file included from /usr/lib/gcc/x86_64-linux-gnu/14/include/sanitizer/common_interface_defs.h:15,
+                 from /usr/lib/gcc/x86_64-linux-gnu/14/include/sanitizer/asan_interface.h:16,
+                 from /workspace/confix-native-audit/harness.c:7:
+/usr/lib/gcc/x86_64-linux-gnu/14/include/stddef.h:416:9: note: this is the location of the previous definition
+  416 | #define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
+      |         ^~~~~~~~

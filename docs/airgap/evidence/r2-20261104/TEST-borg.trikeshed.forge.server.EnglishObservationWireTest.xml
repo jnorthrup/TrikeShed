@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishObservationWireTest[jvm]" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-04T22:24:55.233Z" hostname="0d6dfba25614" time="1.246">
+  <properties/>
+  <testcase name="currentQueriesRecheckAfterEvaluationAndOversizedGraphsRefuseWithoutOmittingNodes()[jvm]" classname="borg.trikeshed.forge.server.EnglishObservationWireTest" time="0.736"/>
+  <testcase name="publishedPhaseOneReceiptRemainsHistoricalWithUnreportedCopyIdentity()[jvm]" classname="borg.trikeshed.forge.server.EnglishObservationWireTest" time="0.234"/>
+  <testcase name="explicitlyWiredNullInputsCannotFallBackToAuthoredSnapshotParameters()[jvm]" classname="borg.trikeshed.forge.server.EnglishObservationWireTest" time="0.064"/>
+  <testcase name="malformedClaimsInjectionAndLegacyCurrentnessRefuse()[jvm]" classname="borg.trikeshed.forge.server.EnglishObservationWireTest" time="0.043"/>
+  <testcase name="literalControlsRoundTripAndWrongBytesCannotImpersonateAReceipt()[jvm]" classname="borg.trikeshed.forge.server.EnglishObservationWireTest" time="0.014"/>
+  <testcase name="sourceSpannedNegationAndExceptionAreQueryableWithoutLegalTruthOrGlobalMutation()[jvm]" classname="borg.trikeshed.forge.server.EnglishObservationWireTest" time="0.14"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
