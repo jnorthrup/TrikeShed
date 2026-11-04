@@ -92,3 +92,24 @@ and v61 incomplete identities/statuses remain unchanged. This combined artifact
 run does not claim general RDF conformance, source authenticity, legal authority,
 role inference, retraction, corpus training or same-angular coexistence. Parent
 publication of master follows the complete integration proof set separately.
+
+Immutable v67 combined checkpoint
+
+Source 78322850881924d6cfbee3b9c216f937e6dabc64 and main.jar SHA256
+39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4
+were selected after root recorded 326 successful checks and all three JS builds.
+All 32 external methods pass with JVM void returns, 1.035054300s; original RDF,
+short-literal and structural comparisons pass, 0.747399723s. Every compiled test,
+driver and bounded-CAS helper source hash exactly matches the executed v66 proof.
+No assertions, input cases or fixtures changed. Only tests/drivers were compiled;
+actual production CodeSources resolve to the new frozen JAR, with no overlays,
+friends, build class directories or ABI shims. JAR/source hashes remain stable.
+
+The original 12 RDF inputs and all CR/TAB/header/body/CRLF/mixed/long-literal controls
+retain their expected results. Existing v59, source-overlay BEFORE, v62 intermediate
+and v66 combined artifacts are unchanged and retain their distinct source/JAR
+identities. This revalidation records the new parse-boundary checkpoint, before
+future copular-template integration. It does not extend the declared RDF profile
+or establish source authority, general inference, retraction or same-angular
+coexistence. No models, NLP parsers, private corpus or live state were used; all
+isolated owners close. Parent master publication follows its full proof set.
