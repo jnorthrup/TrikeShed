@@ -1,0 +1,9 @@
+{
+  "commit": "577cd4977",
+  "files": {
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt": "52606a19357a052348bc076bd69f7a5ad4891c2f465d008e97262c6d6619b13e",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyExportGuardTest.kt": "62d91daf41dac50965b0e9edae10a0ab5fb3bc2e381bcfd7e4053dfb14c347b1",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyTestFixtures.kt": "369356a20e329370e1a4bd33d84e2725785ce3b800fc76ccc5b09dd3ee6516cb",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishTaxonomyWireTest.kt": "ee02c1cdb408a10bbb3c0e852042a5a056d702354c8c16e7e0cf072eeb9ec014"
+  }
+}

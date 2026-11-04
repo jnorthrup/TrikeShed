@@ -1,0 +1,19 @@
+{
+  "result": "PASS",
+  "source": "e3057178652b433421832003417478a98ffce304",
+  "mainJarSha256": "236775cffa83486dddc3ccdb4c73f2a04a2fcba44b49ee97f30798d208491e59",
+  "documentsJsSha256": "fb3176bc9b4b6c64060be7fe811380b1cb9092ad9c8f8d9a3f39b23d6accb522",
+  "spacegraphJsSha256": "5869c3219920cf999b8308d2bfa2f80080346473c8b03ef16e5edad1b034c29b",
+  "pagesJsSha256": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+  "snapshotAndDependencyBytesUnchanged": true,
+  "classpath": "immutable production main.jar plus immutable dependency JARs; own proof namespace only",
+  "sourceFiles": {
+    "Fixture.kt": "c8683ad2a50c137553276d643ff5f9c68e8f81f6af416384461592a10b26edb7",
+    "Reopen.kt": "b267578f6fc82b0cf8c66c94ffd9392333b489c6601539b622088654664485fe",
+    "driver.cjs": "f280e8a76b59fea2705b352a905c5d27f8f735a1ec0ad5a49de9c027f789f998",
+    "source.txt": "1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+    "deny-egress.py": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84",
+    "compile.sh": "64ed4fc27366605475dbcec1754bf437a017cd2653ef1e9627d3277989beac1c",
+    "run-fixture.sh": "0607c2255eb3b5df65c229e09bb892ff6e8ddfbc3642d540ed85fa3b9293a6e6"
+  }
+}

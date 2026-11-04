@@ -1,0 +1,98 @@
+package proof.englishlegalquery
+
+import borg.trikeshed.forge.server.EnglishCorpusWire
+import borg.trikeshed.job.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.litebike.WireHttpResponse
+import borg.trikeshed.module.ModuleContext
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import java.io.File
+
+/** Imports existing synthetic-source bytes and receipts; never fabricates a parser result. */
+class CorpusViewInputs(val manifest: Map<*, *>, val receiptIds: List<String>, val sourceRows: List<ProjectDoc>) {
+    companion object {
+        fun load(artifacts: File, cas: CasStore, originalBytes: MutableMap<String, ByteArray>): CorpusViewInputs {
+            val manifest = fields(reifyStrict(File(artifacts, "corpus-view-manifest.json").readText()))
+            // Filled from the root-authorized frozen v67 snapshot only after GREEN/GO.
+            val expectedJar = File(manifest["expectedExecutedMainJar"] as String).canonicalFile
+            val expectedSource = manifest["expectedExecutedSource"] as String
+            check(expectedSource == "78322850881924d6cfbee3b9c216f937e6dabc64")
+            check(expectedJar.parentFile.resolve("source-head.txt").readText().trim() == expectedSource)
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            expectedJar.inputStream().use { input ->
+                val buffer = ByteArray(65_536)
+                while (true) { val read = input.read(buffer); if (read < 0) break; digest.update(buffer, 0, read) }
+            }
+            val sha = digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+            check(sha == manifest["expectedExecutedMainJarSha256"])
+            for (type in s_[EnglishCorpusWire::class.java, EnglishObservationGraph::class.java,
+                borg.trikeshed.nlp.EnglishCorpusView::class.java].view) {
+                check(File(type.protectionDomain.codeSource.location.toURI()).canonicalFile == expectedJar)
+            }
+            val oldResult = File(manifest["sourceResult"] as String).readBytes()
+            check(ContentId.of(oldResult).hex == manifest["sourceResultSha256"])
+            for (raw in entries(manifest["blocks"])) {
+                val row = fields(raw); val bytes = File(row["file"] as String).readBytes()
+                val cid = ContentId(row["cid"] as String)
+                check(bytes.size == (row["length"] as Number).toInt() && ContentId.of(bytes) == cid)
+                check(cas.put(bytes) == cid); originalBytes[cid.value] = bytes
+            }
+            cas.sync()
+            val ids = entries(manifest["inspectionIds"]).map { it as String }
+            val snapshots = ids.map { EnglishObservationGraph.read(cas, ContentId(it)) }
+            check(snapshots.all { it.parsed.metadata?.runtime?.get("packageVersion") == "4.6.0" })
+            val sourceRows = snapshots.flatMap { requireNotNull(it.sourceSnapshots) }
+            check(sourceRows == entries(manifest["sourceRows"]).map { requireNotNull(ProjectDoc.fromMap(fields(it))) })
+            return CorpusViewInputs(manifest, ids, sourceRows)
+        }
+    }
+}
+
+/** Fixture controls delegate to the registered production owner and export its actual CAS bytes. */
+class CorpusViewFixture(private val ctx: ModuleContext, private val inputs: CorpusViewInputs, private val artifacts: File) {
+    private val calls = java.util.Collections.synchronizedList(mutableListOf<Map<String, Any?>>())
+    private val readbacks = java.util.Collections.synchronizedList(mutableListOf<Map<String, Any?>>())
+    fun evidence(): Map<String, Any?> = _m["scope" j inputs.manifest["scope"],
+        "inspectionIds" j inputs.receiptIds, "parserCalls" j 0, "productionOwner" j EnglishCorpusWire.TYPE,
+        "calls" j synchronized(calls) { calls.toList() }, "readbacks" j synchronized(readbacks) { readbacks.toList() }]
+    suspend fun route(method: String, path: String, body: String): WireHttpResponse? {
+        if (!path.startsWith("/_fixture/corpus-view/")) return null
+        fun reply(value: Any?, status: Int = 200) = WireHttpResponse(status, jsonOf(value), "application/json; charset=utf-8")
+        return when (path) {
+            "/_fixture/corpus-view/meta" -> reply(inputs.manifest - "blocks")
+            "/_fixture/corpus-view/evidence" -> reply(evidence())
+            "/_fixture/corpus-view/readback" -> {
+                require(method == "POST")
+                val request = fields(reifyStrict(body)); require(request.keys == _s["cid"])
+                val cid = ContentId(request["cid"] as String)
+                val reader = ctx.casStore as? BoundedCasReader ?: error("Bounded CAS reader required")
+                val bytes = requireNotNull(reader.getBounded(cid, 4 * 1024 * 1024))
+                check(ContentId.of(bytes) == cid)
+                val decoded = CanonicalCbor.decodeMapBounded(bytes, 4 * 1024 * 1024, 32, 500_000)
+                check(CanonicalCbor.encodeMap(decoded).contentEquals(bytes))
+                File(artifacts, "corpus-view-cas-readbacks").apply { mkdirs() }.resolve(cid.hex + ".cbor").writeBytes(bytes)
+                readbacks.add(_m["cid" j cid.value, "bytes" j bytes.size, "schema" j decoded["schema"]])
+                reply(_m["cid" j cid.value, "bytes" j bytes.size, "value" j decoded])
+            }
+            "/_fixture/corpus-view/lcnc" -> {
+                require(method == "POST")
+                val request = fields(reifyStrict(body)); require(request.keys == _s["inputs", "params"])
+                val params = fields(request["params"]).entries.associate { (it.key as String) to (it.value as String) }
+                val values = fields(request["inputs"]).entries.associate { (it.key as String) to it.value }
+                val runner = requireNotNull(ctx.lcncRunners[EnglishCorpusWire.TYPE])
+                try {
+                    val output = runner.execute(LcncNode("corpus-content-proof", EnglishCorpusWire.TYPE, params), values)
+                    calls.add(_m["request" j request, "status" j 200, "response" j output])
+                    reply(output)
+                } catch (failure: IllegalArgumentException) {
+                    val error = _m["error" j failure.message, "exception" j "IllegalArgumentException"]
+                    calls.add(_m["request" j request, "status" j 409, "response" j error])
+                    reply(error, 409)
+                }
+            }
+            else -> reply(_m["error" j "not_found"], 404)
+        }
+    }
+}

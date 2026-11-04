@@ -1,0 +1,17 @@
+{
+  "result": "PASS",
+  "scope": "Actual fixture JVM during fresh parser turn; in-process Graal CoreNLP shares this JVM, no separate production daemon claim.",
+  "processes": [
+    {
+      "pid": 51537,
+      "executable": "java",
+      "mainClass": "proof.englishcopular.FixtureKt",
+      "heapFlag": [
+        "-Xmx4g"
+      ],
+      "noNewPrivs": "1",
+      "seccompMode": "2",
+      "rss": "2441184 kB"
+    }
+  ]
+}

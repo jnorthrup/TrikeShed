@@ -1,0 +1,23 @@
+{
+  "result": "SOURCE_REVIEW_PASS_RUNTIME_PENDING",
+  "baseSource": "e3057178652b433421832003417478a98ffce304",
+  "fixCommit": "b0d7cd69cd984018bc82a16c35f577bffba1aef8",
+  "changedProductionFiles": [
+    "PanelsFacets.kt",
+    "PanelsReceipts.kt"
+  ],
+  "liveWorkspaceGenerationGuardsUnchanged": {
+    "if (serial != revision || drawer == null) return@launchJs": 5,
+    "if (serial != revision || drawer == null) return": 7,
+    "if (serial == revision && body != null)": 1
+  },
+  "staleWorkspaceLoad": "Explicit terminal Refresh explanation on invalidation; newer request finally only clears its own loading flag",
+  "immutableReceiptScope": "Captured drawer identity + connected section + execution tab + alive page + explicit request ticket; no canvas save revision",
+  "comparisonScope": "Always explicitly captured canvas program CID, with Refresh for current comparison; existing returned comparison program identities unchanged",
+  "beforeObservation": "v68 actual stage2 screenshot/progress shows completed3-rowquery/durable hashes then Evidence Reading workspace stall; no revision event trace recorded in that attempt",
+  "concreteReachableTrigger": "Native Panels.fit calls PatchCamera.saveCameraSoon, which schedules save at250ms; saveDoc increments facets revision while actual workspace/content responses are pending",
+  "proofPrepared": "Transportholds actual production responses unchanged, waits nativeFit shadow-update before releasing; no parser/query/authoredrun requests allowed",
+  "newRuntimeExecution": "Not performed before root v69 GREEN/GO",
+  "driverSha256": "8a7890665d27c9617e18bfcca7c0f4ecc74e8b309b1956e7f9786a80340a46ac",
+  "preparedDriverCorrection": "Before runtime: actual catalog Confix & facets title used for negative tab control"
+}

@@ -49,6 +49,70 @@ val enableLinuxArm64Target = (linuxHost && arm64Host) || providers.gradlePropert
 // ── Locked versions ───────────────────────────────────────────────────────
 // GraalVM CE 25.3.4.1 is the locked runtime (matches the JDK toolchain's bundled Truffle/JVMCI); JDK 25 toolchain.
 val graalVersion = "25.3.4.1"
+
+// Rebuild the retained scalar demonstration with an explicitly selected LLVM/MLIR SDK.
+// This standard arithmetic lowering does not assert a Nix-to-LLVM pass exists.
+val sulongDemoDir = layout.buildDirectory.dir("sulong").get().asFile
+val sulongLlvmBin = providers.gradleProperty("sulongLlvmBin").orNull
+fun sulongStage(name: String, tool: String, source: File, output: File, vararg flags: String) =
+    tasks.register<Exec>(name) {
+        group = "verification"
+        val compiler = sulongLlvmBin?.let { File(it, tool) }
+        inputs.file(source)
+        inputs.property("compiler", compiler?.absolutePath ?: tool)
+        compiler?.let { inputs.file(it) }
+        outputs.file(output)
+        doFirst { output.parentFile.mkdirs() }
+        commandLine(compiler?.absolutePath ?: tool, *flags, source.absolutePath, "-o", output.absolutePath)
+    }
+val lowerSulongDemo = sulongStage("lowerSulongDemoMlir", "mlir-opt", file("docs/sulong-bitcode/add.mlir"),
+    File(sulongDemoDir, "add.llvm.mlir"), "--convert-arith-to-llvm", "--convert-func-to-llvm", "--reconcile-unrealized-casts")
+val translateSulongDemo = sulongStage("translateSulongDemoLlvm", "mlir-translate", File(sulongDemoDir, "add.llvm.mlir"),
+    File(sulongDemoDir, "add.ll"), "--mlir-to-llvmir").also { it.configure { dependsOn(lowerSulongDemo) } }
+val buildSulongDemoBitcode = sulongStage("buildSulongDemoBitcode", "llvm-as", File(sulongDemoDir, "add.ll"),
+    File(sulongDemoDir, "add.bc")).also { it.configure { dependsOn(translateSulongDemo) } }
+tasks.register("verifySulongDemoBitcode") {
+    group = "verification"
+    dependsOn(buildSulongDemoBitcode)
+    val generated = File(sulongDemoDir, "add.bc")
+    val retained = file("src/jvmTest/resources/sulong/add-mlir.bc")
+    inputs.files(generated, retained)
+    doLast { check(generated.readBytes().contentEquals(retained.readBytes())) { "Rebuilt LLVM fixture differs from retained bitcode" } }
+}
+val confixDir = file("src/jvmMain/llvm/confix")
+val compileConfixBridge = tasks.register<Exec>("compileConfixBridge") {
+    group = "verification"
+    val compiler = sulongLlvmBin?.let { File(it, "clang") }
+    inputs.file(File(confixDir, "bridge.c"))
+    inputs.property("compiler", compiler?.absolutePath ?: "clang")
+    compiler?.let { inputs.file(it) }
+    val output = File(sulongDemoDir, "confix-bridge.bc")
+    outputs.file(output)
+    workingDir(projectDir)
+    doFirst { output.parentFile.mkdirs() }
+    commandLine(compiler?.absolutePath ?: "clang", "-target", "x86_64-unknown-linux-gnu", "-std=c11", "-O1",
+        "-emit-llvm", "-c", "-fno-builtin", "-fno-stack-protector", "-fno-ident",
+        "src/jvmMain/llvm/confix/bridge.c", "-o", File(sulongDemoDir, "confix-bridge.bc").absolutePath)
+}
+val buildConfixBitcode = tasks.register<Exec>("buildConfixBitcode") {
+    group = "verification"
+    dependsOn(compileConfixBridge)
+    val linker = sulongLlvmBin?.let { File(it, "llvm-link") }
+    inputs.files(File(confixDir, "confix.ll"), File(sulongDemoDir, "confix-bridge.bc"))
+    inputs.property("linker", linker?.absolutePath ?: "llvm-link")
+    linker?.let { inputs.file(it) }
+    outputs.file(File(sulongDemoDir, "confix.bc"))
+    commandLine(linker?.absolutePath ?: "llvm-link", File(sulongDemoDir, "confix-bridge.bc").absolutePath,
+        File(confixDir, "confix.ll").absolutePath, "-o", File(sulongDemoDir, "confix.bc").absolutePath)
+}
+tasks.register("verifyConfixBitcode") {
+    group = "verification"
+    dependsOn(buildConfixBitcode)
+    val generated = File(sulongDemoDir, "confix.bc")
+    val retained = file("src/jvmTest/resources/sulong/confix.bc")
+    inputs.files(generated, retained)
+    doLast { check(generated.readBytes().contentEquals(retained.readBytes())) { "Rebuilt Confix bitcode differs" } }
+}
 val requestFactoryVersion = "2.13.1"
 
 extra["versions.kotlinx-coroutines-core"] = "1.11.0"

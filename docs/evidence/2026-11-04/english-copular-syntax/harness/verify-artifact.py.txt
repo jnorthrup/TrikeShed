@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+"""Verify immutable snapshot/dependency bytes and own observer namespace before/after execution."""
+from pathlib import Path
+import hashlib,json,sys
+root=Path(__file__).resolve().parent
+snapshot=root/'snapshot'
+identity=json.loads((snapshot/'sha256.json').read_text())
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+for key,value in identity.items():
+ if key=='dependencies':
+  for path,expected in value.items(): assert sha(Path(path))==expected,path
+ else: assert sha(snapshot/key)==value,key
+cp=(snapshot/'classpath.txt').read_text().strip().split(':')
+assert cp[0]==str(snapshot/'main.jar')
+assert all(Path(p).is_file() and not '/TrikeShed/build/' in p for p in cp)
+assert all(p==str(snapshot/'main.jar') or p in identity['dependencies'] for p in cp)
+classes=root/'classes'
+for p in classes.rglob('*.class'): assert str(p.relative_to(classes)).startswith('proof/'),p
+record={'result':'PASS','source':(snapshot/'source-head.txt').read_text().strip(),'mainJarSha256':sha(snapshot/'main.jar'),
+ 'documentsJsSha256':sha(snapshot/'documents.js'),'spacegraphJsSha256':sha(snapshot/'spacegraph.js'),'pagesJsSha256':sha(snapshot/'pages.js'),
+ 'snapshotAndDependencyBytesUnchanged':True,'classpath':'immutable production main.jar plus immutable dependency JARs; own proof namespace only',
+ 'sourceFiles':{name:sha(root/name) for name in ['Fixture.kt','Reopen.kt','driver.cjs','source.txt','deny-egress.py','compile.sh','run-fixture.sh']}}
+output=root/(sys.argv[1] if len(sys.argv)>1 else 'artifact-identity.json')
+output.write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record))

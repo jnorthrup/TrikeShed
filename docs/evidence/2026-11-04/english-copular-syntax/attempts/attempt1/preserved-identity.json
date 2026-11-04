@@ -1,0 +1,20 @@
+{
+  "scope": "Actual fresh native source drop+one actualCore4.6inspection succeeded; stale gallery selector stopped before any authoredexecution. No productfailure/secondparse.",
+  "files": {
+    "driver.cjs": "f280e8a76b59fea2705b352a905c5d27f8f735a1ec0ad5a49de9c027f789f998",
+    "browser-progress.json": "488e4328dd55c9130863a6f9a1bda3f01ada4a99905cf5a47c126f099baa7976",
+    "browser-failure.json": "5e75028c026fb5a23131dfbd34f1375b96a29f3bdab99b025eee05dac3f0e166",
+    "browser-failure.png": "afb67155a8b9613a0c11b86090ac2ad1545afec7922a7090088577bf0080febd",
+    "native-source-drop.png": "ba305648906f071ec74d75f1c9f5ee403333dc9cd826b7043098fa5cbe8671a3",
+    "fresh-inspection-exact-qualified-sentence.png": "a1adb0533d606a7bc3c61d2a0ee3609b515998f81d790593253273e14101e0f5",
+    "fresh-inspection-full-copy-node-identities.png": "ebc4d5418f525ba91e20cf1bc3638968c3972c3b1a193765fdbae6c9b34fede0",
+    "driver-attempt1.log": "1a287b8a918515f6808358e52632d6c274649b5e4d398cc2f21a59405ef552ee",
+    "driver-attempt1.exit": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "fixture-attempt1.log": "aa10bb6884b6fdbd9bb5ed43662fd21f2800f86dde02dfc57b0f65391b382a73",
+    "fixture-attempt1.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "cleanup.json": "001db321ad5cf4cb958546d5f2c79059b51fc6041bb6fd94a127eec498f7fd9a",
+    "artifact-identity-before.json": "ca696de0bbb526e1b3164990c3468dfe1ae19c6fe616244222681315e4bcdd80",
+    "actual-process-scope.json": "1acc6931684930f97d7208d42f148df7397d76b186c7963bfed1ab9b4285cbe6",
+    "outbound-deny-profile.json": "fa9995b05612912be0a6fc8e47bea57a7d41ab5cf0ef4b7d8ee1a8af00a5d810"
+  }
+}

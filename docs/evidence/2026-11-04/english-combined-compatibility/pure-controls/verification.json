@@ -1,0 +1,47 @@
+{
+  "result": "PASS",
+  "scope": "Pure public API controls, selected source facts and recorded CoreNLP4.6 observations only; no native reasoner/parser/providers/network or production overlays",
+  "snapshot": "/workspace/library-files/english-combined-v66-proof/snapshot",
+  "mainJarSha256": "e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397",
+  "classpathSha256": "61a59c0911cb87a82c7192ab277fc48a0d02ade14bd96e6e019ad947703fc65e",
+  "sources": {
+    "SymbolicProbe.java": "f5c514b563b8e549bb250efb596721c20e61f473a9ece89c256d741920b850e5",
+    "CorpusPolicyProbe.java": "715acb6cf48ae3069c924a3d8b21c227aa2a754b9c83f51d0ad0525664c4e272",
+    "ArtifactOrigins.java": "0f92fad11bf5d2e94860a7dff7b306cbcbe516abc8ab0ccf538307b7f20de5de"
+  },
+  "productionCodeSources": {
+    "borg.trikeshed.kif.KifTaxonomySnapshot": "/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.nlp.EnglishCorpus": "/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.nlp.EnglishLdaResult": "/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.nlp.EnglishCorpusView": "/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.forge.server.EnglishCorpusWire": "/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.job.ContentId": "/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.parse.ReifyKt": "/workspace/library-files/english-combined-v66-proof/snapshot/main.jar"
+  },
+  "executedSource": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+  "outputs": {
+    "taxonomy-result.txt": "2203cfa393eb68714dc88c8e456575b32260f5f304de7b97fe03a0e7bbc23137",
+    "corpus-policy-result.json": "63c645154899745736fd99705798df542ffbd6c1fc16a88bdc68ed98d4c0f8ea",
+    "code-sources.json": "0333a3987066b7073c761fa388e2caf6ab16e35a16377c50baff3b6a46394d14"
+  },
+  "sharedExecution": "../shared/verification.json",
+  "corpusViewExecution": "../corpus-view/verification.json",
+  "publication": {
+    "corpusOutput": {
+      "stored": "corpus-policy-result.json.gz",
+      "uncompressedSha256": "63c645154899745736fd99705798df542ffbd6c1fc16a88bdc68ed98d4c0f8ea",
+      "storedSha256": "4989a77e78acfaee89ff81b963e88f7b27ccb2ada0d79104781c3f7f701f21a8"
+    },
+    "taxonomyOutput": "taxonomy-result.txt",
+    "sourceSuffix": ".java.txt is retained external harness source, not a production overlay"
+  },
+  "files": {
+    "ArtifactOrigins.java.txt": "0f92fad11bf5d2e94860a7dff7b306cbcbe516abc8ab0ccf538307b7f20de5de",
+    "CorpusPolicyProbe.java.txt": "715acb6cf48ae3069c924a3d8b21c227aa2a754b9c83f51d0ad0525664c4e272",
+    "README.txt": "c31d71ef9cd6aea3aaefc739e1d757df13c482fe6caa3c23a9bde11ba504dddd",
+    "SymbolicProbe.java.txt": "f5c514b563b8e549bb250efb596721c20e61f473a9ece89c256d741920b850e5",
+    "code-sources.json": "0333a3987066b7073c761fa388e2caf6ab16e35a16377c50baff3b6a46394d14",
+    "corpus-policy-result.json.gz": "4989a77e78acfaee89ff81b963e88f7b27ccb2ada0d79104781c3f7f701f21a8",
+    "taxonomy-result.txt": "2203cfa393eb68714dc88c8e456575b32260f5f304de7b97fe03a0e7bbc23137"
+  }
+}

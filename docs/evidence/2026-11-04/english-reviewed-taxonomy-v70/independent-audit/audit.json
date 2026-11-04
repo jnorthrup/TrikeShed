@@ -1,0 +1,61 @@
+{
+  "result": "PASS",
+  "scope": "Independent retained-data and recorded-request audit; no browser, parser, JVM, production verifier or new inference executed. Synthetic host-authenticated reviewer; conditional support from two occurrences in ONE document, not English entailment, legal truth, independent evidence confidence, native export or world-fact admission.",
+  "artifactIdentity": {
+    "source": "243db15b73636742e57d4319f01ef8db3230c657",
+    "mainJarSha256": "77b02c2619ee94ad74de7fc0584a45e7b3d3d50701287d7104cd5d6913d4632a",
+    "documentsJsSha256": "f90c03ddc54d564013213bc787816065582960a7bd63275cdae854f677f38ca4",
+    "spacegraphJsSha256": "da3e49e994744b5dbb8981ff7436e20527c8569d0794b2d5e9445985bc8300a5",
+    "pagesJsSha256": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+    "immutableDependencyJars": 119,
+    "snapshotAndDependencyHashesVerified": true,
+    "onlyOwnProofClassNamespace": true,
+    "fixtureSha256": "ac1d439c9afff4d2ef657e1147dd5c3b4c630cfb4459c15c1b17c0b169a5137b",
+    "scope": "Preparation validation only; actual default parser and native Documents review walkthrough await separate runtime GO"
+  },
+  "inputs": {
+    "browser-result.json": "sha256:069243be17057b7d5e8f71cac18fe430aa9aada6ebccb40d15e0114277e79d02",
+    "fixture-evidence.json": "sha256:d22fb7a197ee8d5910afaff08dc426f397f633aa0b0e1bdffb92154beaa76b9e",
+    "cleanup.json": "sha256:b9c00003178ddec2cd094877b8b866eb0eda93c49c3411bb0598811b98f2fcf2",
+    "artifact-identity-before.json": "sha256:53f96f2b265c239763ac4157d1efd70f58a6217053c383415761d95d200c035d"
+  },
+  "summary": {
+    "artifacts": 8,
+    "englishWitnesses": 2,
+    "independentSourceDocuments": 1,
+    "successfulInspectionPosts": 1,
+    "walWrites": 2,
+    "currentnessRefusals": 2
+  },
+  "negativeControls": [
+    {
+      "name": "class-sort",
+      "result": "REFUSED"
+    },
+    {
+      "name": "english-quote",
+      "result": "REFUSED"
+    },
+    {
+      "name": "source-cid",
+      "result": "REFUSED"
+    },
+    {
+      "name": "approval-substitution",
+      "result": "REFUSED"
+    },
+    {
+      "name": "unknown-promoted-to-supported",
+      "result": "REFUSED"
+    },
+    {
+      "name": "carrier-byte-flip",
+      "result": "REFUSED"
+    }
+  ],
+  "limits": [
+    "Actual parser execution is evidenced by the separate native Documents producer, not authenticated by a CBOR hash.",
+    "Native engine was unconfigured: UNAVAILABLE is not an exercised native export refusal.",
+    "after-close WAL/carrier reopener is a separate proof artifact."
+  ]
+}

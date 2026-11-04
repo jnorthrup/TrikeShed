@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+taxonomy_proof=/workspace/library-files/documents-english-taxonomy-final-proof
+taxonomy_snapshot=${1:?frozen snapshot required}
+taxonomy_output=${2:?new observer class directory required}
+taxonomy_cp=$(cat "$taxonomy_snapshot/classpath.txt")
+taxonomy_compiler=$(rg --files --no-ignore /workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21 | rg '\.jar$' | head -n 1)
+mkdir "$taxonomy_output"
+java -Xmx768m -cp "$taxonomy_compiler:$taxonomy_cp" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+ -no-stdlib -no-reflect -jvm-target 25 -classpath "$taxonomy_cp" \
+ -d "$taxonomy_output" "$taxonomy_proof/Fixture.kt"

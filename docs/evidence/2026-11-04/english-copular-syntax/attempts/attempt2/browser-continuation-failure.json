@@ -1,0 +1,4 @@
+{
+  "error": "TimeoutError: locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('region', { name: 'Workspace facets' }).getByRole('button', { name: 'Inspect receipt', exact: true })\u001b[22m\n",
+  "stack": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('region', { name: 'Workspace facets' }).getByRole('button', { name: 'Inspect receipt', exact: true })\u001b[22m\n\n    at main (/workspace/library-files/english-copular-v68-proof/driver-continuation.cjs:25:491)"
+}

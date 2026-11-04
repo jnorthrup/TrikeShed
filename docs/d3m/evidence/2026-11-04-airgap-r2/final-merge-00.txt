@@ -1,0 +1,7 @@
+Merge made by the 'ort' strategy.
+ .../forge/server/EnglishTaxonomyWireTest.kt          |  5 +++--
+ .../trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt     | 19 ++++++++++++-------
+ .../trikeshed/lcnc/EnglishTaxonomyExportGuardTest.kt |  3 +--
+ .../trikeshed/lcnc/EnglishTaxonomyTestFixtures.kt    | 20 ++++++++++++++++++++
+ 4 files changed, 36 insertions(+), 11 deletions(-)
+ create mode 100644 src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyTestFixtures.kt

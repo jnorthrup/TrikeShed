@@ -1,0 +1,37 @@
+{
+  "scope": "Same synthetic original short-literal spelling after repair; no bag/model/query execution",
+  "cases": [
+    {
+      "name": "rawCR",
+      "input": "<urn:s> <urn:p> \"a\rb\" .",
+      "kgOutcome": {
+        "status": "REFUSED",
+        "errorClass": "java.lang.IllegalArgumentException",
+        "error": "Raw CR/LF is invalid in a short RDF literal"
+      },
+      "donorObjects": [
+        "\"a\\nb\""
+      ],
+      "tokenizerStringTokens": [
+        "\"a\\rb\""
+      ]
+    },
+    {
+      "name": "rawTAB",
+      "input": "<urn:s> <urn:p> \"a\tb\" .",
+      "kgOutcome": {
+        "status": "ACCEPTED",
+        "objects": [
+          "\"a\\tb\""
+        ]
+      },
+      "donorObjects": [
+        "\"a\\tb\""
+      ],
+      "tokenizerStringTokens": [
+        "\"a\\tb\""
+      ]
+    }
+  ],
+  "productionCodeSource": "file:/workspace/library-files/english-combined-v67-proof/snapshot/main.jar"
+}

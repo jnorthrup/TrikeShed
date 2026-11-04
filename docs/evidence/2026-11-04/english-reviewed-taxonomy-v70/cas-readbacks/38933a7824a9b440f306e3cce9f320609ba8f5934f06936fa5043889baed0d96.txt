@@ -1,0 +1,2 @@
+(instance urn:legal:Tenant urn:legal:Person)
+(subclass urn:legal:Person urn:legal:Agent)

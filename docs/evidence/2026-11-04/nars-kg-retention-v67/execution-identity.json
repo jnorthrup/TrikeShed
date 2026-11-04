@@ -1,0 +1,49 @@
+{
+  "source": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "mainJar": "/workspace/library-files/english-combined-v67-proof/snapshot/main.jar",
+  "mainJarSha256": "39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4",
+  "classpathSha256": "58c6623ac789e9ebb6f73e4edf072cefd4587c8b0c4fb097da0477df80a259b1",
+  "testAndHarnessSources": {
+    "KgRetentionTest.kt": "9e7e1866577dde52d1209469847788b943335e71dc416b6226bfedc45d5693c6",
+    "KgRouteErrorTest.kt": "5483eee00f4291741e2bd3d0d4f03ba1953c57f17bd46fc085634ba772abd0a8",
+    "Runner.kt": "833a178b2a515aa65107d492a6f9c94974f3939a49ab2786161e54c923426d3f",
+    "Probe.kt": "efc99c7ef35c7e85fa29e74774cc08939a3ba8d3fe67a1da0b60ecec19d66e6d",
+    "PackProbe.kt": "860c1fe95d09df3dc7e21511ac039f522964fef106e186e4b4fae6791301c617"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "actualParserExecutions": 0,
+  "modelCalls": 0,
+  "scope": "Exact immutable final-JAR API/CAS synthetic proof; compiled test/harness classes only. Direct HTTP route calls, not socket/browser or production durability/source-authority proof.",
+  "attempt": 1,
+  "runs": {
+    "fixture": {
+      "exit": 0,
+      "seconds": 1.313
+    },
+    "api-cas": {
+      "exit": 0,
+      "seconds": 1.128
+    },
+    "pack-writer": {
+      "exit": 0,
+      "seconds": 1.358
+    },
+    "pack-reader": {
+      "exit": 0,
+      "seconds": 1.083
+    }
+  },
+  "packCloseAndSeparateProcessReopen": {
+    "writerProcessId": 47444,
+    "readerProcessId": 47474,
+    "writerManifestSha256": "a75f8e72d110b4715595dcea72db1a28174bc7b072baa7337918cf58136bbcc7",
+    "readerResultSha256": "217225bc4a50affd21d0143f1583c222cf70b95bc0eaeaa2773d1731f46c5f0f",
+    "caseCount": 2,
+    "scope": "Explicit drain/sync/close and separate reader process only; no crash or power-failure durability claim."
+  },
+  "result": "PASS",
+  "focusedRetentionMethods": 9,
+  "focusedRouteErrorMethods": 4,
+  "focusedMethodsTotal": 13
+}

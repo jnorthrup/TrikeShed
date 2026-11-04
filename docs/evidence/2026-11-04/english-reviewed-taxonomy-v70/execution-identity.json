@@ -1,0 +1,22 @@
+{
+  "source": "243db15b73636742e57d4319f01ef8db3230c657",
+  "mainJar": "/workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar",
+  "mainJarSha256": "77b02c2619ee94ad74de7fc0584a45e7b3d3d50701287d7104cd5d6913d4632a",
+  "classpathSha256": "ff7be87af918577decdda37a8cd24776422136accc161ab5b1f6a70db759bd9c",
+  "sources": {
+    "EnglishTaxonomyCarrierTest.kt": "52606a19357a052348bc076bd69f7a5ad4891c2f465d008e97262c6d6619b13e",
+    "EnglishTaxonomyExportGuardTest.kt": "62d91daf41dac50965b0e9edae10a0ab5fb3bc2e381bcfd7e4053dfb14c347b1",
+    "EnglishTaxonomyTestFixtures.kt": "369356a20e329370e1a4bd33d84e2725785ce3b800fc76ccc5b09dd3ee6516cb",
+    "EnglishTaxonomyWireTest.kt": "ee02c1cdb408a10bbb3c0e852042a5a056d702354c8c16e7e0cf072eeb9ec014",
+    "Runner.kt": "f2ab2016626a3b7064486b7653131a3612f7f5fa0da576356807cb36e24b5fd2"
+  },
+  "productionSourceOverlays": false,
+  "friendAccess": false,
+  "actualParserReads": 0,
+  "modelCalls": 0,
+  "scope": "Exact final-main-JAR focused JVM synthetic contract proof. Actual Core4.6 and Documents/browser proof remain separately scoped.",
+  "exit": 0,
+  "seconds": 4.498,
+  "methods": 13,
+  "result": "PASS"
+}

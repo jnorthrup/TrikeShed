@@ -1,0 +1,95 @@
+{
+  "kind": "english-combined-checkpoint/70",
+  "at": "2026-11-04T22:43:47.528532+00:00",
+  "testedSource": "243db15b73636742e57d4319f01ef8db3230c657",
+  "concurrentAlreadyPublishedProductionBase": "3e3d6aa4b798848d143bef0cdff2ea2aebb51107",
+  "publicationProductionChangesRelativeToConcurrentMaster": [],
+  "concurrentIntegration": "Master independently incorporated tested English source and additional Confix/LLVM code. This evidence publication retains that source unchanged. Actual v70 runtime proofs below used frozen243 artifacts; they are not executions of the later Confix build.",
+  "buildResult": "PASS",
+  "selectedJvmTests": 368,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "fullJvmTestSourceCompilation": true,
+  "threeBrowserBuildTasks": "PASS",
+  "artifactSha256": {
+    "main.jar": "77b02c2619ee94ad74de7fc0584a45e7b3d3d50701287d7104cd5d6913d4632a",
+    "documents.js": "f90c03ddc54d564013213bc787816065582960a7bd63275cdae854f677f38ca4",
+    "spacegraph.js": "da3e49e994744b5dbb8981ff7436e20527c8569d0794b2d5e9445985bc8300a5",
+    "pages.js": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c"
+  },
+  "dependencyJars": 119,
+  "totalClasspathJars": 120,
+  "proofs": {
+    "exactApplicationJarContracts": {
+      "methods": 13,
+      "productionClassesCodeSourceChecked": 15,
+      "overlays": false,
+      "friendAccess": false,
+      "same13CasesIncludedIn368": true
+    },
+    "nativeDocuments": {
+      "result": "PASS_FIRST_ATTEMPT",
+      "sourceBytes": 41,
+      "inspectionCid": "sha256:96cf4246c2ac61240d6f1f5ef24c53a6243cbdca65a11f98225ec02618586919",
+      "inspectionPosts": 1,
+      "syntheticAuthenticatedReviewer": true,
+      "englishAndKifOccurrenceWitnesses": 2,
+      "independentDocuments": 1,
+      "negativeAndUnknownControls": "PASS",
+      "afterCloseExactArtifacts": 8,
+      "crcReviewWalFrames": 2,
+      "independentAuditTamperControls": 9,
+      "finalSourceDeliberatelyStale": true
+    },
+    "panels": {
+      "result": "PASS_FIRST_ATTEMPT",
+      "ownershipCases": 5,
+      "heldReceiptBlocksExactAfterClose": 4,
+      "unchangedSourceHeadFiles": 11,
+      "productionCodeSourcesChecked": 21,
+      "independentAuditTamperControls": 5,
+      "newParserCalls": 0,
+      "newQueryOrRunPosts": 0,
+      "producer": "Exact retained v68 source/inspection/run; new v70 client and server readers"
+    }
+  },
+  "rootPublicAuditReplays": "PASS; native base/after-close and Panels independent Node reports reproduced",
+  "verifiedPublicManifests": [
+    {
+      "name": "exact taxonomy tests",
+      "manifest": "docs/evidence/2026-11-04/english-reviewed-taxonomy-v70/sha256.json",
+      "manifestSha256": "16408101df7047a007cf51cacf505d750b0b56521d51d229671465ef19a78d76",
+      "files": 6
+    },
+    {
+      "name": "native Documents pilot",
+      "manifest": "docs/evidence/2026-11-04/english-reviewed-taxonomy-v70/SHA256.json",
+      "manifestSha256": "8cd60c3d60a26c75e6a9ac5437eb0463af0a80b1b358894112d7211dc762d283",
+      "files": 50
+    },
+    {
+      "name": "new-client Panels races",
+      "manifest": "docs/evidence/2026-11-04/panels-evidence-lifecycle-v70/SHA256.json",
+      "manifestSha256": "757266042b67eb91aac414e2853961f5e008927dd4600b6eb2dfa5b89c88192e",
+      "files": 39
+    }
+  ],
+  "verifiedPublicFiles": 95,
+  "closedOwners": "All proof JVM/browser/listener/parser/review/PackCAS owners reported drained and closed; exit0",
+  "limits": [
+    "Stanford syntax and explicit reviewed translations are not automatic comprehension or legal conclusions.",
+    "No new generative-provider calls, SUMO classification authority, NARS evidence admission or live world facts are established by this pilot. Stanford itself uses local NLP model weights.",
+    "The English carrier is supported only by the existing pure reviewed taxonomy plan; unsupported native/union paths preserve refusal guards.",
+    "The fresh producer had one native Inspect POST; no inaccessible global parser-call counter is invented.",
+    "Fixture containment evidence is scoped to the controlled runtime, not universal production isolation.",
+    "Current NARS angular collisions still refuse distinct PIDs rather than retaining both.",
+    "Topics/word clouds/BM25 remain descriptive retrieval; no statistical repetition becomes legal truth.",
+    "The fresh support pilot is41ASCIIbytes/two simple nominal sentences; it is not a legal-language benchmark, OCR-quality result or Stanford accuracy-uplift claim."
+  ],
+  "activeNextSlices": [
+    "Read-only current retained English inspection opener and form layout/visible query goal.",
+    "Exact proposition attention with owner-side budget resolution and processed acknowledgement.",
+    "Next combined build includes the concurrent Confix/LLVM checks."
+  ]
+}

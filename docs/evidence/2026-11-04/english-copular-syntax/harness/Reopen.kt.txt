@@ -1,0 +1,48 @@
+package proof.englishcopularreopen
+
+import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import kotlinx.coroutines.runBlocking
+import java.io.File
+
+/** Reopens the actual closed PackCasStore; no parser, requests, models or replacement implementation. */
+fun main() = runBlocking {
+    val root = File(requireNotNull(java.lang.System.getenv("PROOF_ROOT")))
+    check(File(root, "fixture-attempt1.exit").readText().trim() == "0")
+    val cleanup = reifyStrict(File(root, "cleanup.json").readText()) as Map<*, *>
+    check(cleanup["allSupervisorsCompleted"] == true && (cleanup["parserCalls"] as Number).toInt() == 1)
+    val result = reifyStrict(File(root, "browser-result.json").readText()) as Map<*, *>
+    check(result["result"] == "PASS")
+    val observations = result["observations"] as Map<*, *>; val run = observations["run"] as Map<*, *>
+    val inspection = observations["inspection"] as Map<*, *>
+    val receipt = ContentId(inspection["receiptCid"] as String)
+    val cas = PackCasStore(JvmFileOperations(), File(root, "runtime/cas").absolutePath)
+    val rows = mutableListOf<Map<String, Any?>>()
+    val target = File(root, "reopened-cas-readbacks").apply { mkdirs() }
+    try {
+        for ((key, observed) in _m["receiptCid" j observations["durable"], "programCid" j observations["program"], "invocationsCid" j observations["invocations"]]) {
+            val cid = ContentId(run[key] as String)
+            val bytes = requireNotNull(cas.getBounded(cid, 4 * 1024 * 1024)); check(ContentId.of(bytes) == cid)
+            val decoded = reifyStrict(bytes.decodeToString(throwOnInvalidSequence = true))
+            check(decoded == observed) { "Stored $key differs from actual content response" }
+            File(target, cid.hex + ".json").writeBytes(bytes)
+            rows.add(_m["kind" j key, "cid" j cid.value, "bytes" j bytes.size, "matchesActualContentResponse" j true])
+        }
+        val checked = EnglishObservationGraph.read(cas, receipt)
+        check(checked.source.text.encodeToByteArray().contentEquals(File(root, "source.txt").readBytes()))
+        check(checked.receiptCid == receipt && checked.sourceSnapshots?.size == 1)
+        check(receipt.value != "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c")
+        val block = requireNotNull(cas.getBounded(receipt, 8 * 1024 * 1024)); check(ContentId.of(block) == receipt)
+        File(target, receipt.hex + ".cbor").writeBytes(block)
+        val source = requireNotNull(cas.getBounded(checked.source.originalCid, 1024)); check(ContentId.of(source) == checked.source.originalCid)
+        File(target, checked.source.originalCid.hex + ".txt").writeBytes(source)
+        val output = _m["result" j "PASS", "scope" j "Exact actual closed PackCasStore bytes reopened after all production owners drained. EnglishObservationGraph.read source/canonical verification and actual browser content JSON equality; no parser rerun or execution authentication by hash.",
+            "inspectionCid" j receipt.value, "originalCid" j checked.source.originalCid.value, "extractedTextCid" j checked.source.extractedTextCid.value,
+            "sourceBytes" j source.size, "selectedSourceSnapshots" j checked.sourceSnapshots?.map { it.toMap() }, "reusedOldInspection" j false,
+            "storedJsonReadbacks" j rows, "EnglishObservationGraphCodeSource" j EnglishObservationGraph::class.java.protectionDomain.codeSource.location.toString()]
+        File(root, "reopened-cas-readbacks.json").writeText(jsonOf(output)); println(jsonOf(output))
+    } finally { cas.close() }
+}

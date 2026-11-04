@@ -1,0 +1,1636 @@
+{
+  "source": "243db15b73636742e57d4319f01ef8db3230c657",
+  "started": "2026-11-04T22:16:48.432757+00:00",
+  "extraTests": [
+    "borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest",
+    "borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest",
+    "borg.trikeshed.forge.server.EnglishTaxonomyWireTest",
+    "borg.trikeshed.lcnc.CurationReviewedReadTest",
+    "borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest",
+    "borg.trikeshed.forge.server.ReviewedTaxonomyWireTest",
+    "borg.trikeshed.forge.server.ReviewedKifWireTest",
+    "borg.trikeshed.lcnc.ReviewedKifCancellationTest",
+    "borg.trikeshed.lcnc.LlvmScalarTest",
+    "borg.trikeshed.kanban.module.LlvmScalarRunTest",
+    "borg.trikeshed.lcnc.NativeHornProfileTest"
+  ],
+  "command": "./gradlew jsBrowserDocumentsDevelopmentWebpack jsBrowserSpacegraphDevelopmentWebpack jsBrowserPagesDevelopmentWebpack jvmTest -I /workspace/.trikeshed-cloud/resolve-jvm.init.gradle -PkotlinJsApps=documents,pages,spacegraph --daemon --configuration-cache --max-workers=4 --tests borg.trikeshed.nlp.EnglishInspectionTest --tests borg.trikeshed.graal.subvm.CoreNlpSourceTest --tests borg.trikeshed.narsese.NormClauseConditionsTest --tests borg.trikeshed.forge.server.DocumentEnglishWireTest --tests borg.trikeshed.narsese.ApplicabilityFactsTest --tests borg.trikeshed.narsese.ConstellationPremiseTest --tests borg.trikeshed.docs.DocumentSurfaceTest --tests borg.trikeshed.forge.server.PrimaryProjectCorpusTest --tests borg.trikeshed.forge.server.DocumentPdfLinksWireTest --tests borg.trikeshed.lcnc.CamelDispatchOwnershipTest --tests borg.trikeshed.graal.subvm.NlpNodeIdentityTest --tests borg.trikeshed.narsese.DependencyCopyInferenceTest --tests borg.trikeshed.nlp.EnglishLegalPatternsTest --tests borg.trikeshed.forge.server.EnglishLegalPatternsWireTest --tests borg.trikeshed.nlp.EnglishCorpusTest --tests borg.trikeshed.nlp.EnglishLdaTest --tests borg.trikeshed.forge.server.EnglishObservationWireTest --tests borg.trikeshed.forge.server.EnglishCorpusWireTest --tests borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest --tests borg.trikeshed.lcnc.PresetAssemblyTest --tests borg.trikeshed.forge.server.SparqlVisualBoundsTest --tests borg.trikeshed.forge.server.SparqlSourceWireTest --tests borg.trikeshed.narsese.KgRdfFidelityTest --tests borg.trikeshed.narsese.KgPropositionIdentityTest --tests borg.trikeshed.narsese.PropositionReadbackTest --tests borg.trikeshed.kif.KifSemanticTest --tests borg.trikeshed.narsese.BeliefAdmissionTest --tests borg.trikeshed.memory.HermesMemoryFeedbackTest --tests borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest --tests borg.trikeshed.hermes.HermesPenDelegatesTest.modelRefusalCarriesNegativeToolEvidence --tests borg.trikeshed.hermes.HermesPenDelegatesTest.negativeClaimIsNotARefusedOperation --tests borg.trikeshed.hermes.HermesPenDelegatesTest.everyCrossingLandsTwice --tests borg.trikeshed.hermes.HermesPenDelegatesTest.rejectedAssertionAdmissionIsNotSuccess --tests borg.trikeshed.narsese.KgRetentionTest --tests borg.trikeshed.litebike.KgHttpUtf8Test --tests borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest --tests borg.trikeshed.memory.ace.AceContextNodesTest --tests borg.trikeshed.memory.ace.BreadcrumbContextNodesTest --tests borg.trikeshed.docs.DocumentNavigationTest --tests borg.trikeshed.terminal.XtermTerminalEraseSavedTest --tests borg.trikeshed.terminal.XtermTerminalRowIdentityTest --tests borg.trikeshed.forge.server.CurationInstalledLinkTest --tests borg.trikeshed.forge.server.CurationIntakeTest --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest --tests borg.trikeshed.forge.server.LinkGrabRetryTest --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest --tests borg.trikeshed.forge.server.ProjectDbBindingTest --tests borg.trikeshed.job.PackCasVerifierTest --tests borg.trikeshed.narsese.BertPythonSleeveTest --tests borg.trikeshed.narsese.JevaWorkerProtocolTest --tests borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest --tests borg.trikeshed.narsese.KgPredicateNamespaceTest --tests borg.trikeshed.kif.KifTaxonomySnapshotTest --tests borg.trikeshed.nlp.EnglishCorpusViewTest --tests borg.trikeshed.narsese.KgRouteErrorTest --tests borg.trikeshed.lcnc.EnglishCopularPresetTest --tests borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest --tests borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest --tests borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest --tests borg.trikeshed.forge.server.EnglishTaxonomyWireTest --tests borg.trikeshed.lcnc.CurationReviewedReadTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyWireTest --tests borg.trikeshed.forge.server.ReviewedKifWireTest --tests borg.trikeshed.lcnc.ReviewedKifCancellationTest --tests borg.trikeshed.lcnc.LlvmScalarTest --tests borg.trikeshed.kanban.module.LlvmScalarRunTest --tests borg.trikeshed.lcnc.NativeHornProfileTest",
+  "productionEditsFrozen": true,
+  "noExclusionsIntroduced": true,
+  "result": "PASS",
+  "totals": {
+    "tests": 368,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "executed": 368,
+  "suites": [
+    {
+      "class": "BreadcrumbForegroundTest[jvm]",
+      "timestamp": "2026-11-04T22:28:16.250Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "DocumentNavigationTest[jvm]",
+      "timestamp": "2026-11-04T22:28:16.474Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "DocumentSurfaceTest[jvm]",
+      "timestamp": "2026-11-04T22:28:16.490Z",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "CurationInstalledLinkTest[jvm]",
+      "timestamp": "2026-11-04T22:28:16.517Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "CurationIntakeTest[jvm]",
+      "timestamp": "2026-11-04T22:28:16.991Z",
+      "tests": 37,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "CurationRemovalOwnershipTest[jvm]",
+      "timestamp": "2026-11-04T22:28:20.081Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "DocumentEnglishWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:20.119Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "DocumentPdfLinksWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:20.347Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishCorpusWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:21.056Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishLegalPatternsWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:37.286Z",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishObservationWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:39.913Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:40.663Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "LinkGrabRetryTest[jvm]",
+      "timestamp": "2026-11-04T22:28:41.681Z",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "PrimaryProjectCorpusTest[jvm]",
+      "timestamp": "2026-11-04T22:28:41.886Z",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ProjectCorpusVisitTest[jvm]",
+      "timestamp": "2026-11-04T22:28:42.167Z",
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ProjectDbBindingTest[jvm]",
+      "timestamp": "2026-11-04T22:28:42.333Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ReviewedKifWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:42.340Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ReviewedTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:46.618Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "SparqlSourceWireTest[jvm]",
+      "timestamp": "2026-11-04T22:28:46.907Z",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "SparqlVisualBoundsTest[jvm]",
+      "timestamp": "2026-11-04T22:28:47.078Z",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "CoreNlpSourceTest[jvm]",
+      "timestamp": "2026-11-04T22:28:47.119Z",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "NlpNodeIdentityTest[jvm]",
+      "timestamp": "2026-11-04T22:28:47.128Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "HermesPenDelegatesTest[jvm]",
+      "timestamp": "2026-11-04T22:28:47.136Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "PackCasVerifierTest[jvm]",
+      "timestamp": "2026-11-04T22:28:53.648Z",
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "LlvmScalarRunTest[jvm]",
+      "timestamp": "2026-11-04T22:28:53.878Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KifSemanticTest[jvm]",
+      "timestamp": "2026-11-04T22:28:56.808Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KifTaxonomySnapshotTest[jvm]",
+      "timestamp": "2026-11-04T22:28:56.857Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "CamelDispatchOwnershipTest[jvm]",
+      "timestamp": "2026-11-04T22:28:56.863Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "CurationReviewedReadTest[jvm]",
+      "timestamp": "2026-11-04T22:28:56.888Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishCamelPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-04T22:28:56.977Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishCopularPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-04T22:28:57.404Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishCopularPresetTest[jvm]",
+      "timestamp": "2026-11-04T22:28:57.553Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishTaxonomyCarrierTest[jvm]",
+      "timestamp": "2026-11-04T22:28:57.588Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishTaxonomyExportGuardTest[jvm]",
+      "timestamp": "2026-11-04T22:28:57.723Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "LlvmScalarTest[jvm]",
+      "timestamp": "2026-11-04T22:28:57.792Z",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "NativeHornProfileTest[jvm]",
+      "timestamp": "2026-11-04T22:28:58.048Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "PresetAssemblyTest[jvm]",
+      "timestamp": "2026-11-04T22:28:58.056Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ReviewedKifCancellationTest[jvm]",
+      "timestamp": "2026-11-04T22:28:58.662Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ReviewedTaxonomyPlanPageTest[jvm]",
+      "timestamp": "2026-11-04T22:28:59.887Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KgHttpUtf8Test[jvm]",
+      "timestamp": "2026-11-04T22:29:00.233Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "HermesMemoryFeedbackTest[jvm]",
+      "timestamp": "2026-11-04T22:29:00.252Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "AceContextNodesTest[jvm]",
+      "timestamp": "2026-11-04T22:29:00.278Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "BreadcrumbContextNodesTest[jvm]",
+      "timestamp": "2026-11-04T22:29:00.299Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ApplicabilityFactsTest[jvm]",
+      "timestamp": "2026-11-04T22:29:00.377Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "BeliefAdmissionTest[jvm]",
+      "timestamp": "2026-11-04T22:29:00.385Z",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "BertPythonSleeveTest[jvm]",
+      "timestamp": "2026-11-04T22:29:00.448Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "ConstellationPremiseTest[jvm]",
+      "timestamp": "2026-11-04T22:29:07.917Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "DependencyCopyInferenceTest[jvm]",
+      "timestamp": "2026-11-04T22:29:07.930Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "DocumentCuratorNlpRetentionTest[jvm]",
+      "timestamp": "2026-11-04T22:29:07.988Z",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "JevaWorkerProtocolTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.018Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KgPredicateNamespaceTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.064Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KgPropositionIdentityTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.083Z",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KgRdfFidelityTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.124Z",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KgRetentionTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.162Z",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "KgRouteErrorTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.259Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "NormClauseConditionsTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.283Z",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "PropositionReadbackTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.294Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishCorpusTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.309Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishCorpusViewTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.395Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishInspectionTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.406Z",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishLdaTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.423Z",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "EnglishLegalPatternsTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.693Z",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "XtermTerminalEraseSavedTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.894Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "XtermTerminalRowIdentityTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.909Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "class": "FileChannelDuplicateTest[jvm]",
+      "timestamp": "2026-11-04T22:29:08.915Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "skips": [],
+  "allJvmTestSourcesCompiled": true,
+  "threeBrowserBuildTasks": "PASS",
+  "classpathExportAttempt1": "Refused expected non-JAR Gradle classpath entries; attempt2 retains only immutable dependency JARs and records omitted source/resource directories and metadata POMs",
+  "newRuntimeProof": {
+    "documents": "PASS; public docs/evidence/2026-11-04/english-reviewed-taxonomy-v70",
+    "panels": "PASS; public docs/evidence/2026-11-04/panels-evidence-lifecycle-v70",
+    "source": "243db15b73636742e57d4319f01ef8db3230c657",
+    "actualNativeInspectionPosts": 1,
+    "defaultStanfordRuntime": "4.6.0",
+    "globalParserCallCounter": "not exposed by default reader; no global-count claim",
+    "scope": "Synthetic host-authenticated review; conditional support from two occurrences in ONE document. Not general English entailment/legal truth/independent confidence/native English export/production-wide airgap."
+  },
+  "initialInvocation": {
+    "tests": 368,
+    "executed": 366,
+    "skipped": 2,
+    "failures": 0,
+    "errors": 0,
+    "xml": "v70-initial-junit",
+    "suites": [
+      {
+        "class": "BreadcrumbForegroundTest[jvm]",
+        "timestamp": "2026-11-04T22:25:35.322Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentNavigationTest[jvm]",
+        "timestamp": "2026-11-04T22:25:35.534Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentSurfaceTest[jvm]",
+        "timestamp": "2026-11-04T22:25:35.547Z",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationInstalledLinkTest[jvm]",
+        "timestamp": "2026-11-04T22:25:35.575Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationIntakeTest[jvm]",
+        "timestamp": "2026-11-04T22:25:36.019Z",
+        "tests": 37,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationRemovalOwnershipTest[jvm]",
+        "timestamp": "2026-11-04T22:25:39.007Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentEnglishWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:39.032Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentPdfLinksWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:39.156Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCorpusWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:39.444Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishLegalPatternsWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:44.579Z",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishObservationWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:46.074Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishTaxonomyWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:46.585Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "LinkGrabRetryTest[jvm]",
+        "timestamp": "2026-11-04T22:25:47.234Z",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PrimaryProjectCorpusTest[jvm]",
+        "timestamp": "2026-11-04T22:25:47.416Z",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ProjectCorpusVisitTest[jvm]",
+        "timestamp": "2026-11-04T22:25:47.678Z",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ProjectDbBindingTest[jvm]",
+        "timestamp": "2026-11-04T22:25:47.827Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ReviewedKifWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:47.835Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      {
+        "class": "ReviewedTaxonomyWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:48.355Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      {
+        "class": "SparqlSourceWireTest[jvm]",
+        "timestamp": "2026-11-04T22:25:48.473Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "SparqlVisualBoundsTest[jvm]",
+        "timestamp": "2026-11-04T22:25:48.658Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CoreNlpSourceTest[jvm]",
+        "timestamp": "2026-11-04T22:25:48.714Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "NlpNodeIdentityTest[jvm]",
+        "timestamp": "2026-11-04T22:25:48.724Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "HermesPenDelegatesTest[jvm]",
+        "timestamp": "2026-11-04T22:25:48.732Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PackCasVerifierTest[jvm]",
+        "timestamp": "2026-11-04T22:25:54.951Z",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "LlvmScalarRunTest[jvm]",
+        "timestamp": "2026-11-04T22:25:55.179Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KifSemanticTest[jvm]",
+        "timestamp": "2026-11-04T22:25:57.678Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KifTaxonomySnapshotTest[jvm]",
+        "timestamp": "2026-11-04T22:25:57.708Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CamelDispatchOwnershipTest[jvm]",
+        "timestamp": "2026-11-04T22:25:57.713Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationReviewedReadTest[jvm]",
+        "timestamp": "2026-11-04T22:25:57.728Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCamelPresetExecutionTest[jvm]",
+        "timestamp": "2026-11-04T22:25:57.782Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCopularPresetExecutionTest[jvm]",
+        "timestamp": "2026-11-04T22:25:58.214Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCopularPresetTest[jvm]",
+        "timestamp": "2026-11-04T22:25:58.421Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishTaxonomyCarrierTest[jvm]",
+        "timestamp": "2026-11-04T22:25:58.456Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishTaxonomyExportGuardTest[jvm]",
+        "timestamp": "2026-11-04T22:25:58.576Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "LlvmScalarTest[jvm]",
+        "timestamp": "2026-11-04T22:25:58.639Z",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "NativeHornProfileTest[jvm]",
+        "timestamp": "2026-11-04T22:25:58.901Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PresetAssemblyTest[jvm]",
+        "timestamp": "2026-11-04T22:25:58.907Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ReviewedKifCancellationTest[jvm]",
+        "timestamp": "2026-11-04T22:25:59.512Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ReviewedTaxonomyPlanPageTest[jvm]",
+        "timestamp": "2026-11-04T22:26:00.738Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgHttpUtf8Test[jvm]",
+        "timestamp": "2026-11-04T22:26:01.017Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "HermesMemoryFeedbackTest[jvm]",
+        "timestamp": "2026-11-04T22:26:01.033Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "AceContextNodesTest[jvm]",
+        "timestamp": "2026-11-04T22:26:01.045Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "BreadcrumbContextNodesTest[jvm]",
+        "timestamp": "2026-11-04T22:26:01.064Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ApplicabilityFactsTest[jvm]",
+        "timestamp": "2026-11-04T22:26:01.129Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "BeliefAdmissionTest[jvm]",
+        "timestamp": "2026-11-04T22:26:01.136Z",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "BertPythonSleeveTest[jvm]",
+        "timestamp": "2026-11-04T22:26:01.185Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ConstellationPremiseTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.352Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DependencyCopyInferenceTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.360Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentCuratorNlpRetentionTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.399Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "JevaWorkerProtocolTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.421Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgPredicateNamespaceTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.455Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgPropositionIdentityTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.466Z",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgRdfFidelityTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.505Z",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgRetentionTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.543Z",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgRouteErrorTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.679Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "NormClauseConditionsTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.705Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PropositionReadbackTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.714Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCorpusTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.725Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCorpusViewTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.833Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishInspectionTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.860Z",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishLdaTest[jvm]",
+        "timestamp": "2026-11-04T22:26:08.880Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishLegalPatternsTest[jvm]",
+        "timestamp": "2026-11-04T22:26:09.172Z",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "XtermTerminalEraseSavedTest[jvm]",
+        "timestamp": "2026-11-04T22:26:09.352Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "XtermTerminalRowIdentityTest[jvm]",
+        "timestamp": "2026-11-04T22:26:09.365Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "FileChannelDuplicateTest[jvm]",
+        "timestamp": "2026-11-04T22:26:09.370Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "configuredNativeInvocation": {
+    "totals": {
+      "tests": 368,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "suites": [
+      {
+        "class": "BreadcrumbForegroundTest[jvm]",
+        "timestamp": "2026-11-04T22:28:16.250Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentNavigationTest[jvm]",
+        "timestamp": "2026-11-04T22:28:16.474Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentSurfaceTest[jvm]",
+        "timestamp": "2026-11-04T22:28:16.490Z",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationInstalledLinkTest[jvm]",
+        "timestamp": "2026-11-04T22:28:16.517Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationIntakeTest[jvm]",
+        "timestamp": "2026-11-04T22:28:16.991Z",
+        "tests": 37,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationRemovalOwnershipTest[jvm]",
+        "timestamp": "2026-11-04T22:28:20.081Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentEnglishWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:20.119Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentPdfLinksWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:20.347Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCorpusWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:21.056Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishLegalPatternsWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:37.286Z",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishObservationWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:39.913Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishTaxonomyWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:40.663Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "LinkGrabRetryTest[jvm]",
+        "timestamp": "2026-11-04T22:28:41.681Z",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PrimaryProjectCorpusTest[jvm]",
+        "timestamp": "2026-11-04T22:28:41.886Z",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ProjectCorpusVisitTest[jvm]",
+        "timestamp": "2026-11-04T22:28:42.167Z",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ProjectDbBindingTest[jvm]",
+        "timestamp": "2026-11-04T22:28:42.333Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ReviewedKifWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:42.340Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ReviewedTaxonomyWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:46.618Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "SparqlSourceWireTest[jvm]",
+        "timestamp": "2026-11-04T22:28:46.907Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "SparqlVisualBoundsTest[jvm]",
+        "timestamp": "2026-11-04T22:28:47.078Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CoreNlpSourceTest[jvm]",
+        "timestamp": "2026-11-04T22:28:47.119Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "NlpNodeIdentityTest[jvm]",
+        "timestamp": "2026-11-04T22:28:47.128Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "HermesPenDelegatesTest[jvm]",
+        "timestamp": "2026-11-04T22:28:47.136Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PackCasVerifierTest[jvm]",
+        "timestamp": "2026-11-04T22:28:53.648Z",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "LlvmScalarRunTest[jvm]",
+        "timestamp": "2026-11-04T22:28:53.878Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KifSemanticTest[jvm]",
+        "timestamp": "2026-11-04T22:28:56.808Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KifTaxonomySnapshotTest[jvm]",
+        "timestamp": "2026-11-04T22:28:56.857Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CamelDispatchOwnershipTest[jvm]",
+        "timestamp": "2026-11-04T22:28:56.863Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "CurationReviewedReadTest[jvm]",
+        "timestamp": "2026-11-04T22:28:56.888Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCamelPresetExecutionTest[jvm]",
+        "timestamp": "2026-11-04T22:28:56.977Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCopularPresetExecutionTest[jvm]",
+        "timestamp": "2026-11-04T22:28:57.404Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCopularPresetTest[jvm]",
+        "timestamp": "2026-11-04T22:28:57.553Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishTaxonomyCarrierTest[jvm]",
+        "timestamp": "2026-11-04T22:28:57.588Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishTaxonomyExportGuardTest[jvm]",
+        "timestamp": "2026-11-04T22:28:57.723Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "LlvmScalarTest[jvm]",
+        "timestamp": "2026-11-04T22:28:57.792Z",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "NativeHornProfileTest[jvm]",
+        "timestamp": "2026-11-04T22:28:58.048Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PresetAssemblyTest[jvm]",
+        "timestamp": "2026-11-04T22:28:58.056Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ReviewedKifCancellationTest[jvm]",
+        "timestamp": "2026-11-04T22:28:58.662Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ReviewedTaxonomyPlanPageTest[jvm]",
+        "timestamp": "2026-11-04T22:28:59.887Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgHttpUtf8Test[jvm]",
+        "timestamp": "2026-11-04T22:29:00.233Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "HermesMemoryFeedbackTest[jvm]",
+        "timestamp": "2026-11-04T22:29:00.252Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "AceContextNodesTest[jvm]",
+        "timestamp": "2026-11-04T22:29:00.278Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "BreadcrumbContextNodesTest[jvm]",
+        "timestamp": "2026-11-04T22:29:00.299Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ApplicabilityFactsTest[jvm]",
+        "timestamp": "2026-11-04T22:29:00.377Z",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "BeliefAdmissionTest[jvm]",
+        "timestamp": "2026-11-04T22:29:00.385Z",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "BertPythonSleeveTest[jvm]",
+        "timestamp": "2026-11-04T22:29:00.448Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "ConstellationPremiseTest[jvm]",
+        "timestamp": "2026-11-04T22:29:07.917Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DependencyCopyInferenceTest[jvm]",
+        "timestamp": "2026-11-04T22:29:07.930Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "DocumentCuratorNlpRetentionTest[jvm]",
+        "timestamp": "2026-11-04T22:29:07.988Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "JevaWorkerProtocolTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.018Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgPredicateNamespaceTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.064Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgPropositionIdentityTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.083Z",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgRdfFidelityTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.124Z",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgRetentionTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.162Z",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "KgRouteErrorTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.259Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "NormClauseConditionsTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.283Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "PropositionReadbackTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.294Z",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCorpusTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.309Z",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishCorpusViewTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.395Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishInspectionTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.406Z",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishLdaTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.423Z",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "EnglishLegalPatternsTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.693Z",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "XtermTerminalEraseSavedTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.894Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "XtermTerminalRowIdentityTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.909Z",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "FileChannelDuplicateTest[jvm]",
+        "timestamp": "2026-11-04T22:29:08.915Z",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "binarySha256": "97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5",
+    "adapterSha256": "e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c",
+    "datalogSha256": "9953ebeb4c4792817f49ff00ff16a4fb82945ff44b2778eecb7f3651e4e7fdd7",
+    "log": "build-v70-native.log",
+    "command": "./gradlew jsBrowserDocumentsDevelopmentWebpack jsBrowserSpacegraphDevelopmentWebpack jsBrowserPagesDevelopmentWebpack jvmTest -I /workspace/.trikeshed-cloud/resolve-jvm.init.gradle -PkotlinJsApps=documents,pages,spacegraph --daemon --configuration-cache --max-workers=4 -Ptrikeshed.native.mlnix=/workspace/library-files/mlnix-native-validation/build/bin/mlnix -Ptrikeshed.native.mlnix.sha256=97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5 -Ptrikeshed.native.adapter=/workspace/TrikeShed/utils/sumo-nix/run.nix -Ptrikeshed.native.datalog=/workspace/library-files/sumo-nix-proof/source --tests borg.trikeshed.nlp.EnglishInspectionTest --tests borg.trikeshed.graal.subvm.CoreNlpSourceTest --tests borg.trikeshed.narsese.NormClauseConditionsTest --tests borg.trikeshed.forge.server.DocumentEnglishWireTest --tests borg.trikeshed.narsese.ApplicabilityFactsTest --tests borg.trikeshed.narsese.ConstellationPremiseTest --tests borg.trikeshed.docs.DocumentSurfaceTest --tests borg.trikeshed.forge.server.PrimaryProjectCorpusTest --tests borg.trikeshed.forge.server.DocumentPdfLinksWireTest --tests borg.trikeshed.lcnc.CamelDispatchOwnershipTest --tests borg.trikeshed.graal.subvm.NlpNodeIdentityTest --tests borg.trikeshed.narsese.DependencyCopyInferenceTest --tests borg.trikeshed.nlp.EnglishLegalPatternsTest --tests borg.trikeshed.forge.server.EnglishLegalPatternsWireTest --tests borg.trikeshed.nlp.EnglishCorpusTest --tests borg.trikeshed.nlp.EnglishLdaTest --tests borg.trikeshed.forge.server.EnglishObservationWireTest --tests borg.trikeshed.forge.server.EnglishCorpusWireTest --tests borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest --tests borg.trikeshed.lcnc.PresetAssemblyTest --tests borg.trikeshed.forge.server.SparqlVisualBoundsTest --tests borg.trikeshed.forge.server.SparqlSourceWireTest --tests borg.trikeshed.narsese.KgRdfFidelityTest --tests borg.trikeshed.narsese.KgPropositionIdentityTest --tests borg.trikeshed.narsese.PropositionReadbackTest --tests borg.trikeshed.kif.KifSemanticTest --tests borg.trikeshed.narsese.BeliefAdmissionTest --tests borg.trikeshed.memory.HermesMemoryFeedbackTest --tests borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest --tests borg.trikeshed.hermes.HermesPenDelegatesTest.modelRefusalCarriesNegativeToolEvidence --tests borg.trikeshed.hermes.HermesPenDelegatesTest.negativeClaimIsNotARefusedOperation --tests borg.trikeshed.hermes.HermesPenDelegatesTest.everyCrossingLandsTwice --tests borg.trikeshed.hermes.HermesPenDelegatesTest.rejectedAssertionAdmissionIsNotSuccess --tests borg.trikeshed.narsese.KgRetentionTest --tests borg.trikeshed.litebike.KgHttpUtf8Test --tests borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest --tests borg.trikeshed.memory.ace.AceContextNodesTest --tests borg.trikeshed.memory.ace.BreadcrumbContextNodesTest --tests borg.trikeshed.docs.DocumentNavigationTest --tests borg.trikeshed.terminal.XtermTerminalEraseSavedTest --tests borg.trikeshed.terminal.XtermTerminalRowIdentityTest --tests borg.trikeshed.forge.server.CurationInstalledLinkTest --tests borg.trikeshed.forge.server.CurationIntakeTest --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest --tests borg.trikeshed.forge.server.LinkGrabRetryTest --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest --tests borg.trikeshed.forge.server.ProjectDbBindingTest --tests borg.trikeshed.job.PackCasVerifierTest --tests borg.trikeshed.narsese.BertPythonSleeveTest --tests borg.trikeshed.narsese.JevaWorkerProtocolTest --tests borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest --tests borg.trikeshed.narsese.KgPredicateNamespaceTest --tests borg.trikeshed.kif.KifTaxonomySnapshotTest --tests borg.trikeshed.nlp.EnglishCorpusViewTest --tests borg.trikeshed.narsese.KgRouteErrorTest --tests borg.trikeshed.lcnc.EnglishCopularPresetTest --tests borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest --tests borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest --tests borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest --tests borg.trikeshed.forge.server.EnglishTaxonomyWireTest --tests borg.trikeshed.lcnc.CurationReviewedReadTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyWireTest --tests borg.trikeshed.forge.server.ReviewedKifWireTest --tests borg.trikeshed.lcnc.ReviewedKifCancellationTest --tests borg.trikeshed.lcnc.LlvmScalarTest --tests borg.trikeshed.kanban.module.LlvmScalarRunTest --tests borg.trikeshed.lcnc.NativeHornProfileTest"
+  },
+  "frozenArtifactsUnchangedAfterNativeRerun": true,
+  "frozen": {
+    "main.jar": "77b02c2619ee94ad74de7fc0584a45e7b3d3d50701287d7104cd5d6913d4632a",
+    "documents.js": "f90c03ddc54d564013213bc787816065582960a7bd63275cdae854f677f38ca4",
+    "spacegraph.js": "da3e49e994744b5dbb8981ff7436e20527c8569d0794b2d5e9445985bc8300a5",
+    "pages.js": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c"
+  },
+  "dependencyJars": 119
+}

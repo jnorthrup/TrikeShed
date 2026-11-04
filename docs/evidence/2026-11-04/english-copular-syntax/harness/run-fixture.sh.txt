@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+copular_proof=/workspace/library-files/english-copular-v68-proof
+export TRIKESHED_SUBVM_HOME=/workspace/TrikeShed/utils/subvm
+export PROOF_ROOT="$copular_proof"
+export PROOF_SNAPSHOT="$copular_proof/snapshot"
+export PROOF_SOURCE="$copular_proof/source.txt"
+export OUTBOUND_DENY_RECEIPT="$copular_proof/outbound-deny-profile.json"
+copular_cp=$(cat "$PROOF_SNAPSHOT/classpath.txt")
+timeout 780s python "$copular_proof/deny-egress.py" -- java -Xmx4g -cp "$copular_proof/classes:$copular_cp" proof.englishcopular.FixtureKt
+copular_exit=$?
+printf '%s\n' "$copular_exit" > "$copular_proof/fixture-attempt1.exit"
+exit "$copular_exit"

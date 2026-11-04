@@ -1,0 +1,19 @@
+{
+  "scope": "All-synthetic actual closed fixture CAS, project durable heads/manifests and operational Kanban WAL. Retained for honest read-only v69 replay, not new ingestion or fresh parser output.",
+  "archiveSha256": "0584a6d921e660123071db695c7e7d29327c9067dafdde3369463ba1274ea5a8",
+  "files": {
+    "runtime/cas/pack": "dd8ae59e10e6f2c53694a37d498c7511c1f0a97e6c368ef3727afa4a8f175181",
+    "runtime/files/english-copular-fresh-proof/synthetic copular guarded clauses.txt": "1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+    "runtime/files/existing-documents/other.txt": "a3f27aacf5ef2e621194339dad5780f0199853e7260f6548bbc24bdf02a95e6b",
+    "runtime/operational-board/.kanban/board.wal": "b1404559816205326007cb6cf7b39282a7830d17fd959929f523cbb32b0c70bb",
+    "runtime/project-couch/english-copular-fresh-proof/.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runtime/project-couch/english-copular-fresh-proof/HEAD": "135bdb78e87aa97b02a8a84818d088e320cd9f8b9f3b11f4451edc6039680ce4",
+    "runtime/project-couch/existing-documents/.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "runtime/project-couch/existing-documents/HEAD": "903c3e69c94fabec44ee180b4662c3c48c2d427bb0894530b5d802f190966c55",
+    "runtime/project-intake-policy/english-copular-fresh-proof.guard": "30087957aa28ac8745610767f908d4fe10e304ba969cc43f1f010fbb3ac2adc5",
+    "runtime/project-intake-policy/existing-documents.guard": "1e6994916f3193b03050d8dfb5601b0c68447cb3c7c9203d6228e3cd9887d568",
+    "runtime/project-manifests/english-copular-fresh-proof.tsv": "a2dba40529cf5bf30e74cac1c5f95637a17efcdf3bb0010ac5d34630076779f9",
+    "runtime/project-manifests/existing-documents.tsv": "6de94dae622910a50db93ce21bbbdab28b5aa3ad8c0f020bcae8f0584eac94b6",
+    "runtime/projects.tsv": "eedbb30424b84305fe009071ff281b799400ed12d9c96281fdd4c755ce536454"
+  }
+}

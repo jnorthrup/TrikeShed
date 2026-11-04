@@ -1,0 +1,87 @@
+{
+  "scope": "Combined immutable-v67 replay of the fixed32 RDF/PID/KIF methods and original-input comparisons",
+  "source": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "mainJarSha256": "39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4",
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "buildClassDirectories": false,
+  "abiShims": false,
+  "tests": {
+    "pass": 32,
+    "fail": 0,
+    "allAnnotatedMethodsVoid": true,
+    "rdfMethods": 7,
+    "existingIdentityAdmissionKifReadbackControls": 25,
+    "runtimeSeconds": 1.0350542999985919
+  },
+  "comparisons": {
+    "result": "PASS",
+    "runtimeSeconds": 0.7473997230008536,
+    "sameImmutableV59RdfInputs": 12,
+    "sameShortCrTabInputs": 2,
+    "sameStructuralSourceOverlayBeforeInputs": 3,
+    "additionalMixedLongLiteralControls": 2,
+    "structuralBeforeRows": [
+      0,
+      1,
+      1
+    ],
+    "structuralAfterRows": [
+      1,
+      2,
+      1
+    ],
+    "longLiteralCrCrLfLfExact": true,
+    "otherPermissiveApiOutputsUnchangedOnSameInputs": true
+  },
+  "v62IntermediateEvidence": "Preserved unchanged with its source/JAR identity; not relabeled as this combined run",
+  "fixtureSetupChange": {
+    "assertionsAndInputCasesUnchanged": true,
+    "constructorsChanged": 2,
+    "change": "No change from v66: same two bounded-CAS consumer constructors and unchanged test helper",
+    "helperBodyUnchanged": true,
+    "helperSourceCommit": "4f2897a62e8ebdec248106359d731bc386fbd147",
+    "productionShim": false,
+    "retentionSpecificContracts": "Covered by the separate retention proof, not newly counted as these32 checks"
+  },
+  "provenance": [
+    "Actual checked production CodeSources resolve to selected main.jar",
+    "Main JAR and test-source hashes unchanged during run",
+    "Original immutable-v59 RDF and raw-short-literal BEFORE results unchanged",
+    "Structural CR-only BEFORE explicitly remains source-overlay evidence",
+    "No tests compile production code or use friend access"
+  ],
+  "observations": [
+    "IRI/literal/blank-node canonical terms and proposition IDs remain distinct in declared source context",
+    "Comma/semicolon/period/escaped quotes/backslashes/language/datatype/prefix cases preserve complete terms",
+    "Malformed and unsupported imports refuse instead of inventing or partially minting prefix triples",
+    "CR-only structural/comment endings retain suffix triples; original short CR/LF refuses, valid TAB and long literal values preserve",
+    "Historical codec/KIF and identity/ancestry/refusal/readback cases pass",
+    "Actual mixed-term source replay does not increase evidence",
+    "All isolated workers/review jobs close and temporary memory files are removed"
+  ],
+  "limits": [
+    "No general RDF conformance, source authentication, semantic role unification or NARS comprehension claim",
+    "Different propositions sharing one angular slot still refuse rather than coexist",
+    "Retraction and corpus training are not implemented by this fidelity proof",
+    "Declared ancestry/context is not authenticated independence or legal authority",
+    "Old historical representations are retained, not migrated by this check",
+    "Other permissive RDF import APIs retain their separate known limits",
+    "In-memory WAL tests do not prove disk/CRC/process-restart durability",
+    "JVM heap/deadline bounds do not establish native-memory or network isolation"
+  ],
+  "v61Status": "INCOMPLETE: 160 of 161 methods despite successful compilation; historical status unchanged",
+  "modelCalls": 0,
+  "nlpParserCalls": 0,
+  "liveBagAccess": false,
+  "privateCorpusUsed": false,
+  "masterPublication": "Parent-owned after the full integration proof set; this records the exact combined artifact",
+  "predecessorV66": {
+    "source": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+    "mainJarSha256": "e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397",
+    "evidencePreservedUnchanged": true,
+    "allTestAndDriverSourceHashesIdentical": true
+  },
+  "testInputIdentityReference": "v66-combined-test-source-identity.json and fixture-only diff, unchanged",
+  "checkpointScope": "Before future copular-template integration; publication remains parent-owned after full proof set"
+}

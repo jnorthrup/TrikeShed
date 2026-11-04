@@ -1,0 +1,50 @@
+from pathlib import Path
+import subprocess, sys, json, hashlib
+
+root = Path(__file__).resolve().parent
+snapshot = Path(sys.argv[1]).resolve()
+authorized = json.loads((root / 'authorized-artifacts.json').read_text())
+assert authorized['rootGreenGo'] is True
+source = (snapshot / 'source-head.txt').read_text().strip()
+assert source == authorized['executedSource'] == '78322850881924d6cfbee3b9c216f937e6dabc64'
+assert 'BUILD SUCCESSFUL' in (snapshot / 'passing-build.log').read_text()
+digest = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+assert digest(snapshot / 'main.jar') == authorized['mainJarSha256']
+cp = (snapshot / 'classpath.txt').read_text().strip()
+assert '/build/classes/' not in cp and '/classes/kotlin/' not in cp and '/jvmTest/' not in cp
+assert cp.split(':')[0] == str(snapshot / 'main.jar')
+jdk = Path('/workspace/.trikeshed-cloud/toolchains/graalvm-25/bin')
+classes = root / 'classes'
+classes.mkdir(exist_ok=False)
+sources = sorted(root.glob('*.java'))
+compiled = subprocess.run([str(jdk / 'javac'), '-cp', cp, '-d', str(classes), *map(str, sources)], capture_output=True, text=True, timeout=30)
+(root / 'compile.log').write_text(compiled.stdout + compiled.stderr)
+assert compiled.returncode == 0, compiled.stderr
+old = Path('/workspace/library-files/english-corpus-inference-v56-proof/corpus-browser')
+cases = [
+    ('ArtifactOrigins', [str(snapshot / 'main.jar')], 'code-sources.json'),
+    ('SymbolicProbe', [], 'taxonomy-result.txt'),
+    ('CorpusPolicyProbe', [str(old / 'result.json'), str(old / 'drop-input')], 'corpus-policy-result.json'),
+]
+for name, args, output in cases:
+    ran = subprocess.run([str(jdk / 'java'), '-Xmx256m', '-cp', str(classes) + ':' + cp, name, *args], capture_output=True, text=True, timeout=30)
+    (root / output).write_text(ran.stdout)
+    (root / (name + '.stderr.log')).write_text(ran.stderr)
+    assert ran.returncode == 0, ran.stderr
+origins = json.loads((root / 'code-sources.json').read_text())
+assert len(origins) == 7 and all(Path(p).resolve() == (snapshot / 'main.jar').resolve() for p in origins.values())
+identity = {
+    'result': 'PASS',
+    'scope': 'Pure public API controls: selected source facts and exact retained CoreNLP4.6 observations; no native solver/parser/providers or production overlays. No network API invoked; no independent kernel network sandbox claimed.',
+    'executedSource': source,
+    'snapshot': str(snapshot),
+    'mainJarSha256': digest(snapshot / 'main.jar'),
+    'classpathSha256': digest(snapshot / 'classpath.txt'),
+    'productionCodeSources': origins,
+    'sources': {p.name: digest(p) for p in sources},
+    'runnerSha256': digest(root / 'run.py'),
+    'outputs': {output: digest(root / output) for _, _, output in cases},
+    'authorization': authorized,
+}
+(root / 'verification.json').write_text(json.dumps(identity, indent=2) + '\n')
+print(json.dumps({'result': 'PASS', 'executedSource': source, 'mainJarSha256': identity['mainJarSha256'], 'codeSources': len(origins)}))

@@ -36,6 +36,9 @@ object ReviewedKifHornPlan {
         require(constant(subject) && constant(obj)) { "Goal requires two exact ground KIF constants" }
         val read = review.taxonomyRead(snapshotCid, revision)
         check()
+        require(!EnglishTaxonomyCarrier.isCarrier(read.candidate)) {
+            "English taxonomy carriers are not supported by native KIF export"
+        }
         val selections = read.candidate.selections
         require(selections.size <= MAX_SELECTIONS) { "Native KIF query supports at most $MAX_SELECTIONS reviewed assertions" }
         val reader = cas as? BoundedCasReader ?: error("Bounded CAS reads are required")

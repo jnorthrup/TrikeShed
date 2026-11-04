@@ -1,0 +1,68 @@
+package proof.englishlegalquery
+
+import borg.trikeshed.couch.*
+import borg.trikeshed.forge.server.*
+import borg.trikeshed.job.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.litebike.WireHttpResponse
+import borg.trikeshed.memory.*
+import borg.trikeshed.modelmux.*
+import borg.trikeshed.module.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+
+/** Actual storage/navigation owners, separate from read-only historical inspection source rows. */
+class DocumentsFixture(
+    private val ctx: ModuleContext, root: File, private val snapshot: File,
+    private val inspections: Map<String, String>, private val historical: List<ProjectDoc>,
+    private val originalBytes: Map<String, ByteArray>,
+) {
+    private val files = JvmFileOperations()
+    private val registry = ProjectDbRegistry("primary")
+    private val store = CouchStoreFactory.casBacked(ctx.casStore)
+    private val gateway = CouchAttachmentGateway(store, ctx.casStore)
+    private val scopes = ProjectScopes(files, gateway,
+        CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(ctx.casStore, store))), ctx.casStore,
+        null, projectDbs = registry, ledgerFile = File(root, "document-projects.tsv"), filesRoot = File(root, "document-files"))
+    private val miner = ProjectMiner(registry, scopes, ctx.casStore, null, File(root, "document-files"))
+    private val corpus = JvmProjectCorpus(registry, scopes, miner)
+    private val brain = BrainClient(endpointSpecs = emptyList())
+    // No miner in the API owner: new UI's automatic /mine gesture gets real production 503.
+    private val patch = PatchWire(brain, scopes, attachments = gateway, corpus = corpus, miner = null)
+    private val uploads = ProjectDbWire(registry, scopes)
+    private val automatic = AtomicInteger()
+    private val reviews = AtomicInteger()
+    suspend fun attach() {
+        scopes.onDocument = { _, _, _ -> automatic.incrementAndGet() }
+        scopes.onTextForReview = { reviews.incrementAndGet() }
+        scopes.onExplicitDocument = { _, _ -> reviews.incrementAndGet() }
+        for (project in historical.map { it.project }.distinct()) scopes.beginUpload(project, manualIntake = true)
+        for (row in historical) scopes.uploadPut(row.project, row.id, requireNotNull(originalBytes[row.cid]), null, manualIntake = true)
+        check(!brain.hasEndpoints() && brain.modelMux().listModels().size == 0)
+    }
+    fun evidence(): Map<String, Any?> = _m[
+        "scope" j "Native new batch upload and navigation use actual ProjectScopes/ProjectDbWire/PatchWire. Preloaded text bytes have new storage revisions, not old inspection revisions. Corpus shelf IDs restored explicitly; snapshot mode only.",
+        "corpusProject" j historical.first().project, "corpusReceiptIds" j inspections.values.sorted(),
+        "automaticIntake" j automatic.get(), "reviewIntake" j reviews.get(),
+        "configuredModels" j brain.modelMux().listModels().size,
+        "minerInApi" j false, "parserOwner" j false,
+    ]
+    suspend fun route(method: String, target: String, raw: ByteArray, body: String): WireHttpResponse? {
+        val path = target.substringBefore('?')
+        if (method == "GET" && path == "/documents") return WireHttpResponse(200, File(snapshot, "web/documents.html").readText(), "text/html; charset=utf-8")
+        if (method == "GET" && path == "/kotlin/documents/documents.js") return WireHttpResponse(200, File(snapshot, "documents.js").readText(), "application/javascript")
+        if (path.startsWith("/_project/")) {
+            val response = uploads.route(method, target, "$method $target HTTP/1.1\r\n\r\n".encodeToByteArray() + raw, null) ?: return null
+            return WireHttpResponse(response.status, response.body, response.contentType)
+        }
+        if (path.startsWith("/api/projects")) {
+            val response = patch.route(method, target, "$method $target HTTP/1.1\r\n\r\n$body", null) ?: return null
+            return WireHttpResponse(response.status, response.body, response.contentType)
+        }
+        return null
+    }
+    suspend fun drain() { scopes.drain(); check(automatic.get() == 0 && reviews.get() == 0) }
+}

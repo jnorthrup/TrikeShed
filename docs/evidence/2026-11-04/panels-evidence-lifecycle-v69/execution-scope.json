@@ -1,0 +1,21 @@
+{
+  "result": "PASS",
+  "scope": "Five deterministic read-only v69 Panels lifecycle controls, first browser attempt; source/inspection/query execution remains the separate v68 evidence.",
+  "source": "d891ec320090cf1804a722ee9dcbefcfded0e5d5",
+  "newParserReads": 0,
+  "newInspections": 0,
+  "newQueries": 0,
+  "newAuthoredRuns": 0,
+  "modelCalls": 0,
+  "heldResponses": "Actual production route.fetch responses, unchanged content; observed native Fit and deferred camera-save event precede release.",
+  "runtimeOwnerPolicy": "Reduced production-owner fixture; transport refuses accidental execution requests as fixture policy; none were requested.",
+  "sourceRows": "Actual production ProjectScopes durable remount; exact canonical receipt source rows before UI, original durable heads/manifests/ledger byte-identical afterwards.",
+  "afterCloseReadbacks": 4,
+  "allOwnersClosed": true,
+  "limits": [
+    "No full production daemon restart claim",
+    "No new fresh parser, current query, approval, inference or OS-wide sandbox claim",
+    "Previous selection is a running historical state of the same original run",
+    "Captured canvas comparison is explicitly historical to the selected workspace, not asserted current"
+  ]
+}

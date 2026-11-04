@@ -1,0 +1,4 @@
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+warning: Linking two modules of different data layouts: 'src/jvmMain/llvm/confix/confix.ll' is '' whereas 'llvm-link' is 'e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128'
+
+25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3  /workspace/confix-offline-rebuild/confix.bc

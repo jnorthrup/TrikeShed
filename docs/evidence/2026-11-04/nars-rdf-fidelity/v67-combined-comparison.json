@@ -1,0 +1,20 @@
+{
+  "result": "PASS",
+  "sameOriginal12Inputs": true,
+  "structuralCommentCrCrLfPreserved": true,
+  "mixedStructuralAndLongLiteralCrCrLfLfPreserved": true,
+  "structuralEolBeforeIsSourceOverlay": true,
+  "sameDeclaredContext": true,
+  "iriVsLiteralNowDistinctTypedTermsAndPids": true,
+  "commaNowOneCompleteLiteral": true,
+  "punctuationEscapesDatatypePreserved": true,
+  "languageAndNamespacePreserved": true,
+  "unsupportedSuffixEscapeSameLinePrefixExplicitlyRefused": true,
+  "originalShortRawCrRefusedValidTabPreserved": true,
+  "otherPermissiveApisUnchangedOnSameInputs": true,
+  "worldAuthorityEstablished": false,
+  "generalRdfConformance": false,
+  "generalSameAngularCoexistence": false,
+  "baselineResultSha256": "af0f19ef4d45f4f52f70b49632b6a59e03802802dbf5718e4b34e16f93ea0bed",
+  "shortLiteralBaselineSha256": "be5478621494b05561f897bcf274864c15d3d064390c3f28c38835dc80460578"
+}
