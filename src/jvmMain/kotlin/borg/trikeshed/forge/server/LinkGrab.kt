@@ -7,9 +7,11 @@ import borg.trikeshed.htx.headerValue
 import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.lcnc.ProjectCorpus
+import borg.trikeshed.lcnc.ProjectDoc
 import borg.trikeshed.lcnc.ProjectNodes
+import borg.trikeshed.lcnc.ProjectText
 import borg.trikeshed.lib.*
-import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.*
 import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
@@ -69,9 +71,11 @@ class LinkGrab(
                 corpus.visit(project) { d ->
                     currentCoroutineContext().ensureActive()
                     if (ProjectNodes.twin(d.id)) return@visit
-                    val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: return@visit
+                    val note = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096) ?: return@visit
+                    val n = ProjectNodes.conventions(note.text)
                     val digest = n["sha256"] ?: return@visit
                     if (d.cid != "sha256:$digest" || n["bytes"]?.toLongOrNull()?.let { it != d.length } == true) return@visit
+                    if (!heldBytes(project, owner, d, note)) return@visit
                     s_[n["url"], n["requested"]].view.filterNotNull().forEach { h.works.add(work(it)) }
                     h.digests.add(digest)
                 }
@@ -83,6 +87,36 @@ class LinkGrab(
                 throw failure
             }
         }
+    }
+
+    /** Listing identities are candidates; only available verified bytes can suppress retrieval. */
+    private suspend fun heldBytes(project: String, owner: ProjectDb?, document: ProjectDoc, notes: ProjectText): Boolean {
+        if (owner == null || document.project != project || notes.project != project ||
+            notes.id != document.id + ProjectNodes.NOTES_SUFFIX || scopes.linkOwner(project) !== owner) return false
+        val head = owner.store.head
+        val bodyBefore = head.slot(document.id) ?: return false
+        val notesBefore = head.slot(notes.id) ?: return false
+        if (bodyBefore.deleted || bodyBefore.attachmentDeleted || bodyBefore.ambiguous ||
+            bodyBefore.rev != document.rev || bodyBefore.sequence != document.seq || bodyBefore.contentId != document.cid ||
+            document.length < 0 || bodyBefore.length?.toLongOrNull() != document.length ||
+            notesBefore.deleted || notesBefore.attachmentDeleted || notesBefore.ambiguous ||
+            notesBefore.rev != notes.rev || notesBefore.sequence != notes.seq || notesBefore.contentId != notes.cid ||
+            ContentId.of(notes.text.encodeToByteArray()).value != notes.cid) return false
+        currentCoroutineContext().ensureActive()
+        val available = try {
+            val cid = ContentId(document.cid)
+            when (val store = owner.db.cas) {
+                is CasVerifier -> store.verify(cid, document.length)
+                is BoundedCasReader -> if (document.length <= INDEX_READ_BYTES) {
+                    val bytes = store.getBounded(cid, document.length.toInt())
+                    bytes != null && bytes.size.toLong() == document.length && ContentId.of(bytes) == cid
+                } else false
+                else -> false
+            }
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { false }
+        currentCoroutineContext().ensureActive()
+        return available && scopes.linkOwner(project) === owner && head.slot(document.id) == bodyBefore && head.slot(notes.id) == notesBefore
     }
 
     /** The caller owns the work; waiters retry a failed claim rather than inheriting its reservation. */
@@ -255,6 +289,8 @@ class LinkGrab(
         const val DEPTH = 2
         const val REDIRECTS = 5
         const val FETCH_MS = 45_000L
+        /** One candidate's allocation cap when streaming CAS verification is unavailable. */
+        const val INDEX_READ_BYTES = 1024 * 1024
         const val AGENT = "TrikeShed-curation/0.1 (+https://github.com/jnorthrup/TrikeShed)"
         const val WAYBACK = "https://web.archive.org/web"
 

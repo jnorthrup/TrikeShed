@@ -17,9 +17,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
 
 class LinkGrabRetryTest {
-    private class Rig(val scope: CoroutineScope, val route: suspend (HtxRequest) -> HtxResponse) {
+    private class Rig(val scope: CoroutineScope, val cas: CasStore = CasStore.inMemory(), val route: suspend (HtxRequest) -> HtxResponse) {
         val home = Files.createTempDirectory("link-retry").toFile()
-        val cas = CasStore.inMemory()
         val store = CouchStoreFactory.casBacked(cas)
         val gateway = CouchAttachmentGateway(store, cas)
         val registry = ProjectDbRegistry("primary")
@@ -56,6 +55,35 @@ class LinkGrabRetryTest {
                 "url: http://localhost/child\nsha256: $digest\n".encodeToByteArray())
             LinkGrab(rig.nodes, rig.corpus, rig.scopes, rig.htx).grab(project, "root.html", DecisionProvider.JEV)
             assertNotNull(rig.corpus.document(project, "localhost/child.html"))
+        } finally { rig.close() }
+    }
+
+    @Test fun corruptRetainedBodyDoesNotBecomeHeldSuccess(): Unit = runBlocking {
+        val backing = CasStore.inMemory()
+        val bounded = object : CasStore(), BoundedCasReader {
+            override fun put(bytes: ByteArray): ContentId = backing.put(bytes)
+            override fun get(cid: ContentId): ByteArray? = backing.get(cid)
+            override fun getBounded(cid: ContentId, maxBytes: Int): ByteArray? {
+                val bytes = backing.get(cid) ?: return null
+                require(bytes.size <= maxBytes)
+                return bytes
+            }
+        }
+        val attempts = AtomicInteger()
+        val rig = Rig(this, cas = bounded) { attempts.incrementAndGet(); response("unavailable", 503) }
+        val project = rig.open("http://localhost/child")
+        try {
+            val bytes = "<html>retained</html>".encodeToByteArray()
+            val cid = rig.scopes.uploadPut(project, "localhost/child.html", bytes)
+            rig.scopes.uploadPut(project, "localhost/child.html.notes.md",
+                "url: http://localhost/child\nsha256: ${cid.hex}\nbytes: ${bytes.size}\n".encodeToByteArray())
+            backing.corrupt(cid)
+            val links = LinkGrab(rig.nodes, rig.corpus, rig.scopes, rig.htx)
+            links.grab(project, "root.html", DecisionProvider.JEV)
+            assertEquals(2, attempts.get(), "Matching listing/notes metadata cannot hide unavailable body bytes")
+            links.grab(project, "root.html", DecisionProvider.JEV)
+            assertEquals(4, attempts.get(), "A failed retrieval must remain eligible for retry")
+            assertFailsWith<IllegalStateException> { backing.get(cid) }
         } finally { rig.close() }
     }
 
