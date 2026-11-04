@@ -461,6 +461,14 @@ D3M is the endorsed integration technique for distributed branch work.
 5 at the end you identify the intent of each conflict or blocks of conflicts for the intent and the fix.
 6 fix compilation and tests.  tests older than 30 days are no longer considered current tests.  better to delete them than fix them.  
 7 git push to origin master.  
-8 do not delete remote or local branches after merge or push, 
+8 do not delete remote or local branches after merge or push,
 
-
+For step 1, enumerate every remote with `git ls-remote --heads <remote>` and
+fetch all branch heads explicitly with
+`git fetch --no-prune <remote> 'refs/heads/*:refs/remotes/<remote>/*'`.
+`git fetch --all` still obeys narrow fetch refspecs and can omit branches.
+Freeze local and remote ref names, commit IDs and committer timestamps before
+ordering; use commit ID then ref name to break equal-time ties. Verify every
+frozen tip is an ancestor of the result before the ordinary master push.
+Retain conflict index stages and base/left/right contents before resolving
+intent; never use blanket side preference, force push or branch deletion.

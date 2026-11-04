@@ -1,0 +1,108 @@
+{
+  "recordedAt": "2026-11-04T22:16:51.257403+00:00",
+  "base": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+  "originalMaster": "44a67b352c5c061e365b3727bf11a19df6faa299",
+  "remoteHeads": 494,
+  "inputs": [
+    {
+      "ref": "refs/remotes/origin/codex/english-copular-template-20261104",
+      "commit": "18070ebb8a5bd877efe8ba7bbed17e277759187c",
+      "time": 1793826487,
+      "contained": false
+    },
+    {
+      "ref": "refs/remotes/origin/fix/panels-evidence-lifecycle-20261104",
+      "commit": "b0d7cd69cd984018bc82a16c35f577bffba1aef8",
+      "time": 1793829224,
+      "contained": false
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-copular-v68-evidence-20261104",
+      "commit": "1666e3bbf3bc1a90e5db573b31354a5793c1d619",
+      "time": 1793829383,
+      "contained": false
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-copular-integration-20261104",
+      "commit": "d891ec320090cf1804a722ee9dcbefcfded0e5d5",
+      "time": 1793829571,
+      "contained": false
+    },
+    {
+      "ref": "refs/heads/master",
+      "commit": "44a67b352c5c061e365b3727bf11a19df6faa299",
+      "time": 1793830219
+    },
+    {
+      "ref": "refs/remotes/origin/codex/english-taxonomy-20261104",
+      "commit": "413160fb06f9496a5395407e1a3152704545bf40",
+      "time": 1793830252,
+      "contained": false
+    },
+    {
+      "ref": "refs/remotes/origin/codex/panels-evidence-lifecycle-v69-20261104",
+      "commit": "15caeccaf05f532c3727be448970ddfb94adebc5",
+      "time": 1793830294,
+      "contained": false
+    }
+  ],
+  "order": "committer timestamp ascending, then OID/ref",
+  "merges": [
+    {
+      "input": "refs/remotes/origin/codex/english-copular-template-20261104",
+      "oid": "18070ebb8a5bd877efe8ba7bbed17e277759187c",
+      "before": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+      "result": "ccefb6de1a32f5289b3baefbbbfe359df4ec9216",
+      "status": "merged",
+      "exitCode": 0
+    },
+    {
+      "input": "refs/remotes/origin/fix/panels-evidence-lifecycle-20261104",
+      "oid": "b0d7cd69cd984018bc82a16c35f577bffba1aef8",
+      "before": "ccefb6de1a32f5289b3baefbbbfe359df4ec9216",
+      "result": "d366d9a2718837f96350627c6653bde69d983836",
+      "status": "merged",
+      "exitCode": 0
+    },
+    {
+      "input": "refs/remotes/origin/codex/english-copular-v68-evidence-20261104",
+      "oid": "1666e3bbf3bc1a90e5db573b31354a5793c1d619",
+      "before": "d366d9a2718837f96350627c6653bde69d983836",
+      "result": "6ecaf100c8855d51513f5a381c1086b95e7a0113",
+      "status": "merged",
+      "exitCode": 0
+    },
+    {
+      "input": "refs/remotes/origin/codex/english-copular-integration-20261104",
+      "oid": "d891ec320090cf1804a722ee9dcbefcfded0e5d5",
+      "before": "6ecaf100c8855d51513f5a381c1086b95e7a0113",
+      "result": "4f8a31588a93a2d5f986b861558c57bbfbd7765e",
+      "status": "merged",
+      "exitCode": 0
+    },
+    {
+      "input": "refs/heads/master",
+      "oid": "44a67b352c5c061e365b3727bf11a19df6faa299",
+      "before": "4f8a31588a93a2d5f986b861558c57bbfbd7765e",
+      "result": "c1a14a989d6709a7c82c3f1d02208e81987569be",
+      "status": "merged",
+      "exitCode": 0
+    },
+    {
+      "input": "refs/remotes/origin/codex/english-taxonomy-20261104",
+      "oid": "413160fb06f9496a5395407e1a3152704545bf40",
+      "before": "c1a14a989d6709a7c82c3f1d02208e81987569be",
+      "result": "38c4f9a95afbc4e1cf008f13351bcb0f1d4f2aba",
+      "status": "merged",
+      "exitCode": 0
+    },
+    {
+      "input": "refs/remotes/origin/codex/panels-evidence-lifecycle-v69-20261104",
+      "oid": "15caeccaf05f532c3727be448970ddfb94adebc5",
+      "before": "38c4f9a95afbc4e1cf008f13351bcb0f1d4f2aba",
+      "result": "f91da5d6e2765debe3c85c0b2bcd081b5e7c90ea",
+      "status": "merged",
+      "exitCode": 0
+    }
+  ]
+}

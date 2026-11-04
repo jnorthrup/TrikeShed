@@ -1,0 +1,21 @@
+Merge made by the 'ort' strategy.
+ docs/english-reviewed-taxonomy.txt                 | 112 ++++++
+ .../kotlin/borg/trikeshed/lcnc/CurationReview.kt   |   6 +-
+ .../trikeshed/lcnc/DocumentTaxonomyCandidate.kt    |   4 +-
+ .../borg/trikeshed/lcnc/EnglishTaxonomyCarrier.kt  | 299 ++++++++++++++++
+ .../borg/trikeshed/lcnc/ReviewedKifHornPlan.kt     |   3 +
+ .../kotlin/borg/trikeshed/lcnc/ReviewedKifUnion.kt |   3 +
+ .../borg/trikeshed/lcnc/ReviewedTaxonomyPlan.kt    |   8 +-
+ .../kotlin/borg/trikeshed/docs/DocumentsEnglish.kt |  15 +-
+ .../trikeshed/docs/DocumentsEnglishTaxonomy.kt     | 382 +++++++++++++++++++++
+ .../trikeshed/forge/server/DocumentReviewWire.kt   |  75 +++-
+ .../forge/server/EnglishTaxonomyWireTest.kt        | 236 +++++++++++++
+ .../trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt   | 200 +++++++++++
+ .../lcnc/EnglishTaxonomyExportGuardTest.kt         | 209 +++++++++++
+ 13 files changed, 1536 insertions(+), 16 deletions(-)
+ create mode 100644 docs/english-reviewed-taxonomy.txt
+ create mode 100644 src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrier.kt
+ create mode 100644 src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglishTaxonomy.kt
+ create mode 100644 src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishTaxonomyWireTest.kt
+ create mode 100644 src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt
+ create mode 100644 src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyExportGuardTest.kt
