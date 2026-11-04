@@ -1,0 +1,64 @@
+{
+  "syntheticOnly": true,
+  "scope": "Standalone JVM source compilation of the new helper and focused tests against immutable v52 main/dependency JARs. No Gradle, friend access, existing production class replacements, parser execution, host/API/browser execution or commonJS proof.",
+  "stages": [
+    {
+      "head": "7e384b49c11a9ca4fb16a5e7d24aabf17c7623c4",
+      "focusedMethods": 9,
+      "result": "PASS",
+      "purpose": "Initial pure helper fixtures including anchor fanout bounds; source used for actual parse."
+    },
+    {
+      "head": "d5035d5c4131821bf423f6c51c3aa62a052fcf7c",
+      "focusedMethods": 10,
+      "result": "PASS",
+      "purpose": "Adds the exact actual CoreNLP numeric-head graph regression; frozen parse replay separately passes 8/8."
+    },
+    {
+      "head": "70a74e1b602137f6d3dd879dfff0504738f1c1f8",
+      "focusedMethods": 11,
+      "result": "PASS",
+      "purpose": "Adds Unicode-prefix/CRLF/tab dual-number capture offsets and removes JVM-only MatchGroup.range."
+    }
+  ],
+  "portableCompileLog": {
+    "sha256": "bee0440c084f9bea6bfc8b33d58861ac99619f48e12bf160c16067b6335cef14",
+    "exit": 0
+  },
+  "portableTestLog": {
+    "sha256": "490a668737b0511598f2f7a6c8a4e344f488fec75756720f0c23b0f3b521c2e6",
+    "exit": 0,
+    "focusedResultLine": "EnglishLegalPatternsTest: 11 focused methods PASS"
+  },
+  "commonJsStatus": "Actual coordinated root v57 compilation rejected MatchGroup.range. Commit 70a74e1b replaces it with common String operations and exact source validation. CommonJS revalidation belongs to the separate root v58 result, not this JVM evidence.",
+  "portableFixture": {
+    "test": "dualNumberWhitespaceAndUnicodePrefixKeepPortableExactCaptureOffsets",
+    "sourcePrefix": "📚 Preamble.\r\n",
+    "selectedText": "Tenant must give notice within THIRTY \r\n (\t30 \t) business days.",
+    "sourceSuffix": "\r\nOther text.",
+    "expectedNumberFormQuotes": [
+      "THIRTY",
+      "30"
+    ],
+    "integerValue": 30,
+    "assertions": [
+      "global UTF16 spans including non-BMP prefix",
+      "exact original quantity literal including CRLF/tabs",
+      "source.substring(begin,end) equals every captured number quote",
+      "selected range is correctly marked incomplete"
+    ],
+    "globalSelectionBegin": 14,
+    "expectedNumberFormGlobalSpans": [
+      {
+        "begin": 45,
+        "end": 51,
+        "quote": "THIRTY"
+      },
+      {
+        "begin": 57,
+        "end": 59,
+        "quote": "30"
+      }
+    ]
+  }
+}

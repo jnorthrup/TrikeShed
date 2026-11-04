@@ -1,0 +1,672 @@
+{
+  "schema": "trikeshed.english-legal-patterns.synthetic-evidence.v1",
+  "authority": "synthetic-parser-observations-only",
+  "syntheticOnly": true,
+  "privateDocumentsRead": false,
+  "actual": {
+    "parserRuns": 1,
+    "helperHead": "7e384b49c11a9ca4fb16a5e7d24aabf17c7623c4",
+    "elapsedMillis": 14021,
+    "observedCases": 8,
+    "durationExpectationsMet": 7,
+    "readerClosed": true,
+    "existingProductionClassOverrides": false,
+    "modelCalls": 0,
+    "narsReteAdmission": false,
+    "retention": "volatile isolated fixture CAS; not durable host integration"
+  },
+  "replay": {
+    "helperHead": "d5035d5c4131821bf423f6c51c3aa62a052fcf7c",
+    "newParserExecutions": 0,
+    "durationExpectationsMet": 8,
+    "modelCalls": 0,
+    "scope": "Pure new-helper replay of the frozen actual CoreNLP4.6.0 parse; no second parser execution or changed annotations"
+  },
+  "cases": [
+    {
+      "name": "matching-number-with-negative-exception",
+      "sourceCid": "sha256:e7e5d6f75d7c58d4d376ab35ccf939dbe5f79b53f2f9cf9be012fffe94134126",
+      "quote": "Tenant must give notice within thirty (30) business days unless notice is not received.",
+      "range": {
+        "begin": 0,
+        "end": 87
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": false,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Tenant",
+            "kind": "token",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "id": "4:0",
+            "word": "notice",
+            "kind": "token",
+            "relation": "obj"
+          }
+        ],
+        "copyNodes": 0,
+        "copyExercise": "not-requested",
+        "durationCandidateCount": 0,
+        "integerReadings": [],
+        "markerQuotes": [
+          "must",
+          "unless",
+          "unless",
+          "not"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 24,
+            "end": 56,
+            "quote": "within thirty (30) business days",
+            "quantityLiteral": "thirty (30)",
+            "integerValue": 30,
+            "numberReadings": [
+              {
+                "begin": 31,
+                "end": 37,
+                "quote": "thirty",
+                "integerValue": 30
+              },
+              {
+                "begin": 39,
+                "end": 41,
+                "quote": "30",
+                "integerValue": 30
+              }
+            ],
+            "unitLiteral": "days",
+            "unitLemma": "day",
+            "modifiers": [
+              {
+                "id": "10:0",
+                "word": "business",
+                "begin": 43,
+                "end": 51
+              }
+            ],
+            "temporalMarker": {
+              "id": "5:0",
+              "word": "within",
+              "begin": 24,
+              "end": 30
+            },
+            "quantitySpecificUnresolved": []
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established",
+        "guard-scope-not-established",
+        "negation-scope-not-established"
+      ]
+    },
+    {
+      "name": "conflicting-number-with-negative-exception",
+      "sourceCid": "sha256:751b76cd56c1145223e2d9829e14a86573421345de20695b276095b5591c8553",
+      "quote": "Tenant must give notice within thirty (60) business days unless notice is not received.",
+      "range": {
+        "begin": 0,
+        "end": 87
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": true,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Tenant",
+            "kind": "token",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "id": "4:0",
+            "word": "notice",
+            "kind": "token",
+            "relation": "obj"
+          }
+        ],
+        "copyNodes": 0,
+        "copyExercise": "not-requested",
+        "durationCandidateCount": 1,
+        "integerReadings": [
+          null
+        ],
+        "markerQuotes": [
+          "must",
+          "unless",
+          "unless",
+          "not"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 24,
+            "end": 56,
+            "quote": "within thirty (60) business days",
+            "quantityLiteral": "thirty (60)",
+            "integerValue": null,
+            "numberReadings": [
+              {
+                "begin": 31,
+                "end": 37,
+                "quote": "thirty",
+                "integerValue": 30
+              },
+              {
+                "begin": 39,
+                "end": 41,
+                "quote": "60",
+                "integerValue": 60
+              }
+            ],
+            "unitLiteral": "days",
+            "unitLemma": "day",
+            "modifiers": [
+              {
+                "id": "10:0",
+                "word": "business",
+                "begin": 43,
+                "end": 51
+              }
+            ],
+            "temporalMarker": {
+              "id": "5:0",
+              "word": "within",
+              "begin": 24,
+              "end": 30
+            },
+            "quantitySpecificUnresolved": [
+              "conflicting-number-forms",
+              "temporal-marker-attachment-not-established"
+            ]
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established",
+        "guard-scope-not-established",
+        "negation-scope-not-established"
+      ]
+    },
+    {
+      "name": "calendar-month-unit",
+      "sourceCid": "sha256:cbce0293525c3112f6883ad063465d91a2947622f05b0527fc1cc3ed6d0aa8f1",
+      "quote": "Tenant must give notice before two calendar months.",
+      "range": {
+        "begin": 0,
+        "end": 51
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": true,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Tenant",
+            "kind": "token",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "id": "4:0",
+            "word": "notice",
+            "kind": "token",
+            "relation": "obj"
+          }
+        ],
+        "copyNodes": 0,
+        "copyExercise": "not-requested",
+        "durationCandidateCount": 1,
+        "integerReadings": [
+          2
+        ],
+        "markerQuotes": [
+          "must",
+          "before"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 24,
+            "end": 50,
+            "quote": "before two calendar months",
+            "quantityLiteral": "two",
+            "integerValue": 2,
+            "numberReadings": [
+              {
+                "begin": 31,
+                "end": 34,
+                "quote": "two",
+                "integerValue": 2
+              }
+            ],
+            "unitLiteral": "months",
+            "unitLemma": "month",
+            "modifiers": [
+              {
+                "id": "7:0",
+                "word": "calendar",
+                "begin": 35,
+                "end": 43
+              }
+            ],
+            "temporalMarker": {
+              "id": "5:0",
+              "word": "before",
+              "begin": 24,
+              "end": 30
+            },
+            "quantitySpecificUnresolved": []
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established",
+        "guard-scope-not-established"
+      ]
+    },
+    {
+      "name": "passive-parser-subject",
+      "sourceCid": "sha256:fe575dc51770f0e48b2b2b9188e2b59b38e0ba7a87ad7947e549444f65d5c70a",
+      "quote": "Notice must be given by Tenant within thirty days.",
+      "range": {
+        "begin": 0,
+        "end": 50
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": true,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Notice",
+            "kind": "token",
+            "relation": "nsubj:pass"
+          }
+        ],
+        "objects": [],
+        "copyNodes": 0,
+        "copyExercise": "not-requested",
+        "durationCandidateCount": 1,
+        "integerReadings": [
+          30
+        ],
+        "markerQuotes": [
+          "must"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 31,
+            "end": 49,
+            "quote": "within thirty days",
+            "quantityLiteral": "thirty",
+            "integerValue": 30,
+            "numberReadings": [
+              {
+                "begin": 38,
+                "end": 44,
+                "quote": "thirty",
+                "integerValue": 30
+              }
+            ],
+            "unitLiteral": "days",
+            "unitLemma": "day",
+            "modifiers": [],
+            "temporalMarker": {
+              "id": "7:0",
+              "word": "within",
+              "begin": 31,
+              "end": 37
+            },
+            "quantitySpecificUnresolved": []
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established"
+      ]
+    },
+    {
+      "name": "coordinated-parser-actions",
+      "sourceCid": "sha256:f6ba720b1890f9917c227daa439154303d75167e79407f5ffec285556b7b771f",
+      "quote": "Tenant must give notice and retain records within thirty days.",
+      "range": {
+        "begin": 0,
+        "end": 62
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": true,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Tenant",
+            "kind": "token",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "id": "4:0",
+            "word": "notice",
+            "kind": "token",
+            "relation": "obj"
+          }
+        ],
+        "copyNodes": 0,
+        "copyExercise": "not-requested",
+        "durationCandidateCount": 1,
+        "integerReadings": [
+          30
+        ],
+        "markerQuotes": [
+          "must"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 43,
+            "end": 61,
+            "quote": "within thirty days",
+            "quantityLiteral": "thirty",
+            "integerValue": 30,
+            "numberReadings": [
+              {
+                "begin": 50,
+                "end": 56,
+                "quote": "thirty",
+                "integerValue": 30
+              }
+            ],
+            "unitLiteral": "days",
+            "unitLemma": "day",
+            "modifiers": [],
+            "temporalMarker": {
+              "id": "8:0",
+              "word": "within",
+              "begin": 43,
+              "end": 49
+            },
+            "quantitySpecificUnresolved": []
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established",
+        "coordination-scope-not-established"
+      ]
+    },
+    {
+      "name": "enhanced-copy-attempt",
+      "sourceCid": "sha256:a27975fbe86e4f7dc3d01897ad10b69dd180612b8e55cde3855034c68fc9efb5",
+      "quote": "Tenant must give notice to Landlord and records to Agent within thirty days.",
+      "range": {
+        "begin": 0,
+        "end": 76
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": true,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Tenant",
+            "kind": "token",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "id": "4:0",
+            "word": "notice",
+            "kind": "token",
+            "relation": "obj"
+          }
+        ],
+        "copyNodes": 0,
+        "copyExercise": "not-exercised",
+        "durationCandidateCount": 1,
+        "integerReadings": [
+          30
+        ],
+        "markerQuotes": [
+          "must"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 57,
+            "end": 75,
+            "quote": "within thirty days",
+            "quantityLiteral": "thirty",
+            "integerValue": 30,
+            "numberReadings": [
+              {
+                "begin": 64,
+                "end": 70,
+                "quote": "thirty",
+                "integerValue": 30
+              }
+            ],
+            "unitLiteral": "days",
+            "unitLemma": "day",
+            "modifiers": [],
+            "temporalMarker": {
+              "id": "11:0",
+              "word": "within",
+              "begin": 57,
+              "end": 63
+            },
+            "quantitySpecificUnresolved": []
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established",
+        "coordination-scope-not-established"
+      ]
+    },
+    {
+      "name": "reversed-roles",
+      "sourceCid": "sha256:c560fb842994ad4455580dc8c46fdef8316813abde1ce1890f17d61e2e33cb48",
+      "quote": "Notice must give Tenant within thirty days.",
+      "range": {
+        "begin": 0,
+        "end": 43
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": true,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Notice",
+            "kind": "token",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "id": "4:0",
+            "word": "Tenant",
+            "kind": "token",
+            "relation": "obj"
+          }
+        ],
+        "copyNodes": 0,
+        "copyExercise": "not-requested",
+        "durationCandidateCount": 1,
+        "integerReadings": [
+          30
+        ],
+        "markerQuotes": [
+          "must"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 24,
+            "end": 42,
+            "quote": "within thirty days",
+            "quantityLiteral": "thirty",
+            "integerValue": 30,
+            "numberReadings": [
+              {
+                "begin": 31,
+                "end": 37,
+                "quote": "thirty",
+                "integerValue": 30
+              }
+            ],
+            "unitLiteral": "days",
+            "unitLemma": "day",
+            "modifiers": [],
+            "temporalMarker": {
+              "id": "5:0",
+              "word": "within",
+              "begin": 24,
+              "end": 30
+            },
+            "quantitySpecificUnresolved": []
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established"
+      ]
+    },
+    {
+      "name": "fraction-is-not-an-integer-deadline",
+      "sourceCid": "sha256:790cf26b7ccb283dea3dfc9d8478b6355603c25f5e0f669dcf3e1c965abb7f76",
+      "quote": "Tenant must give notice within half of 30 days.",
+      "range": {
+        "begin": 0,
+        "end": 47
+      },
+      "actual": {
+        "status": "OBSERVED",
+        "durationExpectationMet": true,
+        "modalActionCount": 1,
+        "subjects": [
+          {
+            "id": "1:0",
+            "word": "Tenant",
+            "kind": "token",
+            "relation": "nsubj"
+          }
+        ],
+        "objects": [
+          {
+            "id": "4:0",
+            "word": "notice",
+            "kind": "token",
+            "relation": "obj"
+          }
+        ],
+        "copyNodes": 0,
+        "copyExercise": "not-requested",
+        "durationCandidateCount": 1,
+        "integerReadings": [
+          null
+        ],
+        "markerQuotes": [
+          "must"
+        ]
+      },
+      "replay": {
+        "durationExpectationMet": true,
+        "sourceQuoteUnchanged": true,
+        "fullDependencyIdsUnchanged": true,
+        "quantities": [
+          {
+            "begin": 24,
+            "end": 46,
+            "quote": "within half of 30 days",
+            "quantityLiteral": "half of 30",
+            "integerValue": null,
+            "numberReadings": [
+              {
+                "begin": 31,
+                "end": 41,
+                "quote": "half of 30",
+                "integerValue": null
+              }
+            ],
+            "unitLiteral": "days",
+            "unitLemma": "day",
+            "modifiers": [],
+            "temporalMarker": {
+              "id": "5:0",
+              "word": "within",
+              "begin": 24,
+              "end": 30
+            },
+            "quantitySpecificUnresolved": [
+              "unsupported-number-language",
+              "temporal-marker-attachment-not-established"
+            ]
+          }
+        ]
+      },
+      "unresolved": [
+        "legal-force-not-established",
+        "cross-sentence-and-paragraph-scope-not-established"
+      ]
+    }
+  ],
+  "projection": "Compact selections, not retained inspection receipts. Full original reports are identified by hash in execution-identity.json; full first counterexample graph is published separately."
+}
