@@ -1,0 +1,53 @@
+import borg.trikeshed.nlp.*;
+import borg.trikeshed.job.*;
+import borg.trikeshed.narsese.DocumentRevision;
+import borg.trikeshed.lib.Join;
+import borg.trikeshed.parse.ReifyKt;
+import kotlin.jvm.functions.Function1;
+import java.util.*;
+import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
+public class CorpusPolicyProbe {
+  static <T> Join<Integer,Function1<Integer,T>> series(List<T> values) {
+    return new Join<>() { public Integer getA(){return values.size();} public Function1<Integer,T> getB(){return values::get;} };
+  }
+  static Map<?,?> map(Object o){return (Map<?,?>)o;}
+  static String str(Map<?,?> m,String k){return (String)m.get(k);}
+  static int num(Map<?,?> m,String k){return ((Number)m.get(k)).intValue();}
+  static ContentId cid(Map<?,?> m,String k){return new ContentId(str(m,k));}
+  static EnglishObservationReceipt receipt(Map<?,?> r,String sourceRoot)throws Exception {
+    var range=map(r.get("range"));var sel=map(r.get("selection"));
+    var source=Files.readAllBytes(Path.of(sourceRoot,str(sel,"id")));
+    if(!ContentId.Companion.of(source).equals(cid(r,"originalCid")))throw new AssertionError("recorded source digest");
+    var text=new String(source,StandardCharsets.UTF_8);
+    var sentences=new ArrayList<EnglishObservationSentence>();
+    for(Object rawSentence:(List<?>)r.get("sentences")) {
+      var s=map(rawSentence);if(!text.substring(num(s,"begin"),num(s,"end")).equals(str(s,"quote")))throw new AssertionError("source quote");
+      var tokens=new ArrayList<EnglishObservationToken>();
+      for(Object rawToken:(List<?>)s.get("tokens")) {
+        var t=map(rawToken);tokens.add(new EnglishObservationToken(num(t,"index"),num(t,"begin"),num(t,"end"),str(t,"word"),str(t,"lemma"),str(t,"pos"),0));
+      }
+      sentences.add(new EnglishObservationSentence(num(s,"index"),num(s,"begin"),num(s,"end"),str(s,"quote"),series(tokens)));
+    }
+    return new EnglishObservationReceipt(cid(r,"receiptCid"),cid(r,"originalCid"),cid(r,"extractedTextCid"),num(range,"begin"),num(range,"end"),num(range,"totalLength"),new DocumentRevision(str(sel,"project"),str(sel,"id"),str(sel,"cid"),str(sel,"rev"),num(sel,"seq")),series(sentences));
+  }
+  public static void main(String[] args)throws Exception {
+    var recorded=map(ReifyKt.reifyStrict(Files.readString(Path.of(args[0]))));
+    var receipts=series(List.of(receipt(map(recorded.get("inventoryA")),args[1]),receipt(map(recorded.get("inventoryB")),args[1])));
+    var raw=EnglishCorpus.INSTANCE.build(receipts,new EnglishCorpusPolicy());
+    if(!raw.getCid().getValue().equals(str(map(recorded.get("current")),"corpusCid")))throw new AssertionError("original corpus replay");
+    var policy=new EnglishCorpusPolicy(false,Set.of("be","have","do"),Set.of("NN","VB","JJ"),true);
+    var filtered=EnglishCorpus.INSTANCE.build(receipts,policy);
+    if(raw.getRawTokenCount()!=filtered.getRawTokenCount()||raw.getSentences().getA()!=filtered.getSentences().getA())throw new AssertionError("raw observations lost");
+    for(int i=0;i<raw.getOccurrences().getA();i++) {
+      var a=raw.getOccurrences().getB().invoke(i);var b=filtered.getOccurrences().getB().invoke(i);
+      if(!a.copy(a.getDocument(),a.getReceiptCid(),a.getSentenceId(),a.getIndex(),a.getBegin(),a.getEnd(),a.getWord(),a.getLemma(),a.getTerm(),a.getPos(),b.getIncluded()).equals(b))throw new AssertionError("occurrence mutated");
+    }
+    var configMap=map(map(map(recorded.get("lda")).get("topics")).get("config"));
+    var config=new EnglishLdaConfig(num(configMap,"topics"),num(configMap,"iterations"),num(configMap,"seed"),((Number)configMap.get("alpha")).doubleValue(),((Number)configMap.get("beta")).doubleValue());
+    var output=new LinkedHashMap<String,Object>();
+    output.put("rawCorpusCidReplayed",true);output.put("sourceDigestsAndQuotesChecked",true);output.put("sameRawOccurrencesExceptIncludedFlag",true);output.put("raw",raw.toMap());output.put("filtered",filtered.toMap());
+    output.put("rawTopics",EnglishCorpusKt.lda(raw,config).toMap());output.put("filteredTopics",EnglishCorpusKt.lda(filtered,config).toMap());
+    System.out.println(ReifyKt.jsonOf(output));
+  }
+}
