@@ -1,0 +1,37 @@
+{
+  "scope": "fixture process and descendants only; inbound listener and ordinary response writes allowed",
+  "notClaimed": [
+    "full OS sandbox",
+    "production daemon air gap",
+    "filesystem isolation",
+    "kernel exploit containment"
+  ],
+  "defaultAction": "ALLOW",
+  "deniedSyscalls": [
+    "connect",
+    "sendto",
+    "sendmsg",
+    "sendmmsg"
+  ],
+  "errno": 13,
+  "selfProbes": [
+    {
+      "operation": "tcp-connect",
+      "errno": 13,
+      "result": "DENIED"
+    },
+    {
+      "operation": "udp-sendto",
+      "errno": 13,
+      "result": "DENIED"
+    },
+    {
+      "operation": "udp-sendmsg",
+      "errno": 13,
+      "result": "DENIED"
+    }
+  ],
+  "noNewPrivileges": 1,
+  "seccompMode": 2,
+  "wrapperSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+}
