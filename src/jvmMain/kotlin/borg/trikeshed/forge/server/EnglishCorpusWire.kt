@@ -16,11 +16,13 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     private val runner = LcncNodeRunner { node, inputs ->
         fun parameter(key: String): Any? = if (key in inputs) inputs[key] else node.params[key]?.let { raw ->
-            if (key == "mode") raw else {
+            if (key == "mode" || key == "view") raw else {
                 require(raw.encodeToByteArray().size <= 65_536) { "English corpus parameter limit" }; reifyStrict(raw)
             }
         }
-        val reply = submit(jsonOf(_m["receiptCids" j parameter("receiptCids"), "mode" j parameter("mode"), "topics" j parameter("topics")]))
+        val request = _m["receiptCids" j parameter("receiptCids"), "mode" j parameter("mode"), "topics" j parameter("topics")] +
+            if ("view" in inputs || "view" in node.params) _m["view" j parameter("view")] else emptyMap()
+        val reply = submit(jsonOf(request))
         val output = reifyStrict(reply.body) as? Map<*, *> ?: error("Invalid English corpus result")
         require(reply.status == 200) { output["error"]?.toString() ?: "English corpus request refused" }
         @Suppress("UNCHECKED_CAST")
@@ -41,7 +43,11 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
     }
     private suspend fun submit(body: String): WireHttpResponse = try { requests.call {
         val request = DocumentReviewWire.taxonomyRequest(body)
-        require(request.keys == _s["receiptCids", "mode", "topics"]) { "English corpus requires exactly receiptCids, mode and topics" }
+        val required = _s["receiptCids", "mode", "topics"]
+        require(request.keys.containsAll(required) && request.keys.all { it in required || it == "view" }) {
+            "English corpus requires receiptCids, mode and topics, with optional view"
+        }
+        val view = if ("view" in request) EnglishCorpusView.parse(request["view"]) else EnglishCorpusView.ALL_LEXICAL
         val ids = request["receiptCids"] as? List<*> ?: error("English receiptCids array required")
         require(ids.size in 1..MAX_RECEIPTS && ids.all { it is String } && ids.toSet().size == ids.size) { "Select 1..32 distinct English receipts" }
         val mode = request["mode"] as? String ?: error("English corpus mode required")
@@ -49,7 +55,7 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
         val config = request["topics"]?.let(::topics)
         val snapshots = ids.map { ContentId(it as String) }.sortedBy { it.value }.map { EnglishObservationGraph.read(ctx.casStore, it) }.toSeries()
         EnglishObservationCurrent.check(corpus, snapshots, mode)
-        val core = EnglishCorpus.build(snapshots α { observation(it) })
+        val core = EnglishCorpus.build(snapshots α { observation(it) }, view.policy())
         val model = config?.let(core::lda)
         val coreMap = core.toMap(); val matrix = core.matrix(); val topicMap = model?.toMap()
         val payload = coreMap + _m["corpusCid" j core.cid.value,
@@ -57,7 +63,8 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
             "source" j _m["selected" j "english-receipt-corpus", "mode" j mode, "historical" j (mode == "snapshot"),
                 "currentness" j if (mode == "current") "checked-before-and-after-build" else "not-checked",
                 "reviewStatus" j "unreviewed", "parserExecution" j "not-reverified", "producerAuthority" j "not-established",
-                "sources" j (snapshots α { it.descriptor(mode) }).toList()]]
+                "sources" j (snapshots α { it.descriptor(mode) }).toList()]] +
+            if ("view" in request) _m["view" j view.wire] else emptyMap()
         val encoded = CanonicalCbor.encodeMap(payload)
         require(encoded.size <= MAX_RESPONSE) { "English corpus exceeds 4MiB; select fewer or shorter ranges" }
         val receiptCid = ContentId.of(encoded)
