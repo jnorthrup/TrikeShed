@@ -744,19 +744,10 @@ class CurationIntake(
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
             scopes.onExplicitDocument = { selected, provider -> intake.offerSelected(selected, provider) }
             scopes.onTextForReview = { selected -> intake.offerTextForReview(selected) }
-<<<<<<< HEAD
-            scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
-            intake.resumeOwned()
-||||||| a39e91f9e
-            scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
-            scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
-=======
-            // Existing memberships have no source ownership record. In particular, a
-            // same-named direct join need not belong to this upload; preserve it and
-            // report the uncertain derived state rather than deleting global books.
+            // A removed upload does not establish ownership of a same-named global book.
+            // Retain uncertain derived membership and expose it through intake status.
             scopes.onRemoved = { project, id -> intake.forget(project, id, unverifiedOwnership = true) }
-            scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
->>>>>>> d7216e115738f2b8df4295c93c32fbb15c1be3e0
+            intake.resumeOwned()
             ctx.routes.claim("language", "/api/intake") { method, _, _, _ ->
                 if (method != "GET") borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 else borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, borg.trikeshed.parse.jsonOf(intake.status()))

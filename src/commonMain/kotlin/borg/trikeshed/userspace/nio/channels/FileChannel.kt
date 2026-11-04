@@ -20,13 +20,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import borg.trikeshed.userspace.UringTrace
-<<<<<<< HEAD
-import borg.trikeshed.lib.*
-||||||| 8f5e4ee8f
-=======
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.DescriptorDuplication
->>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 
 /**
  * FileChannel wired behind UringFacade.

@@ -10,15 +10,6 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 import borg.trikeshed.userspace.nio.file.spi.BoundedFileReader
 import borg.trikeshed.userspace.nio.file.spi.BoundedReadLimitException
-<<<<<<< HEAD
-import borg.trikeshed.userspace.nio.file.spi.ChunkedFileReader
-import borg.trikeshed.userspace.nio.file.spi.FileChangedException
-import borg.trikeshed.util.toLowerHex
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.yield
-||||||| 8f5e4ee8f
-=======
 import borg.trikeshed.userspace.nio.file.spi.ChunkedFileReader
 import borg.trikeshed.userspace.nio.file.spi.FileChangedException
 import borg.trikeshed.userspace.nio.file.spi.DescriptorDuplication
@@ -26,7 +17,6 @@ import borg.trikeshed.util.toLowerHex
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.yield
->>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 import kotlin.concurrent.atomics.AtomicBoolean
 
 /**
@@ -51,8 +41,8 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
     private data class IndexedRecord(val offset: Long, val kind: Byte)
     private val header = ByteBuffer.allocate(HEADER)
     private var end = 0L
-    /** Guards [header], [end], and [index]. Verified reads hold this spin lock across file I/O and hashing;
-     * contending callers may spin for the duration, especially for large references. */
+    /** Guards [header], [end], and [index]. Materialized verified reads hold this gate across I/O;
+     * streaming verification holds it only for descriptor pinning and index revalidation. */
     private val held = AtomicBoolean(false)
 
     private inline fun <T> locked(block: () -> T): T {
@@ -256,119 +246,6 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
         current
     }
 
-<<<<<<< HEAD
-    /** Verify the bytes observed on the store-owned pack, without materializing the object. */
-    override suspend fun verify(cid: ContentId, length: Long): Boolean {
-        require(length >= 0) { "Invalid CAS length" }
-        val context = currentCoroutineContext()
-        suspend fun <T> access(block: () -> T): T {
-            while (!held.compareAndSet(false, true)) {
-                context.ensureActive()
-                yield()
-            }
-            try { context.ensureActive(); return block() } finally { held.store(false) }
-        }
-        val digest = Sha256()
-        // The original channel, not a reopened path, names the store's actual pack.
-        val record = access {
-            check(channel.isOpen()) { "CAS store is closed" }
-            val key = fold(cid.hex)
-            val bucket = collisions[key]
-            val at = bucket?.get(cid.hex)?.offset ?: if (bucket == null) index.get(key, -1L) else -1L
-            if (at < 0) return@access null
-            check(readHeader(at)) { "Indexed pack header is missing or truncated" }
-            check(header.getLong(5) == key) { "Indexed pack header prefix changed" }
-            if (!matches(cid.hex)) {
-                check(bucket == null) { "Indexed pack digest changed" }
-                // A prefix-only entry cannot distinguish this absent digest from a
-                // changed suffix without an independent full-digest index.
-                return@access null
-            }
-            val kind = header.get(0)
-            val len = header.getInt(1)
-            check(kind == BLOB || kind == REF) { "Unknown pack record kind" }
-            check(len >= 0 && at + HEADER.toLong() + len <= end) { "Invalid pack record length" }
-            if (kind == BLOB) {
-                if (len.toLong() != length) return@access null
-                Triple(at, len, null)
-            } else {
-                check(len in 16..MAX_REF_RECORD) { "Invalid reference record length" }
-                val payload = ByteBuffer.allocate(len)
-                var read = 0
-                while (read < len) {
-                    context.ensureActive()
-                    val count = channel.read(payload, at + HEADER + read)
-                    check(count > 0) { "Pack record ended while reading" }
-                    read += count
-                }
-                Triple(at, len, payload.array())
-            }
-        } ?: return false
-        val reference = record.third
-        if (reference == null) {
-            val buffer = ByteBuffer.allocate(64 * 1024)
-            var read = 0
-            while (read < record.second) {
-                context.ensureActive()
-                buffer.clear()
-                buffer.limit(minOf(buffer.array().size, record.second - read))
-                val count = access {
-                    check(channel.isOpen()) { "CAS store is closed" }
-                    channel.read(buffer, record.first + HEADER + read)
-                }
-                check(count > 0) { "Pack record ended while reading" }
-                digest.update(buffer.array(), 0, count)
-                read += count
-            }
-        } else {
-            val stamp = ByteBuffer.wrap(reference)
-            val size = stamp.getLong(0)
-            val mtime = stamp.getLong(8)
-            check(size >= 0) { "Invalid reference length" }
-            if (size != length) return false
-            val path = reference.decodeToString(16, reference.size)
-            if (!files.isFile(path) || files.lastModified(path) != mtime) return false
-            val reader = files as? ChunkedFileReader
-                ?: throw UnsupportedOperationException("Streaming source-backed verification is unavailable")
-            var hashed = 0L
-            val total = try { reader.readChunks(path, size) { bytes, count ->
-                context.ensureActive()
-                check(count in 1..bytes.size && hashed <= Long.MAX_VALUE - count) { "Invalid stream chunk" }
-                if (count.toLong() > size - hashed) throw FileChangedException()
-                digest.update(bytes, 0, count)
-                hashed += count
-            } } catch (_: FileChangedException) { return false }
-            context.ensureActive()
-            check(total == hashed) { "Stream length differs from consumed bytes" }
-            if (total != size || !files.isFile(path) || files.lastModified(path) != mtime) return false
-        }
-        context.ensureActive()
-        check("sha256:" + digest.digest().toLowerHex() == cid.value) { "Stored bytes do not match their content ID" }
-        return access {
-            check(channel.isOpen()) { "CAS store is closed" }
-            val key = fold(cid.hex)
-            val bucket = collisions[key]
-            val current = bucket?.get(cid.hex)?.offset ?: if (bucket == null) index.get(key, -1L) else -1L
-            if (current != record.first) return@access false
-            check(readHeader(current) && matches(cid.hex)) { "Indexed pack header changed" }
-            check(header.get(0) == if (reference == null) BLOB else REF) { "Indexed pack kind changed" }
-            check(header.getInt(1) == record.second) { "Indexed pack length changed" }
-            if (reference != null) {
-                val payload = ByteBuffer.allocate(reference.size)
-                var read = 0
-                while (read < reference.size) {
-                    val count = channel.read(payload, current + HEADER + read)
-                    check(count > 0) { "Indexed reference ended while reading" }
-                    read += count
-                }
-                if (!payload.array().contentEquals(reference)) return@access false
-            }
-            true
-        }
-    }
-
-||||||| 8f5e4ee8f
-=======
     /** Verify observed bytes through a pinned pack reader without materializing the object. */
     override suspend fun verify(cid: ContentId, length: Long): Boolean {
         require(length >= 0) { "Invalid CAS length" }
@@ -490,7 +367,6 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
         }
     }
 
->>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
     /** Distribution drilldown of the index: per segment, first key, last key, rows. */
     fun segments(): List<LongArray> = locked { index.segmentStats() }
 

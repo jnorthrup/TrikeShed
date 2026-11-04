@@ -1,15 +1,10 @@
 package borg.trikeshed.userspace.nio.file.spi
 
 import kotlinx.coroutines.Dispatchers
-<<<<<<< HEAD
-import borg.trikeshed.userspace.execute
-||||||| 8f5e4ee8f
-=======
 import borg.trikeshed.userspace.execute
 import borg.trikeshed.userspace.JvmFileSyscalls
 import borg.trikeshed.userspace.JvmFileTable
 import borg.trikeshed.userspace.JvmNativeDescriptor
->>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 import kotlin.coroutines.CoroutineContext
 
 import borg.trikeshed.lib.Join
@@ -36,14 +31,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
 
 /**
- * JVM userspace.nio adapter — pure [java.nio.file] / NIO channels.
- * No java.io.File. Platform filesystem is only this adapter layer.
+ * JVM userspace.nio adapter for filesystem operations and owned native descriptor duplication.
+ * Platform filesystem and descriptor effects remain at this SPI boundary.
  */
-<<<<<<< HEAD
-class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader {
-||||||| 8f5e4ee8f
-class JvmFileOperations : FileOperations, BoundedFileReader {
-=======
 class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader, DescriptorDuplication {
 
     override fun duplicateDescriptor(id: Int): Int {
@@ -57,7 +47,6 @@ class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader, 
             catch (failure: Throwable) { JvmFileSyscalls.close(fd); throw failure }
         } finally { original.release() }
     }
->>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 
     override val durability: StorageDurability get() = StorageDurability.DURABLE
 

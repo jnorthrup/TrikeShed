@@ -237,22 +237,6 @@ internal class UringFileChannel(
         throw UnsupportedOperationException("File locking is not implemented")
     override fun tryLock(): FileLock? = tryLock(0, Long.MAX_VALUE, false)
 }
-<<<<<<< HEAD
-
-internal data class FileStamp(
-    val major: UInt, val minor: UInt, val inode: ULong, val size: ULong,
-    val modified: Long, val modifiedNanos: Int, val changed: Long, val changedNanos: Int,
-)
-
-/** Require identity and timestamps; the comparison does not freeze an external writer. */
-internal fun fileIdentity(stat: Statx): FileStamp {
-    check(stat.buffer.getInt(0) and 0x3c3 == 0x3c3 && stat.stx_ino != 0uL) { "File identity unavailable" }
-    check(stat.stx_mode and 0xf000 == 0x8000) { "Source is not a regular file" }
-    return FileStamp(stat.stx_dev_major, stat.stx_dev_minor, stat.stx_ino, stat.stx_size,
-        stat.buffer.getLong(0x70), stat.buffer.getInt(0x78), stat.buffer.getLong(0x60), stat.buffer.getInt(0x68))
-}
-||||||| 8f5e4ee8f
-=======
 
 /** Ownership transfers to the opened channel; failure closes the duplicate. */
 internal class PinnedFile(file: File, private val trace: borg.trikeshed.userspace.UringTrace?) : AutoCloseable {
@@ -281,4 +265,3 @@ internal fun fileIdentity(stat: Statx): FileStamp {
     return FileStamp(stat.stx_dev_major, stat.stx_dev_minor, stat.stx_ino, stat.stx_size,
         stat.buffer.getLong(0x70), stat.buffer.getInt(0x78), stat.buffer.getLong(0x60), stat.buffer.getInt(0x68))
 }
->>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
