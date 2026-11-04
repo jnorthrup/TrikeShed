@@ -58,6 +58,62 @@ class LcncConsumptionTest {
         assertEquals("scalar", map(one["selection"])["representation"])
     }
 
+    @Test fun pulseConsumesTheActualWarmFrameWithoutInventingAProducerInvocation() = runTest {
+        var sourceCalls = 0
+        var consumerCalls = 0
+        val ledger = LcncInvocationLedger()
+        val program = LcncProgram("warm-pulse", s_[source("source"),
+            LcncNode("control", "slider", _m["value" j "1"]), sink("consumer", "test.consume")], s_[
+            LcncWire("source", "value", "consumer", "x"), LcncWire("control", "value", "consumer", "control")])
+        val runner = LcncRunner(PureNodes.registry { 0L } + _m[
+            "test.source" j LcncNodeRunner { _, _ -> _m["value" j "warm-${++sourceCalls}"] },
+            "test.consume" j LcncNodeRunner { _, inputs ->
+                consumerCalls++
+                _m["value" j "${inputs["x"]}:${inputs["control"]}"]
+            },
+        ]).apply { invocations = ledger }
+        val first = runner.runProcedure(program)
+        assertNull(first.retained.unavailable)
+        assertEquals("warm-1:1.0", first.nodeOutputs.getValue("consumer")["value"])
+        assertEquals("warm-1", first.retained.outputs.getValue("source")["value"])
+        val original = map(consumed(ledger).first()["producer"])
+        assertEquals("executed", original["origin"])
+        assertEquals(1, original["invocationOrdinal"])
+
+        runner.pulse = LcncPulse("control", _m["value" j 2.0], first.retained)
+        val debug = LcncDebug(stepping = false)
+        try {
+            val second = withContext(debug) { runner.runProcedure(program) }
+            assertEquals(1, sourceCalls)
+            assertEquals(2, consumerCalls)
+            assertEquals("warm-1:2.0", second.nodeOutputs.getValue("consumer")["value"])
+            assertNull(second.retained.unavailable)
+            assertEquals(first.retained.outputs.getValue("source"), second.retained.outputs.getValue("source"))
+            val events = consumed(ledger)
+            assertEquals(_l[0, 1], events.map { map(it["wire"])["index"] })
+            val retained = map(events[0]["producer"])
+            assertEquals("retained", retained["origin"])
+            assertFalse("invocationOrdinal" in retained)
+            assertEquals(false, retained["productionObserved"])
+            assertEquals(1, retained["reuseInvocationOrdinal"])
+            assertEquals("source", retained["nodeId"])
+            assertEquals(0, retained["frameId"])
+            assertEquals(cid(program), retained["documentCid"])
+            val current = map(events[1]["producer"])
+            assertEquals("executed", current["origin"])
+            assertEquals(2, current["invocationOrdinal"])
+            val snapshot = debug.snapshot()
+            val sourceEvents = rows(snapshot["observations"]).filter { it["nodeId"] == "source" }
+            assertEquals(1, sourceEvents.size)
+            assertEquals("after", sourceEvents.single()["phase"])
+            assertEquals("reused", sourceEvents.single()["status"])
+            assertEquals("retained_root_frame", sourceEvents.single()["reason"])
+            val reuse = rows(ledger.snapshot()["entries"]).single { it["nodeId"] == "source" }
+            assertEquals("reused", reuse["status"])
+            assertEquals(snapshot["observations"], ledger.snapshot()["observations"])
+        } finally { debug.close() }
+    }
+
     @Test fun missingRequiredInputAndGuardedScopesDoNotEmitConsumedSuccess() = runTest {
         val ledger = LcncInvocationLedger()
         val ring = LcncNode("ring", LcncContracts.SCOPE, children = s_[sink("inside")])

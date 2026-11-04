@@ -525,8 +525,13 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                 value.filterKeys { !LcncPulse.event(node, it, state.kind(node, "out", it).kind) }
             }) {
                 frame.outputs[node.id] = value
-                if (observationLedger != null) frame.outputInvocations[node.id] = location + mapOf("origin" to
-                    if (activePulse != null && pathNames.isEmpty() && node.id !in pulseRoots) "retained" else "executed")
+                if (observationLedger != null) frame.outputInvocations[node.id] =
+                    if (activePulse != null && pathNames.isEmpty() && node.id !in pulseRoots) {
+                        // The retained frame proves the value, not its original producing invocation.
+                        // This walk's ordinal identifies reuse; it must not pose as fresh production.
+                        (location - "invocationOrdinal") + _m["origin" j "retained",
+                            "reuseInvocationOrdinal" j ordinal, "productionObserved" j false]
+                    } else location + _m["origin" j "executed"]
                 observedOutputs = value
                 projection {
                     val projected = retained()
