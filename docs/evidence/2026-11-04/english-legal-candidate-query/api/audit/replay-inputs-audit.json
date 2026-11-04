@@ -1,0 +1,60 @@
+{
+  "result": "PASS",
+  "scope": "Independent read-only comparison of replay manifest against unchanged actual v58 CBOR/source bytes and exact retained snapshot rows; no fresh ingestion or NLP",
+  "manifestCid": "sha256:8e91de27c87c03bc9b324fd69cab998053adab54e51432c92c4554b1f79301f0",
+  "auditorCid": "sha256:ab65cda33e14641bb9966311d1bc97e244b906cc51fc333b8dbfbbff7c242e84",
+  "decoderSourceCid": "sha256:8f010e1f4b58dade87f8067012d2b9ada10517b4e373489c2a1d5c86a02e8838",
+  "receipts": 7,
+  "sources": 3,
+  "originalSourceTokens": 70,
+  "fullParserNodes": 71,
+  "actualCopyNodes": 1,
+  "selections": [
+    {
+      "name": "matching",
+      "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "originalCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+      "extractedTextCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+      "selection": {
+        "id": "synthetic matching duties.txt",
+        "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "rev": "1-sha256:6bf74f48c795416f7fa5206d9ff2050fb43ab3102d34a6749d080caabaf7a55a",
+        "seq": 0,
+        "project": "english-legal-candidates-proof"
+      },
+      "sourceSnapshotRows": 1
+    },
+    {
+      "name": "conflicting",
+      "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "originalCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+      "extractedTextCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+      "selection": {
+        "id": "synthetic conflicting duties.txt",
+        "cid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "rev": "1-sha256:d99f02fb67328897ab463b429a74831f616c10d67fd10e5d3e638290809f8c87",
+        "seq": 1,
+        "project": "english-legal-candidates-proof"
+      },
+      "sourceSnapshotRows": 1
+    },
+    {
+      "name": "copies",
+      "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "originalCid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+      "extractedTextCid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+      "selection": {
+        "id": "synthetic parser copy.txt",
+        "cid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+        "rev": "1-sha256:ce96902f019c3d9dc5dbc16be600a18ce39864b697277922eb0de41c1cd47f42",
+        "seq": 2,
+        "project": "english-legal-candidates-proof"
+      },
+      "sourceSnapshotRows": 1
+    }
+  ],
+  "limits": [
+    "Replayed currentness fixtures reconstruct the exact retained document rows; they are not a fresh source-ingestion proof",
+    "Recorded parser execution is not authenticated by receipt identity; actual execution evidence remains the distinct v58 browser proof"
+  ]
+}

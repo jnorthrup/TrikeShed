@@ -1,0 +1,25 @@
+// Documentation-only portable runner for the unchanged archived independent auditors.
+// Maps original worker input paths to the exact published bytes; no production code or parser.
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),Module=require('node:module'),zlib=require('node:zlib');
+const root=path.dirname(__dirname),mode=process.argv[2]||'query',panels=process.argv[3]?path.resolve(process.argv[3]):null;
+if(!['input','query'].includes(mode))throw Error('Use input or query [path/to/panels]');
+const filename=path.join(__dirname,mode==='input'?'input-audit.cjs.txt':'query-audit.cjs.txt');
+const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8')),mapped=new Map();
+for(const item of manifest.receipts)mapped.set(item.file,path.join(root,'cas-readbacks',item.cid.slice(7)+'.cbor'));
+for(const item of manifest.sources)mapped.set(item.file,path.join(root,'sources',item.cid.slice(7)+'.txt'));
+mapped.set('/workspace/library-files/documents-legal-candidates-independent-audit/audit.cjs',path.join(__dirname,'decoder-source.cjs.txt'));
+const originalRead=fs.readFileSync.bind(fs),originalExists=fs.existsSync.bind(fs);
+function target(file){return mapped.get(String(file))||String(file);}
+function bytes(file){const selected=target(file);if(originalExists(selected))return originalRead(selected);
+ if(selected===path.join(root,'result.json'))return zlib.gunzipSync(originalRead(path.join(root,'api-result.json.gz')));
+ if(panels&&selected===path.join(panels,'result.json'))return zlib.gunzipSync(originalRead(path.join(panels,'browser-result.json.gz')));
+ return originalRead(selected);
+}
+const shim={...fs,readFileSync(file,options){const value=bytes(file),encoding=typeof options==='string'?options:options?.encoding;return encoding?value.toString(encoding):value;},
+ existsSync(file){const selected=target(file);return originalExists(selected)||selected===path.join(root,'result.json')||(panels&&selected===path.join(panels,'result.json'));}};
+const source=originalRead(filename,'utf8'),argv=process.argv,read=fs.readFileSync,exists=fs.existsSync;
+try {
+ process.argv=['node',filename,root,...(panels?[panels]:[])];fs.readFileSync=shim.readFileSync;fs.existsSync=shim.existsSync;
+ const loaded=new Module(filename,module);loaded.filename=filename;loaded.paths=module.paths;loaded._compile(source,filename);
+} finally {process.argv=argv;fs.readFileSync=read;fs.existsSync=exists;}

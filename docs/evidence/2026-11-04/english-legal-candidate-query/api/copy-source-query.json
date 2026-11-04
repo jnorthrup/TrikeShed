@@ -1,0 +1,488 @@
+{
+  "result": "PASS",
+  "scope": "Actual retained CoreNLP copy vertex, anchored to its original source occurrence; no new lexical occurrence or authenticated producer implied.",
+  "request": {
+    "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+    "mode": "snapshot",
+    "program": {
+      "nodes": [
+        {
+          "id": "select",
+          "type": "sparql.select",
+          "params": {},
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v0",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?node",
+            "ord": "0"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v1",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?word",
+            "ord": "1"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v2",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?index",
+            "ord": "2"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v3",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?copy",
+            "ord": "3"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p0",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:nodeKind>",
+            "object": "\"copy\""
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p1",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:word>",
+            "object": "?word"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p2",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:index>",
+            "object": "?index"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p3",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:copy>",
+            "object": "?copy"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "extra-p0",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:begin>",
+            "object": "?begin"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "extra-v0",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?begin",
+            "ord": "4"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "extra-p1",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:end>",
+            "object": "?end"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "extra-v1",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?end",
+            "ord": "5"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "extra-p2",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:sourceText>",
+            "object": "?source"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "extra-v2",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?source",
+            "ord": "6"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "extra-p3",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:candidateReceipt>",
+            "object": "?candidate"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "extra-v3",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?candidate",
+            "ord": "7"
+          },
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "wires": [
+        {
+          "from": [
+            "v0",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v1",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v2",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v3",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "p0",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p1",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p2",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p3",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "extra-p0",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "extra-v0",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "extra-p1",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "extra-v1",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "extra-p2",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "extra-v2",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "extra-p3",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "extra-v3",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        }
+      ],
+      "controls": {
+        "humanOversight": true,
+        "matingPoints": [],
+        "inspectionOnly": true
+      },
+      "kanban": null,
+      "view": null,
+      "seq": 1
+    }
+  },
+  "status": 200,
+  "response": {
+    "dataset": "english-legal-candidate-observations",
+    "query": "SELECT ?node ?word ?index ?copy ?begin ?end ?source ?candidate WHERE { ?node <urn:trikeshed:english:legal:nodeKind> \"copy\" . ?node <urn:trikeshed:english:legal:word> ?word . ?node <urn:trikeshed:english:legal:index> ?index . ?node <urn:trikeshed:english:legal:copy> ?copy . ?node <urn:trikeshed:english:legal:begin> ?begin . ?node <urn:trikeshed:english:legal:end> ?end . ?node <urn:trikeshed:english:legal:sourceText> ?source . ?node <urn:trikeshed:english:legal:candidateReceipt> ?candidate . }",
+    "results": {
+      "head": {
+        "vars": [
+          "node",
+          "word",
+          "index",
+          "copy",
+          "begin",
+          "end",
+          "source",
+          "candidate"
+        ]
+      },
+      "results": {
+        "bindings": [
+          {
+            "node": {
+              "type": "uri",
+              "value": "urn:trikeshed:english:legal:7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0/sentence/0/node/2:3"
+            },
+            "word": {
+              "type": "literal",
+              "value": "requirements"
+            },
+            "index": {
+              "type": "literal",
+              "value": "2",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "copy": {
+              "type": "literal",
+              "value": "3",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "begin": {
+              "type": "literal",
+              "value": "4",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "end": {
+              "type": "literal",
+              "value": "16",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+            },
+            "source": {
+              "type": "uri",
+              "value": "urn:sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c"
+            },
+            "candidate": {
+              "type": "uri",
+              "value": "urn:sha256:7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0"
+            }
+          }
+        ]
+      }
+    },
+    "source": {
+      "selected": "english-legal-candidate-observations",
+      "receiptCid": "sha256:7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0",
+      "namedGraph": "urn:trikeshed:english:legal:7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0",
+      "originalCid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+      "extractedTextCid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+      "mode": "snapshot",
+      "historical": true,
+      "reviewStatus": "unreviewed",
+      "scope": "recorded-parser-role-and-quantity-candidates",
+      "semanticAuthority": "not-established",
+      "producerAuthority": "not-established",
+      "parserExecution": "not-reverified",
+      "dependencyNodeIdentity": "recorded-index-and-copy",
+      "parserDependencyNodeIdentity": "token-index+copy-count/1",
+      "parserNodeIdentityReported": true,
+      "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+      "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "candidateCid": "sha256:7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0",
+      "quads": 292,
+      "sameSentenceJoin": "cooccurrence-only-not-applicability",
+      "integerValueMeaning": "bounded-lexical-reading-only",
+      "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+      "currentness": "not-checked"
+    }
+  }
+}

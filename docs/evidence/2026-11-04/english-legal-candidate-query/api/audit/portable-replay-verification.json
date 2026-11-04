@@ -1,0 +1,25 @@
+{
+  "result": "PASS",
+  "scope": "Only published synthetic bytes and archived unchanged comparator/decoder source were read; wrapper remaps worker file paths and decompresses exact records in memory. No Kotlin/production verifier/parser or runtime fixture executed.",
+  "reports": [
+    {
+      "mode": "published-input-audit.json",
+      "report": "replay-inputs-audit.json",
+      "sha256": "e0c700d5fd2bb70ff27f4427bc1dbb14fd27ae0f381308c7628312ff2cfd9ed8",
+      "byteIdenticalToOriginalIndependentAudit": true
+    },
+    {
+      "mode": "published-api-audit.json",
+      "report": "api-audit.json",
+      "sha256": "ce8abc66c141f9410bfe4d35d3ddbf75505ff5f791361116c539e2ca5c3a3d3e",
+      "byteIdenticalToOriginalIndependentAudit": true
+    },
+    {
+      "mode": "published-combined-audit.json",
+      "report": "combined-audit.json",
+      "sha256": "5c28fb6dc8c4f51ca1986e0dcd0c3a6968265da74e2bc05b4ab51b9b2f8bdeed",
+      "byteIdenticalToOriginalIndependentAudit": true
+    }
+  ],
+  "combinedPanelsLocation": "../panels (separate documentation branch during validation)"
+}

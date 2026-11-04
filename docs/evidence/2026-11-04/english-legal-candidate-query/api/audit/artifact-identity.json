@@ -1,0 +1,35 @@
+{
+  "result": "PASS",
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "files": [
+    {
+      "file": "main.jar",
+      "sha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89"
+    },
+    {
+      "file": "documents.js",
+      "sha256": "eb6e4e9a78efb6eff64222ffa289987c52c41cb30a59ca6486a55faac4970497"
+    },
+    {
+      "file": "pages.js",
+      "sha256": "9388c8ab1cdffb4db3b86e3e99c92fada2fee91e91e69592678be2fb6f767a54"
+    },
+    {
+      "file": "spacegraph.js",
+      "sha256": "bdc750685c1b940fd3447b9c5ba76d6f8fc58f63b1f57b19fc188bd4d6c09a6c"
+    }
+  ],
+  "productionClassesFromFrozenMainJar": [
+    "borg.trikeshed.forge.server.EnglishLegalQueryWire",
+    "borg.trikeshed.forge.server.EnglishLegalPatternsWire",
+    "borg.trikeshed.rdf.EnglishLegalGraph",
+    "borg.trikeshed.forge.server.SparqlWire",
+    "borg.trikeshed.lcnc.LcncRunner"
+  ],
+  "jarOnlyDependencyClasspath": true,
+  "externalClassesProofNamespaceOnly": true,
+  "externalClassCount": 24,
+  "parserExecution": "none-in-this-replay-proof",
+  "friendAccess": false,
+  "productionClassOverlays": false
+}

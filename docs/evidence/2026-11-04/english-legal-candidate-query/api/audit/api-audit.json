@@ -1,0 +1,40 @@
+{
+  "result": "PASS",
+  "scope": "Independent built-in Node comparison of actual retained-data API/typed/optional Panels outputs against unchanged v58 source observations, CBOR and SHA-256; no parser or production verifier reused",
+  "apiResultCid": "sha256:5961206c0800703397e2c096c260030661bf3245cfe944dab8929f1e8f62b07e",
+  "panelsResultCid": null,
+  "auditorCid": "sha256:ad28a749faba902258cdac29ef2812a68bc2b729d7b2bd2ac9a9db65389c79ed",
+  "decoderSourceCid": "sha256:8f010e1f4b58dade87f8067012d2b9ada10517b4e373489c2a1d5c86a02e8838",
+  "uniqueDerivedCandidateReceipts": 5,
+  "queryOutputsCompared": 18,
+  "refusalsCompared": 7,
+  "bindingsCompared": 23,
+  "knownDurationQueries": 8,
+  "unknownQuantityQueries": 3,
+  "actualCopyQueries": 4,
+  "sameSentenceCooccurrenceQueries": 2,
+  "missingIntegerQueries": 1,
+  "durablePanelsRunsCompared": 0,
+  "durablePanelsRawCasCompared": 0,
+  "uniqueDurableProgramCasCompared": 0,
+  "durableCasFormat": "exact-UTF8-JSON",
+  "checks": [
+    "original candidate CBOR/CIDs unchanged; new copy snapshot differs only in explicit source-mode descriptor",
+    "exact parent/source CIDs, mode, named graph and unreviewed source authority",
+    "all sentence quotations, original/copy nodes, complete dependencies and source spans retained",
+    "exact known30/day result multiset excludes conflicting number-form30",
+    "unknown duration preserves30/60 number forms but has no invented integerValue",
+    "actual copy node URI index:copy/word and parent source span, including direct graph begin/end/source/candidate query",
+    "same-sentence modal/quantity joins remain cooccurrence only",
+    "explicit current stale409 and historical snapshot; mode and visual bounds refuse without partial results",
+    "typed output and accepted four-query drain; zero parser/extraction/model/global graph/legal-admission owners",
+    "optional actual Panels outputs, connected source facets and durable completed/failed receipts"
+  ],
+  "limits": [
+    "Query-time proof replays exact retained observations and source rows; no new NLP execution or fresh document ingestion",
+    "Missing integer triples are unknown or unrepresented, never evidence of legal falsehood",
+    "Manual1200-token overbudget control is explicitly separate from actual CoreNLP observations",
+    "Raw durable Panels CAS comparison count is explicit; zero means this invocation did not compare raw durable blocks",
+    "This is a bounded fixture proof, not general parser accuracy, legal comprehension, application-wide sandboxing or authority authentication"
+  ]
+}

@@ -1,0 +1,279 @@
+{
+  "scope": "Exact retained v58 CoreNLP observations replayed; no fresh ingestion or parser execution. Exact sourceSnapshot rows reconstructed read-only for currentness controls.",
+  "sourceProof": "/workspace/library-files/documents-legal-candidates-proof",
+  "sourceIdentity": {
+    "result": "PASS",
+    "source": "8486ae5f0547c49bf1013a472eda3f505d7c58ac",
+    "snapshot": "/workspace/library-files/documents-legal-candidates-proof/snapshot",
+    "snapshotManifestAndDependenciesVerified": true,
+    "mainArtifactUnchangedAfterProof": true,
+    "bundles": {
+      "main.jar": "c0ad0df4cc9b7160f2776f467c4c8825ec187dc0fcfbb209fbd2c9642224d516",
+      "documents.js": "eb6e4e9a78efb6eff64222ffa289987c52c41cb30a59ca6486a55faac4970497",
+      "spacegraph.js": "034a23cf78b9d8f2f8fbe0db2f32c35cb64b4585432c1a20fe5786327fd86cf0",
+      "pages.js": "9388c8ab1cdffb4db3b86e3e99c92fada2fee91e91e69592678be2fb6f767a54"
+    },
+    "classpathSha256": "5dae15c3f7b013274c6063838a1e197db38655487c652aa47cffb95dd8d28ec3",
+    "jarOnlyDependencies": true,
+    "productionClassOverlays": false,
+    "friendAccess": false,
+    "testClassesOnClasspath": false,
+    "harnessSha256": {
+      "Fixture.kt": "f55754692f2519921cad87967cd307f051768b223527b285be98018fa4edbf8f",
+      "driver.cjs": "2765cb24630703c889cbb3fd56fa61d98231ae19f85bceca95de2d445ec9b458",
+      "deny-egress.py": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+    },
+    "compiledClassSha256": {
+      "proof/englishlegal/FixtureKt$main$1$brain$1.class": "83b0ea17407f79cc0b990d1860a130cf98f1cb764e28cc649e0eaa1e6885702f",
+      "proof/englishlegal/FixtureKt$main$1$5$bytes$after$1.class": "b2aa475059696fbc04661c8b069ce3131f974db3cd31ab854fba82fe57a85ef1",
+      "proof/englishlegal/FixtureKt$main$1.class": "1366af40aa5a8d0d007498105addc800f75be6141c7a5aaa2ab793a6d6503c58",
+      "proof/englishlegal/FixtureSource.class": "18f0ef0cf0cc9bd500c85971178a8f60ae95322361172e16138ac3c52e987780",
+      "proof/englishlegal/FixtureKt$main$1$5$bytes$executed$1.class": "e32d5249b80141b28fc9a409308b15e8980d33f8e9d0eafc0b7d8337042788f3",
+      "proof/englishlegal/FixtureKt$main$1$5$bytes$response$3.class": "a15fa9e8f96ad517a3814f8062fa9dc221d4b09a66cd0736aa2ef8fab836052a",
+      "proof/englishlegal/FixtureKt$main$1$wire$1$1.class": "ff67bd8422a94596044d9c242b819ff04b88e415156b84f3f043de298ab71b92",
+      "proof/englishlegal/FixtureKt$main$1$5$bytes$response$2.class": "4402566c5813b73ce3e49a40df745b830f750eba4104c4b31d91238a31a98f40",
+      "proof/englishlegal/FixtureKt$main$1$invokeSuspend$lambda$11$$inlined$\u03b1$1.class": "7435a08eb9a6f732edcb700c46f15b4757fecb65646031666af25934471a1495",
+      "proof/englishlegal/FixtureKt$main$1$5$bytes$response$1.class": "0fecd6cbba2eba46540c1c1bccd059a735225cd5a8074ec22d502da34ef4f8ac",
+      "proof/englishlegal/FixtureKt$main$1$5$bytes$reteFacts$1.class": "cf5f6b522dd2a1487ef452cb9d48e6bb29fd9a9e8ebb97109304b616ebdfdfc7",
+      "proof/englishlegal/FixtureKt.class": "f670969ecd0ea0db8388338b23ed1d634d54df9e11b47b3dda1951320357cd0c",
+      "proof/englishlegal/FixtureKt$main$1$6.class": "79169ed7f0993ab8a80671b477b4667a8928b1b99cd55c321d48f436f722d1f1",
+      "proof/englishlegal/FixtureKt$main$1$5$bytes$before$1.class": "573025fdf82aaa9a5f88b53deb7dac663d3621853bdcc852e78fdb80a462e8f7"
+    },
+    "parserManifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+    "parserCounting": "External NlpReader delegate counts actual owned CoreNlpRuntime SYNTAX read calls; annotations and metadata are not replaced",
+    "parserCalls": 3,
+    "inspectionCount": 3,
+    "typedLcncCalls": 3,
+    "retainedReadbacks": [
+      {
+        "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "schema": "trikeshed.english-inspection.v1",
+        "inspectionCid": null,
+        "bytes": 11648
+      },
+      {
+        "receiptCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "schema": "trikeshed.english-inspection.v1",
+        "inspectionCid": null,
+        "bytes": 13562
+      },
+      {
+        "receiptCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+        "schema": "trikeshed.english-inspection.v1",
+        "inspectionCid": null,
+        "bytes": 6433
+      },
+      {
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15084
+      },
+      {
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15084
+      },
+      {
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15084
+      },
+      {
+        "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15060
+      },
+      {
+        "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15060
+      },
+      {
+        "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "bytes": 15060
+      },
+      {
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "bytes": 18984
+      },
+      {
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "bytes": 18984
+      },
+      {
+        "receiptCid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+        "schema": "trikeshed.english-legal-patterns.v1",
+        "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+        "bytes": 5860
+      }
+    ],
+    "browserErrors": [],
+    "externalBrowserRequests": [],
+    "sourceTokens": 70,
+    "fullParserNodes": 71,
+    "copyCoverage": "One actual copy node in separate static phrase graph. No copied modal/action candidate or general copy accuracy claim.",
+    "cleanup": {
+      "wireDrained": true,
+      "scopesDrained": true,
+      "supervisorCompleted": true,
+      "parserCalls": 3
+    },
+    "fixtureExit": 0
+  },
+  "receipts": [
+    {
+      "cid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/cas-readbacks/0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23.cbor",
+      "length": 13562
+    },
+    {
+      "cid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/cas-readbacks/0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759.cbor",
+      "length": 15060
+    },
+    {
+      "cid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/cas-readbacks/0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb.cbor",
+      "length": 11648
+    },
+    {
+      "cid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/cas-readbacks/1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb.cbor",
+      "length": 18984
+    },
+    {
+      "cid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/cas-readbacks/4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922.cbor",
+      "length": 5860
+    },
+    {
+      "cid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/cas-readbacks/6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a.cbor",
+      "length": 6433
+    },
+    {
+      "cid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/cas-readbacks/7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798.cbor",
+      "length": 15084
+    }
+  ],
+  "sources": [
+    {
+      "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/drop-input/synthetic matching duties.txt",
+      "length": 133,
+      "id": "synthetic matching duties.txt"
+    },
+    {
+      "cid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/drop-input/synthetic conflicting duties.txt",
+      "length": 178,
+      "id": "synthetic conflicting duties.txt"
+    },
+    {
+      "cid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+      "file": "/workspace/library-files/documents-legal-candidates-proof/drop-input/synthetic parser copy.txt",
+      "length": 54,
+      "id": "synthetic parser copy.txt"
+    }
+  ],
+  "inspections": {
+    "matching": {
+      "receiptCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "selection": {
+        "project": "english-legal-candidates-proof",
+        "id": "synthetic matching duties.txt",
+        "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "rev": "1-sha256:6bf74f48c795416f7fa5206d9ff2050fb43ab3102d34a6749d080caabaf7a55a",
+        "seq": 0
+      },
+      "sourceSnapshots": [
+        {
+          "project": "english-legal-candidates-proof",
+          "id": "synthetic matching duties.txt",
+          "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+          "rev": "1-sha256:6bf74f48c795416f7fa5206d9ff2050fb43ab3102d34a6749d080caabaf7a55a",
+          "seq": 0,
+          "length": 133,
+          "contentType": "text/plain"
+        }
+      ],
+      "range": {
+        "begin": 0,
+        "end": 133,
+        "totalLength": 133,
+        "complete": true
+      }
+    },
+    "conflicting": {
+      "receiptCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "selection": {
+        "project": "english-legal-candidates-proof",
+        "id": "synthetic conflicting duties.txt",
+        "cid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "rev": "1-sha256:d99f02fb67328897ab463b429a74831f616c10d67fd10e5d3e638290809f8c87",
+        "seq": 1
+      },
+      "sourceSnapshots": [
+        {
+          "project": "english-legal-candidates-proof",
+          "id": "synthetic conflicting duties.txt",
+          "cid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+          "rev": "1-sha256:d99f02fb67328897ab463b429a74831f616c10d67fd10e5d3e638290809f8c87",
+          "seq": 1,
+          "length": 178,
+          "contentType": "text/plain"
+        }
+      ],
+      "range": {
+        "begin": 0,
+        "end": 178,
+        "totalLength": 178,
+        "complete": true
+      }
+    },
+    "copies": {
+      "receiptCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "selection": {
+        "project": "english-legal-candidates-proof",
+        "id": "synthetic parser copy.txt",
+        "cid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+        "rev": "1-sha256:ce96902f019c3d9dc5dbc16be600a18ce39864b697277922eb0de41c1cd47f42",
+        "seq": 2
+      },
+      "sourceSnapshots": [
+        {
+          "project": "english-legal-candidates-proof",
+          "id": "synthetic parser copy.txt",
+          "cid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+          "rev": "1-sha256:ce96902f019c3d9dc5dbc16be600a18ce39864b697277922eb0de41c1cd47f42",
+          "seq": 2,
+          "length": 54,
+          "contentType": "text/plain"
+        }
+      ],
+      "range": {
+        "begin": 0,
+        "end": 54,
+        "totalLength": 54,
+        "complete": true
+      }
+    }
+  },
+  "expectedCurrentCandidates": {
+    "matching": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+    "conflicting": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+    "copies": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922"
+  }
+}
