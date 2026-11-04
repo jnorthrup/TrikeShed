@@ -109,6 +109,23 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                 if (run.returns != null) details("Returned values", run.returns)
                 val outputs = run.outputs
                 if (objectValue(outputs)) {
+                    if (run.status == "completed" && run.ok == true)
+                        button("Show recorded outputs on matching canvas", {
+                            panels.launchJs {
+                                try {
+                                    val frozen = content(str(run.programCid))
+                                    if (!current(ticket)) return@launchJs
+                                    val program = LcncProgramConfix.fromJson(str(run.program), JSON.stringify(frozen))
+                                    val document = JSON.stringify(panels.toConfix())
+                                    val canvas = LcncProgramConfix.fromJson(str(panels.panelName().value).ifBlank { "canvas" }, document)
+                                    require(LcncProgramConfix.sameDefinition(program, canvas)) { "Recorded outputs require the matching frozen program" }
+                                    panels.programOutputs(run, document)
+                                    if (current(ticket)) panels.status("Recorded outputs shown · no execution · current source revisions were not evaluated")
+                                } catch (e: CancellationException) { throw e } catch (e: dynamic) {
+                                    if (current(ticket)) panels.status("Recorded outputs not shown: " + failureText(e))
+                                }
+                            }
+                        }, output)
                     val ids = keysOf(outputs).filter { nodeId == null || it == nodeId }
                     val rows = document.createElement("section").asDynamic(); output.appendChild(rows)
                     var offset = 0

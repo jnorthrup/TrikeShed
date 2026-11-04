@@ -70,8 +70,14 @@ fun sheetSeed(id: String, title: String, cursor: Cursor, parent: String? = null,
  * to its own sheet. Hierarchy-as-index (the Confix flat index) → grid-in-cell (TreeSheets).
  */
 fun confixSheets(id: String, title: String, doc: ConfixDoc, maxSheets: Int = 256, maxRows: Int = 1024, maxChars: Int = 65536, maxDepth: Int = 16, maxMillis: Long = 50): List<SheetSeed> {
+    val root = doc.rootCell ?: return emptyList()
+    return confixCellSheets(id, title, root, maxSheets, maxRows, maxChars, maxDepth, maxMillis)
+}
+
+/** Project an already indexed cell without rescanning or changing its source offsets. */
+fun confixCellSheets(id: String, title: String, root: ConfixCell, maxSheets: Int = 256, maxRows: Int = 1024, maxChars: Int = 65536, maxDepth: Int = 16, maxMillis: Long = 50,
+    scalar: (ConfixCell) -> Any? = { it.reify() }): List<SheetSeed> {
     val out = ArrayList<SheetSeed>()
-    val root = doc.rootCell ?: return out
     if (maxSheets <= 0) return out
     val started = TimeSource.Monotonic.markNow()
     var remainingRows = maxRows
@@ -114,7 +120,7 @@ fun confixSheets(id: String, title: String, doc: ConfixDoc, maxSheets: Int = 256
                     SheetRef(childId)
                 }
             }
-            else -> cell.reify().let { if (it is String) text(it) else it }
+            else -> scalar(cell).let { if (it is String) text(it) else it }
         }
         if (isObject) {
             // Confix flat-kid order inside an object is (key, value) pairs (verified by CursorSheetTest on JSON;
@@ -125,11 +131,13 @@ fun confixSheets(id: String, title: String, doc: ConfixDoc, maxSheets: Int = 256
                 rows.add(listOf(text(key), value(kids[i + 1], key, key)))
                 i += 2
             }
-        } else {
+        } else if (cell.row.tag == IOMemento.IoArray) {
             for (i in 0 until kids.size) {
                 if (!rowAllowed()) break
                 rows.add(listOf(i, value(kids[i], "$i", "[$i]")))
             }
+        } else if (rowAllowed()) {
+            rows.add(borg.trikeshed.lib._l[0, value(cell, "value", "value")])
         }
         out.add(SheetSeed(sheetId, sheetTitle, columns, rows, parent, limit != null, limit))
         pending.forEach { (child, childId, childTitle) -> walk(child, childId, childTitle, sheetId, depth + 1) }

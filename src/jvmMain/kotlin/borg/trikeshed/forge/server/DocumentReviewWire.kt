@@ -207,6 +207,7 @@ class DocumentReviewWire private constructor(
         pdfLinks.attach()
         english.attach()
         bindings[DocumentCurationLegos.SOURCE] = DocumentCurationLegos.source(ctx.casStore, corpus)
+        bindings[borg.trikeshed.lcnc.DocumentSpans.TYPE] = borg.trikeshed.lcnc.DocumentSpans.runner(ctx.casStore, corpus)
         bindings[DocumentCurationLegos.SHEET] = DocumentCurationLegos.sheet(ctx.casStore)
         bindings["document.reviewSnapshot"] = LcncNodeRunner { node, inputs ->
             val cid = ContentId((inputs["receiptCid"] ?: node.params["receiptCid"]) as String)

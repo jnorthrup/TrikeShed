@@ -16,6 +16,7 @@ import borg.trikeshed.parse.confix.confixDoc
 import kotlinx.coroutines.CompletableDeferred
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib._s
 
 /**
  * The LCNC-only Kanban surface. It owns no shadow board state: commands enter
@@ -240,10 +241,12 @@ class LcncKanbanExperience(
                 )
             },
             "confix.pickPath" to LcncNodeRunner { node, inputs ->
-                val json = (inputs["json"] ?: node.params["json"])
+                val json = (inputs["data"] ?: inputs["json"] ?: node.params["json"])
                     ?.toString()
                     ?: error("confix.pickPath: json input or param required")
                 val path = required(node, "path")
+                if (node.params["geometry"] == "native" || inputs.keys.any { it in _s["rows", "sourceCid", "ok", "format"] })
+                    return@LcncNodeRunner LcncConfixSelection.select(json, path, inputs["rows"], inputs["sourceCid"], inputs["ok"], inputs["format"])
                 val selected = resolveJsonPath(reify(json), path)
                 if (selected == null) {
                     mapOf("found" to false, "path" to path, "sheets" to emptyList<Any?>(), "sheet" to null)

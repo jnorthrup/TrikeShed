@@ -44,7 +44,7 @@ object DocumentCurationLegos {
     const val SOURCE = "document.source"
 
     /** Resolve one source through the existing project owner or retain explicitly attributed text. */
-    fun source(cas: CasStore, corpus: ProjectCorpus): LcncNodeRunner = boundLcnc(CasStoreKey(cas), boundLcnc(ProjectCorpusKey(corpus)) { owner, _, inputs ->
+    fun source(cas: CasStore, corpus: ProjectCorpus): LcncNodeRunner = boundLcnc(CasStoreKey(cas), boundLcnc(ProjectCorpusKey(corpus)) { owner, node, inputs ->
         val cas = CasStoreKey.require()
         val doc = inputs["doc"] ?: inputs["doc?"]
         val input = inputs["source"] ?: inputs["source?"]
@@ -55,7 +55,10 @@ object DocumentCurationLegos {
         val reference = DocumentCuratorCodec.source(retained)
         val cid = cas.put(CanonicalCbor.encodeMap(reference - "text"))
         cas.sync()
-        mapOf("source" to (reference + ("sourceCid" to cid.value)))
+        val shown = if (node.params["view"] == "reference") reference.filterKeys {
+            it in _s["originalCid", "extractedTextCid", "name", "mediaType", "category", "project", "extraction"]
+        } else reference
+        _m["source" j (shown + _m["sourceCid" j cid.value])]
     })
 
     /** A ProjectDoc is a binary identity, never an alias for its extracted text. */
@@ -392,7 +395,20 @@ object DocumentCurationLegos {
     /** Retain new text or resolve an exact retained source before entering the existing curator. */
     fun retainSource(cas: CasStore, value: Any?): DocumentSource {
         val retained = if (value is DocumentSource) value else {
-            val fields = requireNotNull(value as? Map<*, *>) { "$CURATE.source must be an object" }
+            val supplied = requireNotNull(value as? Map<*, *>) { "$CURATE.source must be an object" }
+            val fields = if (supplied["sourceCid"] == null) supplied else {
+                val cid = ContentId(requireNotNull(supplied["sourceCid"] as? String) { "Source manifest CID must be text" })
+                val bytes = requireNotNull(cas.get(cid)) { "Source manifest is unavailable" }
+                require(ContentId.of(bytes) == cid) { "Source manifest content identity mismatch" }
+                val manifest = CanonicalCbor.decodeMapBounded(bytes, 4 * 1024 * 1024, maxDepth = 24, maxItems = 262144)
+                val claimed = buildMap<String, Any?> {
+                    for ((key, value) in supplied) if (key != "sourceCid" && key != "text")
+                        put(requireNotNull(key as? String), value)
+                }
+                require(claimed.keys.all { it in manifest } && CanonicalCbor.encodeMap(claimed).contentEquals(
+                    CanonicalCbor.encodeMap(manifest.filterKeys { it in claimed }))) { "Source reference differs from retained manifest" }
+                if ("text" in supplied) manifest + _m["text" j supplied["text"]] else manifest
+            }
             require(fields["base64"] == null) { "File bytes require the document extraction feed" }
             val name = sourceName(fields)
             val original = fields["originalCid"]
