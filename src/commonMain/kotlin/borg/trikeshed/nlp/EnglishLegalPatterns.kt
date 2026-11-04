@@ -158,10 +158,17 @@ object EnglishLegalPatterns {
         val pair = Regex("^([A-Za-z\\s-]+?)\\s*\\(\\s*([0-9]+)\\s*\\)$").matchEntire(literal)
         if (pair != null) {
             val left = pair.groups[1]!!; val right = pair.groups[2]!!
+            // Capture ranges are not part of Kotlin/JS MatchGroup. This grammar anchors the
+            // left form at zero and places the digit form after the one opening parenthesis.
+            val opening = literal.indexOf('(')
+            val rightStart = literal.indexOf(right.value, opening + 1)
+            require(opening >= 0 && rightStart > opening && literal.startsWith(left.value) &&
+                literal.substring(opening + 1, rightStart).all { it.isWhitespace() } &&
+                literal.substring(rightStart, rightStart + right.value.length) == right.value) { "Quantity capture span mismatch" }
             val a = integer(left.value); val b = integer(right.value)
             return Reading(if (a != null && a == b) a else null,
                 if (a == null || b == null) "unsupported-number-language" else if (a != b) "conflicting-number-forms" else null,
-                _l[form(left.value, begin + left.range.first, a), form(right.value, begin + right.range.first, b)])
+                _l[form(left.value, begin, a), form(right.value, begin + rightStart, b)])
         }
         val value = integer(literal)
         return Reading(value, if (value == null) "unsupported-number-language" else null, _l[form(literal, begin, value)])

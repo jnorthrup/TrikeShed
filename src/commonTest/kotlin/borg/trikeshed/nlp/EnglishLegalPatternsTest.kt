@@ -229,4 +229,21 @@ class EnglishLegalPatternsTest {
         assertEquals(text, sentence(result)["quote"])
     }
 
+
+    @Test fun dualNumberWhitespaceAndUnicodePrefixKeepPortableExactCaptureOffsets() {
+        val prefix = "📚 Preamble.\r\n"
+        val text = "Tenant must give notice within THIRTY \r\n (\t30 \t) business days."
+        val original = source(prefix + text + "\r\nOther text.")
+        val result = EnglishLegalPatterns.inspect(original, parsed(text, "THIRTY"), prefix.length, prefix.length + text.length)
+        val candidate = duration(result)
+        val readings = (candidate["numberReadings"] as List<*>).map { it as Map<*, *> }
+        assertEquals(30, candidate["integerValue"])
+        assertEquals("THIRTY \r\n (\t30 \t)", candidate["quantityLiteral"])
+        assertEquals(_l["THIRTY", "30"], readings.map { it["quote"] })
+        assertEquals(prefix.length + text.indexOf("THIRTY"), readings[0]["begin"])
+        assertEquals(prefix.length + text.indexOf("30"), readings[1]["begin"])
+        for (reading in readings) assertEquals(reading["quote"], original.text.substring(reading["begin"] as Int, reading["end"] as Int))
+        assertEquals(false, (result["range"] as Map<*, *>)["complete"])
+    }
+
 }
