@@ -16,6 +16,7 @@ import platform.CoreCrypto.CC_SHA256
 import platform.posix.*
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicReference
+import kotlin.jvm.JvmInline
 
 /** Native SHA-256 for a bounded reader block. */
 fun mlxBlockDigest(bytes: ByteArray): String {
@@ -32,6 +33,7 @@ class MlxVerifiedReader internal constructor(
     path: String, admit: (Long) -> Unit, private val retire: (Long) -> Unit,
     private val closeFile: (FileChannel) -> Unit, loadCheck: () -> Unit,
 ) {
+    @JvmInline private value class HeaderNumber(val text: String)
     constructor(path: String, loadCheck: () -> Unit = {}) : this(path, {}, {}, { it.close() }, loadCheck)
     companion object {
         const val BLOCK_BYTES = 1 shl 20
@@ -111,11 +113,11 @@ class MlxVerifiedReader internal constructor(
             loadCheck()
         }
         fun number(value: Any?, maximum: Long): Long {
-            val n = (value as? Number)?.toDouble()
-            require(n != null && n.isFinite() && n >= 0 && n <= maximum.toDouble() && n % 1.0 == 0.0) {
-                "Invalid safetensors integer"
-            }
-            return n.toLong()
+            val text = (value as? HeaderNumber)?.text
+            require(text != null && text.isNotEmpty() && text.all { it in '0'..'9' }) { "Invalid safetensors integer" }
+            val n = text.toLongOrNull()
+            require(n != null && n <= maximum) { "Invalid safetensors integer" }
+            return n
         }
         fun fields(value: Any?): Map<*, *> {
             require(value is Map<*, *> && value.keys.all { it is String } && value.keys.toSet().size == value.size) {
@@ -132,7 +134,7 @@ class MlxVerifiedReader internal constructor(
         }
         require(length in 2..16_777_216L && length <= size - 8) { "Invalid safetensors header length" }
         val header = bytes(8, length.toInt())
-        val entries = fields(reifyStrict(header.decodeToString(throwOnInvalidSequence = true)))
+        val entries = fields(reifyStrict(header.decodeToString(throwOnInvalidSequence = true)) { HeaderNumber(it) })
         val dataSize = size - 8 - length
         val ranges = mutableListOf<Join<Long, Long>>()
         for ((rawName, value) in entries) {

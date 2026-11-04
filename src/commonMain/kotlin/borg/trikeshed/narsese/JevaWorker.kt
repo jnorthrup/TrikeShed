@@ -4,6 +4,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlin.jvm.JvmInline
 
 /** A sampler is owned by the worker job and runs independently of inference. */
 internal suspend fun monitorFootprint(owner: Job, sample: () -> Unit, revoke: () -> Unit) {
@@ -21,29 +22,83 @@ internal class JevaWorker(private val load: suspend (JevaConfig) -> JevaInferenc
         const val FOOTPRINT_MARKER = "TRIKESHED_MLX_FOOTPRINT_LIMIT"
         const val FOOTPRINT_SAMPLE_MARKER = "TRIKESHED_MLX_FOOTPRINT_SAMPLE_FAILED"
     }
+    @JvmInline private value class NumberLiteral(val text: String)
     private var inference: JevaInference? = null
 
+    /** Convert a JSON number to Long only when its exact decimal value is integral and in range. */
+    private fun integer(text: String): Long? {
+        val exponentAt = text.indexOfFirst { it == 'e' || it == 'E' }.let { if (it < 0) text.length else it }
+        val negative = text.startsWith('-')
+        val first = if (negative) 1 else 0
+        val exponentLimit = text.length.toLong() + 20
+        val exponent = if (exponentAt == text.length) 0L else {
+            var at = exponentAt + 1
+            val minus = text[at] == '-'
+            if (text[at] == '-' || text[at] == '+') at++
+            var magnitude = 0L
+            while (at < text.length && magnitude < exponentLimit) {
+                val digit = text[at++].code - '0'.code
+                magnitude = if (magnitude > (exponentLimit - digit) / 10) exponentLimit else magnitude * 10 + digit
+            }
+            if (minus) -magnitude else magnitude
+        }
+        var fractional = 0
+        var afterPoint = false
+        var digits = 0
+        var leading = 0
+        var trailing = 0
+        var nonzero = false
+        for (i in first until exponentAt) {
+            val c = text[i]
+            if (c == '.') { afterPoint = true; continue }
+            digits++
+            if (afterPoint) fractional++
+            if (c != '0') { nonzero = true; trailing = 0 }
+            else { if (!nonzero) leading++; trailing++ }
+        }
+        if (!nonzero) return 0L
+        val shift = exponent - fractional.toLong()
+        val drop = if (shift < 0) -shift else 0
+        if (drop > trailing) return null
+        val append = if (shift > 0) shift else 0
+        val retained = digits.toLong() - drop
+        if (retained - leading + append > 19) return null
+        val value = StringBuilder(21)
+        if (negative) value.append('-')
+        var ordinal = 0
+        for (i in first until exponentAt) {
+            val c = text[i]
+            if (c == '.') continue
+            if (ordinal >= leading && ordinal.toLong() < retained) value.append(c)
+            ordinal++
+        }
+        repeat(append.toInt()) { value.append('0') }
+        return value.toString().toLongOrNull()
+    }
+
     suspend fun exchange(line: String): String {
-        val request = requireNotNull(reifyStrict(line) as? Map<*, *>) { "Invalid Jeva worker request" }
+        val request = requireNotNull(reifyStrict(line) { NumberLiteral(it) } as? Map<*, *>) { "Invalid Jeva worker request" }
         val result = when (request["op"]) {
             "init" -> {
                 check(inference == null) { "Jeva worker is already initialized" }
                 val fields = requireNotNull(request["config"] as? Map<*, *>) { "Missing Jeva worker configuration" }
-                fun positive(name: String): Int = requireNotNull((fields[name] as? Number)?.toInt()?.takeIf { it > 0 }) { "Invalid $name" }
-                val timeout = requireNotNull((fields["timeout_ms"] as? Number)?.toLong()?.takeIf { it > 0 }) { "Invalid timeout_ms" }
-                val footprint = fields["mlx_max_footprint_bytes"]?.let { raw ->
-                    val number = requireNotNull((raw as? Number)?.toDouble()) { "Invalid mlx_max_footprint_bytes" }
-                    require(number.isFinite() && number >= 1.0 && number <= 9_007_199_254_740_991.0 && number % 1.0 == 0.0) {
-                        "Invalid mlx_max_footprint_bytes"
-                    }
-                    number.toLong()
+                // Preserve exact JSON numbers so rounding cannot change a limit.
+                fun integer(name: String, raw: Any?, min: Long, max: Long): Long {
+                    val number = requireNotNull((raw as? NumberLiteral)?.text?.let { this@JevaWorker.integer(it) }) { "Invalid $name" }
+                    require(number in min..max) { "Invalid $name" }
+                    return number
                 }
+                fun positive(name: String): Int = integer(name, fields[name], 1, Int.MAX_VALUE.toLong()).toInt()
+                val timeout = integer("timeout_ms", fields["timeout_ms"], 1, Long.MAX_VALUE)
+                val tokens = fields["mlx_max_tokens"]?.let { integer("mlx_max_tokens", it, 1, Int.MAX_VALUE.toLong()).toInt() }
+                val checkpoint = fields["mlx_checkpoint_limit_bytes"]?.let { integer("mlx_checkpoint_limit_bytes", it, 0, Long.MAX_VALUE) }
+                val footprint = fields["mlx_max_footprint_bytes"]?.let { integer("mlx_max_footprint_bytes", it, 1, 9_007_199_254_740_991L) }
                 val config = JevaConfig(model = Jeva.text(fields["model"], "model"),
                     device = Jeva.text(fields["device"], "device"), revision = fields["revision"] as? String,
                     maxStateLength = positive("max_state_length"), maxOptionLength = positive("max_option_length"),
                     timeoutMs = timeout, runtime = JevaRuntime.KOTLIN,
-                    mlxMaxTokens = (fields["mlx_max_tokens"] as? Number)?.toInt(),
-                    mlxCheckpointLimitBytes = (fields["mlx_checkpoint_limit_bytes"] as? Number)?.toLong(),
+                    mlxMaxTokens = tokens,
+                    mlxCheckpointLimitBytes = checkpoint,
                     mlxMaxFootprintBytes = footprint)
                 load(config).also { inference = it }
                 status()

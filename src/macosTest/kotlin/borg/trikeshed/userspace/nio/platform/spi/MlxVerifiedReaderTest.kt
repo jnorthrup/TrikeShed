@@ -16,6 +16,28 @@ class MlxVerifiedReaderTest {
         }
     }
 
+    @Test fun headerRejectsRoundedOrNonIntegerTensorNumbersBeforeNativeLoad() {
+        val directory = Files.createTempDir("mlx-header-number-")
+        val path = "$directory/weights.safetensors"
+        try {
+            for (header in _l[
+                """{"data":{"dtype":"F32","shape":[2.0],"data_offsets":[0,8]}}""",
+                """{"data":{"dtype":"F32","shape":[2.0000000000000001],"data_offsets":[0,8]}}""",
+                """{"data":{"dtype":"F32","shape":[2],"data_offsets":[0,8e0]}}""",
+                """{"data":{"dtype":"F32","shape":[2],"data_offsets":[-0,8]}}""",
+                """{"data":{"dtype":"F32","shape":[18446744073709551616],"data_offsets":[0,8]}}""",
+            ]) {
+                Files.write(path, encoded(header, 8))
+                val reader = MlxVerifiedReader(path)
+                try { assertFailsWith<IllegalArgumentException>(header) { reader.header(_a["data"]) } }
+                finally { reader.close() }
+            }
+            Files.write(path, encoded("""{"data":{"dtype":"F32","shape":[2],"data_offsets":[0,8]}}""", 8))
+            val reader = MlxVerifiedReader(path)
+            try { reader.header(_a["data"]) } finally { reader.close() }
+        } finally { Files.deleteRecursively(directory) }
+    }
+
     @Test fun invalidTensorHeadersAndMissingNamesAreRejectedBeforeNativeLoad() {
         val directory = Files.createTempDir("mlx-invalid-header-")
         val path = "$directory/weights.safetensors"
@@ -190,8 +212,9 @@ class MlxVerifiedReaderTest {
             val tensors = session.load(path, "data")
             var checks = 0
             class Expired : RuntimeException()
-            assertFailsWith<Expired> { session.materialize(tensors) { if (++checks == 2) throw Expired() } }
-            assertEquals(2, checks)
+            // One preflight poll, one before evaluation, and one after the evaluated weight.
+            assertFailsWith<Expired> { session.materialize(tensors) { if (++checks == 3) throw Expired() } }
+            assertEquals(3, checks)
         } finally { session.close(); Files.deleteRecursively(directory) }
     }
 }

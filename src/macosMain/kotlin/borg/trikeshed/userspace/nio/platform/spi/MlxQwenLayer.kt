@@ -8,6 +8,10 @@ const val RECURRENCE_CHUNK = 8
 /** A packed affine-quantized matrix [out, in * bits / 32] with its scales and biases. */
 class MlxQuantized(val weight: MlxTensor, val scales: MlxTensor, val biases: MlxTensor, val groupSize: Int, val bits: Int)
 
+private fun MlxQuantized.requireOwner(session: MlxMatrixSession) {
+    weight.requireOwner(session); scales.requireOwner(session); biases.requireOwner(session)
+}
+
 fun MlxMatrixSession.linear(input: MlxTensor, matrix: MlxQuantized): MlxTensor =
     quantizedLinear(input, matrix.weight, matrix.scales, matrix.biases, matrix.groupSize, matrix.bits)
 
@@ -21,6 +25,8 @@ fun MlxMatrixSession.fullAttention(
     queryNorm: MlxTensor, keyNorm: MlxTensor,
     heads: Int, keyValueHeads: Int, headDim: Int, ropeDimensions: Int, ropeBase: Float, epsilon: Float,
 ): MlxTensor {
+    input.requireOwner(this); query.requireOwner(this); key.requireOwner(this); value.requireOwner(this); output.requireOwner(this)
+    queryNorm.requireOwner(this); keyNorm.requireOwner(this)
     val tokens = input.a[0]
     val (queries, gate) = split(reshape(linear(input, query), 1, tokens, heads, 2 * headDim), 2, 3)
     val keys = reshape(linear(input, key), 1, tokens, keyValueHeads, headDim)
@@ -44,6 +50,8 @@ fun MlxMatrixSession.linearAttention(
     keyHeads: Int, valueHeads: Int, keyDim: Int, valueDim: Int, kernel: Int, epsilon: Float,
     check: () -> Unit = {},
 ): MlxTensor {
+    input.requireOwner(this); qkv.requireOwner(this); gate.requireOwner(this); beta.requireOwner(this); decay.requireOwner(this)
+    output.requireOwner(this); convolution.requireOwner(this); stateA.requireOwner(this); stateBias.requireOwner(this); norm.requireOwner(this)
     val tokens = input.a[0]
     val keyWidth = keyHeads * keyDim
     val valueWidth = valueHeads * valueDim
