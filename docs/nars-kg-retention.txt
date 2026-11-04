@@ -64,3 +64,24 @@ with the changed production classes compiled as explicit source overlays, no
 friend access and no parser/model. This is not a released artifact result. The
 admitted-drain test first exposed a lazy Series.toList alias; a bounded explicit
 capture back to Series fixed it. The failing attempt is retained externally.
+
+The exact v66 artifact proof subsequently passed all 9 retention and 4 error-route
+methods, with no production overlays or friend access. Actual KIF/RDF source and
+definition bytes resolved under the same existing CIDs through the public routes
+and owner CAS. A production PackCasStore writer drained, synced, closed and exited;
+a distinct reader process reopened the same pack and verified every source and
+definition byte/CID. This is an observed explicit close/reopen result, not a crash
+or power-failure guarantee. The four historical route exceptions now return the
+expected 400/409 responses; the409 case retains its admitted prefix and retry
+does not increase evidence. Public synthetic evidence and exact artifact identity:
+  evidence/2026-11-04/nars-kg-retention/method.txt
+
+The latest v67 artifact repeated those 13 methods, API/CAS/replay checks and the
+two-process production-pack reopen proof against its own fresh immutable JAR.
+Two additional truncated-JSON inputs inside the existing malformed-input method
+now return400 instead of escaping IllegalStateException. Their actual v66
+baseline is preserved separately from the unchanged original four-case v62
+comparison. All six observed error cases keep the correct0/1 resident counts,
+healthy actors and successful next requests; the409 retry does not add evidence.
+The v66 record remains historical evidence. Latest synthetic evidence:
+  evidence/2026-11-04/nars-kg-retention-v67/method.txt

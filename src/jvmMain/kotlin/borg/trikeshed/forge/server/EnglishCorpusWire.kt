@@ -15,13 +15,15 @@ import kotlinx.coroutines.*
 class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: ProjectCorpus) {
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     private val runner = LcncNodeRunner { node, inputs ->
-        fun parameter(key: String): Any? = if (key in inputs) inputs[key] else node.params[key]?.let { raw ->
-            if (key == "mode" || key == "view") raw else {
+        fun parameter(key: String): Any? = if (key == "view") lcncInputValue(node, inputs, key)
+        else if (key in inputs) inputs[key] else node.params[key]?.let { raw ->
+            if (key == "mode") raw else {
                 require(raw.encodeToByteArray().size <= 65_536) { "English corpus parameter limit" }; reifyStrict(raw)
             }
         }
         val request = _m["receiptCids" j parameter("receiptCids"), "mode" j parameter("mode"), "topics" j parameter("topics")] +
-            if ("view" in inputs || "view" in node.params) _m["view" j parameter("view")] else emptyMap()
+            if ("view" in inputs || "view?" in inputs || "in:view" in node.params || "view" in node.params)
+                _m["view" j parameter("view")] else emptyMap()
         val reply = submit(jsonOf(request))
         val output = reifyStrict(reply.body) as? Map<*, *> ?: error("Invalid English corpus result")
         require(reply.status == 200) { output["error"]?.toString() ?: "English corpus request refused" }

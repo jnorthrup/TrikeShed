@@ -1,0 +1,88 @@
+{
+  "result": "PASS",
+  "scope": "Actual old/new immutable public bridge observations, not a source-overlay result",
+  "comparisons": [
+    {
+      "predicate": "https://legal.example/vocabulary#not",
+      "before": {
+        "predicate": "https://legal.example/vocabulary#not",
+        "copula": "SIMILARITY",
+        "relation": "CONTRADICTION",
+        "positiveEvidence": 0,
+        "negativeEvidence": 900
+      },
+      "after": {
+        "predicate": "https://legal.example/vocabulary#not",
+        "copula": "PRODUCT",
+        "relation": "MATCH",
+        "positiveEvidence": 900,
+        "negativeEvidence": 0
+      }
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#causes",
+      "before": {
+        "predicate": "https://legal.example/vocabulary#causes",
+        "copula": "IMPLICATION",
+        "relation": "CAUSALITY",
+        "positiveEvidence": 900,
+        "negativeEvidence": 0
+      },
+      "after": {
+        "predicate": "https://legal.example/vocabulary#causes",
+        "copula": "PRODUCT",
+        "relation": "MATCH",
+        "positiveEvidence": 900,
+        "negativeEvidence": 0
+      }
+    },
+    {
+      "predicate": "https://legal.example/vocabulary#type",
+      "before": {
+        "predicate": "https://legal.example/vocabulary#type",
+        "copula": "INHERITANCE",
+        "relation": "MATCH",
+        "positiveEvidence": 900,
+        "negativeEvidence": 0
+      },
+      "after": {
+        "predicate": "https://legal.example/vocabulary#type",
+        "copula": "PRODUCT",
+        "relation": "MATCH",
+        "positiveEvidence": 900,
+        "negativeEvidence": 0
+      }
+    },
+    {
+      "predicate": "http://www.w3.org/2002/07/owl#disjointWith",
+      "before": {
+        "predicate": "http://www.w3.org/2002/07/owl#disjointWith",
+        "copula": "SIMILARITY",
+        "relation": "CONTRADICTION",
+        "positiveEvidence": 0,
+        "negativeEvidence": 900
+      },
+      "after": {
+        "predicate": "http://www.w3.org/2002/07/owl#disjointWith",
+        "copula": "SIMILARITY",
+        "relation": "CONTRADICTION",
+        "positiveEvidence": 0,
+        "negativeEvidence": 900
+      }
+    }
+  ],
+  "unchangedMappingSourceVersionsBeforeRepair": [
+    {
+      "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+      "mappingSourceSha256": "9a9837a6ab4a3c9c35277b6ff2f1e708781343f0ed301fb38607e255bbafec3e"
+    },
+    {
+      "source": "4e87c9380cd766c2343f88e5c6097b1be8f3327c",
+      "mappingSourceSha256": "9a9837a6ab4a3c9c35277b6ff2f1e708781343f0ed301fb38607e255bbafec3e"
+    },
+    {
+      "source": "8a0e8603c19160f2bb68f4c0222041dc70da8d32",
+      "mappingSourceSha256": "9a9837a6ab4a3c9c35277b6ff2f1e708781343f0ed301fb38607e255bbafec3e"
+    }
+  ]
+}

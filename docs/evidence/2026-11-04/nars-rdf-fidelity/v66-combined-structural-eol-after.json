@@ -1,0 +1,94 @@
+{
+  "scope": "Actual immutable-production strict-reader structural EOL comparison",
+  "cases": [
+    {
+      "name": "header-cr",
+      "input": "# comment\r<urn:s> <urn:p> <urn:o> .",
+      "expectedRows": 1,
+      "actualRows": 1,
+      "status": "PASS",
+      "subjects": [
+        "<urn:s>"
+      ],
+      "objects": [
+        "<urn:o>"
+      ],
+      "firstLiteral": null,
+      "expectedFirstLiteral": null,
+      "comparisonGroup": "same-before-input"
+    },
+    {
+      "name": "body-cr",
+      "input": "<urn:a> <urn:p> <urn:o> . # comment\r<urn:b> <urn:p> <urn:o> .",
+      "expectedRows": 2,
+      "actualRows": 2,
+      "status": "PASS",
+      "subjects": [
+        "<urn:a>",
+        "<urn:b>"
+      ],
+      "objects": [
+        "<urn:o>",
+        "<urn:o>"
+      ],
+      "firstLiteral": null,
+      "expectedFirstLiteral": null,
+      "comparisonGroup": "same-before-input"
+    },
+    {
+      "name": "header-crlf",
+      "input": "# comment\r\n<urn:s> <urn:p> <urn:o> .",
+      "expectedRows": 1,
+      "actualRows": 1,
+      "status": "PASS",
+      "subjects": [
+        "<urn:s>"
+      ],
+      "objects": [
+        "<urn:o>"
+      ],
+      "firstLiteral": null,
+      "expectedFirstLiteral": null,
+      "comparisonGroup": "same-before-input"
+    },
+    {
+      "name": "mixed",
+      "input": "# header\r@prefix ex: <urn:> .\r\nex:a ex:p ex:o . # middle\rex:b ex:p ex:o .\n",
+      "expectedRows": 2,
+      "actualRows": 2,
+      "status": "PASS",
+      "subjects": [
+        "<urn:a>",
+        "<urn:b>"
+      ],
+      "objects": [
+        "<urn:o>",
+        "<urn:o>"
+      ],
+      "firstLiteral": null,
+      "expectedFirstLiteral": null,
+      "comparisonGroup": "additional-structural-control"
+    },
+    {
+      "name": "long-literal",
+      "input": "<urn:a> <urn:p> \"\"\"a\rb\r\nc\nd\"\"\" . # tail\r<urn:b> <urn:p> <urn:o> .",
+      "expectedRows": 2,
+      "actualRows": 2,
+      "status": "PASS",
+      "subjects": [
+        "<urn:a>",
+        "<urn:b>"
+      ],
+      "objects": [
+        "\"a\\rb\\r\\nc\\nd\"",
+        "<urn:o>"
+      ],
+      "firstLiteral": "a\rb\r\nc\nd",
+      "expectedFirstLiteral": "a\rb\r\nc\nd",
+      "comparisonGroup": "additional-structural-control"
+    }
+  ],
+  "productionCodeSource": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+  "modelCalls": 0,
+  "bagOperations": 0
+}

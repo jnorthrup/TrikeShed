@@ -223,7 +223,12 @@ object KgNalBridge {
             t.startsWith("{") || t.startsWith("[") -> {
                 // Confix validates the complete JSON; only root-object keys select a format.
                 // Literal values and keys nested inside another property are source data.
-                val root = reifyStrict(t)
+                val root = try { reifyStrict(t) }
+                catch (invalid: IllegalStateException) {
+                    // The strict JSON validator reports truncated strings/escapes via error().
+                    // Normalize only this pure parsing boundary, before retention or admission.
+                    throw IllegalArgumentException("Invalid KG JSON input", invalid)
+                }
                 val objects = when (root) {
                     is Map<*, *> -> s_[root]
                     is List<*> -> root.toSeries() α { it as? Map<*, *> }

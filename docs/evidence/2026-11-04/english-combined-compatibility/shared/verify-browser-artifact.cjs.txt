@@ -1,0 +1,5 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const text=fs.readFileSync(process.argv[2],'utf8');
+assert(!/require\(["']vm["']\)/.test(text),'pure LCNC context callers must not retain the Node vm import');
+assert(!text.includes("Cannot find module 'vm'"),'no unresolved webpack module sentinel');
+console.log(JSON.stringify({result:'PASS',scope:'Frozen browser bundle static dependency check only; actual new-bundle loading/native runs remain separate compatibility proof.'}));

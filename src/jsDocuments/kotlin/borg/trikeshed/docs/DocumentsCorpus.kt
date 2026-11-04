@@ -279,6 +279,7 @@ internal object DocumentsCorpus {
             val viewLabel = text(controls, "label", "Words ")
             val wordSelection = document.createElement("select") as HTMLSelectElement
             wordSelection.setAttribute("data-corpus-view", "1"); wordSelection.disabled = pending
+            wordSelection.style.cssText = "background:var(--side);color:var(--ink);border:1px solid var(--rule);padding:7px;border-radius:5px"
             for ((key, label) in _l[EnglishCorpusView.ALL_LEXICAL.wire j "All lexical lemmas", EnglishCorpusView.CONTENT.wire j "Content words and legal markers"]) {
                 text(wordSelection, "option", label).setAttribute("value", key)
             }

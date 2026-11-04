@@ -30,6 +30,7 @@ class PanelsFacets(val panels: Panels) {
     var compressionDictionary = ""
     var evidenceNode: String? = null
     var selectedReceipt: dynamic = null
+    private var loadingWorkspace = false
 
     fun install() {
         val anchor = byId("rdfBtn") ?: return
@@ -43,6 +44,10 @@ class PanelsFacets(val panels: Panels) {
     fun changed() {
         if (drawer != null && (tab != "confix" || storedId == null && contentCid == null))
             drawer.querySelector("[data-state]").textContent = "Canvas changed — refresh to inspect this version"
+        if (drawer != null && loadingWorkspace) {
+            body.textContent = "Inspection changed before loading completed. Refresh to inspect this version."
+            loadingWorkspace = false
+        }
         revision++
         cursorPath = "[]"; cursorSelections = emptyMap(); cursorOffset = 0; groupOffset = 0; cursorCid = null
     }
@@ -63,7 +68,7 @@ class PanelsFacets(val panels: Panels) {
         show(tab)
     }
 
-    fun close() { revision++; drawer?.remove(); drawer = null; body = null }
+    fun close() { revision++; loadingWorkspace = false; drawer?.remove(); drawer = null; body = null }
 
     /** Select an evidence filter, not a run, binding assertion or debugger command. */
     fun inspectNode(id: String) {
@@ -91,6 +96,7 @@ class PanelsFacets(val panels: Panels) {
             "workgroups" -> "Construction declaration and stored execution · opening does not save or run"
             else -> "Read-only inspection · no graph execution"
         }
+        loadingWorkspace = true
         body.textContent = "Reading workspace…"
         launchJs {
             try {
@@ -135,6 +141,8 @@ class PanelsFacets(val panels: Panels) {
                         path = "[]"; offset = 0; changed(); show("confix")
                     }
                 }
+            } finally {
+                if (serial == revision) loadingWorkspace = false
             }
         }
     }
@@ -178,7 +186,7 @@ class PanelsFacets(val panels: Panels) {
                 "\nContext: " + str(binding.context.key ?: binding.context.role) +
                 (if (arr(binding.requiredKeys).isEmpty()) "" else "\nServices: " + arr(binding.requiredKeys).joinToString(", ") { str(it) }))
             for (violation in arr(r.violations)) text("Type diagnostic: " + str(violation))
-            receipts(r, serial, JSON.stringify(request))
+            receipts(r, JSON.stringify(request))
             link("Run records", "/api/lcnc/runs?program=" + encodeURIComponent(str(request.name)))
             link("Shared blackboard", "/blackboard")
             pointcutEvidence(serial)

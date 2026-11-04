@@ -1,0 +1,23 @@
+{
+  "beforeSource": "61411d3617d5d6d4083ba2df42bd6c1500cb6d36",
+  "afterSource": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "scope": "Two additional exactsyntheticJSON spellings, actualv66before vsactualfreshafter. Separate from the original4casev62comparison; no socket/parser/model.",
+  "cases": [
+    {
+      "name": "truncated-json-string",
+      "beforeException": "java.lang.IllegalStateException",
+      "afterStatus": 400,
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    },
+    {
+      "name": "truncated-json-escape",
+      "beforeException": "java.lang.IllegalStateException",
+      "afterStatus": 400,
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    }
+  ]
+}

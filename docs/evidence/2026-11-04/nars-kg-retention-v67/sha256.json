@@ -1,0 +1,18 @@
+{
+  "algorithm": "SHA-256",
+  "scope": "Published syntheticv67 evidence files, excluding thismanifest; v66history remains unchanged in siblingfolder. Raworiginalartifacthashes are separate.",
+  "files": {
+    "api-cas-result.json": "f82d740e46fc7c065e1ce9dd1fe3e1294cd6614f2fc5d35218d3b3830a737125",
+    "cleanup.json": "a4ca36a852b23cb251c54c853f1792fc1feaced8678f5987298bbc94bb121a6d",
+    "execution-identity.json": "eebbd8add57bd27c7dd0ed05b1e9da2a1aa5ed67692d47be322517b9ecfc7d03",
+    "fixture-methods.txt": "a6fc7eca0e435f4fd0fb8c4d71981e07498f1b8dca47c0551c634d6fa4464c6b",
+    "method.txt": "742f36754ac9792e76a92765ebf4f7646350b29a8da6e7af5ce6040eb5d11036",
+    "pack-reader.json": "673e2f8995f1cac74625108a77329345731391d55a7a6cf0cce610a626736b02",
+    "pack-writer.json": "a087079ba9182d9f2c3e4ee71e10f9493ebaa84f86574444d2783df3ec5b6787",
+    "retained-artifact-hashes.json": "4f35d0238d4fe377da69c37c292165d3c16ab3e89564ff22e3d5b5c8bba2a6ee",
+    "route-errors-comparison.json": "92ec9c7a396a49292b6c50087f5992c53de40810fa8127d97aa17b3127996c5d",
+    "truncated-json-before-v66-identity.json": "96f5c35185418b1557ed5e733cfc3873922b90b0e1d78a546ff34463ad9b7c1f",
+    "truncated-json-before-v66.json": "b0a5e2db3797f92b3c38264df402c0fd760d33d51183b040db3877d1de2bc3ee",
+    "truncated-json-comparison.json": "054f6514b36559de489ed9342ac834db4b3c442a91d869aa10107d372eff4e63"
+  }
+}

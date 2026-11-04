@@ -1,0 +1,100 @@
+package proof.legalpanels
+
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
+
+/** External fixture data only: actual Panels edits these programs and the real runner executes them. */
+object PanelPrograms {
+    const val A = "legal-known-current-a"
+    const val B = "legal-known-current-b"
+    const val UNKNOWN = "legal-unknown-current-b"
+    const val SNAPSHOT = "legal-known-snapshot-a"
+    const val INNER = "legal-inner-thirty-days"
+    const val INNER_UNKNOWN = "legal-inner-unknown-quantity"
+    const val SQL = "sql-inspection-only"
+    const val MIXED = "mixed-inspection-only"
+    const val UNBOUND = "runtime-unbound-control"
+    private fun predicate(name: String) = "<urn:trikeshed:english:legal:$name>"
+
+    fun inner(unknown: Boolean = false): LcncProgram {
+        val variables = if (unknown) s_["?quote", "?reason", "?sentence", "?candidate"]
+            else s_["?quote", "?status", "?sentence", "?source"]
+        val patterns = if (unknown) s_[
+            Triple("?d", predicate("kind"), "\"duration-language-candidate\""),
+            Triple("?d", predicate("status"), "\"unresolved-quantity-candidate\""),
+            Triple("?d", predicate("quote"), "?quote"),
+            Triple("?d", predicate("unresolved"), "?reason"),
+            Triple("?d", predicate("sentence"), "?s"),
+            Triple("?s", predicate("quote"), "?sentence"),
+            Triple("?d", predicate("candidateReceipt"), "?candidate"),
+        ] else s_[
+            Triple("?d", predicate("kind"), "\"duration-language-candidate\""),
+            Triple("?d", predicate("integerValue"), "\"30\"^^<http://www.w3.org/2001/XMLSchema#integer>"),
+            Triple("?d", predicate("unitLemma"), "\"day\""),
+            Triple("?d", predicate("quote"), "?quote"),
+            Triple("?d", predicate("status"), "?status"),
+            Triple("?d", predicate("sentence"), "?s"),
+            Triple("?s", predicate("quote"), "?sentence"),
+            Triple("?d", predicate("sourceText"), "?source"),
+        ]
+        val nodes = mutableListOf(LcncNode("select", SparqlGraph.SELECT, x = 1480.0, y = 380.0))
+        val wires = mutableListOf<LcncWire>()
+        for ((index, variable) in variables.view.withIndex()) {
+            nodes.add(LcncNode("v$index", SparqlGraph.VARIABLE, _m["name" j variable, "ord" j index.toString()], x = 40.0, y = 50.0 + index * 180))
+            wires.add(LcncWire("v$index", "variable", "select", "variables"))
+        }
+        for ((index, pattern) in patterns.view.withIndex()) {
+            nodes.add(LcncNode("p$index", SparqlGraph.PATTERN, _m["subject" j pattern.first, "predicate" j pattern.second, "object" j pattern.third],
+                x = 350.0 + (index % 3) * 360, y = 50.0 + (index / 3) * 270))
+            wires.add(LcncWire("p$index", "pattern", "select", "patterns"))
+        }
+        return LcncProgram(if (unknown) INNER_UNKNOWN else INNER, nodes.toSeries(), wires.toSeries(),
+            controls = LcncConfixControls(inspectionOnly = true), seq = nodes.size + 1)
+    }
+
+    fun outer(name: String, cid: String, mode: String, unknown: Boolean = false): LcncProgram = LcncProgram(name, s_[
+        LcncNode("receipt", LcncContracts.SCOPE_IN, _m["name" j "inspectionCid", "kind" j "id", "default" j cid], x = 40.0, y = 120.0),
+        LcncNode("mode", "text.value", _m["value" j mode], x = 40.0, y = 350.0),
+        LcncNode("pattern", "json.value", _m["value" j LcncProgramConfix.toJson(inner(unknown))], x = 350.0, y = 120.0),
+        LcncNode("query", EnglishLegalQueryContract.TYPE, x = 700.0, y = 120.0),
+        LcncNode("bindings", "display", x = 1100.0, y = 100.0),
+        LcncNode("source", "display", x = 1100.0, y = 370.0),
+        LcncNode("dataset-out", LcncContracts.SCOPE_OUT, _m["name" j "dataset", "kind" j "text"], x = 1500.0, y = 100.0),
+        LcncNode("results-out", LcncContracts.SCOPE_OUT, _m["name" j "results", "kind" j "json"], x = 1500.0, y = 330.0),
+        LcncNode("source-out", LcncContracts.SCOPE_OUT, _m["name" j "source", "kind" j "json"], x = 1500.0, y = 570.0),
+    ], s_[LcncWire("receipt", "value", "query", "inspectionCid"), LcncWire("mode", "value", "query", "mode"),
+        LcncWire("pattern", "value", "query", "program"), LcncWire("query", "results", "bindings", "x"),
+        LcncWire("query", "source", "source", "x"), LcncWire("query", "dataset", "dataset-out", "value"),
+        LcncWire("query", "results", "results-out", "value"), LcncWire("query", "source", "source-out", "value")], seq = 10)
+
+    fun corpus(receipts: List<String>): LcncProgram = LcncProgram("corpus-view-authored", s_[
+        LcncNode("receipts", "json.value", _m["value" j jsonOf(receipts)], x = 30.0, y = 80.0),
+        LcncNode("corpus-mode", "text.value", _m["value" j "current"], x = 30.0, y = 350.0),
+        LcncNode("view-alias", "text.value", _m["value" j "content"], x = 30.0, y = 590.0),
+        LcncNode("corpus-default", EnglishCorpusContract.TYPE, x = 420.0, y = 80.0),
+        LcncNode("corpus-content", EnglishCorpusContract.TYPE, _m["view" j "all-lexical", "in:view" j "all-lexical"], x = 420.0, y = 570.0),
+        LcncNode("default-matrix", "display", x = 850.0, y = 80.0),
+        LcncNode("content-matrix", "display", x = 850.0, y = 570.0),
+    ], s_[
+        LcncWire("receipts", "value", "corpus-default", "receiptCids"), LcncWire("receipts", "value", "corpus-content", "receiptCids"),
+        LcncWire("corpus-mode", "value", "corpus-default", "mode"), LcncWire("corpus-mode", "value", "corpus-content", "mode"),
+        LcncWire("view-alias", "value", "corpus-content", "view?"),
+        LcncWire("corpus-default", "matrix", "default-matrix", "x"), LcncWire("corpus-content", "matrix", "content-matrix", "x"),
+    ], seq = 8)
+
+    fun sql() = SqlGraph.parse("SELECT * FROM retained_candidate_rows_with_a_long_source_descriptor_name", SQL)
+    fun mixed(): LcncProgram {
+        val grammar = inner()
+        val nodes = mutableListOf<LcncNode>()
+        for (node in grammar.nodes.view) nodes.add(node)
+        nodes.add(LcncNode("unbound", "agent.list", x = 100.0, y = 1200.0))
+        return grammar.copy(name = MIXED, nodes = nodes.toSeries())
+    }
+    fun programs(a: String, b: String): Map<String, LcncProgram> = _m[
+        "node-runtime-unavailable-control" j LcncProgram("node-runtime-unavailable-control", s_[LcncNode("node-provider", "vm.spawn")], emptySeriesOf()),
+        SQL j sql(), MIXED j mixed(), UNBOUND j LcncProgram(UNBOUND, s_[LcncNode("unbound", "agent.list")], emptySeriesOf()),
+        A j outer(A, a, "current"), B j outer(B, b, "current"), UNKNOWN j outer(UNKNOWN, b, "current", true),
+        SNAPSHOT j outer(SNAPSHOT, a, "snapshot"), INNER j inner(), INNER_UNKNOWN j inner(true),
+    ]
+}

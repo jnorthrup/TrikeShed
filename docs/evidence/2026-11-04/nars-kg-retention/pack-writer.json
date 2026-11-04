@@ -1,0 +1,93 @@
+{
+  "scope": "Production default PackCasStore explicit close/reopen fixture; no crash/power-failure guarantee or source/review authority",
+  "mode": "write",
+  "processId": 44062,
+  "productionCodeSources": {
+    "borg.trikeshed.job.PackCasStore": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.userspace.nio.file.spi.JvmFileOperations": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.KgNalBridge": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.KgRetention": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.BeliefBagElement": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar"
+  },
+  "packRoot": "/workspace/library-files/nars-kg-retention-final-proof/pack-attempt1/cas",
+  "bagDrained": true,
+  "syncReturned": true,
+  "packCloseReturned": true,
+  "backendStorageDurability": "DURABLE",
+  "cases": [
+    {
+      "format": "KIF",
+      "sourceText": "  (pays Tenant Landlord)\r\n",
+      "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+      "sourceBytes": 26,
+      "sourceBase64": "ICAocGF5cyBUZW5hbnQgTGFuZGxvcmQpDQo=",
+      "sourceBytesSha256": "19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+      "propositionCid": "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c",
+      "definitionBytes": 226,
+      "definitionBase64": "qmRraW5kd2tnLXNvdXJjZS1wcm9wb3NpdGlvbi8xZmNvcHVsYWdQUk9EVUNUZm9iamVjdGhMYW5kbG9yZGdzdWJqZWN0ZlRlbmFudGhyZWxhdGlvbmVNQVRDSGh0ZW1wb3JhbPZpb2JqZWN0Q2lk9mlwcmVkaWNhdGVkcGF5c2pzdWJqZWN0Q2lk9m1zb3VyY2VDb250ZXh0eEdzaGEyNTY6MTllNWUzNjkxNWNkZGI0YjAyMTExZWMzYjlhMWYzNmNmODdiZjUxMjJmNTliNjk4MjkzMzUzM2Q3NDlmYWQzYw==",
+      "definitionBytesSha256": "36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c",
+      "intakeReport": {
+        "format": "KIF",
+        "statements": 1,
+        "minted": 1,
+        "copulas": {
+          "PRODUCT": 1
+        },
+        "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+        "propositionCids": [
+          "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c"
+        ],
+        "processedAssertions": 1,
+        "globalResidentCountAfterImport": 1,
+        "retention": {
+          "status": "sync-and-exact-bounded-readback-completed",
+          "storageDurability": "DURABLE",
+          "durabilityGuarantee": "storage-dependent",
+          "sourceRepresentation": "exact-accepted-text-utf8",
+          "sourceAuthentication": "not-established",
+          "reviewAuthority": "not-established"
+        }
+      },
+      "preCloseExactReadback": true
+    },
+    {
+      "format": "RDF",
+      "sourceText": " \r\n<urn:AgreementA> <urn:noticeLabel> \"Notice, required; 📚\"@en-US .\r\n",
+      "sourceCid": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+      "sourceBytes": 72,
+      "sourceBase64": "IA0KPHVybjpBZ3JlZW1lbnRBPiA8dXJuOm5vdGljZUxhYmVsPiAiTm90aWNlLCByZXF1aXJlZDsg8J+TmiJAZW4tVVMgLg0K",
+      "sourceBytesSha256": "1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+      "propositionCid": "sha256:ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070",
+      "definitionBytes": 270,
+      "definitionBase64": "qmRraW5kd2tnLXNvdXJjZS1wcm9wb3NpdGlvbi8xZmNvcHVsYWdQUk9EVUNUZm9iamVjdHgeIk5vdGljZSwgcmVxdWlyZWQ7IPCfk5oiQGVuLVVTZ3N1YmplY3RwPHVybjpBZ3JlZW1lbnRBPmhyZWxhdGlvbmVNQVRDSGh0ZW1wb3JhbPZpb2JqZWN0Q2lk9mlwcmVkaWNhdGVvdXJuOm5vdGljZUxhYmVsanN1YmplY3RDaWT2bXNvdXJjZUNvbnRleHR4R3NoYTI1NjoxNDM2NzQ1ZmQzZTM4ZThmYWZkMWU3ZTJlODgzOWQxZGVjOGNiMWI4NDkyYjVkYTFlN2FkYzYxNzQ0NDQwODgx",
+      "definitionBytesSha256": "ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070",
+      "intakeReport": {
+        "format": "TURTLE",
+        "statements": 1,
+        "minted": 1,
+        "copulas": {
+          "PRODUCT": 1
+        },
+        "sourceCid": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+        "propositionCids": [
+          "sha256:ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070"
+        ],
+        "processedAssertions": 1,
+        "globalResidentCountAfterImport": 2,
+        "retention": {
+          "status": "sync-and-exact-bounded-readback-completed",
+          "storageDurability": "DURABLE",
+          "durabilityGuarantee": "storage-dependent",
+          "sourceRepresentation": "exact-accepted-text-utf8",
+          "sourceAuthentication": "not-established",
+          "reviewAuthority": "not-established"
+        }
+      },
+      "preCloseExactReadback": true
+    }
+  ],
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "parserExecutions": 0,
+  "modelCalls": 0
+}

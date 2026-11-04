@@ -1,0 +1,11 @@
+{
+  "source": "4e87c9380cd766c2343f88e5c6097b1be8f3327c",
+  "mainJarSha256": "a9deb460d43ed52139ab8b5ba02a1b94f03146d0f1c21c7fd4612b832a0c9c1c",
+  "harnessSha256": "d55b9399787d16cbe5df795a14ec4135940ba804cc8bb443dccf8c0f571ab8f1",
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "parserExecutions": 0,
+  "modelCalls": 0,
+  "runSeconds": 0.54,
+  "runExit": 0
+}

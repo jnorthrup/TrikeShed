@@ -1,0 +1,54 @@
+{
+  "scope": "Actual immutable v59 public KG intake and bag API with isolated volatile fixture CAS; no production overlays, parser, model, live bag or global state",
+  "codeSource": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+  "sourceText": "  (pays Tenant Landlord)\r\n",
+  "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+  "canonicalPropositionDefinition": {
+    "kind": "kg-source-proposition/1",
+    "sourceContext": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+    "predicate": "pays",
+    "subject": "Tenant",
+    "object": "Landlord",
+    "subjectCid": null,
+    "objectCid": null,
+    "copula": "PRODUCT",
+    "relation": "MATCH",
+    "temporal": null
+  },
+  "definitionPreimageCidMatchesActualPid": true,
+  "propositionCid": "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c",
+  "intakeReport": {
+    "format": "KIF",
+    "statements": 1,
+    "minted": 1,
+    "copulas": {
+      "PRODUCT": 1
+    }
+  },
+  "reportHasRetentionStatus": false,
+  "sourcePresentAfterIntake": false,
+  "definitionPresentAfterIntake": false,
+  "casPutsAfterIntake": [],
+  "signalArchiveCid": "sha256:e16c3e2b45e3b37be9797b29d32aa0e92990953e746ecaff94f22656e7a8082c",
+  "signalArchivePresentAfterAttentionEviction": true,
+  "archivedSignalStillNamesMissingSourceAndProposition": true,
+  "sourcePresentAfterSignalArchive": false,
+  "definitionPresentAfterSignalArchive": false,
+  "casPutsAfterSignalArchive": [
+    "sha256:e16c3e2b45e3b37be9797b29d32aa0e92990953e746ecaff94f22656e7a8082c"
+  ],
+  "bagResidentsAfterAttentionEviction": 0,
+  "modelCalls": 0,
+  "actualParserExecutions": 0,
+  "noCasIntakeAlsoSucceeds": true,
+  "noCasReport": {
+    "format": "KIF",
+    "statements": 1,
+    "minted": 1,
+    "copulas": {
+      "PRODUCT": 1
+    }
+  },
+  "noCasReportHasRetentionStatus": false,
+  "fixtureBagsDrained": true
+}

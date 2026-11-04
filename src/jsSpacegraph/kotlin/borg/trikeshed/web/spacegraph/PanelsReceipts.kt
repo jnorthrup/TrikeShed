@@ -5,11 +5,12 @@ import kotlinx.browser.document
 import kotlinx.coroutines.CancellationException
 
 /** Immutable run evidence; explicit handoffs only load constructions, never execute them. */
-fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: String) {
+fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
     val latest = panels.lastProgramRun
     val nodeId = evidenceNode
     text("Recent recorded runs · up to eight immutable receipts. A matching program version does not mean its inputs or dependencies are still current.")
     val section = document.createElement("section").asDynamic()
+    val owner = drawer
     section.setAttribute("aria-label", "Durable run inspection"); body.appendChild(section)
     val selected = document.createElement("input").asDynamic()
     selected.setAttribute("aria-label", "Run receipt content ID")
@@ -19,7 +20,9 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: Str
     val output = document.createElement("div").asDynamic()
     output.setAttribute("aria-live", "polite")
     var request = 0
-    fun current(ticket: Int) = serial == revision && drawer != null && ticket == request
+    // Immutable receipt ownership follows this view and explicit selection, not canvas saves.
+    fun current(ticket: Int) = !panels.page.closing && drawer === owner && tab == "execution" &&
+        truthy(section.isConnected) && ticket == request
     fun url(cid: String) = "/api/lcnc/content?cid=" + encodeURIComponent(cid)
     suspend fun content(cid: String): dynamic {
         require(Regex("sha256:[0-9a-f]{64}").matches(cid)) { "Use a complete sha256 content ID" }
@@ -82,11 +85,13 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: Str
                 output.textContent = ""
                 text(str(run.program) + " · " + str(run.runId) + " · " + str(run.status), output)
                 text("Receipt: " + cid + "\nProgram: " + str(run.programCid) +
-                    if (run.programCid == workspace.programCid) "\nSame program version as the inspected canvas."
-                    else "\nDifferent program version from the inspected canvas. Inspection does not change the canvas.", output)
+                    if (run.programCid == workspace.programCid) "\nSame program version as the captured canvas inspection."
+                    else "\nDifferent program version from the captured canvas inspection. Inspection does not change the canvas.", output)
+                text("Captured canvas program: " + str(workspace.programCid) +
+                    ". Refresh to compare with the current canvas.", output)
                 val comparison = if (run.programCid != workspace.programCid) document.createElement("p").asDynamic() else null
                 if (comparison != null) {
-                    comparison.textContent = "Comparing the frozen program with the inspected canvas…"
+                    comparison.textContent = "Comparing the frozen program with the captured canvas…"
                     output.appendChild(comparison)
                 }
                 if (str(run.status) in arrayOf("validating", "running"))
@@ -229,9 +234,9 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: Str
                         "Program comparison identity mismatch"
                     }
                     comparison.textContent = when (str(checked.comparison.relation)) {
-                        "presentation" -> "The authored definition matches when presentation is excluded (node position, size, collapse and viewport). " +
+                        "presentation" -> "The authored definition matches the captured canvas when presentation is excluded (node position, size, collapse and viewport). " +
                             "Exact program CIDs remain distinct. Inputs and dependencies were not compared."
-                        "different" -> "The authored definition also differs. This receipt is not evidence for the edited definition."
+                        "different" -> "The authored definition also differs from the captured canvas. This receipt is not evidence for that edited definition."
                         else -> "Frozen-program comparison unavailable; no definition match is established."
                     }
                 } catch (e: CancellationException) { throw e } catch (e: dynamic) {

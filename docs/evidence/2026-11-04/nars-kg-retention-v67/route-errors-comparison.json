@@ -1,0 +1,43 @@
+{
+  "beforeSource": "4e87c9380cd766c2343f88e5c6097b1be8f3327c",
+  "afterSource": "78322850881924d6cfbee3b9c216f937e6dabc64",
+  "scope": "Same synthetic public BeliefWire route inputs; separate fixtures, no socket/browser/parser/model;409 preserves admittedprefix, not rollback",
+  "cases": [
+    {
+      "name": "malformed-kif",
+      "beforeException": "java.lang.IllegalArgumentException",
+      "afterStatus": 400,
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    },
+    {
+      "name": "malformed-rdf",
+      "beforeException": "borg.trikeshed.rdf.SparqlError",
+      "afterStatus": 400,
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    },
+    {
+      "name": "unsupported",
+      "beforeException": "java.lang.IllegalArgumentException",
+      "afterStatus": 400,
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": null
+    },
+    {
+      "name": "known-pid-collision-with-admitted-prefix",
+      "beforeException": "borg.trikeshed.narsese.BeliefAdmissionRefused",
+      "afterStatus": 409,
+      "residentsAfterFailure": 1,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200,
+      "conflictRetryEvidenceUnchanged": true
+    }
+  ]
+}

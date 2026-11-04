@@ -1,0 +1,67 @@
+{
+  "scope": "Exact recorded v56 CoreNLP 4.6.0 synthetic-source receipts replayed, no new parser or execution provenance claim",
+  "sourceResult": "/workspace/library-files/english-corpus-inference-v56-proof/corpus-browser/result.json",
+  "sourceResultSha256": "3e0fa868496de27964068bd9849e05cf55b8ca4b3299cf27af77e53975000cf5",
+  "blocks": [
+    {
+      "cid": "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+      "file": "/workspace/library-files/english-v63-compatibility-proof/corpus-view-inputs/311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c.cbor",
+      "length": 16093,
+      "from": "retained-pack-blob"
+    },
+    {
+      "cid": "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02",
+      "file": "/workspace/library-files/english-v63-compatibility-proof/corpus-view-inputs/e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02.cbor",
+      "length": 19376,
+      "from": "retained-pack-blob"
+    },
+    {
+      "cid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+      "file": "/workspace/library-files/english-v63-compatibility-proof/corpus-view-inputs/1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5.txt",
+      "length": 228,
+      "from": "retained-pack-blob"
+    },
+    {
+      "cid": "sha256:7f31192fb51f638aedf990832eca06fa2659f49f70326aef1ef79dfa615146bf",
+      "file": "/workspace/library-files/english-v63-compatibility-proof/corpus-view-inputs/7f31192fb51f638aedf990832eca06fa2659f49f70326aef1ef79dfa615146bf.txt",
+      "length": 303,
+      "from": "exact-original-upload-bytes-verified-against-recorded-cid"
+    }
+  ],
+  "inspectionIds": [
+    "sha256:311ce8ad376ec995c7fa253ec2736fe98e2d5e77980f236040fffcefad8f6c6c",
+    "sha256:e2792b6eb5a48b382246a0d20e3083ab693fa0105d9b0f3e91dd9232647e1f02"
+  ],
+  "sourceRows": [
+    {
+      "project": "english-corpus-proof",
+      "id": "legal + duties.txt",
+      "cid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+      "rev": "1-sha256:3c70f7c4b466d42be5550a4138ed60d4ea5155a47954f22ae16110d458f70df9",
+      "seq": 0,
+      "length": 228,
+      "contentType": "text/plain"
+    },
+    {
+      "project": "english-corpus-proof",
+      "id": "finance ledger.txt",
+      "cid": "sha256:7f31192fb51f638aedf990832eca06fa2659f49f70326aef1ef79dfa615146bf",
+      "rev": "1-sha256:ef47e47aac51b58c3382661ee5eb1298414c000dc09584f613a38464c1357852",
+      "seq": 1,
+      "length": 303,
+      "contentType": "text/plain"
+    }
+  ],
+  "project": "english-corpus-proof",
+  "document": "finance ledger.txt",
+  "expectedCorpusCid": "sha256:59d38e61db8a210fc41d74605d32ae809d89e95a1b300d8c58b01187f079d8b1",
+  "expectedDefaultReceiptCid": "sha256:e8d647e3721824bed4141ca47abe52e6ac194152bda47dd59cb7b9e44cfa8476",
+  "expectedDefaultMatrixCid": "sha256:aa4518d4e21385509189b2de68f729fa00467143dc8e5ecada8bba98a827f5be",
+  "topicConfig": {
+    "topics": 2,
+    "iterations": 30,
+    "seed": 1,
+    "alpha": 0.1,
+    "beta": 0.01
+  }
+}

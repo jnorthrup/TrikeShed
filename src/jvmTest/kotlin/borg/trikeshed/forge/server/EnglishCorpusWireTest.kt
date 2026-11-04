@@ -145,6 +145,21 @@ class EnglishCorpusWireTest {
             }
             val overridden = runner.run(node, _m["receiptCids" j ids, "mode" j "current", "topics" j null, "view" j "all-lexical"])
             assertEquals(all, overridden)
+            val inputs = _m["receiptCids" j ids, "mode" j "current", "topics" j null]
+            val defaults = node.copy(params = _m["view" j "all-lexical", "in:view" j "content"])
+            assertEquals(content, runner.run(defaults, inputs), "in:view must precede the plain parameter")
+            assertEquals(content, runner.run(node.copy(params = _m["view" j "all-lexical"]),
+                inputs + _m["view?" j "content"]), "The optional view port must reach the same source-pinned content policy as HTTP")
+            assertEquals(all, runner.run(defaults, inputs + _m["view?" j "all-lexical"]),
+                "A wired optional view must override authored defaults")
+            assertEquals(all, runner.run(defaults, inputs + _m["view" j "all-lexical", "view?" j "content"]),
+                "The normalized port must precede its optional alias")
+            for (invalid in s_[null, "unknown"].view) assertFailsWith<IllegalArgumentException> {
+                runner.run(defaults, inputs + _m["view?" j invalid])
+            }
+            assertFailsWith<IllegalArgumentException> {
+                runner.run(defaults, inputs + _m["view" j null, "view?" j "content"])
+            }
             assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
         } finally { close(f) }
     }

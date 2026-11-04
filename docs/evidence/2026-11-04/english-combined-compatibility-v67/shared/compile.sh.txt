@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+query_proof=/workspace/library-files/english-v67-compatibility-proof
+query_snapshot=${1:?Pass the root-authorized immutable GREEN v67 snapshot}
+rg -q 'BUILD SUCCESSFUL' "$query_snapshot/passing-build.log"
+query_cp=$(cat "$query_snapshot/classpath.txt")
+case "$query_cp" in *'/build/classes/'*|*'/classes/kotlin/'*|*'/jvmTest/'*) exit 1;; esac
+query_compiler=$(rg --files --no-ignore /workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21 | rg '\.jar$' | head -n1)
+mkdir "$query_proof/classes"
+java -Xmx1g -cp "$query_compiler:$query_cp" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -jvm-target 25 -classpath "$query_cp" -d "$query_proof/classes" "$query_proof/Fixture.kt" "$query_proof/PanelsGraphs.kt" "$query_proof/PanelPrograms.kt" "$query_proof/DocumentsFixture.kt" "$query_proof/CorpusViewFixture.kt"
+printf '%s\n' "$query_snapshot" > "$query_proof/snapshot-path.txt"

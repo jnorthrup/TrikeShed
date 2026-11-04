@@ -1,0 +1,21 @@
+{
+  "result": "PASS",
+  "checks": [
+    {
+      "file": "documents.js",
+      "sha256": "526c383cd65f96a7821fc267a1d2ccb3f7e5610194a21e5356ec574d4e2ee460",
+      "unwantedStaticVmImportAbsent": true
+    },
+    {
+      "file": "spacegraph.js",
+      "sha256": "aa0215de9396bca523b72004739030b53c8c36e969ca1d7ba3a8a6bfecd1b279",
+      "unwantedStaticVmImportAbsent": true
+    },
+    {
+      "file": "pages.js",
+      "sha256": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+      "unwantedStaticVmImportAbsent": true
+    }
+  ],
+  "scope": "All3frozen artifacts checked statically; actualnewPanels and byte-identicalDocs both freshlyserved and exercised. Pages only rootbuild+staticcheck. No Node VM provider execution/isolation claim."
+}

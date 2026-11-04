@@ -1,0 +1,48 @@
+{
+  "sourceCommit": "4f2897a62e8ebdec248106359d731bc386fbd147",
+  "sources": {
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/KgRdfFidelityTest.kt": {
+      "committedSha256": "9c75a1088d8eb8c916bc22af437e106b9befb2ba0ef9eb6ee8f839d5e669aabe",
+      "compiledTestSha256": "bd2dd0b3cbab20bec3919caf1dab6da7247241f691395d7bccda0635643445c3",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged",
+      "fixtureSourceCommit": "4f2897a62e8ebdec248106359d731bc386fbd147"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/KgPropositionIdentityTest.kt": {
+      "committedSha256": "fdfcf36df6c53e1a20e835854147d80787a0f538436c540b1a9bb533a3b7aedb",
+      "compiledTestSha256": "e12fa9e9706b3bfb927004bc5aeaf41a5d91f317fdb0e2e6e8ea87a263332eae",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged",
+      "fixtureSourceCommit": "4f2897a62e8ebdec248106359d731bc386fbd147"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/BeliefAdmissionTest.kt": {
+      "committedSha256": "460318d7e06eec15b2bb628b6e824ea6619e269cb0fa28ce7dc2720445f98905",
+      "compiledTestSha256": "cca9e9f73468525792264aea60d100607d6e9e2bea060251f76370bf52c970da",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/memory/HermesMemoryFeedbackTest.kt": {
+      "committedSha256": "ecdfc791e8c628588ac6d47fba1feeded4065612e36e111046cf6c6051653dc6",
+      "compiledTestSha256": "4a28b31cc82dc6947ade53787379cca760ebeb3a059e45ebe3dc07e20880927b",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/commonTest/kotlin/borg/trikeshed/kif/KifSemanticTest.kt": {
+      "committedSha256": "a9c3fb64db63c552b8830e7cbb6c7f4e346ccf7ec7bb77b29e20301c0c73267c",
+      "compiledTestSha256": "d08b58738b1e408e7e7af28f659c78a2d7e8ceab46e75ffe3e7b1eaaa5a04412",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/PropositionReadbackTest.kt": {
+      "committedSha256": "b9bd3162cae10ff0c71c3bff691969d549fdc889147a8b3bf21df7850d606d3c",
+      "compiledTestSha256": "95a2a4cb49bba55043db744b84ba71c478d9afc40290ee0f43c2984bfdb586d9",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    }
+  },
+  "productionOverlays": false,
+  "boundedCasFixture": {
+    "originalFile": "src/jvmTest/kotlin/borg/trikeshed/narsese/KgRetentionTest.kt",
+    "sourceCommit": "4f2897a62e8ebdec248106359d731bc386fbd147",
+    "originalFileSha256": "9e7e1866577dde52d1209469847788b943335e71dc416b6226bfedc45d5693c6",
+    "extractedHelperBodySha256": "1b8172988c189f73258d0981f5b6209c6c0c77917efffc63e11bbd512a783240",
+    "compiledHelperSha256": "8699044ef74f56910c960fdc35f66eae89e7e6bdfb343037813d5b4e4735c3b4",
+    "alteration": "Unchanged test-only helper body extracted; package/imports added; no production overlay"
+  },
+  "fixedInputAssertionsSourceCommit": "a6ab66b43770821d4f5a90777e2006decd83e28a",
+  "setupUpdate": "Only two consumer fixture constructors gain bounded test CAS; assertions and all input cases unchanged"
+}

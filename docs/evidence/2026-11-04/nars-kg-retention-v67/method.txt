@@ -1,0 +1,65 @@
+Exact v67 KG retention and malformed-JSON route proof, 2026-11-04
+
+The fresh v67 artifact passed all 13 focused methods (9 retention and 4 route
+methods), including two additional truncated-JSON inputs inside the existing
+malformed-input method. All six directly observed error cases returned the
+expected 400/409 responses. Exact KIF and language-tagged Unicode RDF source and
+full proposition bytes resolved under their existing CIDs through HTTP/LCNC
+intake and CAS. Replay/archive checks preserved signal evidence. A separate
+production PackCasStore reader reopened the closed writer pack and verified all
+four source/definition blocks by complete bytes and CID.
+
+Frozen source: 78322850881924d6cfbee3b9c216f937e6dabc64
+Main JAR SHA256: 39a22e63d765a8cac8c19546ce4714a15d301c559773b81e98e94cb71bbe01b4
+The first fresh v67 attempt passed. Only exact committed test sources and
+external harness classes were compiled. Every recorded production CodeSource
+was checked against this new frozen JAR; there were no production overlays,
+friend paths, live build directories, Gradle, providers, models or NLP parsers.
+Prior v66 evidence and its original files remain unchanged.
+
+The original four error cases retain their exact historical comparison:
+  malformed KIF, malformed RDF and unsupported text: v62 escaped exceptions
+  become HTTP400, zero residents, healthy actor, next valid request200;
+  colliding pays/owes propositions: HTTP409 with one admitted prefix, no false
+  zero-count/rollback response, no evidence increase on retry, next request200.
+route-errors-comparison.json compares ONLY these four cases to the actual v62
+baseline published in ../nars-kg-retention/route-errors-before-v62.json.
+
+The two added cases have their own actual v66 baseline:
+  truncated-json-string: {"value":"private
+  truncated-json-escape: the same synthetic text followed by one backslash.
+Both escaped as IllegalStateException on exact v66, before any assertion, while
+their actors remained healthy and the next request returned200. On v67 both
+return fixed HTTP400 with zero residents, healthy actors and subsequent200.
+The producer normalizes the strict JSON validator's failure at its pure parsing
+boundary. This is not a broad HTTP RuntimeException catch. The value word above
+is synthetic test text; no private document was used. These two cases are
+separate from the original v62 four-case baseline in truncated-json-*.json.
+
+The existing retention controls still check all artifact readbacks before any
+imported Mint, typed nonfatal capability/write/sync/read failures, immutable
+bounded channel admission and owned drain. Missing CAS remains503 with no
+assertions, limits remain413, and cancellation propagates. Raw malformed UTF8
+is rejected400 before dispatch, including an LF header with a later CRLF body
+separator. The actual JVM-public mangled internal HTTP route is invoked by
+reflection without friend access; this is a direct route proof, not a socket
+or browser test. Global resident counts are observations, not per-import totals.
+
+Pack writer PID47444 imported the two synthetic sources using production
+PackCasStore and userspace JvmFileOperations, verified expected bytes, drained
+its bag, synced, closed the pack and exited0. Reader PID47474 then reopened that
+same pack in a distinct process, performed bounded exact source and definition
+reads against the writer's expected byte/digest manifest, closed and exited0.
+Backend DURABLE is reported as storage metadata; this is observed explicit
+close/reopen behavior, not a crash/power-loss or universal durability guarantee.
+Actual Java25 FFM native-access warnings remain retained; no suppression or
+substitute backend was used. All four proof child processes exited0.
+
+Files include the exact identity, 13 fixture methods, API/CAS observations,
+separate pack manifests, both appropriately scoped error comparisons, original
+artifact hashes, and cleanup record. sha256.json hashes the published files.
+The unchanged v59 source/definition retention counterexample and same-CID
+comparison remain in ../nars-kg-retention/. This proof does not backfill old
+hash-only history, authenticate sources, confer review authority, establish
+legal truth or semantic unification, train a corpus, or prove general daemon
+airgap enforcement. No private PDFs or corpus text were read.

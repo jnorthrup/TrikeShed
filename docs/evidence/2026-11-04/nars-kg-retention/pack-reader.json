@@ -1,0 +1,68 @@
+{
+  "scope": "Separate reader process reopened production PackCasStore and performed bounded exact reads; no re-ingest, parser, model, crash/power-failure or source/review authority claim",
+  "mode": "read",
+  "processId": 44092,
+  "writerProcessId": 44062.0,
+  "productionCodeSources": {
+    "borg.trikeshed.job.PackCasStore": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.userspace.nio.file.spi.JvmFileOperations": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.KgNalBridge": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.KgRetention": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar",
+    "borg.trikeshed.narsese.BeliefBagElement": "file:/workspace/library-files/english-combined-v66-proof/snapshot/main.jar"
+  },
+  "packRoot": "/workspace/library-files/nars-kg-retention-final-proof/pack-attempt1/cas",
+  "packCloseReturned": true,
+  "cases": [
+    {
+      "format": "KIF",
+      "sourceCid": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+      "propositionCid": "sha256:36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c",
+      "sourceBytes": 26,
+      "definitionBytes": 226,
+      "sourceExactAfterReopen": true,
+      "definitionExactAfterReopen": true,
+      "sourceBytesSha256": "19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c",
+      "definitionBytesSha256": "36b9c42d9eee916faf1300ac295675303d1921fc54b557ada6d15822e8457f2c",
+      "definition": {
+        "kind": "kg-source-proposition/1",
+        "copula": "PRODUCT",
+        "object": "Landlord",
+        "subject": "Tenant",
+        "relation": "MATCH",
+        "temporal": null,
+        "objectCid": null,
+        "predicate": "pays",
+        "subjectCid": null,
+        "sourceContext": "sha256:19e5e36915cddb4b02111ec3b9a1f36cf87bf5122f59b6982933533d749fad3c"
+      }
+    },
+    {
+      "format": "RDF",
+      "sourceCid": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+      "propositionCid": "sha256:ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070",
+      "sourceBytes": 72,
+      "definitionBytes": 270,
+      "sourceExactAfterReopen": true,
+      "definitionExactAfterReopen": true,
+      "sourceBytesSha256": "1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881",
+      "definitionBytesSha256": "ff869f85ffadb98a21f9c8a367a7d83367721a636e76aee1e917f2e56fd6e070",
+      "definition": {
+        "kind": "kg-source-proposition/1",
+        "copula": "PRODUCT",
+        "object": "\"Notice, required; 📚\"@en-US",
+        "subject": "<urn:AgreementA>",
+        "relation": "MATCH",
+        "temporal": null,
+        "objectCid": null,
+        "predicate": "urn:noticeLabel",
+        "subjectCid": null,
+        "sourceContext": "sha256:1436745fd3e38e8fafd1e7e2e8839d1dec8cb1b8492b5da1e7adc61744440881"
+      }
+    }
+  ],
+  "sourceAndDefinitionExactAfterSeparateProcessReopen": true,
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "parserExecutions": 0,
+  "modelCalls": 0
+}
