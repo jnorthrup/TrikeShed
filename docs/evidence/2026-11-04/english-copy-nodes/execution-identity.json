@@ -1,0 +1,32 @@
+{
+  "source": "5878d7d14095cf0aa8fda5d997ffb35cacf73c5c",
+  "mainJarSha256": "f575d402f9b84bacab0cb805636571eab973e4e18212733ec6a67b8a891d28b8",
+  "documentsJsSha256": "7aef29dcfffe63ed11168fc980f33e974ca677917b55b0d98eaef3388b5e193e",
+  "spacegraphJsSha256": "ae6f0f19ca11fd2bb3f69b58249d31b280be3fbb3ef860f4ec96ef6495d52abe",
+  "pagesJsSha256": "6dc6e8c705b3349e302e5c313aec9490cdca49492844e1d86a50b35d84fe6b92",
+  "classpathSha256": "e7b77f5e8d35ac81641d458a2b41f6e78e430d0340462a8ce06f8cda2709859f",
+  "fixtureSha256": "583659fadf763522a8b70a189a18330105ac0e774acdde6ec941d458358a22fc",
+  "driverSha256": "97a5c9213dfba2d06776b55bcdbabe2c1d2f20b61c2f74ba7824fc7d8e9ce010",
+  "outboundDenyWrapperSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84",
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "mainArtifactUnchangedAfterProof": true,
+  "actualParser": "CoreNLP4.5.10 syntax-v1 observed via production DocumentEnglishWire",
+  "dependencyNodeIdentity": "token-index+copy-count/1",
+  "copyNodeIds": [
+    {
+      "id": "2:3",
+      "word": "requirements"
+    }
+  ],
+  "directFinderCopyIdsMatchProductionBridge": true,
+  "copySentenceSourceTokens": 10,
+  "copySentenceParserNodes": 11,
+  "copySentenceEdges": 12,
+  "projectionSelfEdgePreservedAsDistinctFullNodes": true,
+  "sourceTokenRows": 10,
+  "copySemanticGuard": [
+    "COPIED_NODE"
+  ],
+  "verificationScope": "External localhost transport forwards production project/PDF/English routes; actual native TXT drop and real local parser with outbound syscall deny filter. Not a full daemon listener, production air gap or OS sandbox."
+}
