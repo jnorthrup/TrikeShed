@@ -1,0 +1,4 @@
+/source.txt -text -diff
+/cas-readbacks/*.cbor -text -diff
+/cas-readbacks/*.txt -text -diff
+/closed-runtime-replay.tar.gz -text -diff
