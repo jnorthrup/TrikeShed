@@ -57,9 +57,9 @@ class LinkGrab(
             }
             try {
                 val h = Held(ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet())
-                for (d in corpus.docs(project, limit = Int.MAX_VALUE)) {
+                corpus.visit(project) { d ->
                     currentCoroutineContext().ensureActive()
-                    val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: continue
+                    val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: return@visit
                     listOfNotNull(n["url"], n["requested"]).forEach { h.works.add(work(it)) }
                     n["sha256"]?.let { h.digests.add(it) }
                 }

@@ -310,6 +310,7 @@ object CouchStoreFactory {
             { frame -> head.applyCommit(frame); changes.applyCommit(frame) },
             { doc -> cas.put(canonicalBody(doc)) },
             synchronization = synchronization,
+            captureDocument = ::captureCanonicalBody,
         )
         return CouchStore(ingress, head, changes, cas)
     }
@@ -360,8 +361,19 @@ object CouchStoreFactory {
             { doc -> cas.put(canonicalBody(doc)) },
             initialSequence = maxSequence + 1,
             synchronization = synchronization,
+            captureDocument = ::captureCanonicalBody,
         )
         return CouchStore(ingress, head, changes, cas)
+    }
+
+    /** Own top-level fields for hashing; nested values retain their existing semantics. */
+    private fun captureCanonicalBody(doc: Document): Document {
+        val fields = doc.fields.toList()
+        val names = HashSet<String>(fields.size)
+        for (field in fields) {
+            require(field.name != "_id" && names.add(field.name)) { "Couch body contains an ambiguous field identity" }
+        }
+        return Document(doc.id, fields)
     }
 
     /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */
