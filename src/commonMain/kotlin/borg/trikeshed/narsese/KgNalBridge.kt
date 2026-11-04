@@ -4,6 +4,7 @@ import borg.trikeshed.job.*
 import borg.trikeshed.kif.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.ontology.SumoOntology
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.rdf.*
 
 /**
@@ -199,10 +200,20 @@ object KgNalBridge {
         return when {
             t.startsWith("(") -> KgFormat.KIF
             t.startsWith(KgFormat.TURTLE.marker) -> KgFormat.TURTLE
-            t.startsWith("{") || t.startsWith("[") -> when {
-                KgFormat.JSON_LD.marker in t -> KgFormat.JSON_LD
-                KgFormat.TRIPLET_JSON.marker in t -> KgFormat.TRIPLET_JSON
-                else -> null
+            t.startsWith("{") || t.startsWith("[") -> {
+                // Confix validates the complete JSON; only root-object keys select a format.
+                // Literal values and keys nested inside another property are source data.
+                val root = reifyStrict(t)
+                val objects = when (root) {
+                    is Map<*, *> -> s_[root]
+                    is List<*> -> root.toSeries() α { it as? Map<*, *> }
+                    else -> return null
+                }
+                when {
+                    objects.view.any { it?.containsKey("@context") == true } -> KgFormat.JSON_LD
+                    objects.view.any { it?.containsKey("subject") == true } -> KgFormat.TRIPLET_JSON
+                    else -> null
+                }
             }
             t.startsWith(KgFormat.RDF_XML.marker) && t.getOrNull(KgFormat.RDF_XML.marker.length)?.let {
                 it.isWhitespace() || it == '>' || it == '/'

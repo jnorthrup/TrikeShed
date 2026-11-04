@@ -135,12 +135,20 @@ class KgRdfFidelityTest {
                 |<urn:s> <urn:label> "@prefix" .
                 |""".trimMargin()
             assertEquals(KgFormat.TURTLE, KgNalBridge.sniff(input))
-            assertEquals(KgFormat.JSON_LD, KgNalBridge.sniff("""{"@context":{},"value":"data"}"""))
-            assertEquals(KgFormat.TRIPLET_JSON, KgNalBridge.sniff("""[{"subject":"s","predicate":"p","object":"o"}]"""))
+            val jsonLd = """{"@context":{},"value":"subject"}"""
+            val tripletJson = """[{"subject":"s","predicate":"p","object":"@context"}]"""
+            assertEquals(KgFormat.JSON_LD, KgNalBridge.sniff(jsonLd))
+            assertEquals(KgFormat.TRIPLET_JSON, KgNalBridge.sniff(tripletJson))
+            assertEquals(KgFormat.JSON_LD, KgNalBridge.sniff("[$jsonLd]"))
+            assertNull(KgNalBridge.sniff("""{"value":"@context","nested":{"subject":"data"}}"""))
             assertEquals(KgFormat.RDF_XML, KgNalBridge.sniff("""<rdf:RDF xmlns:rdf="urn:rdf"/>"""))
             assertEquals(KgFormat.KIF, KgNalBridge.sniff("(pays Tenant Landlord)"))
             val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
             try {
+                for (json in s_[jsonLd, tripletJson].view)
+                    assertFailsWith<IllegalArgumentException> { bag.ingestKg(json) }
+                assertFails { bag.ingestKg(tripletJson.dropLast(1)) }
+                assertEquals(0, bag.size, "Unsupported or malformed JSON must not mint beliefs")
                 assertFailsWith<IllegalArgumentException> {
                     bag.ingestKg(input + "\n<urn:s> <urn:p> \"bad\"suffix .")
                 }
