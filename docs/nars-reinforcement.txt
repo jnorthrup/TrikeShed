@@ -1,0 +1,31 @@
+Receipted evidence revision
+
+Reinforce is no longer a blind evidence increment. A truth-changing request must
+name an explicit observation receipt CID and a nonempty exact source-leaf basis.
+The target must be resident. The bag uses the same duplicate/structural/ancestry
+revision path as Mint, preserves its budget, refuses unresolved ancestry, and
+keeps its worker alive after a per-command refusal. Repeated receipts and shared
+source leaves do not add independent units; disjoint declared leaves can support
+positive or negative observations. Missing historical ancestry is not reconstructed
+or authenticated by a replay.
+
+nal.reinforce now requires receiptCid and basis values, supplied by a wire or the
+matching parameter. basis is a JSON array of 1..256 distinct source CID strings.
+The optional wire sockets permit parameter values; the values are mandatory at
+execution. wPlus/wMinus must be finite, nonnegative observation-unit counts within
+the packed evidence range. Angular coordinates must be exact integers; use decimal
+strings for 64-bit coordinates instead of lossy JSON numbers.
+The runner waits for the bag's processed acknowledgement
+before returning processed=true. requestedWPlus/requestedWMinus describe the supplied
+counts, not a claim that duplicate/dependent evidence was added. Missing fields,
+invalid counts and refused admissions fail the node instead of returning success.
+
+Receipt and leaf CIDs declare identity/ancestry; they do not authenticate legal
+authority or real-world source independence. Those review/admission policies remain
+separate. Legacy Reinforce constructors remain source-compatible but unreceipted
+calls now refuse; this does not rewrite existing historical evidence or WAL records.
+
+Deleting a retrieved Hermes memory now demotes attention and removes its persisted
+gloss. It preserves the signal's evidence/bytes. Retrieval preference and user file
+deletion are not negative factual observations. Explicit properly sourced negative
+observations remain supported through the ordinary admission boundary.
