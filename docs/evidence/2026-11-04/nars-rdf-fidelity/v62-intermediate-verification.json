@@ -1,0 +1,66 @@
+{
+  "scope": "INTERMEDIATE immutable-v62 RDF KG fidelity validation, before external master8a and CAS-retention integration",
+  "source": "4e87c9380cd766c2343f88e5c6097b1be8f3327c",
+  "mainJarSha256": "a9deb460d43ed52139ab8b5ba02a1b94f03146d0f1c21c7fd4612b832a0c9c1c",
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "buildClassDirectories": false,
+  "abiShims": false,
+  "tests": {
+    "pass": 32,
+    "fail": 0,
+    "jvmVoidReturnContract": true,
+    "rdfMethods": 7,
+    "existingIdentityAdmissionKifReadbackControls": 25,
+    "runtimeSeconds": 0.8854529879972688
+  },
+  "comparisons": {
+    "result": "PASS",
+    "runtimeSeconds": 0.7876356149972707,
+    "sameImmutableV59RdfInputs": 12,
+    "sameShortCrTabInputs": 2,
+    "sameStructuralSourceOverlayBeforeInputs": 3,
+    "additionalMixedAndLongLiteralControls": 2,
+    "structuralBeforeRows": [
+      0,
+      1,
+      1
+    ],
+    "structuralAfterRows": [
+      1,
+      2,
+      1
+    ],
+    "longLiteralCrCrLfLfExact": true,
+    "otherPermissiveApiOutputsUnchangedOnSameInputs": true
+  },
+  "v59BeforeJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "structuralBeforeEvidence": "SOURCE-OVERLAY actual execution, explicitly not a frozen production-artifact result",
+  "observations": [
+    "IRI/literal/blank-node canonical term kinds and proposition IDs remain distinct in declared context",
+    "Comma, semicolon, period, escaped quotes/backslashes, language tags and datatypes survive",
+    "Namespaces expand without discarding predicate IRI mapping",
+    "Unsupported/malformed suffixes, escapes, same-line prefixes and imports explicitly refuse",
+    "Actual mixed-term source intake/replay and no-partial-mint checks pass",
+    "Raw CR/LF in short literals refuse; valid TAB and long literal line breaks preserve value",
+    "Structural/comment CR and CRLF preserve subsequent triples",
+    "Historical codec/KIF/ancestry/identity and readback controls pass",
+    "All isolated workers/review jobs drain and temporary memory files are removed"
+  ],
+  "limits": [
+    "This artifact precedes later external-master and retention changes; combined verification remains required",
+    "No full Turtle/RDF conformance or world-source authenticity claim",
+    "Canonical Turtle role representation changes derived coordinates/PIDs; no history migration",
+    "Same-angular coexistence, general role inference/unification and retraction remain unsupported",
+    "Declared source context/ancestry is not authenticated authority or independent evidence",
+    "Other permissive RDF readers retain their separate known limitations",
+    "In-memory WAL replay is not disk/CRC/process-restart durability",
+    "Child heap/deadline bounds are not native-memory or network isolation"
+  ],
+  "v61Status": "INCOMPLETE despite successful compilation:160JUnit methods ran instead of161; not GREEN",
+  "modelCalls": 0,
+  "nlpParserCalls": 0,
+  "liveBagAccess": false,
+  "privateCorpusUsed": false,
+  "combinedMasterVerified": false
+}
