@@ -1,0 +1,20 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/workspace/.trikeshed-cloud/home -Djavax.net.ssl.trustStore=/workspace/.trikeshed-cloud/trust/cacerts
+WARNING: A restricted method in java.lang.foreign.Linker has been called
+WARNING: java.lang.foreign.Linker::downcallHandle has been called by borg.trikeshed.userspace.LibcDowncall in an unnamed module (file:/workspace/library-files/english-copular-v68-proof/snapshot/main.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Exception in thread "main" java.lang.IllegalStateException: Check failed.
+	at proof.englishcopularresume.ResumeFixtureKt$main$1.invokeSuspend(ResumeFixture.kt:74)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(Unknown Source)
+	at proof.englishcopularresume.ResumeFixtureKt.main(ResumeFixture.kt:35)
+	at proof.englishcopularresume.ResumeFixtureKt.main(ResumeFixture.kt)

@@ -1,0 +1,5 @@
+locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('region', { name: 'Workspace facets' }).getByRole('button', { name: 'Inspect receipt', exact: true })[22m
+
+    at main (/workspace/library-files/english-copular-v68-proof/driver-continuation.cjs:25:491)

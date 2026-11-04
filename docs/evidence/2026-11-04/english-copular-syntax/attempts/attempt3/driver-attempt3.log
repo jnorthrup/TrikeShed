@@ -1,0 +1,7 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+500 !== 200
+
+    at control (/workspace/library-files/english-copular-v68-proof/driver-evidence.cjs:7:103)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async main (/workspace/library-files/english-copular-v68-proof/driver-evidence.cjs:31:23)
