@@ -38,6 +38,13 @@ the shared bag after processing. Legacy minted is a processed-assertion alias,
 not a count of new resident cells. HTTP retention refusals return an explicit
 status (413 for limits; 503 for unavailable/failed retention).
 
+The KG HTTP route returns fixed 400 errors for strict KIF/RDF/profile input or
+Unicode failures, without echoing submitted text. Typed bag admission conflicts
+return 409 and explicitly leave processing counts unspecified: an earlier
+statement may already have been processed. This is not rollback. Cancellation
+continues to propagate; unexpected runtime failures are not converted into
+input errors. The malformed-input whole-parse boundary still precedes any Mint.
+
 The immutable v59 public API counterexample is retained externally for review:
 source and full proposition bytes were missing even when the signal itself was
 archived in CAS. New imports now retain those same source/proposition CIDs.
