@@ -26,6 +26,7 @@ object EnglishLcncPreset {
             inputKinds = _m["expectedCid" j "id", "routed" j "text", "transport" j "json"], outputKinds = _m["receiptCid" j "id"]),
         EnglishObservationContract.contract(),
         EnglishCorpusContract.contract(),
+        EnglishLegalPatternsContract.contract(),
     ]
 
     fun registry(): Map<String, LcncNodeRunner> = _m[

@@ -3,6 +3,7 @@ package borg.trikeshed.narsese
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.job.ContentId
 
 /**
  * SemanticSignal — one extraction event as a typed Narsese payload.
@@ -10,7 +11,8 @@ import borg.trikeshed.lib.j
  * This is the T-RESUME-SIGNALS-3 shape: signals are data, not objects with
  * behavior. Angular coordinates route attention in the manifold; they do not
  * establish complete proposition identity. Resident revision also checks the
- * available ordered roles, relation and temporal qualification, with exact
+ * available ordered roles, relation and temporal qualification plus optional
+ * exact source-context proposition identities, with exact
  * ancestry required for independent support. This payload is not a complete
  * English predicate/context representation or a symbolic unification engine.
  *
@@ -25,6 +27,8 @@ import borg.trikeshed.lib.j
  *   ancestry). Covariance-intersection preparation: overlapping blooms mean
  *   "may share evidence, do not naively sum" — revision must treat the bases
  *   as dependent. 0L = unknown/empty basis (legacy records).
+ * @param propositionCid optional exact declared source-context proposition digest;
+ * null retains the narrower legacy schema and cannot be mixed with a known identity.
  */
 data class SemanticSignal(
     val angular: Long,
@@ -35,7 +39,10 @@ data class SemanticSignal(
     val temporal: TemporalSignal? = null,
     val provenanceCid: String? = null,
     val basisBloom: Long = 0L,
+    /** Exact declared source-context proposition identity; null preserves legacy schema limits. */
+    val propositionCid: String? = null,
 ) {
+    init { propositionCid?.let(::ContentId) }
     val isAnchored: Boolean get() = objectCid != null
     fun truth(k: Float = 1f): TruthCoord = evidence.truth(k)
 }
@@ -130,6 +137,9 @@ fun Map<Join<Long, Long>, SemanticSignal>.reviseInto(
     incoming: SemanticSignal,
 ): Map<Join<Long, Long>, SemanticSignal> {
     val existing = this[key] ?: return this + (key to incoming)
+    // This legacy pure fold has no ancestry policy; it must at least never erase or cross
+    // a known proposition identity. Production observations use the owner-side bag instead.
+    require(existing.propositionCid == incoming.propositionCid) { "Proposition identity differs or is unresolved" }
     val merged = SemanticSignal(
         angular = incoming.angular,
         evidence = revise(existing.evidence, incoming.evidence),
@@ -139,6 +149,7 @@ fun Map<Join<Long, Long>, SemanticSignal>.reviseInto(
         temporal = incoming.temporal,
         provenanceCid = incoming.provenanceCid,
         basisBloom = existing.basisBloom or incoming.basisBloom, // Bloom union: merged basis
+        propositionCid = incoming.propositionCid,
     )
     return this + (key to merged)
 }

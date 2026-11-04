@@ -1,0 +1,20 @@
+Synthetic natural KG-bridge counterexamples, before the proposition-ID repair
+
+This pure probe used actual immutable source aaba7d5504d516e4ff6a68c19db11630e16c22ef,
+main.jar SHA256 c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1.
+Only its unique test driver was compiled, without production overlays or friend
+access. The production class CodeSource was checked against that frozen JAR.
+No bags, live history, model calls or source-review authority were involved.
+
+pays versus owes with the same ordered roles naturally produced the same angular
+and identical signal bytes; no angular value was forced. The two n-ary transfers
+forms differed only in their third argument and became identical legacy triplets.
+The existing full KifSemantic formulas remained distinct. Negative, modal,
+contextual and conditional examples record how full syntax survives in the
+scoped IR while legacy triplets either disappear or retain only a generic pair.
+These are actual bridge-loss observations, not semantic reasoning benchmarks.
+
+The repair's focused source checks are documented in nars-proposition-identity.txt.
+They do not replace a fresh coordinated production-JAR comparison. This directory
+keeps the immutable BEFORE artifact and does not label it as repaired behavior.
+No supplied documents or private corpus text appear in these synthetic results.
