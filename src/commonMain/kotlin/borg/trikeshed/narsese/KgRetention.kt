@@ -71,6 +71,7 @@ object KgRetention {
             if (cid in blobs) return requireNotNull(blobs[cid])
             if (remaining <= 0) { limited = true; error("Source inspection limit") }
             val cap = minOf(MAX_ARTIFACT_BYTES, remaining)
+            if (cap < MAX_ARTIFACT_BYTES) limited = true
             // Charge the requested bound even when a reader refuses an unavailable or oversized object.
             remaining -= cap
             blobs[cid] = null

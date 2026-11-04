@@ -34,6 +34,7 @@ import kotlinx.coroutines.CancellationException
  *   POST /api/beliefs/tick          one DecayTick (curation pulse, on demand — demos/tests)
  *   POST /api/beliefs/teach         {impulses:[{kind,subject,rationale}], scenarios:[...]} → curator hindsight pass (W5.3)
  *   POST /api/beliefs/query         {pattern:"kif"} → bank solver query (W5.3)
+ *   POST /api/beliefs/attend        {angular,propositionCid,p?,d?,q?} → processed attention, evidence unchanged
  *
  * The loop, drivable end-to-end: mint (seed/pen/user) → review (induction) →
  * tick (attention decay → floor crossings → eviction/spill) → render (bounded
@@ -259,18 +260,15 @@ class BeliefWire(
             }
 
             method == "POST" && p == "/api/beliefs/attend" -> {
+                val command = try { BeliefAttentionRequest.parse(rawBody(text)) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { return json(_m["error" j "invalid_attention_request"], 400) }
                 try {
-                    val body = rawBody(text)
-                    require(body.length <= 4096 && body.encodeToByteArray().size <= 4096) { "Attention request exceeds 4KiB" }
-                    val request = DocumentReviewWire.taxonomyRequest(body).entries.associate {
-                        (it.key as String) to it.value
-                    }
-                    json(_m["attended" j bag.submit(BeliefAttentionRequest.parse(request)).report()])
+                    json(_m["attended" j bag.submit(command).report()])
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (refused: BeliefAdmissionRefused) {
                     json(_m["error" j "attention_refused", "issue" j refused.issue.name, "processed" j false], 409)
-                } catch (_: IllegalArgumentException) { json(_m["error" j "invalid_attention_request"], 400) }
-                catch (_: IllegalStateException) { json(_m["error" j "invalid_attention_request"], 400) }
+                } catch (_: IllegalStateException) { json(_m["error" j "belief_owner_unavailable"], 503) }
             }
 
             // NAL-9 introspection: the system's beliefs about its own belief field

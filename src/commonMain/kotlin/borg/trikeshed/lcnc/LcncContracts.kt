@@ -1136,7 +1136,7 @@ object LcncContracts {
             outputKinds = mapOf("budgets" to "json")),
         LcncPortContract("nal.attend", "attend (processed budget rekey, evidence untouched)",
             _l["angular?", "propositionCid?", "p?", "d?", "q?"], _l["attended"],
-            inputKinds = _m["angular" j "id", "propositionCid" j "id", "p" j "number", "d" j "number", "q" j "number"],
+            inputKinds = _m["angular" j "id", "propositionCid" j "id", "p" j "num", "d" j "num", "q" j "num"],
             outputKinds = mapOf("attended" to "json"),
             params = mapOf(
                 "angular" to LcncPortContract.LcncParamSpec(ph = "angular (decimal string) when none is wired"),
