@@ -1,0 +1,281 @@
+{
+  "experiment": "actual-bag-counterexamples/1",
+  "result": "COMPLETED_WITH_RECORDED_GAPS",
+  "failures": 3,
+  "unsupported": 2,
+  "supported": 4,
+  "capacity": 4096,
+  "intakeCapacity": 256,
+  "maximumObservedResidents": 2,
+  "productionCodeSource": "file:/workspace/library-files/english-inspection-browser-proof/snapshot/main.jar",
+  "massSeeding": false,
+  "liveBagAccess": false,
+  "modelCalls": 0,
+  "wal": "not configured; no durability claim",
+  "sourceA": "sha256:cd68bb9f5fb7f1f93fa6b38e826a8bffc737e9a15d1b384b0c87cc16ed8c6c7c",
+  "sourceB": "sha256:8305038c44caf28671ec50bc55d1932caf885dd1eb412c6ce9dab738850635d3",
+  "tenantTerm": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+  "landlordTerm": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42",
+  "cases": [
+    {
+      "name": "relevance-is-not-evidence",
+      "status": "SUPPORTED",
+      "operation": "Actual Attend followed by awaitProcessed fence",
+      "signalBytesUnchanged": true,
+      "budgetChanged": true,
+      "before": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "after": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      }
+    },
+    {
+      "name": "same-source-repeat-versus-declared-disjoint-source",
+      "status": "SUPPORTED",
+      "duplicateReplayCount": 20,
+      "before": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "afterExactReceiptRepeats": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "afterDifferentReceiptSameLeaf": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "afterDisjointLeaf": {
+        "positive": 2,
+        "negative": 0,
+        "packed": 8589934592,
+        "frequency": 1.0,
+        "confidence": 0.6666667,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "independenceAuthority": "Declared synthetic fixture; disjoint CIDs do not authenticate real-source independence"
+    },
+    {
+      "name": "distinct-routing-addresses-preserve-ordered-role-storage",
+      "status": "SUPPORTED",
+      "scope": "Storage only: addresses and symbolic glosses are fixture supplied, not inferred from English",
+      "forward": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "reverse": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42",
+        "objectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204"
+      },
+      "residents": 2
+    },
+    {
+      "name": "forced-same-angular-different-ordered-roles",
+      "status": "FAIL",
+      "desiredContract": "Do not transfer support between distinct subject/object identities",
+      "fixture": "Deliberately forced equal routing address, not a demonstrated natural encoder/hash collision",
+      "scope": "Direct host bag API; external ingestion may impose additional identity checks",
+      "before": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "after": {
+        "positive": 2,
+        "negative": 0,
+        "packed": 8589934592,
+        "frequency": 1.0,
+        "confidence": 0.6666667,
+        "subjectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42",
+        "objectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204"
+      },
+      "residents": 1,
+      "identityConflationObserved": true
+    },
+    {
+      "name": "missing-basis-cannot-establish-independent-support",
+      "status": "FAIL",
+      "fixture": "Second receipt derives from same synthetic source but omits exact EvidenceBasis",
+      "scope": "Direct host bag API; this tests absent-basis behavior, not remote-call reachability",
+      "before": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "after": {
+        "positive": 2,
+        "negative": 0,
+        "packed": 8589934592,
+        "frequency": 1.0,
+        "confidence": 0.6666667,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "unsupportedUpliftObserved": true
+    },
+    {
+      "name": "empty-basis-cannot-establish-independent-support",
+      "status": "FAIL",
+      "fixture": "A supplied basis with zero leaves is unknown, not proof of disjoint source support",
+      "scope": "Direct host bag API",
+      "before": {
+        "positive": 1,
+        "negative": 0,
+        "packed": 4294967296,
+        "frequency": 1.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "after": {
+        "positive": 2,
+        "negative": 0,
+        "packed": 8589934592,
+        "frequency": 1.0,
+        "confidence": 0.6666667,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "unsupportedUpliftObserved": true
+    },
+    {
+      "name": "explicit-negative-storage-distinct-from-absence",
+      "status": "SUPPORTED",
+      "negative": {
+        "positive": 0,
+        "negative": 1,
+        "packed": 1,
+        "frequency": 0.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "missingResident": false,
+      "scope": "Raw evidence/storage distinction; no semantic proposition query was implemented by this harness"
+    },
+    {
+      "name": "source-retraction-and-proof-revocation",
+      "status": "UNSUPPORTED",
+      "observed": "Setting attention to zero retains original signal/evidence; no retract command exists in BeliefIntake",
+      "afterZeroAttention": {
+        "positive": 0,
+        "negative": 1,
+        "packed": 1,
+        "frequency": 0.0,
+        "confidence": 0.5,
+        "subjectCid": "sha256:dc1c56376d3016a3cf848b1397c2a63728ef69db75ec42088fa0710189dbd204",
+        "objectCid": "sha256:ae98f79d442e3a62baa20b6f1e5a60ac7d6a4473d84541130202832dcc321e42"
+      },
+      "budgetPacked": 0,
+      "requiredBoundary": "Current source/proof validity and historical observation retention are separate"
+    },
+    {
+      "name": "semantic-role-query-and-variable-binding",
+      "status": "UNSUPPORTED",
+      "observed": "LegalNarsEvaluation scores supplied predictions; no bag semantic-answer producer supplies them",
+      "predictionCount": 0,
+      "missing": 2,
+      "scored": 0,
+      "groundedAgreements": 0,
+      "provisionalFixtureLabels": "Human-authored examples; not emitted as model/bag answers"
+    }
+  ],
+  "lifecycle": [
+    {
+      "case": "attention",
+      "capacity": 4096,
+      "workerJoined": true,
+      "supervisorJoined": true,
+      "residentAtEnd": 1
+    },
+    {
+      "case": "source-repetition",
+      "capacity": 4096,
+      "workerJoined": true,
+      "supervisorJoined": true,
+      "residentAtEnd": 1
+    },
+    {
+      "case": "ordered-roles",
+      "capacity": 4096,
+      "workerJoined": true,
+      "supervisorJoined": true,
+      "residentAtEnd": 2
+    },
+    {
+      "case": "forced-routing-collision",
+      "capacity": 4096,
+      "workerJoined": true,
+      "supervisorJoined": true,
+      "residentAtEnd": 1
+    },
+    {
+      "case": "unknown-basis",
+      "capacity": 4096,
+      "workerJoined": true,
+      "supervisorJoined": true,
+      "residentAtEnd": 1
+    },
+    {
+      "case": "empty-basis",
+      "capacity": 4096,
+      "workerJoined": true,
+      "supervisorJoined": true,
+      "residentAtEnd": 1
+    },
+    {
+      "case": "negative-and-missing",
+      "capacity": 4096,
+      "workerJoined": true,
+      "supervisorJoined": true,
+      "residentAtEnd": 1
+    }
+  ]
+}

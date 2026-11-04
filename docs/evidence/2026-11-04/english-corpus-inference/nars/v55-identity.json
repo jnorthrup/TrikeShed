@@ -1,0 +1,27 @@
+{
+  "source": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+  "mainJar": "/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+  "mainJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+  "harnessSha256": "97f1247d8ffa5fcd9c4016c9b3f3e8b62c043c85f93dccddc5bbb08d4f1752a4",
+  "snapshotManifestSha256": "e2590c33fc37418a6cd893fc8b9a316e12707679f0d81a79eb1c6ff38b770bfe",
+  "classpathSha256": "0cdbe8c9e44f916b6805cb736e0a8e2a04e33cef0335e8f8cbed3989777df7f0",
+  "baselineSource": "095fa0d305c55362b4656fb661cc2cb088772e84",
+  "baselineResultSha256": "8e2538916e7d1b152abd045f468113bcd7890b77098a87f70bccaaec0c95c3f2",
+  "baselineHarnessSha256": "ccb09db5a0cf460ff5e68aab37d303d4c57b510d0c8324e51125c4987b44f204",
+  "productionClassOverlays": false,
+  "friendPaths": false,
+  "syntheticOnly": true,
+  "liveBagAccess": false,
+  "attempt": 1,
+  "compiledSources": [
+    "/workspace/library-files/english-corpus-inference-final-proof/nars-admission/AdvancedNarsProbe.kt"
+  ],
+  "wallTimeoutSeconds": 45,
+  "maximumHeap": "512m",
+  "nativeMemoryLimit": false,
+  "startedAt": "2026-11-04T18:12:11.889749+00:00",
+  "runtimeSeconds": 0.7881677170007606,
+  "runtimeExit": 0,
+  "productionCodeSource": "file:/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+  "finishedAt": "2026-11-04T18:12:22.572885+00:00"
+}
