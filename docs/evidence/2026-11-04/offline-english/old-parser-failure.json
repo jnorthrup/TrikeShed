@@ -1,0 +1,99 @@
+{
+  "source": "TENANT MAY REMAIN UNLESS RENT IS NOT DUE.",
+  "documentText": "Tenant may remain unless rent is not due.",
+  "sourceEqual": false,
+  "norms": [
+    {
+      "subject": "tenant",
+      "modal": "may",
+      "verb": "remain",
+      "condition": "unless rent be due",
+      "sentence": "Tenant may remain unless rent is not due."
+    }
+  ],
+  "metadata": {
+    "module": "corenlp",
+    "profile": "no-kbp-v1",
+    "declared": "edu.stanford.nlp:stanford-corenlp:4.5.10,edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+    "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+    "jar": "stanford-corenlp-4.5.10.jar",
+    "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+    "packageVersion": "4.5.10"
+  },
+  "configuration": {
+    "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie",
+    "kbp.maxlen": "100",
+    "threads": "1"
+  },
+  "sentences": [
+    {
+      "begin": 0,
+      "end": 41,
+      "tokens": [
+        {
+          "word": "Tenant",
+          "begin": 0,
+          "end": 6,
+          "sourceSlice": "TENANT",
+          "lemma": "tenant"
+        },
+        {
+          "word": "may",
+          "begin": 7,
+          "end": 10,
+          "sourceSlice": "MAY",
+          "lemma": "may"
+        },
+        {
+          "word": "remain",
+          "begin": 11,
+          "end": 17,
+          "sourceSlice": "REMAIN",
+          "lemma": "remain"
+        },
+        {
+          "word": "unless",
+          "begin": 18,
+          "end": 24,
+          "sourceSlice": "UNLESS",
+          "lemma": "unless"
+        },
+        {
+          "word": "rent",
+          "begin": 25,
+          "end": 29,
+          "sourceSlice": "RENT",
+          "lemma": "rent"
+        },
+        {
+          "word": "is",
+          "begin": 30,
+          "end": 32,
+          "sourceSlice": "IS",
+          "lemma": "be"
+        },
+        {
+          "word": "not",
+          "begin": 33,
+          "end": 36,
+          "sourceSlice": "NOT",
+          "lemma": "not"
+        },
+        {
+          "word": "due",
+          "begin": 37,
+          "end": 40,
+          "sourceSlice": "DUE",
+          "lemma": "due"
+        },
+        {
+          "word": ".",
+          "begin": 40,
+          "end": 41,
+          "sourceSlice": ".",
+          "lemma": "."
+        }
+      ]
+    }
+  ]
+}

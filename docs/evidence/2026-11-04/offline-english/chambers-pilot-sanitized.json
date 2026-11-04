@@ -1,0 +1,60 @@
+{
+  "status": "PARTIAL_WITH_RECORDED_REFUSAL",
+  "documents": 1,
+  "selectedRanges": 3,
+  "attemptedRanges": 3,
+  "acceptedInventories": 2,
+  "refusedInventories": 1,
+  "selectionPolicy": "Start at first blank-line paragraph boundary at or after floor(full extracted UTF16 length /4); then take three consecutive ranges <=2048 UTF16 units, preferring the last paragraph boundary in second half, else last whitespace in second half, else scalar-safe hard boundary. No content/parse-result selection.",
+  "rangeUtf16Sizes": [
+    1898,
+    1672,
+    1794
+  ],
+  "allSelectionsConsecutive": true,
+  "scope": "Exact selected-text/token spans and structural adapter acceptance only. Does not measure OCR accuracy, English/NER accuracy, legal meaning, authority, or whole-document completeness. No quotations, copyrighted text, source URLs or raw exception messages in this report.",
+  "tokensChecked": 1017,
+  "allReturnedTokenSpansExact": true,
+  "acceptedCounts": [
+    {
+      "sentences": 11,
+      "tokens": 310,
+      "dependencies": 326,
+      "markers": 13
+    },
+    {
+      "sentences": 10,
+      "tokens": 327,
+      "dependencies": 341,
+      "markers": 9
+    }
+  ],
+  "refusal": {
+    "range": 0,
+    "reason": "Adapter exported integer indices without Enhanced++ copy-node identities; a projected self edge and duplicate edge were refused. No edges erased.",
+    "numericalEdges": [
+      {
+        "sentenceIndex": 5,
+        "tokens": 26,
+        "invalidEdges": [
+          {
+            "governor": 2,
+            "dependent": 2,
+            "relation": "conj:and"
+          }
+        ],
+        "duplicateEdges": [
+          {
+            "governor": 17,
+            "dependent": 2,
+            "relation": "nsubj"
+          }
+        ]
+      }
+    ]
+  },
+  "sourceContentPublished": false,
+  "actualParser": "local CoreNLP 4.5.10 SYNTAX",
+  "productionClassOverlays": false,
+  "friendAccess": false
+}
