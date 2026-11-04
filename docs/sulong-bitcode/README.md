@@ -7,6 +7,15 @@ through GraalVM LLVM. Its fixed ABI is `i32(i32,i32)`. The LCNC graph supplies
 two integers; it cannot select a path, export, native-access grant or verifier
 setting. No new Graal dependencies are needed.
 
+Verified on 4 November 2026 at `a42b35616ce4262ae2ff03e82351b66cb238cb02`:
+all three stages below passed, including execution and a fresh MLIR rebuild
+without an external network route. The
+[verification manifest](evidence/2026-11-04/verification.json) records source
+hashes, platform scope and the 13 focused regressions. JVM main and all test
+sources, JS, Wasm-JS, Wasm-WASI and Linux x64 main sources compiled without
+exclusions. Load the retained [two-node program](evidence/2026-11-04/program.json)
+into LCNC after configuring the operator profile below.
+
 The demonstrator has three cumulative acceptance stages:
 
 1. Assemble retained LLVM IR and execute actual binary bitcode with verification
@@ -118,7 +127,17 @@ The whole-program receipt contains `programCid`, `receiptCid` and
 `/api/lcnc/content?cid=sha256:...`. The receipt CID identifies a committed command
 envelope with an `lcncRun` member; the invocation CID identifies the separate
 ledger. Successful demonstration runs also export copies under
-`build/reports/sulong/receipt.json` and `invocations.json`.
+`build/reports/sulong/program.json`, `receipt.json` and `invocations.json`.
+Those are the exact CAS bytes identified by their CIDs. The separate
+`response-preview.json` is a reserialized HTTP response preview and is not the
+object identified by `receiptCid`.
+
+The retained run's [receipt](evidence/2026-11-04/receipt.json) and
+[invocation ledger](evidence/2026-11-04/invocations.json) show both completed
+nodes, the module CID and real boundary timings. The restart test opened fresh
+CAS/Couch/blackboard/route owners and recovered these identities without an
+LLVM runner. This demonstrates retained execution evidence, not native heap
+checkpointing.
 
 ## Ownership and observations
 
@@ -180,6 +199,15 @@ pinned compiler SDK; executing retained bitcode does not invoke that compiler.
 An offline deployment must still stage and verify the full JDK, Maven runtime,
 native support libraries and platform closure, then exercise startup with
 network access unavailable. Merely denying guest IO is not an airgap test.
+
+The retained Linux check used `unshare --user --map-current-user --net
+--keep-caps`, enabled only loopback for Gradle's local daemon connection, and
+ran Gradle with `--offline`. There was no external route. Both the actual LCNC
+test run and a forced three-stage MLIR rebuild passed inside that boundary.
+The SDK and dependency caches had already been staged; this is not a
+clean-machine distribution-closure certificate. Preserve the invoking UID:
+an initial root-mapped namespace selected an inaccessible `/root/.cache` for
+Graal resources; keeping the current UID corrected that launch failure.
 
 Before expanding the ABI, select a real bounded upstream kernel, retain its
 source revision and license, enumerate native dependencies, and verify its
