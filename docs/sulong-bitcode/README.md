@@ -192,3 +192,48 @@ The next review gate is a real `mlir-nix` kernel with an agreed buffer ABI and
 semantic corpus. It does not inherit an acceptance claim from scalar addition.
 Cross-engine performance comparisons must use matching computations and report
 cold loading separately from warm execution. No solver-speedup claim is made.
+
+## Concrete upstream handoff
+
+The next candidate was inspected at `jnorthrup/mlir-nix` revision
+`571b57d3ebdcdabe7ac76765b2875de7b98b9dab`:
+[lib/Confix/confix.ll](https://github.com/jnorthrup/mlir-nix/blob/571b57d3ebdcdabe7ac76765b2875de7b98b9dab/lib/Confix/confix.ll).
+The retrieved 84,381-byte source has SHA-256
+`7ba80066f3a8a1775f4a8390d38a8f347c498e5df560bb51b7c18c2fe4de2bc8`.
+LLVM 22.1.8 assembled it into 23,168 bytes; `llvm-nm --undefined-only` reported
+no undefined symbols. This is a current assembly probe, **not execution or
+semantic acceptance**. The source and object remain separate from the scalar
+fixture and are not loaded by `vm.llvm.scalar`.
+
+Its public exports are `confix_scan_json`, `confix_scan_cbor` and
+`confix_scan_yaml`, each taking two pointers and returning a fault integer.
+The IR declares these layouts:
+
+```llvm
+%confix.chars = type { i32, ptr, i32, i32, i32 }
+%confix.flat = type { i32, i32, i32, i32, ptr, ptr, ptr, ptr, ptr, ptr }
+```
+
+The first record supplies size/data and position/limit/mark fields. The second
+contains total rows, fault, fault position, capacity and caller-owned array
+pointers. The existing scalar ABI cannot safely represent those records.
+The next implementation must retain the input bytes and allocate the exact
+span/tag/tree/work arrays with checked capacity arithmetic; call the selected
+scanner; copy a bounded result; and release every buffer while its Context is
+owned. Keep native struct layout and pointer width behind that adapter. Do not
+place Java object addresses into these fields or serialize host pointer values
+into LCNC receipts.
+
+The upstream source explicitly preserves permissive scanner behavior, including
+some text that a strict JSON parser rejects. Therefore compare its row/span/tag
+output with the corresponding Kotlin Confix scanner, and separately retain
+strict input validation where the application requires it. Scanner completion
+does not prove that evidence is valid JSON, that a Nix expression evaluated, or
+that a legal proposition is supported.
+
+WP15's next acceptance packet should contain: the pinned upstream source and
+provenance; an explicit bounded buffer ABI; target-layout checks; JSON/CBOR/YAML
+valid and malformed input cases; capacity and truncation failures; Unicode and
+integer-boundary cases; leak/drain evidence; and a whole-program LCNC receipt
+whose copied rows agree with the Kotlin scanner. Only then extend the module
+catalog or start a comparable scanner benchmark.
