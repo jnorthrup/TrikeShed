@@ -165,12 +165,14 @@ internal object DocumentsEnglish {
             pending = true; openingRetained = retained; render()
             scope.launch {
                 try {
-                    abort = js("new AbortController()")
+                    if (!selected()) return@launch
+                    val controller: dynamic = js("new AbortController()")
+                    abort = controller
                     val body = selection() + _m["begin" j requestedBegin, "end" j requestedEnd] +
                         if (retained) _m["receiptCid" j requestedCid] else emptyMap()
                     val init = RequestInit(method = "POST", body = jsonOf(body),
                         headers = Headers().apply { append("Content-Type", "application/json") })
-                    init.asDynamic().signal = abort.signal
+                    init.asDynamic().signal = controller.signal
                     val response = window.fetch(if (retained) "/api/documents/english/retained" else "/api/documents/english", init).await()
                     val text = response.text().await()
                     if (!selected()) return@launch
@@ -350,6 +352,9 @@ internal object DocumentsEnglish {
             text(resultSection, "p", "Evidence receipt: ${value["receiptCid"]}", "ds-cid")
             val parser = value["parser"] as? Map<*, *>
             text(resultSection, "p", "Reader: ${parser?.get("processor") ?: "not reported"}. Markers are literal word and phrase candidates; their scope and legal effect require review.", "ds-curate-label")
+            val coverage = value["coverage"] as? Map<*, *>
+            if (coverage?.get("parserNodeIdentityReported") != true || coverage["parserDependencyNodeIdentity"] != "token-index+copy-count/1")
+                text(resultSection, "p", "Full parser node identity was not reported. Token indices and displayed syntax do not establish that enhanced copy identities were captured.", "ds-curate-label")
             val use = text(resultSection, "button", "Use this inspection in corpus", "ds-curate-submit")
             use.setAttribute("type", "button"); use.setAttribute("data-corpus-use-inspection", "1"); use.asDynamic().disabled = pending
             use.style.cssText = "margin:10px 0;padding:8px 12px"
@@ -465,6 +470,8 @@ internal object DocumentsEnglish {
             for (value in values.view) text(row, "td", value).style.cssText = "padding:6px 8px;border-bottom:1px solid var(--rule);vertical-align:top"
         }
         private fun syntax(parent: HTMLElement, sentence: Map<*, *>) {
+            if (sentence["nodes"] == null) text(parent, "p",
+                "Legacy token-only format: index:0 labels below are derived for display. Parser copy identities were not recorded, so no copy count is established.", "ds-curate-label")
             DocumentsSyntaxGraph.mount(parent, sentence)
             val tokens = (sentence["tokens"] as List<*>).map { it as Map<*, *> }
             val tokenTable = table(parent, s_["#", "Source word", "Lemma", "POS", "Entity tag", "Text range"])
