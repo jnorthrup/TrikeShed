@@ -1,0 +1,21 @@
+{
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "mainJar": "/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+  "mainJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "snapshotManifestSha256": "8bdf581447a74440cff2931e7878955fe679b7917f765fbfb95e44608d45a7c2",
+  "classpathSha256": "cd9f5788d111d4e8e2c42b8566ec5d30c67881466f9b6f6aee25f25c5f955990",
+  "compiledTestSources": {
+    "Runner.kt": "28adfccb5ee3653f13c15cff90b944476e610151fcee1b3198908e427046c657",
+    "PropositionReadbackTest.kt": "36069e0d1d9aed62db6cea664fc022793289d86f9d516f7abfe40371ed13e86d"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "maximumHeap": "512m",
+  "nativeMemoryLimit": false,
+  "wallTimeoutSeconds": 45,
+  "attempt": 1,
+  "startedAt": "2026-11-04T19:12:00.239351+00:00",
+  "runtimeSeconds": 0.8731778559995291,
+  "runtimeExit": 0,
+  "finishedAt": "2026-11-04T19:12:20.652017+00:00"
+}

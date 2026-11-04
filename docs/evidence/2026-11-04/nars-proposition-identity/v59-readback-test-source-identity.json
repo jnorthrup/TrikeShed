@@ -1,0 +1,7 @@
+{
+  "sourceCommit": "54c28c78c6565cb2ce460c0ac3d7236940076bce",
+  "committedTestSha256": "b9bd3162cae10ff0c71c3bff691969d549fdc889147a8b3bf21df7850d606d3c",
+  "compiledTestSha256": "36069e0d1d9aed62db6cea664fc022793289d86f9d516f7abfe40371ed13e86d",
+  "alteration": "Test package relocated with explicit original-package imports; behavior unchanged",
+  "productionOverlays": false
+}

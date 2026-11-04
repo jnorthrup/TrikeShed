@@ -1,0 +1,67 @@
+{
+  "scope": "Synthetic immutable-v59 NARS proposition-safety and readback validation; no private corpus",
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "mainJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "abiShims": false,
+  "focusedTests": {
+    "pass": 24,
+    "fail": 0,
+    "runtimeSeconds": 0.9103771299996879,
+    "newPropositionTests": 7,
+    "priorBagMemoryTests": 11,
+    "existingKifSemanticTests": 6
+  },
+  "separateReadbackTest": {
+    "pass": 1,
+    "fail": 0,
+    "runtimeSeconds": 0.8731778559995291,
+    "surfaces": [
+      "nars_beliefs appended final column",
+      "LCNC top",
+      "LCNC near",
+      "LCNC sample",
+      "HTTP GET /api/beliefs"
+    ],
+    "knownAndLegacyNullIds": true,
+    "oldCursorIndicesPreserved": true,
+    "evidenceBytesUnchanged": true
+  },
+  "sameInputComparison": {
+    "result": "PASS",
+    "runtimeSeconds": 0.2130834279996634,
+    "baselineSource": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+    "baselineMainJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+    "baselineResultSha256": "d97e8f27ad61078ef052907f25cfe0e5004be7c39ab64dd29fae9fdfa916c7cb",
+    "naturalAngularUnchanged": "4616048923953881095",
+    "distinctPredicateIds": true,
+    "naturalCollisionBehavior": "Second proposition explicitly refused; original resident/evidence preserved",
+    "bothNaryVariantsRefused": true,
+    "fourScopedFullSyntaxCasesUnchanged": true,
+    "fourScopedLegacyCrossingsRefused": true
+  },
+  "controls": [
+    "Historical null-identity eleven-field codec bytes unchanged; new reader supports10/11/12",
+    "Known/unknown mixing refuses before same-receipt replay; null legacy identity is not upgraded",
+    "Known exact identity survives CAS and actual bag-frame replay in an in-memory log",
+    "Malformed UTF16/UTF8 refuses; valid NUL remains distinct/preserved",
+    "No partial prefix mint for unsupported/malformed KIF through real text consumer",
+    "Actual cursor KG intake refuses the natural predicate collision",
+    "All isolated bag workers/supervisors and review jobs close; temporary memory files removed"
+  ],
+  "limits": [
+    "Refusal does not provide coexistence in one angular slot, extra symbolic capacity, role inference, or full NARS comprehension",
+    "Semantic role queries, source retraction and general KIF inference remain unsupported",
+    "Source context/ancestry is declared; it does not authenticate authority or real-world source independence",
+    "Different content contexts are conservatively distinct; identical source bytes can share content context",
+    "Legacy both-null schema and StateNodes thaw remain narrower; no historical rewrite",
+    "Existing RDF term-kind fidelity limitations remain",
+    "The pure proposition digest does not retain its canonical payload in CAS",
+    "In-memory WAL frame replay is not disk/CRC/process-restart durability",
+    "512m heap/45s wall bound for tests and256m/20s for pure comparison are not native-memory or network isolation"
+  ],
+  "modelCalls": 0,
+  "liveBagAccess": false,
+  "privateCorpusUsed": false
+}
