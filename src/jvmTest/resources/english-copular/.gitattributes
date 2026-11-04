@@ -1,0 +1,3 @@
+# Content-addressed fixture bytes must not be converted or whitespace-normalized.
+inspection.cbor -text -diff
+source.txt -text -diff
