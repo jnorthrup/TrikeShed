@@ -153,7 +153,7 @@ class CurationIntake(
     }
 
     /** A document removed from its upload: a queued reading of it is dropped, not failed. */
-    fun forget(project: String, id: String) {
+    fun forget(project: String, id: String, unverifiedOwnership: Boolean = false) {
         synchronized(admission) {
             val affected = inFlight.filter { it.project == project && it.id == id }
             removed.addAll(affected)
@@ -181,6 +181,11 @@ class CurationIntake(
             }
             followUps.remove(project to id)?.let { uncountQueued(it) }
             clearObservations(project, id)
+            if (unverifiedOwnership) {
+                val tally = tallies.computeIfAbsent(project) { Tally() }
+                val note = "$id: derived membership may remain because ownership is unverified"
+                tally.note = if (tally.note.isBlank()) note else "${tally.note}; $note"
+            }
         }
     }
     private val removed = ConcurrentHashMap.newKeySet<Doc>()
@@ -553,7 +558,10 @@ class CurationIntake(
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
             scopes.onExplicitDocument = { selected, provider -> intake.offerSelected(selected, provider) }
             scopes.onTextForReview = { selected -> intake.offerTextForReview(selected) }
-            scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
+            // Existing memberships have no source ownership record. In particular, a
+            // same-named direct join need not belong to this upload; preserve it and
+            // report the uncertain derived state rather than deleting global books.
+            scopes.onRemoved = { project, id -> intake.forget(project, id, unverifiedOwnership = true) }
             scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
             ctx.routes.claim("language", "/api/intake") { method, _, _, _ ->
                 if (method != "GET") borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
