@@ -50,19 +50,22 @@ object KgNalBridge {
          * distinct contexts; this does not authenticate the source or retain this payload in CAS.
          * Raw triple terms retain the existing parser's limits (including RDF term-kind fidelity).
          */
-        fun propositionCid(sourceCid: String): ContentId {
+        fun propositionCid(sourceCid: String): ContentId = ContentId.of(propositionBytes(sourceCid))
+
+        /** The exact existing identity preimage, also retained by the owning KG intake. */
+        fun propositionBytes(sourceCid: String): ByteArray {
             val qualification = temporal(sourceCid)
             for (value in s_[sourceCid, triplet.subject, triplet.predicate, triplet.obj, triplet.subjectCid,
                 triplet.objectCid, qualification?.validFrom, qualification?.validUntil, qualification?.sourceCid].view)
                 value?.encodeToByteArray(throwOnInvalidSequence = true)
-            return ContentId.of(CanonicalCbor.encodeMap(_m[
+            return CanonicalCbor.encodeMap(_m[
                 "kind" j "kg-source-proposition/1", "sourceContext" j sourceCid,
                 "predicate" j triplet.predicate, "subject" j triplet.subject, "object" j triplet.obj,
                 "subjectCid" j triplet.subjectCid, "objectCid" j triplet.objectCid,
                 "copula" j copula.name, "relation" j relation.name,
                 "temporal" j qualification?.let { _m["grade" j it.grade.name, "validFrom" j it.validFrom,
                     "validUntil" j it.validUntil, "sourceCid" j it.sourceCid] },
-            ]))
+            ])
         }
 
         /**

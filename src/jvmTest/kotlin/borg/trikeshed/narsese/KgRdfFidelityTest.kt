@@ -124,7 +124,7 @@ class KgRdfFidelityTest {
 
     @Test fun actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate(): Unit = runBlocking {
         withTimeout(10_000) {
-            val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
+            val bag = BeliefBagElement(cas = KgRetentionFixtureCas(), parentJob = currentCoroutineContext()[Job]); bag.open()
             try {
                 assertFailsWith<IllegalArgumentException> { bag.ingestKg("<urn:valid> <urn:p> <urn:o> .\n<urn:s> <urn:p> \"hello\"garbage .") }
                 assertEquals(0, bag.size)
