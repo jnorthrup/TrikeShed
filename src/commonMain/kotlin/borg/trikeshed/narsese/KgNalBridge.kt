@@ -215,6 +215,12 @@ object KgNalBridge {
                     else -> null
                 }
             }
+            t.startsWith("<rdf:RDF>") -> try {
+                // This exact XML root spelling is also a valid absolute RDF subject IRI.
+                // Only complete strict RDF data selects Turtle; genuine XML keeps its format.
+                TurtleRdf.parseStrict(t)
+                KgFormat.TURTLE
+            } catch (_: IllegalArgumentException) { KgFormat.RDF_XML }
             t.startsWith(KgFormat.RDF_XML.marker) && t.getOrNull(KgFormat.RDF_XML.marker.length)?.let {
                 it.isWhitespace() || it == '>' || it == '/'
             } == true || t.startsWith("<?xml") && KgFormat.RDF_XML.marker in t -> KgFormat.RDF_XML

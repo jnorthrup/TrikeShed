@@ -142,11 +142,15 @@ class KgRdfFidelityTest {
             assertEquals(KgFormat.JSON_LD, KgNalBridge.sniff("[$jsonLd]"))
             assertNull(KgNalBridge.sniff("""{"value":"@context","nested":{"subject":"data"}}"""))
             assertEquals(KgFormat.RDF_XML, KgNalBridge.sniff("""<rdf:RDF xmlns:rdf="urn:rdf"/>"""))
+            val xmlRoot = "<rdf:RDF></rdf:RDF>"
+            assertEquals(KgFormat.RDF_XML, KgNalBridge.sniff(xmlRoot))
+            val iriInput = "<rdf:RDF> <urn:p> <urn:o> ."
+            assertEquals(KgFormat.TURTLE, KgNalBridge.sniff(iriInput))
             assertEquals(KgFormat.KIF, KgNalBridge.sniff("(pays Tenant Landlord)"))
             val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
             try {
-                for (json in s_[jsonLd, tripletJson].view)
-                    assertFailsWith<IllegalArgumentException> { bag.ingestKg(json) }
+                for (unsupported in s_[jsonLd, tripletJson, xmlRoot].view)
+                    assertFailsWith<IllegalArgumentException> { bag.ingestKg(unsupported) }
                 assertFails { bag.ingestKg(tripletJson.dropLast(1)) }
                 assertEquals(0, bag.size, "Unsupported or malformed JSON must not mint beliefs")
                 assertFailsWith<IllegalArgumentException> {
@@ -164,6 +168,12 @@ class KgRdfFidelityTest {
                     val expected = KgNalBridge.map(row).signal(source.value)
                     assertEquals(expected, bag.signalOf(expected.angular))
                 }
+                assertEquals(1, bag.ingestKg(iriInput)["statements"])
+                val iri = KgNalBridge.parseTurtle(iriInput).single()
+                assertEquals("<rdf:RDF>", iri.subject)
+                val iriSource = ContentId.of(iriInput.encodeToByteArray())
+                val iriSignal = KgNalBridge.map(iri).signal(iriSource.value)
+                assertEquals(iriSignal, bag.signalOf(iriSignal.angular))
                 bag.awaitProcessed()
             } finally { bag.drain() }
         }
