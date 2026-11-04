@@ -1,0 +1,22 @@
+{
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "mainJarSha256": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+  "classpathSha256": "cd9f5788d111d4e8e2c42b8566ec5d30c67881466f9b6f6aee25f25c5f955990",
+  "harnessSha256": "8d9b5d3e376dd23eb41f8afe0488cfc4c7e9b64977177b1cfbf9b690bfa0e62d",
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "maximumJavaHeap": "512m",
+  "wallTimeoutSeconds": 30,
+  "scope": "One new external synthetic proof class only, immutable v59 JAR/dependencies; no Gradle/parser/model/global state; CAS is own in-memory fixture.",
+  "readerOrParserConstructed": false,
+  "fixtureBagsDrained": true,
+  "firstLaunch": {
+    "runExit": 1,
+    "runSeconds": 0.158,
+    "failure": "Default java was21; proof class targets JVM25. Class loading failed before main, so no fixture bag/API ran. Original stdout/stderr/exit retained."
+  },
+  "runtimeJava": "/workspace/.trikeshed-cloud/toolchains/graalvm-25/bin/java",
+  "runtimeJavaVersion": "java version \"25.0.4\" 2026-07-21 LTS\nJava(TM) SE Runtime Environment Oracle GraalVM 25.0.4+7.1 (build 25.0.4+7-LTS-jvmci-b01)\nJava HotSpot(TM) 64-Bit Server VM Oracle GraalVM 25.0.4+7.1 (build 25.0.4+7-LTS-jvmci-b01, mixed mode, sharing)",
+  "runSeconds": 0.412,
+  "runExit": 0
+}
