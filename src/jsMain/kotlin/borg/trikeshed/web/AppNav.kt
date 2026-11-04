@@ -50,6 +50,7 @@ object AppNav {
             views = readViews()
             val url = URL(window.location.href)
             for (key in SourceSelection.keys.view) url.searchParams.delete(key)
+            for (key in EnglishQueryNavigation.keys.view) url.searchParams.delete(key)
             url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
             views[current.id] = url.pathname + url.search + url.hash
             try { sessionStorage.setItem(AppDestinations.STORAGE_KEY, JSON.stringify(views)) } catch (_: Throwable) {}
@@ -71,6 +72,7 @@ object AppNav {
                 try {
                     val url = URL(saved as String, window.location.origin)
                     for (key in SourceSelection.keys.view) url.searchParams.delete(key)
+                    for (key in EnglishQueryNavigation.keys.view) url.searchParams.delete(key)
                     url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
                     if (url.origin == window.location.origin && !url.searchParams.has("example") && AppDestinations.accepts(d, url.pathname)) {
                         href = url.pathname + url.search + url.hash
