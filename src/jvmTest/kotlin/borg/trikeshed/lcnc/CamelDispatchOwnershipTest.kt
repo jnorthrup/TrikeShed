@@ -37,7 +37,13 @@ class CamelDispatchOwnershipTest {
         try {
             val runner = ctx.lcncRunners.getValue(SubVmLegos.CAMEL)
             val node = LcncNode("dispatch", SubVmLegos.CAMEL)
+<<<<<<< HEAD
             val waiter = async { runner.run(node, emptyMap()) }
+||||||| 0b5584266
+            val waiter = async { runner.run(node, _m[]) }
+=======
+            val waiter = async { runner.run(node, _m.get()) }
+>>>>>>> cede029abc5b92a0f5d50776921dbc2763dc356a
             assertSame(owner, withTimeout(5000) { entered.await() })
             waiter.cancelAndJoin()
             val drain = async { owner.drain() }
@@ -48,7 +54,13 @@ class CamelDispatchOwnershipTest {
             withTimeout(5000) { drain.await() }
             assertTrue(finished.isCompleted)
             assertTrue(owner.closed.isCompleted)
+<<<<<<< HEAD
             assertFailsWith<IllegalStateException> { runner.run(node, emptyMap()) }
+||||||| 0b5584266
+            assertFailsWith<IllegalStateException> { runner.run(node, _m[]) }
+=======
+            assertFailsWith<IllegalStateException> { runner.run(node, _m.get()) }
+>>>>>>> cede029abc5b92a0f5d50776921dbc2763dc356a
         } finally {
             release.complete(Unit)
             withContext(NonCancellable) { owner.drain(); root.cancelAndJoin() }
