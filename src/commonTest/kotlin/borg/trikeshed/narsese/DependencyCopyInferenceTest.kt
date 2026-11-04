@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.lib.*
 import borg.trikeshed.nlp.*
 import kotlin.test.*
@@ -128,4 +129,49 @@ class DependencyCopyInferenceTest {
         assertFalse(attributed.isSemantic)
         assertEquals(text, quote.quote)
     }
+
+    @Test fun legacyStanfordThreeFieldRecordDoesNotProveCopyAbsence() {
+        val text = "Rain causes floods."; val original = source(text)
+        val plain = NlpDocument(text, s_[sentence(text)])
+        val baseline = NlpcoreAxiomatics.recognize(plain, original.originalCid.value)
+        assertEquals(1, baseline.size)
+        val oldReader = plain.copy(metadata = NlpMetadata("edu.stanford.nlp.pipeline.StanfordCoreNLP",
+            "borg.trikeshed.graal.subvm.CoreNlpRuntime", _m["module" j "corenlp"], _m["annotators" j "depparse"]))
+        val retained = DocumentCuratorCodec.record(record(original, oldReader, baseline))
+        val storedNlp = retained["nlp"] as Map<*, *>
+        val legacySentences = (storedNlp["sentences"] as List<*>).map { raw ->
+            val row = raw as Map<*, *>
+            row + _m["dependencies" j (row["dependencies"] as List<*>).map { edge ->
+                (edge as Map<*, *>).filterKeys { it in _s["governor", "dependent", "relation"] }
+            }]
+        }
+        val bytes = CanonicalCbor.encodeMap(retained + _m["nlp" j (storedNlp + _m["sentences" j legacySentences])])
+        val restored = DocumentCuratorCodec.decode(bytes)
+        val parsed = requireNotNull(restored.nlp)
+        assertFalse(parsed.sentences[0].hasCopiedNodes())
+        assertEquals(NlpProjectionIssue.UNREPORTED_IDENTITY, parsed.projectionIssue(parsed.sentences[0]))
+        assertEquals(NormConditionIssue.UNREPORTED_IDENTITY, NormClauses.conditionIssue(parsed, parsed.sentences[0]))
+        assertEquals(DocumentNlpStatus.AVAILABLE, restored.curationIndex().facet(DocumentCurationIndexK.NlpStatus))
+        assertEquals(0, NlpcoreAxiomatics.recognize(parsed).size)
+        assertEquals(0, restored.nlpAxioms.size)
+        assertEquals(0, DocumentCurationFacts.ruleCandidates(restored).size)
+        assertTrue(NormClauses.extract(parsed, _s["rain"]).isEmpty())
+        assertTrue(NormClauses.facts(parsed).isEmpty()); assertTrue(NormClauses.applicabilityFacts(parsed).isEmpty())
+        val proposal = DocumentProposal(raw = "fixture", subject = "Rain", predicate = "cause", obj = "floods", quote = text,
+            begin = 0, end = text.length, polarity = true, modality = "asserted")
+        val checked = DocumentCuratorGrounding.reconcile(original, parsed, s_[proposal])[0]
+        assertTrue(checked.reasons.view.any { "unreported dependency node identity" in it })
+        val quotation = DocumentCuratorGrounding.quotation(original, checked)
+        assertEquals(0, quotation.quotationBegin); assertEquals(text.length, quotation.quotationEnd)
+        assertEquals(text, quotation.quote)
+        // A new explicitly reported identity allows the same simple fragment to be examined normally.
+        val current = parsed.copy(metadata = requireNotNull(parsed.metadata).copy(runtime = _m[
+            "module" j "corenlp", "dependencyNodeIdentity" j "token-index+copy-count/1"]))
+        assertNull(current.projectionIssue(current.sentences[0]))
+        assertEquals(1, NlpcoreAxiomatics.recognize(current).size)
+        val basic = plain.copy(metadata = NlpMetadata("explicit-basic-fixture", "fixture", _m["module" j "basic"]))
+        assertNull(basic.projectionIssue(basic.sentences[0]))
+        assertEquals(1, NlpcoreAxiomatics.recognize(basic).size)
+    }
+
 }
