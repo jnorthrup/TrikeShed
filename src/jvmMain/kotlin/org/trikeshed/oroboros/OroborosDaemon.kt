@@ -440,9 +440,9 @@ object OroborosDaemon {
         follow?.join()
         intake.drain()
         runCatching { modules.drainAll() }
-        llvm?.drain()
         ctx.drainCouncilCases()
         intake.constellations()?.drain()
+        llvm?.drain()
     }
 
     /** Startup remains joined by the outer owner even when a later bootstrap step throws. */
