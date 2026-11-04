@@ -212,8 +212,9 @@ class MlxVerifiedReaderTest {
             val tensors = session.load(path, "data")
             var checks = 0
             class Expired : RuntimeException()
-            assertFailsWith<Expired> { session.materialize(tensors) { if (++checks == 2) throw Expired() } }
-            assertEquals(2, checks)
+            // One preflight poll, one before evaluation, and one after the evaluated weight.
+            assertFailsWith<Expired> { session.materialize(tensors) { if (++checks == 3) throw Expired() } }
+            assertEquals(3, checks)
         } finally { session.close(); Files.deleteRecursively(directory) }
     }
 }
