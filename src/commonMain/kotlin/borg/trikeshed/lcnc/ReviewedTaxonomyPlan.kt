@@ -137,11 +137,13 @@ object ReviewedTaxonomyPlan {
                     "originalCid" j q.originalCid.value, "extractedTextCid" j q.extractedTextCid.value,
                     "begin" j q.begin, "end" j q.end, "quote" j q.quote]]
         }
+        val englishOrigin = EnglishTaxonomyCarrier.evidence(cas, read.candidate)
         val frame = ContentId.of(CanonicalCbor.encodeMap(_m["kind" j "reviewed-kif-read-frame/1",
-            "readCid" j read.readCid.value, "page" j page, "fragmentExportCid" j ContentId.of(export).value]))
+            "readCid" j read.readCid.value, "page" j page, "fragmentExportCid" j ContentId.of(export).value] +
+            if (englishOrigin == null) emptyMap() else _m["englishOrigin" j englishOrigin]))
         val checked = review.taxonomyRead(snapshotCid, revision)
         require(checked.readCid == read.readCid && checked.decisionCid == read.decisionCid) { "Reviewed material changed during query" }
-        return _m[
+        val report = _m[
             "kind" j "reviewed-taxonomy-read/1", "status" j plan.status.name, "page" j page,
             "coverage" j "positive-reviewed-selected-snapshot", "semantics" j plan.semantics,
             "mappingStatus" j DocumentTaxonomyCandidate.POLICY,
@@ -158,5 +160,7 @@ object ReviewedTaxonomyPlan {
                 "status" j plan.status.name, "truncated" j plan.truncated],
             "counters" j _m["selected" j selected.size, "eligible" j selected.size, "excluded" j 0,
                 "textBytesRead" j bytesRead, "steps" j plan.steps, "proofs" j plan.proofs.size]]
+        return if (englishOrigin == null) report else report + _m[
+            "englishOrigin" j englishOrigin, "englishWitnesses" j englishOrigin["witnesses"]]
     }
 }
