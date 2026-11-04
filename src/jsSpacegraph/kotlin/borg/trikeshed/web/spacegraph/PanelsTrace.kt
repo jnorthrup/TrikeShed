@@ -8,7 +8,7 @@ import kotlinx.browser.window
 
 /** Bounded presentation of consumed-wire observations from the existing execution owner. */
 class PanelsTrace(private val panels: Panels) {
-    private class Spark(val index: Int, val wire: dynamic, var count: Int, var sequence: Int,
+    private class Spark(val index: Int, val wire: dynamic, var count: Int, var sequence: Double,
                         var elapsed: Double, var began: Double = -1.0, var dot: dynamic = null,
                         var label: dynamic = null)
     private val releases = mutableListOf<() -> Unit>()
@@ -22,7 +22,7 @@ class PanelsTrace(private val panels: Panels) {
     private var caption: dynamic = null
     private var run = ""
     private var cid = ""
-    private var sequence = 0
+    private var sequence = 0.0
     private var displayed = 0
     private var omitted = 0
     private var unmatched = 0
@@ -40,7 +40,7 @@ class PanelsTrace(private val panels: Panels) {
         pending.clear(); visible.clear()
         for (n in panels.nodes()) n.el?.removeAttribute("data-observed-phase")
         banner?.remove(); banner = null; caption = null
-        definition = null; canvas = null; run = ""; cid = ""; sequence = 0
+        definition = null; canvas = null; run = ""; cid = ""; sequence = 0.0
         displayed = 0; omitted = 0; unmatched = 0; dropped = 0
     }
 
@@ -106,8 +106,8 @@ class PanelsTrace(private val panels: Panels) {
         dropped = maxOf(dropped, num(snapshot.observationsDropped ?: 0).toInt())
         for (event in arr(snapshot.observations)) {
             val ordinal = num(event.sequence)
-            if (!ordinal.isFinite() || ordinal <= sequence || ordinal > Int.MAX_VALUE || ordinal != ordinal.toInt().toDouble()) continue
-            sequence = ordinal.toInt()
+            if (!ordinal.isFinite() || ordinal <= sequence || ordinal > 9_007_199_254_740_991.0 || ordinal % 1.0 != 0.0) continue
+            sequence = ordinal
             if (event.phase != "consumed" || event.wire == null) continue
             if (event.documentCid != cid) { unmatched++; continue }
             val wire = event.wire
