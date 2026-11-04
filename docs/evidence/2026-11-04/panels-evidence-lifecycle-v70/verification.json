@@ -1,0 +1,33 @@
+{
+  "result": "PASS",
+  "source": "243db15b73636742e57d4319f01ef8db3230c657",
+  "proof": "Five read-only lifecycle controls executed on fresh v70 Panels bundle and fresh JAR-only fixture; original v68 source, parser output and run reused exactly.",
+  "fixtureCompileAttempts": 1,
+  "browserAttempts": 1,
+  "closedStoreReopenAttempts": 1,
+  "cases": {
+    "workspaceInvalidation": "PASS",
+    "immutableReceiptSurvivesCameraSave": "PASS",
+    "newCidRefusesLateOldReceipt": "PASS",
+    "tabRefusesLateReceipt": "PASS",
+    "closeRefusesLateReceipt": "PASS"
+  },
+  "heldActualProductionResponses": 5,
+  "originalJsonCasBlocksAfterClose": 4,
+  "sourceFilesAndProjectHeadsUnchanged": 11,
+  "productionCodeSources": 21,
+  "immutableDependencyJars": 119,
+  "newParserReads": 0,
+  "newQueryRunApprovalPosts": 0,
+  "analysisReteFacts": 0,
+  "analysisBlackboardEntries": 0,
+  "operationalBoardEntriesAfterDrain": 2,
+  "allOwnersClosed": true,
+  "retainedDataAudit": "audit/audit.json",
+  "tamperControlsRejected": 5,
+  "originalProducerSource": "e3057178652b433421832003417478a98ffce304",
+  "originalInspectionCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+  "originalRunReceiptCid": "sha256:511c9b316a75ef117204af4bf5b439a65bc92c93d2833eff9e3dc183e40eb54d",
+  "browserResultSha256": "92fe43611456d6c5b9aa1b743b610a4f3447d41dda089c20a413b35713bb048a",
+  "attemptHistory": "First compile, browser execution and post-close reopen passed. Previous v68 failures and v69 evidence remain at their original paths."
+}

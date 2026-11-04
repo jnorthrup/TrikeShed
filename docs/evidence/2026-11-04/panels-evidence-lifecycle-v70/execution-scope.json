@@ -1,0 +1,17 @@
+{
+  "result": "PASS",
+  "executedClientSource": "243db15b73636742e57d4319f01ef8db3230c657",
+  "oldProducerSource": "e3057178652b433421832003417478a98ffce304",
+  "listener": "http://127.0.0.1:33359",
+  "fixtureCompileAttempts": 1,
+  "browserAttempts": 1,
+  "reopenCompileAttempts": 1,
+  "newParserCalls": 0,
+  "newQueryOrAuthoredRunPosts": 0,
+  "newReviewApprovals": 0,
+  "originalProducerParserReads": 1,
+  "allOwnersClosed": true,
+  "fixtureEvidenceEndpointCalled": false,
+  "counterEvidence": "Actual cleanup.json safetyAfterDrain plus startup source validation; no retrospective runtime /_fixture/evidence response is claimed.",
+  "nativeTaxonomyPilot": "Separate EnglishProof-owned fixture already closed before this listener started; its fresh parse is not a lifecycle-proof parse."
+}
