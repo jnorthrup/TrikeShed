@@ -459,10 +459,12 @@ class MlxMatrixSession internal constructor(
     fun slice(input: MlxTensor, axis: Int, from: Int, until: Int): MlxTensor {
         val stream = gpu()
         val rank = input.a.size
+        require(axis >= -rank && axis < rank) { "Slice axis is outside tensor rank" }
+        val dimension = if (axis < 0) axis + rank else axis
         return derived("slice") { out ->
             memScoped {
-                val start = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == axis) from else 0 }
-                val stop = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == axis) until else input.a[i] }
+                val start = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == dimension) from else 0 }
+                val stop = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = if (i == dimension) until else input.a[i] }
                 val strides = allocArray<IntVar>(rank).also { for (i in 0 until rank) it[i] = 1 }
                 mlx_slice(out, input.handle, start, rank.toULong(), stop, rank.toULong(), strides, rank.toULong(), stream)
             }
