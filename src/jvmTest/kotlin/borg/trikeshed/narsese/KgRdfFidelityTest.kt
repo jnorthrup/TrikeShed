@@ -116,6 +116,14 @@ class KgRdfFidelityTest {
                 assertEquals(1, report["statements"])
                 val expected = KgNalBridge.map(KgNalBridge.parseTurtle(input).single()).signal(ContentId.of(input.encodeToByteArray()).value)
                 assertEquals(expected, bag.signalOf(expected.angular))
+                val twoKinds = "<urn:s> <urn:p> <urn:o> .\n<urn:s> <urn:p> \"urn:o\" ."
+                val source = ContentId.of(twoKinds.encodeToByteArray()).value
+                val signals = KgNalBridge.parseTurtle(twoKinds).map { KgNalBridge.map(it).signal(source) }
+                assertEquals(2, signals.map { it.angular }.distinct().size, "This concrete pair has distinct natural routing addresses")
+                assertEquals(2, bag.ingestKg(twoKinds)["statements"])
+                for (signal in signals) assertEquals(signal, bag.signalOf(signal.angular))
+                bag.ingestKg(twoKinds)
+                for (signal in signals) assertEquals(signal, bag.signalOf(signal.angular), "Exact source replay cannot add evidence")
                 bag.awaitProcessed(); assertTrue(bag.worker?.isActive == true)
             } finally { bag.drain(); assertTrue(bag.worker?.isCompleted == true && bag.supervisor.isCompleted) }
             // These are compatibility controls, not endorsements of the permissive parser's behavior.
