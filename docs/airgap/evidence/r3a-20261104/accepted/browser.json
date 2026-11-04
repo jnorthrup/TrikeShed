@@ -1,0 +1,514 @@
+{
+  "scope": "Actual production Panels bundle, module routes and LLVM runtimes; synthetic JSON transport fixture",
+  "cases": {
+    "liveTransfer": {
+      "result": "PASS",
+      "first": {
+        "x": "281.3630676269531",
+        "y": "211.76202392578125",
+        "count": "1"
+      },
+      "second": {
+        "x": "297.4695129394531",
+        "y": "210.4464111328125"
+      },
+      "caption": "OBSERVED TRANSFERS\nObserved execution · delayed display · 2eec2656-061f-43c8-8c8e-09290beb6d94 1 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    },
+    "durableTransfers": {
+      "result": "PASS",
+      "runId": "2eec2656-061f-43c8-8c8e-09290beb6d94",
+      "programCid": "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+      "transfers": [
+        {
+          "invocationOrdinal": 2,
+          "nodeId": "summary",
+          "type": "vm.llvm.scalar",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-visible-confix",
+          "documentCid": "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 1,
+            "nodeId": "source",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-visible-confix",
+            "documentCid": "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 0,
+            "fromNode": "source",
+            "fromPort": "rowCount",
+            "toNode": "summary",
+            "toPort": "left?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "left?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 4,
+          "elapsedNanos": 672703178
+        },
+        {
+          "invocationOrdinal": 3,
+          "nodeId": "confirm",
+          "type": "vm.llvm.scalar",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-visible-confix",
+          "documentCid": "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 2,
+            "nodeId": "summary",
+            "type": "vm.llvm.scalar",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-visible-confix",
+            "documentCid": "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 1,
+            "fromNode": "summary",
+            "fromPort": "value",
+            "toNode": "confirm",
+            "toPort": "left?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "left?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 7,
+          "elapsedNanos": 1228187645
+        }
+      ],
+      "summary": {
+        "clockOrigin": "walk-start",
+        "attempted": 8,
+        "retained": 8,
+        "omitted": 0,
+        "firstSequence": 1,
+        "lastSequence": 8,
+        "lastObservedSequence": 8,
+        "coverage": "complete"
+      }
+    },
+    "nativeInspection": {
+      "result": "PASS",
+      "text": "CONFIX & FACETS\nRefresh ✕\nInspected this canvas · blackboard revision 7\nUse cases\nWorkgroups\nCases\nConfix & facets\nLow code\nEvidence\n\nProgram identity: sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5\n\nNode inspection · last attempt in this tab. Refresh after running. These observations are not durable run receipts.\n\nsource · vm.llvm.confix\nsummary · vm.llvm.scalar\nconfirm · vm.llvm.scalar\n\nNo attempt recorded in this tab.\n\nBindings identify dispatch owners, not readiness. Inputs and named scope bodies are checked when run.\n\nsource · vm.llvm.confix · KOTLIN\nContext: LcncNodeKey.VM_LLVM_CONFIX\n\nsummary · vm.llvm.scalar · KOTLIN\nContext: LcncNodeKey.VM_LLVM_SCALAR\n\nconfirm · vm.llvm.scalar · KOTLIN\nContext: LcncNodeKey.VM_LLVM_SCALAR\n\nRecent recorded runs · up to eight immutable receipts. A matching program version does not mean its inputs or dependencies are still current.\n\nInspect receipt\n\nLatest explicit program run in this page\n\ncompleted · 2eec2656-061f-43c8-8c8e-09290beb6d94\n\nAn inline run label does not establish named-program membership. Refreshing or reopening this view re-inspects the retained response snapshot.\n\nInspect latest explicit run\n\nInline run · not saved-program history · completed · 2eec2656-061f-43c8-8c8e-09290beb6d94 · this version\n\nInspect 2eec2656-061f-43c8-8c8e-09290beb6d94\n\nairgap-visible-confix · 2eec2656-061f-43c8-8c8e-09290beb6d94 · completed\n\nReceipt: sha256:f88fae2a1ed0f16bbbb3d30bfce4e112713cf82cee260d5e7ba49076aec1c59b\nProgram: sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5\nSame program version as the captured canvas inspection.\n\nCaptured canvas program: sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5. Refresh to compare with the current canvas.\n\nStarted: 1793834598664 · finished: 1793834599964 (epoch ms)\n\nImmutable receipt JSON\nReceipt as Confix sheets\nInspect receipt in Confix\nInvocation inputs (root inputs, not per-node input snapshots)\nExecution budgets and version policy\nReturned values\n\nRecorded node outputs · 3 nodes. Missing outputs are not proof that a node did not run; truncation markers remain visible.\n\nsource\nInspect output source in Confix\nsummary\nInspect output summary in Confix\nconfirm\nInspect output confirm in Confix\nNode invocations · sha256:6c38646b5be63886e95c6d814a4f15c8937d7ab51c7564caeb11e34cf0e0317c\nImmutable JSON\nConfix sheets\nInspect Node invocations in Confix\n\n3 node entries · 0 omitted. Retained in entry order, with parent invocation and zero-based iteration. Inputs and outputs are boundary snapshots; omission markers are not empty values. This is execution evidence, not breakpoint control or proof of external effects.\n\nReplay recorded wire activity\n\nDisplay only; no nodes execute. Motion duration is presentation policy, not engine duration.\n\n3 matching retained invocations. No match is not proof of non-execution; the ledger may omit entries.\n\n#1 · source · vm.llvm.confix · completed\n\nScope path: [] · parent: root · iteration: none\n\nRecorded LLVM observation · confix.flat/1\n\nModule: sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3\n\nGraalVM 25.3.4.1 · LLVM 22.1.8\n\nQueue 708.714 µs · call 52.785 ms · load 43.706 ms\n\nInternal progress: unobserved · pause: between-scans\n\nScanner 18.360 ms · row capacity 16384\n\nOwned native allocation 541064 bytes · after release 0 bytes\n\nBuffer guards: verified\n\nAllocation counters cover the bridge buffer, not the VM heap. Scanner success is not strict validation.\n\nRetained measurements, not a live VM. No native-memory isolation or hard native cancellation is established.\n\nMeasured LLVM runtime\nInvocation boundary JSON\nInspect invocation #1 in Confix\n#2 · summary · vm.llvm.scalar · completed\n#3 · confirm · vm.llvm.scalar · completed\nConsumed evidence and runtime bindings\nFrozen program at invocation · sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5\nPinned subprogram versions\nStored prompt versions\nPrevious state receipt\nRun records\nShared blackboard\n\nPointcuts · latest recorded value per site, daemon-wide. This is not the full trace, a breakpoint, or proof that this canvas executed.\n\nInspect pointcuts\nGraal workspace · VM terminals · Hermes\nDocument evidence and tuple sheets"
+    },
+    "replay": {
+      "result": "PASS",
+      "postRuns": 1,
+      "caption": "OBSERVED TRANSFERS\nRecorded playback · no execution · 2eec2656-061f-43c8-8c8e-09290beb6d94 2 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    },
+    "reducedMotion": {
+      "result": "PASS",
+      "position": [
+        "409",
+        "181.78125"
+      ]
+    },
+    "camera": {
+      "result": "PASS",
+      "cameraBefore": "matrix(1, 0, 0, 1, 245, 20)",
+      "cameraAfterZoom": "matrix(0.60241, 0, 0, 0.60241, 743.976, 97.9277)",
+      "cameraAfterPan": "matrix(0.594053, 0, 0, 0.594053, 684.778, 134.408)",
+      "panStart": [
+        0.594053,
+        0,
+        0,
+        0.594053,
+        754.463,
+        99.5656
+      ],
+      "panHeld": [
+        0.594053,
+        0,
+        0,
+        0.594053,
+        714.463,
+        119.566
+      ],
+      "alignment": {
+        "x": 409,
+        "y": 181.78125,
+        "pathX": 409,
+        "pathY": 181.78125
+      },
+      "postRuns": 1
+    },
+    "nativeFlyover": {
+      "result": "PASS",
+      "text": "vm.llvm.confix\nsource\nLAST DISPLAYED RUN · RECORDED LLVM EVIDENCE\nRecorded LLVM observation · confix.flat/1\nQueue 708.714 µs · call 52.785 ms\nInternal progress: unobserved\nPause: between-scans\nScanner 18.360 ms\nBridge allocation 541064 bytes\nAfter release 0 bytes\nBuffer guards: verified\nFull module identity and limits: Evidence\nsource\nsha256:ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573\ncopied rows\n7\nnot_found",
+      "rows": [
+        {
+          "text": "Recorded LLVM observation · confix.flat/1",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "Queue 708.714 µs · call 52.785 ms",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "Internal progress: unobserved",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "Pause: between-scans",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "Scanner 18.360 ms",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "Bridge allocation 541064 bytes",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "After release 0 bytes",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "Buffer guards: verified",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "Full module identity and limits: Evidence",
+          "width": 334,
+          "contentWidth": 334
+        },
+        {
+          "text": "copied rows 7",
+          "width": 334,
+          "contentWidth": 334
+        }
+      ]
+    },
+    "editedDefinition": {
+      "result": "PASS",
+      "staleActivityCleared": true
+    },
+    "reopen": {
+      "result": "PASS",
+      "nativeInstalled": false,
+      "identicalLedger": true
+    },
+    "reopenedBrowser": {
+      "result": "PASS",
+      "postRuns": 1,
+      "caption": "OBSERVED TRANSFERS\nRecorded playback · no execution · 2eec2656-061f-43c8-8c8e-09290beb6d94 2 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    },
+    "legacyReceipt": {
+      "result": "PASS",
+      "receiptCid": "sha256:f5a6c98d1937e92d2ca41dd663bb559398a7e494acfbfca70b111d22d338ec4c",
+      "noFabricatedReplay": true,
+      "text": "CONFIX & FACETS\nRefresh ✕\nInspected this canvas · blackboard revision 2\nUse cases\nWorkgroups\nCases\nConfix & facets\nLow code\nEvidence\n\nProgram identity: sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5\n\nNode inspection · last attempt in this tab. Refresh after running. These observations are not durable run receipts.\n\nsource · vm.llvm.confix\nsummary · vm.llvm.scalar\nconfirm · vm.llvm.scalar\n\nNo attempt recorded in this tab.\n\nBindings identify dispatch owners, not readiness. Inputs and named scope bodies are checked when run.\n\nsource · vm.llvm.confix · UNBOUND\nContext: LcncNodeKey.VM_LLVM_CONFIX\n\nsummary · vm.llvm.scalar · UNBOUND\nContext: LcncNodeKey.VM_LLVM_SCALAR\n\nconfirm · vm.llvm.scalar · UNBOUND\nContext: LcncNodeKey.VM_LLVM_SCALAR\n\nRecent recorded runs · up to eight immutable receipts. A matching program version does not mean its inputs or dependencies are still current.\n\nInspect receipt\n\nInline run · not saved-program history · completed · 2eec2656-061f-43c8-8c8e-09290beb6d94 · this version\n\nInspect 2eec2656-061f-43c8-8c8e-09290beb6d94\n\nairgap-confix-source · 2730bdce-0d2b-40ab-aace-675b42c65979 · completed\n\nReceipt: sha256:f5a6c98d1937e92d2ca41dd663bb559398a7e494acfbfca70b111d22d338ec4c\nProgram: sha256:e03d1513ea606e6fb7fdb9df0965e9865c7a30fc2077b115e2b88be0835ed4b6\nDifferent program version from the captured canvas inspection. Inspection does not change the canvas.\n\nCaptured canvas program: sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5. Refresh to compare with the current canvas.\n\nThe authored definition also differs from the captured canvas. This receipt is not evidence for that edited definition.\n\nStarted: 1793831100354 · finished: 1793831100450 (epoch ms)\n\nImmutable receipt JSON\nReceipt as Confix sheets\nInspect receipt in Confix\nInvocation inputs (root inputs, not per-node input snapshots)\nExecution budgets and version policy\nReturned values\n\nRecorded node outputs · 2 nodes. Missing outputs are not proof that a node did not run; truncation markers remain visible.\n\nsource\nInspect output source in Confix\nsummary\nInspect output summary in Confix\nNode invocations · sha256:afbcc39ef12d23dfd1c40f0d3b8b95358ec2b7585384120248eaf5a4f84194db\nImmutable JSON\nConfix sheets\nInspect Node invocations in Confix\n\n2 node entries · 0 omitted. Retained in entry order, with parent invocation and zero-based iteration. Inputs and outputs are boundary snapshots; omission markers are not empty values. This is execution evidence, not breakpoint control or proof of external effects.\n\n2 matching retained invocations. No match is not proof of non-execution; the ledger may omit entries.\n\n#1 · source · vm.llvm.confix · completed\n\nScope path: [] · parent: root · iteration: none\n\nRecorded LLVM observation · confix.flat/1\n\nModule: sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3\n\nGraalVM 25.3.4.1 · LLVM 22.1.8\n\nQueue 525.061 µs · call 54.621 ms · load 48.457 ms\n\nInternal progress: unobserved · pause: between-scans\n\nScanner 24.003 ms · row capacity 16384\n\nOwned native allocation 541064 bytes · after release 0 bytes\n\nBuffer guards: verified\n\nAllocation counters cover the bridge buffer, not the VM heap. Scanner success is not strict validation.\n\nRetained measurements, not a live VM. No native-memory isolation or hard native cancellation is established.\n\nMeasured LLVM runtime\nInvocation boundary JSON\nInspect invocation #1 in Confix\n#2 · summary · vm.llvm.scalar · completed\nConsumed evidence and runtime bindings\nFrozen program at invocation · sha256:e03d1513ea606e6fb7fdb9df0965e9865c7a30fc2077b115e2b88be0835ed4b6\nPinned subprogram versions\nStored prompt versions\nPrevious state receipt\nRun records\nShared blackboard\n\nPointcuts · latest recorded value per site, daemon-wide. This is not the full trace, a breakpoint, or proof that this canvas executed.\n\nInspect pointcuts\nGraal workspace · VM terminals · Hermes\nDocument evidence and tuple sheets"
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":1}},\"inputs\":{},\"debugToken\":\"d112c2c1-5853-4159-a414-2de34c0186d6\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"d112c2c1-5853-4159-a414-2de34c0186d6\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"2eec2656-061f-43c8-8c8e-09290beb6d94\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"d112c2c1-5853-4159-a414-2de34c0186d6\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"2eec2656-061f-43c8-8c8e-09290beb6d94\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"d112c2c1-5853-4159-a414-2de34c0186d6\",\"ordinal\":3,\"action\":\"continue\",\"runId\":\"2eec2656-061f-43c8-8c8e-09290beb6d94\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":1}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":648.2331021762831,\"y\":152.6806005195328,\"z\":0.5940532463780522}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":648.2331021762831,\"y\":152.6806005195328,\"z\":0.5940532463780522}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":648.2331021762831,\"y\":152.6806005195328,\"z\":0.5940532463780522}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null},\"compareProgramCid\":\"sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":1}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":1}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":1}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null},\"compareProgramCid\":\"sha256:e03d1513ea606e6fb7fdb9df0965e9865c7a30fc2077b115e2b88be0835ed4b6\"}"
+    }
+  ],
+  "errors": [],
+  "responses": [
+    {
+      "runId": "2eec2656-061f-43c8-8c8e-09290beb6d94",
+      "program": "airgap-visible-confix",
+      "programKey": null,
+      "programCid": "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+      "inputs": {},
+      "status": "completed",
+      "queuedAtMs": 1793834598362,
+      "queueNamed": false,
+      "queueDeclaredSubnet": null,
+      "queueRequest": {
+        "debugToken": "d112c2c1-5853-4159-a414-2de34c0186d6",
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "subnet": "local"
+      },
+      "queueDurability": "DURABLE",
+      "executionFamily": "lcnc/run/2eec2656-061f-43c8-8c8e-09290beb6d94",
+      "parentRunId": null,
+      "versionPolicy": "root-at-queue,subprogram-at-first-use",
+      "budgets": {
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "maxPayloadChars": 131072
+      },
+      "jobId": "lcnc/run/2eec2656-061f-43c8-8c8e-09290beb6d94",
+      "sequence": 3,
+      "timelineRevision": 3,
+      "receiptCid": "sha256:f88fae2a1ed0f16bbbb3d30bfce4e112713cf82cee260d5e7ba49076aec1c59b",
+      "workgroup": "lcnc/program/airgap-visible-confix@sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+      "claimId": 1,
+      "subnet": "local",
+      "claimedAtSubnet": "local",
+      "claimLineage": [
+        {
+          "workgroup": "lcnc/program/airgap-visible-confix@sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+          "claimId": 1
+        }
+      ],
+      "parentWorkgroup": null,
+      "parentClaimId": null,
+      "startedAtMs": 1793834598664,
+      "programVersions": {},
+      "previousReceiptCid": "sha256:aaa270b69e19bd1c939926aeecd1ad924606bcfcf496c760314bcf7db729a84b",
+      "returns": {},
+      "outputs": {
+        "source": {
+          "ok": true,
+          "format": "JSON",
+          "sourceCid": "sha256:ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573",
+          "sourceBytes": 52,
+          "rowCount": 7,
+          "observedRows": 7,
+          "rows": [
+            {
+              "open": 0,
+              "close": 51,
+              "tag": "IoObject",
+              "depth": 0,
+              "children": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            {
+              "open": 1,
+              "close": 11,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 13,
+              "close": 22,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 24,
+              "close": 33,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 35,
+              "close": 36,
+              "tag": "IoDouble",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 38,
+              "close": 45,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 47,
+              "close": 50,
+              "tag": "IoBoolean",
+              "depth": 1,
+              "children": []
+            }
+          ],
+          "fault": {
+            "code": 0,
+            "name": "none",
+            "at": 0,
+            "atKind": "none"
+          },
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
+            "abi": "confix.flat/1",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-scans",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 43705798,
+            "semanticProfile": "mlir-nix-confix-571b57d3",
+            "strictValidation": false,
+            "copyTransport": "packed-i32",
+            "scanNanos": 18360420,
+            "allocatedBytes": 541064,
+            "rowCapacity": 16384,
+            "guardsVerified": true,
+            "liveBytesAfter": 0,
+            "queueNanos": 708714,
+            "callNanos": 52784899
+          },
+          "sourceRetained": true
+        },
+        "summary": {
+          "value": 107,
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b",
+            "export": "add",
+            "abi": "i32(i32,i32)",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-calls",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 815922981,
+            "queueNanos": 910303,
+            "callNanos": 1084393
+          }
+        },
+        "confirm": {
+          "value": 108,
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b",
+            "export": "add",
+            "abi": "i32(i32,i32)",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-calls",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 815922981,
+            "queueNanos": 120139,
+            "callNanos": 551681
+          }
+        }
+      },
+      "bindings": [],
+      "bindingsTruncated": false,
+      "promptVersions": {},
+      "consumed": [],
+      "consumedTruncated": false,
+      "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rootStateCid": "sha256:10d0e9f0289eeb413c07113bd8ec17e9a5a18f8668e523338b23a93b4e5abc9f",
+      "rootStateFormat": "cbor",
+      "ok": true,
+      "finishedAtMs": 1793834599964,
+      "invocationsCid": "sha256:6c38646b5be63886e95c6d814a4f15c8937d7ab51c7564caeb11e34cf0e0317c",
+      "oroborosCid": "sha256:141dafd10b17ef6984433bbfc790b82108eb595644bd4cd088d0f1836b1fe103",
+      "invocationsAttempted": 3,
+      "invocationsDropped": 0
+    }
+  ],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "d9de24e48775e538fa030c01a54fd3861781af691ff6470ade9b7cdb0b86b5fc",
+    "bytes": 1768479
+  },
+  "liveVideo": "page@1ba85176818d766f2e96d1df5265666d.webm",
+  "reopenedVideo": "page@c4a40817a6394e77069a0cdede1d4f6f.webm"
+}

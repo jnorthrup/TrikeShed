@@ -9,6 +9,7 @@ and D3M integration record. A planned gate is not a completed release.
 |---|---|---|
 | R1: owned scalar execution | Standard MLIR arithmetic through a pinned Sulong module, two wired LCNC nodes, durable receipt reopening | [Verified runbook](../sulong-bitcode/README.md); published master `26d5bf3db` |
 | R2: owned Confix scanning | Execute the real pinned upstream JSON/CBOR/YAML scanner, copy bounded rows, release native buffers, compare Kotlin results, retain a whole-program LCNC receipt | [Verified runbook](02-confix.md), [exact evidence](evidence/r2-20261104/verification.json), [D3M record](../d3m/2026-11-04-airgap-r2.md) |
+| R3a: observed transfers | Actual selected-wire sparks, recorded LLVM flyovers, reduced motion and immutable receipt playback | [Implemented contract and evidence](04-observed-transfers.md); bounded precursor to full R3 |
 | R3: visible document traversal | Source intake to scanner/evidence nodes with measured wire activity, pause at supported boundaries and evidence flyovers | Planned; [implementation handoff](03-visible-traversal.md) and [visual acceptance](../lcnc/airgap-demonstrator/07-visualization.md) |
 | R4: offline release closure | Reproducible packaged runtime, verified dependency closure and clean-machine startup without external networking | Planned; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
@@ -57,6 +58,6 @@ sanitizer audit passed 150,026 bounded cases; it is not an exhaustive proof.
 
 All 494 enumerated remote branches and six local branches were contained by
 the final D3M audit (501 refs including origin/HEAD). No conflicts occurred and
-no branches were deleted. R3's [implementation handoff](03-visible-traversal.md)
-identifies the next measured visualization work; R4 remains the sealed runtime
-and clean-machine closure gate.
+no branches were deleted in that R2 publication. [R3a](04-observed-transfers.md)
+adds measured wire activity and native inspection. R3's full document path
+and R4's sealed runtime/clean-machine closure remain open.

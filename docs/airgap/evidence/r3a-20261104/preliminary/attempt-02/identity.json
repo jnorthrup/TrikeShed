@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "dda9b3227399bab0c337caba653548c693bb5559",
+  "files": {
+    "TrikeShed-jvm.jar": "c978a50015648bceefda86e5af58fe4a18142be613daecfba6ae2b61049c05e3",
+    "resources/web/kotlin/spacegraph/spacegraph.js": "d0077d675d01c3ef6e65032ad837ce2427d27d91dff8776d9bf9f922ce7a0a9b",
+    "resources/web/kotlin/spacegraph/spacegraph.js.map": "5c7a09fcd4becdef20676824b713d447247794bbb2b97b8a271cb292e0db71a3",
+    "resources/web/kotlin/spacegraph/spacegraph.js.LICENSE.txt": "b3e1a8b42b6a529b83814eff7bd05ba54f513d97037ac3addf6428fdf9a74eee"
+  },
+  "compiler": "Kotlin 2.4.21 standalone fixture, no production class overlays",
+  "network": "Linux user/network namespace, loopback only"
+}

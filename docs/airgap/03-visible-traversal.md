@@ -1,8 +1,11 @@
 # R3: visible document traversal — implementation handoff
 
-Status: planned; source inspection at the R2 combined commit
-`f91da5d6e2765debe3c85c0b2bcd081b5e7c90ea`. This is the next release gate,
-not a claim that the animation or final browser acceptance already exists.
+Status: R3 remains open. [R3a](04-observed-transfers.md) implements selected-wire
+observations, bounded browser motion, recorded native inspection and explicit
+receipt playback. This handoff was written against R2 source
+`f91da5d6e2765debe3c85c0b2bcd081b5e7c90ea`; descriptions below of the
+then-current renderer and proposed schema are historical design context. Use
+R3a's implemented contract and evidence for current behavior.
 The [visualization blueprint](../lcnc/airgap-demonstrator/07-visualization.md)
 owns the wider design. This handoff identifies concrete seams after R2.
 
@@ -87,7 +90,7 @@ fields, to be reviewed as a versioned extension before implementation:
 | `producer` | Resolved output owner plus producing invocation/frame identity |
 | `wire` | Frozen from-node/port and to-node/port; preserve authored wire index if endpoints repeat |
 | `selection` | Single selected value or position in an explicitly many-input port |
-| `elapsedNanos` | Owner's monotonic duration since run admission, not wall-clock chronology across machines |
+| `elapsedNanos` | Owner's monotonic duration since walk start, including pauses; not wall-clock chronology across machines |
 | `phase` | Observed selection/entry/settlement; no synthetic percentage |
 | `evidence` | Existing retained value/source identity when available; otherwise an explicit unavailable reason |
 
@@ -174,8 +177,7 @@ logic that inspects its fault/`ok` ports.
 7. D3M-integrate all enumerated branch heads, review intent, verify the combined
    artifact, retain failures and fixes, then publish the next ordinary master.
 
-The incoming English taxonomy UI has a separate final-artifact acceptance gap:
-authenticate, declare, prepare, freeze, approve and query, then invalidate source
-or credential and test held responses after closure. Retain that gap until its
-own browser evidence passes. It must not be hidden by R2's JVM regressions or
-by historical copular/Panel captures.
+The incoming English taxonomy and Panels lifecycle branches now retain v70
+exact-artifact acceptance evidence under `docs/evidence`. Their source hashes
+and stated limits remain authoritative. R3a's native-wire browser proof does
+not recertify those separate workflows on its own combined artifact.

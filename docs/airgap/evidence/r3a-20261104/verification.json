@@ -1,0 +1,426 @@
+{
+  "kind": "airgap-observed-transfers-release/1",
+  "release": "R3a",
+  "testedSourceCommit": "2c94dc5594c4a3c62154c81a1ea1441b9a168e26",
+  "combinedBeforeLiteralConformance": "6ce259715c888da2aa27a172690ee69ab1308366",
+  "jvmTestSourceCommit": "e6d480cb47aa2553d7607b0865db6242ad7c2c0c",
+  "commonTargetBuildCommit": "e6d480cb47aa2553d7607b0865db6242ad7c2c0c",
+  "browserBuildCommit": "2c94dc5594c4a3c62154c81a1ea1441b9a168e26",
+  "sourceEquivalence": "Only PanelsLlvm.kt and PanelsBlip.kt changed after the JVM/common-target check to shorten clipped hover rows. The final production Spacegraph bundle and complete browser proof were rebuilt/rerun. JVM, shared code and build configuration are unchanged. Publication changes after testedSourceCommit are documentation/evidence only.",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "jdk": "GraalVM CE 25.3.4.1+1.1",
+  "kotlin": "2.4.21",
+  "gradle": "9.8.2",
+  "llvm": "22.1.8",
+  "testSuites": [
+    {
+      "name": "DocumentEnglishRetainedWireTest[jvm]",
+      "timestamp": "2026-11-04T23:18:33.687Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "staleSourcesAndALateMutationBeforePublicationReturnNoInspection()[jvm]",
+        "retainedOpeningReturnsTheActualPayloadAndExactOriginalCborWithoutAReaderOrNewReceipt()[jvm]",
+        "validLegacyPayloadKeepsItsOriginalIdentitySpellingWithoutInventingNodes()[jvm]",
+        "drainWithdrawsBothRoutesAndWaitsForAcceptedInspectionAndRetainedOpening()[jvm]",
+        "retainedOpeningRequiresExactEightFieldsSourceIdentityAndRangeEvenForIdenticalOtherDocuments()[jvm]",
+        "missingMalformedTamperedOversizedAndCorruptRetainedBlocksRefuseBoundedlyWithoutInitializingAReader()[jvm]"
+      ]
+    },
+    {
+      "name": "KanbanPinnedDispatchTest[jvm]",
+      "timestamp": "2026-11-04T23:18:34.343Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "queuedRunUsesItsPinnedWorkgroupDespiteNearerWildcard()[jvm]"
+      ]
+    },
+    {
+      "name": "LlvmConfixRunTest[jvm]",
+      "timestamp": "2026-11-04T23:18:36.697Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm]",
+        "sourceGeometryAndScalarSummarySurviveReopening()[jvm]"
+      ]
+    },
+    {
+      "name": "LlvmScalarRunTest[jvm]",
+      "timestamp": "2026-11-04T23:18:39.996Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm]",
+        "failedConfiguredBootstrapReleasesItsRootOwner()[jvm]"
+      ]
+    },
+    {
+      "name": "EnglishCopularPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-04T23:18:41.632Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm]",
+        "currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm]",
+        "forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm]"
+      ]
+    },
+    {
+      "name": "EnglishTaxonomyCarrierTest[jvm]",
+      "timestamp": "2026-11-04T23:18:42.505Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm]",
+        "sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm]",
+        "exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm]",
+        "familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm]",
+        "sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm]",
+        "declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm]"
+      ]
+    },
+    {
+      "name": "EnglishTaxonomyExportGuardTest[jvm]",
+      "timestamp": "2026-11-04T23:18:42.792Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "manualKifRetainsSingleAndMultipleSnapshotExports()[jvm]",
+        "anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm]",
+        "persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm]",
+        "eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm]"
+      ]
+    },
+    {
+      "name": "FinanceKifPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-04T23:18:42.936Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "formulaPresetRunsTheSharedInspectionRunnerWithoutAnAssertionService()[jvm]",
+        "financePresetReadsCurrentDocumentsAndConservesExactReviewTotals()[jvm]"
+      ]
+    },
+    {
+      "name": "LcncConsumptionTest[jvm]",
+      "timestamp": "2026-11-04T23:18:43.320Z",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "inlineConsumptionReferencesTheEnclosingOutputOwner()[jvm]",
+        "interventionReplacesWireAttributionAndSharesTheAcknowledgedControlSequence()[jvm]",
+        "cancelledPausedConsumerDoesNotClaimWireDelivery()[jvm]",
+        "intervenedBindingIsLinkedThroughItsActualScopeInputProducer()[jvm]",
+        "finalEvidenceTrimmingRecountsTheStreamInsteadOfPreservingAStaleSummary()[jvm]",
+        "manyPortsRetainAuthoredPositionsAndTheirExistingSingleValueShape()[jvm]",
+        "singlePortRecordsOnlyTheLastFedWireIncludingDuplicateEndpoints()[jvm]",
+        "omittedSelectionsAndWindowEvictionKeepExactCountsAndPositions()[jvm]",
+        "missingRequiredInputAndGuardedScopesDoNotEmitConsumedSuccess()[jvm]",
+        "pulseConsumesTheActualWarmFrameWithoutInventingAProducerInvocation()[jvm]",
+        "repeatedNamedFramesUseTheirActualProducerAndDocumentIdentity()[jvm]"
+      ]
+    },
+    {
+      "name": "LcncPinnedBindingTest[jvm]",
+      "timestamp": "2026-11-04T23:18:43.436Z",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "failedBindingPreparationLeavesNoRegistrationAndCanRetry()[jvm]"
+      ]
+    },
+    {
+      "name": "LlvmConfixTest[jvm]",
+      "timestamp": "2026-11-04T23:18:43.442Z",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "upstreamScannersMatchRetainedKotlinGeometry()[jvm]",
+        "yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm]",
+        "admittedCancellationSettlesBeforeEvidenceAndClose()[jvm]",
+        "faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm]",
+        "strictProfilesAndFailedOpeningLeaveNoSeat()[jvm]",
+        "copiedGeometryRemainsReadableAfterContextClose()[jvm]",
+        "admissionBoundsAndOperatorAuthorityAreEnforced()[jvm]"
+      ]
+    },
+    {
+      "name": "LlvmScalarTest[jvm]",
+      "timestamp": "2026-11-04T23:18:44.418Z",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "nativeDeniedControlStillRefusesLlvm()[jvm]",
+        "cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm]",
+        "drainSettlesAcceptedQueueBeforeClosingContext()[jvm]",
+        "runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm]",
+        "invalidModuleOpenReleasesSeatForRetry()[jvm]",
+        "profileIsStrictOperatorConfiguration()[jvm]",
+        "verifiedBinaryExecutesAndCopiesHostScalars()[jvm]"
+      ]
+    },
+    {
+      "name": "WorkModelRouteTest[jvm]",
+      "timestamp": "2026-11-04T23:18:44.890Z",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm]",
+        "selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm]"
+      ]
+    },
+    {
+      "name": "WorkSelectNodeTest[jvm]",
+      "timestamp": "2026-11-04T23:18:45.076Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "guardedRingsRunOnlyTheSelectedBranch()[jvm]",
+        "refusesAmbiguousIdsAndInexactLimits()[jvm]",
+        "excludesUnknownExpiredUnavailableAndOverBudgetQuotes()[jvm]",
+        "selectsLowestDeclaredPriceAcrossModelAndService()[jvm]"
+      ]
+    },
+    {
+      "name": "AceContextNodesTest[jvm]",
+      "timestamp": "2026-11-04T23:18:45.105Z",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "normalizedFrameNameTakesPrecedenceOverOptionalAlias()[jvm]",
+        "optionalFrameWiresRetainPayloadIdentity()[jvm]",
+        "frameParametersRemainDefaultsAndNullWiresMaskThem()[jvm]"
+      ]
+    },
+    {
+      "name": "BreadcrumbContextNodesTest[jvm]",
+      "timestamp": "2026-11-04T23:18:45.138Z",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "boundedRecallReportsOmissionAndKeepsDisjointRangesDistinct()[jvm]",
+        "sourceRecallSelectsTheChildAndPreservesExactRawEvidence()[jvm]",
+        "offeredPresetProjectsAndExpandsLocalEvidenceWithoutAModel()[jvm]",
+        "invalidBudgetsAndUnknownContextsRefuseWithoutCreatingMemory()[jvm]"
+      ]
+    },
+    {
+      "name": "PropositionAttentionTest[jvm]",
+      "timestamp": "2026-11-04T23:18:45.266Z",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers()[jvm]",
+        "lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity()[jvm]",
+        "httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409()[jvm]",
+        "exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes()[jvm]",
+        "sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer()[jvm]",
+        "productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence()[jvm]"
+      ]
+    }
+  ],
+  "testTotals": {
+    "tests": 71,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "verifiedTargets": [
+    "JVM main and all test sources",
+    "JS main",
+    "Documents production browser bundle",
+    "Spacegraph production browser bundle",
+    "Wasm-JS main",
+    "Wasm-WASI main",
+    "Linux x64 main"
+  ],
+  "testScope": "71 selected regressions, not the full repository suite. Retained-English and reviewed-taxonomy unit fixtures declare synthetic syntax; browser LLVM kernels are real native execution.",
+  "browser": {
+    "caseNames": [
+      "liveTransfer",
+      "durableTransfers",
+      "nativeInspection",
+      "replay",
+      "reducedMotion",
+      "camera",
+      "nativeFlyover",
+      "editedDefinition",
+      "reopen",
+      "reopenedBrowser",
+      "legacyReceipt"
+    ],
+    "browserVersion": "154.0.8037.57",
+    "source": "accepted/browser.json",
+    "identity": "accepted/identity.json",
+    "bundle": {
+      "sha256": "d9de24e48775e538fa030c01a54fd3861781af691ff6470ade9b7cdb0b86b5fc",
+      "bytes": 1768479
+    },
+    "screenshots": [
+      "camera-preserves-observed-wire.png",
+      "live-consumed-wire.png",
+      "native-flyover.png",
+      "native-invocation-inspection.png",
+      "recorded-wire-playback.png",
+      "reopened-without-llvm.png"
+    ],
+    "liveVideo": "accepted/videos/page@1ba85176818d766f2e96d1df5265666d.webm",
+    "reopenedVideo": "accepted/videos/page@c4a40817a6394e77069a0cdede1d4f6f.webm"
+  },
+  "execution": {
+    "runId": "2eec2656-061f-43c8-8c8e-09290beb6d94",
+    "programCid": "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5",
+    "receiptCid": "sha256:f88fae2a1ed0f16bbbb3d30bfce4e112713cf82cee260d5e7ba49076aec1c59b",
+    "invocationsCid": "sha256:6c38646b5be63886e95c6d814a4f15c8937d7ab51c7564caeb11e34cf0e0317c",
+    "rowCount": 7,
+    "finalValue": 108,
+    "wireSelections": 2,
+    "bridgeLiveBytesAfter": 0,
+    "cleanup": {
+      "moduleOwnersCompleted": true,
+      "nativeRootDrained": true,
+      "listenerJoined": true,
+      "reopened": true
+    },
+    "scope": "Production userspace HTTP listener, KanbanModule, CAS/Couch, public vmLegos bootstrap, actual production JVM jar and compiled Panels bundle. Fixture-only setup/control routes; no production class overlays or mock execution responses."
+  },
+  "offline": {
+    "boundary": "Linux user/network namespace with loopback only, no external route; external TCP connect returned ENETUNREACH",
+    "record": "accepted/network.json",
+    "jvmTests": "--offline inside the same kind of OS-isolated namespace",
+    "targetBuild": "--offline with staged Gradle/Yarn caches; not OS network-denied",
+    "dependencyState": "Compiler, JVM runtime dependencies, Chromium and recording helper were staged before isolation. No clean-machine or sealed-distribution claim."
+  },
+  "nativeFlyoverScope": "The fixture does not install the asserted/inferred /api/lcnc/blip plane route, which returns not found. Recorded LLVM rows still render from the real completed output; this proof does not claim that plane service.",
+  "observationSchema": "lcnc-observations/1",
+  "observationSummary": {
+    "clockOrigin": "walk-start",
+    "attempted": 8,
+    "retained": 8,
+    "omitted": 0,
+    "firstSequence": 1,
+    "lastSequence": 8,
+    "lastObservedSequence": 8,
+    "coverage": "complete"
+  },
+  "cas": {
+    "sha256:10d0e9f0289eeb413c07113bd8ec17e9a5a18f8668e523338b23a93b4e5abc9f": {
+      "path": "accepted/cas/10d0e9f0289eeb413c07113bd8ec17e9a5a18f8668e523338b23a93b4e5abc9f.cbor",
+      "bytes": 1969
+    },
+    "sha256:141dafd10b17ef6984433bbfc790b82108eb595644bd4cd088d0f1836b1fe103": {
+      "path": "accepted/cas/141dafd10b17ef6984433bbfc790b82108eb595644bd4cd088d0f1836b1fe103.json",
+      "bytes": 12696
+    },
+    "sha256:f88fae2a1ed0f16bbbb3d30bfce4e112713cf82cee260d5e7ba49076aec1c59b": {
+      "path": "accepted/cas/f88fae2a1ed0f16bbbb3d30bfce4e112713cf82cee260d5e7ba49076aec1c59b.json",
+      "bytes": 4587
+    },
+    "sha256:ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573": {
+      "path": "accepted/cas/ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573.source",
+      "bytes": 52
+    },
+    "sha256:6c38646b5be63886e95c6d814a4f15c8937d7ab51c7564caeb11e34cf0e0317c": {
+      "path": "accepted/cas/6c38646b5be63886e95c6d814a4f15c8937d7ab51c7564caeb11e34cf0e0317c.json",
+      "bytes": 7759
+    },
+    "sha256:8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5": {
+      "path": "accepted/cas/8a4ea9c990d6d3b141e65e2fa6c6f3c7ba5da313e867fd43d6aeed2a2580f0e5.json",
+      "bytes": 865
+    }
+  },
+  "sourceSha256": {
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "0859ded143f5152110891eeab5db575ce812066a6cd30f4448ead4bb44a66b17",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt": "fa6c8fe56e71bc0b025194f2cfe2617182f40ad7d2106b44c82f254e2f1d5928",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt": "d4e292c671e12875b1311b38784bd7a4e7101a02cc592f458fecaaae84c90b1b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncRunner.kt": "ee532ec30759231c01e88f248b36fb0063240b922caac79f8dd45396160ab731",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncScopeFrame.kt": "02e3637480f81eaddf2e84de4293b9459f920ef61a6b1970dd3555c2ca045e9f",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/OroborosEvidence.kt": "a7530aeea310aa36dac16d012c556e8f67bf40fd30112e6e312db726c2e43479",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefAttentionRequest.kt": "b3531ba0fc68a53274d9e5a0ecade31113a827aeea6c65ebdfef46e32125192d",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt": "76094428784f394ec067bde7a48042ac59b08cbc4563ea134eb8d996fb6cb2f4",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefsNodes.kt": "e2191381cc16b6b7233fda57fe575c5d4b4a8de2e51723d75304d9aae86c82b1",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/KgRetention.kt": "08d66222cb9a179662e6e658869f88eeae38ddb5b54d185a19a43b4bdfc14686",
+    "src/commonMain/kotlin/borg/trikeshed/rdf/EnglishObservationGraph.kt": "93b1511c0dde36509352ad60095a067b8073b3873e97a9aa83905cd3b5e2baaa",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/LcncConsumptionTest.kt": "f63c487a022bb81c4b4b8ba985fe870f57ea71248d3329c2cb933bfc16c1140b",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt": "f8d9b4553af1700292e50504bbbb42f93244714397a8fc7cd5570d83819eaa6d",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglishTaxonomy.kt": "e275fd559608ab69dd7f24732a94c96ba7f37667aac90b9e58d072aa956969bc",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsSyntaxGraph.kt": "a484f7b75283b15b982c31d2c5c04974239e27a47d832030074c9945edb1200f",
+    "src/jsMain/kotlin/borg/trikeshed/web/PanelsPage.kt": "a1a00a145983c6a8989a94f43cddcddc94bebc7102685aaba954544032128c5a",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt": "6394c05a2ad4dd01ea2fb2dd95b43bd37713af460fdb622f45f00d3660085305",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsBlip.kt": "0a80a7319f73d325eb699c6274b660c2e7fdbdcfeb1bb1ac9d1553f4252ad4e7",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "a7bcc2d2f5ac8bdc63228c90802dc95e286f2fb348036886d9edfca9b59dd970",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsLlvm.kt": "40bd108f81d139b043b5e084f7f0902abf3d69ca28e2437e320b365744c38c11",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt": "cb51b70f08c33292e37a68ff19f8eaefc720d26a65b7fd196a66f6732e7380d6",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "e9a96dd83b52592d0ffb7cc74447ac22e153ef3d4543fc0ba3cf9f349a04a94f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "aecaee8a0b1fe810462159e8653cd11fb78d581c6a5399c95ced27816a642240",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/BeliefWire.kt": "d1c5464aeb20fc5e1bac61390f8a5f58045c58747a9dbe08b25bc670e8f6e265",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentEnglishWire.kt": "9597e0a42d0f590bb37c691458e6c3a04f473419fb213698fae4b1ca2f056a2b",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/RouteManifest.kt": "e3ac6335883594806e3ac237b85b7eea1d57190fe69228faaca1484a2e4f2392",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/DocumentEnglishRetainedWireTest.kt": "153900b309767c49b604957842e1cb0b50e573a0a97d2a94df54feaba6793c48",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/PropositionAttentionTest.kt": "e6ceb6a93e13e67c159fd16749f5016f61147434f8edbd932535d434db4e2924"
+  },
+  "preliminaryAttempts": [
+    {
+      "path": "preliminary/attempt-01",
+      "result": "Real moving wire and durable result passed; harness incorrectly expected source invocation #0 instead of #1."
+    },
+    {
+      "path": "preliminary/attempt-02",
+      "result": "Seven browser cases passed; fixture omitted host route release before reopening and received duplicate /api/board claim. Fixture corrected to call ModuleRouteRegistry.release after stopping admission.",
+      "identityLimit": "Preliminary sourceCommit records Git HEAD at launch, not a fresh build attestation. Both preliminary attempts used JVM artifact c978a50015648bceefda86e5af58fe4a18142be613daecfba6ae2b61049c05e3 and JS d0077d675d01c3ef6e65032ad837ce2427d27d91dff8776d9bf9f922ce7a0a9b; final acceptance uses accepted/identity.json."
+    }
+  ],
+  "screenshotReview": {
+    "priorSuccessfulRun": "preliminary/attempt-03",
+    "change": "All 11 cases passed on e6d480cb4; screenshot review then found clipped native hover measurements. Final browser source shortens those rows; accepted evidence adds width assertions."
+  },
+  "invocationCorrection": "The first combined JVM command attached --tests to muxClasspath and failed before compilation. Corrected task ordering; failed log retained.",
+  "limits": [
+    "Synthetic 52-byte JSON, not a PDF or actual Coinbase agreement",
+    "No general Nix evaluator, unified native GC, zero-copy, speedup or native sandbox claim",
+    "LLVM internal progress remains unobserved; pause only at supported boundaries",
+    "Root/inline document wires displayed; named subprogram observations retained but counted unmapped",
+    "No achieved FPS, 4ms preparation budget or dense recursive RTS acceptance",
+    "Bounded observations and display counts are not complete unbounded causal history",
+    "No full daemon distribution, clean-machine closure, Apple Silicon acceptance or external provider execution",
+    "Incoming v70 English/lifecycle evidence retains its own artifact scope"
+  ],
+  "d3m": "../../../d3m/2026-11-04-airgap-r3a.md"
+}

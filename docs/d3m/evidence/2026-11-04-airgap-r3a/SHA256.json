@@ -1,0 +1,15 @@
+{
+  ".gitattributes": "216716818a250441b2b28c50e67e84338280be6df9e6dbf784bfdf9d993008b5",
+  "d3m-r3-integrate.txt": "5e804abf9423bda2cf80bb061931b0be215871a3a2275ebe5e676821b08850e2",
+  "inputs.json": "7b195eb2b68f27680c2eb9e1be352f125b534291bf352b85583bd9c67b44ae4d",
+  "integration-inputs.json": "666b5c219bf4a004a6081e9fea07c12e522113f06a756514994a0c66b7cea9c0",
+  "integration-steps.json": "a1a384ec94574de43e2b65ce21f0f887e9f1a55d97635edfd4a1f2f744fb0af0",
+  "publication-inputs.json": "61cb68c503682539180a2ab6178a8f30f4e5bf0c36b3cad29f74d39bffdc5bb0",
+  "publication-ref-inventory.json": "28b276c3a25b5ec54405ddd851aa8981172a310d2e06117526803164b1f66609",
+  "publication-remote-heads.txt": "d762ac1dac5d507986d24add88ab8b87975950a754b4dd32fe1c6ce5ddbccc4b",
+  "publication-steps.json": "c1d795d71f348bd8c010dc2163598744c0db5b7067abb52a33cddf65c1363e82",
+  "r3-all-heads-fetch.txt": "9dadf02efb5e0277281f121edb82cffea43eaab104e53c3f4031cf792767b21e",
+  "r3-all-heads-refresh.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "refreshed-inputs.json": "420b5c15bea4181a5b62a4a846ef43f70e3bd2a59c9ae873e672bab053a3b4e9",
+  "remote-heads-refresh.txt": "9cd49dc76f6b690c7ac652ed13bcbc0abcd3da423934c256b430b967804dbece"
+}
