@@ -55,18 +55,19 @@ class BeliefWire(
                 val diagnostic = beliefDiagnostics(bag.snapshot().values)
                 val rows = (0 until top.size).map { i ->
                     val (signal, budget) = top[i]
-                    mapOf(
-                        "angular" to signal.angular.toString(),
-                        "relation" to signal.relation.name,
-                        "expectation" to Nal.truthOf(signal.evidence).expectation(),
-                        "evidence" to mapOf("positive" to signal.evidence.positive, "negative" to signal.evidence.negative),
-                        "priority" to budget.pf,
-                        "durability" to budget.df,
-                        "quality" to budget.qf,
-                        "state" to AttentionEconomy.stateOf(budget).name,
-                        "subjectCid" to signal.subjectCid,
-                        "provenanceCid" to signal.provenanceCid,
-                    )
+                    _m[
+                        "angular" j signal.angular.toString(),
+                        "relation" j signal.relation.name,
+                        "expectation" j Nal.truthOf(signal.evidence).expectation(),
+                        "evidence" j _m["positive" j signal.evidence.positive, "negative" j signal.evidence.negative],
+                        "priority" j budget.pf,
+                        "durability" j budget.df,
+                        "quality" j budget.qf,
+                        "state" j AttentionEconomy.stateOf(budget).name,
+                        "subjectCid" j signal.subjectCid,
+                        "provenanceCid" j signal.provenanceCid,
+                        "propositionCid" j signal.propositionCid,
+                    ]
                 }
                 json(_m["size" j bag.size, "capacity" j bag.capacity, "beliefs" j rows,
                     "diagnostics" j _m[
