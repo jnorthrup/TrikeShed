@@ -445,6 +445,15 @@ object OroborosDaemon {
         llvm?.drain()
     }
 
+    /** FLYWHEEL_CYCLE_INTERVAL overrides CLI --interval-ms only when it is positive. */
+    private fun cycleInterval(config: DaemonConfig): Long {
+        val ms = HostSystem.getenv("FLYWHEEL_CYCLE_INTERVAL")?.toLongOrNull()
+        return if (ms != null && ms > 0) {
+            HostSystem.err("[OROBOROS] FLYWHEEL_CYCLE_INTERVAL=${ms}ms (env override)")
+            ms
+        } else config.intervalMs
+    }
+
     /** Startup remains joined by the outer owner even when a later bootstrap step throws. */
     private fun CoroutineScope.startModules(supervisor: borg.trikeshed.module.ModuleSupervisor,
                                            config: DaemonConfig, ownCleanup: (suspend () -> Unit) -> Unit): suspend () -> Unit {
@@ -714,19 +723,7 @@ object OroborosDaemon {
             HostSystem.err("[OROBOROS] JULES_API_KEY not set; Jules credential pool will be empty.")
         }
 
-        // FLYWHEEL_CYCLE_INTERVAL env overrides CLI --interval-ms.
-        val envInterval = HostSystem.getenv("FLYWHEEL_CYCLE_INTERVAL")
-        val intervalMs = if (envInterval != null) {
-            val ms = envInterval.toLongOrNull()
-            if (ms != null && ms > 0) {
-                HostSystem.err("[OROBOROS] FLYWHEEL_CYCLE_INTERVAL=${ms}ms (env override)")
-                ms
-            } else {
-                config.intervalMs
-            }
-        } else {
-            config.intervalMs
-        }
+        val intervalMs = cycleInterval(config)
         val watch = config.watch
         val maxSlots = config.maxSlots
         val kanbanPort = config.kanbanPort
@@ -1663,14 +1660,12 @@ object OroborosDaemon {
                 },
             )
         }
-        // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
-        // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
-        val llvmKernel = borg.trikeshed.lcnc.OroborosLcncWiring.vmLegos(moduleContext, ownCleanup)
         // The coding-agent lane (Forge genesis, Cut A): the host's CLIs probed once; agent.run /
         // agent.list legos and the claim worker's lane share one runner; receipts are agent/run/<runId>.
         val agentWire = borg.trikeshed.lcnc.OroborosLcncWiring.codingAgents(
             moduleContext, config.agents, jfile(repoDir), jfile(forgeHome), args)
-        borg.trikeshed.lcnc.OroborosLcncWiring.lcncStores(moduleContext, promptStore, snapshotService, projectCorpus)
+        val llvmKernel = borg.trikeshed.lcnc.OroborosLcncWiring.lcncStores(
+            moduleContext, promptStore, snapshotService, projectCorpus, ownCleanup)
         // ── hermes.lastUsed: the outcome, next to the intent ──────────
         // mux.meta answers "what is modelmux configured to select" and reports
         // selection:null. Hermes' own state.db answers "what actually replied",

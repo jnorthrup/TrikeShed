@@ -90,7 +90,9 @@ object OroborosLcncWiring {
         promptStore: borg.trikeshed.lcnc.PromptStore,
         snapshotService: borg.trikeshed.forge.server.WorkspaceSnapshotService,
         projectCorpus: borg.trikeshed.forge.server.JvmProjectCorpus,
-    ) {
+        ownCleanup: (suspend () -> Unit) -> Unit,
+    ): KernelElement? {
+        val kernel = vmLegos(moduleContext, ownCleanup)
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
         promptStore.register(moduleContext)
         snapshotService.register(moduleContext)
@@ -101,5 +103,6 @@ object OroborosLcncWiring {
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.FinanceNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { borg.trikeshed.platform.HostSystem.currentTimeMillis() })
+        return kernel
     }
 }
