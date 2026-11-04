@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.reifyStrict
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -183,5 +184,47 @@ class LcncConsumptionTest {
             assertTrue(consumed(ledger).isEmpty())
             assertEquals("cancelled", rows(ledger.snapshot()["entries"]).last()["status"])
         } finally { debug.close() }
+    }
+
+    @Test fun intervenedBindingIsLinkedThroughItsActualScopeInputProducer() = runTest {
+        val ledger = LcncInvocationLedger()
+        val debug = LcncDebug(stepping = false)
+        debug.select(_s["input"])
+        val program = LcncProgram("binding", s_[LcncNode("input", LcncContracts.SCOPE_IN, _m["name" j "x"]), sink()],
+            s_[LcncWire("input", "value", "sink", "x")])
+        try {
+            val run = async(debug) { walker(ledger).runProcedure(program, _m["x" j "original"]) }
+            val ordinal = held(debug)["ordinal"] as Int
+            assertTrue(debug.intervene(ordinal, bindings = _m["x" j "changed"]))
+            assertTrue(debug.command(ordinal, LcncDebug.Command.CONTINUE))
+            assertEquals("changed", run.await().nodeOutputs.getValue("sink")["value"])
+            val event = consumed(ledger).single()
+            assertEquals("input", map(event["wire"])["fromNode"])
+            val producer = map(event["producer"])
+            assertEquals("executed", producer["origin"])
+            assertEquals("x", producer["bindingName"])
+            assertEquals(rows(debug.snapshot()["interventions"]).single()["sequence"], producer["interventionSequence"])
+        } finally { debug.close() }
+    }
+
+    @Test fun finalEvidenceTrimmingRecountsTheStreamInsteadOfPreservingAStaleSummary() {
+        val ledger = LcncInvocationLedger()
+        repeat(128) { ledger.observe(_m["phase" j "consumed", "nodeId" j "x".repeat(1024)]) }
+        val before = ledger.observationSnapshot()
+        val state = before + _m["state" j "completed", "site" j _m["detail" j "s".repeat(110_000)]]
+        val encoded = oroborosEvidence("run", "sha256:" + "a".repeat(64), state)
+        val saved = map(map(reifyStrict(encoded.decodeToString()))["debug"])
+        val events = rows(saved["observations"])
+        assertTrue(events.size < rows(before["observations"]).size, "The envelope must exercise additional evidence trimming")
+        val summary = map(saved["observationSummary"])
+        assertEquals(events.size, (summary["retained"] as Number).toInt())
+        assertEquals(128 - events.size, (summary["omitted"] as Number).toInt())
+        assertEquals(summary["omitted"], saved["observationsDropped"])
+        assertEquals(events.firstOrNull()?.get("sequence"), summary["firstSequence"])
+        assertEquals(events.lastOrNull()?.get("sequence"), summary["lastSequence"])
+        assertEquals("partial", summary["coverage"])
+        assertEquals(128, (summary["lastObservedSequence"] as Number).toInt())
+        assertTrue((saved["observationsOmitted"] as Number).toInt() > 0)
+        assertTrue(encoded.size <= 1_048_576)
     }
 }

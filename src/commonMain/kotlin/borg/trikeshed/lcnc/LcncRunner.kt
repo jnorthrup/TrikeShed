@@ -512,7 +512,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
             val invocation = invocations?.begin(ordinal, node, pathNames, parentInvocation, iteration)
             invocation?.values?.putAll(mapOf("frameId" to frame.observationId,
                 "documentName" to state.documentName, "documentCid" to state.documentCid))
-            val location = mapOf("invocationOrdinal" to ordinal, "nodeId" to node.id, "type" to node.type,
+            val location = if (observationLedger == null) emptyMap() else mapOf("invocationOrdinal" to ordinal, "nodeId" to node.id, "type" to node.type,
                 "path" to pathNames.toList(), "parent" to parentInvocation, "iteration" to iteration,
                 "frameId" to frame.observationId, "documentName" to state.documentName, "documentCid" to state.documentCid)
             var status = "completed"
@@ -555,7 +555,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                     invocation?.capture("inputs", emptyMap<String, Any?>())
                     debug?.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, emptyMap(),
                         frame = frame, apply = { patch ->
-                            frame.intervene(patch.bindings)
+                            frame.intervene(patch.bindings, patch.sequence)
                             retainedUnavailable = true
                             retainedReason = "debug_intervention"
                             retainedProjections.clear()
@@ -572,10 +572,18 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                     when {
                         name != null && owner != null -> {
                             if (event != null && owner.parent == null && eventBinding) skip("expired_binding")
-                            else publish(_m["value" j frame.binding(name)], origins = {
-                                mapOf("value" to (owner.retainedBindingOrigins[name] ?: emptySeriesOf()))
-                            }) {
-                                if (name in owner.retainedBindings) _m["value" j owner.retainedBindings[name]] else emptyMap()
+                            else {
+                                publish(_m["value" j frame.binding(name)], origins = {
+                                    mapOf("value" to (owner.retainedBindingOrigins[name] ?: emptySeriesOf()))
+                                }) {
+                                    if (name in owner.retainedBindings) _m["value" j owner.retainedBindings[name]] else emptyMap()
+                                }
+                                owner.bindingInterventions[name]?.let { sequence ->
+                                    frame.outputInvocations[node.id]?.let { produced ->
+                                        frame.outputInvocations[node.id] = produced + mapOf("interventionSequence" to sequence,
+                                            "bindingName" to name, "bindingFrameId" to owner.observationId)
+                                    }
+                                }
                             }
                         }
                         node.params.containsKey("default") ->
@@ -616,7 +624,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                             frame = frame, apply = { patch ->
                                 inputs = inputs + patch.inputs
                                 consumption?.intervene(patch)
-                                frame.intervene(patch.bindings)
+                                frame.intervene(patch.bindings, patch.sequence)
                                 retainedUnavailable = true
                                 retainedReason = "debug_intervention"
                                 retainedProjections.clear()

@@ -40,11 +40,25 @@ fun oroborosEvidence(runId: String, programCid: String, debug: OroborosState): B
         return true
     }
 
+    fun observationsTrimmed() {
+        if (state["observationSchema"] != LcncInvocationLedger.OBSERVATION_SCHEMA) return
+        val previous = state["observationSummary"] as? Map<*, *> ?: return
+        val attempted = (previous["attempted"] as? Number)?.toLong() ?: return
+        val rows = state["observations"] as? List<*> ?: return
+        if (attempted < rows.size) return
+        state["observationsDropped"] = attempted - rows.size
+        state["observationSummary"] = previous + mapOf(
+            "retained" to rows.size, "omitted" to attempted - rows.size,
+            "firstSequence" to (rows.firstOrNull() as? Map<*, *>)?.get("sequence"),
+            "lastSequence" to (rows.lastOrNull() as? Map<*, *>)?.get("sequence"),
+            "coverage" to if (attempted == rows.size.toLong()) "complete" else "partial")
+    }
+
     while (true) {
         encoded()?.let { return it }
         when {
             trim(monitor, "events", "eventsOmitted") -> monitor!!["complete"] = false
-            trim(state, "observations", "observationsOmitted") -> Unit
+            trim(state, "observations", "observationsOmitted") -> observationsTrimmed()
             state["site"] != null && state["stateOmitted"] == null -> {
                 state["site"] = (state["site"] as? Map<*, *>)?.filterKeys {
                     it in setOf("nodeId", "type", "path", "invocationOrdinal", "phase", "status", "depth")

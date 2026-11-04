@@ -52,13 +52,15 @@ class LcncScopeFrame(
     internal var observationDocumentName: String? = null
     /** Actual publication sites, kept with the output owner rather than resolved from a later canvas. */
     internal val outputInvocations: MutableMap<String, Map<String, Any?>> = LinkedHashMap()
+    internal val bindingInterventions: MutableMap<String, Int> = LinkedHashMap()
 
     /** Only the paused execution installs lexical overrides; prior node outputs are not replayed. */
-    internal fun intervene(patch: Map<String, Any?>) {
+    internal fun intervene(patch: Map<String, Any?>, sequence: Int? = null) {
         if (patch.isEmpty()) return
         bindings = bindings + patch
         bindingSources = bindingSources + patch.keys.associateWith { "intervention" }
         for (name in patch.keys) {
+            if (sequence == null) bindingInterventions.remove(name) else bindingInterventions[name] = sequence
             retainedBindings.remove(name)
             retainedBindingOrigins.remove(name)
         }
