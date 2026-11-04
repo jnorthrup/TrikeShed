@@ -86,3 +86,12 @@ recall modes expose the same nullable CID string. Reading these surfaces changes
 neither evidence nor routing. A distinct proposition at the same natural angular
 still refuses; this does not provide coexistence, extra symbolic capacity, role
 inference or cross-document unification.
+
+Final coordinated v59 artifact validation passed against source
+5548a842517e98f47f83aebfa30387dc2cc820b4, main.jar SHA256
+b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89:
+all 24 fixed-input methods, the original predicate/arity counterexamples, and the
+separate actual cursor/LCNC/HTTP readback check. Tests/drivers only were compiled;
+production CodeSource checks confirm the frozen JAR, without overlays, friends or
+ABI shims. Evidence is under docs/evidence/2026-11-04/nars-proposition-identity.
+The safety result is explicit refusal, with no coexistence or new reasoning claim.

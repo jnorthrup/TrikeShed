@@ -1,0 +1,137 @@
+{
+  "result": "PASS",
+  "tests": [
+    {
+      "name": "KgPropositionIdentityTest.codecKeepsHistoricalNullBytesAndReadsTenElevenAndTwelveFields",
+      "status": "PASS",
+      "runtimeNanos": 84132966
+    },
+    {
+      "name": "KgPropositionIdentityTest.identityPreservesPredicateOrderedRolesTemporalAndDeclaredContextButExcludesEvidence",
+      "status": "PASS",
+      "runtimeNanos": 11334354
+    },
+    {
+      "name": "KgPropositionIdentityTest.knownIdentitySurvivesCasAndWalAndRefusalsDoNotRewriteHistory",
+      "status": "PASS",
+      "runtimeNanos": 108015438
+    },
+    {
+      "name": "KgPropositionIdentityTest.knownUnknownMixingCannotUpgradeOrEraseIdentityInEitherDirection",
+      "status": "PASS",
+      "runtimeNanos": 6064859
+    },
+    {
+      "name": "KgPropositionIdentityTest.naturalPredicateCollisionRefusesBeforeSameReceiptReplayAndKeepsActorHealthy",
+      "status": "PASS",
+      "runtimeNanos": 4797694
+    },
+    {
+      "name": "KgPropositionIdentityTest.realTextAndCursorConsumersCannotCrossPredicatesOrPartiallyMintMalformedKif",
+      "status": "PASS",
+      "runtimeNanos": 65001804
+    },
+    {
+      "name": "KgPropositionIdentityTest.strictKifRetainsBinaryGroundLiteralsAndRejectsScopedOrLossyForms",
+      "status": "PASS",
+      "runtimeNanos": 8142326
+    },
+    {
+      "name": "BeliefAdmissionTest.lcncReinforcementRequiresSourceFieldsAndReportsOnlyProcessedCommands",
+      "status": "PASS",
+      "runtimeNanos": 60943470
+    },
+    {
+      "name": "BeliefAdmissionTest.onlyNonemptyDisjointExactLeavesIncreaseEvidence",
+      "status": "PASS",
+      "runtimeNanos": 18752021
+    },
+    {
+      "name": "BeliefAdmissionTest.receiptArchivedAfterPlacementRejectionCannotBeCountedAgain",
+      "status": "PASS",
+      "runtimeNanos": 21609873
+    },
+    {
+      "name": "BeliefAdmissionTest.reinforcementCannotBypassUnknownAncestryAfterLegacyAdmissionOrWalReplay",
+      "status": "PASS",
+      "runtimeNanos": 7449688
+    },
+    {
+      "name": "BeliefAdmissionTest.reinforcementRequiresReceiptsAndNeverTurnsRepeatedSourcesIntoNewEvidence",
+      "status": "PASS",
+      "runtimeNanos": 14011053
+    },
+    {
+      "name": "BeliefAdmissionTest.replayPreservesHistoryButDoesNotInventLostExactAncestry",
+      "status": "PASS",
+      "runtimeNanos": 7390663
+    },
+    {
+      "name": "BeliefAdmissionTest.spillRevivalChecksPriorIdentityAndRevisesExactlyOnce",
+      "status": "PASS",
+      "runtimeNanos": 5179295
+    },
+    {
+      "name": "BeliefAdmissionTest.structureRefusalPreservesResidentAndMetadataAndTheActorKeepsWorking",
+      "status": "PASS",
+      "runtimeNanos": 6166182
+    },
+    {
+      "name": "BeliefAdmissionTest.unavailableHistoryCannotBeResetByAnIncomingObservation",
+      "status": "PASS",
+      "runtimeNanos": 7436325
+    },
+    {
+      "name": "BeliefAdmissionTest.unknownEmptyAndLegacyAncestryCannotBecomeIndependentSupport",
+      "status": "PASS",
+      "runtimeNanos": 3704036
+    },
+    {
+      "name": "HermesMemoryFeedbackTest.deletingRetrievedMemoryDemotesAttentionWithoutRefutingItsProposition",
+      "status": "PASS",
+      "runtimeNanos": 16933453
+    },
+    {
+      "name": "KifSemanticTest.connectivesFunctionsAndQuotedSyntaxStayStructured",
+      "status": "PASS",
+      "runtimeNanos": 156801527
+    },
+    {
+      "name": "KifSemanticTest.malformedAndOversizedInputsFailBeforeRecursiveDecode",
+      "status": "PASS",
+      "runtimeNanos": 2836084
+    },
+    {
+      "name": "KifSemanticTest.malformedUtf16IsRejectedAndNonBmpSyntaxRoundTrips",
+      "status": "PASS",
+      "runtimeNanos": 1111583
+    },
+    {
+      "name": "KifSemanticTest.modalityAndHigherOrderFormsAreRetainedWithoutExecution",
+      "status": "PASS",
+      "runtimeNanos": 3789643
+    },
+    {
+      "name": "KifSemanticTest.repeatedQuotationPreservesNestedSyntaxAndDoesNotCaptureVariables",
+      "status": "PASS",
+      "runtimeNanos": 6684853
+    },
+    {
+      "name": "KifSemanticTest.shadowedBindersAreDistinctAndAlphaSafe",
+      "status": "PASS",
+      "runtimeNanos": 3799905
+    }
+  ],
+  "productionCodeSources": {
+    "BeliefBagElement": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "KgNalBridge": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "SignalCodec": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "SemanticSignal": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "KifSemantic": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "HermesMemoryFiles": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar"
+  },
+  "productionOverlays": false,
+  "friendPaths": false,
+  "modelCalls": 0,
+  "liveBagAccess": false
+}

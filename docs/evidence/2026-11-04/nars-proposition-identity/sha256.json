@@ -1,5 +1,14 @@
 {
-  "method.txt": "490d23a5bda0aeb2c9cf78d1d3f34c661fffedb9ba0f458afc424c71e5952169",
+  "method.txt": "e9a7676778fe8d694060d8229bf44474f49e5f9356e8051fa0f79d5f6f60f2ee",
+  "v59-verification.json": "8dce5cbc685a1bfaf6921b2779009386dc6bf193c0e80ec0cc45b9059a03ae67",
   "baseline-v55-result.json": "d97e8f27ad61078ef052907f25cfe0e5004be7c39ab64dd29fae9fdfa916c7cb",
+  "v59-readback-identity.json": "f5193af09ba7db930e3aea03c7b555f7b923e3435d415dbd829410378407975e",
+  "v59-identity.json": "bc5ba5155076c2e49c2097a9779f418ade465b969621a81e4f3ec29ff6a93202",
+  "v59-counterexample-comparison.json": "70a4753b070f4e50bbe9e230aa35eb51fa341d09c80684093fa9a607692ad76c",
+  "v59-counterexample-after.json": "4276bfff7f8fea144c7df6b50d2392c1897e7a54f77c53ffb29496d57baa5110",
+  "v59-readback-result.json": "bf33bf98ea1a5aa6c85e4bb668b2beb2def0b6fe4040c771785bab83105c1ea9",
+  "v59-readback-test-source-identity.json": "27d9ae4e1ed72feaa550e23222d017dbb88089a488788a1fbc910b0e28bc203d",
+  "v59-tests-result.json": "12cbef2aafb4420ca3dfc8085c035c0faa6344b2413d6f1570417c1c0e689d05",
+  "v59-test-source-identity.json": "a0a7d4d3b35539caed72df298a9ada241bf917cd141de331d18c3d01d50de2ee",
   "baseline-v55-identity.json": "90c91d0b8f4ea8176d1484dbddd1fdd0821eff144f232e3e1bd266c3d77b0e9b"
 }

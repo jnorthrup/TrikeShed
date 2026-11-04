@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "tests": [
+    {
+      "name": "cursorLcncAndHttpExposeOptionalIdentityWithoutChangingEvidence",
+      "status": "PASS"
+    }
+  ],
+  "productionCodeSources": {
+    "BeliefBagElement": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "NalNodes": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "BeliefWire": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar",
+    "NarsTablesKt": "file:/workspace/library-files/english-combined-v59-proof/snapshot/main.jar"
+  },
+  "productionOverlays": false,
+  "friendPaths": false,
+  "modelCalls": 0,
+  "liveBagAccess": false,
+  "oldCursorIndicesRetained": true,
+  "evidenceBytesUnchanged": true,
+  "knownAndLegacyNullIds": true
+}

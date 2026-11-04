@@ -1,0 +1,11 @@
+{
+  "result": "PASS",
+  "sameOriginalInputPairs": true,
+  "predicateIdentityNowDistinct": true,
+  "naturalAngularUnchanged": true,
+  "bothNaryLossesNowExplicitlyRefused": true,
+  "fourScopedSyntaxCasesUnchangedAndLegacyCrossingRefused": true,
+  "newSemanticRoleQuery": false,
+  "newRetraction": false,
+  "baselineResultSha256": "d97e8f27ad61078ef052907f25cfe0e5004be7c39ab64dd29fae9fdfa916c7cb"
+}

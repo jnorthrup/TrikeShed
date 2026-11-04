@@ -18,3 +18,30 @@ The repair's focused source checks are documented in nars-proposition-identity.t
 They do not replace a fresh coordinated production-JAR comparison. This directory
 keeps the immutable BEFORE artifact and does not label it as repaired behavior.
 No supplied documents or private corpus text appear in these synthetic results.
+
+Final coordinated immutable-v59 validation
+
+Source 5548a842517e98f47f83aebfa30387dc2cc820b4 and main.jar SHA256
+b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89
+were frozen after a complete JVM rebuild. Only unique-package copies of TESTS
+and external drivers were compiled. No production sources, overlays, friend
+paths or ABI shims were used. Six production CodeSource checks plus the separate
+cursor/LCNC/HTTP readback checks point to that exact JAR; hashes remained stable.
+
+The same pays/owes and Dollar/Euro source inputs were compared with the unchanged
+v55 BEFORE witness. The natural angular remains 4616048923953881095. Predicate IDs
+and signal bytes are now distinct, and the actual bag regression verifies typed
+refusal with unchanged original resident/evidence. The second proposition does
+NOT coexist in that angular slot. Both n-ary forms now refuse instead of dropping
+the third role. All four negative/modal/context/conditional full syntax forms are
+unchanged in KifSemantic while the legacy triplet crossing explicitly refuses.
+
+All 24 focused tests pass (seven new proposition tests, eleven prior bag/memory
+checks, six existing scoped-KIF checks), 0.910377130s. The pure same-input comparison
+passes, 0.213083428s. A SEPARATE one-method readback proof passes, 0.873177856s: the
+appended cursor column keeps old indices and HTTP/LCNC top/near/sample expose
+known/legacy-null IDs while exact evidence bytes remain unchanged. These test
+counts are not counts of reasoning capabilities. All isolated jobs close and
+temporary memory files are removed. No models, private corpus or live state were
+used. All existing source-context, authority, RDF, legacy-schema and WAL limits
+remain explicit in v59-verification.json and nars-proposition-identity.txt.
