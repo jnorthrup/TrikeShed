@@ -1,0 +1,12 @@
+// Consumes the actual emitted Kotlin/JS file supplied by the next frozen build.
+// This checks its unchanged Node primitive, not an end-to-end VmSupervisor binding.
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const text=fs.readFileSync(process.argv[2],'utf8');
+const mark="var vm = require('vm');",at=text.indexOf(mark);assert(at>=0,'Node compilation retains its real vm dependency');
+const start=text.lastIndexOf('function (src, ms)',at),end=text.indexOf('}(source,',at);assert(start>=0&&end>at);
+const expression=text.slice(start,end+1);
+const invoke=Function('require','source','wallMillis','return ('+expression+')(source,wallMillis)');
+assert.equal(invoke(require,'6 * 7',1000),'42');
+assert.equal(invoke(require,'typeof process',1000),'"undefined"');
+assert.throws(()=>invoke(require,'while (true) {}',10),/GUEST_ERROR:.*timed out/i);
+console.log(JSON.stringify({result:'PASS',scope:'Actual generated Node eval primitive; arithmetic, empty guest context and timeout. No full provider binding or browser Node capability claim.'}));

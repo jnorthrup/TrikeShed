@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+query_proof=/workspace/library-files/english-v63-compatibility-proof
+query_snapshot=$(cat "$query_proof/snapshot-path.txt")
+export PROOF_ROOT="$query_proof"
+export PROOF_SNAPSHOT="$query_snapshot"
+export TRIKESHED_SUBVM_HOME=/workspace/TrikeShed/utils/subvm
+export OUTBOUND_DENY_RECEIPT="$query_proof/outbound-deny-profile.json"
+query_cp=$(cat "$query_snapshot/classpath.txt")
+timeout 1000s python "$query_proof/deny-egress.py" -- java -Xmx1g -cp "$query_proof/classes:$query_cp" proof.englishlegalquery.FixtureKt
+query_result=$?
+printf '%s\n' "$query_result" > "$query_proof/fixture.exit"
+exit "$query_result"
