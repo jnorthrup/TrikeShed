@@ -53,6 +53,11 @@ internal class TerminalGrid(private val hermes: Boolean) {
         val isCursor = truthy(cursor.visible) && cursor.row == r && cursor.column == c
         val s = document.createElement("span") as HTMLElement
         s.className = "cell" + (if (truthy(cell.blink)) " blink" else "") + (if (isCursor) " cursor" else "")
+        // The following cell paints its own opaque background. Place a two-cell glyph above it.
+        if (c + 1 < columns && truthy(lines[r][c + 1].continuation)) {
+            s.style.position = "relative"; s.style.zIndex = "1"
+        }
+        if (isCursor) { s.style.position = "relative"; s.style.zIndex = "2" }
         var fg = color(cell.fg, cell.fgRgb, "#d8dce6")
         var bg = color(cell.bg, cell.bgRgb, "#000")
         if (truthy(cell.inverse)) { val t = fg; fg = bg; bg = t }
