@@ -125,3 +125,6 @@ retain their copied vertices, including the formerly refused range. This is a
 representation/compatibility check, not general accuracy or a speedup claim;
 six selected syntax weight resources are byte-identical. Default SDK pin promotion
 is a separate delivery. Evidence: docs/evidence/2026-11-04/english-copy-nodes.
+
+Corpus and query follow-up
+Selected inspections now feed explicit local corpus/wordcloud/concordance/LDA and receipt-local visual SPARQL workflows, including a local Camel LCNC preset. The default installed Stanford bundle is pinned4.6.0; prior results above retain their original version and artifact scope. See docs/english-corpus-inference.txt and docs/stanford-nlp-version.txt for current behavior, validation and limits.

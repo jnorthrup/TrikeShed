@@ -1,0 +1,16 @@
+Prepared while the coordinated build is running. Do not compile or execute before root GREEN signal.
+
+This external-only fixture uses an immutable successful-build main.jar, documents.js, spacegraph.js, pages.js and web resources supplied by the root corpus browser proof agent. All dependencies are JAR files; no production class overlays, test classes, friend paths, Gradle runs, or live build/classes.
+
+Actual production /panels bundle renders EnglishLcncPreset.build(retainedReceiptCid). Loading is inert. One explicit browser Run enters the real KanbanModule /api/lcnc/run service and retains its actual durable run receipt. The real DocumentEnglishWire creates the retained receipt and its EnglishObservationWire owner queries that same receipt dataset. A clearly labelled synthetic source and parser NlpDocument fixture avoids a second expensive parser process. It does not claim real CoreNLP output, model output, English comprehension, or legal authority.
+
+Installed Camel module manifest and classloader provide DefaultCamelContext; SubVmLegos.camel with VmHost.NONE and CamelRouteLegos own actual local direct/mock transport. The unchanged retained CID is checked in body/reply/header before querying. This is JVM classloader execution, with OWN host-effect trust. It is not fresh GraalJS isolation and does not prove arbitrary EIP network routes.
+
+A hostile local plan runs through the actual Camel engine and changes its body while retaining the expected header. EnglishLcncPreset evidence verification must refuse it before query. A fixture barrier controls timing of one admitted Camel command: cancelling its waiter does not cancel the owned dispatch, drain waits, actual output is retained, and later admission is refused. The barrier is explicitly labelled external timing control.
+
+Fixture-only seccomp denies outbound connect/sendto/sendmsg/sendmmsg. Browser external request monitoring is recorded. This is not a production air-gap or full OS sandbox claim. Synthetic source is suitable for proof screenshots; no private corpus text is served.
+
+Screens: inert preset canvas; completed graph with transport/query/source display nodes; actual durable receipt Evidence drawer; individual actual canvas output nodes; explicitly labelled external engine/hostile-CID/cancellation/drain observer.
+
+Final v55 proof: PASS on source aaba7d5504d516e4ff6a68c19db11630e16c22ef.
+External reduced ModuleContext, not a full daemon boot or production-readiness claim. Unbound agent/model vocabulary remains visible in the palette; the note is presentation-only with no runner. Generic concentric lane captions do not prove agent activity. One explicit authored inline run used actual KanbanModule durable receipts; this does not establish saved-program history membership. Initial fit changes presentation coordinates, so the immutable run program and current canvas may have different CIDs while the authored definition matches. Output closeups were positioned with actual UI drag/zoom gestures after execution; result trees were expanded through UI clicks. Fixed local direct/mock Camel only; no arbitrary EIP network behavior, no fresh GraalJS isolation, no provider model, no real CoreNLP execution in this Camel fixture.

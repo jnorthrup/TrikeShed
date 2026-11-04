@@ -1,0 +1,186 @@
+package proof.englishcamel
+
+import borg.trikeshed.couch.*
+import borg.trikeshed.dag.*
+import borg.trikeshed.forge.server.DocumentEnglishWire
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.subvm.*
+import borg.trikeshed.job.*
+import borg.trikeshed.kanban.module.KanbanModule
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.module.*
+import borg.trikeshed.nlp.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import borg.trikeshed.vm.VmHost
+import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.*
+import java.io.File
+import java.net.InetSocketAddress
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
+/** External HTTP listener only; production graph, runners, query owner and run receipts are unchanged. */
+fun main() = runBlocking {
+    val artifacts = File(requireNotNull(System.getenv("PROOF_ROOT")))
+    val snapshot = File(requireNotNull(System.getenv("PROOF_SNAPSHOT")))
+    val root = File(artifacts, "runtime").apply { require(!exists()); mkdirs() }
+    check(GuestModules.isInstalled("camel"))
+    val files = JvmFileOperations(); val cas = FileCasStore(files, File(root, "cas").absolutePath)
+    val store = CouchStoreFactory.casBacked(cas); val gateway = CouchAttachmentGateway(store, cas)
+    val owner = SupervisorJob(coroutineContext[Job]); val scope = CoroutineScope(Dispatchers.IO + owner + files)
+    val ctx = ModuleContext(Couch("camel-proof", store, cas), ReteNetwork(), ReteProductionRegistry(), null, null,
+        ConfixBlackboard.empty(), cas, gateway, ModuleRouteRegistry(), scope, { 123L }, root)
+    val text = "Tenant may remain unless rent is not due."
+    val corpus = InMemoryProjectCorpus()
+    cas.put(text.encodeToByteArray()); corpus.put("synthetic-camel-proof", "agreement.txt", text.encodeToByteArray())
+    val source = checkNotNull(corpus.document("synthetic-camel-proof", "agreement.txt"))
+    fun parsed(value: String): NlpDocument {
+        val words = Regex("[A-Za-z]+|[^\\sA-Za-z]").findAll(value).toList()
+        val tokens = words.mapIndexed { i, word -> NlpToken(i + 1, word.range.first, word.range.last + 1,
+            word.value, word.value.lowercase(), "NN", "O") }.toSeries()
+        val edges = (0 until tokens.size).toSeries() α { i -> NlpDependency(if (i == 0) 0 else 1, i + 1, if (i == 0) "root" else "dep") }
+        return NlpDocument(value, s_[NlpSentence(0, 0, value.length, tokens, edges)],
+            NlpMetadata("fixture", "Synthetic parser annotations for Camel transport proof; not CoreNLP"))
+    }
+    val wire = DocumentEnglishWire(ctx, corpus) { NlpReader { parsed(it) } }; wire.attach()
+    ctx.lcncRunners.putAll(PureNodes.registry { 123L })
+    ctx.lcncRunners.putAll(TribunalNodes.registry(TribunalDialog { _, _, _ -> error("No model provider in this fixture") }).filterKeys { it == "display" })
+    ctx.lcncRunners[SubVmLegos.CAMEL] = SubVmLegos.camel(VmHost.NONE)
+    ctx.lcncRunners[SubVmLegos.CAMEL_CATALOG] = SubVmLegos.camelCatalog()
+    val camel = CamelRouteLegos.register(ctx)
+    val modules = ModuleSupervisor(ctx)
+    val response = checkNotNull(ctx.routes.match(DocumentEnglishWire.PATH)).route("POST", DocumentEnglishWire.PATH,
+        jsonOf(_m["project" j source.project, "id" j source.id, "cid" j source.cid, "rev" j source.rev,
+            "seq" j source.seq, "begin" j 0, "end" j text.length]), null)!!
+    check(response.status == 200) { response.body }
+    val inspection = reifyMap(response.body); val evidenceCid = inspection["receiptCid"] as String
+    val program = EnglishLcncPreset.build(evidenceCid)
+    val programJson = LcncProgramConfix.toJson(program)
+    check(LcncTypeCheck.check(program, LcncContracts.all().associateBy { it.type }, strict = true).isEmpty())
+    val programName = "english-camel-proof"
+    val programBytes = programJson.encodeToByteArray()
+    gateway.putAttachment(OroborosAttachmentRef("panels/$programName", "application/json", programBytes.size.toLong(),
+        ContentId.of(programBytes), "external-proof-fixture", "1", 1L), programBytes)
+    modules.attach(KanbanModule())
+    val loader = checkNotNull(GuestModules.loaderFor("camel"))
+    val engineClass = loader.loadClass("org.apache.camel.impl.DefaultCamelContext")
+    val verifiedModule = GuestModules.verify("camel"); check(verifiedModule.ok)
+    val engine = _m["class" j engineClass.name, "loader" j engineClass.classLoader.javaClass.name,
+        "jar" j engineClass.protectionDomain.codeSource.location.toExternalForm(),
+        "version" j engineClass.`package`.implementationVersion,
+        "moduleManifestVerified" j verifiedModule.ok,
+        "isolation" j "Actual Camel JVM classloader engine; no GraalJS context or VM sandbox claim",
+        "scope" j "Fixed local direct:english-evidence to mock:english-evidence route"]
+    val finish = CountDownLatch(1); val executor = Executors.newFixedThreadPool(8)
+    var lifecycle: Map<String, Any?>? = null
+    var hostile: Map<String, Any?>? = null
+    suspend fun hostileCid(): Map<String, Any?> {
+        hostile?.let { return it }
+        val changed = "sha256:" + "b".repeat(64)
+        val altered = CamelRoutePlan("direct:english-evidence", s_[CamelRouteStep.SetHeader(EnglishLcncPreset.HEADER, evidenceCid),
+            CamelRouteStep.SetBody(changed), CamelRouteStep.To("mock:english-evidence")])
+        val dispatched = ctx.lcncRunners.getValue(SubVmLegos.CAMEL).run(LcncNode("hostile-dispatch", SubVmLegos.CAMEL,
+            _m["trust" j "OWN", "reach" j "LOCAL", "module" j "camel", "body" j "english-evidence"]), _m["route?" j altered.toValue()])
+        check(dispatched["routed"] == changed)
+        val failure = try {
+            EnglishLcncPreset.registry().getValue(EnglishLcncPreset.EVIDENCE).run(LcncNode("hostile-check", EnglishLcncPreset.EVIDENCE),
+                _m["expectedCid" j evidenceCid, "routed" j dispatched["routed"], "transport" j dispatched["receipt"]])
+            error("Changed identity was accepted")
+        } catch (failure: IllegalArgumentException) { check(failure.message!!.contains("changed")); failure.message }
+        return _m["result" j "REFUSED", "expectedCid" j evidenceCid, "actualEngineOutput" j dispatched,
+            "error" j failure, "queryDispatched" j false].also { hostile = it }
+    }
+    suspend fun drainProbe(): Map<String, Any?> {
+        lifecycle?.let { return it }
+        val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>()
+        val actual = CompletableDeferred<Map<String, Any?>>()
+        val directEngine = SubVmLegos.camel(VmHost.NONE)
+        val command = ctx.lcncRunners.getValue(SubVmLegos.CAMEL)
+        withContext(ctx.scope.coroutineContext.minusKey(Job)) { camel.open() }
+        val plan = EnglishLcncPreset.registry().getValue(EnglishLcncPreset.ROUTE).run(LcncNode("plan", EnglishLcncPreset.ROUTE),
+            _m["receiptCid" j evidenceCid]).getValue("route")
+        return coroutineScope {
+            val waiter = async {
+                camel.command {
+                    entered.complete(Unit); release.await()
+                    directEngine.run(LcncNode("drain-dispatch", SubVmLegos.CAMEL,
+                        _m["trust" j "OWN", "reach" j "LOCAL", "module" j "camel", "body" j "english-evidence"]),
+                        _m["route?" j plan]).also { actual.complete(it) }
+                }
+            }
+            withTimeout(5000) { entered.await() }; waiter.cancelAndJoin()
+            val draining = async { camel.drain() }; yield(); val waited = !draining.isCompleted; check(waited)
+            release.complete(Unit); withTimeout(30_000) { draining.await() }
+            val output = actual.await(); check(output["routed"] == evidenceCid && camel.closed.isCompleted)
+            val refusal = try { command.run(LcncNode("closed", SubVmLegos.CAMEL), _m["route?" j plan]); error("Admission after drain") }
+                catch (failure: IllegalStateException) { failure.message.orEmpty() }
+            _m["result" j "PASS", "timingControl" j "External fixture barrier before actual Camel dispatch",
+                "waiterCancelled" j waiter.isCancelled, "drainWaitedForAdmittedDispatch" j waited,
+                "actualEngineOutput" j output, "ownerClosed" j camel.closed.isCompleted,
+                "postDrainAdmissionRefused" j refusal].also { lifecycle = it }
+        }
+    }
+    val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 8); server.executor = executor
+    server.createContext("/") { exchange ->
+        try {
+            val method = exchange.requestMethod; val path = exchange.requestURI.rawPath; val target = exchange.requestURI.toASCIIString()
+            val raw = exchange.requestBody.readBytes(); val body = raw.decodeToString()
+            var status = 200; var mime = "application/json; charset=utf-8"
+            val bytes = when {
+                path == "/_fixture/meta" -> jsonOf(_m["scope" j "External listener, actual production LCNC canvas/run service/query owner and installed Camel engine",
+                    "parser" j "Clearly labelled synthetic parser fixture; no CoreNLP or model was run",
+                    "sourceText" j text, "source" j source.toMap(), "evidenceCid" j evidenceCid,
+                    "inspection" j inspection, "engine" j engine, "program" j reify(programJson)]).encodeToByteArray()
+                path == "/_fixture/hostile" -> jsonOf(runBlocking { hostileCid() }).encodeToByteArray()
+                path == "/_fixture/drain" -> jsonOf(runBlocking { drainProbe() }).encodeToByteArray()
+                path == "/_fixture/evidence" -> {
+                    val readback = checkNotNull(cas.getBounded(ContentId(evidenceCid), DocumentEnglishWire.MAX_RECEIPT))
+                    check(ContentId.of(readback).value == evidenceCid)
+                    check(cas.getBounded(ContentId(source.cid), text.encodeToByteArray().size)!!.contentEquals(text.encodeToByteArray()))
+                    check(ctx.beliefBag == null && ctx.documentReview == null)
+                    jsonOf(_m["sourceRetained" j true, "receiptIdentityVerified" j true, "evidenceCid" j evidenceCid,
+                        "modelConfigured" j false, "modelCalls" j 0, "reviewOwnerPresent" j false,
+                        "beliefBagPresent" j false, "nativeVmHost" j "VmHost.NONE", "engine" j engine]).encodeToByteArray()
+                }
+                path == "/_fixture/finish" -> { finish.countDown(); "{}".encodeToByteArray() }
+                path == "/_fixture/observations" -> { mime = "text/html; charset=utf-8"; File(artifacts, "observations.html").readBytes() }
+                path == "/api/panels/presets" -> jsonOf(_m["presets" j LcncPresets.all().map { (name, doc) ->
+                    val info = LcncPresets.info(name)
+                    _m["name" j name, "title" j (info?.title ?: name), "does" j info?.does.orEmpty(), "needs" j info?.needs.orEmpty(),
+                        "see" j info?.see.orEmpty(), "tweakFirst" j info?.tweakFirst.orEmpty(), "document" j reify(doc)]
+                }]).encodeToByteArray()
+                path == "/api/panels" -> jsonOf(_m["panels" j _l[_m["name" j programName]]]).encodeToByteArray()
+                path == "/api/panels/$programName" -> {
+                    if (exchange.requestURI.query == "entry=1") jsonOf(LcncBlackboard.programEntry(programName, program, LcncContracts.all().associateBy { it.type })).encodeToByteArray()
+                    else programBytes
+                }
+                ctx.routes.match(path) != null -> {
+                    val reply = runBlocking { checkNotNull(ctx.routes.match(path)).route(method, target, body, null) }!!
+                    status = reply.status; mime = reply.contentType; reply.body.encodeToByteArray()
+                }
+                path == "/panels" -> { mime = "text/html; charset=utf-8"; File(snapshot, "web/panels.html").readBytes() }
+                path == "/kotlin/spacegraph/spacegraph.js" -> { mime = "application/javascript"; File(snapshot, "spacegraph.js").readBytes() }
+                path.endsWith(".css") -> { mime = "text/css"; File(snapshot, "web/" + path.substringAfterLast('/')).readBytes() }
+                path.startsWith("/vendor/") -> { mime = if (path.endsWith(".js")) "application/javascript" else "text/plain"; File(snapshot, "web" + path).readBytes() }
+                else -> { status = 404; "{}".encodeToByteArray() }
+            }
+            exchange.responseHeaders.set("Content-Type", mime); exchange.sendResponseHeaders(status, bytes.size.toLong())
+            exchange.responseBody.use { it.write(bytes) }
+        } catch (failure: Throwable) {
+            failure.printStackTrace()
+            runCatching { val bytes = jsonOf(_m["error" j failure.message]).encodeToByteArray(); exchange.sendResponseHeaders(500, bytes.size.toLong()); exchange.responseBody.use { it.write(bytes) } }
+        } finally { exchange.close() }
+    }
+    try {
+        server.start(); println("CAMEL_PROOF_URL=http://127.0.0.1:${server.address.port}")
+        check(withContext(Dispatchers.IO) { finish.await(12, TimeUnit.MINUTES) })
+    } finally {
+        server.stop(0); executor.shutdownNow(); modules.drainAll(); wire.drain(); camel.drain(); owner.complete(); owner.join()
+        File(artifacts, "cleanup.json").writeText(jsonOf(_m["modulesDrained" j true, "queryOwnerDrained" j true,
+            "camelOwnerClosed" j camel.closed.isCompleted, "supervisorCompleted" j owner.isCompleted]))
+    }
+}
