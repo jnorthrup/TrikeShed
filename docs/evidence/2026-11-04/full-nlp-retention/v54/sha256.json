@@ -1,0 +1,9 @@
+{
+  "named-negated-exception-prompt.json": "08fdee0b87bf7f3d5db40c04ad2ccc16ef1c7d40d503073aac366591c75fb6ac",
+  "execution-identity.json": "1d29d26e3750c95d920eb5f1f9633f40777168e727f8f8679f9093c1b410763f",
+  "positive-if-prompt.json": "d54a8c853e8edc4f2bb445635f167a48adee72d2828956972bfdf7b3c8e28191",
+  "positive-if-receipt.cbor": "f0bfd21d19442a80f6361bf236eec1251133d284a33d8522240fc4cb45318829",
+  "outbound-deny-profile.json": "fa9995b05612912be0a6fc8e47bea57a7d41ab5cf0ef4b7d8ee1a8af00a5d810",
+  "result.json": "9a024dcf9fca4a389b63396338da3df879913f2fa4233cb37063270e29e22f57",
+  "named-negated-exception-receipt.cbor": "020ce1028e52d01fd717be63e78055969e45af87d802f97f8a30736afe0227d0"
+}

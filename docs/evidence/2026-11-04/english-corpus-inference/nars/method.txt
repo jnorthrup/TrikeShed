@@ -1,0 +1,80 @@
+Actual immutable-JAR NARS admission and reinforcement evidence
+
+The v51 baseline and v54 results use frozen production main.jar files identified
+by source commit, JAR SHA256, snapshot manifest and classpath hashes in the
+identity files. The original baseline artifacts are unchanged. All published
+observations here are synthetic. No supplied documents, private corpus text,
+provider credentials, model activity or live bag/WAL contents are included.
+
+The same nine baseline cases retain their exact case names and synthetic source,
+term and receipt inputs. The v54 driver adds typed per-command refusal capture
+and verifies unchanged signal bytes, gloss and budget plus a subsequent processed
+fence. It does not treat enqueue success as completed admission. Three v51
+failures now refuse explicitly: forced equal angular address with different
+ordered roles (STRUCTURE_MISMATCH), null ancestry and empty ancestry
+(UNRESOLVED_BASIS). Four supported controls remain supported. The two capability
+gaps remain UNSUPPORTED: semantic role querying/variable binding and source
+retraction/proof revocation. No fixture labels are inserted as semantic answers.
+
+Four additional controls are separate from the original nine: larger overlapping
+claims, zero Bloom hint with an exact shared leaf, actual frame replay through
+an in-memory DurableAppendLog, and CAS archive identity/exactly-once revival.
+The experiment total is eleven SUPPORTED, zero FAIL and two UNSUPPORTED. The
+additional controls retain their preparation label additional-v53-control in raw
+JSON; the actual executed artifact was v54, as its identity file records.
+Configured capacity was 4096 and intake 256; at most two residents were observed.
+This is a counterexample/regression experiment, not a capacity or throughput test.
+
+A separate run compiles only two focused TEST source files (moved to unique
+proof.nars package) and a test driver against the same immutable v54 JAR. It
+compiles no production sources and uses no friend paths. All eleven methods
+pass: seven admission/lifecycle controls, three Reinforce/LCNC controls and one
+memory-file feedback control. These eleven tests are not eleven extra reasoning
+capabilities and are not added to the experiment case count. Production class
+CodeSource checks cover BeliefBagElement, BeliefsNodes and HermesMemoryFiles.
+The committed test source hashes and compiled test hashes are recorded separately.
+The initial external driver compilation failed on a bracket and a package import;
+those fixture-only errors were fixed and the successful second attempt is
+recorded. Failed attempt logs remain in the external proof archive.
+
+Reinforce now requires an explicit receipt plus nonempty exact ancestry and uses
+the same guarded revision as Mint. Missing fields, unknown/empty ancestry and
+post-WAL unknown ancestry cannot add support. Exact receipt replay and overlapping
+sources cannot boost evidence even with larger claimed counts. Declared disjoint
+positive and negative observations remain usable. LCNC waits for processed
+acknowledgment; it reports requested counts rather than claiming every requested
+unit was added. Deleting retrieved memory demotes attention without changing
+SignalCodec bytes/evidence, and its deleted gloss stays removed after reload.
+All isolated bags/workers/supervisors drain and temporary memory files are removed.
+
+The identity guard covers the current signal schema's ordered subject/object,
+relation and temporal qualifications. It is not complete predicate/context
+identity, a full semantic index, English understanding or role unification. The
+equal-angular case is deliberately forced and does not establish a naturally
+occurring hash/encoder collision. Source CIDs declare ancestry; they do not
+authenticate real-world independence, authority or legal correctness. Existing
+unknown history is retained, never silently assigned new ancestry or rolled back.
+The WAL fixtures use actual frame encoding/replay with an in-memory log, not a
+disk/CRC/process-restart durability proof. Explicit negative storage is distinct
+from absence; it does not create a semantic UNKNOWN-answer mechanism.
+
+Both runs used bounded child JVMs with 512m maximum heap and 45s wall timeout,
+without a native memory cap or network-denial profile. No models, provider calls,
+training, mass seeding or live-state changes occurred. v54 is the measured build;
+final v55 rerun evidence will be recorded separately rather than replacing it.
+
+Final v55 rerun (separate artifact, 2026-11-04)
+
+Source aaba7d5504d516e4ff6a68c19db11630e16c22ef and production main.jar SHA256
+c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1
+were frozen separately. Both proofs ran in new directories, preserving every v54
+result and failed preparation log. The comparison harness hash and all three
+focused-test/driver source hashes exactly match v54. No production overlays or
+friend paths were used, and actual production CodeSource checks point to the
+final v55 snapshot JAR. All workers/supervisors were drained and temporary memory
+files removed. The same nine cases again retain four controls, fix three failed
+invariants by typed refusal, and leave two unsupported capabilities explicit;
+the four additional controls pass. Experiment total: eleven SUPPORTED, zero FAIL,
+two UNSUPPORTED, runtime 0.788167717 s. The separate eleven focused tests all pass,
+runtime 0.602312151 s. These are synthetic invariant checks, not evidence of new
+semantic inference, authenticated source independence or legal comprehension.

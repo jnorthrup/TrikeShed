@@ -1,0 +1,65 @@
+{
+  "scope": "actual immutable-v55 pure bridge counterexamples; no bag or world assertions",
+  "productionCodeSource": "file:/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+  "predicateOmission": {
+    "firstPredicate": "pays",
+    "secondPredicate": "owes",
+    "firstGloss": "(*, Tenant, Landlord) --> pays",
+    "secondGloss": "(*, Tenant, Landlord) --> owes",
+    "sameNaturalAngular": true,
+    "identicalSignalBytes": true,
+    "angular": "4616048923953881095"
+  },
+  "thirdRoleLoss": {
+    "firstSource": "(transfers Tenant Landlord Dollar)",
+    "secondSource": "(transfers Tenant Landlord Euro)",
+    "legacyTripletsIdentical": true,
+    "retainedLegacyObject": "Landlord",
+    "fullKifFormulasDistinct": true
+  },
+  "retainedScopeCases": [
+    {
+      "source": "(not (pays Tenant Landlord))",
+      "fullSyntax": "(not (pays Tenant Landlord))",
+      "formulaKind": "Not",
+      "unsupportedForms": 0,
+      "legacyTriplets": []
+    },
+    {
+      "source": "(necessarily (pays Tenant Landlord))",
+      "fullSyntax": "(necessarily (pays Tenant Landlord))",
+      "formulaKind": "Unsupported",
+      "unsupportedForms": 1,
+      "legacyTriplets": []
+    },
+    {
+      "source": "(holdsDuring ContractA (pays Tenant Landlord))",
+      "fullSyntax": "(holdsDuring ContractA (pays Tenant Landlord))",
+      "formulaKind": "Unsupported",
+      "unsupportedForms": 1,
+      "legacyTriplets": [
+        {
+          "subject": "ContractA",
+          "predicate": "holdsDuring",
+          "object": "(pays Tenant Landlord)"
+        }
+      ]
+    },
+    {
+      "source": "(=> (noticeGiven Tenant) (pays Tenant Landlord))",
+      "fullSyntax": "(=> (noticeGiven Tenant) (pays Tenant Landlord))",
+      "formulaKind": "Implies",
+      "unsupportedForms": 0,
+      "legacyTriplets": [
+        {
+          "subject": "(noticeGiven Tenant)",
+          "predicate": "=>",
+          "object": "(pays Tenant Landlord)"
+        }
+      ]
+    }
+  ],
+  "modelCalls": 0,
+  "bagOperations": 0,
+  "reviewAuthority": "not-established"
+}

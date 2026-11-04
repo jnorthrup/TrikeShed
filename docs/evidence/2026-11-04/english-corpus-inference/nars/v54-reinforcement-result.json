@@ -1,0 +1,71 @@
+{
+  "result": "PASS",
+  "tests": [
+    {
+      "name": "structureRefusalPreservesResidentAndMetadataAndTheActorKeepsWorking",
+      "status": "PASS",
+      "runtimeNanos": 441674759
+    },
+    {
+      "name": "unknownEmptyAndLegacyAncestryCannotBecomeIndependentSupport",
+      "status": "PASS",
+      "runtimeNanos": 25952398
+    },
+    {
+      "name": "onlyNonemptyDisjointExactLeavesIncreaseEvidence",
+      "status": "PASS",
+      "runtimeNanos": 51460473
+    },
+    {
+      "name": "spillRevivalChecksPriorIdentityAndRevisesExactlyOnce",
+      "status": "PASS",
+      "runtimeNanos": 22382806
+    },
+    {
+      "name": "replayPreservesHistoryButDoesNotInventLostExactAncestry",
+      "status": "PASS",
+      "runtimeNanos": 15360313
+    },
+    {
+      "name": "receiptArchivedAfterPlacementRejectionCannotBeCountedAgain",
+      "status": "PASS",
+      "runtimeNanos": 54338588
+    },
+    {
+      "name": "unavailableHistoryCannotBeResetByAnIncomingObservation",
+      "status": "PASS",
+      "runtimeNanos": 14928956
+    },
+    {
+      "name": "reinforcementRequiresReceiptsAndNeverTurnsRepeatedSourcesIntoNewEvidence",
+      "status": "PASS",
+      "runtimeNanos": 24832561
+    },
+    {
+      "name": "reinforcementCannotBypassUnknownAncestryAfterLegacyAdmissionOrWalReplay",
+      "status": "PASS",
+      "runtimeNanos": 13611860
+    },
+    {
+      "name": "lcncReinforcementRequiresSourceFieldsAndReportsOnlyProcessedCommands",
+      "status": "PASS",
+      "runtimeNanos": 132432955
+    },
+    {
+      "name": "deletingRetrievedMemoryDemotesAttentionWithoutRefutingItsProposition",
+      "status": "PASS",
+      "runtimeNanos": 25165901
+    }
+  ],
+  "productionCodeSources": {
+    "BeliefBagElement": "file:/workspace/library-files/english-corpus-browser-proof/snapshot/main.jar",
+    "BeliefsNodes": "file:/workspace/library-files/english-corpus-browser-proof/snapshot/main.jar",
+    "HermesMemoryFiles": "file:/workspace/library-files/english-corpus-browser-proof/snapshot/main.jar"
+  },
+  "productionOverlays": false,
+  "friendPaths": false,
+  "modelCalls": 0,
+  "liveBagAccess": false,
+  "sourceIndependenceAuthority": "Declared synthetic exact leaves; not source authentication",
+  "walScope": "Actual frame codec/replay through in-memory log; not disk/CRC/process restart durability"
+}

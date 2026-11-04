@@ -1,0 +1,22 @@
+{
+  "source": "46da66cdb28e650e71490ae48741e6f5dcfa0563",
+  "mainJar": "/workspace/library-files/english-corpus-browser-proof/snapshot/main.jar",
+  "mainJarSha256": "c753a967ff83be0652c219b010d7100fcc50d34bcae0132ab7a8a11ff4421361",
+  "snapshotManifestSha256": "8828ddf9414891913f00a646a83574b1318f67a1b2894130a55f61a322985c2d",
+  "classpathSha256": "cbb4cfc2fc28d96d27b2af14470a67dcaed98a6de11eed049785e483cea47384",
+  "compiledTestSources": {
+    "Runner.kt": "b1ff85d28472e83f86a9ed34be3f98479297eed6ff5e73c1316ccd503b8d5b09",
+    "BeliefAdmissionTest.kt": "ed28beb878dece2e480436f0eb1e335cdbfa1232a361d88083dfad8bae83d9c2",
+    "HermesMemoryFeedbackTest.kt": "bdbba3b5a92a0dfedea1a119b7f543a13f108038d564645f00f8202ec667b0ed"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "maximumHeap": "512m",
+  "nativeMemoryLimit": false,
+  "wallTimeoutSeconds": 45,
+  "attempt": 2,
+  "startedAt": "2026-11-04T18:09:50.555465+00:00",
+  "runtimeSeconds": 1.1266312160005327,
+  "runtimeExit": 0,
+  "finishedAt": "2026-11-04T18:10:02.534329+00:00"
+}

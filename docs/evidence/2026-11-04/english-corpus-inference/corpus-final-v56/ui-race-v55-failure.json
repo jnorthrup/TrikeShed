@@ -1,0 +1,8 @@
+{
+  "source": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+  "build": "v55",
+  "mainJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+  "scope": "Failed actual browser attempt; no corpus PASS claimed. Two actual SDK4.6 inspections and ID shelf reload preceded the immediate mode-change panel race.",
+  "fix": "6f9990253: sync native details.open before repaint; preserve explicit reveal override",
+  "failureScreenshotSha256": "6a3b5147d3244c2db57d40babafa80a8b4c0b7a9b90bef3ae93036b7cda9b06c"
+}

@@ -1,0 +1,11 @@
+{
+  "serversStopped": {
+    "38907": true
+  },
+  "browserClosed": true,
+  "fixtureExit": 0,
+  "driverExit": 0,
+  "runtimeCasRetained": true,
+  "successfulAttempt": 1,
+  "v55FailedAttemptPreserved": true
+}

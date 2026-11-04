@@ -1,0 +1,25 @@
+{
+  "runtimeSource": "e6fd0568905e31ab9ca044f9982b6728fc068858",
+  "build": "v56",
+  "selectedJvmTests": 123,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "browserBundles": [
+    "documents",
+    "spacegraph",
+    "pages"
+  ],
+  "mainJarSHA256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+  "documentsJsSHA256": "bd77ed9ed7509802cc104a3a1dfc19aba380ac6cc60484894b573ad34fe0dfc5",
+  "jvmByteIdenticalToV55": true,
+  "spacegraphAndPagesByteIdenticalToV55": true,
+  "actualWorkflows": {
+    "corpus": "corpus-final-v56",
+    "camel": "camel (v55 identical JVM and Spacegraph bundle)",
+    "nars": "nars (v55 identical JVM)",
+    "fullRetention": "../full-nlp-retention/v55 (identical JVM)"
+  },
+  "scope": "Selected bounded workflows; not general English/legal accuracy, production-wide isolation or a complete reasoner",
+  "privateDocumentTextPublished": false
+}
