@@ -8,8 +8,8 @@ import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.lcnc.ProjectCorpus
 import borg.trikeshed.lcnc.ProjectNodes
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toArray
+import borg.trikeshed.lib.*
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
@@ -40,15 +40,23 @@ class LinkGrab(
     private val admit: ((String, String, DecisionProvider?) -> Unit)? = null,
 ) {
     /** Per group, the works it holds: canonical addresses ([work]) and content digests, read once from its notes. */
-    private class Held(val works: MutableSet<String>, val digests: MutableSet<String>)
+    private class Held(val owner: ProjectDb?, val works: MutableSet<String>, val digests: MutableSet<String>) {
+        val pending = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
+    }
     private val held = ConcurrentHashMap<String, CompletableDeferred<Held>>()
 
     private suspend fun held(project: String): Held {
         while (true) {
+            val owner = scopes.linkOwner(project)
             val created = CompletableDeferred<Held>()
             val existing = held.putIfAbsent(project, created)
             if (existing != null) {
-                try { return existing.await() }
+                try {
+                    val result = existing.await()
+                    if (result.owner === owner) return result
+                    held.remove(project, existing)
+                    continue
+                }
                 catch (cancelled: CancellationException) {
                     if (!currentCoroutineContext().isActive) throw cancelled
                     // The initial scanner was cancelled; a live caller can retry.
@@ -56,12 +64,15 @@ class LinkGrab(
                 }
             }
             try {
-                val h = Held(ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet())
+                val h = Held(owner, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet())
                 corpus.visit(project) { d ->
                     currentCoroutineContext().ensureActive()
+                    if (ProjectNodes.twin(d.id)) return@visit
                     val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: return@visit
-                    listOfNotNull(n["url"], n["requested"]).forEach { h.works.add(work(it)) }
-                    n["sha256"]?.let { h.digests.add(it) }
+                    val digest = n["sha256"] ?: return@visit
+                    if (d.cid != "sha256:$digest" || n["bytes"]?.toLongOrNull()?.let { it != d.length } == true) return@visit
+                    s_[n["url"], n["requested"]].view.filterNotNull().forEach { h.works.add(work(it)) }
+                    h.digests.add(digest)
                 }
                 created.complete(h)
                 return h
@@ -69,6 +80,29 @@ class LinkGrab(
                 held.remove(project, created)
                 created.completeExceptionally(failure)
                 throw failure
+            }
+        }
+    }
+
+    /** The caller owns the work; waiters retry a failed claim rather than inheriting its reservation. */
+    private suspend fun claim(h: Held, key: String, complete: () -> Boolean, work: suspend () -> Boolean): Boolean {
+        while (true) {
+            currentCoroutineContext().ensureActive()
+            if (complete()) return false
+            val reply = CompletableDeferred<Boolean>()
+            val previous = h.pending.putIfAbsent(key, reply)
+            if (previous != null) {
+                if (previous.await()) return false
+                continue
+            }
+            var accepted = false
+            try {
+                if (complete()) return false
+                accepted = work()
+                return accepted
+            } finally {
+                h.pending.remove(key, reply)
+                reply.complete(accepted)
             }
         }
     }
@@ -88,8 +122,13 @@ class LinkGrab(
         var landed = 0; var echoes = 0
         for (l in links) {
             val href = l["href"].toString().substringBefore('#')
-            if (!h.works.add(work(href))) { echoes++; continue }
-            runCatching { if (land(project, href, l["anchor"]?.toString().orEmpty(), citing, "$project/$id", depth + 1, asOf, provider, h)) landed++ else echoes++ }
+            val key = work(href)
+            runCatching {
+                val accepted = claim(h, "work:$key", { key in h.works }) {
+                    land(project, href, l["anchor"]?.toString().orEmpty(), citing, "$project/$id", depth + 1, asOf, provider, h)
+                }
+                if (accepted) landed++ else echoes++
+            }
                 .onFailure {
                     if (it is CancellationException && !currentCoroutineContext().isActive) throw it
                     System.err.println("[GRAB] $href: ${it.message ?: it}")
@@ -113,7 +152,8 @@ class LinkGrab(
             require(scopes.list().none { it.name == group }) { "Project $group already exists" }
             scopes.beginUpload(group, "assets", manualIntake = true)
         } else if (scopes.list().none { it.name == group }) scopes.beginUpload(group, "assets", provider)
-        held(group).let { h -> h.works.add(work(url)); h.works.add(work(at)); h.digests.add(digest) }
+        val h = held(group)
+        val owner = requireNotNull(h.owner) { "Project is unavailable: $group" }
         val doc = "$host/${stem(url)}.$ext"
         val twin = buildString {
             append("work: ").append(at).append('\n').append("url: ").append(at).append('\n')
@@ -123,8 +163,9 @@ class LinkGrab(
             append("bytes: ").append(bytes.size).append('\n').append("type: ").append(type).append('\n')
             append("depth: 0\n")
         }
-        scopes.uploadPut(group, doc + ProjectNodes.NOTES_SUFFIX, twin.encodeToByteArray(), provider, manualIntake = manualIntake)
-        scopes.uploadPut(group, doc, bytes, provider, manualIntake = manualIntake)
+        currentCoroutineContext().ensureActive()
+        scopes.importLink(owner, doc, bytes, twin.encodeToByteArray(), provider, admit, manualIntake)
+        h.works.add(work(url)); h.works.add(work(at)); h.digests.add(digest)
         return group to doc
     }
 
@@ -135,8 +176,8 @@ class LinkGrab(
      */
     private suspend fun land(project: String, href: String, anchor: String, citing: String, citedIn: String, depth: Int,
                              asOf: String?, provider: DecisionProvider, h: Held): Boolean {
+        val owner = requireNotNull(h.owner) { "Project is unavailable: $project" }
         val stem = name(host(href) ?: return false) + "/" + stem(href)
-        if (listOf("html", "pdf").any { corpus.read(project, "$stem.$it${ProjectNodes.NOTES_SUFFIX}", 16) != null }) return false
         val (bytes, type, at) = runCatching { fetch(href) }.getOrElse { refused ->
             if (refused is CancellationException && !currentCoroutineContext().isActive) throw refused
             runCatching { fetch("$WAYBACK/${asOf ?: "2"}id_/$href") }.getOrElse { archived ->
@@ -145,15 +186,10 @@ class LinkGrab(
             }
         }
         val archived = at.startsWith(WAYBACK)
-        val ext = when {
-            "pdf" in type -> "pdf"
-            "html" in type -> "html"
-            else -> return false
-        }
+        val ext = extension(bytes, type, false)
         // A redirect onto a held work, or bytes the group already holds under another address, is that work again.
         val digest = borg.trikeshed.job.ContentId.of(bytes).hex
-        if (!archived && work(at) != work(href) && !h.works.add(work(at))) return false
-        if (!h.digests.add(digest)) return false
+        if (!archived && work(at) in h.works) { h.works.add(work(href)); return false }
         val doc = "$stem.$ext"
         val twin = buildString {
             val url = if (archived) href else at
@@ -167,9 +203,17 @@ class LinkGrab(
             if (anchor.isNotBlank()) append("anchor: ").append(anchor.replace('\n', ' ')).append('\n')
             append("depth: ").append(depth).append('\n')
         }
-        scopes.uploadPut(project, doc + ProjectNodes.NOTES_SUFFIX, twin.encodeToByteArray(), provider)
-        scopes.uploadPut(project, doc, bytes, provider, admit = admit)
-        return true
+        val accepted = claim(h, "digest:$digest", { digest in h.digests }) {
+            currentCoroutineContext().ensureActive()
+            scopes.importLink(owner, doc, bytes, twin.encodeToByteArray(), provider, admit)
+            h.digests.add(digest)
+            true
+        }
+        if (digest in h.digests) {
+            h.works.add(work(href))
+            if (!archived) h.works.add(work(at))
+        }
+        return accepted
     }
 
     /** [url]'s bytes, content type and final address, following redirects over the daemon's HTX route. */
@@ -238,8 +282,8 @@ class LinkGrab(
             val rest = url.substringAfter("://").substringAfter('/', "").substringBefore('#').trim('/')
             val flat = rest.replace(Regex("[^A-Za-z0-9._-]+"), "_").trim('_', '.').ifEmpty { "index" }
                 .let { s -> s.substringBeforeLast('.').takeIf { s.substringAfterLast('.', "").lowercase() in setOf("html", "htm", "pdf", "aspx", "asp", "php") } ?: s }
-            return if (flat.length <= 48) flat
-            else flat.take(40).trimEnd('_', '-', '.') + "-" + borg.trikeshed.job.ContentId.of(url.encodeToByteArray()).hex.take(7)
+            return if (flat == rest && flat.length <= 48) flat
+            else flat.take(40).trimEnd('_', '-', '.') + "-" + ContentId.of(work(url).encodeToByteArray()).hex.take(16)
         }
 
         fun resolve(from: String, location: String): String = when {

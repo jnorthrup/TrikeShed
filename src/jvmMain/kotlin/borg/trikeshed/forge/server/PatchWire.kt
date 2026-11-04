@@ -98,6 +98,77 @@ class ProjectScopes(
 
     fun list(): List<Scope> = scopes
 
+    /** Capture the actual mounted database, rather than a name that a later mount can reuse. */
+    internal fun linkOwner(name: String): ProjectDb? = synchronized(sourceWrites) {
+        if (name in closingSources) null else projectDbs?.get(name)
+    }
+
+    /** Conditional link publication and admission share the ordinary upload/removal owner. */
+    internal fun importLink(expected: ProjectDb, target: String, bytes: ByteArray, notes: ByteArray,
+                            provider: DecisionProvider?, admit: ((String, String, DecisionProvider?) -> Unit)?,
+                            manualIntake: Boolean = false): ContentId = synchronized(sourceWrites) {
+        val name = expected.name
+        val rel = target.trim('/')
+        require(rel == target && rel.isNotBlank() && rel.split('/').none { it.isBlank() || it == "." || it == ".." }) { "Invalid link path" }
+        val notePath = rel + borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX
+        val cid = ContentId.of(bytes)
+        val proposed = borg.trikeshed.lcnc.ProjectNodes.conventions(notes.decodeToString(throwOnInvalidSequence = true))
+        require(proposed["sha256"] == cid.hex && proposed["bytes"] == bytes.size.toString()) { "Link notes differ from the body" }
+        val addresses = s_[proposed["url"], proposed["requested"]].view.filterNotNull().map(LinkGrab::work).toSet()
+        require(addresses.isNotEmpty()) { "Link source address is unavailable" }
+        fun current() {
+            check(name !in closingSources && projectDbs?.get(name) === expected) { "Link project was unmounted or replaced" }
+            require(!manualIntake || intakeMode(name) == CurationIntake.Mode.Manual) { "Project is not configured for manual intake" }
+        }
+        fun mirror(path: String, existing: Boolean) {
+            filesRoot?.let { root ->
+                var at = root.toPath().toAbsolutePath().normalize()
+                check(!java.nio.file.Files.isSymbolicLink(at)) { "Link mirror root is a symbolic link" }
+                for (part in (name + "/" + path).split('/')) {
+                    at = at.resolve(part)
+                    check(!java.nio.file.Files.isSymbolicLink(at)) { "Link mirror path is a symbolic link" }
+                }
+                check(existing || !java.nio.file.Files.exists(at, java.nio.file.LinkOption.NOFOLLOW_LINKS)) { "Link mirror target is already owned" }
+            }
+        }
+        current()
+        val head = expected.store.head
+        val bodyBefore = head.slot(rel)
+        val noteBefore = head.slot(notePath)
+        val body = expected.gateway.getAttachmentRef(rel)
+        val priorNotes = expected.gateway.getAttachmentRef(notePath)
+        require(bodyBefore == null || bodyBefore.deleted || body?.contentId == cid) { "Link body target is already owned" }
+        require(body == null || body.length == bytes.size.toLong()) { "Link body length differs" }
+        require(noteBefore == null || noteBefore.deleted || priorNotes != null) { "Link notes target is already owned" }
+        if (priorNotes != null) {
+            require(priorNotes.length <= 262_144) { "Link notes exceed the provenance bound" }
+            val retained = requireNotNull(casStore.get(priorNotes.contentId)) { "Link notes are unavailable" }
+            require(ContentId.of(retained) == priorNotes.contentId) { "Link notes changed" }
+            val parsed = borg.trikeshed.lcnc.ProjectNodes.conventions(retained.decodeToString(throwOnInvalidSequence = true))
+            require(parsed["sha256"] == cid.hex && parsed["bytes"]?.let { it == bytes.size.toString() } != false &&
+                s_[parsed["url"], parsed["requested"]].view.filterNotNull().any { LinkGrab.work(it) in addresses }) { "Link notes target belongs to another source" }
+        } else require(body == null) { "Existing document has no matching link provenance" }
+        mirror(rel, body != null); mirror(notePath, priorNotes != null)
+        if (priorNotes == null) uploadPut(name, notePath, notes, provider, manualIntake = manualIntake)
+        current()
+        // Couch subscribers run synchronously and may publish a user body during the notes write.
+        require(head.slot(rel) == bodyBefore) { "Link body changed while notes were published" }
+        val note = requireNotNull(expected.gateway.getAttachmentRef(notePath))
+        require(note.contentId == (priorNotes?.contentId ?: ContentId.of(notes))) { "Link notes changed during publication" }
+        mirror(rel, body != null); mirror(notePath, true)
+        if (body == null) uploadPut(name, rel, bytes, provider, manualIntake = manualIntake, admit = { _, _, _ -> })
+        current()
+        require(expected.gateway.getAttachmentRef(rel)?.contentId == cid &&
+            expected.gateway.getAttachmentRef(notePath)?.contentId == note.contentId) { "Link source changed during publication" }
+        val retained = requireNotNull(casStore.get(cid)) { "Link body is unavailable" }
+        require(ContentId.of(retained) == cid) { "Link body changed before admission" }
+        if (!manualIntake) (admit ?: onDocument)?.invoke(name, rel, provider)
+        current()
+        require(expected.gateway.getAttachmentRef(rel)?.contentId == cid &&
+            expected.gateway.getAttachmentRef(notePath)?.contentId == note.contentId) { "Link source changed during admission" }
+        cid
+    }
+
     private val documentProviders = java.util.concurrent.ConcurrentHashMap<Pair<String, String>, DecisionProvider>()
     fun decisionProvider(project: String, id: String): DecisionProvider? = documentProviders[project to id]
         ?: scopes.firstOrNull { it.name == project }?.decisionProvider
