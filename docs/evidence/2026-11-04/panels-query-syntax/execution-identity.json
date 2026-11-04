@@ -1,0 +1,77 @@
+{
+  "result": "PASS",
+  "source": "a42f1dbdefadf7fe774247b4abfd589e6b4ecb73",
+  "listener": "http://127.0.0.1:39621",
+  "artifacts": {
+    "main.jar": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+    "spacegraph.js": "8158c98757aafa01fed68ace364ae21b397bca7575815ab1177bb361452edfef",
+    "documents.js": "eb6e4e9a78efb6eff64222ffa289987c52c41cb30a59ca6486a55faac4970497",
+    "pages.js": "9388c8ab1cdffb4db3b86e3e99c92fada2fee91e91e69592678be2fb6f767a54",
+    "classpath.txt": "b92799ff5eceab215771217a6b3d4eed8c76f09a1e10938a8b453e0b87e40602"
+  },
+  "snapshotAndDependenciesVerifiedUnchanged": true,
+  "backendByteIdenticalToV59": true,
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "jarOnlyDependencies": true,
+  "setupQueries": 0,
+  "parserCalls": 0,
+  "authoredOuterRuns": 1,
+  "outerReceiptCid": "sha256:858da54575a8a27d562bd108b5b704c39dd2258b4b66d598ada634c81b12e75b",
+  "rawDurableBytesHashVerified": true,
+  "harness": {
+    "Fixture.kt": "6d10dc9780431199fe8c3bc013575281efec20edffa9083eddbef17f5dc9fb00",
+    "PanelsGraphs.kt": "80c964e13e1f11ea6d2b2ac34504fabfb3599ebe18e7cfc97ba9c1457bf14582",
+    "PanelPrograms.kt": "222031246d706a7adfcec073ba71d60652d35d0310e6bdf83aad58e896fc8413",
+    "driver.cjs": "a3971b6b3a10646a26fb60a4236af9993842f056f65ebdb209e2769bd4863b71",
+    "deny-egress.py": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+  },
+  "compiledClasses": {
+    "proof/legalpanels/PanelPrograms.class": "3d9795a57899766d48cb99034e4b53d62554d14907b4cd334ab585a47249a977",
+    "proof/englishlegalquery/ReplayCorpus.class": "b41c0a21072d7ff52e778b96e603fd6090c13134058af333f5221f8e6b24a9ed",
+    "proof/englishlegalquery/FixtureKt$main$1.class": "865238e32cb8baac9e5d4545b395e6b06b51040a4d4c7f76802bc1b5f806c5cd",
+    "proof/englishlegalquery/ReplayCorpus$bytes$1.class": "a5c7c5a5cc491f11f169af02239eafd80459cf40943f6767f0a278c163e26286",
+    "proof/englishlegalquery/FixtureKt$main$1$2.class": "23bf7d839e41e4bce8583d274de5b2a3ada480be0dded8187fdf7c5354e79679",
+    "proof/englishlegalquery/FixtureKt$main$1$1$bytes$response$2.class": "d25ebdd3e884c033d7c09c6cbcf75bf39a58b32d68422abe4a559c6ad22771ae",
+    "proof/englishlegalquery/PanelsFixture$attach$2.class": "9173e20ba78188d7b3660f7d2266ff2720df1700b0e57a91b2852dd7b2d2c4ba",
+    "proof/englishlegalquery/FixtureKt$main$1$request$1.class": "5bb1f8fa4a342e359617dcd3a59aa59d22efa2339925f410db6117886548283a",
+    "proof/englishlegalquery/FixtureKt.class": "da2f5b8fa7e93abcb5c601154f82661564cd0249a55957c31e8242c7e169a40c",
+    "proof/englishlegalquery/ReplayCorpus$read$1.class": "cd57b4b3f48be28917a110934071b6ec9a258331dd03d0d99c361bf672c11e93",
+    "proof/englishlegalquery/PanelsFixture$attach$1.class": "9b53a32bfcbbd1a37f63697987d7fe39177adbfabe7f9b692fc190a4cc8a6c0f",
+    "proof/englishlegalquery/PanelsFixture.class": "5cbf4f927e1fa510f39eb1b0a5c08ba7a7855712e49b62e64fbc2b4ed99b60dc",
+    "proof/englishlegalquery/PanelsFixture$evidence$2.class": "37137f72537a006138532355ee4ebe159f533472b0efaf28376a33a51f89bc83",
+    "proof/englishlegalquery/ReplayCorpus$docs$$inlined$sortedBy$1.class": "d30710fb66aa7ac54e085ee0ec6c7317bb5002e0d74f0e4edcc589c2e88f5093",
+    "proof/englishlegalquery/FixtureKt$main$1$primarySafety$1.class": "0a34850f20d3d020389d95bf1f19491656b3885469bbef4142ccb7b2f9664d1f",
+    "proof/englishlegalquery/ReplayCorpus$document$1.class": "827f3c1b785095dd69ea49cadf9ffbb93125596b3dfec8eed313e6f6b87687ee",
+    "proof/englishlegalquery/FixtureKt$main$1$1$bytes$response$1.class": "2713eb3244eb2aa68a3e2cf06e70cba2aba57bdee325f14d09b6e9a80ef60917"
+  },
+  "before": {
+    "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+    "spacegraphJs": "bdc750685c1b940fd3447b9c5ba76d6f8fc58f63b1f57b19fc188bd4d6c09a6c",
+    "screenshot": "sparql-before-v59.png",
+    "sha256": "3595e599f64d50653382f413096c3ce46e681076dba43039f3c3d2c39c4c8d90",
+    "scope": "Actual earlier v59 SPARQL screenshot, unchanged bytes, not a reconstructed image. No SQL before screenshot is claimed."
+  },
+  "cleanup": {
+    "wireDrained": true,
+    "panelsDrained": true,
+    "allSupervisorsCompleted": true,
+    "registryRemoved": true,
+    "safety": {
+      "reteFacts": 0,
+      "blackboardValues": 0,
+      "beliefBagPresent": false,
+      "reviewOwnerPresent": false,
+      "modelMuxConfigured": false,
+      "parserOwnerPresent": false,
+      "parserCalls": 0,
+      "extractCalls": 0,
+      "globalQuadStorePresent": false
+    }
+  },
+  "fixtureExit": 0,
+  "history": [
+    "External compile1 rejected invalid empty Series literal in control fixture, before runtime. Existing emptySeriesOf() fixed the fixture; no production change.",
+    "External compile2 and first actual browser attempt passed."
+  ]
+}
