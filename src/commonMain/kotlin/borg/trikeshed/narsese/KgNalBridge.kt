@@ -152,9 +152,9 @@ object KgNalBridge {
     }
 
     /**
-     * Parse + bridge the whole crossing: pre-LLM text → NalMapped signals.
-     * The will of the decedent, crossed into NAL — one statement at a time.
-     * Unparseable statements are skipped, never guessed.
+     * Parse the complete supported input before producing rules. Malformed or
+     * unsupported statements in a recognized format refuse the whole crossing;
+     * an unrecognized format returns no rules.
      */
     fun bridgeToRules(text: String, confidence: Float = 0.9f): Series<EternalRule> {
         val triplets = when (sniff(text)) {
@@ -250,7 +250,7 @@ object KgNalBridge {
         }
     }
 
-    /** Parse + map: the whole crossing in one call. Unparseable statements are skipped. */
+    /** Parse known formats completely; malformed input refuses and unknown formats return no rows. */
     fun bridge(text: String, confidence: Float = 0.9f): List<NalMapped> = when (sniff(text)) {
         KgFormat.KIF -> parseKif(text, confidence).map(::map)
         KgFormat.TURTLE, KgFormat.N_TRIPLES -> parseTurtle(text, confidence).map(::map)
