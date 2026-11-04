@@ -48,4 +48,16 @@ class AceContextNodesTest {
         val empty = runner.run(node, _m.get())
         assertEquals(empty, runner.run(node, _m["playbook" j null, "playbook?" j "Other policy"]))
     }
+
+    @Test fun frameParametersRemainDefaultsAndNullWiresMaskThem(): Unit = runBlocking {
+        val runner = AceContextNodes.registry().getValue("context.assemble")
+        val bare = LcncNode("assemble", "context.assemble")
+        val configured = bare.copy(params = _m["playbook" j "Plain default", "in:playbook" j "Port default"])
+        assertEquals(runner.run(bare, _m["playbook" j "Port default"]), runner.run(configured, _m.get()))
+        assertEquals(runner.run(bare, _m["playbook" j "Wired policy"]),
+            runner.run(configured, _m["playbook?" j "Wired policy"]))
+        assertEquals(runner.run(bare, _m.get()), runner.run(configured, _m["playbook?" j null]))
+        assertEquals(runner.run(bare, _m.get()),
+            runner.run(configured, _m["playbook" j null, "playbook?" j "Wired policy"]))
+    }
 }
