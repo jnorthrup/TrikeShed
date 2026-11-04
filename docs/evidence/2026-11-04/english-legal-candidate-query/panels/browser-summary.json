@@ -1,0 +1,303 @@
+{
+  "result": "PASS",
+  "source": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "archive": {
+    "file": "browser-result.json.gz",
+    "rawResultCid": "sha256:83bba903d10aba48fe72a43bf8bbaff4a395fa902997fdc79a11c7eec74ca4ae",
+    "rawBytes": 714792,
+    "compressedBytes": 28035
+  },
+  "scope": "Actual immutable Panels connected outer graphs and inspection-only inner BGP canvases; explicit runs use actual KanbanModule durable inline service borrowing the actual candidate query owner. Reuses actual retained v58 CoreNLP4.6 observations, with no new parser. Source-linked unreviewed candidates, not legal applicability; unknown integer is not false.",
+  "innerGraphInspectionOnly": {
+    "legal-inner-thirty-days": true,
+    "legal-inner-unknown-quantity": true
+  },
+  "runs": {
+    "matching": {
+      "runId": "1269805b-bb73-4abd-8e7c-097704284527",
+      "status": "completed",
+      "ok": true,
+      "receiptCid": "sha256:82b96ad92b0d683148e00f5657e819f86d4e8b8bbbb7d219f63c69d390e7b983",
+      "programCid": "sha256:4684fa8e026df3e94ca69ce9f07d58df3bed857411736c3eebdc4196d942cfb0",
+      "httpStatus": 200,
+      "dataset": "english-legal-candidate-observations",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "namedGraph": "urn:trikeshed:english:legal:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "originalCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "extractedTextCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "candidateCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "quads": 898,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (30) business days"
+          },
+          "status": {
+            "type": "literal",
+            "value": "lexical-integer-candidate"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Tenant shall not pay rent within thirty (30) business days unless Owner consents."
+          },
+          "source": {
+            "type": "uri",
+            "value": "urn:sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703"
+          }
+        }
+      ]
+    },
+    "knownB": {
+      "runId": "23aeeca9-5cf4-47ed-b69e-d369e15563c9",
+      "status": "completed",
+      "ok": true,
+      "receiptCid": "sha256:892bf471f78bf82347017f73c4ca9e40ff8370efc35a5cc025364d4bb1dbf039",
+      "programCid": "sha256:67a5adffa7937f2dd49c7da10ff52c623dcd7bbffb98d641769e09da8921a810",
+      "httpStatus": 200,
+      "dataset": "english-legal-candidate-observations",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "namedGraph": "urn:trikeshed:english:legal:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "originalCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "extractedTextCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "candidateCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "quads": 1124,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within 30 calendar days"
+          },
+          "status": {
+            "type": "literal",
+            "value": "lexical-integer-candidate"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Rent shall be paid by Tenant within 30 calendar days."
+          },
+          "source": {
+            "type": "uri",
+            "value": "urn:sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042"
+          }
+        }
+      ]
+    },
+    "unknownB": {
+      "runId": "02d972a3-a905-49f7-9b91-688b33067573",
+      "status": "completed",
+      "ok": true,
+      "receiptCid": "sha256:e96339b6962c86bf0bf8c34a2de1cf1a2292b81450728f93ad731ee7a3627fa8",
+      "programCid": "sha256:0fe9cec7712112c8ad777aeac4c581371b99240b8eeef0789c31f8059355ac33",
+      "httpStatus": 200,
+      "dataset": "english-legal-candidate-observations",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "namedGraph": "urn:trikeshed:english:legal:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "originalCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "extractedTextCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "candidateCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "quads": 1124,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (60) business days"
+          },
+          "reason": {
+            "type": "literal",
+            "value": "legal-force-not-established"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Tenant shall pay rent within thirty (60) business days."
+          },
+          "candidate": {
+            "type": "uri",
+            "value": "urn:sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb"
+          }
+        },
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (60) business days"
+          },
+          "reason": {
+            "type": "literal",
+            "value": "cross-sentence-and-paragraph-scope-not-established"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Tenant shall pay rent within thirty (60) business days."
+          },
+          "candidate": {
+            "type": "uri",
+            "value": "urn:sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb"
+          }
+        },
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (60) business days"
+          },
+          "reason": {
+            "type": "literal",
+            "value": "conflicting-number-forms"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Tenant shall pay rent within thirty (60) business days."
+          },
+          "candidate": {
+            "type": "uri",
+            "value": "urn:sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb"
+          }
+        }
+      ]
+    },
+    "stale": {
+      "runId": "db96592f-5b25-4487-99e9-009de78b8408",
+      "status": "failed",
+      "ok": false,
+      "receiptCid": "sha256:007734b98d13ebfd795c6ffc4b610dec11e665de0685fc4b7118918f2089b8bd",
+      "programCid": "sha256:4684fa8e026df3e94ca69ce9f07d58df3bed857411736c3eebdc4196d942cfb0",
+      "httpStatus": 400,
+      "error": "English observation source snapshot is stale or unavailable"
+    },
+    "snapshot": {
+      "runId": "e749775c-c3ca-43ed-9c19-eb76eab11544",
+      "status": "completed",
+      "ok": true,
+      "receiptCid": "sha256:39f02296929cde16eb513bd049f6c9e124f4526ddb7fdd6026c766b07f0fbc44",
+      "programCid": "sha256:118606e78b1fc18afa3137b166a5b29f28a4167c13946ffabc5c397569384c0b",
+      "httpStatus": 200,
+      "dataset": "english-legal-candidate-observations",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "namedGraph": "urn:trikeshed:english:legal:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "originalCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "extractedTextCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "mode": "snapshot",
+        "historical": true,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "candidateCid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+        "quads": 898,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "not-checked"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (30) business days"
+          },
+          "status": {
+            "type": "literal",
+            "value": "lexical-integer-candidate"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Tenant shall not pay rent within thirty (30) business days unless Owner consents."
+          },
+          "source": {
+            "type": "uri",
+            "value": "urn:sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703"
+          }
+        }
+      ]
+    }
+  },
+  "mutation": {
+    "scope": "explicit-replay-row-control-not-ingestion",
+    "before": {
+      "project": "english-legal-candidates-proof",
+      "id": "synthetic matching duties.txt",
+      "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+      "rev": "1-sha256:6bf74f48c795416f7fa5206d9ff2050fb43ab3102d34a6749d080caabaf7a55a",
+      "seq": 0,
+      "length": 133,
+      "contentType": "text/plain"
+    },
+    "after": {
+      "project": "english-legal-candidates-proof",
+      "id": "synthetic matching duties.txt",
+      "cid": "sha256:cd890d949e43068433ba0b84b806946b8d3126113aaaefbeeca280e76723d39c",
+      "rev": "replay-control-2",
+      "seq": 1000,
+      "length": 163,
+      "contentType": "text/plain"
+    }
+  },
+  "browserErrors": [],
+  "externalBrowserRequests": [],
+  "authoredRunGestures": 5,
+  "parserCalls": 0
+}
