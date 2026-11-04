@@ -10,6 +10,8 @@ import borg.trikeshed.narsese.AttentionEconomy
 import borg.trikeshed.narsese.GroupCoherenceEnactment
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
+import borg.trikeshed.narsese.KgRetentionIssue
+import borg.trikeshed.narsese.KgRetentionRefused
 import borg.trikeshed.narsese.ingestKg
 import borg.trikeshed.narsese.CuratorImpulseElement
 import borg.trikeshed.narsese.CuratorImpulseKind
@@ -281,7 +283,13 @@ class BeliefWire(
             method == "POST" && p == "/api/beliefs/kg" -> {
                 val kgText = rawBody(text)
                 if (kgText.isBlank()) return json(mapOf("error" to "empty body"), 400)
-                json(bag.ingestKg(kgText) { angular, expression -> memoryFiles?.gloss(angular, expression) })
+                try {
+                    json(bag.ingestKg(kgText) { angular, expression -> memoryFiles?.gloss(angular, expression) })
+                } catch (refused: KgRetentionRefused) {
+                    json(_m["error" j "kg_retention_refused", "processedAssertions" j 0,
+                        "retention" j _m["status" j "refused", "issue" j refused.issue.name]],
+                        if (refused.issue == KgRetentionIssue.LIMIT) 413 else 503)
+                }
             }
 
             else -> null
@@ -292,10 +300,14 @@ class BeliefWire(
         JvmKanbanServer.HttpResponse(status, jsonOf(value))
 
     /** Extra routes receive the RAW request (headers + body) as `text`; split first. */
-    private fun rawBody(text: String): String = when {
-        "\r\n\r\n" in text -> text.substringAfter("\r\n\r\n")
-        "\n\n" in text -> text.substringAfter("\n\n")
-        else -> text
+    private fun rawBody(text: String): String {
+        val crlf = text.indexOf("\r\n\r\n")
+        val lf = text.indexOf("\n\n")
+        return when {
+            crlf >= 0 && (lf < 0 || crlf < lf) -> text.substring(crlf + 4)
+            lf >= 0 -> text.substring(lf + 2)
+            else -> text
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

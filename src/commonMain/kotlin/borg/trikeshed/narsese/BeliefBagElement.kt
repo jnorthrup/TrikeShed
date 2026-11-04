@@ -55,6 +55,9 @@ sealed class BeliefIntake {
 
     /** FIFO processing fence. Completion does not imply a durable WAL flush. */
     data class Fence(val completion: CompletableDeferred<Unit>) : BeliefIntake()
+
+    /** Exact source/definition artifacts must complete retention before imported assertions start. */
+    data class RetainKg(val artifacts: KgRetention.Batch, val completion: CompletableDeferred<Unit>? = null) : BeliefIntake()
 }
 
 sealed class BeliefEvent {
@@ -126,6 +129,8 @@ class BeliefBagElement(
     /** Diagnostic for unacknowledged legacy sends; submit's exceptional acknowledgement is authoritative. */
     @Volatile var lastAdmissionRefusal: BeliefAdmissionRefused? = null
         private set
+    @Volatile var lastRetentionRefusal: KgRetentionRefused? = null
+        private set
 
     // The attention table: funnel-probe geometry × stochastic hijack replacement
     // (narchy HijackBag × Krapivin funnel — see HijackBeliefBag). The intake
@@ -175,6 +180,7 @@ class BeliefBagElement(
                         is BeliefIntake.Mint -> cmd.completion
                         is BeliefIntake.Reinforce -> cmd.completion
                         is BeliefIntake.Fence -> cmd.completion
+                        is BeliefIntake.RetainKg -> cmd.completion
                         else -> null
                     }
                     try {
@@ -182,6 +188,9 @@ class BeliefBagElement(
                         completion?.complete(Unit)
                     } catch (refused: BeliefAdmissionRefused) {
                         lastAdmissionRefusal = refused
+                        completion?.completeExceptionally(refused)
+                    } catch (refused: KgRetentionRefused) {
+                        lastRetentionRefusal = refused
                         completion?.completeExceptionally(refused)
                     } catch (t: Throwable) {
                         failure = t
@@ -204,6 +213,7 @@ class BeliefBagElement(
                         is BeliefIntake.Mint -> pending.completion
                         is BeliefIntake.Reinforce -> pending.completion
                         is BeliefIntake.Fence -> pending.completion
+                        is BeliefIntake.RetainKg -> pending.completion
                         else -> null
                     }
                     completion?.completeExceptionally(stopped)
@@ -226,6 +236,15 @@ class BeliefBagElement(
         val completion = CompletableDeferred<Unit>()
         intake.send(cmd.copy(completion = completion))
         completion.await()
+    }
+
+    /** The same channel owns CAS writes, acknowledgements, refusals, and drain as the belief work. */
+    suspend fun retainKg(artifacts: KgRetention.Batch): borg.trikeshed.userspace.nio.file.spi.StorageDurability {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(BeliefIntake.RetainKg(artifacts, completion))
+        completion.await()
+        return checkNotNull(cas).durability
     }
 
     /**
@@ -322,6 +341,7 @@ class BeliefBagElement(
             is BeliefIntake.Attend -> attend(cmd.angular, cmd.budget)
             BeliefIntake.DecayTick -> decayAll()
             is BeliefIntake.Fence -> return
+            is BeliefIntake.RetainKg -> { KgRetention.retain(cas, cmd.artifacts); return }
         }
         momentsDirty = true
         maybeFlush()

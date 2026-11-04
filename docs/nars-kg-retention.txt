@@ -1,0 +1,59 @@
+KG source and proposition retention
+
+Text KG imports through POST /api/beliefs/kg and the LCNC kg.ingest node share
+the existing BeliefBagElement.ingestKg function. Before any imported assertion
+is submitted, it awaits a RetainKg command on that bag's existing intake channel.
+The same owner, acknowledgement and drain paths handle the CAS work.
+
+The source block is the exact accepted text encoded as strict UTF8, preserving
+leading/trailing whitespace and CRLF. The actual KG HTTP route rejects malformed
+UTF8 before its request is converted into replacement text. LCNC String input
+rejects unpaired UTF16 surrogates. Header/body selection uses the earliest
+supported separator; an embedded CRLF separator cannot erase an LF-framed prefix.
+
+Each proposition block is EXACTLY the existing kg-source-proposition/1 canonical
+CBOR identity preimage. It retains the declared source context, full predicate,
+ordered subject/object, their optional CIDs, copula/relation and temporal fields.
+Confidence, evidence, observation receipts and attention remain outside this
+identity. Existing proposition CIDs and SignalCodec/WAL schemas do not change.
+
+The owner requires CAS and its existing BoundedCasReader capability before any
+write. It validates all artifact identities/bounds, checks every put's returned
+CID, syncs the store once, and completes exact bounded readback/rehashing of ALL
+artifacts before acknowledging retention. Only then can existing Mint submissions
+start. Missing CAS, unavailable bounded reads, bad acknowledgements, sync failure,
+or missing/corrupt readback refuse the import with a typed KgRetentionIssue. A
+retention refusal admits zero imported assertions and leaves the actor running.
+An unsuccessful retention may leave content-addressed blobs; there is no generic
+multiassertion transaction or rollback claim. Ordinary direct Mint is unchanged.
+
+Limits before writes/admission: 65,536 source UTF16 characters, 256 KiB source or
+individual definition bytes, at most 2048 definitions, and 4 MiB aggregate bytes.
+Duplicate proposition blocks are retained once; processed assertions are counted
+separately. The report returns sourceCid, unique propositionCids, retention status
+sync-and-exact-bounded-readback-completed, and the backend's storageDurability.
+Durability remains storage-dependent: in-memory CAS reports VOLATILE, never a
+generic durable=true. globalResidentCountAfterImport is only an observation of
+the shared bag after processing. Legacy minted is a processed-assertion alias,
+not a count of new resident cells. HTTP retention refusals return an explicit
+status (413 for limits; 503 for unavailable/failed retention).
+
+The immutable v59 public API counterexample is retained externally for review:
+source and full proposition bytes were missing even when the signal itself was
+archived in CAS. New imports now retain those same source/proposition CIDs.
+Earlier hash-only history is not backfilled or retracted. Existing read surfaces
+still expose identity fields; this change does not add a generic CAS HTTP reader
+or claim that every historical ID resolves. Retention does not authenticate a
+source, confer legal/review authority, train a corpus, or unify propositions.
+
+Focused new source tests cover exact old IDs and CRLF, complete readback before
+any Mint, missing capabilities, put/sync/readback refusal, bounds, actor health,
+replay/archive evidence stability, owned drain, HTTP+LCNC consumers, and identity
+readback. External source-overlay JVM checks are distinct from the next complete
+JVM/commonJS build and final artifact/API/browser proof.
+
+The final isolated check passed 44 methods against immutable v59 dependencies,
+with the changed production classes compiled as explicit source overlays, no
+friend access and no parser/model. This is not a released artifact result. The
+admitted-drain test first exposed a lazy Series.toList alias; a bounded explicit
+capture back to Series fixed it. The failing attempt is retained externally.
