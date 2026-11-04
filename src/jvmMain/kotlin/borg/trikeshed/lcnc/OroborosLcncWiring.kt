@@ -17,12 +17,15 @@ import borg.trikeshed.lib.*
  */
 object OroborosLcncWiring {
     suspend fun vmLegos(context: ModuleContext, ownCleanup: (suspend () -> Unit) -> Unit): KernelElement? {
+        val confixConfig = HostSystem.getenv("TRIKESHED_LLVM_CONFIX_PROFILE")
         val owned = llvm(context)
-        owned?.let { ownCleanup { it.a.drain() } }
-        SubVmLegos.register(context, owned?.b?.runner())
+        val kernel = owned?.a ?: confixConfig?.let { KernelElement(context.scope.coroutineContext, KernelId("llvm")) }
+        kernel?.let { ownCleanup { it.drain() } }
+        val scanner = kernel?.let { confix(context, it, confixConfig) }
+        SubVmLegos.register(context, owned?.b?.runner(), scanner?.runner(context.casStore))
         UringLegos.register(context)
         CamelRouteLegos.register(context)
-        return owned?.a
+        return kernel
     }
 
     /** Bootstrap extraction keeps the daemon's coroutine below the JVM method-size limit. */
@@ -58,6 +61,21 @@ object OroborosLcncWiring {
             try { kernel.drain() } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
             throw failure
         }
+    }
+
+    /** Opens a second serial evaluation seat under the same LLVM root. */
+    internal suspend fun confix(context: ModuleContext, kernel: KernelElement,
+                               config: String? = HostSystem.getenv("TRIKESHED_LLVM_CONFIX_PROFILE")): LlvmConfix? {
+        if (config == null) return null
+        require(config.isNotBlank() && java.nio.file.Path.of(config).isAbsolute) {
+            "TRIKESHED_LLVM_CONFIX_PROFILE requires an absolute operator configuration path"
+        }
+        val files = checkNotNull(context.scope.coroutineContext[FileOperations])
+        val profile = withContext(fileIoContext) {
+            LlvmConfixProfile.parse(LlvmScalarProfile.read(files, files.canonicalPath(config), 16 * 1024)
+                .decodeToString(throwOnInvalidSequence = true))
+        }
+        return LlvmConfix.open(kernel, KernelId("confix"), profile, files)
     }
 
     /** Only the operator's startup environment selects native code; request bodies cannot. */

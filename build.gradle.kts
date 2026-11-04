@@ -86,9 +86,10 @@ val compileConfixBridge = tasks.register<Exec>("compileConfixBridge") {
     inputs.file(File(confixDir, "bridge.c"))
     inputs.property("compiler", compiler?.absolutePath ?: "clang")
     compiler?.let { inputs.file(it) }
-    outputs.file(File(sulongDemoDir, "confix-bridge.bc"))
+    val output = File(sulongDemoDir, "confix-bridge.bc")
+    outputs.file(output)
     workingDir(projectDir)
-    doFirst { sulongDemoDir.mkdirs() }
+    doFirst { output.parentFile.mkdirs() }
     commandLine(compiler?.absolutePath ?: "clang", "-target", "x86_64-unknown-linux-gnu", "-std=c11", "-O1",
         "-emit-llvm", "-c", "-fno-builtin", "-fno-stack-protector", "-fno-ident",
         "src/jvmMain/llvm/confix/bridge.c", "-o", File(sulongDemoDir, "confix-bridge.bc").absolutePath)

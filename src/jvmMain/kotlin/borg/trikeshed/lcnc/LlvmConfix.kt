@@ -167,6 +167,7 @@ class LlvmConfix private constructor(
                             check(code in 0..5 && header.execute(handle, 1).asInt() == code && total in 0..capacity) { "Invalid Confix result header" }
                             val at = header.execute(handle, 2).asInt()
                             var children = 0
+                            // Series.toList is lazy here: materialize arrays while the native handle is owned.
                             val rows = ((if (code == 0) total else 0) j { row: Int ->
                                 fun value(field: Int) = cell.execute(handle, row, field).asInt()
                                 val begin = value(0); val end = value(1); val tag = value(2); val depth = value(3); val count = value(4)
@@ -175,9 +176,9 @@ class LlvmConfix private constructor(
                                 children += count; check(children <= total)
                                 val kids = (count j { index: Int -> child.execute(handle, row, index).asInt().also {
                                     check(it > row && it < total) { "Confix child outside geometry" }
-                                } }).view.toList()
+                                } }).toArray().asList()
                                 _m.get<String, Any?>("open" j begin, "close" j end, "tag" j tags[tag], "depth" j depth, "children" j kids)
-                            }).view.toList()
+                            }).toArray().asList()
                             _m.get<String, Any?>("ok" j (code == 0), "format" j format.name, "sourceCid" j ContentId.of(source).value,
                                 "sourceBytes" j source.size, "rowCount" j rows.size, "observedRows" j total, "rows" j rows,
                                 "fault" j _m["code" j code, "name" j s_["none", "truncated", "reserved-cbor-ai", "span-bounds", "nonprogress", "row-capacity"][code],
