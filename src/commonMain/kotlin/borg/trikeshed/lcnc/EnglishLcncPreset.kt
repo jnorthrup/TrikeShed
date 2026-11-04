@@ -25,6 +25,7 @@ object EnglishLcncPreset {
         LcncPortContract(EVIDENCE, "Check routed evidence identity", _l["expectedCid", "routed", "transport"], _l["receiptCid"],
             inputKinds = _m["expectedCid" j "id", "routed" j "text", "transport" j "json"], outputKinds = _m["receiptCid" j "id"]),
         EnglishObservationContract.contract(),
+        EnglishCorpusContract.contract(),
     ]
 
     fun registry(): Map<String, LcncNodeRunner> = _m[

@@ -105,6 +105,25 @@ class EnglishCamelPresetExecutionTest {
             _m["expectedCid" j id, "routed" j changed, "transport" j _m["reply" j changed, "headers" j _m[EnglishLcncPreset.HEADER j id]])) }
     }
 
+    @Test fun actualCorpusRunnerUsesItsPublishedInvocationKeyWithoutOptionalTopics(): Unit = runBlocking {
+        val f = fixture("english-corpus-invocation", coroutineContext[Job])
+        try {
+            assertSame(LcncNodeKey.ENGLISH_QUERY, LcncNodeKey.of(EnglishObservationContract.TYPE))
+            assertSame(LcncNodeKey.ENGLISH_CORPUS, LcncNodeKey.of(EnglishCorpusContract.TYPE))
+            val contract = assertNotNull(LcncContracts.find(EnglishCorpusContract.TYPE))
+            assertEquals("json", contract.outputKinds["topicCid"], "An omitted topic model has no topic CID")
+            val corpus = assertNotNull(f.ctx.lcncRunners[EnglishCorpusContract.TYPE])
+            val output = corpus.run(LcncNode("corpus", EnglishCorpusContract.TYPE),
+                _m["receiptCids" j _l[f.receipt], "mode" j "current", "topics" j null])
+            assertNull(output["topics"]); assertNull(output["topicCid"])
+            assertTrue((output["occurrences"] as List<*>).isNotEmpty())
+            val source = output["source"] as Map<*, *>
+            assertEquals("english-receipt-corpus", source["selected"])
+            assertEquals("unreviewed", source["reviewStatus"])
+            assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
+        } finally { f.close() }
+    }
+
     @Test fun cancelledWaiterStillDrainsAnAdmittedActualCamelDispatch(): Unit = runBlocking {
         val f = fixture("english-camel-drain", coroutineContext[Job])
         val entered = CompletableDeferred<Unit>(); val release = CompletableDeferred<Unit>(); val actual = CompletableDeferred<Map<String, Any?>>()
