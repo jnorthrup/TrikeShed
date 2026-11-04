@@ -1,9 +1,11 @@
 package borg.trikeshed.web.pages
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.web.PanelsPage
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import org.w3c.dom.EventSource
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLTextAreaElement
@@ -287,29 +289,43 @@ object HermesTerminalPage {
         }
     }
 
+    private val geometry = page.lane(workers = 1, maxActions = 1)
+    private val geometryUpdates = Channel<Twin<Int>>(Channel.CONFLATED)
     private var resizeTimer = 0
+
+    private fun resizeLoop() {
+        page.own { geometryUpdates.close() }
+        checkNotNull(geometry.submit {
+            for (size in geometryUpdates) {
+                try {
+                    val body: dynamic = obj(); body.columns = size.a; body.rows = size.b
+                    val response = fetchResponse(endpoint("/resize"), requestInit("POST", jsonHeaders(), JSON.stringify(body)))
+                    val result = response.jsonValue()
+                    if (!response.ok) error(strOrEmpty(result.error).ifEmpty { "Terminal resize rejected" })
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    if (!page.closing) pageFailure(failure)
+                }
+            }
+        }) { "Terminal resize lane is unavailable" }
+    }
 
     private fun fitGeometry() {
         page.cancelLater(resizeTimer)
         resizeTimer = page.later(250) {
-            page.submit {
-                if (page.closing) return@submit
-                val wrap = byId("screenWrap").getBoundingClientRect()
-                val probe = document.createElement("span") as HTMLElement
-                probe.className = "cell"
-                probe.textContent = "M"
-                byId("screen").appendChild(probe)
-                val box = probe.getBoundingClientRect()
-                probe.remove()
-                val bw = if (box.width != 0.0) box.width else 8.5
-                val bh = if (box.height != 0.0) box.height else 16.0
-                val columns = maxOf(20, minOf(220, kotlin.math.floor((wrap.width - 32) / bw).toInt()))
-                val rows = maxOf(6, minOf(80, kotlin.math.floor((wrap.height - 30) / bh).toInt()))
-                if (columns != grid.columns || rows != grid.rows) {
-                    val b: dynamic = obj(); b.columns = columns; b.rows = rows
-                    fetchResponse(endpoint("/resize"), requestInit("POST", jsonHeaders(), JSON.stringify(b))).jsonValue()
-                }
-            }
+            val wrap = byId("screenWrap").getBoundingClientRect()
+            val probe = document.createElement("span") as HTMLElement
+            probe.className = "cell"
+            probe.textContent = "M"
+            byId("screen").appendChild(probe)
+            val box = probe.getBoundingClientRect()
+            probe.remove()
+            val bw = if (box.width != 0.0) box.width else 8.5
+            val bh = if (box.height != 0.0) box.height else 16.0
+            val columns = maxOf(20, minOf(220, kotlin.math.floor((wrap.width - 32) / bw).toInt()))
+            val rows = maxOf(6, minOf(80, kotlin.math.floor((wrap.height - 30) / bh).toInt()))
+            geometryUpdates.trySend(columns j rows)
         }
     }
 
@@ -339,7 +355,7 @@ object HermesTerminalPage {
     fun mount() {
         // Capture precedes the owner's pagehide listener, so pending text joins the input lane.
         page.on(window, "pagehide", { close().ignore() }, true)
-        page.mount { install() }
+        page.mount { resizeLoop(); install() }
     }
 
     private fun reconnect() {
