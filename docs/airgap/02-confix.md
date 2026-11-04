@@ -34,7 +34,7 @@ Create a trusted operator profile outside request-controlled storage:
 ```json
 {
   "module": "/absolute/TrikeShed/build/sulong/confix.bc",
-  "sha256": "REPLACE_WITH_SHA256_OF_VERIFIED_MODULE",
+  "sha256": "25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
   "abi": "confix.flat/1",
   "maxInputBytes": 65536,
   "maxRows": 16384

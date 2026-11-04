@@ -5,8 +5,9 @@
   "versions": {
     "llvm": "22.1.8",
     "gcc": "14.2.0",
-    "jdk": "GraalVM 25.3.4.1",
-    "kotlin_numeric_oracle": "2.4.21"
+    "jdk": "25.0.4.1+1-jvmci-25.3-b22",
+    "kotlin_numeric_oracle": "2.4.21",
+    "vm": "GraalVM CE 25.3.4.1+1.1"
   },
   "coverage": {
     "scanner": "ASan instrumentation added to every function attribute group, opt -passes=asan with explicit x86_64 Linux target; six report load/store symbol classes verified",
