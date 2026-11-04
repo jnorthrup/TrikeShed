@@ -1,0 +1,2 @@
+Tenant is a Person. A Person is an Agent.
+Source amended after synthetic review.

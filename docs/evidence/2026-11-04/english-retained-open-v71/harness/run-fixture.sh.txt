@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+retained_proof=/workspace/library-files/english-retained-open-final-proof
+export PROOF_ROOT=${1:?prepared positive or stale case directory required}
+export PROOF_SNAPSHOT=${2:?immutable snapshot required}
+retained_classes=${3:?fresh observer class directory required}
+export OUTBOUND_DENY_RECEIPT="$PROOF_ROOT/outbound-deny-profile.json"
+retained_cp=$(cat "$PROOF_SNAPSHOT/classpath.txt")
+timeout 780s python "$retained_proof/deny-egress.py" -- java -Xmx768m -cp "$retained_classes:$retained_cp" proof.englishretainedopen.FixtureKt
+retained_exit=$?
+printf '%s\n' "$retained_exit" > "$PROOF_ROOT/fixture-attempt1.exit"
+exit "$retained_exit"

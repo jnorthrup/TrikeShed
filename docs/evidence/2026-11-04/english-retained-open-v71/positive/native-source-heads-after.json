@@ -1,0 +1,29 @@
+{
+  "result": "PASS",
+  "scope": "Original selected source project head/manifest/policy/mirror bytes unchanged from its own actual closed archive. A new separate Manual navigation project was legitimately added; whole-ledger equality is not claimed. Positive and stale heads were never mixed or rewound.",
+  "sourceCurrentAtActualStartup": true,
+  "files": [
+    {
+      "path": "runtime/project-couch/english-taxonomy-fresh-profile-proof/HEAD",
+      "sha256": "42c214d75cb1cf24c02a73ecc7d3d040380d169a04a25ca76a2b463591e42e9c",
+      "unchanged": true
+    },
+    {
+      "path": "runtime/project-manifests/english-taxonomy-fresh-profile-proof.tsv",
+      "sha256": "311e47263ef040fe1db194cbad68efc1d921592130e878154f8898e98b7f9a66",
+      "unchanged": true
+    },
+    {
+      "path": "runtime/project-intake-policy/english-taxonomy-fresh-profile-proof.guard",
+      "sha256": "ea6faf550466382954e93ee1604d23e3e9db4dd1cf730d538433181e10eb6a84",
+      "unchanged": true
+    },
+    {
+      "path": "runtime/files/english-taxonomy-fresh-profile-proof/synthetic taxonomy copular clauses.txt",
+      "sha256": "efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "unchanged": true
+    }
+  ],
+  "originalLedgerRowsRetained": true,
+  "archiveSha256": "51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc"
+}

@@ -1,0 +1,44 @@
+{
+  "result": "PASS",
+  "scope": "Independent combined positive/stale native retained-open data audit. Separate actual producer archives3f958 current and96cf amended; no source-head rewind, merged contexts, new parser run, semantic interpretation or invented parser counter. After-close CAS/head audit is separate.",
+  "inputs": {
+    "stale/browser-result.json": "sha256:946a20011b44b8d9718e765b76d9597fc6f41bc82f86b96ff9a781466c39a321",
+    "stale/fixture-evidence.json": "sha256:ea7af39b9e371cfbee25c3d57b3d618ddd5dfc9eb950c59536a905b53a32094b",
+    "stale/cleanup.json": "sha256:4fdcb8646098b20d734872ed6d90a7fdcd3d390fb80615907c3233308f9ecd98",
+    "stale/setup.json": "sha256:757cc28a662f435c777afd88495aae3b2f60193816168d01cc24914515364c2e",
+    "positive/independent-audit/audit.cjs": "sha256:171d3f6d2c26df245d118b414e7287a6cabdcdaa4ef744020734b9d8f56d6c13",
+    "positive/independent-audit/audit.json": "sha256:ba70e57f8c77f272171dccfcebdab3e06785e1f599b31810a561faeb7e729a83"
+  },
+  "positive": {
+    "storedBlocks": 5,
+    "originalReceiptPreserved": true,
+    "sharedHeadCopularRows": 2,
+    "authoredRuns": 1,
+    "freshInspectPosts": 0
+  },
+  "stale": {
+    "sourceAmended": true,
+    "oldInspectionPreserved": true,
+    "requestUsesActualCurrentTuple": true,
+    "status": 409,
+    "historicalFallback": false
+  },
+  "negativeControls": [
+    {
+      "name": "head-rewind",
+      "result": "REFUSED"
+    },
+    {
+      "name": "historical-fallback",
+      "result": "REFUSED"
+    },
+    {
+      "name": "stale-turned-success",
+      "result": "REFUSED"
+    },
+    {
+      "name": "new-query",
+      "result": "REFUSED"
+    }
+  ]
+}
