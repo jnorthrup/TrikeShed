@@ -1,0 +1,53 @@
+{
+  "scope": "Actual frozen v62 public BeliefWire route direct call; no socket/browser/parser/model or live state",
+  "codeSource": "file:/workspace/library-files/nars-rdf-fidelity-v62-proof/snapshot/main.jar",
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "cases": [
+    {
+      "name": "malformed-kif",
+      "observation": {
+        "kind": "escaped-exception",
+        "exceptionType": "java.lang.IllegalArgumentException",
+        "admissionIssue": null
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    },
+    {
+      "name": "malformed-rdf",
+      "observation": {
+        "kind": "escaped-exception",
+        "exceptionType": "borg.trikeshed.rdf.SparqlError",
+        "admissionIssue": null
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    },
+    {
+      "name": "unsupported",
+      "observation": {
+        "kind": "escaped-exception",
+        "exceptionType": "java.lang.IllegalArgumentException",
+        "admissionIssue": null
+      },
+      "residentsAfterFailure": 0,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    },
+    {
+      "name": "known-pid-collision-with-admitted-prefix",
+      "observation": {
+        "kind": "escaped-exception",
+        "exceptionType": "borg.trikeshed.narsese.BeliefAdmissionRefused",
+        "admissionIssue": "PROPOSITION_MISMATCH"
+      },
+      "residentsAfterFailure": 1,
+      "actorHealthy": true,
+      "subsequentValidStatus": 200
+    }
+  ],
+  "fixtureBagsDrained": true
+}

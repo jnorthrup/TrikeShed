@@ -1,0 +1,20 @@
+{
+  "algorithm": "SHA-256",
+  "scope": "Published synthetic evidence files, excluding this manifest. Raw retained artifact hashes are separate.",
+  "files": {
+    "api-cas-result.json": "1815e458b131f03401a67c84022bf60d88469dbcbfb90b14450c8a1d54591b2e",
+    "cleanup.json": "c112fc0f2b3ddb063a0299d23d0a8c0facbf4ec2bb8bf8442c889da6580a7ed5",
+    "execution-identity.json": "8c2c7af4d383bd196277a6d4bf8f5e70a210b0e5c24d43f1c756367a0d03b150",
+    "fixture-methods.txt": "a6fc7eca0e435f4fd0fb8c4d71981e07498f1b8dca47c0551c634d6fa4464c6b",
+    "method.txt": "1a4e459fa3549057c5eb94fcdb2c3fae5bf38aec51ae8633800327a260f14ae1",
+    "pack-reader.json": "b5514d23f5fb3b11c9a72dca99cbdcd7a1ad25aed7bbb614c9a0d18fa7c52674",
+    "pack-writer.json": "690736c7f912f08c72361127dc25df6d8679c7b1fd75bbb86eec986e6813d8b4",
+    "retained-artifact-hashes.json": "e8d5bc8396b0efec04444a56ae40a7526531bbec1a93adeb58d79dd69437a156",
+    "retention-comparison.json": "d3caa67282204737327fcbc438205b55e4d66d36f3f74a1fac529190b184f541",
+    "retention-gap-before-v59-identity.json": "a6ced0fe93e5ca713fa6c807432edc09d0aa7aa65d74acb649407e82f212ea1c",
+    "retention-gap-before-v59.json": "14c268beedb189a6812594543b3ca673ac34940d67adb6bbf196c2668e890c56",
+    "route-errors-before-v62-identity.json": "a567d2f70d9adb595525b4f65825514ad4be72c8fc59ccd77bd57a83ceb2a88e",
+    "route-errors-before-v62.json": "8ffcbbdaa321d8b01522804b7eb35072ba1124de6c619245b59be8342d5b43ce",
+    "route-errors-comparison.json": "f123455159079df35348949840b1013ce4e77e86d619cd28042305e83613b759"
+  }
+}
