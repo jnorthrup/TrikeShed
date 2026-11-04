@@ -61,20 +61,20 @@ fun EvidenceLedger.cursor(): ColumnCursor {
 
 /**
  * The bag as the table `nars_beliefs`: angular, frequency and confidence (the bag's own truth horizon),
- * the budget's priority, durability and quality, relation, subjectCid, objectCid, provenanceCid, gloss.
+ * the budget's priority, durability and quality, relation, subjectCid, objectCid, provenanceCid, gloss, then optional propositionCid.
  */
 fun BeliefBagElement.cursor(): ColumnCursor = rowsCursor(
-    listOf("angular", "frequency", "confidence", "priority", "durability", "quality", "relation", "subjectCid", "objectCid", "provenanceCid", "gloss"),
+    _l["angular", "frequency", "confidence", "priority", "durability", "quality", "relation", "subjectCid", "objectCid", "provenanceCid", "gloss", "propositionCid"],
     snapshot().entries.sortedBy { it.key.a }.map { (key, signal) ->
         val angular = key.a
         val budget = BudgetCoord(key.b)
         val truth = Nal.truthOf(signal.evidence)
-        mapOf(
-            "angular" to angular, "frequency" to truth.frequency.toDouble(), "confidence" to truth.confidence.toDouble(),
-            "priority" to budget.pf.toDouble(), "durability" to budget.df.toDouble(), "quality" to budget.qf.toDouble(),
-            "relation" to signal.relation.name, "subjectCid" to signal.subjectCid, "objectCid" to signal.objectCid,
-            "provenanceCid" to signal.provenanceCid, "gloss" to glossOf(angular),
-        )
+        _m[
+            "angular" j angular, "frequency" j truth.frequency.toDouble(), "confidence" j truth.confidence.toDouble(),
+            "priority" j budget.pf.toDouble(), "durability" j budget.df.toDouble(), "quality" j budget.qf.toDouble(),
+            "relation" j signal.relation.name, "subjectCid" j signal.subjectCid, "objectCid" j signal.objectCid,
+            "provenanceCid" j signal.provenanceCid, "gloss" j glossOf(angular), "propositionCid" j signal.propositionCid,
+        ]
     },
-    mapOf("angular" to "int8", "frequency" to "float8", "confidence" to "float8", "priority" to "float8", "durability" to "float8", "quality" to "float8", "objectCid" to "text", "provenanceCid" to "text", "gloss" to "text"),
+    _m["angular" j "int8", "frequency" j "float8", "confidence" j "float8", "priority" j "float8", "durability" j "float8", "quality" j "float8", "objectCid" j "text", "provenanceCid" j "text", "gloss" j "text", "propositionCid" j "text"],
 )

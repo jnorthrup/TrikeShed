@@ -8,9 +8,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.boundLcnc
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 
 /**
  * NAL belief-bag LCNC nodes — thin wrappers over the already-built
@@ -61,14 +59,15 @@ object NalNodes {
                 (0 until sampled.size).map { i ->
                     val s = sampled[i].a
                     val b = sampled[i].b
-                    mapOf(
-                        "angular" to s.angular,
-                        "subject" to s.subjectCid,
-                        "evidence" to mapOf("wPlus" to s.evidence.positive, "wMinus" to s.evidence.negative),
-                        "priority" to b.pf,
-                        "durability" to b.df,
-                        "quality" to b.qf,
-                    )
+                    _m[
+                        "angular" j s.angular,
+                        "subject" j s.subjectCid,
+                        "propositionCid" j s.propositionCid,
+                        "evidence" j _m["wPlus" j s.evidence.positive, "wMinus" j s.evidence.negative],
+                        "priority" j b.pf,
+                        "durability" j b.df,
+                        "quality" j b.qf,
+                    ]
                 }
             }
             "near" -> {
@@ -77,11 +76,12 @@ object NalNodes {
                 val near = bag.recallNear(centroid, maxDistance)
                 (0 until near.size).map { i ->
                     val s = near[i]
-                    mapOf(
-                        "angular" to s.angular,
-                        "subject" to s.subjectCid,
-                        "evidence" to mapOf("wPlus" to s.evidence.positive, "wMinus" to s.evidence.negative),
-                    )
+                    _m[
+                        "angular" j s.angular,
+                        "subject" j s.subjectCid,
+                        "propositionCid" j s.propositionCid,
+                        "evidence" j _m["wPlus" j s.evidence.positive, "wMinus" j s.evidence.negative],
+                    ]
                 }
             }
             else -> { // "top"
@@ -89,18 +89,19 @@ object NalNodes {
                 (0 until top.size).map { i ->
                     val s = top[i].a
                     val b = top[i].b
-                    mapOf(
-                        "angular" to s.angular,
-                        "subject" to s.subjectCid,
-                        "evidence" to mapOf("wPlus" to s.evidence.positive, "wMinus" to s.evidence.negative),
-                        "priority" to b.pf,
-                        "durability" to b.df,
-                        "quality" to b.qf,
-                    )
+                    _m[
+                        "angular" j s.angular,
+                        "subject" j s.subjectCid,
+                        "propositionCid" j s.propositionCid,
+                        "evidence" j _m["wPlus" j s.evidence.positive, "wMinus" j s.evidence.negative],
+                        "priority" j b.pf,
+                        "durability" j b.df,
+                        "quality" j b.qf,
+                    ]
                 }
             }
         }
-        mapOf("beliefs" to beliefs)
+        _m["beliefs" j beliefs]
     }
 
     /**

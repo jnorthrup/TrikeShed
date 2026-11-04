@@ -79,3 +79,10 @@ compiler2.4.21 and immutable v55 dependencies, no friend access or Gradle. The f
 run lacked Compose's generated stability field; that fixture ABI failure was
 retained and corrected by using the actual compiler plugin, without changing
 production behavior. These source checks are not a final immutable-JAR claim.
+
+Read visibility: nars_beliefs appends optional propositionCid after the existing
+columns, preserving their indices. The HTTP beliefs listing and all three LCNC
+recall modes expose the same nullable CID string. Reading these surfaces changes
+neither evidence nor routing. A distinct proposition at the same natural angular
+still refuses; this does not provide coexistence, extra symbolic capacity, role
+inference or cross-document unification.
