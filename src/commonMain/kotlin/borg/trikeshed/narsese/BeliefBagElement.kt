@@ -43,8 +43,9 @@ sealed class BeliefIntake {
         val completion: CompletableDeferred<Unit>? = null,
     ) : BeliefIntake()
 
-    /** Evidence delta onto an existing angular; budget untouched. */
-    data class Reinforce(val angular: Long, val delta: EvidenceCoord, val receiptCid: ContentId? = null) : BeliefIntake()
+    /** Receipted observation onto an existing resident; exact ancestry is required and budget is untouched. */
+    data class Reinforce(val angular: Long, val delta: EvidenceCoord, val receiptCid: ContentId? = null,
+        val evidenceBasis: EvidenceBasis? = null, val completion: CompletableDeferred<Unit>? = null) : BeliefIntake()
 
     /** Attention change only: rekey to the new budget; evidence untouched. */
     data class Attend(val angular: Long, val budget: BudgetCoord) : BeliefIntake()
@@ -64,7 +65,7 @@ sealed class BeliefEvent {
     data class Contradicted(val angular: Long, val subjectCid: String) : BeliefEvent()
 }
 
-enum class BeliefAdmissionIssue { STRUCTURE_MISMATCH, UNRESOLVED_BASIS, ARCHIVE_UNAVAILABLE }
+enum class BeliefAdmissionIssue { STRUCTURE_MISMATCH, UNRESOLVED_BASIS, ARCHIVE_UNAVAILABLE, RECEIPT_REQUIRED, RESIDENT_REQUIRED }
 
 /** Per-command refusal; unlike a failed WAL append, this does not stop the owning intake worker. */
 class BeliefAdmissionRefused(val angular: Long, val issue: BeliefAdmissionIssue, cause: Throwable? = null) :
@@ -171,6 +172,7 @@ class BeliefBagElement(
                 for (cmd in intake) {
                     val completion = when (cmd) {
                         is BeliefIntake.Mint -> cmd.completion
+                        is BeliefIntake.Reinforce -> cmd.completion
                         is BeliefIntake.Fence -> cmd.completion
                         else -> null
                     }
@@ -199,6 +201,7 @@ class BeliefBagElement(
                     val pending = intake.tryReceive().getOrNull() ?: break
                     val completion = when (pending) {
                         is BeliefIntake.Mint -> pending.completion
+                        is BeliefIntake.Reinforce -> pending.completion
                         is BeliefIntake.Fence -> pending.completion
                         else -> null
                     }
@@ -210,6 +213,14 @@ class BeliefBagElement(
 
     /** Await the existing single writer, including its WAL append/flush policy. */
     suspend fun submit(cmd: BeliefIntake.Mint) {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(cmd.copy(completion = completion))
+        completion.await()
+    }
+
+    /** The same processed acknowledgement/refusal boundary for a receipted evidence revision. */
+    suspend fun submit(cmd: BeliefIntake.Reinforce) {
         check(worker != null) { "Belief bag is not open" }
         val completion = CompletableDeferred<Unit>()
         intake.send(cmd.copy(completion = completion))
@@ -306,7 +317,7 @@ class BeliefBagElement(
     private suspend fun handle(cmd: BeliefIntake) {
         when (cmd) {
             is BeliefIntake.Mint -> mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis, cmd.gloss)
-            is BeliefIntake.Reinforce -> reinforce(cmd.angular, cmd.delta)
+            is BeliefIntake.Reinforce -> reinforce(cmd)
             is BeliefIntake.Attend -> attend(cmd.angular, cmd.budget)
             BeliefIntake.DecayTick -> decayAll()
             is BeliefIntake.Fence -> return
@@ -414,12 +425,15 @@ class BeliefBagElement(
         return EvidenceBasis.of(*leaves.toTypedArray())
     }
 
-    private fun reinforce(angular: Long, delta: EvidenceCoord) {
-        val existing = hijack.get(angular) ?: return
-        val merged = existing.signal.copy(evidence = revise(existing.signal.evidence, delta))
-        hijack.put(HijackBeliefBag.Slot(angular, existing.budget, merged)) { _, inc -> inc }
-        walAppend("B:${existing.budget.packed}:" + SignalCodec.encode(merged).decodeToString())
-        _events.tryEmit(BeliefEvent.Revised(angular, merged.evidence))
+    private fun reinforce(command: BeliefIntake.Reinforce) {
+        val receipt = command.receiptCid ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.RECEIPT_REQUIRED)
+        val basis = command.evidenceBasis?.takeIf { it.leaves.size > 0 }
+            ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.UNRESOLVED_BASIS)
+        val existing = hijack.get(command.angular)
+            ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.RESIDENT_REQUIRED)
+        // Reuse exactly the structural, duplicate, ancestry, CAS and WAL path used by Mint.
+        // No relevance or user-memory deletion can become independent evidence through this command.
+        mint(existing.signal.copy(evidence = command.delta, provenanceCid = receipt.value), existing.budget, receipt, basis)
     }
 
     private fun attend(angular: Long, budget: BudgetCoord) {

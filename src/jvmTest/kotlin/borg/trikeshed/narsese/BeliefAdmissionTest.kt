@@ -3,6 +3,7 @@ package borg.trikeshed.narsese
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.*
+import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
 import kotlin.test.*
@@ -215,5 +216,90 @@ class BeliefAdmissionTest {
                 assertNotNull(bag.signalOf(73))
             }
         }
+    }
+
+    @Test fun reinforcementRequiresReceiptsAndNeverTurnsRepeatedSourcesIntoNewEvidence() = runBlocking {
+        withTimeout(10_000) { withBag { bag ->
+            mint(bag, signal(81), "reinforce-seed")
+            val budget = bag.budgetOf(81)
+            refused(BeliefAdmissionIssue.RECEIPT_REQUIRED) {
+                bag.submit(BeliefIntake.Reinforce(81, EvidenceCoord(100, 0)))
+            }
+            for (basis in s_[null, EvidenceBasis.of()].view) refused(BeliefAdmissionIssue.UNRESOLVED_BASIS) {
+                bag.submit(BeliefIntake.Reinforce(81, EvidenceCoord(100, 0), receipt("unbased-reinforce"), basis))
+            }
+            refused(BeliefAdmissionIssue.RESIDENT_REQUIRED) {
+                bag.submit(BeliefIntake.Reinforce(999, EvidenceCoord(1, 0), receipt("nonresident"), EvidenceBasis.of(b)))
+            }
+            assertEquals(EvidenceCoord(1, 0), bag.signalOf(81)?.evidence)
+            // An explicitly sourced independent negative observation is still accepted.
+            bag.submit(BeliefIntake.Reinforce(81, EvidenceCoord(0, 1), receipt("independent-negative"), EvidenceBasis.of(b)))
+            assertEquals(EvidenceCoord(1, 1), bag.signalOf(81)?.evidence)
+            assertEquals(receipt("independent-negative").value, bag.signalOf(81)?.provenanceCid)
+            repeat(20) {
+                bag.submit(BeliefIntake.Reinforce(81, EvidenceCoord(100, 100), receipt("independent-negative"), EvidenceBasis.of(b)))
+            }
+            bag.submit(BeliefIntake.Reinforce(81, EvidenceCoord(100, 100), receipt("same-source-new-receipt"), EvidenceBasis.of(b)))
+            assertEquals(EvidenceCoord(1, 1), bag.signalOf(81)?.evidence)
+            val c = receipt("synthetic-source-C")
+            bag.submit(BeliefIntake.Reinforce(81, EvidenceCoord(1, 0), receipt("independent-positive"), EvidenceBasis.of(c)))
+            assertEquals(EvidenceCoord(2, 1), bag.signalOf(81)?.evidence)
+            assertEquals(budget, bag.budgetOf(81))
+            assertEquals("original", bag.glossOf(81))
+        } }
+    }
+
+    @Test fun reinforcementCannotBypassUnknownAncestryAfterLegacyAdmissionOrWalReplay() = runBlocking {
+        withTimeout(10_000) {
+            withBag { bag ->
+                mint(bag, signal(91), "legacy-reinforce", basis = null)
+                refused(BeliefAdmissionIssue.UNRESOLVED_BASIS) {
+                    bag.submit(BeliefIntake.Reinforce(91, EvidenceCoord(10, 0), receipt("legacy-new-receipt"), EvidenceBasis.of(b)))
+                }
+                assertEquals(EvidenceCoord(1, 0), bag.signalOf(91)?.evidence)
+            }
+            val cas = CasStore.inMemory(); val wal = Frames()
+            withBag(cas, wal) { bag -> mint(bag, signal(92), "before-reinforce-replay") }
+            withBag(cas, wal) { bag ->
+                // Same-receipt replay is a no-op, not a way to assign new ancestry to old history.
+                bag.submit(BeliefIntake.Reinforce(92, EvidenceCoord(100, 0), receipt("before-reinforce-replay"), EvidenceBasis.of(a)))
+                refused(BeliefAdmissionIssue.UNRESOLVED_BASIS) {
+                    bag.submit(BeliefIntake.Reinforce(92, EvidenceCoord(1, 0), receipt("after-replay-new"), EvidenceBasis.of(b)))
+                }
+                bag.intake.send(BeliefIntake.Reinforce(92, EvidenceCoord(100, 0)))
+                bag.awaitProcessed()
+                assertEquals(BeliefAdmissionIssue.RECEIPT_REQUIRED, bag.lastAdmissionRefusal?.issue)
+                assertEquals(EvidenceCoord(1, 0), bag.signalOf(92)?.evidence)
+                mint(bag, signal(93), "healthy-after-reinforce-refusal")
+                assertNotNull(bag.signalOf(93))
+            }
+        }
+    }
+
+    @Test fun lcncReinforcementRequiresSourceFieldsAndReportsOnlyProcessedCommands() = runBlocking {
+        withTimeout(10_000) { withBag { bag ->
+            mint(bag, signal(101), "lcnc-seed")
+            val runner = BeliefsNodes.reinforceRunner(bag)
+            val node = LcncNode("revision", "nal.reinforce", _m["angular" j "101", "wPlus" j "0", "wMinus" j "1"])
+            assertFailsWith<IllegalArgumentException> { runner.run(node, emptyMap()) }
+            assertFailsWith<IllegalArgumentException> { runner.run(node, _m["receiptCid" j receipt("node-negative").value]) }
+            val inputs = _m["receiptCid" j receipt("node-negative").value, "basis" j _l[b.value]]
+            for (invalid in s_[101.5, Double.NaN, 9_007_199_254_740_992.0].view)
+                assertFailsWith<IllegalArgumentException> { runner.run(node, inputs + _m["angular" j invalid]) }
+            for (invalid in s_["-1", "NaN", "Infinity", "999999999999"].view)
+                assertFailsWith<IllegalArgumentException> { runner.run(node.copy(params = node.params + _m["wPlus" j invalid]), inputs) }
+            assertEquals(EvidenceCoord(1, 0), bag.signalOf(101)?.evidence)
+            val output = runner.run(node, inputs)["revised"] as Map<*, *>
+            assertEquals(true, output["processed"])
+            assertEquals(Nal.UNIT, output["requestedWMinus"])
+            assertEquals(EvidenceCoord(1, Nal.UNIT), bag.signalOf(101)?.evidence)
+            runner.run(node, inputs)
+            assertEquals(EvidenceCoord(1, Nal.UNIT), bag.signalOf(101)?.evidence)
+            val parameterNode = node.copy(params = node.params + _m["receiptCid" j receipt("node-negative").value,
+                "basis" j borg.trikeshed.parse.jsonOf(_l[b.value])])
+            assertEquals(true, (runner.run(parameterNode, emptyMap())["revised"] as Map<*, *>)["processed"])
+            assertEquals(EvidenceCoord(1, Nal.UNIT), bag.signalOf(101)?.evidence)
+            assertFailsWith<IllegalArgumentException> { runner.run(node, inputs + _m["basis" j emptyList<String>()]) }
+        } }
     }
 }
