@@ -1,0 +1,6 @@
+locator.waitFor: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('region', { name: 'Workspace facets' }).locator('[data-body] > p').filter({ hasText: /^Read a copular syntax diagram\n/ }) to be visible[22m
+
+    at loadPreset (/workspace/library-files/english-copular-v68-proof/driver.cjs:29:295)
+    at async main (/workspace/library-files/english-copular-v68-proof/driver.cjs:30:3)

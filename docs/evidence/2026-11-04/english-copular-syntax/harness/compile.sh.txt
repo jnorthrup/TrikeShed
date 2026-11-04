@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+copular_proof=/workspace/library-files/english-copular-v68-proof
+copular_snapshot=${1:?immutable snapshot required}
+copular_output=${2:?new output directory required}
+copular_cp=$(cat "$copular_snapshot/classpath.txt")
+copular_compiler=$(rg --files --no-ignore /workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21 | rg '\.jar$' | head -n 1)
+mkdir "$copular_output"
+java -Xmx768m -cp "$copular_compiler:$copular_cp" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+ -no-stdlib -no-reflect -jvm-target 25 -classpath "$copular_cp" \
+ -d "$copular_output" "$copular_proof/Fixture.kt" "$copular_proof/Reopen.kt" "$copular_proof/ResumeFixture.kt" "$copular_proof/EvidenceFixture.kt"

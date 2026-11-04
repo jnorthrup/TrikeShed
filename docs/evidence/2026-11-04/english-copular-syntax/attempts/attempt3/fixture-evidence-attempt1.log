@@ -1,0 +1,46 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/workspace/.trikeshed-cloud/home -Djavax.net.ssl.trustStore=/workspace/.trikeshed-cloud/trust/cacerts
+WARNING: A restricted method in java.lang.foreign.Linker has been called
+WARNING: java.lang.foreign.Linker::downcallHandle has been called by borg.trikeshed.userspace.LibcDowncall in an unnamed module (file:/workspace/library-files/english-copular-v68-proof/snapshot/main.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+ENGLISH_COPULAR_EVIDENCE_URL=http://127.0.0.1:39395
+[To redirect Truffle log output to a file use one of the following options:
+* '--log.file=<path>' if the option is passed using a guest language launcher.
+* '-Dpolyglot.log.file=<path>' if the option is passed using the host Java launcher.
+* Configure logging using the polyglot embedding API.]
+[engine] WARNING: The polyglot engine uses a fallback runtime that does not support runtime compilation to native code.
+Execution without runtime compilation will negatively impact the guest application performance.
+The following cause was found: Version check failed.
+Your Java runtime '25.0.4+7-LTS-jvmci-b01' with compiler version '25.0.4' is incompatible with polyglot version '25.3.4.1'.
+Update the Java runtime to the latest update release of JDK '25'.
+To disable this version check the '-Dpolyglotimpl.DisableVersionChecks=true' system property can be used.
+It is not recommended to disable version checks.
+
+For more information see: https://www.graalvm.org/latest/reference-manual/embed-languages/#runtime-optimization-support.
+To disable this warning use the '--engine.WarnInterpreterOnly=false' option or the '-Dpolyglot.engine.WarnInterpreterOnly=false' system property.
+[To redirect Truffle log output to a file use one of the following options:
+* '--log.file=<path>' if the option is passed using a guest language launcher.
+* '-Dpolyglot.log.file=<path>' if the option is passed using the host Java launcher.
+* Configure logging using the polyglot embedding API.]
+[engine] WARNING: The polyglot engine uses a fallback runtime that does not support runtime compilation to native code.
+Execution without runtime compilation will negatively impact the guest application performance.
+The following cause was found: Version check failed.
+Your Java runtime '25.0.4+7-LTS-jvmci-b01' with compiler version '25.0.4' is incompatible with polyglot version '25.3.4.1'.
+Update the Java runtime to the latest update release of JDK '25'.
+To disable this version check the '-Dpolyglotimpl.DisableVersionChecks=true' system property can be used.
+It is not recommended to disable version checks.
+
+For more information see: https://www.graalvm.org/latest/reference-manual/embed-languages/#runtime-optimization-support.
+To disable this warning use the '--engine.WarnInterpreterOnly=false' option or the '-Dpolyglot.engine.WarnInterpreterOnly=false' system property.
+java.lang.IllegalArgumentException: Required value was null.
+	at proof.englishcopularevidence.EvidenceFixtureKt$main$1.invokeSuspend$lambda$16(EvidenceFixture.kt:160)
+	at jdk.httpserver/com.sun.net.httpserver.Filter$Chain.doFilter(Filter.java:98)
+	at jdk.httpserver/sun.net.httpserver.AuthFilter.doFilter(AuthFilter.java:76)
+	at jdk.httpserver/com.sun.net.httpserver.Filter$Chain.doFilter(Filter.java:101)
+	at jdk.httpserver/sun.net.httpserver.ServerImpl$Exchange$LinkHandler.handle(ServerImpl.java:924)
+	at jdk.httpserver/com.sun.net.httpserver.Filter$Chain.doFilter(Filter.java:98)
+	at jdk.httpserver/sun.net.httpserver.ServerImpl$Exchange.run(ServerImpl.java:900)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614)
+	at java.base/java.lang.Thread.run(Thread.java:1474)

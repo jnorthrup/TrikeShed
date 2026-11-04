@@ -1,0 +1,4684 @@
+{
+  "observations": {
+    "upload": {
+      "status": "Added 1 files to english-copular-fresh-proof. Parsing finished: 0 extracted, 0 failed. Content remains unreviewed. Open uploaded project",
+      "priorSelectionPreserved": true
+    },
+    "inspection": {
+      "schema": "trikeshed.english-inspection.v1",
+      "reviewStatus": "unreviewed",
+      "authority": "lexical-and-parser-observations-only",
+      "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+      "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+      "range": {
+        "begin": 0,
+        "end": 228,
+        "totalLength": 228,
+        "complete": true
+      },
+      "parser": {
+        "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+        "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+        "runtime": {
+          "module": "corenlp",
+          "profile": "syntax-v1",
+          "dependencyGraph": "enhanced-plus-plus",
+          "dependencyNodeIdentity": "token-index+copy-count/1",
+          "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+          "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+          "jar": "stanford-corenlp-4.6.0.jar",
+          "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+          "packageVersion": "4.6.0",
+          "parserNormalization": "sentence-case/1",
+          "sourceTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+          "parserInputCid": "sha256:329c5ffc3a46db70561bd0f76bbb7dc556ccbc3fe0cfb2b3a4dbe9be8a6e1b7f",
+          "relationGlossSource": "parser-input"
+        },
+        "configuration": {
+          "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+          "threads": "1"
+        }
+      },
+      "coverage": {
+        "kind": "bounded-text-range",
+        "semantics": "not-established",
+        "markerMethod": "literal-word-and-phrase-candidates",
+        "dependencyNodeIdentity": "token-index+copy-count/1",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "scope": "sentence-token-dependency-observations",
+        "omitted": [
+          "constituency",
+          "coreference",
+          "openie",
+          "kbp",
+          "legal-interpretation"
+        ]
+      },
+      "sentences": [
+        {
+          "index": 0,
+          "begin": 0,
+          "end": 89,
+          "quote": "THE TENANT MUST NOT DISCLOSE CUSTOMER DATA UNLESS THE CUSTOMER HAS GIVEN WRITTEN CONSENT.",
+          "quotation": {
+            "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "begin": 0,
+            "end": 89,
+            "quote": "THE TENANT MUST NOT DISCLOSE CUSTOMER DATA UNLESS THE CUSTOMER HAS GIVEN WRITTEN CONSENT.",
+            "anchors": [],
+            "unresolved": [
+              "page",
+              "folio",
+              "section",
+              "table",
+              "diagram",
+              "coordinates"
+            ],
+            "category": "document",
+            "provenance": {
+              "extractionKind": "identity-utf8",
+              "reviewStatus": "unreviewed"
+            },
+            "authentication": "unverified",
+            "quotationSource": "extracted-text"
+          },
+          "tokens": [
+            {
+              "index": 1,
+              "begin": 0,
+              "end": 3,
+              "word": "THE",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O"
+            },
+            {
+              "index": 2,
+              "begin": 4,
+              "end": 10,
+              "word": "TENANT",
+              "lemma": "tenant",
+              "pos": "NN",
+              "ner": "O"
+            },
+            {
+              "index": 3,
+              "begin": 11,
+              "end": 15,
+              "word": "MUST",
+              "lemma": "must",
+              "pos": "MD",
+              "ner": "O"
+            },
+            {
+              "index": 4,
+              "begin": 16,
+              "end": 19,
+              "word": "NOT",
+              "lemma": "not",
+              "pos": "RB",
+              "ner": "O"
+            },
+            {
+              "index": 5,
+              "begin": 20,
+              "end": 28,
+              "word": "DISCLOSE",
+              "lemma": "disclose",
+              "pos": "VB",
+              "ner": "O"
+            },
+            {
+              "index": 6,
+              "begin": 29,
+              "end": 37,
+              "word": "CUSTOMER",
+              "lemma": "customer",
+              "pos": "NN",
+              "ner": "O"
+            },
+            {
+              "index": 7,
+              "begin": 38,
+              "end": 42,
+              "word": "DATA",
+              "lemma": "datum",
+              "pos": "NNS",
+              "ner": "O"
+            },
+            {
+              "index": 8,
+              "begin": 43,
+              "end": 49,
+              "word": "UNLESS",
+              "lemma": "unless",
+              "pos": "IN",
+              "ner": "O"
+            },
+            {
+              "index": 9,
+              "begin": 50,
+              "end": 53,
+              "word": "THE",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O"
+            },
+            {
+              "index": 10,
+              "begin": 54,
+              "end": 62,
+              "word": "CUSTOMER",
+              "lemma": "customer",
+              "pos": "NN",
+              "ner": "O"
+            },
+            {
+              "index": 11,
+              "begin": 63,
+              "end": 66,
+              "word": "HAS",
+              "lemma": "have",
+              "pos": "VBZ",
+              "ner": "O"
+            },
+            {
+              "index": 12,
+              "begin": 67,
+              "end": 72,
+              "word": "GIVEN",
+              "lemma": "give",
+              "pos": "VBN",
+              "ner": "O"
+            },
+            {
+              "index": 13,
+              "begin": 73,
+              "end": 80,
+              "word": "WRITTEN",
+              "lemma": "write",
+              "pos": "VBN",
+              "ner": "O"
+            },
+            {
+              "index": 14,
+              "begin": 81,
+              "end": 88,
+              "word": "CONSENT",
+              "lemma": "consent",
+              "pos": "NN",
+              "ner": "O"
+            },
+            {
+              "index": 15,
+              "begin": 88,
+              "end": 89,
+              "word": ".",
+              "lemma": ".",
+              "pos": ".",
+              "ner": "O"
+            }
+          ],
+          "nodes": [
+            {
+              "index": 1,
+              "begin": 0,
+              "end": 3,
+              "word": "THE",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O",
+              "id": "1:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 2,
+              "begin": 4,
+              "end": 10,
+              "word": "TENANT",
+              "lemma": "tenant",
+              "pos": "NN",
+              "ner": "O",
+              "id": "2:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 3,
+              "begin": 11,
+              "end": 15,
+              "word": "MUST",
+              "lemma": "must",
+              "pos": "MD",
+              "ner": "O",
+              "id": "3:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 4,
+              "begin": 16,
+              "end": 19,
+              "word": "NOT",
+              "lemma": "not",
+              "pos": "RB",
+              "ner": "O",
+              "id": "4:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 5,
+              "begin": 20,
+              "end": 28,
+              "word": "DISCLOSE",
+              "lemma": "disclose",
+              "pos": "VB",
+              "ner": "O",
+              "id": "5:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 6,
+              "begin": 29,
+              "end": 37,
+              "word": "CUSTOMER",
+              "lemma": "customer",
+              "pos": "NN",
+              "ner": "O",
+              "id": "6:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 7,
+              "begin": 38,
+              "end": 42,
+              "word": "DATA",
+              "lemma": "datum",
+              "pos": "NNS",
+              "ner": "O",
+              "id": "7:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 8,
+              "begin": 43,
+              "end": 49,
+              "word": "UNLESS",
+              "lemma": "unless",
+              "pos": "IN",
+              "ner": "O",
+              "id": "8:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 9,
+              "begin": 50,
+              "end": 53,
+              "word": "THE",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O",
+              "id": "9:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 10,
+              "begin": 54,
+              "end": 62,
+              "word": "CUSTOMER",
+              "lemma": "customer",
+              "pos": "NN",
+              "ner": "O",
+              "id": "10:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 11,
+              "begin": 63,
+              "end": 66,
+              "word": "HAS",
+              "lemma": "have",
+              "pos": "VBZ",
+              "ner": "O",
+              "id": "11:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 12,
+              "begin": 67,
+              "end": 72,
+              "word": "GIVEN",
+              "lemma": "give",
+              "pos": "VBN",
+              "ner": "O",
+              "id": "12:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 13,
+              "begin": 73,
+              "end": 80,
+              "word": "WRITTEN",
+              "lemma": "write",
+              "pos": "VBN",
+              "ner": "O",
+              "id": "13:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 14,
+              "begin": 81,
+              "end": 88,
+              "word": "CONSENT",
+              "lemma": "consent",
+              "pos": "NN",
+              "ner": "O",
+              "id": "14:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 15,
+              "begin": 88,
+              "end": 89,
+              "word": ".",
+              "lemma": ".",
+              "pos": ".",
+              "ner": "O",
+              "id": "15:0",
+              "copy": 0,
+              "kind": "token"
+            }
+          ],
+          "dependencies": [
+            {
+              "governor": 0,
+              "dependent": 5,
+              "relation": "root",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "0:0",
+              "dependentNode": "5:0"
+            },
+            {
+              "governor": 2,
+              "dependent": 1,
+              "relation": "det",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "2:0",
+              "dependentNode": "1:0"
+            },
+            {
+              "governor": 5,
+              "dependent": 2,
+              "relation": "nsubj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "5:0",
+              "dependentNode": "2:0"
+            },
+            {
+              "governor": 5,
+              "dependent": 3,
+              "relation": "aux",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "5:0",
+              "dependentNode": "3:0"
+            },
+            {
+              "governor": 5,
+              "dependent": 4,
+              "relation": "advmod",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "5:0",
+              "dependentNode": "4:0"
+            },
+            {
+              "governor": 7,
+              "dependent": 6,
+              "relation": "compound",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "7:0",
+              "dependentNode": "6:0"
+            },
+            {
+              "governor": 5,
+              "dependent": 7,
+              "relation": "obj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "5:0",
+              "dependentNode": "7:0"
+            },
+            {
+              "governor": 12,
+              "dependent": 8,
+              "relation": "mark",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "12:0",
+              "dependentNode": "8:0"
+            },
+            {
+              "governor": 10,
+              "dependent": 9,
+              "relation": "det",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "10:0",
+              "dependentNode": "9:0"
+            },
+            {
+              "governor": 12,
+              "dependent": 10,
+              "relation": "nsubj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "12:0",
+              "dependentNode": "10:0"
+            },
+            {
+              "governor": 12,
+              "dependent": 11,
+              "relation": "aux",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "12:0",
+              "dependentNode": "11:0"
+            },
+            {
+              "governor": 5,
+              "dependent": 12,
+              "relation": "advcl:unless",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "5:0",
+              "dependentNode": "12:0"
+            },
+            {
+              "governor": 14,
+              "dependent": 13,
+              "relation": "amod",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "14:0",
+              "dependentNode": "13:0"
+            },
+            {
+              "governor": 12,
+              "dependent": 14,
+              "relation": "obj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "12:0",
+              "dependentNode": "14:0"
+            },
+            {
+              "governor": 5,
+              "dependent": 15,
+              "relation": "punct",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "5:0",
+              "dependentNode": "15:0"
+            }
+          ],
+          "markers": [
+            {
+              "kind": "modal",
+              "label": "modal-marker",
+              "begin": 11,
+              "end": 15,
+              "quote": "MUST",
+              "status": "lexical-candidate"
+            },
+            {
+              "kind": "negation",
+              "label": "negation-marker",
+              "begin": 16,
+              "end": 19,
+              "quote": "NOT",
+              "status": "lexical-candidate"
+            },
+            {
+              "kind": "condition",
+              "label": "condition-marker",
+              "begin": 43,
+              "end": 49,
+              "quote": "UNLESS",
+              "status": "lexical-candidate"
+            },
+            {
+              "kind": "exception",
+              "label": "exception-marker",
+              "begin": 43,
+              "end": 49,
+              "quote": "UNLESS",
+              "status": "lexical-candidate"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "begin": 91,
+          "end": 145,
+          "quote": "The requirements for sellers and for buyers are clear.",
+          "quotation": {
+            "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "begin": 91,
+            "end": 145,
+            "quote": "The requirements for sellers and for buyers are clear.",
+            "anchors": [],
+            "unresolved": [
+              "page",
+              "folio",
+              "section",
+              "table",
+              "diagram",
+              "coordinates"
+            ],
+            "category": "document",
+            "provenance": {
+              "extractionKind": "identity-utf8",
+              "reviewStatus": "unreviewed"
+            },
+            "authentication": "unverified",
+            "quotationSource": "extracted-text"
+          },
+          "tokens": [
+            {
+              "index": 1,
+              "begin": 91,
+              "end": 94,
+              "word": "The",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O"
+            },
+            {
+              "index": 2,
+              "begin": 95,
+              "end": 107,
+              "word": "requirements",
+              "lemma": "requirement",
+              "pos": "NNS",
+              "ner": "O"
+            },
+            {
+              "index": 3,
+              "begin": 108,
+              "end": 111,
+              "word": "for",
+              "lemma": "for",
+              "pos": "IN",
+              "ner": "O"
+            },
+            {
+              "index": 4,
+              "begin": 112,
+              "end": 119,
+              "word": "sellers",
+              "lemma": "seller",
+              "pos": "NNS",
+              "ner": "O"
+            },
+            {
+              "index": 5,
+              "begin": 120,
+              "end": 123,
+              "word": "and",
+              "lemma": "and",
+              "pos": "CC",
+              "ner": "O"
+            },
+            {
+              "index": 6,
+              "begin": 124,
+              "end": 127,
+              "word": "for",
+              "lemma": "for",
+              "pos": "IN",
+              "ner": "O"
+            },
+            {
+              "index": 7,
+              "begin": 128,
+              "end": 134,
+              "word": "buyers",
+              "lemma": "buyer",
+              "pos": "NNS",
+              "ner": "O"
+            },
+            {
+              "index": 8,
+              "begin": 135,
+              "end": 138,
+              "word": "are",
+              "lemma": "be",
+              "pos": "VBP",
+              "ner": "O"
+            },
+            {
+              "index": 9,
+              "begin": 139,
+              "end": 144,
+              "word": "clear",
+              "lemma": "clear",
+              "pos": "JJ",
+              "ner": "O"
+            },
+            {
+              "index": 10,
+              "begin": 144,
+              "end": 145,
+              "word": ".",
+              "lemma": ".",
+              "pos": ".",
+              "ner": "O"
+            }
+          ],
+          "nodes": [
+            {
+              "index": 1,
+              "begin": 91,
+              "end": 94,
+              "word": "The",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O",
+              "id": "1:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 2,
+              "begin": 95,
+              "end": 107,
+              "word": "requirements",
+              "lemma": "requirement",
+              "pos": "NNS",
+              "ner": "O",
+              "id": "2:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 2,
+              "begin": 95,
+              "end": 107,
+              "word": "requirements",
+              "lemma": "requirement",
+              "pos": "NNS",
+              "ner": "O",
+              "id": "2:3",
+              "copy": 3,
+              "kind": "copy"
+            },
+            {
+              "index": 3,
+              "begin": 108,
+              "end": 111,
+              "word": "for",
+              "lemma": "for",
+              "pos": "IN",
+              "ner": "O",
+              "id": "3:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 4,
+              "begin": 112,
+              "end": 119,
+              "word": "sellers",
+              "lemma": "seller",
+              "pos": "NNS",
+              "ner": "O",
+              "id": "4:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 5,
+              "begin": 120,
+              "end": 123,
+              "word": "and",
+              "lemma": "and",
+              "pos": "CC",
+              "ner": "O",
+              "id": "5:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 6,
+              "begin": 124,
+              "end": 127,
+              "word": "for",
+              "lemma": "for",
+              "pos": "IN",
+              "ner": "O",
+              "id": "6:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 7,
+              "begin": 128,
+              "end": 134,
+              "word": "buyers",
+              "lemma": "buyer",
+              "pos": "NNS",
+              "ner": "O",
+              "id": "7:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 8,
+              "begin": 135,
+              "end": 138,
+              "word": "are",
+              "lemma": "be",
+              "pos": "VBP",
+              "ner": "O",
+              "id": "8:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 9,
+              "begin": 139,
+              "end": 144,
+              "word": "clear",
+              "lemma": "clear",
+              "pos": "JJ",
+              "ner": "O",
+              "id": "9:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 10,
+              "begin": 144,
+              "end": 145,
+              "word": ".",
+              "lemma": ".",
+              "pos": ".",
+              "ner": "O",
+              "id": "10:0",
+              "copy": 0,
+              "kind": "token"
+            }
+          ],
+          "dependencies": [
+            {
+              "governor": 0,
+              "dependent": 9,
+              "relation": "root",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "0:0",
+              "dependentNode": "9:0"
+            },
+            {
+              "governor": 2,
+              "dependent": 1,
+              "relation": "det",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "2:0",
+              "dependentNode": "1:0"
+            },
+            {
+              "governor": 9,
+              "dependent": 2,
+              "relation": "nsubj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "9:0",
+              "dependentNode": "2:0"
+            },
+            {
+              "governor": 2,
+              "dependent": 2,
+              "relation": "conj:and",
+              "governorCopy": 0,
+              "dependentCopy": 3,
+              "governorNode": "2:0",
+              "dependentNode": "2:3"
+            },
+            {
+              "governor": 9,
+              "dependent": 2,
+              "relation": "nsubj",
+              "governorCopy": 0,
+              "dependentCopy": 3,
+              "governorNode": "9:0",
+              "dependentNode": "2:3"
+            },
+            {
+              "governor": 4,
+              "dependent": 3,
+              "relation": "case",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "4:0",
+              "dependentNode": "3:0"
+            },
+            {
+              "governor": 2,
+              "dependent": 4,
+              "relation": "nmod:for",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "2:0",
+              "dependentNode": "4:0"
+            },
+            {
+              "governor": 2,
+              "dependent": 5,
+              "relation": "cc",
+              "governorCopy": 3,
+              "dependentCopy": 0,
+              "governorNode": "2:3",
+              "dependentNode": "5:0"
+            },
+            {
+              "governor": 7,
+              "dependent": 6,
+              "relation": "case",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "7:0",
+              "dependentNode": "6:0"
+            },
+            {
+              "governor": 2,
+              "dependent": 7,
+              "relation": "nmod:for",
+              "governorCopy": 3,
+              "dependentCopy": 0,
+              "governorNode": "2:3",
+              "dependentNode": "7:0"
+            },
+            {
+              "governor": 9,
+              "dependent": 8,
+              "relation": "cop",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "9:0",
+              "dependentNode": "8:0"
+            },
+            {
+              "governor": 9,
+              "dependent": 10,
+              "relation": "punct",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "9:0",
+              "dependentNode": "10:0"
+            }
+          ],
+          "markers": []
+        },
+        {
+          "index": 2,
+          "begin": 147,
+          "end": 226,
+          "quote": "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+          "quotation": {
+            "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "begin": 147,
+            "end": 226,
+            "quote": "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+            "anchors": [],
+            "unresolved": [
+              "page",
+              "folio",
+              "section",
+              "table",
+              "diagram",
+              "coordinates"
+            ],
+            "category": "document",
+            "provenance": {
+              "extractionKind": "identity-utf8",
+              "reviewStatus": "unreviewed"
+            },
+            "authentication": "unverified",
+            "quotationSource": "extracted-text"
+          },
+          "tokens": [
+            {
+              "index": 1,
+              "begin": 147,
+              "end": 153,
+              "word": "Tenant",
+              "lemma": "tenant",
+              "pos": "NN",
+              "ner": "O"
+            },
+            {
+              "index": 2,
+              "begin": 154,
+              "end": 157,
+              "word": "may",
+              "lemma": "may",
+              "pos": "MD",
+              "ner": "O"
+            },
+            {
+              "index": 3,
+              "begin": 158,
+              "end": 164,
+              "word": "occupy",
+              "lemma": "occupy",
+              "pos": "VB",
+              "ner": "O"
+            },
+            {
+              "index": 4,
+              "begin": 165,
+              "end": 171,
+              "word": "unless",
+              "lemma": "unless",
+              "pos": "IN",
+              "ner": "O"
+            },
+            {
+              "index": 5,
+              "begin": 172,
+              "end": 176,
+              "word": "rent",
+              "lemma": "rent",
+              "pos": "NN",
+              "ner": "O"
+            },
+            {
+              "index": 6,
+              "begin": 177,
+              "end": 179,
+              "word": "is",
+              "lemma": "be",
+              "pos": "VBZ",
+              "ner": "O"
+            },
+            {
+              "index": 7,
+              "begin": 180,
+              "end": 183,
+              "word": "not",
+              "lemma": "not",
+              "pos": "RB",
+              "ner": "O"
+            },
+            {
+              "index": 8,
+              "begin": 184,
+              "end": 187,
+              "word": "due",
+              "lemma": "due",
+              "pos": "JJ",
+              "ner": "O"
+            },
+            {
+              "index": 9,
+              "begin": 187,
+              "end": 188,
+              "word": ",",
+              "lemma": ",",
+              "pos": ",",
+              "ner": "O"
+            },
+            {
+              "index": 10,
+              "begin": 189,
+              "end": 192,
+              "word": "and",
+              "lemma": "and",
+              "pos": "CC",
+              "ner": "O"
+            },
+            {
+              "index": 11,
+              "begin": 193,
+              "end": 197,
+              "word": "only",
+              "lemma": "only",
+              "pos": "RB",
+              "ner": "O"
+            },
+            {
+              "index": 12,
+              "begin": 198,
+              "end": 200,
+              "word": "if",
+              "lemma": "if",
+              "pos": "IN",
+              "ner": "O"
+            },
+            {
+              "index": 13,
+              "begin": 201,
+              "end": 204,
+              "word": "the",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O"
+            },
+            {
+              "index": 14,
+              "begin": 205,
+              "end": 211,
+              "word": "permit",
+              "lemma": "permit",
+              "pos": "NN",
+              "ner": "O"
+            },
+            {
+              "index": 15,
+              "begin": 212,
+              "end": 219,
+              "word": "remains",
+              "lemma": "remain",
+              "pos": "VBZ",
+              "ner": "O"
+            },
+            {
+              "index": 16,
+              "begin": 220,
+              "end": 225,
+              "word": "valid",
+              "lemma": "valid",
+              "pos": "JJ",
+              "ner": "O"
+            },
+            {
+              "index": 17,
+              "begin": 225,
+              "end": 226,
+              "word": ".",
+              "lemma": ".",
+              "pos": ".",
+              "ner": "O"
+            }
+          ],
+          "nodes": [
+            {
+              "index": 1,
+              "begin": 147,
+              "end": 153,
+              "word": "Tenant",
+              "lemma": "tenant",
+              "pos": "NN",
+              "ner": "O",
+              "id": "1:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 2,
+              "begin": 154,
+              "end": 157,
+              "word": "may",
+              "lemma": "may",
+              "pos": "MD",
+              "ner": "O",
+              "id": "2:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 3,
+              "begin": 158,
+              "end": 164,
+              "word": "occupy",
+              "lemma": "occupy",
+              "pos": "VB",
+              "ner": "O",
+              "id": "3:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 4,
+              "begin": 165,
+              "end": 171,
+              "word": "unless",
+              "lemma": "unless",
+              "pos": "IN",
+              "ner": "O",
+              "id": "4:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 5,
+              "begin": 172,
+              "end": 176,
+              "word": "rent",
+              "lemma": "rent",
+              "pos": "NN",
+              "ner": "O",
+              "id": "5:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 6,
+              "begin": 177,
+              "end": 179,
+              "word": "is",
+              "lemma": "be",
+              "pos": "VBZ",
+              "ner": "O",
+              "id": "6:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 7,
+              "begin": 180,
+              "end": 183,
+              "word": "not",
+              "lemma": "not",
+              "pos": "RB",
+              "ner": "O",
+              "id": "7:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 8,
+              "begin": 184,
+              "end": 187,
+              "word": "due",
+              "lemma": "due",
+              "pos": "JJ",
+              "ner": "O",
+              "id": "8:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 9,
+              "begin": 187,
+              "end": 188,
+              "word": ",",
+              "lemma": ",",
+              "pos": ",",
+              "ner": "O",
+              "id": "9:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 10,
+              "begin": 189,
+              "end": 192,
+              "word": "and",
+              "lemma": "and",
+              "pos": "CC",
+              "ner": "O",
+              "id": "10:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 11,
+              "begin": 193,
+              "end": 197,
+              "word": "only",
+              "lemma": "only",
+              "pos": "RB",
+              "ner": "O",
+              "id": "11:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 12,
+              "begin": 198,
+              "end": 200,
+              "word": "if",
+              "lemma": "if",
+              "pos": "IN",
+              "ner": "O",
+              "id": "12:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 13,
+              "begin": 201,
+              "end": 204,
+              "word": "the",
+              "lemma": "the",
+              "pos": "DT",
+              "ner": "O",
+              "id": "13:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 14,
+              "begin": 205,
+              "end": 211,
+              "word": "permit",
+              "lemma": "permit",
+              "pos": "NN",
+              "ner": "O",
+              "id": "14:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 15,
+              "begin": 212,
+              "end": 219,
+              "word": "remains",
+              "lemma": "remain",
+              "pos": "VBZ",
+              "ner": "O",
+              "id": "15:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 16,
+              "begin": 220,
+              "end": 225,
+              "word": "valid",
+              "lemma": "valid",
+              "pos": "JJ",
+              "ner": "O",
+              "id": "16:0",
+              "copy": 0,
+              "kind": "token"
+            },
+            {
+              "index": 17,
+              "begin": 225,
+              "end": 226,
+              "word": ".",
+              "lemma": ".",
+              "pos": ".",
+              "ner": "O",
+              "id": "17:0",
+              "copy": 0,
+              "kind": "token"
+            }
+          ],
+          "dependencies": [
+            {
+              "governor": 0,
+              "dependent": 3,
+              "relation": "root",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "0:0",
+              "dependentNode": "3:0"
+            },
+            {
+              "governor": 3,
+              "dependent": 1,
+              "relation": "nsubj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "3:0",
+              "dependentNode": "1:0"
+            },
+            {
+              "governor": 3,
+              "dependent": 2,
+              "relation": "aux",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "3:0",
+              "dependentNode": "2:0"
+            },
+            {
+              "governor": 8,
+              "dependent": 4,
+              "relation": "mark",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "8:0",
+              "dependentNode": "4:0"
+            },
+            {
+              "governor": 8,
+              "dependent": 5,
+              "relation": "nsubj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "8:0",
+              "dependentNode": "5:0"
+            },
+            {
+              "governor": 8,
+              "dependent": 6,
+              "relation": "cop",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "8:0",
+              "dependentNode": "6:0"
+            },
+            {
+              "governor": 8,
+              "dependent": 7,
+              "relation": "advmod",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "8:0",
+              "dependentNode": "7:0"
+            },
+            {
+              "governor": 3,
+              "dependent": 8,
+              "relation": "advcl:unless",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "3:0",
+              "dependentNode": "8:0"
+            },
+            {
+              "governor": 8,
+              "dependent": 9,
+              "relation": "punct",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "8:0",
+              "dependentNode": "9:0"
+            },
+            {
+              "governor": 8,
+              "dependent": 10,
+              "relation": "dep",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "8:0",
+              "dependentNode": "10:0"
+            },
+            {
+              "governor": 15,
+              "dependent": 11,
+              "relation": "advmod",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "15:0",
+              "dependentNode": "11:0"
+            },
+            {
+              "governor": 15,
+              "dependent": 12,
+              "relation": "mark",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "15:0",
+              "dependentNode": "12:0"
+            },
+            {
+              "governor": 14,
+              "dependent": 13,
+              "relation": "det",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "14:0",
+              "dependentNode": "13:0"
+            },
+            {
+              "governor": 15,
+              "dependent": 14,
+              "relation": "nsubj",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "15:0",
+              "dependentNode": "14:0"
+            },
+            {
+              "governor": 10,
+              "dependent": 15,
+              "relation": "dep",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "10:0",
+              "dependentNode": "15:0"
+            },
+            {
+              "governor": 15,
+              "dependent": 16,
+              "relation": "xcomp",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "15:0",
+              "dependentNode": "16:0"
+            },
+            {
+              "governor": 3,
+              "dependent": 17,
+              "relation": "punct",
+              "governorCopy": 0,
+              "dependentCopy": 0,
+              "governorNode": "3:0",
+              "dependentNode": "17:0"
+            }
+          ],
+          "markers": [
+            {
+              "kind": "modal",
+              "label": "modal-marker",
+              "begin": 154,
+              "end": 157,
+              "quote": "may",
+              "status": "lexical-candidate"
+            },
+            {
+              "kind": "condition",
+              "label": "condition-marker",
+              "begin": 165,
+              "end": 171,
+              "quote": "unless",
+              "status": "lexical-candidate"
+            },
+            {
+              "kind": "exception",
+              "label": "exception-marker",
+              "begin": 165,
+              "end": 171,
+              "quote": "unless",
+              "status": "lexical-candidate"
+            },
+            {
+              "kind": "negation",
+              "label": "negation-marker",
+              "begin": 180,
+              "end": 183,
+              "quote": "not",
+              "status": "lexical-candidate"
+            },
+            {
+              "kind": "condition",
+              "label": "condition-marker",
+              "begin": 193,
+              "end": 200,
+              "quote": "only if",
+              "status": "lexical-candidate"
+            }
+          ]
+        }
+      ],
+      "counts": {
+        "sentences": 3,
+        "tokens": 42,
+        "nodes": 43,
+        "dependencies": 44,
+        "markers": 9
+      },
+      "selection": {
+        "project": "english-copular-fresh-proof",
+        "id": "synthetic copular guarded clauses.txt",
+        "cid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+        "rev": "1-sha256:c70f5e496b4af02948f3267d4aa6df6f1d6fd893c7ec2e4cc10116c75941b084",
+        "seq": 0
+      },
+      "source": {
+        "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+        "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+        "name": "synthetic copular guarded clauses.txt",
+        "mediaType": "text/plain",
+        "correlation": "english-copular-fresh-proof/synthetic copular guarded clauses.txt@1-sha256:c70f5e496b4af02948f3267d4aa6df6f1d6fd893c7ec2e4cc10116c75941b084",
+        "metadata": {},
+        "category": "document",
+        "provenance": {
+          "extractionKind": "identity-utf8",
+          "reviewStatus": "unreviewed"
+        },
+        "project": {
+          "project": "english-copular-fresh-proof",
+          "id": "synthetic copular guarded clauses.txt",
+          "cid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+          "rev": "1-sha256:c70f5e496b4af02948f3267d4aa6df6f1d6fd893c7ec2e4cc10116c75941b084",
+          "seq": 0
+        },
+        "extraction": {
+          "project": "english-copular-fresh-proof",
+          "id": "synthetic copular guarded clauses.txt",
+          "cid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+          "rev": "1-sha256:c70f5e496b4af02948f3267d4aa6df6f1d6fd893c7ec2e4cc10116c75941b084",
+          "seq": 0
+        },
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ]
+      },
+      "sourceSnapshots": [
+        {
+          "project": "english-copular-fresh-proof",
+          "id": "synthetic copular guarded clauses.txt",
+          "cid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+          "rev": "1-sha256:c70f5e496b4af02948f3267d4aa6df6f1d6fd893c7ec2e4cc10116c75941b084",
+          "seq": 0,
+          "length": 228,
+          "contentType": "text/plain"
+        }
+      ],
+      "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+    },
+    "sourceContext": {
+      "copyQuote": "The requirements for sellers and for buyers are clear.",
+      "requirementsSourceOccurrences": 1,
+      "requirementsParserNodeIds": [
+        "2:0",
+        "2:3"
+      ],
+      "guardedQuote": "Tenant may occupy unless rent is not due, and only if the permit remains valid.",
+      "guardedMarkers": [
+        {
+          "kind": "modal",
+          "label": "modal-marker",
+          "begin": 154,
+          "end": 157,
+          "quote": "may",
+          "status": "lexical-candidate"
+        },
+        {
+          "kind": "condition",
+          "label": "condition-marker",
+          "begin": 165,
+          "end": 171,
+          "quote": "unless",
+          "status": "lexical-candidate"
+        },
+        {
+          "kind": "exception",
+          "label": "exception-marker",
+          "begin": 165,
+          "end": 171,
+          "quote": "unless",
+          "status": "lexical-candidate"
+        },
+        {
+          "kind": "negation",
+          "label": "negation-marker",
+          "begin": 180,
+          "end": 183,
+          "quote": "not",
+          "status": "lexical-candidate"
+        },
+        {
+          "kind": "condition",
+          "label": "condition-marker",
+          "begin": 193,
+          "end": 200,
+          "quote": "only if",
+          "status": "lexical-candidate"
+        }
+      ]
+    },
+    "continuation": {
+      "scope": "Same retained fresh inspection and source rows from actual attempt1; no upload or parser call in continuation",
+      "priorProgressCid": "sha256:488e4328dd55c9130863a6f9a1bda3f01ada4a99905cf5a47c126f099baa7976",
+      "priorInspectionCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+    },
+    "inertPattern": {
+      "name": "preset-english-copular-pattern",
+      "nodeCount": 14,
+      "patternCount": 8,
+      "runDisabled": true,
+      "liveDisabled": true,
+      "authoredRuns": 0
+    },
+    "run": {
+      "runId": "140c813b-d802-4afb-a4e9-2e1141633fb6",
+      "program": "english-copular-query",
+      "programKey": null,
+      "programCid": "sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b",
+      "inputs": {},
+      "status": "completed",
+      "queuedAtMs": 123,
+      "queueNamed": false,
+      "queueDeclaredSubnet": null,
+      "queueRequest": {
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "subnet": "local"
+      },
+      "queueDurability": "DURABLE",
+      "executionFamily": "lcnc/run/140c813b-d802-4afb-a4e9-2e1141633fb6",
+      "parentRunId": null,
+      "versionPolicy": "root-at-queue,subprogram-at-first-use",
+      "budgets": {
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "maxPayloadChars": 131072
+      },
+      "jobId": "lcnc/run/140c813b-d802-4afb-a4e9-2e1141633fb6",
+      "sequence": 3,
+      "timelineRevision": 3,
+      "receiptCid": "sha256:511c9b316a75ef117204af4bf5b439a65bc92c93d2833eff9e3dc183e40eb54d",
+      "workgroup": "lcnc/program/english-copular-query@sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b",
+      "claimId": 1,
+      "subnet": "local",
+      "claimedAtSubnet": "local",
+      "claimLineage": [
+        {
+          "workgroup": "lcnc/program/english-copular-query@sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b",
+          "claimId": 1
+        }
+      ],
+      "parentWorkgroup": null,
+      "parentClaimId": null,
+      "startedAtMs": 123,
+      "programVersions": {},
+      "previousReceiptCid": "sha256:4f479f0470c6b5a5bfab50344ff35dc744310de4a578346312ad1148d8dab9cf",
+      "returns": {
+        "dataset": "english-receipt-observations",
+        "results": {
+          "head": {
+            "vars": [
+              "head",
+              "subject",
+              "copula",
+              "subjectWord",
+              "predicateWord"
+            ]
+          },
+          "results": {
+            "bindings": [
+              {
+                "head": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                },
+                "subject": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                },
+                "copula": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                },
+                "subjectWord": {
+                  "type": "literal",
+                  "value": "requirements"
+                },
+                "predicateWord": {
+                  "type": "literal",
+                  "value": "clear"
+                }
+              },
+              {
+                "head": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                },
+                "subject": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                },
+                "copula": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                },
+                "subjectWord": {
+                  "type": "literal",
+                  "value": "requirements"
+                },
+                "predicateWord": {
+                  "type": "literal",
+                  "value": "clear"
+                }
+              },
+              {
+                "head": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                },
+                "subject": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                },
+                "copula": {
+                  "type": "uri",
+                  "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                },
+                "subjectWord": {
+                  "type": "literal",
+                  "value": "rent"
+                },
+                "predicateWord": {
+                  "type": "literal",
+                  "value": "due"
+                }
+              }
+            ]
+          }
+        },
+        "source": {
+          "selected": "english-receipt-observations",
+          "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+          "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+          "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+          "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+          "mode": "current",
+          "historical": false,
+          "reviewStatus": "unreviewed",
+          "scope": "recorded-lexical-and-parser-claims",
+          "semanticAuthority": "not-established",
+          "producerAuthority": "not-established",
+          "parserExecution": "not-reverified",
+          "dependencyNodeIdentity": "recorded-index-and-copy",
+          "parserDependencyNodeIdentity": "token-index+copy-count/1",
+          "parserNodeIdentityReported": true,
+          "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+          "quads": 1001,
+          "currentness": "checked-before-and-after-query"
+        }
+      },
+      "outputs": {
+        "receipt": {
+          "value": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+        },
+        "mode": {
+          "value": "current"
+        },
+        "query-pattern": {
+          "value": {
+            "nodes": [
+              {
+                "id": "select",
+                "type": "sparql.select",
+                "params": {},
+                "x": 1480,
+                "y": 400,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "v0",
+                "type": "sparql.variable",
+                "params": {
+                  "name": "?head",
+                  "ord": "0"
+                },
+                "x": 40,
+                "y": 40,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "v1",
+                "type": "sparql.variable",
+                "params": {
+                  "name": "?subject",
+                  "ord": "1"
+                },
+                "x": 40,
+                "y": 190,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "v2",
+                "type": "sparql.variable",
+                "params": {
+                  "name": "?copula",
+                  "ord": "2"
+                },
+                "x": 40,
+                "y": 340,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "v3",
+                "type": "sparql.variable",
+                "params": {
+                  "name": "?subjectWord",
+                  "ord": "3"
+                },
+                "x": 40,
+                "y": 490,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "v4",
+                "type": "sparql.variable",
+                "params": {
+                  "name": "?predicateWord",
+                  "ord": "4"
+                },
+                "x": 40,
+                "y": 640,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p0",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?cop",
+                  "predicate": "<urn:trikeshed:english:observation:relation>",
+                  "object": "\"cop\""
+                },
+                "x": 340,
+                "y": 40,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p1",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?cop",
+                  "predicate": "<urn:trikeshed:english:observation:governor>",
+                  "object": "?head"
+                },
+                "x": 680,
+                "y": 40,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p2",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?sub",
+                  "predicate": "<urn:trikeshed:english:observation:governor>",
+                  "object": "?head"
+                },
+                "x": 1020,
+                "y": 40,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p3",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?sub",
+                  "predicate": "<urn:trikeshed:english:observation:relation>",
+                  "object": "\"nsubj\""
+                },
+                "x": 340,
+                "y": 280,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p4",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?cop",
+                  "predicate": "<urn:trikeshed:english:observation:dependent>",
+                  "object": "?copula"
+                },
+                "x": 680,
+                "y": 280,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p5",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?sub",
+                  "predicate": "<urn:trikeshed:english:observation:dependent>",
+                  "object": "?subject"
+                },
+                "x": 1020,
+                "y": 280,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p6",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?subject",
+                  "predicate": "<urn:trikeshed:english:observation:word>",
+                  "object": "?subjectWord"
+                },
+                "x": 340,
+                "y": 520,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              },
+              {
+                "id": "p7",
+                "type": "sparql.pattern",
+                "params": {
+                  "subject": "?head",
+                  "predicate": "<urn:trikeshed:english:observation:word>",
+                  "object": "?predicateWord"
+                },
+                "x": 680,
+                "y": 520,
+                "width": null,
+                "height": null,
+                "collapsed": false,
+                "subprogram": null,
+                "children": []
+              }
+            ],
+            "wires": [
+              {
+                "from": [
+                  "v0",
+                  "variable"
+                ],
+                "to": [
+                  "select",
+                  "variables"
+                ]
+              },
+              {
+                "from": [
+                  "v1",
+                  "variable"
+                ],
+                "to": [
+                  "select",
+                  "variables"
+                ]
+              },
+              {
+                "from": [
+                  "v2",
+                  "variable"
+                ],
+                "to": [
+                  "select",
+                  "variables"
+                ]
+              },
+              {
+                "from": [
+                  "v3",
+                  "variable"
+                ],
+                "to": [
+                  "select",
+                  "variables"
+                ]
+              },
+              {
+                "from": [
+                  "v4",
+                  "variable"
+                ],
+                "to": [
+                  "select",
+                  "variables"
+                ]
+              },
+              {
+                "from": [
+                  "p0",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              },
+              {
+                "from": [
+                  "p1",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              },
+              {
+                "from": [
+                  "p2",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              },
+              {
+                "from": [
+                  "p3",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              },
+              {
+                "from": [
+                  "p4",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              },
+              {
+                "from": [
+                  "p5",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              },
+              {
+                "from": [
+                  "p6",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              },
+              {
+                "from": [
+                  "p7",
+                  "pattern"
+                ],
+                "to": [
+                  "select",
+                  "patterns"
+                ]
+              }
+            ],
+            "controls": {
+              "humanOversight": true,
+              "matingPoints": [],
+              "inspectionOnly": true
+            },
+            "kanban": null,
+            "view": {
+              "x": 20,
+              "y": 20,
+              "z": 0.6
+            },
+            "seq": 15
+          }
+        },
+        "query": {
+          "dataset": "english-receipt-observations",
+          "query": "SELECT ?head ?subject ?copula ?subjectWord ?predicateWord WHERE { ?cop <urn:trikeshed:english:observation:relation> \"cop\" . ?cop <urn:trikeshed:english:observation:governor> ?head . ?sub <urn:trikeshed:english:observation:governor> ?head . ?sub <urn:trikeshed:english:observation:relation> \"nsubj\" . ?cop <urn:trikeshed:english:observation:dependent> ?copula . ?sub <urn:trikeshed:english:observation:dependent> ?subject . ?subject <urn:trikeshed:english:observation:word> ?subjectWord . ?head <urn:trikeshed:english:observation:word> ?predicateWord . }",
+          "results": {
+            "head": {
+              "vars": [
+                "head",
+                "subject",
+                "copula",
+                "subjectWord",
+                "predicateWord"
+              ]
+            },
+            "results": {
+              "bindings": [
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "requirements"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "clear"
+                  }
+                },
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "requirements"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "clear"
+                  }
+                },
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "rent"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "due"
+                  }
+                }
+              ]
+            }
+          },
+          "source": {
+            "selected": "english-receipt-observations",
+            "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+            "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+            "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "mode": "current",
+            "historical": false,
+            "reviewStatus": "unreviewed",
+            "scope": "recorded-lexical-and-parser-claims",
+            "semanticAuthority": "not-established",
+            "producerAuthority": "not-established",
+            "parserExecution": "not-reverified",
+            "dependencyNodeIdentity": "recorded-index-and-copy",
+            "parserDependencyNodeIdentity": "token-index+copy-count/1",
+            "parserNodeIdentityReported": true,
+            "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+            "quads": 1001,
+            "currentness": "checked-before-and-after-query"
+          }
+        },
+        "bindings": {
+          "x": {
+            "head": {
+              "vars": [
+                "head",
+                "subject",
+                "copula",
+                "subjectWord",
+                "predicateWord"
+              ]
+            },
+            "results": {
+              "bindings": [
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "requirements"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "clear"
+                  }
+                },
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "requirements"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "clear"
+                  }
+                },
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "rent"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "due"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "source": {
+          "x": {
+            "selected": "english-receipt-observations",
+            "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+            "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+            "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "mode": "current",
+            "historical": false,
+            "reviewStatus": "unreviewed",
+            "scope": "recorded-lexical-and-parser-claims",
+            "semanticAuthority": "not-established",
+            "producerAuthority": "not-established",
+            "parserExecution": "not-reverified",
+            "dependencyNodeIdentity": "recorded-index-and-copy",
+            "parserDependencyNodeIdentity": "token-index+copy-count/1",
+            "parserNodeIdentityReported": true,
+            "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+            "quads": 1001,
+            "currentness": "checked-before-and-after-query"
+          }
+        },
+        "dataset-out": {},
+        "results-out": {},
+        "source-out": {}
+      },
+      "bindings": [
+        {
+          "nodeId": "receipt",
+          "path": [],
+          "name": "receiptCid",
+          "type": "id",
+          "source": "default",
+          "ownerDepth": null,
+          "depth": 0,
+          "value": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+          "status": "resolved"
+        }
+      ],
+      "bindingsTruncated": false,
+      "promptVersions": {},
+      "consumed": [],
+      "consumedTruncated": false,
+      "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rootStateCid": "sha256:8c624488d8c9e88ab66818228479ba7f2f791850cfa254c1497532b0320a78d3",
+      "rootStateFormat": "cbor",
+      "ok": true,
+      "finishedAtMs": 123,
+      "invocationsCid": "sha256:e0ceb64900e52d0f62b4e700bf5d4bb9ceeed044c661d6b4682cb354cfd6ab51",
+      "oroborosCid": "sha256:f9ab5d099e641dea2c96f22b237178dead0cda68f656bb507e5c445d7c613e27",
+      "invocationsAttempted": 10,
+      "invocationsDropped": 0
+    },
+    "queryInvocationInputs": {
+      "omitted": "work_limit",
+      "scope": "Bounded ledger does not retain the complete fourteen-node syntax program; identity/mode are verified from actual authored program and actual query source output."
+    },
+    "durable": {
+      "type": "complete",
+      "jobId": "lcnc/run/140c813b-d802-4afb-a4e9-2e1141633fb6",
+      "expectedRevision": 2,
+      "idempotencyKey": "lcnc/run/140c813b-d802-4afb-a4e9-2e1141633fb6:completed:7761875f-7b78-4567-96d4-c1c7a4c04367",
+      "title": "LCNC english-copular-query",
+      "owner": "lcnc-runner",
+      "tags": [
+        "lcnc-run"
+      ],
+      "lcncRun": {
+        "runId": "140c813b-d802-4afb-a4e9-2e1141633fb6",
+        "program": "english-copular-query",
+        "programKey": null,
+        "programCid": "sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b",
+        "inputs": {},
+        "status": "completed",
+        "queuedAtMs": 123,
+        "queueNamed": false,
+        "queueDeclaredSubnet": null,
+        "queueRequest": {
+          "timeoutMs": 120000,
+          "maxNodes": 10000,
+          "subnet": "local"
+        },
+        "queueDurability": "DURABLE",
+        "executionFamily": "lcnc/run/140c813b-d802-4afb-a4e9-2e1141633fb6",
+        "parentRunId": null,
+        "versionPolicy": "root-at-queue,subprogram-at-first-use",
+        "budgets": {
+          "timeoutMs": 120000,
+          "maxNodes": 10000,
+          "maxPayloadChars": 131072
+        },
+        "jobId": "lcnc/run/140c813b-d802-4afb-a4e9-2e1141633fb6",
+        "workgroup": "lcnc/program/english-copular-query@sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b",
+        "claimId": 1,
+        "subnet": "local",
+        "claimedAtSubnet": "local",
+        "claimLineage": [
+          {
+            "workgroup": "lcnc/program/english-copular-query@sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b",
+            "claimId": 1
+          }
+        ],
+        "parentWorkgroup": null,
+        "parentClaimId": null,
+        "startedAtMs": 123,
+        "programVersions": {},
+        "previousReceiptCid": "sha256:4f479f0470c6b5a5bfab50344ff35dc744310de4a578346312ad1148d8dab9cf",
+        "returns": {
+          "dataset": "english-receipt-observations",
+          "results": {
+            "head": {
+              "vars": [
+                "head",
+                "subject",
+                "copula",
+                "subjectWord",
+                "predicateWord"
+              ]
+            },
+            "results": {
+              "bindings": [
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "requirements"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "clear"
+                  }
+                },
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "requirements"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "clear"
+                  }
+                },
+                {
+                  "head": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                  },
+                  "subject": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                  },
+                  "copula": {
+                    "type": "uri",
+                    "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                  },
+                  "subjectWord": {
+                    "type": "literal",
+                    "value": "rent"
+                  },
+                  "predicateWord": {
+                    "type": "literal",
+                    "value": "due"
+                  }
+                }
+              ]
+            }
+          },
+          "source": {
+            "selected": "english-receipt-observations",
+            "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+            "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+            "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+            "mode": "current",
+            "historical": false,
+            "reviewStatus": "unreviewed",
+            "scope": "recorded-lexical-and-parser-claims",
+            "semanticAuthority": "not-established",
+            "producerAuthority": "not-established",
+            "parserExecution": "not-reverified",
+            "dependencyNodeIdentity": "recorded-index-and-copy",
+            "parserDependencyNodeIdentity": "token-index+copy-count/1",
+            "parserNodeIdentityReported": true,
+            "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+            "quads": 1001,
+            "currentness": "checked-before-and-after-query"
+          }
+        },
+        "outputs": {
+          "receipt": {
+            "value": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+          },
+          "mode": {
+            "value": "current"
+          },
+          "query-pattern": {
+            "value": {
+              "nodes": [
+                {
+                  "id": "select",
+                  "type": "sparql.select",
+                  "params": {},
+                  "x": 1480,
+                  "y": 400,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "v0",
+                  "type": "sparql.variable",
+                  "params": {
+                    "name": "?head",
+                    "ord": "0"
+                  },
+                  "x": 40,
+                  "y": 40,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "v1",
+                  "type": "sparql.variable",
+                  "params": {
+                    "name": "?subject",
+                    "ord": "1"
+                  },
+                  "x": 40,
+                  "y": 190,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "v2",
+                  "type": "sparql.variable",
+                  "params": {
+                    "name": "?copula",
+                    "ord": "2"
+                  },
+                  "x": 40,
+                  "y": 340,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "v3",
+                  "type": "sparql.variable",
+                  "params": {
+                    "name": "?subjectWord",
+                    "ord": "3"
+                  },
+                  "x": 40,
+                  "y": 490,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "v4",
+                  "type": "sparql.variable",
+                  "params": {
+                    "name": "?predicateWord",
+                    "ord": "4"
+                  },
+                  "x": 40,
+                  "y": 640,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p0",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?cop",
+                    "predicate": "<urn:trikeshed:english:observation:relation>",
+                    "object": "\"cop\""
+                  },
+                  "x": 340,
+                  "y": 40,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p1",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?cop",
+                    "predicate": "<urn:trikeshed:english:observation:governor>",
+                    "object": "?head"
+                  },
+                  "x": 680,
+                  "y": 40,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p2",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?sub",
+                    "predicate": "<urn:trikeshed:english:observation:governor>",
+                    "object": "?head"
+                  },
+                  "x": 1020,
+                  "y": 40,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p3",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?sub",
+                    "predicate": "<urn:trikeshed:english:observation:relation>",
+                    "object": "\"nsubj\""
+                  },
+                  "x": 340,
+                  "y": 280,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p4",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?cop",
+                    "predicate": "<urn:trikeshed:english:observation:dependent>",
+                    "object": "?copula"
+                  },
+                  "x": 680,
+                  "y": 280,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p5",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?sub",
+                    "predicate": "<urn:trikeshed:english:observation:dependent>",
+                    "object": "?subject"
+                  },
+                  "x": 1020,
+                  "y": 280,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p6",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?subject",
+                    "predicate": "<urn:trikeshed:english:observation:word>",
+                    "object": "?subjectWord"
+                  },
+                  "x": 340,
+                  "y": 520,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                },
+                {
+                  "id": "p7",
+                  "type": "sparql.pattern",
+                  "params": {
+                    "subject": "?head",
+                    "predicate": "<urn:trikeshed:english:observation:word>",
+                    "object": "?predicateWord"
+                  },
+                  "x": 680,
+                  "y": 520,
+                  "width": null,
+                  "height": null,
+                  "collapsed": false,
+                  "subprogram": null,
+                  "children": []
+                }
+              ],
+              "wires": [
+                {
+                  "from": [
+                    "v0",
+                    "variable"
+                  ],
+                  "to": [
+                    "select",
+                    "variables"
+                  ]
+                },
+                {
+                  "from": [
+                    "v1",
+                    "variable"
+                  ],
+                  "to": [
+                    "select",
+                    "variables"
+                  ]
+                },
+                {
+                  "from": [
+                    "v2",
+                    "variable"
+                  ],
+                  "to": [
+                    "select",
+                    "variables"
+                  ]
+                },
+                {
+                  "from": [
+                    "v3",
+                    "variable"
+                  ],
+                  "to": [
+                    "select",
+                    "variables"
+                  ]
+                },
+                {
+                  "from": [
+                    "v4",
+                    "variable"
+                  ],
+                  "to": [
+                    "select",
+                    "variables"
+                  ]
+                },
+                {
+                  "from": [
+                    "p0",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                },
+                {
+                  "from": [
+                    "p1",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                },
+                {
+                  "from": [
+                    "p2",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                },
+                {
+                  "from": [
+                    "p3",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                },
+                {
+                  "from": [
+                    "p4",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                },
+                {
+                  "from": [
+                    "p5",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                },
+                {
+                  "from": [
+                    "p6",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                },
+                {
+                  "from": [
+                    "p7",
+                    "pattern"
+                  ],
+                  "to": [
+                    "select",
+                    "patterns"
+                  ]
+                }
+              ],
+              "controls": {
+                "humanOversight": true,
+                "matingPoints": [],
+                "inspectionOnly": true
+              },
+              "kanban": null,
+              "view": {
+                "x": 20,
+                "y": 20,
+                "z": 0.6
+              },
+              "seq": 15
+            }
+          },
+          "query": {
+            "dataset": "english-receipt-observations",
+            "query": "SELECT ?head ?subject ?copula ?subjectWord ?predicateWord WHERE { ?cop <urn:trikeshed:english:observation:relation> \"cop\" . ?cop <urn:trikeshed:english:observation:governor> ?head . ?sub <urn:trikeshed:english:observation:governor> ?head . ?sub <urn:trikeshed:english:observation:relation> \"nsubj\" . ?cop <urn:trikeshed:english:observation:dependent> ?copula . ?sub <urn:trikeshed:english:observation:dependent> ?subject . ?subject <urn:trikeshed:english:observation:word> ?subjectWord . ?head <urn:trikeshed:english:observation:word> ?predicateWord . }",
+            "results": {
+              "head": {
+                "vars": [
+                  "head",
+                  "subject",
+                  "copula",
+                  "subjectWord",
+                  "predicateWord"
+                ]
+              },
+              "results": {
+                "bindings": [
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "rent"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "due"
+                    }
+                  }
+                ]
+              }
+            },
+            "source": {
+              "selected": "english-receipt-observations",
+              "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "mode": "current",
+              "historical": false,
+              "reviewStatus": "unreviewed",
+              "scope": "recorded-lexical-and-parser-claims",
+              "semanticAuthority": "not-established",
+              "producerAuthority": "not-established",
+              "parserExecution": "not-reverified",
+              "dependencyNodeIdentity": "recorded-index-and-copy",
+              "parserDependencyNodeIdentity": "token-index+copy-count/1",
+              "parserNodeIdentityReported": true,
+              "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+              "quads": 1001,
+              "currentness": "checked-before-and-after-query"
+            }
+          },
+          "bindings": {
+            "x": {
+              "head": {
+                "vars": [
+                  "head",
+                  "subject",
+                  "copula",
+                  "subjectWord",
+                  "predicateWord"
+                ]
+              },
+              "results": {
+                "bindings": [
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "rent"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "due"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "source": {
+            "x": {
+              "selected": "english-receipt-observations",
+              "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "mode": "current",
+              "historical": false,
+              "reviewStatus": "unreviewed",
+              "scope": "recorded-lexical-and-parser-claims",
+              "semanticAuthority": "not-established",
+              "producerAuthority": "not-established",
+              "parserExecution": "not-reverified",
+              "dependencyNodeIdentity": "recorded-index-and-copy",
+              "parserDependencyNodeIdentity": "token-index+copy-count/1",
+              "parserNodeIdentityReported": true,
+              "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+              "quads": 1001,
+              "currentness": "checked-before-and-after-query"
+            }
+          },
+          "dataset-out": {},
+          "results-out": {},
+          "source-out": {}
+        },
+        "bindings": [
+          {
+            "nodeId": "receipt",
+            "path": [],
+            "name": "receiptCid",
+            "type": "id",
+            "source": "default",
+            "ownerDepth": null,
+            "depth": 0,
+            "value": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+            "status": "resolved"
+          }
+        ],
+        "bindingsTruncated": false,
+        "promptVersions": {},
+        "consumed": [],
+        "consumedTruncated": false,
+        "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rootStateCid": "sha256:8c624488d8c9e88ab66818228479ba7f2f791850cfa254c1497532b0320a78d3",
+        "rootStateFormat": "cbor",
+        "ok": true,
+        "finishedAtMs": 123,
+        "invocationsCid": "sha256:e0ceb64900e52d0f62b4e700bf5d4bb9ceeed044c661d6b4682cb354cfd6ab51",
+        "oroborosCid": "sha256:f9ab5d099e641dea2c96f22b237178dead0cda68f656bb507e5c445d7c613e27",
+        "invocationsAttempted": 10,
+        "invocationsDropped": 0
+      },
+      "reason": "completed",
+      "atMs": 123
+    },
+    "invocations": {
+      "entries": [
+        {
+          "ordinal": 1,
+          "nodeId": "instructions",
+          "type": "note",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "skipped",
+          "inputs": {},
+          "elapsedMs": 7,
+          "reason": "annotation"
+        },
+        {
+          "ordinal": 2,
+          "nodeId": "receipt",
+          "type": "scope.in",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {},
+          "elapsedMs": 4,
+          "outputs": {
+            "value": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+          }
+        },
+        {
+          "ordinal": 3,
+          "nodeId": "mode",
+          "type": "text.value",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {},
+          "elapsedMs": 7,
+          "outputs": {
+            "value": "current"
+          }
+        },
+        {
+          "ordinal": 4,
+          "nodeId": "query-pattern",
+          "type": "json.value",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {},
+          "elapsedMs": 1,
+          "outputsOmitted": "work_limit"
+        },
+        {
+          "ordinal": 5,
+          "nodeId": "query",
+          "type": "document.english.query",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputsOmitted": "work_limit",
+          "elapsedMs": 266,
+          "outputsOmitted": "payload_limit"
+        },
+        {
+          "ordinal": 6,
+          "nodeId": "bindings",
+          "type": "display",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {
+            "x": {
+              "head": {
+                "vars": [
+                  "head",
+                  "subject",
+                  "copula",
+                  "subjectWord",
+                  "predicateWord"
+                ]
+              },
+              "results": {
+                "bindings": [
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "rent"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "due"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "elapsedMs": 0,
+          "outputs": {
+            "x": {
+              "head": {
+                "vars": [
+                  "head",
+                  "subject",
+                  "copula",
+                  "subjectWord",
+                  "predicateWord"
+                ]
+              },
+              "results": {
+                "bindings": [
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "rent"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "due"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 7,
+          "nodeId": "source",
+          "type": "display",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {
+            "x": {
+              "selected": "english-receipt-observations",
+              "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "mode": "current",
+              "historical": false,
+              "reviewStatus": "unreviewed",
+              "scope": "recorded-lexical-and-parser-claims",
+              "semanticAuthority": "not-established",
+              "producerAuthority": "not-established",
+              "parserExecution": "not-reverified",
+              "dependencyNodeIdentity": "recorded-index-and-copy",
+              "parserDependencyNodeIdentity": "token-index+copy-count/1",
+              "parserNodeIdentityReported": true,
+              "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+              "quads": 1001,
+              "currentness": "checked-before-and-after-query"
+            }
+          },
+          "elapsedMs": 0,
+          "outputs": {
+            "x": {
+              "selected": "english-receipt-observations",
+              "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "mode": "current",
+              "historical": false,
+              "reviewStatus": "unreviewed",
+              "scope": "recorded-lexical-and-parser-claims",
+              "semanticAuthority": "not-established",
+              "producerAuthority": "not-established",
+              "parserExecution": "not-reverified",
+              "dependencyNodeIdentity": "recorded-index-and-copy",
+              "parserDependencyNodeIdentity": "token-index+copy-count/1",
+              "parserNodeIdentityReported": true,
+              "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+              "quads": 1001,
+              "currentness": "checked-before-and-after-query"
+            }
+          }
+        },
+        {
+          "ordinal": 8,
+          "nodeId": "dataset-out",
+          "type": "scope.out",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {
+            "value": "english-receipt-observations"
+          },
+          "elapsedMs": 0,
+          "outputs": {}
+        },
+        {
+          "ordinal": 9,
+          "nodeId": "results-out",
+          "type": "scope.out",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {
+            "value": {
+              "head": {
+                "vars": [
+                  "head",
+                  "subject",
+                  "copula",
+                  "subjectWord",
+                  "predicateWord"
+                ]
+              },
+              "results": {
+                "bindings": [
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "requirements"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "clear"
+                    }
+                  },
+                  {
+                    "head": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+                    },
+                    "subject": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+                    },
+                    "copula": {
+                      "type": "uri",
+                      "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+                    },
+                    "subjectWord": {
+                      "type": "literal",
+                      "value": "rent"
+                    },
+                    "predicateWord": {
+                      "type": "literal",
+                      "value": "due"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "elapsedMs": 0,
+          "outputs": {}
+        },
+        {
+          "ordinal": 10,
+          "nodeId": "source-out",
+          "type": "scope.out",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "status": "completed",
+          "inputs": {
+            "value": {
+              "selected": "english-receipt-observations",
+              "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+              "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+              "mode": "current",
+              "historical": false,
+              "reviewStatus": "unreviewed",
+              "scope": "recorded-lexical-and-parser-claims",
+              "semanticAuthority": "not-established",
+              "producerAuthority": "not-established",
+              "parserExecution": "not-reverified",
+              "dependencyNodeIdentity": "recorded-index-and-copy",
+              "parserDependencyNodeIdentity": "token-index+copy-count/1",
+              "parserNodeIdentityReported": true,
+              "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+              "quads": 1001,
+              "currentness": "checked-before-and-after-query"
+            }
+          },
+          "elapsedMs": 0,
+          "outputs": {}
+        }
+      ],
+      "attempted": 10,
+      "dropped": 0,
+      "truncated": false,
+      "kind": "lcnc-invocations",
+      "runId": "140c813b-d802-4afb-a4e9-2e1141633fb6",
+      "programCid": "sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b"
+    },
+    "program": {
+      "nodes": [
+        {
+          "id": "instructions",
+          "type": "note",
+          "params": {
+            "text": "Choose a retained English inspection and source mode, then Run. Matches are syntax only: negated, modal and conditional sentences can match. The word result is not the complete sentence; open the inspection for exact quotations and markers. Copied grammar nodes are not additional source occurrences."
+          },
+          "x": 40,
+          "y": 20,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "receipt",
+          "type": "scope.in",
+          "params": {
+            "name": "receiptCid",
+            "kind": "id",
+            "default": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+          },
+          "x": 40,
+          "y": 230,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "mode",
+          "type": "text.value",
+          "params": {
+            "value": "current"
+          },
+          "x": 373,
+          "y": 430,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "query-pattern",
+          "type": "json.value",
+          "params": {
+            "value": "{\"nodes\":[{\"id\":\"select\", \"type\":\"sparql.select\", \"params\":{}, \"x\":1480.0, \"y\":400.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v0\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?head\", \"ord\":\"0\"}, \"x\":40.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v1\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subject\", \"ord\":\"1\"}, \"x\":40.0, \"y\":190.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v2\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?copula\", \"ord\":\"2\"}, \"x\":40.0, \"y\":340.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v3\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subjectWord\", \"ord\":\"3\"}, \"x\":40.0, \"y\":490.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v4\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?predicateWord\", \"ord\":\"4\"}, \"x\":40.0, \"y\":640.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p0\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"cop\\\"\"}, \"x\":340.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p1\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":680.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p2\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":1020.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p3\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"nsubj\\\"\"}, \"x\":340.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p4\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?copula\"}, \"x\":680.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p5\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?subject\"}, \"x\":1020.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p6\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?subject\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?subjectWord\"}, \"x\":340.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p7\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?head\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?predicateWord\"}, \"x\":680.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}], \"wires\":[{\"from\":[\"v0\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v1\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v2\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v3\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v4\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"p0\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p1\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p2\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p3\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p4\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p5\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p6\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p7\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}], \"controls\":{\"humanOversight\":true, \"matingPoints\":[], \"inspectionOnly\":true}, \"kanban\":null, \"view\":{\"x\":20.0, \"y\":20.0, \"z\":0.6}, \"seq\":15}"
+          },
+          "x": 603,
+          "y": 230,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "query",
+          "type": "document.english.query",
+          "params": {
+            "receiptCid": "",
+            "mode": "",
+            "program": ""
+          },
+          "x": 833,
+          "y": 230,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "bindings",
+          "type": "display",
+          "params": {},
+          "x": 1209,
+          "y": 150,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "source",
+          "type": "display",
+          "params": {},
+          "x": 1209,
+          "y": 410,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "dataset-out",
+          "type": "scope.out",
+          "params": {
+            "name": "dataset",
+            "kind": "text"
+          },
+          "x": 1400,
+          "y": 140,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "results-out",
+          "type": "scope.out",
+          "params": {
+            "name": "results",
+            "kind": "json"
+          },
+          "x": 1709,
+          "y": 340,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "source-out",
+          "type": "scope.out",
+          "params": {
+            "name": "source",
+            "kind": "json"
+          },
+          "x": 1400,
+          "y": 540,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        }
+      ],
+      "wires": [
+        {
+          "from": [
+            "receipt",
+            "value"
+          ],
+          "to": [
+            "query",
+            "receiptCid"
+          ]
+        },
+        {
+          "from": [
+            "mode",
+            "value"
+          ],
+          "to": [
+            "query",
+            "mode"
+          ]
+        },
+        {
+          "from": [
+            "query-pattern",
+            "value"
+          ],
+          "to": [
+            "query",
+            "program"
+          ]
+        },
+        {
+          "from": [
+            "query",
+            "results"
+          ],
+          "to": [
+            "bindings",
+            "x"
+          ]
+        },
+        {
+          "from": [
+            "query",
+            "source"
+          ],
+          "to": [
+            "source",
+            "x"
+          ]
+        },
+        {
+          "from": [
+            "query",
+            "dataset"
+          ],
+          "to": [
+            "dataset-out",
+            "value"
+          ]
+        },
+        {
+          "from": [
+            "query",
+            "results"
+          ],
+          "to": [
+            "results-out",
+            "value"
+          ]
+        },
+        {
+          "from": [
+            "query",
+            "source"
+          ],
+          "to": [
+            "source-out",
+            "value"
+          ]
+        }
+      ],
+      "controls": {
+        "humanOversight": true,
+        "matingPoints": []
+      },
+      "kanban": null,
+      "view": {
+        "x": 10.352941176470587,
+        "y": 270.47058823529414,
+        "z": 0.9411764705882353
+      },
+      "seq": 1
+    },
+    "query": {
+      "dataset": "english-receipt-observations",
+      "query": "SELECT ?head ?subject ?copula ?subjectWord ?predicateWord WHERE { ?cop <urn:trikeshed:english:observation:relation> \"cop\" . ?cop <urn:trikeshed:english:observation:governor> ?head . ?sub <urn:trikeshed:english:observation:governor> ?head . ?sub <urn:trikeshed:english:observation:relation> \"nsubj\" . ?cop <urn:trikeshed:english:observation:dependent> ?copula . ?sub <urn:trikeshed:english:observation:dependent> ?subject . ?subject <urn:trikeshed:english:observation:word> ?subjectWord . ?head <urn:trikeshed:english:observation:word> ?predicateWord . }",
+      "results": {
+        "head": {
+          "vars": [
+            "head",
+            "subject",
+            "copula",
+            "subjectWord",
+            "predicateWord"
+          ]
+        },
+        "results": {
+          "bindings": [
+            {
+              "head": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+              },
+              "subject": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:0"
+              },
+              "copula": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+              },
+              "subjectWord": {
+                "type": "literal",
+                "value": "requirements"
+              },
+              "predicateWord": {
+                "type": "literal",
+                "value": "clear"
+              }
+            },
+            {
+              "head": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/9:0"
+              },
+              "subject": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/2:3"
+              },
+              "copula": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/1/node/8:0"
+              },
+              "subjectWord": {
+                "type": "literal",
+                "value": "requirements"
+              },
+              "predicateWord": {
+                "type": "literal",
+                "value": "clear"
+              }
+            },
+            {
+              "head": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/8:0"
+              },
+              "subject": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/5:0"
+              },
+              "copula": {
+                "type": "uri",
+                "value": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e/sentence/2/node/6:0"
+              },
+              "subjectWord": {
+                "type": "literal",
+                "value": "rent"
+              },
+              "predicateWord": {
+                "type": "literal",
+                "value": "due"
+              }
+            }
+          ]
+        }
+      },
+      "source": {
+        "selected": "english-receipt-observations",
+        "receiptCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+        "namedGraph": "urn:trikeshed:english:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+        "originalCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+        "extractedTextCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-lexical-and-parser-claims",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+        "quads": 1001,
+        "currentness": "checked-before-and-after-query"
+      }
+    }
+  },
+  "writes": [
+    {
+      "path": "/_project/english-copular-fresh-proof/begin",
+      "query": "?kind=assets&intake=manual",
+      "body": null
+    },
+    {
+      "path": "/_project/english-copular-fresh-proof/putDocumentBatch",
+      "query": "?intake=manual",
+      "body": null
+    },
+    {
+      "path": "/api/projects/english-copular-fresh-proof/mine",
+      "query": "",
+      "body": null
+    },
+    {
+      "path": "/api/documents/english",
+      "query": "",
+      "body": {
+        "project": "english-copular-fresh-proof",
+        "id": "synthetic copular guarded clauses.txt",
+        "cid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+        "rev": "1-sha256:c70f5e496b4af02948f3267d4aa6df6f1d6fd893c7ec2e4cc10116c75941b084",
+        "seq": 0,
+        "begin": 0,
+        "end": 228
+      }
+    },
+    {
+      "path": "/api/lcnc/run",
+      "query": "",
+      "body": {
+        "type": "board.get",
+        "params": {},
+        "inputs": {}
+      }
+    },
+    {
+      "path": "/api/lcnc/run",
+      "query": "",
+      "body": {
+        "type": "board.get",
+        "params": {},
+        "inputs": {}
+      }
+    },
+    {
+      "path": "/api/lcnc/run",
+      "query": "",
+      "body": {
+        "name": "english-copular-query",
+        "document": {
+          "name": "english-copular-query",
+          "nodes": [
+            {
+              "id": "instructions",
+              "type": "note",
+              "x": 40,
+              "y": 20,
+              "params": {
+                "text": "Choose a retained English inspection and source mode, then Run. Matches are syntax only: negated, modal and conditional sentences can match. The word result is not the complete sentence; open the inspection for exact quotations and markers. Copied grammar nodes are not additional source occurrences."
+              },
+              "collapsed": false
+            },
+            {
+              "id": "receipt",
+              "type": "scope.in",
+              "x": 40,
+              "y": 230,
+              "params": {
+                "name": "receiptCid",
+                "kind": "id",
+                "default": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "mode",
+              "type": "text.value",
+              "x": 373,
+              "y": 430,
+              "params": {
+                "value": "current"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "query-pattern",
+              "type": "json.value",
+              "x": 603,
+              "y": 230,
+              "params": {
+                "value": "{\"nodes\":[{\"id\":\"select\", \"type\":\"sparql.select\", \"params\":{}, \"x\":1480.0, \"y\":400.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v0\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?head\", \"ord\":\"0\"}, \"x\":40.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v1\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subject\", \"ord\":\"1\"}, \"x\":40.0, \"y\":190.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v2\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?copula\", \"ord\":\"2\"}, \"x\":40.0, \"y\":340.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v3\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subjectWord\", \"ord\":\"3\"}, \"x\":40.0, \"y\":490.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v4\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?predicateWord\", \"ord\":\"4\"}, \"x\":40.0, \"y\":640.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p0\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"cop\\\"\"}, \"x\":340.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p1\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":680.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p2\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":1020.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p3\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"nsubj\\\"\"}, \"x\":340.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p4\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?copula\"}, \"x\":680.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p5\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?subject\"}, \"x\":1020.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p6\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?subject\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?subjectWord\"}, \"x\":340.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p7\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?head\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?predicateWord\"}, \"x\":680.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}], \"wires\":[{\"from\":[\"v0\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v1\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v2\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v3\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v4\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"p0\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p1\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p2\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p3\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p4\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p5\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p6\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p7\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}], \"controls\":{\"humanOversight\":true, \"matingPoints\":[], \"inspectionOnly\":true}, \"kanban\":null, \"view\":{\"x\":20.0, \"y\":20.0, \"z\":0.6}, \"seq\":15}"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "query",
+              "type": "document.english.query",
+              "x": 833,
+              "y": 230,
+              "params": {
+                "receiptCid": "",
+                "mode": "",
+                "program": ""
+              },
+              "collapsed": false
+            },
+            {
+              "id": "bindings",
+              "type": "display",
+              "x": 1209,
+              "y": 150,
+              "params": {},
+              "collapsed": false
+            },
+            {
+              "id": "source",
+              "type": "display",
+              "x": 1209,
+              "y": 410,
+              "params": {},
+              "collapsed": false
+            },
+            {
+              "id": "dataset-out",
+              "type": "scope.out",
+              "x": 1400,
+              "y": 140,
+              "params": {
+                "name": "dataset",
+                "kind": "text"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "results-out",
+              "type": "scope.out",
+              "x": 1709,
+              "y": 340,
+              "params": {
+                "name": "results",
+                "kind": "json"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "source-out",
+              "type": "scope.out",
+              "x": 1400,
+              "y": 540,
+              "params": {
+                "name": "source",
+                "kind": "json"
+              },
+              "collapsed": false
+            }
+          ],
+          "wires": [
+            {
+              "from": [
+                "receipt",
+                "value"
+              ],
+              "to": [
+                "query",
+                "receiptCid"
+              ]
+            },
+            {
+              "from": [
+                "mode",
+                "value"
+              ],
+              "to": [
+                "query",
+                "mode"
+              ]
+            },
+            {
+              "from": [
+                "query-pattern",
+                "value"
+              ],
+              "to": [
+                "query",
+                "program"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "results"
+              ],
+              "to": [
+                "bindings",
+                "x"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "source"
+              ],
+              "to": [
+                "source",
+                "x"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "dataset"
+              ],
+              "to": [
+                "dataset-out",
+                "value"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "results"
+              ],
+              "to": [
+                "results-out",
+                "value"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "source"
+              ],
+              "to": [
+                "source-out",
+                "value"
+              ]
+            }
+          ],
+          "controls": {
+            "humanOversight": true,
+            "matingPoints": []
+          },
+          "view": {
+            "x": 10.352941176470587,
+            "y": 270.47058823529414,
+            "z": 0.9411764705882353
+          }
+        },
+        "inputs": {}
+      }
+    },
+    {
+      "path": "/api/lcnc/workspace",
+      "query": "",
+      "body": {
+        "name": "english-copular-query",
+        "document": {
+          "name": "english-copular-query",
+          "nodes": [
+            {
+              "id": "instructions",
+              "type": "note",
+              "x": 40,
+              "y": 20,
+              "params": {
+                "text": "Choose a retained English inspection and source mode, then Run. Matches are syntax only: negated, modal and conditional sentences can match. The word result is not the complete sentence; open the inspection for exact quotations and markers. Copied grammar nodes are not additional source occurrences."
+              },
+              "collapsed": false
+            },
+            {
+              "id": "receipt",
+              "type": "scope.in",
+              "x": 40,
+              "y": 230,
+              "params": {
+                "name": "receiptCid",
+                "kind": "id",
+                "default": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "mode",
+              "type": "text.value",
+              "x": 438,
+              "y": 430,
+              "params": {
+                "value": "current"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "query-pattern",
+              "type": "json.value",
+              "x": 668,
+              "y": 230,
+              "params": {
+                "value": "{\"nodes\":[{\"id\":\"select\", \"type\":\"sparql.select\", \"params\":{}, \"x\":1480.0, \"y\":400.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v0\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?head\", \"ord\":\"0\"}, \"x\":40.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v1\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subject\", \"ord\":\"1\"}, \"x\":40.0, \"y\":190.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v2\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?copula\", \"ord\":\"2\"}, \"x\":40.0, \"y\":340.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v3\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subjectWord\", \"ord\":\"3\"}, \"x\":40.0, \"y\":490.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v4\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?predicateWord\", \"ord\":\"4\"}, \"x\":40.0, \"y\":640.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p0\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"cop\\\"\"}, \"x\":340.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p1\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":680.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p2\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":1020.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p3\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"nsubj\\\"\"}, \"x\":340.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p4\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?copula\"}, \"x\":680.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p5\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?subject\"}, \"x\":1020.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p6\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?subject\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?subjectWord\"}, \"x\":340.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p7\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?head\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?predicateWord\"}, \"x\":680.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}], \"wires\":[{\"from\":[\"v0\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v1\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v2\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v3\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v4\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"p0\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p1\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p2\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p3\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p4\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p5\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p6\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p7\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}], \"controls\":{\"humanOversight\":true, \"matingPoints\":[], \"inspectionOnly\":true}, \"kanban\":null, \"view\":{\"x\":20.0, \"y\":20.0, \"z\":0.6}, \"seq\":15}"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "query",
+              "type": "document.english.query",
+              "x": 898,
+              "y": 230,
+              "params": {
+                "receiptCid": "",
+                "mode": "",
+                "program": ""
+              },
+              "collapsed": false
+            },
+            {
+              "id": "bindings",
+              "type": "display",
+              "x": 1296,
+              "y": 150,
+              "params": {},
+              "collapsed": false
+            },
+            {
+              "id": "source",
+              "type": "display",
+              "x": 1296,
+              "y": 410,
+              "params": {},
+              "collapsed": false
+            },
+            {
+              "id": "dataset-out",
+              "type": "scope.out",
+              "x": 1526,
+              "y": 140,
+              "params": {
+                "name": "dataset",
+                "kind": "text"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "results-out",
+              "type": "scope.out",
+              "x": 2003,
+              "y": 340,
+              "params": {
+                "name": "results",
+                "kind": "json"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "source-out",
+              "type": "scope.out",
+              "x": 1694,
+              "y": 540,
+              "params": {
+                "name": "source",
+                "kind": "json"
+              },
+              "collapsed": false
+            }
+          ],
+          "wires": [
+            {
+              "from": [
+                "receipt",
+                "value"
+              ],
+              "to": [
+                "query",
+                "receiptCid"
+              ]
+            },
+            {
+              "from": [
+                "mode",
+                "value"
+              ],
+              "to": [
+                "query",
+                "mode"
+              ]
+            },
+            {
+              "from": [
+                "query-pattern",
+                "value"
+              ],
+              "to": [
+                "query",
+                "program"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "results"
+              ],
+              "to": [
+                "bindings",
+                "x"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "source"
+              ],
+              "to": [
+                "source",
+                "x"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "dataset"
+              ],
+              "to": [
+                "dataset-out",
+                "value"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "results"
+              ],
+              "to": [
+                "results-out",
+                "value"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "source"
+              ],
+              "to": [
+                "source-out",
+                "value"
+              ]
+            }
+          ],
+          "controls": {
+            "humanOversight": true,
+            "matingPoints": []
+          },
+          "view": {
+            "x": 10.352941176470587,
+            "y": 270.47058823529414,
+            "z": 0.9411764705882353
+          }
+        },
+        "path": [],
+        "offset": 0,
+        "limit": 32,
+        "cursor": {
+          "path": [],
+          "axes": [
+            [
+              2
+            ]
+          ],
+          "selections": [],
+          "offset": 0,
+          "groupOffset": 0,
+          "sourceCid": null
+        }
+      }
+    },
+    {
+      "path": "/api/lcnc/workspace",
+      "query": "",
+      "body": {
+        "name": "english-copular-query",
+        "document": {
+          "name": "english-copular-query",
+          "nodes": [
+            {
+              "id": "instructions",
+              "type": "note",
+              "x": 40,
+              "y": 20,
+              "params": {
+                "text": "Choose a retained English inspection and source mode, then Run. Matches are syntax only: negated, modal and conditional sentences can match. The word result is not the complete sentence; open the inspection for exact quotations and markers. Copied grammar nodes are not additional source occurrences."
+              },
+              "collapsed": false
+            },
+            {
+              "id": "receipt",
+              "type": "scope.in",
+              "x": 40,
+              "y": 230,
+              "params": {
+                "name": "receiptCid",
+                "kind": "id",
+                "default": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "mode",
+              "type": "text.value",
+              "x": 438,
+              "y": 430,
+              "params": {
+                "value": "current"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "query-pattern",
+              "type": "json.value",
+              "x": 668,
+              "y": 230,
+              "params": {
+                "value": "{\"nodes\":[{\"id\":\"select\", \"type\":\"sparql.select\", \"params\":{}, \"x\":1480.0, \"y\":400.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v0\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?head\", \"ord\":\"0\"}, \"x\":40.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v1\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subject\", \"ord\":\"1\"}, \"x\":40.0, \"y\":190.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v2\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?copula\", \"ord\":\"2\"}, \"x\":40.0, \"y\":340.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v3\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?subjectWord\", \"ord\":\"3\"}, \"x\":40.0, \"y\":490.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"v4\", \"type\":\"sparql.variable\", \"params\":{\"name\":\"?predicateWord\", \"ord\":\"4\"}, \"x\":40.0, \"y\":640.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p0\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"cop\\\"\"}, \"x\":340.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p1\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":680.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p2\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:governor>\", \"object\":\"?head\"}, \"x\":1020.0, \"y\":40.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p3\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:relation>\", \"object\":\"\\\"nsubj\\\"\"}, \"x\":340.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p4\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?cop\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?copula\"}, \"x\":680.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p5\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?sub\", \"predicate\":\"<urn:trikeshed:english:observation:dependent>\", \"object\":\"?subject\"}, \"x\":1020.0, \"y\":280.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p6\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?subject\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?subjectWord\"}, \"x\":340.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}, {\"id\":\"p7\", \"type\":\"sparql.pattern\", \"params\":{\"subject\":\"?head\", \"predicate\":\"<urn:trikeshed:english:observation:word>\", \"object\":\"?predicateWord\"}, \"x\":680.0, \"y\":520.0, \"width\":null, \"height\":null, \"collapsed\":false, \"subprogram\":null, \"children\":[]}], \"wires\":[{\"from\":[\"v0\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v1\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v2\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v3\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"v4\", \"variable\"], \"to\":[\"select\", \"variables\"]}, {\"from\":[\"p0\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p1\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p2\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p3\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p4\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p5\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p6\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}, {\"from\":[\"p7\", \"pattern\"], \"to\":[\"select\", \"patterns\"]}], \"controls\":{\"humanOversight\":true, \"matingPoints\":[], \"inspectionOnly\":true}, \"kanban\":null, \"view\":{\"x\":20.0, \"y\":20.0, \"z\":0.6}, \"seq\":15}"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "query",
+              "type": "document.english.query",
+              "x": 898,
+              "y": 230,
+              "params": {
+                "receiptCid": "",
+                "mode": "",
+                "program": ""
+              },
+              "collapsed": false
+            },
+            {
+              "id": "bindings",
+              "type": "display",
+              "x": 1296,
+              "y": 150,
+              "params": {},
+              "collapsed": false
+            },
+            {
+              "id": "source",
+              "type": "display",
+              "x": 1296,
+              "y": 410,
+              "params": {},
+              "collapsed": false
+            },
+            {
+              "id": "dataset-out",
+              "type": "scope.out",
+              "x": 1526,
+              "y": 140,
+              "params": {
+                "name": "dataset",
+                "kind": "text"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "results-out",
+              "type": "scope.out",
+              "x": 2003,
+              "y": 340,
+              "params": {
+                "name": "results",
+                "kind": "json"
+              },
+              "collapsed": false
+            },
+            {
+              "id": "source-out",
+              "type": "scope.out",
+              "x": 1694,
+              "y": 540,
+              "params": {
+                "name": "source",
+                "kind": "json"
+              },
+              "collapsed": false
+            }
+          ],
+          "wires": [
+            {
+              "from": [
+                "receipt",
+                "value"
+              ],
+              "to": [
+                "query",
+                "receiptCid"
+              ]
+            },
+            {
+              "from": [
+                "mode",
+                "value"
+              ],
+              "to": [
+                "query",
+                "mode"
+              ]
+            },
+            {
+              "from": [
+                "query-pattern",
+                "value"
+              ],
+              "to": [
+                "query",
+                "program"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "results"
+              ],
+              "to": [
+                "bindings",
+                "x"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "source"
+              ],
+              "to": [
+                "source",
+                "x"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "dataset"
+              ],
+              "to": [
+                "dataset-out",
+                "value"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "results"
+              ],
+              "to": [
+                "results-out",
+                "value"
+              ]
+            },
+            {
+              "from": [
+                "query",
+                "source"
+              ],
+              "to": [
+                "source-out",
+                "value"
+              ]
+            }
+          ],
+          "controls": {
+            "humanOversight": true,
+            "matingPoints": []
+          },
+          "view": {
+            "x": 10.352941176470587,
+            "y": 270.47058823529414,
+            "z": 0.9411764705882353
+          }
+        },
+        "path": [],
+        "offset": 0,
+        "limit": 32,
+        "cursor": {
+          "path": [],
+          "axes": [
+            [
+              2
+            ]
+          ],
+          "selections": [],
+          "offset": 0,
+          "groupOffset": 0,
+          "sourceCid": null
+        },
+        "compareProgramCid": "sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b"
+      }
+    }
+  ],
+  "errors": [],
+  "external": []
+}
