@@ -43,7 +43,7 @@ object NormClauses {
     private val negators = setOf("not", "never", "no", "n't")
     private val modifiers = arrayOf("compound", "amod", "nmod:poss", "nummod")
     private val conditionMarks = setOf("if", "when", "unless", "until", "where", "whenever", "before", "after", "upon")
-    private val otherConditions = Regex("\\b(?:except|excepting|notwithstanding|provided\\s+that|providing\\s+that|assuming\\s+that|subject\\s+to|on\\s+condition|in\\s+(?:the\\s+)?event|as\\s+long\\s+as|only\\s+if|even\\s+if)\\b", RegexOption.IGNORE_CASE)
+    private val otherConditions = Regex("\\b(?:except|excepting|notwithstanding|save\\s+that|other\\s+than|provided\\s+that|providing\\s+that|assuming\\s+that|subject\\s+to|on\\s+condition|in\\s+(?:the\\s+)?event|as\\s+long\\s+as|only\\s+if|even\\s+if)\\b", RegexOption.IGNORE_CASE)
 
     /** Predicate words that carry legal force without a modal verb: the force, and whether it denies. */
     private val predicateForce = mapOf(

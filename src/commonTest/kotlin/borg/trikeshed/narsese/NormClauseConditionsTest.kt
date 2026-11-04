@@ -111,4 +111,20 @@ class NormClauseConditionsTest {
             due("unless", s_[Edge("due", "not", "neg")]), triples = true)
         assertTrue(NormClauses.extract(unsupported).isEmpty())
     }
+
+    @Test fun saveThatAndOtherThanExceptionsCannotBecomeBareNorms() {
+        val save = document("Tenant must pay rent save that landlord waives fees.", s_[
+            Edge("pay", "waives", "advcl"), Edge("waives", "landlord", "nsubj"),
+            Edge("waives", "fees", "obj"), Edge("waives", "that", "mark"),
+            Edge("that", "save", "fixed")], triples = true)
+        val other = document("Tenant must pay rent other than fees.", s_[
+            Edge("pay", "fees", "obl:than"), Edge("fees", "than", "case"),
+            Edge("fees", "other", "amod")], triples = true)
+        for (doc in s_[save, other].view) {
+            val original = doc.text
+            assertEquals(NormConditionIssue.UNSUPPORTED, NormClauses.conditionIssue(doc, doc.sentences[0]))
+            assertTrue(NormClauses.extract(doc).isEmpty(), original)
+            assertEquals(original, doc.text)
+        }
+    }
 }
