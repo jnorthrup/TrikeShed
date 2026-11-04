@@ -1,0 +1,76 @@
+Reopen retained English inspection
+=================================
+
+This is a separate read action from "Inspect English locally". In Documents,
+select the current source, set the same Start/End range as the retained inspection,
+paste its exact CID into "Retained inspection CID", then choose "Open retained
+inspection". No parser or generative model runs. The displayed annotations keep
+their original producer metadata; reopening does not authenticate that producer.
+
+The current document and extraction must match the inspection's stored project,
+document, CID, revision, sequence and source snapshots. A receipt from a different
+document refuses even if both documents contain identical bytes. A stale source
+does not silently open in historical mode. Partial ranges remain visibly partial.
+Editing the CID or range clears downstream results; a late response for an old
+CID, range or document cannot populate the new selection. The CID field remains
+editable during opening so a pending read can be cancelled without changing the
+document. Navigation closes the controller and clears any review credential.
+
+API
+---
+POST /api/documents/english/retained requires exactly these fields:
+
+  project, id, cid, rev, seq, begin, end, receiptCid
+
+The first five identify the selected original source revision. begin/end are the
+same exact global UTF-16 range stored in the receipt, at most 16,384 characters.
+receiptCid is the retained English inspection CID. The response is the actual
+verified original receipt payload, plus its receiptCid and this read envelope:
+
+  retrieval.kind = retained-current-inspection
+  retrieval.parserExecuted = false
+  retrieval.modelCalled = false
+  retrieval.currentness = checked-before-and-after-open
+
+The original payload's canonical CBOR hashes to receiptCid, excluding the response
+envelope. Original optional fields and legacy dependency spellings are preserved;
+old receipts do not acquire invented recorded node identities. Original/source
+and extraction bytes, quotations, graph structure and receipt metadata are checked
+through EnglishObservationGraph.read. EnglishObservationCurrent checks every
+stored source snapshot before and after response preparation. The returned JSON
+has an 8 MiB bound and refuses rather than truncating. GET returns 405. Malformed,
+missing, tampered, oversized, wrong-source, wrong-range or stale receipts refuse
+without an inspection payload. Existing error/status conventions remain in use.
+
+This route shares the existing document-English admission/drain owner. It does
+not check parser installation, initialize the lazy reader, mine, mint another
+receipt, write CAS, append a review event or admit a world/Rete/NARS assertion.
+POST /api/documents/english remains the real fresh local inspection operation.
+Reopening stored annotations never masquerades as that fresh operation.
+
+Taxonomy form presentation
+--------------------------
+The associated taxonomy review controls now use existing Documents form styles
+and responsive groups so labels, choices, evidence cards and action buttons stay
+readable. Roles, sorts, IRIs and context still start empty. The exact validated
+query goal is displayed beside its result status; editing a goal removes the old
+result. Password input stays blank on rendering, with the active credential kept
+only in the current controller's memory. No authentication or review policy was
+changed by the layout work.
+
+Verification scope
+------------------
+Six focused public-route JVM methods passed a preliminary frozen-source check
+against the immutable v70 dependency/main classpath plus explicitly named new and
+unchanged internal source dependencies. They cover exact CBOR/payload identity,
+optional-null and legacy fidelity, zero retained-reader factory calls, no new CAS
+files or blackboard changes, source/range mismatch, source mutation including a
+late mutation, malformed/missing/tampered/oversized/corrupt blocks, recovery after
+refusal, and draining both paths while accepted work completes.
+
+The fixtures label all annotations as synthetic. One drain fixture intentionally
+uses a blocking synthetic fresh reader to verify owner lifetime; it is not an
+actual CoreNLP run. No actual parser, model, Gradle, production friend access or
+browser execution was used for those checks. Final coordinated JVM/common-JS and
+native Documents opener/late-response validation remain pending. These changes do
+not relabel the already published v70 build, fresh-parser pilot or screenshots.
