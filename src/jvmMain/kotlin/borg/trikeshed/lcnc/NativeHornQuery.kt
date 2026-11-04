@@ -311,7 +311,7 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
 }
 
 /** Strict parser also rejects duplicate keys and excessive nesting before recursive reification. */
-private object DocumentResult {
+internal object DocumentResult {
     fun parse(text: String): Map<String, Any?> {
         var depth = 0; var string = false; var escape = false
         for (c in text) if (string) {
