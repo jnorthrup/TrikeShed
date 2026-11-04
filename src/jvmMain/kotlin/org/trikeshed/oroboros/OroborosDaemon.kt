@@ -50,7 +50,6 @@ import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -436,12 +435,32 @@ object OroborosDaemon {
         intake: borg.trikeshed.forge.server.CurationIntake,
         modules: borg.trikeshed.module.ModuleSupervisor,
         ctx: borg.trikeshed.module.ModuleContext,
+        llvm: borg.trikeshed.kernel.KernelElement?,
     ) {
         follow?.join()
         intake.drain()
         runCatching { modules.drainAll() }
+        llvm?.drain()
         ctx.drainCouncilCases()
         intake.constellations()?.drain()
+    }
+
+    /** Startup remains joined by the outer owner even when a later bootstrap step throws. */
+    private fun CoroutineScope.startModules(supervisor: borg.trikeshed.module.ModuleSupervisor,
+                                           config: DaemonConfig, ownCleanup: (suspend () -> Unit) -> Unit) {
+        val startup = launch {
+            if (HostSystem.getenv("TRIKESHED_NO_KANBAN_MODULE") != "1") {
+                runCatching { supervisor.attach(borg.trikeshed.kanban.module.KanbanModule()) }
+                    .onSuccess { HostSystem.err("[OROBOROS] module attached: ${it.id} (default) — ${it.describe()}") }
+                    .onFailure { HostSystem.err("[OROBOROS] KanbanModule attach FAILED: ${it.message}") }
+            }
+            for (fqcn in config.modules) {
+                runCatching { supervisor.attach(fqcn) }
+                    .onSuccess { HostSystem.err("[OROBOROS] module attached: ${it.id} ($fqcn)") }
+                    .onFailure { HostSystem.err("[OROBOROS] module attach FAILED for $fqcn: ${it.message}") }
+            }
+        }
+        ownCleanup { startup.join(); supervisor.drainAll() }
     }
 
     /** Keep consumer shutdown and its fact dependencies outside mainImpl's large state machine. */
@@ -1644,29 +1663,11 @@ object OroborosDaemon {
         }
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
-        val llvmScalar = borg.trikeshed.lcnc.OroborosLcncWiring.llvm(moduleContext)
-        llvmScalar?.let { owned -> ownCleanup { owned.a.drain() } }
-        borg.trikeshed.lcnc.SubVmLegos.register(moduleContext, llvmScalar?.b?.runner())
-        // uring legos: the ring as palette nodes — SQE in, CQE out, through the
-        // facade's probed backend; contracts in LcncContracts, one registration site.
-        borg.trikeshed.lcnc.UringLegos.register(moduleContext)
-        // The LIFETIME half of camel: vm.camel.up/down/routes hold a CamelContext open past the
-        // run that started it, so a poller (timer:, file:, imaps:) has somewhere to live and every
-        // Exchange that crosses lands on the board as camel/route/<id>/exchange.
-        borg.trikeshed.lcnc.CamelRouteLegos.register(moduleContext)
+        val llvmKernel = borg.trikeshed.lcnc.OroborosLcncWiring.vmLegos(moduleContext, ownCleanup)
         // The coding-agent lane (Forge genesis, Cut A): the host's CLIs probed once; agent.run /
         // agent.list legos and the claim worker's lane share one runner; receipts are agent/run/<runId>.
-        val agentRoster = borg.trikeshed.agent.AgentCliProbe.probe(config.agents, borg.trikeshed.agent.AgentRegistry.KNOWN)
-        val agentRunner = borg.trikeshed.agent.JvmAgentRunner(
-            agentRoster, repoDir = jfile(repoDir), forgeHome = jfile(forgeHome), cas = casStore, attachments = attachmentGateway, blackboard = daemonBlackboard,
-        )
-        moduleContext.agentRuns = agentRunner
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.AgentNodes.registry(agentRunner) { borg.trikeshed.platform.randomUuid().toString() })
-        val agentWire = borg.trikeshed.forge.server.AgentWire(
-            agentRunner, daemonBlackboard, probedAtMs = HostSystem.currentTimeMillis(),
-            enabledBy = if ("--agents" in args) "--agents" else if (HostSystem.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default",
-        )
-        HostSystem.err("[OROBOROS] coding agents: " + agentRoster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
+        val agentWire = borg.trikeshed.lcnc.OroborosLcncWiring.codingAgents(
+            moduleContext, config.agents, jfile(repoDir), jfile(forgeHome), args)
         borg.trikeshed.lcnc.OroborosLcncWiring.lcncStores(moduleContext, promptStore, snapshotService, projectCorpus)
         // ── hermes.lastUsed: the outcome, next to the intent ──────────
         // mux.meta answers "what is modelmux configured to select" and reports
@@ -2031,8 +2032,6 @@ object OroborosDaemon {
             },
         )
         val moduleWire = borg.trikeshed.forge.server.ModuleWire(moduleSupervisor, moduleRoutes)
-        var moduleStartup: Job? = null
-        ownCleanup { moduleStartup?.join(); moduleSupervisor.drainAll() }
         val webhookRuntime = borg.trikeshed.forge.server.couchWebhookRuntime(
             couchStore, daemonBlackboard, jfile(forgeHome),
             runners = moduleContext.lcncRunners,
@@ -2082,20 +2081,7 @@ object OroborosDaemon {
         runCatching { programLedger.thaw() }
             .onSuccess { restored -> HostSystem.err("[OROBOROS] programs: $restored head(s) restored from the ledger") }
             .onFailure { HostSystem.err("[OROBOROS] programs: ledger thaw FAILED (${it.message}); the daemon boots without the ledger's heads") }
-        moduleStartup = launch {
-            // KanbanModule is the point of the module system: attached by DEFAULT (the WAL-backed
-            // board replaces the fossil plan-parser). TRIKESHED_NO_KANBAN_MODULE=1 opts out.
-            if (HostSystem.getenv("TRIKESHED_NO_KANBAN_MODULE") != "1") {
-                runCatching { moduleSupervisor.attach(borg.trikeshed.kanban.module.KanbanModule()) }
-                    .onSuccess { HostSystem.err("[OROBOROS] module attached: ${it.id} (default) — ${it.describe()}") }
-                    .onFailure { HostSystem.err("[OROBOROS] KanbanModule attach FAILED: ${it.message}") }
-            }
-            for (fqcn in config.modules) {
-                runCatching { moduleSupervisor.attach(fqcn) }
-                    .onSuccess { HostSystem.err("[OROBOROS] module attached: ${it.id} ($fqcn)") }
-                    .onFailure { HostSystem.err("[OROBOROS] module attach FAILED for $fqcn: ${it.message}") }
-            }
-        }
+        startModules(moduleSupervisor, config, ownCleanup)
 
         // ── Project dbs: every mounted db grows its own Changes→Rete tendon
         //    (partition = db name — blackboard subscope seams by project), then
@@ -2487,8 +2473,7 @@ object OroborosDaemon {
                 runCatching { documentReviewWire.stopAdmission() }
                 // The follow/Wiki producer stops at its admission boundary and settles its
                 // current pass before the runner registry, model clients, or stores close.
-                drainCuration(curatorFollowJob, curationIntake, moduleSupervisor, moduleContext)
-                llvmScalar?.a?.drain()
+                drainCuration(curatorFollowJob, curationIntake, moduleSupervisor, moduleContext, llvmKernel)
                 // Join accepted route commands, then consumers and their final facts. A failed
                 // stop is not permission to close the observation dependencies underneath it.
                 drainCamel(moduleContext, blackboardFacts, graalFacts, jvmVitals)

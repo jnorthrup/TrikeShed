@@ -16,6 +16,30 @@ import borg.trikeshed.lib.*
  * Called from the daemon with resolved jvm values.
  */
 object OroborosLcncWiring {
+    suspend fun vmLegos(context: ModuleContext, ownCleanup: (suspend () -> Unit) -> Unit): KernelElement? {
+        val owned = llvm(context)
+        owned?.let { ownCleanup { it.a.drain() } }
+        SubVmLegos.register(context, owned?.b?.runner())
+        UringLegos.register(context)
+        CamelRouteLegos.register(context)
+        return owned?.a
+    }
+
+    /** Bootstrap extraction keeps the daemon's coroutine below the JVM method-size limit. */
+    suspend fun codingAgents(context: ModuleContext, enabled: Set<String>, repo: java.io.File,
+                             home: java.io.File, args: Array<String>): borg.trikeshed.forge.server.AgentWire {
+        val roster = borg.trikeshed.agent.AgentCliProbe.probe(enabled, borg.trikeshed.agent.AgentRegistry.KNOWN)
+        val runner = borg.trikeshed.agent.JvmAgentRunner(roster, repoDir = repo, forgeHome = home,
+            cas = context.casStore, attachments = context.attachments, blackboard = context.blackboard)
+        context.agentRuns = runner
+        context.lcncRunners.putAll(AgentNodes.registry(runner) { borg.trikeshed.platform.randomUuid().toString() })
+        val wire = borg.trikeshed.forge.server.AgentWire(runner, context.blackboard,
+            probedAtMs = HostSystem.currentTimeMillis(),
+            enabledBy = if ("--agents" in args) "--agents" else if (HostSystem.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default")
+        HostSystem.err("[OROBOROS] coding agents: " + roster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
+        return wire
+    }
+
     /** Optional trusted scalar backend; caller retains the root until all LCNC consumers drain. */
     internal suspend fun llvm(context: ModuleContext,
                               config: String? = HostSystem.getenv("TRIKESHED_LLVM_SCALAR_PROFILE")): Join<KernelElement, LlvmScalar>? {
