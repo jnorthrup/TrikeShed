@@ -10,6 +10,7 @@ import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.narsese.*
 import borg.trikeshed.nlp.*
 import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.*
 
@@ -25,7 +26,11 @@ class DocumentEnglishWire(
     private val reader = lazy { readerFactory?.invoke() ?: CoreNlpRuntime(CoreNlpRuntime.Profile.SYNTAX) }
     private val observations = EnglishObservationWire(ctx, corpus)
 
-    fun attach() { ctx.routes.claim(OWNER, PATH, route = ::route); observations.attach() }
+    fun attach() {
+        ctx.routes.claim(OWNER, PATH, route = ::route)
+        ctx.routes.claim(OWNER, RETAINED_PATH, route = ::route)
+        observations.attach()
+    }
 
     /** CoreNLP's synchronous call has no wall deadline; accepted calls finish before its owner closes. */
     suspend fun drain() {
@@ -39,14 +44,17 @@ class DocumentEnglishWire(
     private fun json(value: Any?, status: Int = 200) = WireHttpResponse(status, jsonOf(value), "application/json; charset=utf-8")
 
     internal suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): WireHttpResponse {
-        if (path.substringBefore('?') != PATH) return json(_m["error" j "not_found"], 404)
-        if (method == "GET") return json(_m["available" j available(), "requiresModel" j false,
+        val endpoint = path.substringBefore('?')
+        val retained = endpoint == RETAINED_PATH
+        if (endpoint != PATH && !retained) return json(_m["error" j "not_found"], 404)
+        if (method == "GET" && !retained) return json(_m["available" j available(), "requiresModel" j false,
             "module" j "corenlp", "profile" j "syntax-v1", "maxChars" j MAX_CHARS,
             "semantics" j "not-established", "parseWallDeadline" j null])
         if (method != "POST") return json(_m["error" j "method_not_allowed"], 405)
         return try { requests.call {
             val input = DocumentReviewWire.taxonomyRequest(text.substringAfter("\r\n\r\n", text))
-            require(input.keys == _s["project", "id", "cid", "rev", "seq", "begin", "end"]) { "Unexpected or missing English inspection fields" }
+            val fields = _s["project", "id", "cid", "rev", "seq", "begin", "end"] + if (retained) _s["receiptCid"] else emptySet()
+            require(input.keys == fields) { "Unexpected or missing English inspection fields" }
             fun field(key: String) = (input[key] as? String)?.takeIf { it.isNotBlank() && it.length <= 4096 } ?: error("$key required")
             val expected = ProjectDoc(field("project"), field("id"), field("cid"), field("rev"),
                 DocumentReviewWire.revision(input["seq"]), 0, "")
@@ -56,12 +64,34 @@ class DocumentEnglishWire(
             }
             val begin = offset("begin"); val end = offset("end")
             require(end > begin && end - begin <= MAX_CHARS) { "Select 1..16384 UTF-16 characters" }
+            if (retained) return@call open(expected, begin, end, ContentId(field("receiptCid")))
             if (!available()) return@call json(_m["available" j false, "requiresModel" j false,
                 "error" j "Local CoreNLP module is not installed; install it before English inspection."], 503)
             inspect(expected, begin, end)
         } } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: UnsupportedOperationException) { json(_m["error" j failure.message], 503) }
         catch (failure: Exception) { json(_m["error" j (failure.message ?: "English inspection refused")], 409) }
+    }
+
+    /** A separate read action: never initializes the lazy reader, mines, mutates review, or mints a receipt. */
+    private suspend fun open(expected: ProjectDoc, begin: Int, end: Int, cid: ContentId): WireHttpResponse {
+        current(expected)
+        val snapshot = EnglishObservationGraph.read(ctx.casStore, cid)
+        require(snapshot.selection == DocumentRevision(expected.project, expected.id, expected.cid, expected.rev, expected.seq)) {
+            "Retained English inspection belongs to another source revision"
+        }
+        val range = snapshot.inventory["range"] as Map<*, *>
+        require((range["begin"] as Number).toInt() == begin && (range["end"] as Number).toInt() == end) {
+            "Retained English inspection range differs from the selected range"
+        }
+        EnglishObservationCurrent.check(corpus, s_[snapshot], "current")
+        val response = jsonOf(EnglishObservationGraph.retained(snapshot) + _m["receiptCid" j cid.value,
+            "retrieval" j _m["kind" j "retained-current-inspection", "parserExecuted" j false,
+                "modelCalled" j false, "currentness" j "checked-before-and-after-open"]])
+        require(response.encodeToByteArray().size <= MAX_RETAINED_RESPONSE) { "Retained English inspection response exceeds 8MiB" }
+        EnglishObservationCurrent.check(corpus, s_[snapshot], "current")
+        current(expected)
+        return WireHttpResponse(200, response, "application/json; charset=utf-8")
     }
 
     private suspend fun current(expected: ProjectDoc): ProjectDoc {
@@ -159,11 +189,13 @@ class DocumentEnglishWire(
 
     companion object {
         const val PATH = "/api/documents/english"
+        const val RETAINED_PATH = "/api/documents/english/retained"
         const val OWNER = "document-english"
         const val MAX_CHARS = 16_384
         const val MAX_ORIGINAL = 32 * 1024 * 1024
         const val MAX_TEXT = 4 * 1024 * 1024
         const val MAX_LINEAGE = 65_536
         const val MAX_RECEIPT = 8 * 1024 * 1024
+        const val MAX_RETAINED_RESPONSE = 8 * 1024 * 1024
     }
 }

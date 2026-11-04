@@ -44,6 +44,9 @@ internal object DocumentsEnglish {
         private var begin = 0
         private var end = minOf(RANGE_LIMIT, preview.length).let { at -> if (splitScalar(at)) at - 1 else at }
         private var pending = false
+        private var inspectionEpoch = 0
+        private var retainedCid = ""
+        private var openingRetained = false
         private var failure: String? = null
         private var result: Map<*, *>? = null
         private var corpusNotice: String? = null
@@ -55,7 +58,7 @@ internal object DocumentsEnglish {
         private var legalResult: Map<*, *>? = null
         private var taxonomy: DocumentsEnglishTaxonomy? = null
         private fun resetTaxonomy() { taxonomy?.close(); taxonomy = null }
-        fun close() { abort?.abort(); resetLegal(); resetTaxonomy(); job.cancel() }
+        fun close() { inspectionEpoch++; abort?.abort(); resetLegal(); resetTaxonomy(); job.cancel() }
         private fun present() = owner === this && job.isActive && current() && host.asDynamic().isConnected == true
         private fun splitScalar(at: Int) = at in 1 until preview.length && preview[at - 1].isHighSurrogate() && preview[at].isLowSurrogate()
         private fun text(parent: HTMLElement, tag: String, value: String, className: String? = null): HTMLElement =
@@ -137,26 +140,56 @@ internal object DocumentsEnglish {
                 }
             }
         }
-        private fun inspect() {
+        private fun invalidateInspection() {
+            inspectionEpoch++; abort?.abort(); abort = null; pending = false
+            result = null; failure = null; corpusNotice = null
+            resetTaxonomy(); resetLegal()
+            host.querySelector("[data-english-result]")?.remove()
+            host.querySelector("[data-english-pending]")?.remove()
+            host.querySelector("[data-english-failure]")?.remove()
+            host.querySelector("[data-english-inspect]")?.let { it.asDynamic().disabled = preview.isEmpty() }
+            host.querySelector("[data-english-open-retained]")?.let { it.asDynamic().disabled = !cid(retainedCid) || !validRange() }
+            host.querySelector("[data-english-begin]")?.let { it.asDynamic().disabled = false }
+            host.querySelector("[data-english-end]")?.let { it.asDynamic().disabled = false }
+        }
+        private fun inspect() = load(false)
+        private fun load(retained: Boolean) {
             if (!validRange()) { failure = "Choose a nonempty range of at most 16,384 characters without splitting a character."; render(); return }
+            if (retained && !cid(retainedCid)) { failure = "Enter an exact retained inspection CID."; render(); return }
             val requestedBegin = begin; val requestedEnd = end
-            resetTaxonomy()
-            resetLegal()
-            pending = true; failure = null; render()
+            val requestedCid = retainedCid
+            invalidateInspection()
+            val ticket = inspectionEpoch
+            fun selected() = present() && ticket == inspectionEpoch && begin == requestedBegin && end == requestedEnd &&
+                (!retained || retainedCid == requestedCid)
+            pending = true; openingRetained = retained; render()
             scope.launch {
                 try {
-                    abort = js("new AbortController()")
-                    val init = RequestInit(method = "POST", body = jsonOf(selection() + _m["begin" j requestedBegin, "end" j requestedEnd]),
+                    if (!selected()) return@launch
+                    val controller: dynamic = js("new AbortController()")
+                    abort = controller
+                    val body = selection() + _m["begin" j requestedBegin, "end" j requestedEnd] +
+                        if (retained) _m["receiptCid" j requestedCid] else emptyMap()
+                    val init = RequestInit(method = "POST", body = jsonOf(body),
                         headers = Headers().apply { append("Content-Type", "application/json") })
-                    init.asDynamic().signal = abort.signal
-                    val response = window.fetch("/api/documents/english", init).await()
-                    val value = reifyStrict(response.text().await()) as? Map<*, *> ?: error("Unreadable English inspection response")
+                    init.asDynamic().signal = controller.signal
+                    val response = window.fetch(if (retained) "/api/documents/english/retained" else "/api/documents/english", init).await()
+                    val text = response.text().await()
+                    if (!selected()) return@launch
+                    require(text.length <= 8 * 1024 * 1024 && text.encodeToByteArray().size <= 8 * 1024 * 1024) { "English inspection response exceeds the display bound" }
+                    val value = reifyStrict(text) as? Map<*, *> ?: error("Unreadable English inspection response")
                     require(response.ok && value["error"] == null) { (value["detail"] ?: value["error"] ?: "Local English inspection failed (HTTP ${response.status})").toString() }
                     validate(value, requestedBegin, requestedEnd)
-                    if (present()) { result = value; corpusNotice = null }
+                    if (retained) {
+                        val retrieval = value["retrieval"] as? Map<*, *> ?: error("Missing retained inspection provenance")
+                        require(value["receiptCid"] == requestedCid && retrieval["kind"] == "retained-current-inspection" &&
+                            retrieval["parserExecuted"] == false && retrieval["modelCalled"] == false &&
+                            retrieval["currentness"] == "checked-before-and-after-open") { "Retained inspection identity or currentness differs" }
+                    }
+                    if (selected()) { result = value; retainedCid = value["receiptCid"] as String; corpusNotice = null }
                 } catch (cancelled: CancellationException) { throw cancelled }
-                catch (error: Throwable) { if (present()) failure = error.message ?: "Local English inspection is unavailable" }
-                finally { if (present()) { pending = false; render() } }
+                catch (error: Throwable) { if (selected()) failure = error.message ?: "English inspection is unavailable" }
+                finally { if (selected()) { abort = null; pending = false; render() } }
             }
         }
         private fun resetLegal() {
@@ -267,7 +300,7 @@ internal object DocumentsEnglish {
             input.className = "ds-curate-name"; input.style.cssText = "width:110px;padding:7px 9px"
             input.disabled = pending; input.setAttribute(attribute, "1"); holder.appendChild(input)
             input.addEventListener("input", {
-                if (present() && !pending) { assign(input.value.toIntOrNull() ?: -1); resetTaxonomy() }
+                if (present() && !pending) { assign(input.value.toIntOrNull() ?: -1); invalidateInspection() }
             })
         }
         fun render() {
@@ -283,21 +316,46 @@ internal object DocumentsEnglish {
             rangeInput(controls, "Start", "data-english-begin", begin) { begin = it }
             rangeInput(controls, "End", "data-english-end", end) { end = it }
             val button = text(controls, "button", "Inspect English locally", "ds-curate-submit")
+            button.setAttribute("data-english-inspect", "1")
             button.setAttribute("type", "button"); button.asDynamic().disabled = pending || preview.isEmpty()
             button.style.marginTop = "0"
             button.addEventListener("click", { if (present() && !pending) inspect() })
             text(section, "p", "Range uses text character offsets, ending before End. Each inspection covers at most 16,384 characters; the result reports whether it covers the full stored text.", "ds-curate-label")
-            if (pending) text(section, "p", "Inspecting English locally…").setAttribute("role", "status")
-            failure?.let { text(section, "p", it, "ds-curate-error").setAttribute("role", "status") }
+            val retainedControls = text(section, "div", "")
+            retainedControls.style.cssText = "display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:18px 0"
+            val retainedLabel = text(retainedControls, "label", "Retained inspection CID", "ds-curate-label")
+            retainedLabel.style.cssText = "display:flex;flex:1 1 320px;flex-direction:column;gap:6px;min-width:0"
+            val retainedField = document.createElement("input") as HTMLInputElement
+            retainedField.type = "text"; retainedField.value = retainedCid; retainedField.maxLength = 71
+            retainedField.className = "ds-curate-name"; retainedField.style.cssText = "width:100%;box-sizing:border-box"
+            retainedField.setAttribute("aria-label", "Retained inspection CID"); retainedField.setAttribute("data-english-retained-cid", "1")
+            retainedLabel.appendChild(retainedField)
+            retainedField.addEventListener("input", { if (present()) { retainedCid = retainedField.value; invalidateInspection() } })
+            val open = text(retainedControls, "button", "Open retained inspection", "ds-curate-submit")
+            open.setAttribute("type", "button"); open.setAttribute("data-english-open-retained", "1"); open.style.marginTop = "0"
+            open.asDynamic().disabled = pending || !cid(retainedCid) || !validRange()
+            open.addEventListener("click", { if (present() && !pending) load(true) })
+            text(section, "p", "Open stored annotations for this exact document revision and range. This checks the retained source and current project without rerunning the parser.", "ds-curate-label")
+            if (pending) text(section, "p", if (openingRetained) "Opening retained English inspection…" else "Inspecting English locally…").also {
+                it.setAttribute("role", "status"); it.setAttribute("data-english-pending", "1")
+            }
+            failure?.let { text(section, "p", it, "ds-curate-error").also { message ->
+                message.setAttribute("role", "status"); message.setAttribute("data-english-failure", "1")
+            } }
             val value = result ?: return
+            val resultSection = text(section, "div", ""); resultSection.setAttribute("data-english-result", "1")
             val range = value["range"] as Map<*, *>
-            text(section, "h3", "Unreviewed inspection", "ds-curate-h3")
-            text(section, "p", "Text range ${range["begin"]}–${range["end"]} of ${range["totalLength"]} characters · " +
+            text(resultSection, "h3", "Unreviewed inspection", "ds-curate-h3")
+            if (value["retrieval"] != null) text(resultSection, "p", "Opened from retained evidence; no parser was run. Recorded parser execution is not reverified.", "ds-curate-label")
+            text(resultSection, "p", "Text range ${range["begin"]}–${range["end"]} of ${range["totalLength"]} characters · " +
                 if (range["complete"] == true) "full text covered" else "partial coverage")
-            text(section, "p", "Evidence receipt: ${value["receiptCid"]}", "ds-cid")
+            text(resultSection, "p", "Evidence receipt: ${value["receiptCid"]}", "ds-cid")
             val parser = value["parser"] as? Map<*, *>
-            text(section, "p", "Reader: ${parser?.get("processor") ?: "not reported"}. Markers are literal word and phrase candidates; their scope and legal effect require review.", "ds-curate-label")
-            val use = text(section, "button", "Use this inspection in corpus", "ds-curate-submit")
+            text(resultSection, "p", "Reader: ${parser?.get("processor") ?: "not reported"}. Markers are literal word and phrase candidates; their scope and legal effect require review.", "ds-curate-label")
+            val coverage = value["coverage"] as? Map<*, *>
+            if (coverage?.get("parserNodeIdentityReported") != true || coverage?.get("parserDependencyNodeIdentity") != "token-index+copy-count/1")
+                text(resultSection, "p", "Full parser node identity was not reported. Token indices and displayed syntax do not establish that enhanced copy identities were captured.", "ds-curate-label")
+            val use = text(resultSection, "button", "Use this inspection in corpus", "ds-curate-submit")
             use.setAttribute("type", "button"); use.setAttribute("data-corpus-use-inspection", "1"); use.asDynamic().disabled = pending
             use.style.cssText = "margin:10px 0;padding:8px 12px"
             use.addEventListener("click", {
@@ -307,15 +365,15 @@ internal object DocumentsEnglish {
                     render()
                 }
             })
-            corpusNotice?.let { text(section, "p", it, "ds-curate-label").setAttribute("role", "status") }
-            legalControls(section, value)
+            corpusNotice?.let { text(resultSection, "p", it, "ds-curate-label").setAttribute("role", "status") }
+            legalControls(resultSection, value)
             if (!pending && number(range["begin"]) == begin && number(range["end"]) == end) {
                 val controller = taxonomy ?: DocumentsEnglishTaxonomy(value, scope).also { taxonomy = it }
-                controller.mount(text(section, "div", "")) {
+                controller.mount(text(resultSection, "div", "")) {
                     present() && !pending && result === value && number(range["begin"]) == begin && number(range["end"]) == end
                 }
             }
-            for (raw in value["sentences"] as List<*>) sentence(section, raw as Map<*, *>)
+            for (raw in value["sentences"] as List<*>) sentence(resultSection, raw as Map<*, *>)
         }
         private fun legalControls(parent: HTMLElement, inspection: Map<*, *>) {
             val section = text(parent, "section", "")
@@ -412,6 +470,8 @@ internal object DocumentsEnglish {
             for (value in values.view) text(row, "td", value).style.cssText = "padding:6px 8px;border-bottom:1px solid var(--rule);vertical-align:top"
         }
         private fun syntax(parent: HTMLElement, sentence: Map<*, *>) {
+            if (sentence["nodes"] == null) text(parent, "p",
+                "Legacy token-only format: index:0 labels below are derived for display. Parser copy identities were not recorded, so no copy count is established.", "ds-curate-label")
             DocumentsSyntaxGraph.mount(parent, sentence)
             val tokens = (sentence["tokens"] as List<*>).map { it as Map<*, *> }
             val tokenTable = table(parent, s_["#", "Source word", "Lemma", "POS", "Entity tag", "Text range"])
