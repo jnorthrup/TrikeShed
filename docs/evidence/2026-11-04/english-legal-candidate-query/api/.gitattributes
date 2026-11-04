@@ -1,0 +1,3 @@
+sources/*.txt -text whitespace=cr-at-eol
+cas-readbacks/*.cbor -text
+*.gz -text

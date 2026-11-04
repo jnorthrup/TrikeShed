@@ -1,0 +1,79 @@
+{
+  "scope": "Seven exact v58 input receipts and three source bytes; five derived candidate receipts share four existing CIDs. Eight unique CBOR blocks, with no omitted copied vertices or dependencies. All document text is synthetic.",
+  "blocks": [
+    {
+      "cid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+      "bytes": 13562,
+      "file": "cas-readbacks/0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23.cbor",
+      "input": true,
+      "derived": false
+    },
+    {
+      "cid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+      "bytes": 11648,
+      "file": "cas-readbacks/0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb.cbor",
+      "input": true,
+      "derived": false
+    },
+    {
+      "cid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+      "bytes": 18984,
+      "file": "cas-readbacks/1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb.cbor",
+      "input": true,
+      "derived": true
+    },
+    {
+      "cid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+      "bytes": 5860,
+      "file": "cas-readbacks/4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922.cbor",
+      "input": true,
+      "derived": true
+    },
+    {
+      "cid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+      "bytes": 15084,
+      "file": "cas-readbacks/7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798.cbor",
+      "input": true,
+      "derived": true
+    },
+    {
+      "cid": "sha256:0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759",
+      "bytes": 15060,
+      "file": "cas-readbacks/0e46bbd2df09c26c694aea61234535430154b5a6ad5f1b385dc363bfa8afa759.cbor",
+      "input": true,
+      "derived": true
+    },
+    {
+      "cid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+      "bytes": 6433,
+      "file": "cas-readbacks/6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a.cbor",
+      "input": true,
+      "derived": false
+    },
+    {
+      "cid": "sha256:7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0",
+      "bytes": 5836,
+      "file": "cas-readbacks/7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0.cbor",
+      "input": false,
+      "derived": true
+    },
+    {
+      "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+      "bytes": 133,
+      "file": "sources/4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703.txt",
+      "kind": "exact-synthetic-UTF8-source"
+    },
+    {
+      "cid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+      "bytes": 178,
+      "file": "sources/a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042.txt",
+      "kind": "exact-synthetic-UTF8-source"
+    },
+    {
+      "cid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+      "bytes": 54,
+      "file": "sources/7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c.txt",
+      "kind": "exact-synthetic-UTF8-source"
+    }
+  ]
+}

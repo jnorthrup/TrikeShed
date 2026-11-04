@@ -1,0 +1,25 @@
+// Read-only replay-input audit; independent decoder from the prior synthetic-data auditor.
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=path.resolve(process.argv[2]||'/workspace/library-files/english-legal-query-api-proof');
+const sha=b=>'sha256:'+crypto.createHash('sha256').update(b).digest('hex');
+const decoderFile='/workspace/library-files/documents-legal-candidates-independent-audit/audit.cjs';
+const decoderSource=fs.readFileSync(decoderFile,'utf8'),context={assert,TextDecoder,JSON,Buffer};
+vm.createContext(context);vm.runInContext(decoderSource.slice(decoderSource.indexOf('function decode(bytes){'),decoderSource.indexOf('const checked=new Map()')),context);
+const manifestBytes=fs.readFileSync(path.join(root,'manifest.json')),manifest=JSON.parse(manifestBytes),receipts=new Map(),sources=new Map();
+for(const entry of manifest.receipts){const bytes=fs.readFileSync(entry.file);assert.equal(bytes.length,entry.length);assert.equal(sha(bytes),entry.cid);receipts.set(entry.cid,context.decode(bytes));}
+for(const entry of manifest.sources){const bytes=fs.readFileSync(entry.file);assert.equal(bytes.length,entry.length);assert.equal(sha(bytes),entry.cid);sources.set(entry.cid,new TextDecoder('utf-8',{fatal:true}).decode(bytes));}
+let tokens=0,nodes=0,copies=0;const selections=[];
+for(const [name,entry] of Object.entries(manifest.inspections)){
+ const receipt=receipts.get(entry.receiptCid);assert(receipt);assert.equal(receipt.schema,'trikeshed.english-inspection.v1');assert.deepEqual(entry.selection,receipt.selection);assert.deepEqual(entry.sourceSnapshots,receipt.sourceSnapshots);assert.deepEqual(entry.range,receipt.range);
+ const text=sources.get(receipt.extractedTextCid);assert.equal(typeof text,'string');assert.equal(receipt.originalCid,receipt.selection.cid);assert.equal(receipt.extractedTextCid,receipt.originalCid);assert.equal(receipt.reviewStatus,'unreviewed');assert.equal(receipt.parser.runtime.packageVersion,'4.6.0');assert.equal(receipt.parser.runtime.manifestCid,manifest.sourceIdentity.parserManifestCid);
+ for(const row of receipt.sourceSnapshots){assert.equal(row.cid,receipt.originalCid);assert.equal(row.length,Buffer.byteLength(text));for(const field of ['project','id','cid','rev','seq'])assert.equal(row[field],receipt.selection[field]);}
+ for(const sentence of receipt.sentences){assert.equal(sentence.quote,text.slice(sentence.begin,sentence.end));tokens+=sentence.tokens.length;nodes+=sentence.nodes.length;copies+=sentence.nodes.filter(n=>n.copy>0).length;for(const token of sentence.tokens)assert.equal(token.word,text.slice(token.begin,token.end));}
+ selections.push({name,inspectionCid:entry.receiptCid,originalCid:receipt.originalCid,extractedTextCid:receipt.extractedTextCid,selection:receipt.selection,sourceSnapshotRows:entry.sourceSnapshots.length});
+}
+for(const [cid,receipt] of receipts)if(receipt.schema==='trikeshed.english-legal-patterns.v1'){
+ const inspection=receipts.get(receipt.inspectionCid);assert(inspection);assert.deepEqual(receipt.selection,inspection.selection);assert.equal(receipt.originalCid,inspection.originalCid);assert.equal(receipt.extractedTextCid,inspection.extractedTextCid);assert.equal(receipt.reviewStatus,'unreviewed');assert.equal(receipt.producerAuthority,'not-established');assert.equal(receipt.parserExecution,'not-reverified');
+ assert.equal(receipt.sentences.length,inspection.sentences.length);receipt.sentences.forEach((sentence,i)=>{for(const field of ['index','begin','end','quote','nodes','dependencies','markers'])assert.deepEqual(sentence[field],inspection.sentences[i][field]);});
+}
+assert.equal(receipts.size,7);assert.equal(sources.size,3);assert.equal(tokens,70);assert.equal(nodes,71);assert.equal(copies,1);
+process.stdout.write(JSON.stringify({result:'PASS',scope:'Independent read-only comparison of replay manifest against unchanged actual v58 CBOR/source bytes and exact retained snapshot rows; no fresh ingestion or NLP',manifestCid:sha(manifestBytes),auditorCid:sha(fs.readFileSync(__filename)),decoderSourceCid:sha(Buffer.from(decoderSource)),receipts:receipts.size,sources:sources.size,originalSourceTokens:tokens,fullParserNodes:nodes,actualCopyNodes:copies,selections,limits:['Replayed currentness fixtures reconstruct the exact retained document rows; they are not a fresh source-ingestion proof','Recorded parser execution is not authenticated by receipt identity; actual execution evidence remains the distinct v58 browser proof']},null,2)+'\n');

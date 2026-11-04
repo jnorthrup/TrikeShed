@@ -1,0 +1,35 @@
+package proof.englishlegalqueryexport
+
+import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import kotlinx.coroutines.runBlocking
+import java.io.File
+
+/** Read-only reopening after all runtime owners drain; exact JSON bytes, no producer/parser re-execution. */
+fun main()=runBlocking {
+    val root=File("/workspace/library-files/english-legal-query-api-proof")
+    check(File(root,"fixture.exit").readText().trim()=="0")
+    val panels=File("/workspace/library-files/legal-candidate-query-panels-proof")
+    val result=reifyStrict(File(panels,"result.json").readText()) as Map<*,*>;check(result["result"]=="PASS")
+    val runs=result["runs"] as Map<*,*>;val retained=result["retained"] as Map<*,*>
+    val cas=PackCasStore(JvmFileOperations(),File(root,"runtime/cas").absolutePath)
+    val exported=File(panels,"durable-readbacks").apply {mkdirs()};val rows=mutableListOf<Map<String,Any?>>()
+    try {
+        for((key,raw)in runs) {
+            val run=raw as Map<*,*>;val cid=ContentId(run["receiptCid"] as String)
+            val bytes=requireNotNull(cas.getBounded(cid,4*1024*1024));check(ContentId.of(bytes)==cid)
+            val decoded=reifyStrict(bytes.decodeToString(throwOnInvalidSequence=true)) as Map<*,*>
+            check(decoded==retained[key]) {"Receipt bytes differ from original actual content response"}
+            val stored=decoded["lcncRun"] as Map<*,*>;check(stored["runId"]==run["runId"] && stored["status"]==run["status"])
+            File(exported,cid.hex+".json").writeBytes(bytes)
+            val programCid=ContentId(run["programCid"] as String);val program=requireNotNull(cas.getBounded(programCid,4*1024*1024));check(ContentId.of(program)==programCid)
+            File(exported,programCid.hex+".json").writeBytes(program)
+            rows.add(_m["name" j key,"receiptCid" j cid.value,"receiptBytes" j bytes.size,"programCid" j programCid.value,"programBytes" j program.size,"status" j run["status"],"rawReceiptMatchesActualContentResponse" j true])
+        }
+        check(rows.size==5)
+        File(panels,"reopened-cas-readbacks.json").writeText(jsonOf(_m["result" j "PASS","scope" j "Read-only CAS reopening after actual Kanban/query owner drain; exact hash-verified stored run receipt and authored program JSON bytes, no model/parser.","receipts" j rows]))
+        println(jsonOf(_m["result" j "PASS","durableRunReceipts" j rows.size,"exactStoredJson" j true]))
+    }finally {cas.close()}
+}

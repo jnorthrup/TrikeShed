@@ -1,0 +1,77 @@
+{
+  "result": "PASS",
+  "scope": "Exact retained actual v58 CoreNLP observations replayed through the new immutable production API and typed LCNC owner; no fresh ingestion/parser execution. Live rows are exact read-only snapshot reconstruction with explicit stale/reset controls.",
+  "artifact": {
+    "sourceHead": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+    "snapshot": "/workspace/library-files/english-combined-v59-proof/snapshot",
+    "hashes": {
+      "main.jar": "b5a9df6993873660edb0c15a8739f2e589ccc54a0421d525eaccb0f5053f0e89",
+      "documents.js": "eb6e4e9a78efb6eff64222ffa289987c52c41cb30a59ca6486a55faac4970497",
+      "spacegraph.js": "bdc750685c1b940fd3447b9c5ba76d6f8fc58f63b1f57b19fc188bd4d6c09a6c",
+      "pages.js": "9388c8ab1cdffb4db3b86e3e99c92fada2fee91e91e69592678be2fb6f767a54",
+      "classpath.txt": "cd9f5788d111d4e8e2c42b8566ec5d30c67881466f9b6f6aee25f25c5f955990",
+      "passing-build.log": "f155b63ae106b348dcf26962d0fae1565a3e77580e757b8b52f7e3e350f851c3",
+      "source-head.txt": "f4bd07b3ca74856e4d19c69f9d9c16f528ab7c2423e1da5bdce5afda423bd53d"
+    },
+    "productionClassOverlays": false,
+    "friendAccess": false,
+    "scope": "External public-API harness only; retained v58 parser observations replayed, not a new NLP run.",
+    "jarOnlyDependencies": true,
+    "classpathJars": 118,
+    "externalHarnessClasses": 24,
+    "result": "PASS",
+    "immutableArtifactsUnchanged": true,
+    "fixtureExit": 0,
+    "cleanup": {
+      "wireDrained": true,
+      "panelsDrained": true,
+      "allSupervisorsCompleted": true,
+      "registryRemoved": true,
+      "safety": {
+        "reteFacts": 0,
+        "blackboardValues": 0,
+        "beliefBagPresent": false,
+        "reviewOwnerPresent": false,
+        "modelMuxConfigured": false,
+        "parserOwnerPresent": false,
+        "parserCalls": 0,
+        "extractCalls": 0,
+        "globalQuadStorePresent": false
+      }
+    }
+  },
+  "httpApiCalls": 7,
+  "primarySafety": {
+    "reteFacts": 0,
+    "blackboardValues": 0,
+    "beliefBagPresent": false,
+    "reviewOwnerPresent": false,
+    "modelMuxConfigured": false,
+    "parserOwnerPresent": false,
+    "parserCalls": 0,
+    "extractCalls": 0,
+    "globalQuadStorePresent": false
+  },
+  "acceptedQueryDrain": {
+    "acceptedQueries": 4,
+    "completedQueries": 4,
+    "registryRemoved": true,
+    "heldBeforeDrain": true
+  },
+  "typedLcnc": {
+    "actualRunner": true,
+    "typeErrors": [],
+    "explicitNullModeRefused": true
+  },
+  "panelsEvidence": "../panels",
+  "rawApiRecord": "api-result.json.gz",
+  "copySourceQuery": "copy-source-query.json",
+  "history": "proof-history.json",
+  "limits": [
+    "Producer authority not established; parsing not reverified during this replay.",
+    "Candidates are unreviewed parser/lexical observations, not legal applicability or world assertions.",
+    "Same-sentence joins establish cooccurrence only. Integer values are bounded lexical readings, not computed deadlines.",
+    "Graph-overbudget case is a separate manually annotated control, not an actual CoreNLP accuracy/performance claim.",
+    "Outbound syscall denial is limited to the fixture process; no full OS sandbox or production-daemon airgap claim."
+  ]
+}
