@@ -58,8 +58,8 @@ class EnglishCorpusViewTest {
             val before = raw.occurrences[index]; val after = content.occurrences[index]
             assertEquals(before.copy(included = after.included), after)
         }
-        assertTrue(content.occurrences.view.filter { it.term in _s["must", "not", "unless"] }.all { it.included })
-        assertTrue(content.occurrences.view.filter { it.term in _s["the", "be", "have", "and", "do"] }.none { it.included })
+        assertTrue(content.occurrences.view.all { it.term !in _s["must", "not", "unless"] || it.included })
+        assertTrue(content.occurrences.view.none { it.term in _s["the", "be", "have", "and", "do"] && it.included })
         val hit = content.search(s_["write"])[0]
         assertEquals("written", hit.matches[0].word)
         assertTrue(hit.sentence.quote.contains("have written consent"))
