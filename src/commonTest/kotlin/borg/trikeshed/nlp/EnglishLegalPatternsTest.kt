@@ -171,4 +171,62 @@ class EnglishLegalPatternsTest {
         assertTrue(failure.message.orEmpty().contains("quotation anchor limit"))
     }
 
+
+    @Test fun observedCoreNlp46NumberHeadNpmodRetainsTheMatchingDualQuantity() {
+        // Exact tokens/edges captured from the actual local 4.6.0 syntax-v1 experiment over this synthetic text.
+        // This regression replays that observed parse; it does not stand in for rerunning the parser.
+        val text = "Tenant must give notice within thirty (30) business days unless notice is not received."
+        val tokens = s_[NlpToken(1,0,6,"Tenant","tenant","NN","O"),
+            NlpToken(2,7,11,"must","must","MD","O"),
+            NlpToken(3,12,16,"give","give","VB","O"),
+            NlpToken(4,17,23,"notice","notice","NN","O"),
+            NlpToken(5,24,30,"within","within","IN","O"),
+            NlpToken(6,31,37,"thirty","thirty","CD","NUMBER"),
+            NlpToken(7,38,39,"(","(","-LRB-","O"),
+            NlpToken(8,39,41,"30","30","CD","NUMBER"),
+            NlpToken(9,41,42,")",")","-RRB-","O"),
+            NlpToken(10,43,51,"business","business","NN","DATE"),
+            NlpToken(11,52,56,"days","day","NNS","DATE"),
+            NlpToken(12,57,63,"unless","unless","IN","O"),
+            NlpToken(13,64,70,"notice","notice","NN","O"),
+            NlpToken(14,71,73,"is","be","VBZ","O"),
+            NlpToken(15,74,77,"not","not","RB","O"),
+            NlpToken(16,78,86,"received","receive","VBN","O"),
+            NlpToken(17,86,87,".",".",".","O")]
+        val edges = s_[NlpDependency(0,3,"root"),
+            NlpDependency(3,1,"nsubj"),
+            NlpDependency(3,2,"aux"),
+            NlpDependency(3,4,"obj"),
+            NlpDependency(6,5,"case"),
+            NlpDependency(3,6,"obl:within"),
+            NlpDependency(8,7,"punct"),
+            NlpDependency(6,8,"dep"),
+            NlpDependency(8,9,"punct"),
+            NlpDependency(11,10,"compound"),
+            NlpDependency(6,11,"obl:npmod"),
+            NlpDependency(16,12,"mark"),
+            NlpDependency(16,13,"nsubj:pass"),
+            NlpDependency(16,14,"aux:pass"),
+            NlpDependency(16,15,"advmod"),
+            NlpDependency(3,16,"advcl:unless"),
+            NlpDependency(3,17,"punct")]
+        val parsed = NlpDocument(text, s_[NlpSentence(0, 0, text.length, tokens, edges)])
+        val result = EnglishLegalPatterns.inspect(source(text), parsed, 0, text.length)
+        val candidate = duration(result)
+        assertEquals(30, candidate["integerValue"])
+        assertEquals("within thirty (30) business days", candidate["quote"])
+        assertEquals("thirty (30)", candidate["quantityLiteral"])
+        assertTrue((candidate["numberDependencies"] as List<*>).any { raw ->
+            val edge = raw as Map<*, *>
+            edge["governorNode"] == "6:0" && edge["dependentNode"] == "11:0" && edge["relation"] == "obl:npmod"
+        })
+        assertTrue((candidate["markerDependencies"] as List<*>).any { raw ->
+            val edge = raw as Map<*, *>
+            edge["governorNode"] == "6:0" && edge["dependentNode"] == "5:0" && edge["relation"] == "case"
+        })
+        assertTrue("guard-scope-not-established" in candidate["unresolved"] as List<*>)
+        assertTrue("negation-scope-not-established" in candidate["unresolved"] as List<*>)
+        assertEquals(text, sentence(result)["quote"])
+    }
+
 }
