@@ -178,7 +178,10 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                                 text("Scope path: " + JSON.stringify(entry.path) + " · parent: " + str(entry.parent ?: "root") +
                                     " · iteration: " + str(entry.iteration ?: "none"), item)
                                 val runtime = entry.runtime
-                                if (objectValue(runtime)) {
+                                if (objectValue(runtime) && runtime.backend == "graalvm-llvm") {
+                                    for (line in llvmObservation(runtime)) text(line, item)
+                                    details("Measured LLVM runtime", runtime, item)
+                                } else if (objectValue(runtime)) {
                                     text("Guest observation · ${str(runtime.language)} · ${str(runtime.tier)}\nVM: ${str(runtime.vmId)}", item)
                                     text("Captured before release, not a live VM or proof of cleanup. Profiles count observed root returns, not all statements or breakpoints.", item)
                                     if (runtime.sourceScope == "graal-wrapper")
