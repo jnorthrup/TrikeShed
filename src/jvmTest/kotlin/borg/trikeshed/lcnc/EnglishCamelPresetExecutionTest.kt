@@ -101,8 +101,11 @@ class EnglishCamelPresetExecutionTest {
                 .validate(CamelLinkage.Reach.LOCAL, _l["camel", "camel-mail"])
         }
         val changed = "sha256:" + "b".repeat(64)
-        assertFailsWith<IllegalArgumentException> { registry.getValue(EnglishLcncPreset.EVIDENCE).run(LcncNode("check", EnglishLcncPreset.EVIDENCE),
-            _m["expectedCid" j id, "routed" j changed, "transport" j _m["reply" j changed, "headers" j _m[EnglishLcncPreset.HEADER j id]])) }
+        assertFailsWith<IllegalArgumentException> {
+            registry.getValue(EnglishLcncPreset.EVIDENCE).run(LcncNode("check", EnglishLcncPreset.EVIDENCE),
+                _m["expectedCid" j id, "routed" j changed,
+                    "transport" j _m["reply" j changed, "headers" j _m[EnglishLcncPreset.HEADER j id]]])
+        }
     }
 
     @Test fun actualCorpusRunnerUsesItsPublishedInvocationKeyWithoutOptionalTopics(): Unit = runBlocking {
