@@ -6,7 +6,7 @@ import borg.trikeshed.wiki.WikiSurface
 /** A navigation reference. Only retained receipt and current source reads establish its evidence. */
 data class SourceSelection(val receiptCid: String, val proposal: Int, val project: String, val document: String) {
     fun query(): String = "sourceReceipt=${WikiSurface.encode(receiptCid)}&sourceProposal=$proposal&sourceProject=${WikiSurface.encode(project)}&sourceDocument=${WikiSurface.encode(document)}"
-    fun documentsHref(): String = "/documents?${query()}&passageReceipt=${WikiSurface.encode(receiptCid)}&passageProposal=$proposal#${WikiSurface.encode(project)}/${WikiSurface.encode(document)}"
+    fun documentsHref(): String = "/documents?${query()}&passageReceipt=${WikiSurface.encode(receiptCid)}&passageProposal=$proposal#${DocumentSurface.projectFragment(project)}/${WikiSurface.encode(document)}"
     fun href(surface: String): String {
         require(surface in _s["wiki", "curator", "panels"])
         return "/$surface?${query()}"
@@ -78,7 +78,6 @@ data class SourceSelection(val receiptCid: String, val proposal: Int, val projec
             require(Regex("^(0|[1-9][0-9]{0,8})$").matches(ordinal)) { "Invalid proposal ordinal" }
             val project = one("sourceProject")
             val document = one("sourceDocument")
-            require(project != DocumentSurface.CURATION_HASH) { "Reserved project identity" }
             return SourceSelection(receipt, ordinal.toInt(), project, document)
         }
         fun from(passage: DocumentPassage): SourceSelection = SourceSelection(passage.receiptCid, passage.ordinal,

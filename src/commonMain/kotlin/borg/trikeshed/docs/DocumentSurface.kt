@@ -107,6 +107,9 @@ object DocumentSurface {
     const val CURATION_HASH = "curation"
     private val cidPattern = Regex("^sha256:[0-9a-f]{64}$")
 
+    /** Keep the project named curation distinct from the retained-curation route. */
+    fun projectFragment(project: String): String = if (project == CURATION_HASH) "%63uration" else WikiSurface.encode(project)
+
     private fun revision(value: Any?): DocRevision? {
         val r = value as? Map<*, *> ?: return null
         val seq = (r["seq"] as? Number)?.toDouble() ?: return null
@@ -287,7 +290,7 @@ object DocumentSurface {
         val textRevision = result.extractionRevision ?: source
         fun valid(r: DocRevision) = r.project.isNotBlank() && r.id.isNotBlank() && r.rev.isNotBlank() && r.seq >= 0 && cidPattern.matches(r.cid)
         if (!valid(source) || !valid(textRevision) || source.project != textRevision.project ||
-            source.project == CURATION_HASH || source.cid != result.originalCid || textRevision.cid != result.extractedTextCid || !validText) return null
+            source.cid != result.originalCid || textRevision.cid != result.extractedTextCid || !validText) return null
         val begin = proposal.quotationBegin ?: return null
         val end = proposal.quotationEnd ?: return null
         val quote = proposal.quote ?: return null
@@ -381,10 +384,10 @@ object DocumentSurface {
         append("<h2 class=\"ds-curate-h2\">").append(esc(result.name.ifBlank { "Untitled" })).append("</h2>")
         append("<p class=\"ds-sub\">Saved attempt · <code class=\"ds-cid\" title=\"")
             .append(esc(result.receiptCid)).append("\">").append(esc(shortCid(result.receiptCid))).append("</code></p>")
-        val project = result.project?.takeIf { it.isNotBlank() && it != CURATION_HASH }
+        val project = result.project?.takeIf { it.isNotBlank() }
         val documentId = result.documentId?.takeIf { it.isNotBlank() }
         if (project != null && documentId != null) {
-            append("<p><a href=\"/documents#").append(WikiSurface.encode(project)).append('/').append(WikiSurface.encode(documentId))
+            append("<p><a href=\"/documents#").append(projectFragment(project)).append('/').append(WikiSurface.encode(documentId))
                 .append("\" data-source-project=\"").append(esc(project)).append("\" data-source-document=\"")
                 .append(esc(documentId)).append("\">Open current project document</a> ")
                 .append("(it may have changed since this attempt).</p>")
@@ -546,7 +549,7 @@ object DocumentSurface {
             val open = p.name == selected
             append("<li><a class=\"ds-proj").append(if (open) " ds-selected" else "").append('"')
             if (open) append(" aria-current=\"true\"")
-            append(" href=\"#").append(esc(p.name)).append("\" data-project=\"").append(esc(p.name)).append("\">")
+            append(" href=\"#").append(projectFragment(p.name)).append("\" data-project=\"").append(esc(p.name)).append("\">")
             append("<span class=\"ds-caret\">").append(if (open) "▾" else "▸").append("</span>")
             append("<span class=\"ds-name\">").append(esc(p.name)).append("</span>")
             append("<span class=\"ds-count\">").append(p.docs).append("</span></a>")
@@ -563,7 +566,7 @@ object DocumentSurface {
         for (d in rows) {
             append("<li><a class=\"ds-page").append(if (d.id == selectedId) " ds-selected" else "").append('"')
             if (d.id == selectedId) append(" aria-current=\"true\"")
-            append(" href=\"#").append(esc(project)).append('/').append(esc(d.id))
+            append(" href=\"#").append(projectFragment(project)).append('/').append(WikiSurface.encode(d.id))
             append("\" data-doc=\"").append(esc(d.id)).append("\" title=\"")
             if (d.contentStatus == "unchecked-metadata") append("Unchecked metadata: ")
             append(esc(d.cid)).append("\">")
@@ -586,7 +589,7 @@ object DocumentSurface {
         append("<div class=\"ds-crumbs\">")
         if (project == null) append("<span class=\"ds-dim\">Pick a workspace</span>")
         else {
-            append("<a href=\"#").append(esc(project)).append("\" data-project=\"").append(esc(project)).append("\">")
+            append("<a href=\"#").append(projectFragment(project)).append("\" data-project=\"").append(esc(project)).append("\">")
                 .append(esc(project)).append("</a>")
             if (docId != null && view == SurfaceView.PAGE)
                 append("<span class=\"ds-sep\">/</span><span class=\"ds-here\">").append(esc(docId)).append("</span>")
