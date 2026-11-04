@@ -513,7 +513,10 @@ class BeliefBagElement(
             "identityScope" j if (command.propositionCid == null) "legacy-angular" else "exact-resident-proposition"]
         if (existing == null) return BeliefAttention(angular, identity, null, false)
         val base = existing.budget
-        val budget = command.budget ?: BudgetCoord(command.p ?: base.pf, command.d ?: base.df, command.q ?: base.qf)
+        fun part(value: Float?, retained: Int) = value?.let {
+            (it.coerceIn(0f, 1f) * BudgetCoord.SCALE).toInt()
+        } ?: retained
+        val budget = command.budget ?: BudgetCoord(part(command.p, base.p), part(command.d, base.d), part(command.q, base.q))
         val changed = base.packed != budget.packed
         if (changed) {
             hijack.put(HijackBeliefBag.Slot(angular, budget, existing.signal)) { _, inc -> inc }
@@ -530,7 +533,10 @@ class BeliefBagElement(
             when {
                 priorityFloor > 0f && decayed.pf < priorityFloor -> null
                 decayed.packed == s.budget.packed -> s
-                else -> HijackBeliefBag.Slot(s.angular, decayed, s.signal)
+                else -> {
+                    walAppend("A:${s.angular}:${decayed.packed}")
+                    HijackBeliefBag.Slot(s.angular, decayed, s.signal)
+                }
             }
         }
         walAppend("D:$walSeq")
@@ -608,7 +614,7 @@ class BeliefBagElement(
                 val angular = if (cut > 2) text.substring(2, cut).toLongOrNull() else null
                 if (angular != null) counted.getOrPut(angular) { HashSet() }.add(text.substring(cut + 1))
             }
-            // "D:" decay markers are group boundaries; the following B/A records carry state
+            // "D:" decay markers are group boundaries; B/A records carry exact budget state.
         }
     }
 }
