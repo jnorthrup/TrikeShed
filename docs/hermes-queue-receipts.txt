@@ -1,0 +1,16 @@
+Hermes host bag receipts
+
+Successful nonblocking trySend now reports beliefAdmission="queued". A successful
+bag_assert also returns queued=true, replacing admitted=true; the blackboard receipt
+uses the same queued key. Verdict="ok" and angular are retained. In-repository
+guest consumers and assertions use queued. External consumers that read admitted
+must migrate that field.
+
+These fields acknowledge queueing only. They do not acknowledge processed semantic
+admission, a successful structural/ancestry check, WAL durability, or inference.
+Full/closed queues retain their refusal outcomes. Bag.submit provides the separate
+processed acknowledgement and can fail with BeliefAdmissionRefused while the bag
+worker continues. Legacy direct sends remain queue admission, not that acknowledgement.
+
+This changes the host response contract only. It does not update the pinned Python
+donor, ModelMux provider routing, Hermes architecture or session handling.
