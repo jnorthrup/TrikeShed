@@ -1,0 +1,16 @@
+{
+  "tests": 155,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "source": "a42f1dbdefadf7fe774247b4abfd589e6b4ecb73",
+  "build": "v60",
+  "browserBundles": [
+    "documents",
+    "spacegraph",
+    "pages"
+  ],
+  "buildSuccessful": true,
+  "suiteCount": 29,
+  "jvmTestTask": "executed"
+}
