@@ -1,0 +1,13 @@
+{
+  "result": "PASS",
+  "scope": "Source dependency/semantic preservation review only; no Kotlin compilation or new bundle execution",
+  "base": "d3fe16065a8ce935fe1ea07234785e458094a877",
+  "portPresencePrecedenceCopiedExactly": true,
+  "textTypeBlankAndDefaultRulesRetained": true,
+  "vmWrappersDelegate": true,
+  "commonConsumersOfVmRuntimeNodes": [],
+  "nodeAndBrowserProviderFileUnchanged": true,
+  "providerFileSha256": "ecd27082d4882ec84a34e8b815694121918976ac041491d10aeeba95cdc57d35",
+  "beforeFailure": "webpack static require(vm) resolution; not Node VM execution in browser",
+  "notYetVerified": "next GREEN browser bundle dependency elimination and actual Node primitive control"
+}

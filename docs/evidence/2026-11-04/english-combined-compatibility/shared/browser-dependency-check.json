@@ -1,0 +1,21 @@
+{
+  "result": "PASS",
+  "checks": [
+    {
+      "file": "documents.js",
+      "sha256": "526c383cd65f96a7821fc267a1d2ccb3f7e5610194a21e5356ec574d4e2ee460",
+      "unwantedStaticVmImportAbsent": true
+    },
+    {
+      "file": "spacegraph.js",
+      "sha256": "290e51a94a54fecbcc98559898b8b093579b50f5cf182580087e8229c784b286",
+      "unwantedStaticVmImportAbsent": true
+    },
+    {
+      "file": "pages.js",
+      "sha256": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+      "unwantedStaticVmImportAbsent": true
+    }
+  ],
+  "scope": "Static dependency check on all three frozen bundles; actual Documents and Panels loading/native flows checked separately. No Node provider or browser VM isolation execution claim."
+}
