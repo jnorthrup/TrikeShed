@@ -43,8 +43,8 @@ object EnglishInspection {
         for (anchor in source.anchors) {
             require(anchor.begin >= 0 && anchor.end >= anchor.begin && anchor.end <= source.text.length) { "Source anchor outside extracted text" }
             boundary(source.text, anchor.begin); boundary(source.text, anchor.end)
-            require(anchor.page == null || anchor.page > 0) { "Source page must be positive" }
-            require(anchor.coordinates == null || anchor.coordinates.size == 4 && anchor.coordinates.all { it >= 0 }) { "Invalid source coordinates" }
+            require(anchor.page?.let { it > 0 } != false) { "Source page must be positive" }
+            require(anchor.coordinates?.let { it.size == 4 && it.all { value -> value >= 0 } } != false) { "Invalid source coordinates" }
             require(anchor.unresolved.size <= 64) { "Source anchor metadata limit" }
             for (value in s_[anchor.folio, anchor.section, anchor.table, anchor.diagram].view) value?.let(::field)
             for (value in anchor.unresolved) field(value)
@@ -139,7 +139,7 @@ object EnglishInspection {
                 "markerMethod" j "literal-word-and-phrase-candidates", "scope" j "sentence-token-dependency-observations",
                 "omitted" j _l["constituency", "coreference", "openie", "kbp", "legal-interpretation"]],
             "sentences" j rows, "counts" j _m["sentences" j rows.size, "tokens" j tokenCount,
-                "dependencies" j dependencyCount, "markers" j markerCount])
+                "dependencies" j dependencyCount, "markers" j markerCount]]
         require(CanonicalCbor.encodeMap(inventory).size <= MAX_BYTES) { "English inventory exceeds 4MiB" }
         return inventory
     }
