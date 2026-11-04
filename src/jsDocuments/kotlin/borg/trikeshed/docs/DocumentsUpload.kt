@@ -134,7 +134,7 @@ internal object DocumentsUpload {
             status.textContent = "Added $sent files to $actual. $parsing Content remains unreviewed. "
             val link = document.createElement("a")
             link.textContent = "Open uploaded project"
-            link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(actual)}#${WikiSurface.encode(actual)}")
+            link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(actual)}#${DocumentSurface.projectFragment(actual)}")
             status.appendChild(link)
         }
         fun submit(read: suspend () -> Join<List<Entry>, String>) {
@@ -231,7 +231,7 @@ internal object DocumentsUpload {
                                 projects.appendChild(document.createElement("br"))
                                 val link = document.createElement("a")
                                 link.textContent = "Open project $project"
-                                link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(project)}#${WikiSurface.encode(project)}")
+                                link.setAttribute("href", "/documents?uploadedProject=${WikiSurface.encode(project)}#${DocumentSurface.projectFragment(project)}")
                                 projects.appendChild(link)
                                 projects.appendChild(detail)
                             }
