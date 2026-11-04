@@ -1,0 +1,53 @@
+{
+  "result": "PASS",
+  "mode": "DATA_ONLY",
+  "scope": "Fresh stage1 actual CoreNLP4.6 inspection plus parser-free stage2 retained query; this audit does not attest completion of browser capture",
+  "stage1ProgressCid": "sha256:488e4328dd55c9130863a6f9a1bda3f01ada4a99905cf5a47c126f099baa7976",
+  "stage2ProgressCid": "sha256:0872326888c387eb35336090e8292bc2e7f03dc5e39a13b9ee6bc7dcfcbc960c",
+  "freshInspectionCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+  "sourceCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+  "sourceBytes": 228,
+  "sourceTokens": 42,
+  "fullParserNodes": 43,
+  "parserCopyVertices": 1,
+  "copularRows": 3,
+  "requirementSourceOccurrences": 1,
+  "requirementNodeIds": [
+    "2:0",
+    "2:3"
+  ],
+  "fullQualifiedQuoteAndNegativeContextRetained": true,
+  "inspectionCborHashVerified": true,
+  "rawJsonCasHashesVerified": 3,
+  "totalActualParserReads": 1,
+  "continuationActualParserReads": 0,
+  "bothRecordedOwnersDrained": true,
+  "browserCaptureCompletion": "NOT_ATTESTED",
+  "limits": [
+    "Two distinct runtime stages, not a single uninterrupted browser walkthrough",
+    "Stage2 reopens the exact fresh receipt and source rows; it does not run another parser",
+    "Copular rows are syntax and word labels, not positive assertions, class membership, legal force or resolved guard scope",
+    "Exact receipt hashes do not authenticate parser execution; fresh execution evidence remains the separate recorded producer stage",
+    "This audit is read-only data comparison and does not claim OS-wide airgap or new inference"
+  ],
+  "auditorCid": "sha256:894ff5237ffeb9915fee078ed443db79769ae52479d1a373ff93f319d8a9be38",
+  "negativeControls": [
+    {
+      "mutation": "altered-subject-copy-id",
+      "rejected": true
+    },
+    {
+      "mutation": "wrong-named-graph",
+      "rejected": true
+    },
+    {
+      "mutation": "visible-qualified-quote-omits-not",
+      "rejected": true
+    },
+    {
+      "mutation": "raw-durable-receipt-bitflip",
+      "rejected": true
+    }
+  ],
+  "negativeControlScope": "In-memory copies only; actual proof artifacts were not modified"
+}

@@ -1,0 +1,73 @@
+{
+  "result": "PASS",
+  "mode": "THREE_STAGE_RETAINED_EVIDENCE_CAPTURE",
+  "scope": "One actual fresh parser read, one retained current copular run, then a separate read-only native Evidence reopening with explicit Refresh. Not an uninterrupted UI walkthrough or a lifecycle fix.",
+  "preservedDataOnlyAuditCid": "sha256:28c45e374e6306c773e738eceacecd029e4f162f26ee41c317e35a946cf764dd",
+  "baseAuditorCid": "sha256:894ff5237ffeb9915fee078ed443db79769ae52479d1a373ff93f319d8a9be38",
+  "stage1ProgressCid": "sha256:488e4328dd55c9130863a6f9a1bda3f01ada4a99905cf5a47c126f099baa7976",
+  "stage2ProgressCid": "sha256:0872326888c387eb35336090e8292bc2e7f03dc5e39a13b9ee6bc7dcfcbc960c",
+  "finalBrowserResultCid": "sha256:27652a2117a926565ff91dfadc5c679c65e2d8cdd4f708c260d3ff143e95cf98",
+  "finalCleanupCid": "sha256:1d3b006eb30021f8067cfbf0b65dea56150db94a6b04189dc8728bcf22b7b54e",
+  "afterCloseReopenReportCid": "sha256:d118df3e6e0ac2cbe8b490d51837f800db62cae5b6783246df6b565a3b3d43f0",
+  "freshInspectionCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+  "sourceCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+  "sourceBytes": 228,
+  "sourceTokens": 42,
+  "fullParserNodes": 43,
+  "copularRows": 3,
+  "totalActualParserReads": 1,
+  "totalAuthoredRuns": 1,
+  "continuationActualParserReads": 0,
+  "finalCaptureNewParserQueryOrRunPosts": 0,
+  "finalCaptureRefreshes": 1,
+  "finalSourceAndInspectionBytesUnchanged": true,
+  "rawStoredJsonBlocksCompared": 3,
+  "successfulContentJsonMatchesRawCas": true,
+  "finalOwnersDrained": true,
+  "limitations": [
+    "v68 Reading-workspace lifecycle defect remains unresolved; the later UI repair is separate work",
+    "All earlier gallery, drawer and exporter failures remain preserved; this is explicitly a staged capture",
+    "Final-stage POST /api/lcnc/workspace requests inspect current canvas state; their unsaved document hashes are not automatically CAS blocks",
+    "Copular syntax is not class membership, positive legal force, condition applicability or comprehension",
+    "The data audit verifies recorded outputs and byte identity, not parser execution authenticity from a CID alone",
+    "Fixture outgoing denial is recorded separately; this script does not exercise runtime network isolation"
+  ],
+  "finalAuditorCid": "sha256:9ae34723bd074046c7426747c1ed7816b71ee8a545ae73e976c2dc8c7b9ee105",
+  "preservedBaseNegativeControls": [
+    {
+      "mutation": "altered-subject-copy-id",
+      "rejected": true
+    },
+    {
+      "mutation": "wrong-named-graph",
+      "rejected": true
+    },
+    {
+      "mutation": "visible-qualified-quote-omits-not",
+      "rejected": true
+    },
+    {
+      "mutation": "raw-durable-receipt-bitflip",
+      "rejected": true
+    }
+  ],
+  "finalCaptureNegativeControls": [
+    {
+      "mutation": "extra-parser-post",
+      "rejected": true
+    },
+    {
+      "mutation": "extra-query-or-run-post",
+      "rejected": true
+    },
+    {
+      "mutation": "captured-source-wrong-graph",
+      "rejected": true
+    },
+    {
+      "mutation": "after-close-source-row-mismatch",
+      "rejected": true
+    }
+  ],
+  "negativeControlScope": "In-memory copies only; all real proof files remain unchanged"
+}

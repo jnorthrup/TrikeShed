@@ -1,0 +1,13 @@
+{
+  "scope": "Frozen v68 external pilot across preserved stages. Only actual parser count1 and actual authoredrun count1; finalread-onlystage does not resolve the separately confirmed UI lifecycle defect.",
+  "source": "e3057178652b433421832003417478a98ffce304",
+  "functionalStages": 3,
+  "browserAttempts": 4,
+  "actualParserReads": 1,
+  "actualAuthoredRuns": 1,
+  "fixturePreflightFailure": "JSON to CBOR number re-encoding comparator, preserved before server/query execution",
+  "classes": "own proof namespace only; production implementation loaded from frozen main.jar",
+  "allOwnersClosed": true,
+  "observedGraalRuntimeLimit": "JDK25.0.4 vs polyglot25.3.4.1 compiler-version check triggered fallback; checks not disabled",
+  "screenshots": 8
+}
