@@ -159,7 +159,10 @@ object EnglishInspection {
             "extractedTextCid" j source.extractedTextCid.value,
             "range" j _m["begin" j begin, "end" j end, "totalLength" j source.text.length, "complete" j (begin == 0 && end == source.text.length)],
             "parser" j metadata, "coverage" j _m["kind" j "bounded-text-range", "semantics" j "not-established",
-                "markerMethod" j "literal-word-and-phrase-candidates", "dependencyNodeIdentity" j "token-index+copy-count/1", "scope" j "sentence-token-dependency-observations",
+                "markerMethod" j "literal-word-and-phrase-candidates", "dependencyNodeIdentity" j "token-index+copy-count/1",
+                "parserDependencyNodeIdentity" j parsed.metadata?.runtime?.get("dependencyNodeIdentity"),
+                "parserNodeIdentityReported" j (parsed.metadata?.runtime?.containsKey("dependencyNodeIdentity") == true),
+                "scope" j "sentence-token-dependency-observations",
                 "omitted" j _l["constituency", "coreference", "openie", "kbp", "legal-interpretation"]],
             "sentences" j rows, "counts" j _m["sentences" j rows.size, "tokens" j tokenCount, "nodes" j nodeCount,
                 "dependencies" j dependencyCount, "markers" j markerCount]]
