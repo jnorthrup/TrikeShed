@@ -10,6 +10,7 @@ import borg.trikeshed.narsese.AttentionEconomy
 import borg.trikeshed.narsese.GroupCoherenceEnactment
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
+import borg.trikeshed.narsese.BeliefAdmissionRefused
 import borg.trikeshed.narsese.KgRetentionIssue
 import borg.trikeshed.narsese.KgRetentionRefused
 import borg.trikeshed.narsese.ingestKg
@@ -21,6 +22,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.ReplayScenario
 import borg.trikeshed.narsese.ReplayTurn
 import borg.trikeshed.narsese.TurnReviewElement
+import kotlinx.coroutines.CancellationException
 /**
  * BeliefWire — the NARS curation loop's HTTP window, mounted on the kanban
  * listener like GraalWire/VmWire:
@@ -285,10 +287,22 @@ class BeliefWire(
                 if (kgText.isBlank()) return json(mapOf("error" to "empty body"), 400)
                 try {
                     json(bag.ingestKg(kgText) { angular, expression -> memoryFiles?.gloss(angular, expression) })
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (refused: KgRetentionRefused) {
                     json(_m["error" j "kg_retention_refused", "processedAssertions" j 0,
                         "retention" j _m["status" j "refused", "issue" j refused.issue.name]],
                         if (refused.issue == KgRetentionIssue.LIMIT) 413 else 503)
+                } catch (refused: BeliefAdmissionRefused) {
+                    // Earlier statements may already have been processed; this is not a transaction.
+                    json(_m["error" j "kg_admission_refused",
+                        "admission" j _m["status" j "refused", "issue" j refused.issue.name],
+                        "processing" j "earlier-statements-may-have-been-processed"], 409)
+                } catch (_: CharacterCodingException) {
+                    json(_m["error" j "invalid_kg_unicode"], 400)
+                } catch (_: IllegalArgumentException) {
+                    // Includes strict KIF/input-profile errors and the RDF parser's SparqlError.
+                    json(_m["error" j "invalid_kg_input"], 400)
                 }
             }
 
