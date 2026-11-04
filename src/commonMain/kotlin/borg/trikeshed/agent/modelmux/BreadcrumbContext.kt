@@ -78,6 +78,7 @@ data class BreadcrumbProjection(
     val reference: borg.trikeshed.agent.modelmux.BreadcrumbRef? = null,
     val cid: ContentId? = null,
     val title: String? = null,
+    val foreground: Boolean = false,
 ) {
     /** A zero-presence reference remains addressable with the breadcrumb tool. */
     fun render(): String = buildString {
@@ -87,6 +88,7 @@ data class BreadcrumbProjection(
         title?.let { append(",\"title\":").append(jsonOf(it.breadcrumbPrefix(600))) }
         append(",\"source\":").append(jsonOf(source.breadcrumbPrefix(160)))
         append(",\"presence\":").append(presence.value)
+        append(",\"foreground\":").append(foreground)
         if (presence.value > 0.0) append(",\"content\":").append(jsonOf(content))
         if (children.isNotEmpty()) {
             append(",\"breadcrumbs\":[")
@@ -143,6 +145,10 @@ class BreadcrumbContext(
 ) {
     private val records = LinkedHashMap<borg.trikeshed.agent.modelmux.BreadcrumbId, borg.trikeshed.agent.modelmux.BreadcrumbRecord>()
     private val pending = LinkedHashMap<borg.trikeshed.agent.modelmux.BreadcrumbId, borg.trikeshed.agent.modelmux.BreadcrumbPresence>()
+    private val history = mutableSetOf<BreadcrumbId>()
+    /** Selected evidence and requested extent; retained records and their lineage remain immutable. */
+    var foreground: Join<BreadcrumbId, BreadcrumbPresence>? = null
+        private set
     private val emissions = mutableSetOf<borg.trikeshed.agent.modelmux.BreadcrumbId>()
     private val emissionReservations = mutableMapOf<borg.trikeshed.agent.modelmux.BreadcrumbId, Int>()
     private val calls = LinkedHashMap<Triple<String, Long, Long>, borg.trikeshed.agent.modelmux.MuxCallRecord>()
@@ -166,6 +172,8 @@ class BreadcrumbContext(
         records.clear(); records.putAll(checkpoint.records)
         index.restore(checkpoint.index)
         pending.clear(); pending.putAll(checkpoint.pending)
+        history.clear(); history.addAll(checkpoint.history)
+        foreground = checkpoint.foreground
         emissions.clear(); emissions.addAll(checkpoint.emissions)
         emissionReservations.clear(); emissionReservations.putAll(checkpoint.emissionReservations)
         calls.clear(); calls.putAll(checkpoint.calls)
@@ -253,6 +261,8 @@ class BreadcrumbContext(
                 "content" to it.content, "createdAt" to it.createdAt.value.toString(), "lastAccessAt" to it.lastAccessAt.value.toString(),
                 "gain" to it.gain, "children" to it.children.map { child -> child.value }) },
             "index" to index.metadataState(),
+            "foreground" to foreground?.let { _m["id" j it.a.value, "presence" j it.b.value] },
+            "history" to history.map { it.value },
             "pending" to pending.map { mapOf("id" to it.key.value, "presence" to it.value.value) },
             "emissions" to emissions.map { it.value },
             "receipts" to calls.values.map(::receiptState),
@@ -366,15 +376,26 @@ class BreadcrumbContext(
         at: borg.trikeshed.agent.modelmux.BreadcrumbTimestamp = borg.trikeshed.agent.modelmux.BreadcrumbTimestamp(
             clock()
         ),
-    ): Boolean = access(id, at, presence)
+    ): Boolean {
+        if (!access(id, at, BreadcrumbPresence(0.0))) return false
+        val visited = mutableSetOf<BreadcrumbId>()
+        fun resize(next: BreadcrumbId) {
+            val record = records[next] ?: return
+            if (!visited.add(next)) return
+            pending[next] = presence
+            for (child in record.children) resize(child)
+        }
+        resize(id)
+        return true
+    }
 
-    /** Indexed recall refreshes lineage access without scheduling an unbounded legacy projection. */
+    /** Successful content recall selects one root; zero extent only refreshes access. No legacy projection is queued. */
     fun access(
         id: borg.trikeshed.agent.modelmux.BreadcrumbId,
         at: borg.trikeshed.agent.modelmux.BreadcrumbTimestamp = borg.trikeshed.agent.modelmux.BreadcrumbTimestamp(
             clock()
         ),
-        presence: borg.trikeshed.agent.modelmux.BreadcrumbPresence? = null,
+        presence: borg.trikeshed.agent.modelmux.BreadcrumbPresence = BreadcrumbPresence(1.0),
     ): Boolean {
         if (id !in records) return false
         val visited = mutableSetOf<borg.trikeshed.agent.modelmux.BreadcrumbId>()
@@ -385,10 +406,13 @@ class BreadcrumbContext(
                 maxOf(record.lastAccessAt.value, at.value)
             )
             )
-            if (presence != null) pending[next] = presence
             for (child in record.children) explode(child)
         }
         explode(id)
+        if (presence.value > 0.0) {
+            history.add(id)
+            foreground = id j presence
+        }
         return true
     }
 
@@ -423,12 +447,28 @@ class BreadcrumbContext(
         val byId = records.toMap()
         val carried = rows.flatMapTo(mutableSetOf()) { it.children }
         val lexicon = lexicon()
-        fun one(record: borg.trikeshed.agent.modelmux.BreadcrumbRecord, path: Set<borg.trikeshed.agent.modelmux.BreadcrumbId>): borg.trikeshed.agent.modelmux.BreadcrumbProjection =
-            record.project(overrides[record.id] ?: retention.presence(record, at), lexicon).copy(
+        val selected = foreground
+        val historical = history.toSet()
+        fun one(record: BreadcrumbRecord, path: Set<BreadcrumbId>, nested: Boolean = false,
+                reference: Boolean = false): BreadcrumbProjection {
+            val focused = !nested && record.id == selected?.a
+            val past = record.id in historical && record.id != selected?.a
+            val presence = when {
+                reference || nested && record.id == selected?.a -> BreadcrumbPresence(0.0)
+                record.id in overrides -> overrides.getValue(record.id)
+                focused -> checkNotNull(selected).b
+                past -> BreadcrumbPresence(0.0)
+                else -> retention.presence(record, at)
+            }
+            return record.project(presence, lexicon).copy(
                 reference = index[record.id]?.ref, cid = index[record.id]?.cid, title = index[record.id]?.title,
-                children = record.children.filter { it !in path }.mapNotNull { byId[it] }.map { one(it, path + it.id) },
-                root = record.id !in carried)
-        return rows.size j { index -> one(rows[index], setOf(rows[index].id)) }
+                children = record.children.filter { it !in path }.mapNotNull { byId[it] }.map {
+                    one(it, path + it.id, nested = true, reference = reference || past && record.id !in overrides)
+                },
+                root = !nested && (focused || record.id !in carried || (overrides[record.id]?.value ?: 0.0) > 0.0),
+                foreground = focused)
+        }
+        return rows.size j { index -> one(rows[index], _s[rows[index].id]) }
     }
 
     companion object {
@@ -446,7 +486,7 @@ class BreadcrumbContext(
             val fields = setOf("version", "retention", "sequence", "records", "pending", "emissions", "submission")
             val parsed = reifyStrict(state)
             val present = (parsed as? Map<*, *>)?.keys ?: emptySet<Any?>()
-            val root = objectState(parsed, fields + setOf("receipts", "horizon", "index").filter { it in present })
+            val root = objectState(parsed, fields + setOf("receipts", "horizon", "index", "foreground", "history").filter { it in present })
             require(root["version"] == 1.0) { "unsupported breadcrumb state version" }
             val policy = objectState(root["retention"], setOf("ageHalfLifeMs", "recencyHalfLifeMs", "threshold"))
             val retention = borg.trikeshed.agent.modelmux.BreadcrumbRetention(
@@ -486,6 +526,18 @@ class BreadcrumbContext(
                 context.index.put(record)
             }
             root["index"]?.let(context.index::restoreMetadata)
+            if ("history" in root) for (value in arrayState(root["history"])) {
+                val id = BreadcrumbId(stringState(value))
+                require(id in context.records && context.history.add(id)) { "invalid or duplicate breadcrumb history" }
+            }
+            root["foreground"]?.let { value ->
+                val row = objectState(value, _s["id", "presence"])
+                val id = BreadcrumbId(stringState(row["id"]))
+                val presence = presenceState(row["presence"])
+                require(id in context.records && presence.value > 0.0) { "invalid breadcrumb foreground" }
+                context.foreground = id j presence
+                context.history.add(id)
+            }
             for (value in arrayState(root["pending"])) {
                 val row = objectState(value, setOf("id", "presence"))
                 val id = borg.trikeshed.agent.modelmux.BreadcrumbId(stringState(row["id"]))

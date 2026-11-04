@@ -12,6 +12,23 @@ object BreadcrumbContextNodes {
     const val PROJECT = "context.project"
     const val RECALL = "context.recall"
 
+    fun contracts(): List<LcncPortContract> = _l[
+        LcncPortContract(PROJECT, "Project local source passages", _l["source", "question", "context"],
+            _l["summary", "sourceCid", "sourceRef", "cid", "ref", "breadcrumbId", "sourceId", "context", "manifestCid", "requiresExpansion", "projection"],
+            inputKinds = _m["source" j "text", "question" j "text", "context" j "text"],
+            outputKinds = _m["summary" j "text", "sourceCid" j "id", "sourceRef" j "text", "cid" j "id", "ref" j "text",
+                "breadcrumbId" j "text", "sourceId" j "text", "context" j "text", "manifestCid" j "id",
+                "requiresExpansion" j "json", "projection" j "json"],
+            params = _m["name" j LcncPortContract.LcncParamSpec(v = "source.txt"),
+                "maxChars" j LcncPortContract.LcncParamSpec(v = "2000")], isEffect = true),
+        LcncPortContract(RECALL, "Recall retained source passages", _l["ref", "cid", "context", "question?"],
+            _l["recall", "text", "context", "sourceCids"],
+            inputKinds = _m["ref" j "text", "cid" j "id", "context" j "text", "question" j "text"],
+            outputKinds = _m["recall" j "json", "text" j "text", "context" j "text", "sourceCids" j "json"],
+            params = _m["presence" j LcncPortContract.LcncParamSpec(v = "1"),
+                "budgetChars" j LcncPortContract.LcncParamSpec(v = "6144")], isEffect = true),
+    ]
+
     fun registry(cas: CasStore, breadcrumbs: BreadcrumbElement): Map<String, LcncNodeRunner> = _m[
         PROJECT j LcncNodeRunner { node, inputs ->
             val source = VmRuntimeNodes.string(node, inputs, "source")

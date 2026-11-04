@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import kotlinx.coroutines.Job
+import borg.trikeshed.memory.ace.*
 import kotlin.coroutines.CoroutineContext
 
 /** Singleton invocation identities. Domain services keep their own keys in the same context. */
@@ -122,6 +123,8 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     PANEL_VOTE("panel.vote"),
     CONTEXT_FOLD("context.fold"),
     CONTEXT_ASSEMBLE("context.assemble"),
+    CONTEXT_PROJECT(BreadcrumbContextNodes.PROJECT),
+    CONTEXT_RECALL(BreadcrumbContextNodes.RECALL),
     VIEW_EMIT(LcncContracts.VIEW_EMIT),
     VIEW_REDUCE(LcncContracts.VIEW_REDUCE),
     READ_CONSTRUCT("read.construct"),

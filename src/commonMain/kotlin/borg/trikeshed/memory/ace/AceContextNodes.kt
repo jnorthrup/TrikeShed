@@ -5,7 +5,7 @@ import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
@@ -58,10 +58,10 @@ object AceContextNodes {
 
         "context.assemble" to LcncNodeRunner { node, inputs ->
             val program = AceContextProgram.preset(
-                toolsSystem = (inputs["toolsSystem"]?.toString() ?: "").encodeToByteArray(),
-                playbookBase = (inputs["playbook"]?.toString() ?: "").encodeToByteArray(),
-                envelope = (inputs["envelope"]?.toString() ?: "").encodeToByteArray(),
-                volatileTail = (inputs["tail"]?.toString() ?: "").encodeToByteArray(),
+                toolsSystem = (VmRuntimeNodes.value(node, inputs, "toolsSystem")?.toString() ?: "").encodeToByteArray(),
+                playbookBase = (VmRuntimeNodes.value(node, inputs, "playbook")?.toString() ?: "").encodeToByteArray(),
+                envelope = (VmRuntimeNodes.value(node, inputs, "envelope")?.toString() ?: "").encodeToByteArray(),
+                volatileTail = (VmRuntimeNodes.value(node, inputs, "tail")?.toString() ?: "").encodeToByteArray(),
             )
             val toolNames = (node.params["tools"] ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }
             val config = AceContextProgram.Config(
