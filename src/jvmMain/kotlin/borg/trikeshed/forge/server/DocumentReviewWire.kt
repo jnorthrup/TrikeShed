@@ -104,6 +104,20 @@ class DocumentReviewWire private constructor(
                 })
             }
         }
+
+        private suspend fun englishCurrent(ctx: ModuleContext, corpus: ProjectCorpus,
+            snapshot: borg.trikeshed.rdf.EnglishObservationGraph.Snapshot) {
+            EnglishObservationCurrent.check(corpus, s_[snapshot], "current")
+            val source = snapshot.source
+            val project = requireNotNull(source.project) { "English origin project is unavailable" }
+            require(source.provenance["notesCid"]?.let {
+                corpus.document(project.project, project.id + ProjectNodes.NOTES_SUFFIX)?.cid == it
+            } != false) { "English origin notes changed" }
+            val evidenceId = source.metadata["evidenceId"]?.singleOrNull()
+            val evidence = evidenceId?.let { ctx.blackboard.snapshot().values["headhunter/$it"] as? Map<*, *> }
+            require(evidenceId == null || evidence?.get("cid") == source.metadata["evidenceCid"]?.singleOrNull() &&
+                (evidence?.get("fields") as? Map<*, *>)?.get("deleted") != true) { "English origin evidence changed" }
+        }
         suspend fun open(ctx: ModuleContext, corpus: ProjectCorpus, books: ConstellationNodes, nativeHorn: NativeHornQuery? = null): DocumentReviewWire =
             withContext(fileIoContext) {
                 val files = checkNotNull(ctx.scope.coroutineContext[FileOperations])
@@ -125,11 +139,18 @@ class DocumentReviewWire private constructor(
                     resolve = { kind, cid, ids -> when (kind) {
                         "book" -> books.reviewCandidate(cid, ids)
                         "document" -> DocumentReviewCandidate.candidate(ctx.casStore, cid, ids)
-                        DocumentTaxonomyCandidate.KIND, DocumentTaxonomyCandidate.PARTITION_KIND ->
-                            DocumentTaxonomyCandidate.candidate(ctx.casStore, cid, ids, kind = kind)
+                        DocumentTaxonomyCandidate.KIND, DocumentTaxonomyCandidate.PARTITION_KIND -> {
+                            val record = DocumentTaxonomyCandidate.record(ctx.casStore, cid)
+                            if (EnglishTaxonomyCarrier.marked(record)) EnglishTaxonomyCarrier.candidate(ctx.casStore, cid, ids, kind = kind)
+                            else DocumentTaxonomyCandidate.candidate(ctx.casStore, cid, ids, kind = kind)
+                        }
                         else -> error("Unknown curation kind")
                     } },
                     current = { candidate ->
+                        val translated = if (DocumentTaxonomyCandidate.isTaxonomy(candidate.kind)) {
+                            val record = DocumentTaxonomyCandidate.record(ctx.casStore, candidate.curationReceiptCid)
+                            if (EnglishTaxonomyCarrier.marked(record)) EnglishTaxonomyCarrier.verify(ctx.casStore, candidate.curationReceiptCid) else null
+                        } else null
                         val source = when (candidate.kind) {
                             "book" -> books.reviewSource(candidate.curationReceiptCid)
                             "document" -> DocumentReviewCandidate.record(ctx.casStore, candidate.curationReceiptCid).source
@@ -139,7 +160,9 @@ class DocumentReviewWire private constructor(
                         }
                         val retained = if (candidate.kind == "book") books.reviewCurrent(candidate) else if (DocumentTaxonomyCandidate.isTaxonomy(candidate.kind)) {
                             val ids = candidate.selections.view.map { it.id }
-                            val resolved = DocumentTaxonomyCandidate.candidate(ctx.casStore, candidate.curationReceiptCid, ids,
+                            val resolved = if (translated != null) EnglishTaxonomyCarrier.candidate(ctx.casStore, candidate.curationReceiptCid, ids,
+                                retainPolicy = false, kind = candidate.kind)
+                            else DocumentTaxonomyCandidate.candidate(ctx.casStore, candidate.curationReceiptCid, ids,
                                 retainPolicy = false, kind = candidate.kind)
                             resolved.kind == candidate.kind && resolved.family == candidate.family &&
                                 resolved.curationReceiptCid == candidate.curationReceiptCid && resolved.ontologyCid == candidate.ontologyCid &&
@@ -150,10 +173,14 @@ class DocumentReviewWire private constructor(
                             candidate.sourceRevision == DocumentReviewCandidate.revision(record.source) &&
                                 candidate.ontologyCid == ContentId.of(CanonicalCbor.encodeMap(DocumentReviewCandidate.ontology(record)))
                         }
-                        val evidenceId = source.metadata["evidenceId"]?.singleOrNull()
+                        val evidenceSource = translated?.built?.snapshot?.source ?: source
+                        val evidenceId = evidenceSource.metadata["evidenceId"]?.singleOrNull()
                         val evidence = evidenceId?.let { ctx.blackboard.snapshot().values["headhunter/$it"] as? Map<*, *> }
-                        retained && DocumentCurationLegos.current(corpus, source) && (evidenceId == null ||
-                            evidence?.get("cid") == source.metadata["evidenceCid"]?.singleOrNull() &&
+                        val sourceCurrent = if (translated != null) {
+                            englishCurrent(ctx, corpus, translated.built.snapshot); true
+                        } else DocumentCurationLegos.current(corpus, source)
+                        retained && sourceCurrent && (evidenceId == null ||
+                            evidence?.get("cid") == evidenceSource.metadata["evidenceCid"]?.singleOrNull() &&
                                 (evidence?.get("fields") as? Map<*, *>)?.get("deleted") != true)
                     }, clock = ctx.clock, conditionPolicy = ConditionReviewPolicy.STRICT_BOOK)
                 try {
@@ -208,7 +235,7 @@ class DocumentReviewWire private constructor(
         ctx.blackboard.put("lcnc/readiness/document.reviewDecision", mapOf(
             "available" to principals.isNotEmpty(), "reason" to if (principals.isEmpty()) "No analyst principal is configured" else null,
             "prerequisites" to listOf("authenticated analyst session")), "documents")
-        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-candidates", "/taxonomy-plan", "/taxonomy-query", "/taxonomy-union", "/taxonomy-chain", "/horn-input", "/horn-query"))
+        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-candidates", "/taxonomy-plan", "/taxonomy-query", "/taxonomy-union", "/taxonomy-chain", "/horn-input", "/horn-query", "/english-taxonomy-candidates", "/english-taxonomy"))
             ctx.routes.claim("document-review", "/api/documents/review$suffix", route = ::route)
     }
 
@@ -226,7 +253,8 @@ class DocumentReviewWire private constructor(
         val endpoint = path.substringBefore('?')
         val actor = principal(text)
         val reasoningInput = endpoint.endsWith("/taxonomy-candidates") || endpoint.endsWith("/taxonomy-plan") || endpoint.endsWith("/taxonomy-query") || endpoint.endsWith("/taxonomy-union") || endpoint.endsWith("/taxonomy-chain") ||
-            endpoint.endsWith("/horn-input") || endpoint.endsWith("/horn-query")
+            endpoint.endsWith("/horn-input") || endpoint.endsWith("/horn-query") ||
+            endpoint.endsWith("/english-taxonomy-candidates") || endpoint.endsWith("/english-taxonomy")
         if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release") ||
                 endpoint.endsWith("/assess") || endpoint.endsWith("/assessment") || reasoningInput) && actor == null)
             return json(mapOf("error" to "authenticated_reviewer_required"), 401)
@@ -246,6 +274,33 @@ class DocumentReviewWire private constructor(
                         fun cid(key: String) = ContentId(input[key] as? String ?: error("$key required"))
                         fun revision() = revision(input["expectedRevision"])
                         json(when {
+                            endpoint.endsWith("/english-taxonomy-candidates") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("inspectionCid"))
+                                val snapshot = borg.trikeshed.rdf.EnglishObservationGraph.read(ctx.casStore, cid("inspectionCid"))
+                                englishCurrent(ctx, corpus, snapshot)
+                                val result = EnglishTaxonomyCarrier.candidates(snapshot)
+                                require(jsonOf(result).encodeToByteArray().size <= 1_048_576) { "English translation candidates exceed 1MiB" }
+                                englishCurrent(ctx, corpus, snapshot)
+                                result
+                            }
+                            endpoint.endsWith("/english-taxonomy") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("inspectionCid", "contextIri", "declarations"))
+                                val snapshot = borg.trikeshed.rdf.EnglishObservationGraph.read(ctx.casStore, cid("inspectionCid"))
+                                englishCurrent(ctx, corpus, snapshot)
+                                val rows = input["declarations"] as? List<*> ?: error("Explicit translation declarations required")
+                                require(rows.size in 1..EnglishTaxonomyCarrier.MAX_FORMS) { "Choose 1 to 32 English occurrences" }
+                                val declarations = rows.map { raw ->
+                                    val row = raw as? Map<*, *> ?: error("Translation declaration must be an object")
+                                    fields(row, setOf("id", "relation", "subjectIri", "subjectSort", "objectIri", "objectSort"))
+                                    row.entries.associate { (key, value) -> key as String to value }
+                                }
+                                val retained = EnglishTaxonomyCarrier.prepare(ctx.casStore, snapshot,
+                                    input["contextIri"] as? String ?: error("Explicit source context IRI required"), declarations)
+                                englishCurrent(ctx, corpus, snapshot)
+                                EnglishTaxonomyCarrier.projection(retained).also {
+                                    require(jsonOf(it).encodeToByteArray().size <= 1_048_576) { "English translation response exceeds 1MiB" }
+                                }
+                            }
                             endpoint.endsWith("/taxonomy-candidates") -> withContext(checkNotNull(actor)) {
                                 fields(input, setOf("receiptCid", "offset", "limit"))
                                 fun pageValue(key: String): Int = revision(input[key]).let {
