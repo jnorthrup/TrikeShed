@@ -10,6 +10,7 @@ import borg.trikeshed.module.*
 import borg.trikeshed.parse.*
 import borg.trikeshed.rdf.EnglishObservationGraph
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
