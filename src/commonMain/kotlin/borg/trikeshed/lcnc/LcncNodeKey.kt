@@ -216,6 +216,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     ENGLISH_ROUTE(EnglishLcncPreset.ROUTE),
     ENGLISH_EVIDENCE(EnglishLcncPreset.EVIDENCE),
     ENGLISH_QUERY(EnglishObservationContract.TYPE),
+    ENGLISH_CORPUS(EnglishCorpusContract.TYPE),
     WIKI_PROPOSE(LcncContracts.WIKI_PROPOSE);
 
     fun construct(node: LcncNode, inputs: Map<String, Any?>, runner: LcncNodeRunner, parent: Job): LcncNodeElement {
