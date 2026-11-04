@@ -169,9 +169,9 @@ class EnglishTaxonomyWireTest {
                     assertTrue(rows(witness["bindings"]).any { it["relation"] == "cop" })
                     assertTrue(rows(witness["bindings"]).any { it["relation"] == "nsubj" })
                 }
-                assertEquals(witnesses.map { it["englishQuotation"] }.toSet(), rows(result["selected"]).map {
+                assertEquals(witnesses.map { it["englishQuotation"] }, rows(result["selected"]).map {
                     (((it["value"] as Map<*, *>)["englishOrigin"] as Map<*, *>)["englishQuotation"])
-                }.toSet())
+                })
                 val exported = (result["plan"] as Map<*, *>)["export"] as String
                 assertContains(exported, "kif-taxonomy/v1/instance-assertion")
                 assertContains(exported, "kif-taxonomy/v1/instance-subclass")
