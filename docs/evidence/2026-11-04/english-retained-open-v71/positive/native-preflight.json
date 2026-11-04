@@ -1,0 +1,31 @@
+{
+  "freshStatus": {
+    "available": false,
+    "requiresModel": false,
+    "module": "corenlp",
+    "profile": "syntax-v1",
+    "maxChars": 16384,
+    "semantics": "not-established",
+    "parseWallDeadline": null
+  },
+  "counters": {
+    "freshInspectionPosts": 0,
+    "retainedOpenPosts": 0,
+    "authoredRunPosts": 0,
+    "queryCalls": 0,
+    "guestModules": {
+      "installed": [],
+      "mounted": []
+    },
+    "parserExecutionBoundary": "Actual empty SDK root, installed/mounted modules empty, no fresh Inspect POST and production retrieval flags; not an invented global parser counter",
+    "modelCalls": 0,
+    "configuredModelCount": 0,
+    "automaticIntake": 0,
+    "reviewIntakeCalls": 0,
+    "analysisReteFacts": 0,
+    "blackboardUnchangedFromReadinessBaseline": true,
+    "operationalBoardReteFacts": 1,
+    "operationalBoardBlackboardEntries": 1,
+    "operationalScope": "Explicit query/run records only, separate from linguistic observations and world facts"
+  }
+}

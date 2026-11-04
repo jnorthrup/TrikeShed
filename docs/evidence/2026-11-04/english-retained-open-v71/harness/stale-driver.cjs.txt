@@ -1,0 +1,2 @@
+'use strict';
+require('./positive-driver.cjs').run({stale:true}).catch(e=>{console.error(e.stack||e);process.exitCode=1;});

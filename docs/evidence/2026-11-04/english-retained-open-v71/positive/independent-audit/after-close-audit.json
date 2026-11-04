@@ -1,0 +1,72 @@
+{
+  "result": "PASS",
+  "scope": "Independent after-close stored-block/raw-JSON/head-file audit, tied to unchanged positive and combined reports. Production reopener canonical/source verification is recorded, not reexecuted here. Each selected project HEAD/manifest/manual-policy/sourceMirror is hashed against its OWN archive report; separate navigation project additions mean whole-ledger equality is not claimed. Currentness reflects actual startup tuple checks and immutable original heads, not hashes alone or a new query.",
+  "inputs": {
+    "positive/native-reopened-cas.json": "sha256:d3762525f6fb03e3271d399fcb4b890763239a9227057fc8114a7c835722f555",
+    "positive/native-source-heads-after.json": "sha256:0ebb9d3439cc6ff4a5c8d3129e92868021e47467d2141668d0b77f93028a54c9",
+    "stale/native-reopened-cas.json": "sha256:f242bbee3bb85c5dede9e5e2a5d1176d1e5f4a985696180bf591c3b00bcb4e6a",
+    "stale/native-source-heads-after.json": "sha256:1680a742a73663c39a17ea5255e9b8376e25af56ac2b0c569b8c8bffbe079f6a"
+  },
+  "positive": {
+    "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+    "sourceCurrentAtActualStartup": true,
+    "unchangedStoredBlocks": 5,
+    "headFiles": [
+      {
+        "path": "runtime/project-couch/english-taxonomy-fresh-profile-proof/HEAD",
+        "cid": "sha256:42c214d75cb1cf24c02a73ecc7d3d040380d169a04a25ca76a2b463591e42e9c"
+      },
+      {
+        "path": "runtime/project-manifests/english-taxonomy-fresh-profile-proof.tsv",
+        "cid": "sha256:311e47263ef040fe1db194cbad68efc1d921592130e878154f8898e98b7f9a66"
+      },
+      {
+        "path": "runtime/project-intake-policy/english-taxonomy-fresh-profile-proof.guard",
+        "cid": "sha256:ea6faf550466382954e93ee1604d23e3e9db4dd1cf730d538433181e10eb6a84"
+      },
+      {
+        "path": "runtime/files/english-taxonomy-fresh-profile-proof/synthetic taxonomy copular clauses.txt",
+        "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883"
+      }
+    ],
+    "authoredRunCid": "sha256:7f52bb88d7f4f15da2bc70ebdd7bc0116dd7ddcb4adf37197d93bcd61366a57f"
+  },
+  "stale": {
+    "inspectionCid": "sha256:96cf4246c2ac61240d6f1f5ef24c53a6243cbdca65a11f98225ec02618586919",
+    "sourceCurrentAtActualStartup": false,
+    "unchangedStoredBlocks": 2,
+    "headFiles": [
+      {
+        "path": "runtime/project-couch/english-taxonomy-reviewed-pilot/HEAD",
+        "cid": "sha256:48bee535f0115c291e92df03558dfdb0268da605d5a014e85dc76c0ed07d420d"
+      },
+      {
+        "path": "runtime/project-manifests/english-taxonomy-reviewed-pilot.tsv",
+        "cid": "sha256:fab1dea806eff95f9960ce48da8df4ce12cf557bd1575a33776ce911be09bc88"
+      },
+      {
+        "path": "runtime/project-intake-policy/english-taxonomy-reviewed-pilot.guard",
+        "cid": "sha256:7c03b50c68cea91c5ab9a7999779fb94273c9d1b3b19bd036aff5b2c8d09b6aa"
+      },
+      {
+        "path": "runtime/files/english-taxonomy-reviewed-pilot/synthetic taxonomy review clauses.txt",
+        "cid": "sha256:aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db"
+      }
+    ],
+    "authoredRunCid": null
+  },
+  "negativeControls": [
+    {
+      "name": "wrong-retained-run",
+      "result": "REFUSED"
+    },
+    {
+      "name": "rewound-source-head",
+      "result": "REFUSED"
+    },
+    {
+      "name": "false-stale-currentness",
+      "result": "REFUSED"
+    }
+  ]
+}

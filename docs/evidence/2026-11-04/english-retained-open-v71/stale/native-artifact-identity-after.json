@@ -1,0 +1,31 @@
+{
+  "source": "4bdcc227781fa68b07c0105655a19f3e0c11959f",
+  "mainJarSha256": "6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355",
+  "documentsJsSha256": "2d5eb1391a648c3d46adff6f42818182acfaff188ef6a63d668a9e6157730e94",
+  "spacegraphJsSha256": "449b64d2e884e3b3533695a03abd4185fd7ae558a884af18917651b0b2657d19",
+  "pagesJsSha256": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+  "immutableDependencies": 119,
+  "allFrozenBytesVerified": true,
+  "fixtureSha256": "edf0fa4a3830b8efa3b650993a6008d718dc1f3ad047b9e3128d0e2e0c200448",
+  "sourceScope": "Native retained-open proof; positive actual old3f958 current archive and negative actual96cf amended archive are separate; no parser execution is planned.",
+  "case": "stale",
+  "setup": {
+    "case": "stale",
+    "inspectionCid": "sha256:96cf4246c2ac61240d6f1f5ef24c53a6243cbdca65a11f98225ec02618586919",
+    "selection": {
+      "project": "english-taxonomy-reviewed-pilot",
+      "id": "synthetic taxonomy review clauses.txt",
+      "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "rev": "1-sha256:83883628511f1ef043b3ecb43d9c2c3e70a9b7dd649f89338becc60dadef308e",
+      "seq": 0
+    },
+    "expectedCurrent": false,
+    "sourceArchiveSha256": "728a9927a8d98f05f4f615abd5bbfe5daf5b55ba2e587cd9495cc48849414fc8",
+    "scope": "Private copy of actual closed producer runtime, no row invention, no head rewind or cross-case merging; preparation only, no application runtime started"
+  },
+  "allFrozenBytesUnchangedAfter": true,
+  "driverSha256": "d877b94f5a577d847f90849fc40f27ab6ffaedf21b2641906e1f68dd742a54ad",
+  "staleWrapperSha256": "333ef5765074c28bb9e261a0c4017c9a9a2b0cffda9fd8aa1bb83afd56136141",
+  "nativeReopenSourceSha256": "0af19a97558f28dd2d8e74b0acee4129b54008c78a4176f51924ccf256a4b1c0",
+  "ownCodeSources": "Actual default review/English/query/Kanban classes report frozen snapshot main.jar; own proof namespaces only, no production overlays/friend access"
+}

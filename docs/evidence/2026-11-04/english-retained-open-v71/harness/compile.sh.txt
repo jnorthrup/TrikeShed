@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+retained_proof=/workspace/library-files/english-retained-open-final-proof
+retained_snapshot=${1:?immutable snapshot required}
+retained_output=${2:?new observer class directory required}
+retained_cp=$(cat "$retained_snapshot/classpath.txt")
+retained_compiler=$(rg --files --no-ignore /workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21 | rg '\.jar$' | head -n 1)
+mkdir "$retained_output"
+java -Xmx768m -cp "$retained_compiler:$retained_cp" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler \
+ -no-stdlib -no-reflect -jvm-target 25 -classpath "$retained_cp" -d "$retained_output" "$retained_proof/Fixture.kt"
