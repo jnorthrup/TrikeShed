@@ -1,0 +1,2 @@
+(subclass Finch Agent)
+(subclass Finch Device)

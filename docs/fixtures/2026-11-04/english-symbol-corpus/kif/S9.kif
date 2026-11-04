@@ -1,0 +1,1 @@
+(not (instance urn:fixture:legal:S9:Device urn:fixture:legal:S9:Agent))

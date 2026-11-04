@@ -1,0 +1,1 @@
+Agreement A says a Finch is an Agent. Agreement B says an Agent is an Entity. These are separately declared frames.

@@ -1,0 +1,2 @@
+; Format detector control: valid commented KIF.
+(instance Mira Tenant)

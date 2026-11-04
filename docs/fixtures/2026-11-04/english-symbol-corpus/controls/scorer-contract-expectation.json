@@ -1,0 +1,21 @@
+{
+  "kind": "supplied-scorer-contract-control/1",
+  "scope": "Manually supplied annotation-based scorer controls; neither prediction came from a model, bag, parser or reasoner. Never count these as semantic evaluation performance.",
+  "S2": {
+    "providedPremiseIds": [
+      "S2:p1"
+    ],
+    "missingRequiredPremiseIds": [
+      "S2:p2"
+    ],
+    "completeRequiredPath": false,
+    "observedScorerGroundedAgreement": true
+  },
+  "S6": {
+    "providedWitnesses": [],
+    "providedLabel": "UNKNOWN",
+    "observedScorerGroundedAgreement": true,
+    "guardOrAuthorizationComprehensionEstablished": false
+  },
+  "execution": "EXISTING_V71_CLI_SCORE_ONLY"
+}

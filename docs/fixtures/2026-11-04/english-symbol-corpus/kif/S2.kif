@@ -1,0 +1,2 @@
+(subclass urn:fixture:legal:S2:Finch urn:fixture:legal:S2:Agent)
+(subclass urn:fixture:legal:S2:Agent urn:fixture:legal:S2:Entity)
