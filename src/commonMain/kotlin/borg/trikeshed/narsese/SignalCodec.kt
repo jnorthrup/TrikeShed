@@ -21,12 +21,14 @@ object SignalCodec {
         field(t?.sourceCid ?: "")
         field(s.provenanceCid ?: "")
         field(s.basisBloom.toString())
-    }.encodeToByteArray()
+        // Null retains the exact historical eleven-field bytes and their CAS identities.
+        s.propositionCid?.let { field(it) }
+    }.encodeToByteArray(throwOnInvalidSequence = true)
 
     fun decode(bytes: ByteArray): SemanticSignal {
-        val fields = parse(bytes.decodeToString())
+        val fields = parse(bytes.decodeToString(throwOnInvalidSequence = true))
         // 10 fields = legacy (pre-basisBloom) WAL/CAS records: bloom defaults to 0
-        require(fields.size == 10 || fields.size == 11) { "SignalCodec: expected 10 or 11 fields, got ${fields.size}" }
+        require(fields.size in 10..12) { "SignalCodec: expected 10, 11 or 12 fields, got ${fields.size}" }
         val gradeName = fields[5]
         val temporal = if (gradeName.isEmpty()) null else TemporalSignal(
             grade = TemporalGrade.valueOf(gradeName),
@@ -42,7 +44,8 @@ object SignalCodec {
             objectCid = fields[4].ifEmpty { null },
             temporal = temporal,
             provenanceCid = fields[9].ifEmpty { null },
-            basisBloom = if (fields.size == 11) fields[10].toLong() else 0L,
+            basisBloom = if (fields.size >= 11) fields[10].toLong() else 0L,
+            propositionCid = if (fields.size == 12) fields[11] else null,
         )
     }
 
