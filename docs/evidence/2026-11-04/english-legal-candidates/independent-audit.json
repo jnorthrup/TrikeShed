@@ -1,0 +1,30 @@
+{
+  "result": "PASS",
+  "scope": "Independent built-in Node JSON/CBOR and SHA-256 comparator; no parser or production verifier reused",
+  "resultCid": "sha256:8a21e80ddb0c86a0ddb0fd43800dc849bde1d57c34270f73a62f2a0fdb92d822",
+  "auditorCid": "sha256:8f010e1f4b58dade87f8067012d2b9ada10517b4e373489c2a1d5c86a02e8838",
+  "uniqueRetainedReceipts": 7,
+  "exportedReadbacksCompared": 12,
+  "retainedResponsesCompared": 11,
+  "originalSourceTokens": 70,
+  "fullParserNodes": 71,
+  "candidateResponsesCompared": 8,
+  "modalObservationsAcrossComparedResponses": 21,
+  "durationObservationsAcrossComparedResponses": 11,
+  "dependencyBindingsAcrossComparedResponses": 224,
+  "checks": [
+    "source UTF-8 hash and global UTF-16 quotation slices",
+    "original source tokens distinct from full index:copy nodes",
+    "exact sentence quotation, markers, nodes and complete dependencies",
+    "modal/subject/object directed bindings and full identities",
+    "number literal/forms/modifier/unit spans; no calendar conversion",
+    "HTTP and typed LCNC equality with retained CBOR bytes and receipt SHA-256",
+    "same-source repeat, current stale refusal, explicit historical replay",
+    "three explicit parser calls; zero model/review/Rete admission counters",
+    "candidate request fields and parent receipt ownership"
+  ],
+  "limits": [
+    "Independently verifies recorded outputs and retained byte identity, not parser authenticity beyond actual harness metadata",
+    "Does not recreate browser timing, prove general production airgap, authenticate legal meaning, or promote candidate authority"
+  ]
+}

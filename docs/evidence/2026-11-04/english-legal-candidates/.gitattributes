@@ -1,0 +1,2 @@
+# Preserve exact uploaded UTF-8 bytes, including the deliberate CRLF line endings.
+sources/*.txt -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
