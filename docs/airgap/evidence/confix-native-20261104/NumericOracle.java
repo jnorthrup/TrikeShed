@@ -1,0 +1,1 @@
+public class NumericOracle { public static void main(String[] a) throws Exception { var m=Class.forName("kotlin.text.StringsKt").getMethod("toDoubleOrNull",String.class);m.setAccessible(true);for(String s:a)System.out.println(s+" => "+m.invoke(null,s)); } }

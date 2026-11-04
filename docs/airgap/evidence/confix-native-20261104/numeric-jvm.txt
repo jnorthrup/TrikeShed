@@ -1,0 +1,7 @@
+1e++5 => null
+NaN => NaN
+Infinity => Infinity
+1f => 1.0
+0x1p0 => 1.0
++NaN => NaN
+-NaN => NaN

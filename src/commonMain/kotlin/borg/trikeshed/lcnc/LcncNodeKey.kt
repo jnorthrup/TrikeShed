@@ -186,6 +186,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     VM_GRAALCE("vm.graalce"),
     VM_POLYGLOT("vm.polyglot"),
     VM_LLVM_SCALAR(LlvmScalarContract.TYPE),
+    VM_LLVM_CONFIX(LlvmConfixContract.TYPE),
     COUNCIL_SEAT("council.seat"),
     NARS_SEAT("nars.seat"),
     TEXT_FOLD("text.fold"),
