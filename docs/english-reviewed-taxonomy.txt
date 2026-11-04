@@ -110,3 +110,11 @@ verified eligibility and D/K/R retention; it did not exercise host approval or a
 browser. No private PDFs were inputs to this pilot. Coordinated full JVM/common-JS
 checks and exact final-artifact Documents proof remain required before claiming
 the shipped workflow is verified.
+
+Exact v70 JVM contract checkpoint
+--------------------------------
+Integrated source 243db15 passed an independent rerun of all 13 focused methods
+against immutable main JAR 77b02c26. Only test and harness classes were compiled;
+there was no production overlay, friend access, parser, model or browser. See
+docs/evidence/2026-11-04/english-reviewed-taxonomy-v70/summary.txt and its retained
+identity and logs. The real Documents UI/parser pilot remains separately scoped.
