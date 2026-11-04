@@ -232,7 +232,7 @@ fixture sources, runtime hashes and network observations are retained.
 [Exact manifest](evidence/r3a-20261104/verification.json) ·
 [D3M integration](../d3m/2026-11-04-airgap-r3a.md).
 
-The final D3M inventory contains 502 remote branches, eight local branches
-and origin/HEAD. All 511 refs are ancestors of the release. No textual merge
+The final D3M inventory contains 503 remote branches, eight local branches
+and origin/HEAD. All 512 refs are ancestors of the release. No textual merge
 conflicts occurred; both preliminary harness failures and the earlier
 successful capture remain separately identified in the evidence packet.

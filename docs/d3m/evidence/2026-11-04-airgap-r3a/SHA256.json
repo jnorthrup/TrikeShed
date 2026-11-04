@@ -1,6 +1,10 @@
 {
   ".gitattributes": "216716818a250441b2b28c50e67e84338280be6df9e6dbf784bfdf9d993008b5",
   "d3m-r3-integrate.txt": "5e804abf9423bda2cf80bb061931b0be215871a3a2275ebe5e676821b08850e2",
+  "final-evidence-step.json": "0ed70d73c8600fe1d0dc1415afa06f1771a622bf92ab56dfe949be395821c45c",
+  "final-fetch.txt": "e9f1365f78868b823d4be87076e2718d9700829046a7e757a1de0e7913c56847",
+  "final-ref-inventory.json": "f592494483eefb826a172a82c87b1e00e8a887a11dbab2cb70d17cd990e77227",
+  "final-remote-heads.txt": "79f8c46e76e79b99a1e1b42900e0aebc64daaf1408b54092a0fa64830e65264d",
   "inputs.json": "7b195eb2b68f27680c2eb9e1be352f125b534291bf352b85583bd9c67b44ae4d",
   "integration-inputs.json": "666b5c219bf4a004a6081e9fea07c12e522113f06a756514994a0c66b7cea9c0",
   "integration-steps.json": "a1a384ec94574de43e2b65ce21f0f887e9f1a55d97635edfd4a1f2f744fb0af0",
