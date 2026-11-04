@@ -1,0 +1,40 @@
+{
+  "source": "095fa0d305c55362b4656fb661cc2cb088772e84",
+  "mainJarSha256": "7de155422c32eaff00d01f322b84521300f355002e44e1333d350bbb25b07c40",
+  "documentsJsSha256": "f4e0cd025fc07c218e3f1d13998ab04ab69933b021c66560549038c585ed7c5c",
+  "spacegraphJsSha256": "e7cd7297278e4c6e0ce09d2cac329be319c88499e0c6d94344be60176753754e",
+  "pagesJsSha256": "290e833d570ced9214d29163939f01cb2a9afbf2aeea832d86391fdca6168d1c",
+  "fixtureSourceSha256": "4e106813e41d24736a56b83e2babae497596a87ed2694c3afc70f32d7f21d085",
+  "driverSourceSha256": "4c663a6fa5e4b326f493ad89b728bc6cb7aff61979bc240eac044b382f2188db",
+  "wrapperSourceSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84",
+  "fixtureClasses": [
+    "borg/trikeshed/forge/server/FixtureKt$main$1$4$bytes$response$1.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$4$bytes$response$2.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$4$bytes$response$3.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$4$bytes$reteFacts$1.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$5.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$brain$1.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$invokeSuspend$lambda$11$$inlined$\u03b1$1.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$invokeSuspend$lambda$11$$inlined$\u03b1$2.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1$invokeSuspend$lambda$11$5$$inlined$\u03b1$1.class",
+    "borg/trikeshed/forge/server/FixtureKt$main$1.class",
+    "borg/trikeshed/forge/server/FixtureKt.class"
+  ],
+  "productionClassOverlays": false,
+  "friendPaths": false,
+  "runtimeDependencies": "Frozen main.jar followed by immutable dependency JARs; no live production class directories",
+  "configuredModelCount": 0,
+  "reader": "actual local CoreNLP 4.5.10 SYNTAX profile",
+  "networkDeny": "Fixture process inherited seccomp EACCES filter on connect,sendto,sendmsg,sendmmsg; Python selfprobes and actual Java before/after probes passed; inbound HTTP accept/read/write allowed",
+  "notClaimed": [
+    "full daemon listener",
+    "general production air gap",
+    "complete OS sandbox",
+    "whole-document legal interpretation"
+  ],
+  "compileExit": 0,
+  "fixtureExit": 0,
+  "driverExit": 0,
+  "successfulAttempt": 3,
+  "earlierAttempts": "Two harness-only upstream UI setup mismatches before upload/parse: nested summary selector; open-by-default panel. No product sources changed."
+}

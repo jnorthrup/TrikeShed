@@ -1,0 +1,38 @@
+MontyLingua and offline legal English
+
+Reviewed jnorthrup/MontyLingua at 1cb3dd743bf7a1897943d79a2869e06333c6e0de.
+The repository's initial commit is from 2018; its documentation describes
+MontyLingua 2.1 released in August 2004. No donor code or model assets were imported.
+
+MontyTagger uses ranked lexicon lookup, unknown-word lexical rules, ordered
+Brill-style tag transformations and optional commonsense POS repair. Its custom
+lexicon and inspectable repairs are useful comparison points. MontyREChunker
+builds shallow adjective/noun/verb chunks with regex rules; it is not a full
+dependency or constituency parser. Some richer extraction handles negation and
+passive flags, but does not establish legal exception or quantifier scope.
+
+The concise jist_predicates API explicitly strips modal verbs/determiners and
+excludes subordinate-clause objects. That can lose the distinction between must
+and may. It is unsuitable as a direct source of obligation or world-fact quads.
+Its tokenizer can normalize spacing/punctuation and expand contractions, without
+original offsets; a source-aligned port needs an explicit edit map.
+
+The code is Python 2. Nine of thirteen selected modules failed Python 3.12 syntax
+parsing; passing syntax alone would not prove GraalPy compatibility. Asset tree
+metadata lists fourteen Python MDF files totaling 14,674,240 bytes, not measured
+loaded memory. Missing commonsense data can attempt a rebuild from a training
+file absent from this repository. No runnable bundle was verified.
+
+License.txt distinguishes noncommercial/nonproprietary GPL use and commercial
+licensing; GitHub reports NOASSERTION. Reading the source does not establish
+commercial redistribution rights. This review adds no licensing-dependent code.
+
+The current local CoreNLP SYNTAX profile remains the executed baseline. A useful
+future comparator would test source-aligned lexicon/rule diagnostics on the same
+frozen passages; no speed or accuracy superiority has been measured.
+
+Pinned sources:
+https://github.com/jnorthrup/MontyLingua/tree/1cb3dd743bf7a1897943d79a2869e06333c6e0de
+https://github.com/jnorthrup/MontyLingua/blob/1cb3dd743bf7a1897943d79a2869e06333c6e0de/python/MontyLingua.py#L195
+https://github.com/jnorthrup/MontyLingua/blob/1cb3dd743bf7a1897943d79a2869e06333c6e0de/python/MontyExtractor.py#L173
+https://github.com/jnorthrup/MontyLingua/blob/1cb3dd743bf7a1897943d79a2869e06333c6e0de/License.txt#L10

@@ -59,3 +59,38 @@ disconnecting; its existing provisioning command is:
   ./gradlew -p utils/subvm installCorenlp
 Rebuild/restart the application and refresh Documents after updating the checkout.
 The standard utils/oroboros launcher has a 24 GiB maximum Java heap.
+
+Verification — 2026-11-04
+Coordinated v51 at 095fa0d305c55362b4656fb661cc2cb088772e84 built three browser
+bundles and passed all 50 selected JUnit checks, zero failures/errors/skips.
+The exact frozen main JAR SHA256 is
+7de155422c32eaff00d01f322b84521300f355002e44e1333d350bbb25b07c40.
+Actual browser native text drop, explicit inspection, original uppercase/Unicode
+spans, dependency SVG, partial coverage, stale refusal and late-response isolation
+passed with real CoreNLP 4.5.10. A process-only seccomp filter denied outbound
+connect/sendto/sendmsg/sendmmsg; Java TCP/UDP probes were refused before and after
+parsing. No models were configured; no provider, review, automatic curation or
+Rete admission occurred. This proves the stated workflow under that external
+filter, not a production-wide air gap or complete OS sandbox.
+
+The old actual parser changed the case of TENANT MAY REMAIN UNLESS RENT IS NOT
+DUE and produced condition 'unless rent be due'. The new actual parser preserves
+the source and identifies this negative guard as unresolved, producing no norm.
+A source-revision race was also reproduced before its fix; the final regression
+refuses a newer extraction labelled with an older requested selection.
+
+One supplied-document pilot attempted three predetermined consecutive Chambers
+ranges. All 1,017 returned token spans matched source text; two inventories were
+accepted and one refused an Enhanced++ copied-node projection that the old
+integer-only endpoint shape cannot represent. Edges were not erased. This is a
+known representation limit; full copy-node identity is the next implementation
+slice. Neither these samples nor the synthetic checks measure general English,
+OCR or legal accuracy. Existing saved readings are not automatically migrated.
+
+Current upstream upload behavior also starts local project parsing after saving;
+the plain-text browser fixture exercised that real route with zero extraction
+work. The inspection action itself never starts mining. Public synthetic evidence,
+screenshots and a content-free pilot summary are in
+docs/evidence/2026-11-04/offline-english. Supplied text and detailed failures remain
+private. Earlier harness selector/open-panel mismatches and the corrected upstream
+Camel test compilation failure are recorded; no compile inputs or checks were hidden.

@@ -1,0 +1,18 @@
+{
+  "result": "EXPECTED_RED",
+  "productionSource": "16425cc711140a2523cc7c0d4c8eb131c63a2d9f",
+  "mainJarSha256": "62e2555b59862254fecae9ad6cf78d5aa01f1b4108f6fb7d592c6dce73b5334e",
+  "testSourceCommit": "8ac324fc91785c8a0511e0761df38744136942a3",
+  "testMethod": "DocumentEnglishWireTest.aHeadChangeBetweenSelectionCheckAndSourceLookupCannotSubstituteNewExtraction",
+  "observedHttpStatus": 200,
+  "expectedHttpStatus": 409,
+  "unitTestFriendAccess": true,
+  "productionClassOverlays": false,
+  "compileExit": 0,
+  "processExit": 1,
+  "scope": "JVM main and three JS bundles compiled; overall v50 FAILED compiling existing upstream CamelDispatchOwnershipTest _m[] syntax. Unit RED baseline only, no green coordinated-build claim.",
+  "observedSelectionCid": "sha256:339f9a9a617c09bd2d623853471993d5b70896a3b996de933a98bfbd680b814e",
+  "observedSourceCid": "sha256:1dd060ac55711485431e588400570d24c80c92eefb3a442b1415ebec1a073d24",
+  "observedReceiptCid": "sha256:a728229d0486ed02ff2895acac93d416090e5c19f39a148331117d1e3a394604",
+  "sourceDiffersFromSelection": true
+}

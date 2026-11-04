@@ -1,0 +1,18 @@
+{
+  "method.txt": "ef7b59ac38d388811d8db35f9d482f03a300ff14664c6f17d31526b803b1ecee",
+  "english-original-case-token-syntax.png": "bca6a9e69db1a0335bd4358ed20921dfb334340e1e93178d3f502c0189cef88a",
+  "english-partial-coverage.png": "6eabc68385a0ee669bf72d3b3c0910b5e4fe163aaba682b2aaa8b15d7fee4a81",
+  "verification-v51.json": "4b0ff03c78b8498d7e292357beb189a575ccbcfbd667b6fe34be04fafca7067e",
+  "english-directed-dependency-graph.png": "69f0384bb3a3226d4e52e84aeaace7ce05a4e41a42a2245824f99f9fbda35e79",
+  "execution-identity.json": "ec91bf64c31aa4f552619888059f81344d19f75821377678d06f3fe10f3a81da",
+  "guard-probe.json": "70b02bc85e4f9b059e84b6a491997cf6f32174fe4ddc6f48b990fac74d5e7efc",
+  "old-parser-failure.json": "315c553a4610f963353b88894abcdf0f5bcfc4f4e5e242600c4fcfd63ce66783",
+  "outbound-deny-profile.json": "fa9995b05612912be0a6fc8e47bea57a7d41ab5cf0ef4b7d8ee1a8af00a5d810",
+  "english-stale-source-refused.png": "2c987580a84a19125b648ae456697e7a1ff602ea06c8eea85cf5bf8696fc664b",
+  "english-source-dropped-selection-preserved.png": "23c22abef4505585a303b8f603b19830992fc798037906874539a147e115a7a0",
+  "source-race-red.json": "52d82b29b7304add3f9a53ba620783b5a26b6d090659a328a2563a3ef8f2b725",
+  "browser-result.json": "ad266caee15189248dde06f064c5a42428e6d4c9d64ee17d334ac76a9fb2e58e",
+  "english-local-marker-inventory.png": "759fe59194209405732a69c8f3d67add3d707ecfedb2d4bc6f328da9b6d92229",
+  "cleanup.json": "1d59ae06838b5025d0335bdf4505aa681427a7b7da86ac0c19abf657bb5a03c3",
+  "chambers-pilot-sanitized.json": "fb367bf2be7dfc7590484fe6be69a7dfe871d1af75114c5be02f2ef3bc981fb2"
+}
