@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+import hashlib,json,pathlib,sys
+root=pathlib.Path('/workspace/library-files/english-legal-query-api-proof')
+snapshot=pathlib.Path((root/'snapshot-path.txt').read_text().strip())
+def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+files=['main.jar','documents.js','spacegraph.js','pages.js','classpath.txt','passing-build.log','source-head.txt']
+identity={'sourceHead':(snapshot/'source-head.txt').read_text().strip(),'snapshot':str(snapshot),'hashes':{n:sha(snapshot/n) for n in files},'productionClassOverlays':False,'friendAccess':False,'scope':'External public-API harness only; retained v58 parser observations replayed, not a new NLP run.'}
+assert identity['sourceHead']=='5548a842517e98f47f83aebfa30387dc2cc820b4'
+assert 'BUILD SUCCESSFUL' in (snapshot/'passing-build.log').read_text()
+cp=(snapshot/'classpath.txt').read_text().strip().split(':')
+assert cp and all(pathlib.Path(p).is_file() and p.endswith('.jar') for p in cp)
+assert all('/build/classes/' not in p and '/classes/kotlin/' not in p and '/jvmTest/' not in p for p in cp)
+identity['jarOnlyDependencies']=True
+identity['classpathJars']=len(cp)
+classfiles=list((root/'classes').rglob('*.class'))
+assert classfiles and all(str(p.relative_to(root/'classes')).startswith('proof/') for p in classfiles)
+identity['externalHarnessClasses']=len(classfiles)
+if sys.argv[1:] == ['before']:
+ (root/'artifact-before.json').write_text(json.dumps(identity,indent=2)+'\n')
+ print(json.dumps({'result':'FROZEN','sourceHead':identity['sourceHead'],'mainSha256':identity['hashes']['main.jar']}));sys.exit()
+before=json.load(open(root/'artifact-before.json'));assert before==identity,'Frozen artifact changed during proof'
+assert (root/'fixture.exit').read_text().strip()=='0'
+assert json.load(open(root/'result.json'))['result']=='PASS'
+cleanup=json.load(open(root/'cleanup.json'));assert cleanup['wireDrained'] and cleanup['panelsDrained'] and cleanup['allSupervisorsCompleted'] and cleanup['registryRemoved']
+identity.update(result='PASS',immutableArtifactsUnchanged=True,fixtureExit=0,cleanup=cleanup)
+(root/'execution-identity.json').write_text(json.dumps(identity,indent=2)+'\n')
+print(json.dumps({'result':'PASS','sourceHead':identity['sourceHead'],'mainSha256':identity['hashes']['main.jar'],'productionOverlays':False,'friendAccess':False}))

@@ -1,0 +1,1 @@
+{"result":"PASS","node":"urn:trikeshed:english:legal:7b6aee887b34e128d2fd5f9d85b1e5ed0cd6f0def9a08fce96815ad5b74fe1d0/sentence/0/node/2:3","index":"2","copy":"3","begin":"4","end":"16"}

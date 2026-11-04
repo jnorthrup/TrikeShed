@@ -1,0 +1,1228 @@
+{
+  "result": "PASS",
+  "scope": "Exact retained actual v58 CoreNLP observations replayed through the new immutable production API and typed LCNC owner; no fresh ingestion/parser execution. Live rows are exact read-only snapshot reconstruction with explicit stale/reset controls.",
+  "sourceHead": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "rawResult": {
+    "file": "api-result.json.gz",
+    "uncompressedBytes": 385383,
+    "uncompressedSha256": "5961206c0800703397e2c096c260030661bf3245cfe944dab8929f1e8f62b07e",
+    "gzipBytes": 16408,
+    "gzipSha256": "c2888f98779962fe2e6ceec7f65cab5ac4609cb034efa49c732aba23d6006421"
+  },
+  "sourceRows": [
+    {
+      "project": "english-legal-candidates-proof",
+      "id": "synthetic matching duties.txt",
+      "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+      "rev": "1-sha256:6bf74f48c795416f7fa5206d9ff2050fb43ab3102d34a6749d080caabaf7a55a",
+      "seq": 0,
+      "length": 133,
+      "contentType": "text/plain"
+    },
+    {
+      "project": "english-legal-candidates-proof",
+      "id": "synthetic conflicting duties.txt",
+      "cid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+      "rev": "1-sha256:d99f02fb67328897ab463b429a74831f616c10d67fd10e5d3e638290809f8c87",
+      "seq": 1,
+      "length": 178,
+      "contentType": "text/plain"
+    },
+    {
+      "project": "english-legal-candidates-proof",
+      "id": "synthetic parser copy.txt",
+      "cid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+      "rev": "1-sha256:ce96902f019c3d9dc5dbc16be600a18ce39864b697277922eb0de41c1cd47f42",
+      "seq": 2,
+      "length": 54,
+      "contentType": "text/plain"
+    }
+  ],
+  "cases": [
+    {
+      "label": "matching-current",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "conflicting-document-independent-valid30",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "conflicting-quantity-unresolved",
+      "status": 200,
+      "error": null,
+      "rowCount": 3
+    },
+    {
+      "label": "actual-recorded-copy-vertices",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "conflict-duration-has-no-integer",
+      "status": 200,
+      "error": null,
+      "rowCount": 0
+    },
+    {
+      "label": "explicit-null-mode",
+      "status": 409,
+      "error": "Explicit legal query source mode required",
+      "rowCount": null
+    },
+    {
+      "label": "noninspection-program-refused",
+      "status": 400,
+      "error": "inspection-only: a SPARQL syntax graph must not be dispatched as a procedure",
+      "rowCount": null
+    },
+    {
+      "label": "nine-patterns-refused",
+      "status": 413,
+      "error": "Visual query has too many patterns",
+      "rowCount": null
+    },
+    {
+      "label": "stale-current-refused",
+      "status": 409,
+      "error": "English observation source snapshot is stale or unavailable",
+      "rowCount": null
+    },
+    {
+      "label": "historical-snapshot",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "manual-control-over20k-quads",
+      "status": 409,
+      "error": "Legal candidate graph exceeds 20000 quads; inspect a smaller text range",
+      "rowCount": null
+    },
+    {
+      "label": "http",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "http",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "http",
+      "status": 200,
+      "error": null,
+      "rowCount": 3
+    },
+    {
+      "label": "http",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "http",
+      "status": 200,
+      "error": null,
+      "rowCount": 1
+    },
+    {
+      "label": "http",
+      "status": 409,
+      "error": "Explicit legal query source mode required",
+      "rowCount": null
+    }
+  ],
+  "outputs": [
+    {
+      "label": "matching",
+      "status": 200,
+      "query": "SELECT ?quote ?status ?sentence ?source WHERE { ?d <urn:trikeshed:english:legal:kind> \"duration-language-candidate\" . ?d <urn:trikeshed:english:legal:integerValue> \"30\"^^<http://www.w3.org/2001/XMLSchema#integer> . ?d <urn:trikeshed:english:legal:unitLemma> \"day\" . ?d <urn:trikeshed:english:legal:quote> ?quote . ?d <urn:trikeshed:english:legal:status> ?status . ?d <urn:trikeshed:english:legal:sentence> ?s . ?s <urn:trikeshed:english:legal:quote> ?sentence . ?d <urn:trikeshed:english:legal:sourceText> ?source . }",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "namedGraph": "urn:trikeshed:english:legal:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "originalCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "extractedTextCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "candidateCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "quads": 898,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (30) business days"
+          },
+          "status": {
+            "type": "literal",
+            "value": "lexical-integer-candidate"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Tenant shall not pay rent within thirty (30) business days unless Owner consents."
+          },
+          "source": {
+            "type": "uri",
+            "value": "urn:sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "label": "known-conflicting-document",
+      "status": 200,
+      "query": "SELECT ?quote ?status ?sentence ?source WHERE { ?d <urn:trikeshed:english:legal:kind> \"duration-language-candidate\" . ?d <urn:trikeshed:english:legal:integerValue> \"30\"^^<http://www.w3.org/2001/XMLSchema#integer> . ?d <urn:trikeshed:english:legal:unitLemma> \"day\" . ?d <urn:trikeshed:english:legal:quote> ?quote . ?d <urn:trikeshed:english:legal:status> ?status . ?d <urn:trikeshed:english:legal:sentence> ?s . ?s <urn:trikeshed:english:legal:quote> ?sentence . ?d <urn:trikeshed:english:legal:sourceText> ?source . }",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "namedGraph": "urn:trikeshed:english:legal:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "originalCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "extractedTextCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "candidateCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "quads": 1124,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within 30 calendar days"
+          },
+          "status": {
+            "type": "literal",
+            "value": "lexical-integer-candidate"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Rent shall be paid by Tenant within 30 calendar days."
+          },
+          "source": {
+            "type": "uri",
+            "value": "urn:sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "label": "unknown-conflict",
+      "status": 200,
+      "query": "SELECT ?quote ?reason WHERE { ?d <urn:trikeshed:english:legal:status> \"unresolved-quantity-candidate\" . ?d <urn:trikeshed:english:legal:quote> ?quote . ?d <urn:trikeshed:english:legal:unresolved> ?reason . }",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "namedGraph": "urn:trikeshed:english:legal:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "originalCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "extractedTextCid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0566991d49152176aaee2bd01a036499664597d6b59b35df69afdbddfae78c23",
+        "candidateCid": "sha256:1e8309f1ca6eae367ed6932c7f6270b92eff5dc59c6c1148177258bf1e9318eb",
+        "quads": 1124,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (60) business days"
+          },
+          "reason": {
+            "type": "literal",
+            "value": "legal-force-not-established"
+          }
+        },
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (60) business days"
+          },
+          "reason": {
+            "type": "literal",
+            "value": "cross-sentence-and-paragraph-scope-not-established"
+          }
+        },
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (60) business days"
+          },
+          "reason": {
+            "type": "literal",
+            "value": "conflicting-number-forms"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "label": "actual-parser-copies",
+      "status": 200,
+      "query": "SELECT ?node ?word ?index ?copy WHERE { ?node <urn:trikeshed:english:legal:nodeKind> \"copy\" . ?node <urn:trikeshed:english:legal:word> ?word . ?node <urn:trikeshed:english:legal:index> ?index . ?node <urn:trikeshed:english:legal:copy> ?copy . }",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+        "namedGraph": "urn:trikeshed:english:legal:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+        "originalCid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+        "extractedTextCid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:6019a7b0c6647fd0aea717fc3e6c8ab2a6cb88449adffa71a539d551b8d66f0a",
+        "candidateCid": "sha256:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922",
+        "quads": 292,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "node": {
+            "type": "uri",
+            "value": "urn:trikeshed:english:legal:4b061ccc6d2c3e56f968066a1d39719a1b38ded868967cae833a1592099a5922/sentence/0/node/2:3"
+          },
+          "word": {
+            "type": "literal",
+            "value": "requirements"
+          },
+          "index": {
+            "type": "literal",
+            "value": "2",
+            "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+          },
+          "copy": {
+            "type": "literal",
+            "value": "3",
+            "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "label": "same-sentence-observations-not-applicability",
+      "status": 200,
+      "query": "SELECT ?quote ?status ?sentence ?action WHERE { ?d <urn:trikeshed:english:legal:kind> \"duration-language-candidate\" . ?d <urn:trikeshed:english:legal:integerValue> \"30\"^^<http://www.w3.org/2001/XMLSchema#integer> . ?d <urn:trikeshed:english:legal:sentence> ?s . ?action <urn:trikeshed:english:legal:kind> \"modal-action-candidate\" . ?action <urn:trikeshed:english:legal:sentence> ?s . ?s <urn:trikeshed:english:legal:quote> ?sentence . ?d <urn:trikeshed:english:legal:quote> ?quote . ?action <urn:trikeshed:english:legal:modalLiteral> ?status . }",
+      "source": {
+        "selected": "english-legal-candidate-observations",
+        "receiptCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "namedGraph": "urn:trikeshed:english:legal:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "originalCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "extractedTextCid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "mode": "current",
+        "historical": false,
+        "reviewStatus": "unreviewed",
+        "scope": "recorded-parser-role-and-quantity-candidates",
+        "semanticAuthority": "not-established",
+        "producerAuthority": "not-established",
+        "parserExecution": "not-reverified",
+        "dependencyNodeIdentity": "recorded-index-and-copy",
+        "parserDependencyNodeIdentity": "token-index+copy-count/1",
+        "parserNodeIdentityReported": true,
+        "bindingProvenance": "candidate-receipt-resources-with-parent-inspection-and-exact-source-spans",
+        "inspectionCid": "sha256:0f096aaa4ae48279f185710c6a4b369c6d0de31b8087659251afcbe18df2adbb",
+        "candidateCid": "sha256:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798",
+        "quads": 898,
+        "sameSentenceJoin": "cooccurrence-only-not-applicability",
+        "integerValueMeaning": "bounded-lexical-reading-only",
+        "missingIntegerValue": "unresolved-or-unrepresented-not-false",
+        "currentness": "checked-before-and-after-query"
+      },
+      "bindings": [
+        {
+          "quote": {
+            "type": "literal",
+            "value": "within thirty (30) business days"
+          },
+          "status": {
+            "type": "literal",
+            "value": "shall"
+          },
+          "sentence": {
+            "type": "literal",
+            "value": "Tenant shall not pay rent within thirty (30) business days unless Owner consents."
+          },
+          "action": {
+            "type": "uri",
+            "value": "urn:trikeshed:english:legal:7ea1e3c8695c335217932dde4e61e71294cf585c809f5942b607c33c5656f798/sentence/0/action/0"
+          }
+        }
+      ],
+      "error": null
+    },
+    {
+      "label": "explicit-null-mode-refused",
+      "status": 409,
+      "query": null,
+      "source": null,
+      "bindings": [],
+      "error": "Explicit legal query source mode required"
+    }
+  ],
+  "programs": {
+    "thirtyDays": {
+      "nodes": [
+        {
+          "id": "select",
+          "type": "sparql.select",
+          "params": {},
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v0",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?quote",
+            "ord": "0"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v1",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?status",
+            "ord": "1"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v2",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?sentence",
+            "ord": "2"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v3",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?source",
+            "ord": "3"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p0",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:kind>",
+            "object": "\"duration-language-candidate\""
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p1",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:integerValue>",
+            "object": "\"30\"^^<http://www.w3.org/2001/XMLSchema#integer>"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p2",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:unitLemma>",
+            "object": "\"day\""
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p3",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:quote>",
+            "object": "?quote"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p4",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:status>",
+            "object": "?status"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p5",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:sentence>",
+            "object": "?s"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p6",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?s",
+            "predicate": "<urn:trikeshed:english:legal:quote>",
+            "object": "?sentence"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p7",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:sourceText>",
+            "object": "?source"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        }
+      ],
+      "wires": [
+        {
+          "from": [
+            "v0",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v1",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v2",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v3",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "p0",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p1",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p2",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p3",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p4",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p5",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p6",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p7",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        }
+      ],
+      "controls": {
+        "humanOversight": true,
+        "matingPoints": [],
+        "inspectionOnly": true
+      },
+      "kanban": null,
+      "view": null,
+      "seq": 1
+    },
+    "unknown": {
+      "nodes": [
+        {
+          "id": "select",
+          "type": "sparql.select",
+          "params": {},
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v0",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?quote",
+            "ord": "0"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v1",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?reason",
+            "ord": "1"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p0",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:status>",
+            "object": "\"unresolved-quantity-candidate\""
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p1",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:quote>",
+            "object": "?quote"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p2",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?d",
+            "predicate": "<urn:trikeshed:english:legal:unresolved>",
+            "object": "?reason"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        }
+      ],
+      "wires": [
+        {
+          "from": [
+            "v0",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v1",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "p0",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p1",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p2",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        }
+      ],
+      "controls": {
+        "humanOversight": true,
+        "matingPoints": [],
+        "inspectionOnly": true
+      },
+      "kanban": null,
+      "view": null,
+      "seq": 1
+    },
+    "copies": {
+      "nodes": [
+        {
+          "id": "select",
+          "type": "sparql.select",
+          "params": {},
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v0",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?node",
+            "ord": "0"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v1",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?word",
+            "ord": "1"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v2",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?index",
+            "ord": "2"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "v3",
+          "type": "sparql.variable",
+          "params": {
+            "name": "?copy",
+            "ord": "3"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p0",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:nodeKind>",
+            "object": "\"copy\""
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p1",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:word>",
+            "object": "?word"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p2",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:index>",
+            "object": "?index"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        },
+        {
+          "id": "p3",
+          "type": "sparql.pattern",
+          "params": {
+            "subject": "?node",
+            "predicate": "<urn:trikeshed:english:legal:copy>",
+            "object": "?copy"
+          },
+          "x": 0,
+          "y": 0,
+          "width": null,
+          "height": null,
+          "collapsed": false,
+          "subprogram": null,
+          "children": []
+        }
+      ],
+      "wires": [
+        {
+          "from": [
+            "v0",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v1",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v2",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "v3",
+            "variable"
+          ],
+          "to": [
+            "select",
+            "variables"
+          ]
+        },
+        {
+          "from": [
+            "p0",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p1",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p2",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        },
+        {
+          "from": [
+            "p3",
+            "pattern"
+          ],
+          "to": [
+            "select",
+            "patterns"
+          ]
+        }
+      ],
+      "controls": {
+        "humanOversight": true,
+        "matingPoints": [],
+        "inspectionOnly": true
+      },
+      "kanban": null,
+      "view": null,
+      "seq": 1
+    }
+  },
+  "copySourceQuery": "copy-source-query.json",
+  "typedLcnc": {
+    "typeErrors": [],
+    "nullModeRefused": true,
+    "dataset": "english-legal-candidate-observations"
+  },
+  "currentnessControl": {
+    "scope": "explicit-replay-row-control-not-ingestion",
+    "before": {
+      "project": "english-legal-candidates-proof",
+      "id": "synthetic matching duties.txt",
+      "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+      "rev": "1-sha256:6bf74f48c795416f7fa5206d9ff2050fb43ab3102d34a6749d080caabaf7a55a",
+      "seq": 0,
+      "length": 133,
+      "contentType": "text/plain"
+    },
+    "after": {
+      "project": "english-legal-candidates-proof",
+      "id": "synthetic matching duties.txt",
+      "cid": "sha256:cd890d949e43068433ba0b84b806946b8d3126113aaaefbeeca280e76723d39c",
+      "rev": "replay-control-2",
+      "seq": 1000,
+      "length": 163,
+      "contentType": "text/plain"
+    }
+  },
+  "resetControl": {
+    "scope": "explicit-readonly-replay-reset",
+    "rows": [
+      {
+        "project": "english-legal-candidates-proof",
+        "id": "synthetic matching duties.txt",
+        "cid": "sha256:4bfc4615cc4665b4dc0e6cb0a8ac660e547d5365e4333690829b9674478be703",
+        "rev": "1-sha256:6bf74f48c795416f7fa5206d9ff2050fb43ab3102d34a6749d080caabaf7a55a",
+        "seq": 0,
+        "length": 133,
+        "contentType": "text/plain"
+      },
+      {
+        "project": "english-legal-candidates-proof",
+        "id": "synthetic conflicting duties.txt",
+        "cid": "sha256:a8c03eab7ed3b9517876ad235e99c918ab3c151c05cbd166045643e8e81bb042",
+        "rev": "1-sha256:d99f02fb67328897ab463b429a74831f616c10d67fd10e5d3e638290809f8c87",
+        "seq": 1,
+        "length": 178,
+        "contentType": "text/plain"
+      },
+      {
+        "project": "english-legal-candidates-proof",
+        "id": "synthetic parser copy.txt",
+        "cid": "sha256:7b013fd3fba2f5a95dcb848b391e38736969c98b21c32b6906c79d941212086c",
+        "rev": "1-sha256:ce96902f019c3d9dc5dbc16be600a18ce39864b697277922eb0de41c1cd47f42",
+        "seq": 2,
+        "length": 54,
+        "contentType": "text/plain"
+      }
+    ]
+  },
+  "manualBudgetControl": {
+    "scope": "manual-annotated-control-not-CoreNLP",
+    "inspectionCid": "sha256:e788a77935314ce4306aace157a41b82f7b1f2febae9bde86604d56e8edf8d98",
+    "tokens": 1200,
+    "result": {
+      "error": "Legal candidate graph exceeds 20000 quads; inspect a smaller text range"
+    }
+  },
+  "lifecycle": {
+    "acceptedQueries": 4,
+    "completedQueries": 4,
+    "registryRemoved": true,
+    "heldBeforeDrain": true
+  },
+  "safety": {
+    "reteFacts": 0,
+    "blackboardValues": 0,
+    "beliefBagPresent": false,
+    "reviewOwnerPresent": false,
+    "modelMuxConfigured": false,
+    "parserOwnerPresent": false,
+    "parserCalls": 0,
+    "extractCalls": 0,
+    "globalQuadStorePresent": false
+  }
+}

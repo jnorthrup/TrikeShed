@@ -1,0 +1,47 @@
+{
+  "sourceHead": "5548a842517e98f47f83aebfa30387dc2cc820b4",
+  "productionChangedDuringProof": false,
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "compiles": [
+    {
+      "attempt": 1,
+      "result": "FAIL",
+      "cause": "External harness referenced an internal codec and had two bracket errors; fixed only external harness."
+    },
+    {
+      "attempt": 2,
+      "result": "PASS",
+      "followup": "External harness status expectations corrected before runtime to production visual guard400/413."
+    },
+    {
+      "attempt": 3,
+      "result": "PASS",
+      "classes": "classes/"
+    }
+  ],
+  "runtimeAttempts": [
+    {
+      "attempt": 1,
+      "api": "PASS",
+      "ownerDrain": "PASS",
+      "artifactImmutability": "PASS",
+      "browser": "CAPTURE FAILURE after successfulmatching/known/unknownruns: native receipt facet generation changed; capture refresh/wait added."
+    },
+    {
+      "attempt": 2,
+      "api": "PASS",
+      "ownerDrain": "PASS",
+      "artifactImmutability": "PASS",
+      "browser": "HARNESS EXPECTATION FAILURE: stale authored run correctly returned400 + failed receipt; browser driver incorrectly expected200. Harness corrected."
+    },
+    {
+      "attempt": 3,
+      "api": "PASS",
+      "ownerDrain": "PASS",
+      "artifactImmutability": "PASS",
+      "browser": "PASS: five actual authored durable runs, including correct stale HTTP400 failed receipt and successful historical snapshot.",
+      "reopenedCas": "PASS: five exact run JSON receipts + exact authored program JSON, all hash verified."
+    }
+  ]
+}
