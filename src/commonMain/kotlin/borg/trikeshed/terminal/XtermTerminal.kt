@@ -605,11 +605,16 @@ class XtermTerminal(
             }
         }
 <<<<<<< HEAD
+<<<<<<< HEAD
 ||||||| a39e91f9e
         if (mode == 3) scrollbackRows.clear()
 =======
         if (mode == 3) { scrollbackRows.clear(); scrollbackRowIds.clear() }
 >>>>>>> e4affdace595940b8e99b54ecb6c37e898cf4015
+||||||| 678c7a818
+        if (mode == 3) { scrollbackRows.clear(); scrollbackRowIds.clear() }
+=======
+>>>>>>> 3a590fcd12c9edfa2e6da73fde060701dc55927e
     }
 
     private fun eraseLine(mode: Int) = when (mode) {
