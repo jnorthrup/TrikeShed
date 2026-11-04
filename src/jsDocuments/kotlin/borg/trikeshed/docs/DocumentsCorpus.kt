@@ -77,7 +77,7 @@ internal object DocumentsCorpus {
         fun changed() { result = null; failure = null; selectedTerm = null; render() }
         fun reveal() {
             if (!present()) return
-            open = true; render()
+            open = true; render(preserveOpen = false)
             host.querySelector("[data-english-corpus]")?.asDynamic()?.scrollIntoView(js("({block:'nearest'})"))
         }
         private fun text(parent: HTMLElement, tag: String, value: String, className: String? = null): HTMLElement =
@@ -234,8 +234,10 @@ internal object DocumentsCorpus {
                 finally { if (present()) { pending = false; render() } }
             }
         }
-        fun render() {
+        fun render(preserveOpen: Boolean = true) {
             if (!present()) return
+            // A native details toggle may still be queued when an input change repaints the panel.
+            if (preserveOpen) host.querySelector("[data-english-corpus]")?.let { shown -> open = shown.asDynamic().open == true }
             host.textContent = ""
             val details = text(host, "details", ""); details.setAttribute("data-english-corpus", "1"); details.asDynamic().open = open
             details.style.cssText = "max-width:1080px;margin:12px auto 20px;padding:14px 24px;border:1px solid var(--rule);border-radius:8px;overflow-wrap:anywhere"
