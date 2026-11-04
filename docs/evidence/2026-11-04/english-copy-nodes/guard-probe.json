@@ -1,0 +1,86 @@
+{
+  "source": "TENANT MAY REMAIN UNLESS RENT IS NOT DUE.",
+  "documentText": "TENANT MAY REMAIN UNLESS RENT IS NOT DUE.",
+  "sourceEqual": true,
+  "conditionIssues": [
+    "NEGATED"
+  ],
+  "interpretedNormCount": 0,
+  "tokens": [
+    [
+      {
+        "word": "TENANT",
+        "lemma": "tenant",
+        "begin": 0,
+        "end": 6
+      },
+      {
+        "word": "MAY",
+        "lemma": "may",
+        "begin": 7,
+        "end": 10
+      },
+      {
+        "word": "REMAIN",
+        "lemma": "remain",
+        "begin": 11,
+        "end": 17
+      },
+      {
+        "word": "UNLESS",
+        "lemma": "unless",
+        "begin": 18,
+        "end": 24
+      },
+      {
+        "word": "RENT",
+        "lemma": "rent",
+        "begin": 25,
+        "end": 29
+      },
+      {
+        "word": "IS",
+        "lemma": "be",
+        "begin": 30,
+        "end": 32
+      },
+      {
+        "word": "NOT",
+        "lemma": "not",
+        "begin": 33,
+        "end": 36
+      },
+      {
+        "word": "DUE",
+        "lemma": "due",
+        "begin": 37,
+        "end": 40
+      },
+      {
+        "word": ".",
+        "lemma": ".",
+        "begin": 40,
+        "end": 41
+      }
+    ]
+  ],
+  "metadata": {
+    "module": "corenlp",
+    "profile": "syntax-v1",
+    "dependencyGraph": "enhanced-plus-plus",
+    "dependencyNodeIdentity": "token-index+copy-count/1",
+    "declared": "edu.stanford.nlp:stanford-corenlp:4.5.10,edu.stanford.nlp:stanford-corenlp:4.5.10:models",
+    "manifestCid": "sha256:fd3b2c47976d57f6277ea5a70ab93639cd8e2a2a88c9fed35e8d3c51063d30af",
+    "jar": "stanford-corenlp-4.5.10.jar",
+    "jarSha256": "f813ce4ed7319d79225f2a520d40733075c6b3500dd0b81ee069229e461aab43",
+    "packageVersion": "4.5.10",
+    "parserNormalization": "sentence-case/1",
+    "sourceTextCid": "sha256:6f64546fcb9d9b08f7b2fc96eeaeb34e0fa9748e9d41437a3e2b8be53c3ddb3c",
+    "parserInputCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+    "relationGlossSource": "parser-input"
+  },
+  "configuration": {
+    "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+    "threads": "1"
+  }
+}

@@ -13,6 +13,8 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.nlp.NlpDocument
+import borg.trikeshed.nlp.projectionIssue
+import borg.trikeshed.nlp.NlpProjectionIssue
 /** Semantic admission stays NNV-only; a verified quotation admits only occurrence in source text. */
 internal object DocumentCuratorGrounding {
     private const val proposalInstructions = """Return only a JSON object with format "TRIPLET_JSON" and a triplets array.
@@ -118,6 +120,11 @@ substitute filename, link or adjacency heuristics.
         val sentences = nlp.sentences.values().filter { it.begin == begin && it.end == end }
         if (sentences.size != 1) return refusal("quote is not one complete NLP sentence")
         val sentence = sentences.single()
+        when (nlp.projectionIssue(sentence)) {
+            NlpProjectionIssue.COPIED_NODE -> return refusal("unsupported dependency copy-node interpretation")
+            NlpProjectionIssue.UNREPORTED_IDENTITY -> return refusal("unreported dependency node identity; locally reparse the source")
+            null -> Unit
+        }
         val tokens = sentence.tokens.values()
         if (tokens.size !in 3..4 || tokens.map { it.index }.distinct().size != tokens.size)
             return refusal("unsupported clause structure")

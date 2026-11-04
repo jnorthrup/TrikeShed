@@ -10,6 +10,8 @@ object EnglishInspection {
     const val MAX_CHARS = 65_536
     const val MAX_SENTENCES = 512
     const val MAX_TOKENS = 8192
+    const val MAX_NODES = 16_384
+    const val MAX_COPY = 1024
     const val MAX_DEPENDENCIES = 16_384
     const val MAX_MARKERS = 4096
     const val MAX_FIELD = 4096
@@ -56,6 +58,7 @@ object EnglishInspection {
         require(parsed.sentences.size in 0..MAX_SENTENCES) { "English sentence limit" }
         require(text.isBlank() || parsed.sentences.size > 0) { "Parser omitted nonblank text" }
         var tokenCount = 0
+        var nodeCount = 0
         var dependencyCount = 0
         var markerCount = 0
         var quotedAnchorCount = 0
@@ -86,28 +89,47 @@ object EnglishInspection {
                     "word" j token.word, "lemma" j token.lemma, "pos" j token.tag, "ner" j token.ner])
             }
             require(text.substring(previousTokenEnd, sentence.end).isBlank()) { "Tokens omit sentence text" }
+            // Copy nodes are parser vertices anchored to a real token, never new source-word occurrences.
+            val byIndex = tokens.associateBy { it["index"] as Int }
+            val nodes = mutableMapOf<String, Map<String, Any?>>()
+            fun node(index: Int, copy: Int): String {
+                require(copy in 0..MAX_COPY && (index != 0 || copy == 0)) { "Invalid dependency copy identity" }
+                val id = "$index:$copy"
+                if (index == 0) return id
+                val token = requireNotNull(byIndex[index]) { "Invalid dependency endpoint" }
+                if (id !in nodes) {
+                    require(nodeCount < MAX_NODES) { "English dependency node limit" }; nodeCount++
+                    nodes[id] = token + _m["id" j id, "copy" j copy, "kind" j if (copy == 0) "token" else "copy"]
+                }
+                return id
+            }
+            for (index in indices) node(index, 0)
             val edges = mutableSetOf<NlpDependency>()
             var roots = 0
-            val children = mutableMapOf<Int, MutableList<Int>>()
+            val children = mutableMapOf<String, MutableList<String>>()
             val dependencies = mutableListOf<Map<String, Any?>>()
             for (dependency in sentence.dependencies.view) {
                 field(dependency.relation)
                 require(dependency.relation.isNotBlank() && edges.add(dependency)) { "Duplicate or empty dependency" }
-                require(dependency.dependent in indices && (dependency.governor == 0 || dependency.governor in indices) &&
-                    dependency.governor != dependency.dependent) { "Invalid dependency endpoint" }
+                require(dependency.dependent in indices && (dependency.governor == 0 || dependency.governor in indices)) { "Invalid dependency endpoint" }
+                val governor = node(dependency.governor, dependency.governorCopy)
+                val dependent = node(dependency.dependent, dependency.dependentCopy)
+                require(governor != dependent) { "Dependency edge repeats the same full node identity" }
                 require((dependency.governor == 0) == dependency.relation.equals("root", true)) { "Invalid root dependency" }
                 if (dependency.governor == 0) roots++
-                children.getOrPut(dependency.governor) { mutableListOf() }.add(dependency.dependent)
-                dependencies.add(_m["governor" j dependency.governor, "dependent" j dependency.dependent, "relation" j dependency.relation])
+                children.getOrPut(governor) { mutableListOf() }.add(dependent)
+                dependencies.add(_m["governor" j dependency.governor, "dependent" j dependency.dependent, "relation" j dependency.relation,
+                    "governorCopy" j dependency.governorCopy, "dependentCopy" j dependency.dependentCopy,
+                    "governorNode" j governor, "dependentNode" j dependent])
             }
             require(roots == 1) { "Parser must report one dependency root" }
-            val reachable = mutableSetOf<Int>()
-            val pending = mutableListOf(0)
+            val reachable = mutableSetOf<String>()
+            val pending = mutableListOf("0:0")
             while (pending.isNotEmpty()) {
                 val head = pending.removeAt(pending.lastIndex)
                 for (child in children[head].orEmpty()) if (reachable.add(child)) pending.add(child)
             }
-            require(reachable == indices) { "Dependency graph omits or disconnects token" }
+            require(reachable == nodes.keys) { "Dependency graph omits or disconnects a full node identity" }
             val quote = text.substring(sentence.begin, sentence.end)
             val matches = mutableListOf<Map<String, Any?>>()
             for (marker in markers.view) for (match in marker.pattern.findAll(quote)) {
@@ -120,7 +142,8 @@ object EnglishInspection {
             quotedAnchorCount += source.anchors.count { it.begin < begin + sentence.end && it.end > begin + sentence.begin }
             require(quotedAnchorCount <= MAX_QUOTED_ANCHORS) { "Quoted source anchor limit" }
             rows.add(_m["index" j sentence.index, "begin" j (begin + sentence.begin), "end" j (begin + sentence.end), "quote" j quote, "quotation" j source.quotation(begin + sentence.begin, begin + sentence.end),
-                "tokens" j tokens, "dependencies" j dependencies,
+                "tokens" j tokens, "nodes" j nodes.values.sortedWith(compareBy({ it["index"] as Int }, { it["copy"] as Int })),
+                "dependencies" j dependencies,
                 "markers" j matches.sortedWith(compareBy({ it["begin"] as Int }, { it["end"] as Int }, { it["kind"] as String }))])
         }
         require(text.substring(previousSentenceEnd).isBlank()) { "Parser omits trailing text" }
@@ -136,9 +159,12 @@ object EnglishInspection {
             "extractedTextCid" j source.extractedTextCid.value,
             "range" j _m["begin" j begin, "end" j end, "totalLength" j source.text.length, "complete" j (begin == 0 && end == source.text.length)],
             "parser" j metadata, "coverage" j _m["kind" j "bounded-text-range", "semantics" j "not-established",
-                "markerMethod" j "literal-word-and-phrase-candidates", "scope" j "sentence-token-dependency-observations",
+                "markerMethod" j "literal-word-and-phrase-candidates", "dependencyNodeIdentity" j "token-index+copy-count/1",
+                "parserDependencyNodeIdentity" j parsed.metadata?.runtime?.get("dependencyNodeIdentity"),
+                "parserNodeIdentityReported" j (parsed.metadata?.runtime?.containsKey("dependencyNodeIdentity") == true),
+                "scope" j "sentence-token-dependency-observations",
                 "omitted" j _l["constituency", "coreference", "openie", "kbp", "legal-interpretation"]],
-            "sentences" j rows, "counts" j _m["sentences" j rows.size, "tokens" j tokenCount,
+            "sentences" j rows, "counts" j _m["sentences" j rows.size, "tokens" j tokenCount, "nodes" j nodeCount,
                 "dependencies" j dependencyCount, "markers" j markerCount]]
         require(CanonicalCbor.encodeMap(inventory).size <= MAX_BYTES) { "English inventory exceeds 4MiB" }
         return inventory

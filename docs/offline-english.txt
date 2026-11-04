@@ -83,8 +83,8 @@ One supplied-document pilot attempted three predetermined consecutive Chambers
 ranges. All 1,017 returned token spans matched source text; two inventories were
 accepted and one refused an Enhanced++ copied-node projection that the old
 integer-only endpoint shape cannot represent. Edges were not erased. This is a
-known representation limit; full copy-node identity is the next implementation
-slice. Neither these samples nor the synthetic checks measure general English,
+representation limit addressed by the copy-node follow-up below. Neither these
+samples nor the synthetic checks measure general English,
 OCR or legal accuracy. Existing saved readings are not automatically migrated.
 
 Current upstream upload behavior also starts local project parsing after saving;
@@ -94,3 +94,34 @@ screenshots and a content-free pilot summary are in
 docs/evidence/2026-11-04/offline-english. Supplied text and detailed failures remain
 private. Earlier harness selector/open-panel mismatches and the corrected upstream
 Camel test compilation failure are recorded; no compile inputs or checks were hidden.
+
+Enhanced++ identity follow-up
+Dependency endpoints now retain Stanford's token index AND copy count through
+the live bridge, positional wire, named stored record, prompt rows, inventory and
+SVG. A copied grammatical vertex reuses its original word's exact source anchor;
+it is not another source-word occurrence. Full vertex identity controls edge
+uniqueness and reachability. Legacy three-field records remain readable but lost
+identities cannot be recovered by assuming zero copies.
+
+Index-only norm/premise/axiom/model-grounding consumers decline copied sentences.
+Known historical Stanford records without reported node identity are also excluded
+from new semantic projections until reparsed. Raw NLP stays available; exact
+quotations and unrelated supported sentences survive. These gates do not retract
+previously admitted history or provide a copy-aware semantic interpreter.
+
+Coordinated v52 at 5878d7d14095cf0aa8fda5d997ffb35cacf73c5c passed all 63 selected
+checks with three browser bundles. Main JAR SHA256:
+f575d402f9b84bacab0cb805636571eab973e4e18212733ec6a67b8a891d28b8.
+The actual donor and browser both observed vertex 2:3 in the synthetic phrase
+The requirements for sellers and for buyers are clear. Ten source words remain
+ten table rows, while eleven graph vertices and all twelve edges survive. The
+SVG includes 2:0 to 2:3 rather than flattening it into a self edge. Actual parser,
+source, partial/stale/late, receipt and outbound-denial checks passed again.
+
+Two fresh, filtered JVMs then compared CoreNLP 4.5.10 and staged 4.6.0 on the same
+three private ranges plus thirteen synthetic cases. All sixteen cases completed
+per version with identical structural outputs. All three private graphs now
+retain their copied vertices, including the formerly refused range. This is a
+representation/compatibility check, not general accuracy or a speedup claim;
+six selected syntax weight resources are byte-identical. Default SDK pin promotion
+is a separate delivery. Evidence: docs/evidence/2026-11-04/english-copy-nodes.

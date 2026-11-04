@@ -1,0 +1,18 @@
+{
+  "method.txt": "9093084b2c003b1b02bb768d9e062c8bef056814e11d9887bd151357416bfcba",
+  "verification-v52.json": "752029edaf4acb48e7751164d9ff086364fad4e285ec85b66f0966b65758bc11",
+  "english-original-case-token-syntax.png": "f4ef6ab43f78de40adbdd029cc97dabb1a89a9873f55aacfafa03171694705e3",
+  "english-partial-coverage.png": "0ad944f5b0cb7b461b2e86f609ef2faaef61ffde283e1f9b0fb45e7fcc12214c",
+  "english-directed-dependency-graph.png": "e492ae29d8761cfca4849ff014429952846bd7cc3fe4cd5901c6e9075bdbad43",
+  "execution-identity.json": "43c8a8456afaa3fac236faa72c38bbeb930fed77ecf8d08cdb9069282003e624",
+  "copy-guard-probe.json": "33f2a89098bad7b8263f07a3d7f8425142767a9065c5daca9124ae8eeaa18f9d",
+  "guard-probe.json": "9bcdc1f842c9690514bdda87f92247bf55194e3e6a293cedcf04cdaf8ae9fb41",
+  "outbound-deny-profile.json": "fa9995b05612912be0a6fc8e47bea57a7d41ab5cf0ef4b7d8ee1a8af00a5d810",
+  "english-stale-source-refused.png": "4687a6420edef7d098e5bccbefb7434f50a3591f203595cdab8039749188f042",
+  "english-source-dropped-selection-preserved.png": "390c2f7c2f2e56257c3bb5672b1c9f28ee10102173a1be1b78a6ee385663ea06",
+  "stanford-comparison.json": "e665a1bf6ae760b2d69a2f956a725ff01f5b1eb5f5d196a071e37ae21915e90e",
+  "browser-result.json": "449fe40595a1ddaa4fb04430c4f776dce9fd80b8f544605b9cda05d70f0bf6e9",
+  "english-local-marker-inventory.png": "c7b7dce818c0786f2fa33d1445597eee915a46f57a13bfef3e9a6326597738a9",
+  "english-copied-node-graph.png": "12321080a7b35acf102f93af0e730ede5f6c18cd98ec8565fb4f50e78c5d8474",
+  "cleanup.json": "2af1f4a747914025472a061527c3c83e16c503b7fd7664e904fbef61526f46e1"
+}

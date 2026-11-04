@@ -5,6 +5,8 @@ import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpRelation
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
+import borg.trikeshed.nlp.projectionIssue
+import borg.trikeshed.nlp.NlpProjectionIssue
 
 /**
  * A normative clause read off the dependency parse: a subject noun phrase, a deontic or habitual
@@ -35,8 +37,8 @@ data class NormClause(
     val predicate: String get() = listOfNotNull(verb, obj).joinToString("_") { it.replace(' ', '_') }
 }
 
-/** A guarded sentence omitted from norm interpretation; its source remains available for review. */
-enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED }
+/** Unsupported norm interpretation; the exact sentence and parser observations remain available for review. */
+enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED, COPIED_NODE, UNREPORTED_IDENTITY }
 
 object NormClauses {
     private val modals = setOf("will", "must", "may", "shall", "should", "can", "cannot", "would", "ought")
@@ -269,7 +271,7 @@ object NormClauses {
         for (s in doc.sentences.values()) {
             // Relation triples do not establish guard scope, even when a simple dependency norm is supported.
             // Never let an alternate OpenIE/KBP reading erase the sentence's qualification.
-            if (hasCondition(doc, s)) continue
+            if (doc.projectionIssue(s) != null || hasCondition(doc, s)) continue
             if (s.relations.isEmpty() && s.kbp.isEmpty()) continue
             val tokens = s.tokens.values().associateBy { it.index }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
@@ -347,6 +349,11 @@ object NormClauses {
      */
     fun conditionIssue(doc: NlpDocument, sentence: NlpSentence,
                        parties: Map<String, PartyAliases.Party> = emptyMap()): NormConditionIssue? {
+        when (doc.projectionIssue(sentence)) {
+            NlpProjectionIssue.COPIED_NODE -> return NormConditionIssue.COPIED_NODE
+            NlpProjectionIssue.UNREPORTED_IDENTITY -> return NormConditionIssue.UNREPORTED_IDENTITY
+            null -> Unit
+        }
         val tokens = sentence.tokens.values().associateBy { it.index }
         val deps = sentence.dependencies.values()
         fun word(token: NlpToken) = token.word.lowercase().replace('’', '\'')
@@ -408,6 +415,7 @@ object NormClauses {
      * Some affirmative facts will be omitted, and unrecognized language can still pass the filter.
      */
     internal fun maySupplyPositivePremise(doc: NlpDocument, sentence: NlpSentence): Boolean {
+        if (doc.projectionIssue(sentence) != null) return false
         if (sentence.begin < 0 || sentence.end <= sentence.begin || sentence.end > doc.text.length) return false
         val text = doc.text.substring(sentence.begin, sentence.end)
         if ('?' in text || '"' in text || '“' in text || '”' in text) return false
@@ -444,6 +452,7 @@ object NormClauses {
     private fun premiseFacts(doc: NlpDocument, conservative: Boolean): Set<String> {
         val out = LinkedHashSet<String>()
         for (s in doc.sentences.values()) {
+            if (doc.projectionIssue(s) != null) continue
             if (conservative && !maySupplyPositivePremise(doc, s)) continue
             val tokens = s.tokens.values().associateBy { it.index }
             val deps = s.dependencies.values()

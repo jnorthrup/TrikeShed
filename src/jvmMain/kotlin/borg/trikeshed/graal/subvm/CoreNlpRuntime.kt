@@ -267,6 +267,8 @@ class CoreNlpRuntime(val profile: Profile = Profile.FULL) : NlpReader, AutoClose
             return buildMap {
                 put("module", manifest.module)
                 put("profile", profile.id)
+                put("dependencyGraph", "enhanced-plus-plus")
+                put("dependencyNodeIdentity", "token-index+copy-count/1")
                 manifest.parent?.let { put("parent", it) }
                 if (manifest.declared.isNotEmpty()) put("declared", manifest.declared.joinToString(","))
                 manifestText?.let { put("manifestCid", ContentId.of(it.encodeToByteArray()).value) }
@@ -364,11 +366,16 @@ function parse(text) {
       toks.push([t.index(), t.beginPosition(), t.endPosition(), t.originalText(), t.lemma() || '', t.tag() || '', t.ner() || 'O']);
     }
     var g = s.dependencyParse(), deps = [], roots = [];
-    for (var ri = g.getRoots().iterator(); ri.hasNext();) roots.push(ri.next().index());
-    roots.sort(function (a, b) { return a - b; });
-    for (var j = 0; j < roots.length; j++) deps.push([0, roots[j], 'root']);
+    for (var ri = g.getRoots().iterator(); ri.hasNext();) {
+      var root = ri.next(); roots.push([root.index(), root.copyCount()]);
+    }
+    roots.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    for (var j = 0; j < roots.length; j++) deps.push([0, roots[j][0], 'root', 0, roots[j][1]]);
     var es = g.edgeListSorted();
-    for (var j = 0; j < es.size(); j++) { var e = es.get(j); deps.push([e.getGovernor().index(), e.getDependent().index(), e.getRelation().toString()]); }
+    for (var j = 0; j < es.size(); j++) {
+      var e = es.get(j), governor = e.getGovernor(), dependent = e.getDependent();
+      deps.push([governor.index(), dependent.index(), e.getRelation().toString(), governor.copyCount(), dependent.copyCount()]);
+    }
     var cm = s.coreMap();
     out.push([k, toks.length ? toks[0][1] : 0, toks.length ? toks[toks.length - 1][2] : 0, toks, deps, relations(cm, TRIPLES), relations(cm, KBP)]);
   }
