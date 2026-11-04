@@ -1,0 +1,18 @@
+{
+  "sourceCommit": "45d67b69ffe55c3e16389431ffd84a712c9c1d39",
+  "productionSourceOverlays": false,
+  "sources": {
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/BeliefAdmissionTest.kt": {
+      "committedSourceSha256": "460318d7e06eec15b2bb628b6e824ea6619e269cb0fa28ce7dc2720445f98905",
+      "compiledTestSource": "/workspace/library-files/nars-reinforcement-proof-final/BeliefAdmissionTest.kt",
+      "compiledTestSha256": "ed28beb878dece2e480436f0eb1e335cdbfa1232a361d88083dfad8bae83d9c2",
+      "onlyAlteration": "test package moved to proof.nars with explicit production imports"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/memory/HermesMemoryFeedbackTest.kt": {
+      "committedSourceSha256": "ecdfc791e8c628588ac6d47fba1feeded4065612e36e111046cf6c6051653dc6",
+      "compiledTestSource": "/workspace/library-files/nars-reinforcement-proof-final/HermesMemoryFeedbackTest.kt",
+      "compiledTestSha256": "bdbba3b5a92a0dfedea1a119b7f543a13f108038d564645f00f8202ec667b0ed",
+      "onlyAlteration": "test package moved to proof.nars with explicit production imports, including original-package text extension"
+    }
+  }
+}
