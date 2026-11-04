@@ -126,4 +126,39 @@ class KgRdfFidelityTest {
             assertFailsWith<IllegalArgumentException> { KgNalBridge.parseKif("(not (pays Tenant Landlord))") }
         }
     }
+    @Test fun textConsumerTreatsInterchangeMarkersInsideRdfLiteralsAsData() = runBlocking {
+        withTimeout(10_000) {
+            val input = """# "@context" and <rdf:RDF are comment text
+                |<urn:s> <urn:label> "subject" .
+                |<urn:s> <urn:label> "@context" .
+                |<urn:s> <urn:label> "<rdf:RDF>" .
+                |<urn:s> <urn:label> "@prefix" .
+                |""".trimMargin()
+            assertEquals(KgFormat.TURTLE, KgNalBridge.sniff(input))
+            assertEquals(KgFormat.JSON_LD, KgNalBridge.sniff("""{"@context":{},"value":"data"}"""))
+            assertEquals(KgFormat.TRIPLET_JSON, KgNalBridge.sniff("""[{"subject":"s","predicate":"p","object":"o"}]"""))
+            assertEquals(KgFormat.RDF_XML, KgNalBridge.sniff("""<rdf:RDF xmlns:rdf="urn:rdf"/>"""))
+            assertEquals(KgFormat.KIF, KgNalBridge.sniff("(pays Tenant Landlord)"))
+            val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
+            try {
+                assertFailsWith<IllegalArgumentException> {
+                    bag.ingestKg(input + "\n<urn:s> <urn:p> \"bad\"suffix .")
+                }
+                assertEquals(0, bag.size, "A malformed tail must not mint marker-looking literal prefixes")
+                val report = bag.ingestKg(input)
+                assertEquals(4, report["statements"])
+                val source = ContentId.of(input.encodeToByteArray())
+                val rows = KgNalBridge.parseTurtle(input)
+                assertEquals(_l["\"subject\"", "\"@context\"", "\"<rdf:RDF>\"", "\"@prefix\""], rows.map { it.obj })
+                val identities = rows.map { KgNalBridge.map(it).propositionCid(source.value) }
+                assertEquals(4, identities.distinct().size)
+                for (row in rows) {
+                    val expected = KgNalBridge.map(row).signal(source.value)
+                    assertEquals(expected, bag.signalOf(expected.angular))
+                }
+                bag.awaitProcessed()
+            } finally { bag.drain() }
+        }
+    }
+
 }

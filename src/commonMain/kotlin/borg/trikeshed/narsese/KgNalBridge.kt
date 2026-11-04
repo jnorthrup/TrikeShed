@@ -189,14 +189,25 @@ object KgNalBridge {
     // ── format sniff ──────────────────────────────────────────────────
 
     fun sniff(text: String): KgFormat? {
-        val t = text.trimStart()
+        var offset = 0
+        while (offset < text.length) {
+            while (offset < text.length && text[offset].isWhitespace()) offset++
+            if (offset == text.length || text[offset] != '#') break
+            while (offset < text.length && text[offset] != '\n' && text[offset] != '\r') offset++
+        }
+        val t = text.substring(offset)
         return when {
             t.startsWith("(") -> KgFormat.KIF
-            KgFormat.TURTLE.marker in text -> KgFormat.TURTLE
-            KgFormat.RDF_XML.marker in text -> KgFormat.RDF_XML
-            KgFormat.JSON_LD.marker in text -> KgFormat.JSON_LD
-            KgFormat.TRIPLET_JSON.marker in text -> KgFormat.TRIPLET_JSON
-            KgFormat.N_TRIPLES.marker in text -> KgFormat.N_TRIPLES
+            t.startsWith(KgFormat.TURTLE.marker) -> KgFormat.TURTLE
+            t.startsWith("{") || t.startsWith("[") -> when {
+                KgFormat.JSON_LD.marker in t -> KgFormat.JSON_LD
+                KgFormat.TRIPLET_JSON.marker in t -> KgFormat.TRIPLET_JSON
+                else -> null
+            }
+            t.startsWith(KgFormat.RDF_XML.marker) && t.getOrNull(KgFormat.RDF_XML.marker.length)?.let {
+                it.isWhitespace() || it == '>' || it == '/'
+            } == true || t.startsWith("<?xml") && KgFormat.RDF_XML.marker in t -> KgFormat.RDF_XML
+            t.startsWith(KgFormat.N_TRIPLES.marker) -> KgFormat.N_TRIPLES
             Regex("""^\S+\s+\S+\s+.+\s*\.\s*$""", RegexOption.MULTILINE).containsMatchIn(t) -> KgFormat.TURTLE
             else -> null
         }
