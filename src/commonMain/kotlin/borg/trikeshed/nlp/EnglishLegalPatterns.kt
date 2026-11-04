@@ -9,6 +9,7 @@ object EnglishLegalPatterns {
     const val MAX_MODAL_ACTIONS = 1024
     const val MAX_DURATIONS = 1024
     const val MAX_BINDINGS = 32_768
+    const val MAX_QUOTED_ANCHORS = 8192
     const val MAX_NUMBER_TOKENS = 24
     const val MAX_BYTES = 4 * 1024 * 1024
     private val modals = _s["shall", "must", "may", "might", "should", "can", "cannot", "could", "will", "would", "ought"]
@@ -29,6 +30,9 @@ object EnglishLegalPatterns {
         val observations = EnglishInspection.inspect(source, parsed, begin, end)
         val rawSentences = observations["sentences"] as List<*>
         var modalCount = 0; var durationCount = 0; var bindingCount = 0
+        var quotedAnchors = rawSentences.sumOf { raw ->
+            (((raw as Map<*, *>)["quotation"] as Map<*, *>)["anchors"] as List<*>).size
+        }
         val sentences = mutableListOf<Map<String, Any?>>()
         for ((ordinal, sentence) in parsed.sentences.view.withIndex()) {
             val observed = rawSentences[ordinal] as Map<*, *>
@@ -97,6 +101,9 @@ object EnglishLegalPatterns {
                 val marker = (if (numberStart > 0) tokens[numberStart - 1] else null)?.takeIf { it.lemma.lowercase() in temporal }
                 val first = marker?.let { begin + it.begin } ?: numericBegin
                 val last = begin + unit.end
+                val intersectingAnchors = source.anchors.count { it.begin < last && it.end > first }
+                require(quotedAnchors <= MAX_QUOTED_ANCHORS - intersectingAnchors) { "Legal pattern quotation anchor limit" }
+                quotedAnchors += intersectingAnchors
                 val issues = unresolved.toMutableList()
                 number.issue?.let(issues::add)
                 val modifierLemmas = qualifierTokens.map { it.lemma.lowercase() }.toSet()
