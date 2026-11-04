@@ -134,7 +134,7 @@ class LlvmScalar private constructor(
                     val module = ctx.eval(Source.newBuilder("llvm", ByteSequence.create(bytes), "${cid.hex}.bc").build())
                     val function = requireNotNull(module.getMember(profile.export)) { "LLVM export missing: ${profile.export}" }
                     require(function.canExecute()) { "LLVM export is not executable" }
-                    val metadata = _m<String, Any?>["backend" j "graalvm-llvm", "moduleCid" j cid.value,
+                    val metadata: Map<String, Any?> = _m["backend" j "graalvm-llvm", "moduleCid" j cid.value,
                         "export" j profile.export, "abi" j LlvmScalarProfile.ABI,
                         "engineVersion" j ctx.engine.version, "llvmVersion" j ctx.engine.languages.getValue("llvm").version,
                         "nativeAccess" j true, "verifyBitcode" j true, "internalProgress" j "unobserved",
