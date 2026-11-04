@@ -1,0 +1,115 @@
+{
+  "status": "PASS",
+  "scope": "Actual local FULL parser plus production codec and private file readback; external Java bridge uses JVM-public codec methods, not a full curator/UI pipeline",
+  "inputs": "Same fixed two synthetic inputs as the previous FULL smoke; no supplied book text",
+  "cases": [
+    {
+      "id": "positive-if",
+      "status": "PASS",
+      "sourceText": "Tenant must pay rent if payment is due.",
+      "sourceCid": "sha256:d6de3786b30bc27bce8d3ee31b12f13d325d5cf45f2131f7c4c7cf57255f9ce4",
+      "receiptCid": "sha256:f0bfd21d19442a80f6361bf236eec1251133d284a33d8522240fc4cb45318829",
+      "receiptBytes": 5547,
+      "producerOpenie": 5,
+      "retainedOpenie": 5,
+      "producerKbp": 0,
+      "retainedKbp": 0,
+      "producerMentions": 0,
+      "retainedMentions": 0,
+      "promptOpenie": 5,
+      "promptKbp": 0,
+      "fieldCoverage": {
+        "nlp": true,
+        "relations": true,
+        "kbp": true,
+        "mentions": true
+      },
+      "allObservationFieldsExact": true,
+      "allSourceTokenSpansExact": true,
+      "deterministicBytes": true,
+      "generativeModelInvoked": false,
+      "metadata": {
+        "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+        "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+        "runtime": {
+          "module": "corenlp",
+          "profile": "full-v1",
+          "dependencyGraph": "enhanced-plus-plus",
+          "dependencyNodeIdentity": "token-index+copy-count/1",
+          "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+          "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+          "jar": "stanford-corenlp-4.6.0.jar",
+          "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+          "packageVersion": "4.6.0",
+          "parserNormalization": "identity/1",
+          "sourceTextCid": "sha256:d6de3786b30bc27bce8d3ee31b12f13d325d5cf45f2131f7c4c7cf57255f9ce4",
+          "parserInputCid": "sha256:d6de3786b30bc27bce8d3ee31b12f13d325d5cf45f2131f7c4c7cf57255f9ce4",
+          "relationGlossSource": "parser-input"
+        },
+        "configuration": {
+          "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp",
+          "kbp.maxlen": "100",
+          "threads": "1"
+        }
+      },
+      "elapsedMillis": 20162
+    },
+    {
+      "id": "named-negated-exception",
+      "status": "PASS",
+      "sourceText": "Alice must notify Acme Corporation unless notice is not due.",
+      "sourceCid": "sha256:ddf9e001cbc235e2f0773a66ac0609f02bb7ffaaf91458f68387c72156929fca",
+      "receiptCid": "sha256:020ce1028e52d01fd717be63e78055969e45af87d802f97f8a30736afe0227d0",
+      "receiptBytes": 5624,
+      "producerOpenie": 2,
+      "retainedOpenie": 2,
+      "producerKbp": 0,
+      "retainedKbp": 0,
+      "producerMentions": 0,
+      "retainedMentions": 0,
+      "promptOpenie": 2,
+      "promptKbp": 0,
+      "fieldCoverage": {
+        "nlp": true,
+        "relations": true,
+        "kbp": true,
+        "mentions": true
+      },
+      "allObservationFieldsExact": true,
+      "allSourceTokenSpansExact": true,
+      "deterministicBytes": true,
+      "generativeModelInvoked": false,
+      "metadata": {
+        "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+        "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+        "runtime": {
+          "module": "corenlp",
+          "profile": "full-v1",
+          "dependencyGraph": "enhanced-plus-plus",
+          "dependencyNodeIdentity": "token-index+copy-count/1",
+          "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+          "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+          "jar": "stanford-corenlp-4.6.0.jar",
+          "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+          "packageVersion": "4.6.0",
+          "parserNormalization": "identity/1",
+          "sourceTextCid": "sha256:ddf9e001cbc235e2f0773a66ac0609f02bb7ffaaf91458f68387c72156929fca",
+          "parserInputCid": "sha256:ddf9e001cbc235e2f0773a66ac0609f02bb7ffaaf91458f68387c72156929fca",
+          "relationGlossSource": "parser-input"
+        },
+        "configuration": {
+          "annotators": "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp",
+          "kbp.maxlen": "100",
+          "threads": "1"
+        }
+      },
+      "elapsedMillis": 168
+    }
+  ],
+  "nonemptyOpenieProduced": 7,
+  "nonemptyKbpOrMentionCoverageClaimed": false,
+  "generativeModelsInvoked": 0,
+  "networkOperationsIssuedByProbe": 0,
+  "reasoningAdmission": false,
+  "totalMillis": 20360
+}

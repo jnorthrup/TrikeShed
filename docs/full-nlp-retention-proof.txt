@@ -1,0 +1,45 @@
+FULL parser observations survive retained curation records
+
+Two fixed synthetic sentences were parsed by the actual local CoreNLP 4.6.0
+FULL profile in fresh JVMs. Each run produced seven OpenIE observations: five
+from the positive-condition sentence and two from the negated-exception sentence.
+All seven survived the production codec, file readback, bounded decode and prompt
+projection with exact range endpoints, glosses, confidence bits and parser metadata.
+Source text and token spans stayed exact. Re-encoding the decoded records yielded
+identical CBOR bytes. Both JVMs exited zero and closed their owned parser readers.
+
+The v54 run used source 46da66cdb28e650e71490ae48741e6f5dcfa0563 and main JAR
+c753a967ff83be0652c219b010d7100fcc50d34bcae0132ab7a8a11ff4421361.
+The final v55 run used source aaba7d5504d516e4ff6a68c19db11630e16c22ef and JAR
+c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1.
+The v56 correction changed Documents JavaScript open-state handling; its JVM JAR
+is byte-identical to v55. The FULL retention evidence therefore covers that same
+JVM runtime, while retaining the actual v55 source identity. Browser/UI evidence
+is separate. Durations are observations, not a benchmark or production deadline.
+
+Each run used the production CoreNlpRuntime and DocumentCuratorCodec from its
+frozen main JAR plus immutable dependencies. An external Java adapter called
+the codec's JVM-public methods normally; no private reflection, Kotlin friend
+access or production class overlays were used. These are actual producer/codec
+checks with private file readback, not a full document-curator or UI pipeline.
+No generative model, review approval or reasoning admission was invoked.
+
+KBP emitted zero tuples and the current producer emitted zero coreference
+mentions. Their empty results were retained, but this does not establish live
+nonempty KBP/coreference coverage. Nonempty typed fixtures separately verify
+codec retention of those fields, empty ranges and mention chains. Recorded
+OpenIE output can be linguistically or legally wrong; retention proves no legal
+interpretation, authority, OCR accuracy or comprehension.
+
+The process and descendants inherited a fixture-only seccomp profile denying
+connect/sendto/sendmsg/sendmmsg, self-probed before exec. It is not a full OS
+sandbox, filesystem boundary or production-daemon air-gap claim. Exact source,
+JAR, external probe and wrapper hashes accompany the evidence. Raw logs remain
+outside Git; published source sentences and receipts are entirely synthetic.
+
+Evidence: docs/evidence/2026-11-04/full-nlp-retention, with distinct v54/v55
+directories, results, raw CBOR receipts, prompt rows, network-profile receipts,
+hashes and cross-run receipt comparison. The actual old-codec regression used
+typed fixtures; the earlier live FULL smoke established producer outputs but
+did not itself run the old retention codec. See english-observation-retention.txt
+for historical missing-field coverage and the bounds of the codec checks.
