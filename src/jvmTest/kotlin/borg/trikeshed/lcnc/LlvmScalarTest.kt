@@ -112,10 +112,10 @@ class LlvmScalarTest {
             val runner = LlvmScalar.open(kernel, KernelId("scalar"), profile(), files(bytes())).runner()
             val node = LcncNode("sum", LlvmScalarContract.TYPE, _m["left" j "19", "right" j "23"])
             for (value in s_.get<Any?>(null, 1.5, Double.NaN, 2147483648L, "1e2", true).view)
-                assertFails { runner.run(node, _m["left" j value]) }
-            assertFails { runner.run(node.copy(params = node.params + _m["module" j "/arbitrary.bc"]), emptyMap()) }
-            assertFails { runner.run(node, _m["export" j "arbitrary"]) }
-            assertEquals(42, runner.run(node, emptyMap())["value"])
+                assertFails { runner.execute(node, _m["left" j value]) }
+            assertFails { runner.execute(node.copy(params = node.params + _m["module" j "/arbitrary.bc"]), emptyMap()) }
+            assertFails { runner.execute(node, _m["export" j "arbitrary"]) }
+            assertEquals(42, runner.execute(node, emptyMap())["value"])
         } finally { kernel.drain() }
     }
 
