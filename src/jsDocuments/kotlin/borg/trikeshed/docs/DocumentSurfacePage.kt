@@ -459,7 +459,7 @@ object DocumentSurfacePage {
         if (view == SurfaceView.PAGE && english != null) {
             val ticket = generation
             val host = document.createElement("div") as HTMLElement
-            document.getElementById(DocumentSurface.CONTENT_ID)?.appendChild(host)
+            document.getElementById(DocumentSurface.CONTENT_ID)?.let { content -> content.insertBefore(host, content.firstChild) }
             DocumentsEnglish.mount(host, english, ticket) {
                 generation == ticket && !curationMode && view == SurfaceView.PAGE && project == english.project &&
                     doc?.sourceRevision == english.sourceRevision && doc?.displayTextRevision == english.displayTextRevision
