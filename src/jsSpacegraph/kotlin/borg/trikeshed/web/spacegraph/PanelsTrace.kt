@@ -29,11 +29,13 @@ class PanelsTrace(private val panels: Panels) {
     private var dropped = 0
     private var speed = 1.0
     private var mode = "Waiting for execution observations"
+    private var owner = Any()
     private val motion = window.matchMedia("(prefers-reduced-motion: reduce)")
 
     init { panels.page.own { clear() } }
 
     fun clear() {
+        owner = Any()
         panels.page.cancelFrame(frame); frame = 0
         while (releases.isNotEmpty()) releases.removeAt(releases.lastIndex).invoke()
         for (spark in visible) { spark.dot?.remove(); spark.label?.remove() }
@@ -44,8 +46,16 @@ class PanelsTrace(private val panels: Panels) {
         displayed = 0; omitted = 0; unmatched = 0; dropped = 0
     }
 
-    fun start(program: LcncProgram) {
-        clear(); definition = program; canvas = panels.graph; revision = panels.documentRevision
+    /** Reserve at the gesture, before any read; an older response cannot reclaim this activity. */
+    fun reserve(): Any { clear(); return owner }
+
+    fun owns(ticket: Any): Boolean = !panels.page.closing && ticket === owner
+
+    fun start(program: LcncProgram): Any = reserve().also { start(it, program) }
+
+    fun start(ticket: Any, program: LcncProgram) {
+        if (!owns(ticket)) return
+        definition = program; canvas = panels.graph; revision = panels.documentRevision
         banner = document.createElement("section").asDynamic()
         banner.setAttribute("aria-label", "Observed wire activity")
         banner.style.cssText = "position:fixed;right:16px;bottom:36px;z-index:55;max-width:380px;background:var(--panel,#101620);color:var(--ink,#dce6f3);border:1px solid #57d3ff;border-radius:9px;padding:12px;font:12px/1.5 var(--mono,monospace);box-shadow:0 8px 26px #0006"
@@ -82,15 +92,17 @@ class PanelsTrace(private val panels: Panels) {
         return true
     }
 
-    fun unavailable(reason: String) {
+    fun unavailable(ticket: Any, reason: String) {
+        if (!owns(ticket)) return
         panels.page.cancelFrame(frame); frame = 0
         omitted += pending.sumOf { it.count }; pending.clear()
         for (spark in visible) { spark.dot?.remove(); spark.label?.remove() }
         visible.clear()
-        recorded(reason)
+        recorded(ticket, reason)
     }
 
-    fun recorded(reason: String) {
+    fun recorded(ticket: Any, reason: String) {
+        if (!owns(ticket)) return
         mode = reason
         for (n in panels.nodes()) n.el?.removeAttribute("data-observed-phase")
         report()
@@ -104,11 +116,12 @@ class PanelsTrace(private val panels: Panels) {
             if (motion.matches) " Reduced motion: static markers." else ""
     }
 
-    fun observe(runId: String, programCid: String, snapshot: dynamic, replay: Boolean = false) {
+    fun observe(ticket: Any, runId: String, programCid: String, snapshot: dynamic, replay: Boolean = false) {
+        if (!owns(ticket)) return
         if (!current()) { clear(); return }
-        if (snapshot.observationSchema != "lcnc-observations/1") { unavailable("Wire observations unavailable for this receipt version"); return }
-        if (!Regex("sha256:[0-9a-f]{64}").matches(programCid) || runId.isBlank()) { unavailable("Execution identity unavailable"); return }
-        if (run.isNotEmpty() && (run != runId || cid != programCid)) { unavailable("Execution identity changed; activity stopped"); return }
+        if (snapshot.observationSchema != "lcnc-observations/1") { unavailable(ticket, "Wire observations unavailable for this receipt version"); return }
+        if (!Regex("sha256:[0-9a-f]{64}").matches(programCid) || runId.isBlank()) { unavailable(ticket, "Execution identity unavailable"); return }
+        if (run.isNotEmpty() && (run != runId || cid != programCid)) { unavailable(ticket, "Execution identity changed; activity stopped"); return }
         run = runId; cid = programCid
         mode = if (replay) "Recorded playback · no execution" else "Observed execution · delayed display"
         dropped = maxOf(dropped, num(snapshot.observationsDropped ?: 0).toInt())
