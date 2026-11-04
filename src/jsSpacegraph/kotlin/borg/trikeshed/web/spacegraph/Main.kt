@@ -48,6 +48,15 @@ private fun boot() {
 /** boot: restore, or seed the starter panel. Boot waits for contract hydration. */
 private suspend fun start(p: Panels, revision: Int = p.documentRevision) {
     val search = URLSearchParams(window.location.search)
+    if (EnglishQueryNavigation.requested(window.location.search)) {
+        p.autosave = false
+        p.graph.controls = objOf { it.humanOversight = true; it.inspectionOnly = true }
+        byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true; byId("debugBtn")?.disabled = true
+        byId("palette").classList.remove("open")
+        p.applyView(); p.page.frame { p.redraw() }
+        p.loadEnglishQuery(window.location.search, revision)
+        return
+    }
     val sourceContext = sourceContextValues()
     if (borg.trikeshed.docs.SourceSelection.requested(sourceContext)) {
         p.autosave = false

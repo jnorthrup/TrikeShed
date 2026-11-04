@@ -3,6 +3,7 @@ package borg.trikeshed.docs
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
+import borg.trikeshed.web.EnglishQueryNavigation
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.*
@@ -303,6 +304,26 @@ internal object DocumentsEnglish {
                 if (present() && !pending) { assign(input.value.toIntOrNull() ?: -1); invalidateInspection() }
             })
         }
+        private fun visualQuery(parent: HTMLElement, inspection: Map<*, *>) {
+            val range = inspection["range"] as? Map<*, *> ?: return
+            val requestedBegin = number(range["begin"]); val requestedEnd = number(range["end"])
+            val receipt = inspection["receiptCid"] as? String ?: return
+            val ticket = inspectionEpoch
+            fun selected() = present() && parent.asDynamic().isConnected == true && !pending && result === inspection && ticket == inspectionEpoch &&
+                retainedCid == receipt && begin == requestedBegin && end == requestedEnd && validRange()
+            if (!selected()) return
+            val href = runCatching {
+                validate(inspection, requestedBegin, requestedEnd)
+                EnglishQueryNavigation.href(inspection)
+            }.getOrNull() ?: return
+            val link = text(parent, "a", "Open visual query (does not run)", "ds-curate-submit")
+            link.setAttribute("href", href); link.setAttribute("target", "_blank"); link.setAttribute("rel", "noopener noreferrer")
+            link.setAttribute("data-english-open-query", "1")
+            link.style.cssText = "display:inline-block;margin:10px 12px 10px 0;padding:8px 12px;text-decoration:none"
+            for (event in s_["click", "auxclick", "contextmenu"].view) link.addEventListener(event, { e ->
+                if (!selected() || runCatching { validate(inspection, requestedBegin, requestedEnd) }.isFailure) e.preventDefault()
+            })
+        }
         fun render() {
             if (!present()) return
             host.textContent = ""
@@ -355,6 +376,7 @@ internal object DocumentsEnglish {
             val coverage = value["coverage"] as? Map<*, *>
             if (coverage?.get("parserNodeIdentityReported") != true || coverage?.get("parserDependencyNodeIdentity") != "token-index+copy-count/1")
                 text(resultSection, "p", "Full parser node identity was not reported. Token indices and displayed syntax do not establish that enhanced copy identities were captured.", "ds-curate-label")
+            visualQuery(resultSection, value)
             val use = text(resultSection, "button", "Use this inspection in corpus", "ds-curate-submit")
             use.setAttribute("type", "button"); use.setAttribute("data-corpus-use-inspection", "1"); use.asDynamic().disabled = pending
             use.style.cssText = "margin:10px 0;padding:8px 12px"
