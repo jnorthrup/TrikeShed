@@ -13,8 +13,22 @@ data class NlpToken(
     val ner: String,
 )
 
-/** Sentence-local, one-based indices; governor zero denotes the parser's explicit root. */
-data class NlpDependency(val governor: Int, val dependent: Int, val relation: String)
+/**
+ * Sentence-local parser node identity is (token index, copy count), not token index alone.
+ * Enhanced dependency copies refer to an original source token; they are not new text tokens.
+ * Governor (0, 0) denotes the explicit root. Old three-field records use copy count zero;
+ * that compatibility default cannot recover identities a historical reader already collapsed.
+ */
+data class NlpDependency(val governor: Int, val dependent: Int, val relation: String,
+    val governorCopy: Int = 0, val dependentCopy: Int = 0) {
+    /** Preserve the existing three-argument JVM constructor as well as Kotlin source calls. */
+    constructor(governor: Int, dependent: Int, relation: String) : this(governor, dependent, relation, 0, 0)
+
+    init {
+        require(governorCopy >= 0 && dependentCopy >= 0) { "Dependency copy counts must be nonnegative" }
+        require(governor != 0 || governorCopy == 0) { "The virtual dependency root cannot be copied" }
+    }
+}
 
 /**
  * An open relation triple (subject; relation; object) as token-index spans of its sentence, with the
