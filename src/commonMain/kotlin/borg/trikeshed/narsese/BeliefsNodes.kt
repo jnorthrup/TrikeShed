@@ -23,6 +23,21 @@ import kotlin.math.abs
  */
 object BeliefsNodes {
 
+    /** Public resonance boundaries validate before the underlying top-k arrays are allocated. */
+    fun resonanceCount(value: Any?, fallback: Int = 8): Int {
+        val count = when (value) {
+            null -> fallback
+            is String -> value.takeIf { it.length <= 32 }?.toIntOrNull()
+            is Number -> value.toDouble().let {
+                require(it.isFinite() && it % 1.0 == 0.0 && it in 1.0..64.0) { "k must be a whole integer from 1 to 64" }
+                it.toInt()
+            }
+            else -> null
+        }
+        require(count != null && count in 1..64) { "k must be a whole integer from 1 to 64" }
+        return count
+    }
+
     /** BeliefWire's hard-coded pen cohort — the legion-alarm default. */
     private val PEN_COHORT = listOf("mux_converse", "bag_recall", "bag_assert", "crumb_walk", "skill_scribe")
         .map { "pen/$it" }
@@ -91,13 +106,14 @@ object BeliefsNodes {
                 "antonymPeaks" to emptyList<Any?>(),
                 "error" to "goal required",
             )
-        val k = node.params["k"]?.toIntOrNull() ?: 8
+        val k = resonanceCount(node.params["k"])
         val mode = node.params["mode"] ?: "whitened"
         val centroid = AngularCodec.encode(
             relation = RelationKind.CAUSALITY,
             taxonomyKey = node.params["taxonomy"],
             subjectTerm = goal,
         )
+        val identity = bag.sourceContexts()
         val (syn, ant) = if (mode == "whitened") {
             val r = bag.resonateWhitened(centroid, k)
             fun wrow(pk: MomentField.Peak) = mapOf(
@@ -108,7 +124,7 @@ object BeliefsNodes {
                 "pri" to pk.pri,
                 "frequency" to pk.freq,
                 "level" to bag.levelOf(pk.angular),
-            )
+            ) + identity(bag.signalOf(pk.angular))
             r.synonyms.map(::wrow) to r.antonyms.map(::wrow)
         } else {
             val r = bag.resonate(centroid, k)
@@ -120,7 +136,7 @@ object BeliefsNodes {
                 "pri" to s.pri,
                 "level" to bag.levelOf(s.angular),
                 "relation" to s.signal.relation.name,
-            )
+            ) + identity(s.signal)
             r.synonyms.map(::row) to r.antonyms.map(::row)
         }
         mapOf(
@@ -183,25 +199,17 @@ object BeliefsNodes {
 
     /**
      * `nal.attend` — [BeliefIntake.Attend] as a lego: rekey an angular to a
-     * new budget, evidence untouched. Unsupplied p/d/q components keep the
-     * resident budget's value (0.5 when the angular is not resident — the
-     * bag's Attend on a non-resident angular is a no-op anyway).
+     * new budget, evidence untouched. The writer resolves missing components
+     * and acknowledges processing. A supplied propositionCid requires that
+     * exact current resident; angular-only legacy calls retain their absent no-op.
      */
     fun attendRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
-        val angular = parseAngular(port(inputs, "angular") ?: node.params["angular"])
-            ?: return@boundLcnc mapOf("attended" to mapOf("error" to "angular required"))
-        val base = bag.budgetOf(angular)
-        val p = node.params["p"]?.toFloatOrNull() ?: base?.pf ?: 0.5f
-        val d = node.params["d"]?.toFloatOrNull() ?: base?.df ?: 0.5f
-        val q = node.params["q"]?.toFloatOrNull() ?: base?.qf ?: 0.5f
-        bag.intake.send(BeliefIntake.Attend(angular, BudgetCoord(p, d, q)))
-        mapOf(
-            "attended" to mapOf(
-                "angular" to angular.toString(),
-                "p" to p, "d" to d, "q" to q,
-                "resident" to (base != null),
-            ),
-        )
+        val request = mutableMapOf<String, Any?>()
+        for (name in s_["angular", "propositionCid", "p", "d", "q"].view)
+            (port(inputs, name) ?: node.params[name]?.takeIf { it.isNotBlank() })?.let { request[name] = it }
+        if ("angular" !in request) return@boundLcnc _m["attended" j _m["error" j "angular required"]]
+        val attended = bag.submit(BeliefAttentionRequest.parse(request, requireProposition = false))
+        _m["attended" j attended.report()]
     }
 
     /**

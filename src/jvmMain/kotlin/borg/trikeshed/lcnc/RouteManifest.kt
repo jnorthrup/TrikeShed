@@ -235,6 +235,7 @@ object RouteManifest {
             RouteEntry("POST", "/api/beliefs/teach", "curator hindsight pass (W5.3)"),
             RouteEntry("POST", "/api/beliefs/query", "bank solver query (W5.3)"),
             RouteEntry("POST", "/api/beliefs/resonate", "solver proposal support and refutation"),
+            RouteEntry("POST", "/api/beliefs/attend", "processed attention for an exact resident proposition; evidence unchanged"),
             RouteEntry("GET", "/api/beliefs/introspect", "NAL-9 introspection"),
             RouteEntry("POST", "/api/beliefs/kg", "Turtle/RDF/KIF to NAL beliefs"),
         ),
