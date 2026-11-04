@@ -163,6 +163,14 @@ class PropositionAttentionTest {
                 for (invalid in s_["NaN", "Infinity", "garbage"].view) assertFailsWith<IllegalArgumentException> {
                     runner.run(node.copy(params = _m["p" j invalid]), _m["angular" j signal.angular.toString(), "propositionCid" j pid])
                 }
+                val resonanceRunner = BeliefsNodes.resonateRunner(bag)
+                val valid = LcncNode("resonance", "beliefs.resonate", _m["goal" j "Tenant", "mode" j "hamming"])
+                for (invalid in s_["0", "-1", "2147483647", "1.5"].view) {
+                    assertFailsWith<IllegalArgumentException> {
+                        resonanceRunner.run(valid.copy(params = valid.params + _m["k" j invalid]), emptyMap())
+                    }
+                    assertTrue((resonanceRunner.run(valid, emptyMap())["synonyms"] as List<*>).isNotEmpty())
+                }
                 for (mode in s_["hamming", "whitened"].view) {
                     val output = BeliefsNodes.resonateRunner(bag).run(LcncNode("resonance", "beliefs.resonate", _m["goal" j "Tenant", "mode" j mode]), emptyMap())
                     val rows = (output["synonyms"] as List<*>) + (output["antonyms"] as List<*>)
@@ -196,6 +204,14 @@ class PropositionAttentionTest {
                     assertEquals(409, request(jsonOf(body + _m["propositionCid" j ContentId.of("wrong".encodeToByteArray()).value])).status)
                     assertEquals(400, request("{\"angular\":\"1\",\"angular\":\"2\",\"propositionCid\":\"$pid\"}").status)
                     assertEquals(400, request(" ".repeat(4097)).status)
+                    for (invalid in s_[0, -1, Int.MAX_VALUE, 1.5].view) {
+                        val refused = assertNotNull(wire.route("POST", "/api/beliefs/resonate",
+                            jsonOf(_m["goal" j "Tenant", "k" j invalid]), null))
+                        assertEquals(400, refused.status)
+                        assertEquals("invalid_resonance_limit", reifyMap(refused.body)["error"])
+                        assertEquals(200, assertNotNull(wire.route("POST", "/api/beliefs/resonate",
+                            jsonOf(_m["goal" j "Tenant"]), null)).status)
+                    }
                     for (mode in s_["hamming", "whitened"].view) {
                         val resonance = assertNotNull(wire.route("POST", "/api/beliefs/resonate", jsonOf(_m["goal" j "Tenant", "mode" j mode]), null))
                         val result = reifyMap(resonance.body)

@@ -12,6 +12,7 @@ import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
 import borg.trikeshed.narsese.BeliefAdmissionRefused
 import borg.trikeshed.narsese.BeliefAttentionRequest
+import borg.trikeshed.narsese.BeliefsNodes
 import borg.trikeshed.narsese.KgRetentionIssue
 import borg.trikeshed.narsese.KgRetentionRefused
 import borg.trikeshed.narsese.ingestKg
@@ -218,7 +219,8 @@ class BeliefWire(
             method == "POST" && p == "/api/beliefs/resonate" -> {
                 val req = parse(text)
                 val goal = req["goal"]?.toString() ?: return json(mapOf("error" to "goal required"), 400)
-                val k = (req["k"] as? Number)?.toInt() ?: 8
+                val k = try { BeliefsNodes.resonanceCount(req["k"]) }
+                catch (_: IllegalArgumentException) { return json(_m["error" j "invalid_resonance_limit"], 400) }
                 val centroid = borg.trikeshed.narsese.AngularCodec.encode(
                     relation = borg.trikeshed.narsese.RelationKind.CAUSALITY,
                     taxonomyKey = req["taxonomy"]?.toString(),

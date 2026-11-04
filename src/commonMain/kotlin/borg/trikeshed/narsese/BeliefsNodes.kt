@@ -23,6 +23,21 @@ import kotlin.math.abs
  */
 object BeliefsNodes {
 
+    /** Public resonance boundaries validate before the underlying top-k arrays are allocated. */
+    fun resonanceCount(value: Any?, fallback: Int = 8): Int {
+        val count = when (value) {
+            null -> fallback
+            is String -> value.takeIf { it.length <= 32 }?.toIntOrNull()
+            is Number -> value.toDouble().let {
+                require(it.isFinite() && it % 1.0 == 0.0 && it in 1.0..64.0) { "k must be a whole integer from 1 to 64" }
+                it.toInt()
+            }
+            else -> null
+        }
+        require(count != null && count in 1..64) { "k must be a whole integer from 1 to 64" }
+        return count
+    }
+
     /** BeliefWire's hard-coded pen cohort — the legion-alarm default. */
     private val PEN_COHORT = listOf("mux_converse", "bag_recall", "bag_assert", "crumb_walk", "skill_scribe")
         .map { "pen/$it" }
@@ -91,7 +106,7 @@ object BeliefsNodes {
                 "antonymPeaks" to emptyList<Any?>(),
                 "error" to "goal required",
             )
-        val k = node.params["k"]?.toIntOrNull() ?: 8
+        val k = resonanceCount(node.params["k"])
         val mode = node.params["mode"] ?: "whitened"
         val centroid = AngularCodec.encode(
             relation = RelationKind.CAUSALITY,
