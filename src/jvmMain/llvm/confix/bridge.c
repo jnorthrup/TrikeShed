@@ -1,7 +1,14 @@
 /* Bounded ownership ABI for the pinned mlir-nix Confix scanner. */
-#include <stdint.h>
-#include <stddef.h>
-#include <stdlib.h>
+/* Compiler builtin integer types keep this ABI independent of host SDK headers. */
+typedef __INT32_TYPE__ int32_t;
+typedef __UINT32_TYPE__ uint32_t;
+typedef __UINT64_TYPE__ uint64_t;
+typedef __UINT8_TYPE__ uint8_t;
+typedef __SIZE_TYPE__ size_t;
+extern void *calloc(size_t, size_t);
+extern void free(void *);
+#define NULL ((void *)0)
+#define offsetof(type, field) __builtin_offsetof(type, field)
 
 typedef struct { int32_t size; uint8_t *data; int32_t pos, limit, mark; } Chars;
 typedef struct {
