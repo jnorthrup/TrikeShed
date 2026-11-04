@@ -103,3 +103,13 @@ Only tests/drivers were compiled; production CodeSource/JAR hashes were checked,
 without overlays or friends. Evidence is labeled v62-intermediate under the RDF
 fidelity evidence directory. External-master and CAS-retention integration still
 require a later combined-artifact run. No final-master verification is claimed.
+
+The combined immutable v66 artifact also passed these 32 methods and the original
+RDF/CR comparisons against source 61411d3617d5d6d4083ba2df42bd6c1500cb6d36,
+JAR SHA256 e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397.
+Only two real-consumer fixtures gain the required bounded test CAS; assertions
+and input cases remain unchanged, and the helper body is retained by source hash.
+Tests/drivers only were compiled, with production CodeSource/JAR checks and no
+overlays/friends. v62 remains an intermediate historical result; this combined
+result is separately named v66-combined in the evidence directory. Source/role
+reasoning, authentication and coexistence limits above still apply.
