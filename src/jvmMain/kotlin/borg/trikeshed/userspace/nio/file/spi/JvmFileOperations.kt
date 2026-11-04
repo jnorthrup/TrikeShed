@@ -1,7 +1,15 @@
 package borg.trikeshed.userspace.nio.file.spi
 
 import kotlinx.coroutines.Dispatchers
+<<<<<<< HEAD
 import borg.trikeshed.userspace.execute
+||||||| 8f5e4ee8f
+=======
+import borg.trikeshed.userspace.execute
+import borg.trikeshed.userspace.JvmFileSyscalls
+import borg.trikeshed.userspace.JvmFileTable
+import borg.trikeshed.userspace.JvmNativeDescriptor
+>>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 import kotlin.coroutines.CoroutineContext
 
 import borg.trikeshed.lib.Join
@@ -31,7 +39,25 @@ import java.util.zip.ZipFile
  * JVM userspace.nio adapter — pure [java.nio.file] / NIO channels.
  * No java.io.File. Platform filesystem is only this adapter layer.
  */
+<<<<<<< HEAD
 class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader {
+||||||| 8f5e4ee8f
+class JvmFileOperations : FileOperations, BoundedFileReader {
+=======
+class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader, DescriptorDuplication {
+
+    override fun duplicateDescriptor(id: Int): Int {
+        val original = JvmFileTable.descriptor(id) as? JvmNativeDescriptor
+            ?: throw UnsupportedOperationException("Native descriptor duplication is unavailable")
+        check(original.retain()) { "File descriptor is closed" }
+        try {
+            val fd = JvmFileSyscalls.duplicate(original.fd)
+            check(fd >= 0) { "File descriptor duplication failed: $fd" }
+            return try { JvmFileTable.register(JvmNativeDescriptor(fd)) }
+            catch (failure: Throwable) { JvmFileSyscalls.close(fd); throw failure }
+        } finally { original.release() }
+    }
+>>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 
     override val durability: StorageDurability get() = StorageDurability.DURABLE
 

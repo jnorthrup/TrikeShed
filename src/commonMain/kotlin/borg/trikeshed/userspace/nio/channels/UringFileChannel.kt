@@ -9,6 +9,10 @@ import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.UringIOException
+import borg.trikeshed.userspace.nio.file.spi.DescriptorDuplication
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.channels.Channel
 
 internal class UringFileChannel(
     private val file: File,
@@ -16,6 +20,7 @@ internal class UringFileChannel(
     private val readable: Boolean = true,
     private val writable: Boolean = true,
 ) : FileChannel() {
+    private val descriptorGate = SynchronizedObject()
     private var pos: Long = 0
     private var nextToken: Long = 1
     private var open: Boolean = true
@@ -45,8 +50,8 @@ internal class UringFileChannel(
         return count
     }
 
-    override fun close() {
-        if (!open) return
+    override fun close(): Unit = synchronized(descriptorGate) {
+        if (!open) return@synchronized
         var failure: Throwable? = null
         try { execute(UringOp.CLOSE) } catch (caught: Throwable) {
             failure = caught
@@ -58,9 +63,19 @@ internal class UringFileChannel(
             }
         }
         failure?.let { throw it }
+        Unit
     }
 
     override fun isOpen(): Boolean = open && file.isOpen()
+
+    internal override fun pin(operations: DescriptorDuplication): PinnedFile {
+        val owned = synchronized(descriptorGate) {
+            checkOpen()
+            if (!readable) throw NonReadableChannelException()
+            File.fromFd(operations.duplicateDescriptor(file.id))
+        }
+        return PinnedFile(owned, channel.trace)
+    }
 
     override fun read(dst: ByteBuffer): Int = read(dst, pos).also { if (it > 0) pos += it }
 
@@ -222,6 +237,7 @@ internal class UringFileChannel(
         throw UnsupportedOperationException("File locking is not implemented")
     override fun tryLock(): FileLock? = tryLock(0, Long.MAX_VALUE, false)
 }
+<<<<<<< HEAD
 
 internal data class FileStamp(
     val major: UInt, val minor: UInt, val inode: ULong, val size: ULong,
@@ -235,3 +251,34 @@ internal fun fileIdentity(stat: Statx): FileStamp {
     return FileStamp(stat.stx_dev_major, stat.stx_dev_minor, stat.stx_ino, stat.stx_size,
         stat.buffer.getLong(0x70), stat.buffer.getInt(0x78), stat.buffer.getLong(0x60), stat.buffer.getInt(0x68))
 }
+||||||| 8f5e4ee8f
+=======
+
+/** Ownership transfers to the opened channel; failure closes the duplicate. */
+internal class PinnedFile(file: File, private val trace: borg.trikeshed.userspace.UringTrace?) : AutoCloseable {
+    private val ownership = Channel<File>(1).apply { trySend(file).getOrThrow(); close() }
+    fun open(): FileChannel {
+        val file = ownership.tryReceive().getOrNull() ?: error("Pinned file already consumed")
+        try {
+            return UringFileChannel(file, UringChannels.open(trace = trace), readable = true, writable = false)
+        } catch (failure: Throwable) {
+            try { file.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
+        }
+    }
+    override fun close() { ownership.tryReceive().getOrNull()?.close() }
+}
+
+internal data class FileStamp(
+    val major: UInt, val minor: UInt, val inode: ULong, val size: ULong,
+    val modified: Long, val modifiedNanos: Int, val changed: Long, val changedNanos: Int,
+)
+
+/** Require identity and timestamps; the comparison does not freeze an external writer. */
+internal fun fileIdentity(stat: Statx): FileStamp {
+    check(stat.buffer.getInt(0) and 0x3c3 == 0x3c3 && stat.stx_ino != 0uL) { "File identity unavailable" }
+    check(stat.stx_mode and 0xf000 == 0x8000) { "Source is not a regular file" }
+    return FileStamp(stat.stx_dev_major, stat.stx_dev_minor, stat.stx_ino, stat.stx_size,
+        stat.buffer.getLong(0x70), stat.buffer.getInt(0x78), stat.buffer.getLong(0x60), stat.buffer.getInt(0x68))
+}
+>>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c

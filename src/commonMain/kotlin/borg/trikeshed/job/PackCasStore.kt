@@ -10,12 +10,23 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 import borg.trikeshed.userspace.nio.file.spi.BoundedFileReader
 import borg.trikeshed.userspace.nio.file.spi.BoundedReadLimitException
+<<<<<<< HEAD
 import borg.trikeshed.userspace.nio.file.spi.ChunkedFileReader
 import borg.trikeshed.userspace.nio.file.spi.FileChangedException
 import borg.trikeshed.util.toLowerHex
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.yield
+||||||| 8f5e4ee8f
+=======
+import borg.trikeshed.userspace.nio.file.spi.ChunkedFileReader
+import borg.trikeshed.userspace.nio.file.spi.FileChangedException
+import borg.trikeshed.userspace.nio.file.spi.DescriptorDuplication
+import borg.trikeshed.util.toLowerHex
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.yield
+>>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 import kotlin.concurrent.atomics.AtomicBoolean
 
 /**
@@ -245,6 +256,7 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
         current
     }
 
+<<<<<<< HEAD
     /** Verify the bytes observed on the store-owned pack, without materializing the object. */
     override suspend fun verify(cid: ContentId, length: Long): Boolean {
         require(length >= 0) { "Invalid CAS length" }
@@ -355,6 +367,130 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
         }
     }
 
+||||||| 8f5e4ee8f
+=======
+    /** Verify observed bytes through a pinned pack reader without materializing the object. */
+    override suspend fun verify(cid: ContentId, length: Long): Boolean {
+        require(length >= 0) { "Invalid CAS length" }
+        val context = currentCoroutineContext()
+        suspend fun <T> access(block: () -> T): T {
+            while (!held.compareAndSet(false, true)) {
+                context.ensureActive()
+                yield()
+            }
+            try { context.ensureActive(); return block() } finally { held.store(false) }
+        }
+        val duplicator = files as? DescriptorDuplication
+            ?: throw UnsupportedOperationException("Owned pack readers are unavailable")
+        data class Pin(val offset: Long, val end: Long, val collision: Boolean,
+                       val descriptor: borg.trikeshed.userspace.nio.channels.PinnedFile)
+        val key = fold(cid.hex)
+        val pin = access {
+            check(channel.isOpen()) { "CAS store is closed" }
+            val bucket = collisions[key]
+            val at = bucket?.get(cid.hex)?.offset ?: if (bucket == null) index.get(key, -1L) else -1L
+            if (at < 0) return@access null
+            Pin(at, end, bucket != null, channel.pin(duplicator))
+        } ?: return false
+        // The gate covers only index lookup and descriptor pinning, not backend creation or I/O.
+        val reader = pin.descriptor.open()
+        var failure: Throwable? = null
+        try {
+            fun readAt(at: Long, size: Int): ByteArray {
+                val buffer = ByteBuffer.allocate(size)
+                var read = 0
+                while (read < size) {
+                    context.ensureActive()
+                    val count = reader.read(buffer, at + read)
+                    check(count > 0) { "Indexed pack record ended while reading" }
+                    read += count
+                }
+                return buffer.array()
+            }
+            fun headerMatches(bytes: ByteArray): Boolean {
+                val hex = cid.hex
+                for (i in 0 until 32) {
+                    val value = bytes[5 + i].toInt() and 255
+                    if (HEX[value ushr 4] != hex[2 * i] || HEX[value and 15] != hex[2 * i + 1]) return false
+                }
+                return true
+            }
+            val first = readAt(pin.offset, HEADER)
+            val firstBuffer = ByteBuffer.wrap(first)
+            check(firstBuffer.getLong(5) == key) { "Indexed pack header prefix changed" }
+            if (!headerMatches(first)) {
+                check(!pin.collision) { "Indexed pack digest changed" }
+                // A prefix-only index cannot distinguish an absent collision from a changed suffix.
+                return false
+            }
+            val kind = firstBuffer.get(0)
+            val size = firstBuffer.getInt(1)
+            check(kind == BLOB || kind == REF) { "Unknown pack record kind" }
+            check(size >= 0 && pin.offset >= 0 && pin.offset <= pin.end - HEADER &&
+                size.toLong() <= pin.end - pin.offset - HEADER) { "Invalid pack record length" }
+            val reference = if (kind == REF) {
+                check(size in 16..MAX_REF_RECORD) { "Invalid reference record length" }
+                readAt(pin.offset + HEADER, size)
+            } else null
+            val digest = Sha256()
+            if (reference == null) {
+                if (size.toLong() != length) return false
+                val buffer = ByteBuffer.allocate(64 * 1024)
+                var offset = 0
+                while (offset < size) {
+                    context.ensureActive()
+                    buffer.clear()
+                    buffer.limit(minOf(buffer.array().size, size - offset))
+                    val count = reader.read(buffer, pin.offset + HEADER + offset)
+                    check(count > 0) { "Indexed pack record ended while reading" }
+                    digest.update(buffer.array(), 0, count)
+                    offset += count
+                }
+            } else {
+                val stamp = ByteBuffer.wrap(reference)
+                val declared = stamp.getLong(0)
+                val mtime = stamp.getLong(8)
+                check(declared >= 0) { "Invalid reference length" }
+                if (declared != length) return false
+                val path = reference.decodeToString(16, reference.size)
+                if (!files.isFile(path) || files.lastModified(path) != mtime) return false
+                val source = files as? ChunkedFileReader
+                    ?: throw UnsupportedOperationException("Streaming source-backed verification is unavailable")
+                var hashed = 0L
+                val total = try { source.readChunks(path, declared) { bytes, count ->
+                    context.ensureActive()
+                    check(count in 1..bytes.size && hashed <= Long.MAX_VALUE - count) { "Invalid stream chunk" }
+                    if (count.toLong() > declared - hashed) throw FileChangedException()
+                    digest.update(bytes, 0, count)
+                    hashed += count
+                } } catch (_: FileChangedException) { return false }
+                context.ensureActive()
+                check(total == hashed) { "Stream length differs from consumed bytes" }
+                if (total != declared || !files.isFile(path) || files.lastModified(path) != mtime) return false
+            }
+            context.ensureActive()
+            check("sha256:" + digest.digest().toLowerHex() == cid.value) { "Stored bytes do not match their content ID" }
+            if (!readAt(pin.offset, HEADER).contentEquals(first)) error("Indexed pack header changed")
+            if (reference != null && !readAt(pin.offset + HEADER, size).contentEquals(reference)) return false
+            return access {
+                check(channel.isOpen()) { "CAS store is closed" }
+                val bucket = collisions[key]
+                val current = bucket?.get(cid.hex)?.offset ?: if (bucket == null) index.get(key, -1L) else -1L
+                current == pin.offset
+            }
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
+        } finally {
+            val primary = failure
+            if (primary == null) reader.close()
+            else try { reader.close() } catch (cleanup: Throwable) {
+                if (cleanup !== primary) primary.addSuppressed(cleanup)
+            }
+        }
+    }
+
+>>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
     /** Distribution drilldown of the index: per segment, first key, last key, rows. */
     fun segments(): List<LongArray> = locked { index.segmentStats() }
 

@@ -20,7 +20,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import borg.trikeshed.userspace.UringTrace
+<<<<<<< HEAD
 import borg.trikeshed.lib.*
+||||||| 8f5e4ee8f
+=======
+import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.nio.file.spi.DescriptorDuplication
+>>>>>>> 8ddca0dc56cefb051af7f1a112a62b7b5c4a665c
 
 /**
  * FileChannel wired behind UringFacade.
@@ -50,6 +56,10 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
     public abstract fun lock(): FileLock
     public abstract fun tryLock(position: Long, size: Long, shared: Boolean): FileLock?
     public abstract fun tryLock(): FileLock?
+
+    /** The source owner must serialize duplication with every close and CLOSE completion. */
+    internal open fun pin(operations: DescriptorDuplication): PinnedFile =
+        throw UnsupportedOperationException("Descriptor duplication is unavailable")
 
     companion object {
         /** Synchronous CQE settlement with the caller's trace; the caller explicitly closes this channel. */
