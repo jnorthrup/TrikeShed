@@ -13,6 +13,7 @@ import kotlinx.coroutines.*
 /** One verified receipt is one isolated read-only dataset; the daemon's store and live Rete are never inputs. */
 class EnglishObservationWire(private val ctx: ModuleContext, private val corpus: ProjectCorpus) {
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
+    private val statistics = EnglishCorpusWire(ctx, corpus)
     private val runner = LcncNodeRunner { node, inputs ->
         val request = _m["receiptCid" j (inputs["receiptCid"] ?: node.params["receiptCid"]),
             "mode" j (inputs["mode"] ?: node.params["mode"]),
@@ -29,10 +30,12 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
     fun attach() {
         ctx.routes.claim(OWNER, PATH, route = ::route)
         ctx.lcncRunners[TYPE] = runner
+        statistics.attach()
     }
 
     suspend fun drain() {
         ctx.routes.release(OWNER)
+        statistics.drain()
         if (ctx.lcncRunners[TYPE] === runner) ctx.lcncRunners.remove(TYPE)
         requests.drain()
     }
@@ -53,24 +56,14 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
         require(mode in _s["snapshot", "current"]) { "English query mode must be snapshot or current" }
         val program = request["program"] as? Map<*, *> ?: error("English query visual program required")
         val snapshot = EnglishObservationGraph.read(ctx.casStore, cid)
-        suspend fun checkCurrent() {
-            if (mode != "current") return
-            val rows = requireNotNull(snapshot.sourceSnapshots) { "Historical receipt lacks complete source snapshots; use explicit snapshot mode" }
-            for (expected in rows) {
-                val row = corpus.document(expected.project, expected.id)
-                require(row != null && row.cid == expected.cid && row.rev == expected.rev && row.seq == expected.seq && row.length == expected.length) {
-                    "English observation source snapshot is stale or unavailable"
-                }
-            }
-        }
-        checkCurrent()
+        EnglishObservationCurrent.check(corpus, s_[snapshot], mode)
         val store = EnglishObservationGraph.project(snapshot)
         // This fresh wire has no live overlay, external dataset callback or update route exposed.
         val visual = SparqlWire(SparqlSurface(store))
         val reply = requireNotNull(visual.route("POST", "/sparql/visual", "POST /sparql/visual HTTP/1.1\r\n\r\n" +
             jsonOf(_m["dataset" j "quad-store", "program" j program]), null))
         if (reply.status != 200) return@call reply
-        checkCurrent()
+        EnglishObservationCurrent.check(corpus, s_[snapshot], mode)
         val output = reifyStrict(reply.body) as? Map<*, *> ?: error("Invalid bounded visual query result")
         val result = output + _m["dataset" j "english-receipt-observations", "source" j
             (snapshot.descriptor(mode) + _m["quads" j store.size, "currentness" j if (mode == "current") "checked-before-and-after-query" else "not-checked"])]
