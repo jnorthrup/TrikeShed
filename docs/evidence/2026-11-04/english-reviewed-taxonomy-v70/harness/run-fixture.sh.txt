@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+taxonomy_proof=/workspace/library-files/documents-english-taxonomy-final-proof
+export TRIKESHED_SUBVM_HOME=/workspace/TrikeShed/utils/subvm
+export PROOF_ROOT="$taxonomy_proof"
+export PROOF_SNAPSHOT=${1:?frozen snapshot required}
+export OUTBOUND_DENY_RECEIPT="$taxonomy_proof/outbound-deny-profile.json"
+taxonomy_cp=$(cat "$PROOF_SNAPSHOT/classpath.txt")
+timeout 780s python "$taxonomy_proof/deny-egress.py" -- java -Xmx4g -cp "$taxonomy_proof/classes:$taxonomy_cp" proof.englishtaxonomyui.FixtureKt
+taxonomy_exit=$?
+printf '%s\n' "$taxonomy_exit" > "$taxonomy_proof/fixture-attempt1.exit"
+exit "$taxonomy_exit"

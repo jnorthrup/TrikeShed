@@ -1,0 +1,12 @@
+{
+  "source": "243db15b73636742e57d4319f01ef8db3230c657",
+  "mainJarSha256": "77b02c2619ee94ad74de7fc0584a45e7b3d3d50701287d7104cd5d6913d4632a",
+  "documentsJsSha256": "f90c03ddc54d564013213bc787816065582960a7bd63275cdae854f677f38ca4",
+  "spacegraphJsSha256": "da3e49e994744b5dbb8981ff7436e20527c8569d0794b2d5e9445985bc8300a5",
+  "pagesJsSha256": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c",
+  "immutableDependencyJars": 119,
+  "snapshotAndDependencyHashesVerified": true,
+  "onlyOwnProofClassNamespace": true,
+  "fixtureSha256": "ac1d439c9afff4d2ef657e1147dd5c3b4c630cfb4459c15c1b17c0b169a5137b",
+  "scope": "Preparation validation only; actual default parser and native Documents review walkthrough await separate runtime GO"
+}

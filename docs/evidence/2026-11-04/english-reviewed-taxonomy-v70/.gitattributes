@@ -1,0 +1,5 @@
+/source.txt -text -diff
+/cas-readbacks/*.cbor -text -diff
+/cas-readbacks/*.txt -text -diff
+/review.wal -text -diff
+/closed-runtime-after-mutation.tar.gz -text -diff
