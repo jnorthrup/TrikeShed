@@ -47,10 +47,11 @@ class EnglishCorpusWireTest {
             "cid" j row.cid, "rev" j row.rev, "seq" j row.seq, "begin" j begin, "end" j end]), null)
         assertEquals(200, response.status, response.body); return reifyStrict(response.body) as Map<*, *>
     }
-    private suspend fun request(f: Fixture, receipts: List<String>, mode: String = "current", topics: Any? = null, status: Int = 200): Map<*, *> {
+    private suspend fun request(f: Fixture, receipts: List<String>, mode: String = "current", topics: Any? = null,
+                                status: Int = 200, extra: Map<String, Any?> = emptyMap()): Map<*, *> {
         val route = assertNotNull(f.ctx.routes.match(EnglishCorpusWire.PATH))
         val response = assertNotNull(route.route("POST", EnglishCorpusWire.PATH,
-            jsonOf(_m["receiptCids" j receipts, "mode" j mode, "topics" j topics]), null))
+            jsonOf(_m["receiptCids" j receipts, "mode" j mode, "topics" j topics] + extra), null))
         assertEquals(status, response.status, response.body); return reifyStrict(response.body) as Map<*, *>
     }
     private suspend fun close(f: Fixture) { f.english.drain(); f.owner.complete(); f.owner.join() }
@@ -111,6 +112,40 @@ class EnglishCorpusWireTest {
             request(f, _l[full], status = 409)
             val historical = request(f, _l[full], mode = "snapshot")
             assertEquals(true, (historical["source"] as Map<*, *>)["historical"])
+        } finally { close(f) }
+    }
+
+    @Test fun optionalViewPreservesLegacyRequestsAndHttpAndLcncRefuseExplicitNullOrUnknown(): Unit = runBlocking {
+        val f = fixture("corpus-view", coroutineContext[Job])
+        try {
+            val text = "Tenant must not have consent."
+            put(f, "agreement.txt", text)
+            val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
+            val default = request(f, ids)
+            assertFalse("view" in default)
+            val all = request(f, ids, extra = _m["view" j "all-lexical"])
+            for (key in s_["corpusCid", "matrixCid", "terms", "sentences", "occurrences"].view) assertEquals(default[key], all[key])
+            val content = request(f, ids, extra = _m["view" j "content"])
+            assertEquals("content", content["view"])
+            assertEquals(EnglishCorpusView.CONTENT.policy().toMap(), (content["matrix"] as Map<*, *>)["policy"])
+            val included = (content["terms"] as List<*>).map { (it as Map<*, *>)["lemma"] }
+            assertTrue("must" in included && "not" in included && "have" !in included)
+            assertEquals(default["rawTokenCount"], content["rawTokenCount"])
+            assertEquals(default["sentences"], content["sentences"])
+            for (invalid in s_[null, "unknown", 1].view) request(f, ids, status = 409, extra = _m["view" j invalid])
+
+            val runner = assertNotNull(f.ctx.lcncRunners[EnglishCorpusWire.TYPE])
+            val legacy = runner.run(LcncNode("legacy", EnglishCorpusWire.TYPE), _m["receiptCids" j ids, "mode" j "current", "topics" j null])
+            assertEquals(default, legacy, "Omitted LCNC view must preserve the original response and receipt bytes")
+            val node = LcncNode("content", EnglishCorpusWire.TYPE, _m["view" j "content"])
+            val authored = runner.run(node, _m["receiptCids" j ids, "mode" j "current", "topics" j null])
+            assertEquals(content, authored)
+            for (invalid in s_[null, "unknown"].view) assertFailsWith<IllegalArgumentException> {
+                runner.run(node, _m["receiptCids" j ids, "mode" j "current", "topics" j null, "view" j invalid])
+            }
+            val overridden = runner.run(node, _m["receiptCids" j ids, "mode" j "current", "topics" j null, "view" j "all-lexical"])
+            assertEquals(all, overridden)
+            assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
         } finally { close(f) }
     }
 

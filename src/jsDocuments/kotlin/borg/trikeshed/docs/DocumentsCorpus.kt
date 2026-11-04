@@ -1,6 +1,7 @@
 package borg.trikeshed.docs
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.nlp.EnglishCorpusView
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.wiki.WikiSurface
@@ -65,6 +66,7 @@ internal object DocumentsCorpus {
         var pending = false
         private var open = false
         private var mode = "snapshot"
+        private var view = EnglishCorpusView.ALL_LEXICAL
         private var topicsEnabled = false
         private var topicCount = 2
         private var iterations = 30
@@ -105,7 +107,8 @@ internal object DocumentsCorpus {
             require(!(end < text.length && text[end - 1].isHighSurrogate() && text[end].isLowSurrogate()))
             return text.substring(begin, end)
         }
-        private fun validate(value: Map<*, *>, requested: List<String>, requestedMode: String, topicConfig: Map<String, Any?>?) {
+        private fun validate(value: Map<*, *>, requested: List<String>, requestedMode: String,
+                             requestedView: EnglishCorpusView, topicConfig: Map<String, Any?>?) {
             require(value["schema"] == "trikeshed.english-corpus.v1" && value["reviewStatus"] == "unreviewed" &&
                 value["authority"] == "statistics-of-reported-parser-observations" && value["legalMeaning"] == "not-established" && value["countsAreEvidenceConfidence"] == false) { "Unexpected corpus authority or schema" }
             sourceId(value["receiptCid"]); sourceId(value["corpusCid"]); sourceId(value["matrixCid"])
@@ -117,6 +120,12 @@ internal object DocumentsCorpus {
             require(descriptor["currentness"] == if (requestedMode == "current") "checked-before-and-after-build" else "not-checked") { "Corpus currentness differs from the requested mode" }
             val matrix = value["matrix"] as? Map<*, *> ?: error("Corpus matrix is unavailable")
             require(matrix["schema"] == "trikeshed.english-matrix.v1")
+            require(matrix["policy"] == requestedView.policy().toMap()) {
+                "Corpus word selection differs from the requested view"
+            }
+            require(if (requestedView == EnglishCorpusView.ALL_LEXICAL) "view" !in value else value["view"] == requestedView.wire) {
+                "Corpus view differs from the requested selection"
+            }
             val docs = rows(matrix["documents"], 256)
             val terms = rows(value["terms"], 4096)
             val sentences = rows(value["sentences"], 20_000)
@@ -212,6 +221,7 @@ internal object DocumentsCorpus {
             val requested = shelf(project).ids.toList()
             if (requested.isEmpty()) return
             val requestedMode = mode
+            val requestedView = view
             val topics = if (topicsEnabled) {
                 if (topicCount !in 1..16 || iterations !in 1..100 || seed < 0) { failure = "Choose 1–16 topics, 1–100 iterations and a nonnegative integer seed."; render(); return }
                 _m["topics" j topicCount, "iterations" j iterations, "seed" j seed, "alpha" j .1, "beta" j .01]
@@ -220,14 +230,16 @@ internal object DocumentsCorpus {
             scope.launch {
                 try {
                     abort = js("new AbortController()")
-                    val init = RequestInit(method = "POST", body = jsonOf(_m["receiptCids" j requested, "mode" j requestedMode, "topics" j topics]),
+                    val request = _m["receiptCids" j requested, "mode" j requestedMode, "topics" j topics] +
+                        if (requestedView == EnglishCorpusView.ALL_LEXICAL) emptyMap() else _m["view" j requestedView.wire]
+                    val init = RequestInit(method = "POST", body = jsonOf(request),
                         headers = Headers().apply { append("Content-Type", "application/json") })
                     init.asDynamic().signal = abort.signal
                     val response = window.fetch("/api/documents/english/corpus", init).await()
                     val body = response.text().await(); require(body.length <= 4 * 1024 * 1024) { "Corpus response exceeds 4MiB" }
                     val value = reifyStrict(body) as? Map<*, *> ?: error("Unreadable corpus response")
                     require(response.ok && value["error"] == null) { (value["detail"] ?: value["error"] ?: "Corpus build failed (HTTP ${response.status})").toString() }
-                    validate(value, requested, requestedMode, topics)
+                    validate(value, requested, requestedMode, requestedView, topics)
                     if (present()) result = value
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Throwable) { if (present()) failure = error.message ?: "Corpus view is unavailable" }
@@ -264,6 +276,18 @@ internal object DocumentsCorpus {
             }
             input.value = mode; input.style.cssText = "background:var(--side);color:var(--ink);border:1px solid var(--rule);padding:7px;border-radius:5px"; modeLabel.appendChild(input)
             input.addEventListener("change", { if (present() && !pending) { mode = input.value; changed() } })
+            val viewLabel = text(controls, "label", "Words ")
+            val wordSelection = document.createElement("select") as HTMLSelectElement
+            wordSelection.setAttribute("data-corpus-view", "1"); wordSelection.disabled = pending
+            for ((key, label) in _l[EnglishCorpusView.ALL_LEXICAL.wire j "All lexical lemmas", EnglishCorpusView.CONTENT.wire j "Content words and legal markers"]) {
+                text(wordSelection, "option", label).setAttribute("value", key)
+            }
+            wordSelection.value = view.wire; viewLabel.appendChild(wordSelection)
+            wordSelection.addEventListener("change", {
+                if (present() && !pending) { view = EnglishCorpusView.parse(wordSelection.value); changed() }
+            })
+            if (view == EnglishCorpusView.CONTENT) text(details, "p",
+                "Content words keeps nouns, verbs, adjectives and protected guard/modal words. It omits be, have and do; all original words and sentences remain in the receipt.", "ds-curate-label")
             val topicLabel = text(controls, "label", "")
             val enable = document.createElement("input") as HTMLInputElement; enable.type = "checkbox"; enable.checked = topicsEnabled; enable.disabled = pending; enable.setAttribute("data-corpus-topics-enable", "1"); topicLabel.appendChild(enable)
             text(topicLabel, "span", " Fit local statistical topics (LDA)")
