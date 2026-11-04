@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+lifecycle_proof=/workspace/library-files/panels-evidence-lifecycle-proof
+export TRIKESHED_SUBVM_HOME=/workspace/TrikeShed/utils/subvm
+export PROOF_ROOT="$lifecycle_proof"
+export PROOF_SNAPSHOT=/workspace/library-files/english-copular-v69-proof/snapshot
+export PROOF_SOURCE="$lifecycle_proof/source.txt"
+export OUTBOUND_DENY_RECEIPT="$lifecycle_proof/outbound-deny-profile.json"
+lifecycle_cp=$(cat "$PROOF_SNAPSHOT/classpath.txt")
+timeout 600s python "$lifecycle_proof/deny-egress.py" -- java -Xmx768m -cp "$lifecycle_proof/classes:$lifecycle_cp" proof.evidencelifecycle.FixtureKt
+lifecycle_exit=$?
+printf '%s\n' "$lifecycle_exit" > "$lifecycle_proof/fixture-attempt1.exit"
+exit "$lifecycle_exit"

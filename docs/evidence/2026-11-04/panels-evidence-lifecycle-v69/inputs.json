@@ -1,0 +1,15 @@
+{
+  "status": "PREPARED_NOT_EXECUTED",
+  "producerSource": "e3057178652b433421832003417478a98ffce304",
+  "inspectionCid": "sha256:baf539d50f07ad48d282f55cb63bd03ba43edf82a882d51ff0d6e4fd599f0d8e",
+  "sourceCid": "sha256:1f310bfb50270455e6aa301123450c519227a30bef7aec0aa58406c9c4a52ae5",
+  "runId": "140c813b-d802-4afb-a4e9-2e1141633fb6",
+  "runReceiptCid": "sha256:511c9b316a75ef117204af4bf5b439a65bc92c93d2833eff9e3dc183e40eb54d",
+  "programCid": "sha256:ca8697466b2542ce29caef89e21d4a5e0ecaa307c85ac6ef2b2953d84359129b",
+  "invocationsCid": "sha256:e0ceb64900e52d0f62b4e700bf5d4bb9ceeed044c661d6b4682cb354cfd6ab51",
+  "previousReceiptCid": "sha256:4f479f0470c6b5a5bfab50344ff35dc744310de4a578346312ad1148d8dab9cf",
+  "priorProgressPath": "/workspace/library-files/english-copular-v68-proof/attempt2/browser-continuation-progress.json",
+  "priorProgressSha256": "0872326888c387eb35336090e8292bc2e7f03dc5e39a13b9ee6bc7dcfcbc960c",
+  "rawRunReceiptFile": "/workspace/library-files/english-copular-v68-proof/durable-readbacks/511c9b316a75ef117204af4bf5b439a65bc92c93d2833eff9e3dc183e40eb54d.json",
+  "noFreshParserOrAuthoredRun": "All cases use actual already-retained v68 receipt/source/project. Only readonly gallery/workspace/content requests and nativecamera/UI gestures."
+}
