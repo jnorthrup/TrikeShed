@@ -20,7 +20,7 @@ The subsequent [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) selects JVM-ho
 |---|---|
 | Programme owner | [Charter](00-charter.md), [storyboard](13-demonstration-storyboard.md), [timeline and costs](15-timeline-and-costs.md) |
 | Runtime implementer | [Architecture](02-tier-architecture.md), [execution and control](06-execution-and-control.md), [wire contracts](19-wire-contracts.md) |
-| MLIR-Nix / JVM implementer | [Polyglot pivot and ABI](22-mlir-nix-polyglot.md), [engine atlas](08-engine-atlas.md), [WP15](14-work-packages.md) |
+| MLIR-Nix / JVM implementer | [Polyglot pivot and ABI](22-mlir-nix-polyglot.md), [Sulong build and ownership contract](22-sulong-bitcode.md), [engine atlas](08-engine-atlas.md), [WP15](14-work-packages.md) |
 | Graal and Spacegraph implementer | [Visualization](07-visualization.md), [storyboard](13-demonstration-storyboard.md), [acceptance](16-validation.md) |
 | Curator and ontology implementer | [Sources](03-source-intake-and-airgap.md), [evidence](04-evidence-rdf-and-memory.md), [engine atlas](08-engine-atlas.md) |
 | NARS and Rete implementer | [Consolidation](10-nars-rete-consolidation.md), [CPU plan](11-cpu-and-indexes.md), [contracts](19-wire-contracts.md) |
@@ -51,6 +51,7 @@ The subsequent [MLIR-Nix Polyglot pivot](22-mlir-nix-polyglot.md) selects JVM-ho
 21. [Offline and development operating procedures](20-operating-procedures.md)
 22. [Requirement and acceptance traceability](21-traceability.md)
 23. [MLIR-Nix Polyglot pivot and implementation gates](22-mlir-nix-polyglot.md)
+24. [Sulong bitcode build ownership and acceptance contract](22-sulong-bitcode.md)
 
 ## Decisions that hold the design together
 

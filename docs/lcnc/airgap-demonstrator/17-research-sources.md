@@ -36,7 +36,7 @@ Sources were inspected on 4 November 2026. The register states what each source 
 
 ## Polyglot pivot sources
 
-The subsequent [Polyglot RFC revision](22-mlir-nix-polyglot.md) adds this source set, inspected on 4 November 2026. Its code inventory pins `mlir-nix` independently from the existing SUMO-Nix bridge; no runtime benchmark or upstream build was executed for the revision.
+The subsequent [Polyglot RFC revision](22-mlir-nix-polyglot.md) and [Sulong bitcode contract](22-sulong-bitcode.md) use this source set, inspected on 4 November 2026. Its code inventory pins `mlir-nix` independently from the existing SUMO-Nix bridge; no runtime benchmark or upstream build was executed for the revision.
 
 | ID | Primary source | Supported use | Boundary |
 |---|---|---|---|
@@ -48,6 +48,9 @@ The subsequent [Polyglot RFC revision](22-mlir-nix-polyglot.md) adds this source
 | R33 | [Polyglot Source API](https://www.graalvm.org/sdk/javadoc/org/graalvm/polyglot/Source.html) and [Context builder](https://www.graalvm.org/sdk/javadoc/org/graalvm/polyglot/Context.Builder.html) | Binary Sources and explicit privilege policy | Illustrative adapter statements are not implemented code |
 | R34 | [Polyglot C header](https://github.com/oracle/graal/blob/master/sulong/projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/polyglot.h) | Explicit string conversion and length semantics | Header at inspected default branch; deployment must pin its own compatible version |
 | R35 | [mlir-nix at 571b57d3](https://github.com/jnorthrup/mlir-nix/tree/571b57d3ebdcdabe7ac76765b2875de7b98b9dab) | Inspected C API, pass registry, guarded JIT and build definitions | No full repository audit, Sulong port or claim that prior bridge pins changed |
+| R36 | [LLVM assembler](https://www.llvm.org/docs/CommandGuide/llvm-as.html) | LLVM IR to bitcode assembly stage | Does not compile MLIR or supply missing Nix semantics |
+| R37 | [Clang toolchain stages](https://clang.llvm.org/docs/Toolchain.html) | C/C++ frontend, IR and linking stage distinctions | A proposed build still needs a pinned toolchain and actual output |
+| R38 | [Context lifecycle API](https://www.graalvm.org/25.0/javadoc/sdk/org/graalvm/polyglot/Context.html) | Explicit close and interruption constraints | Non-interruptible host/native execution prevents an assumed hard per-request deadline |
 
 ## Repository evidence register
 
@@ -67,6 +70,8 @@ These records are first-party project evidence, read as reports tied to their st
 | L10 | [MontyLingua assessment](../../montylingua-assessment.txt) | Legacy extraction, modal loss, alignment and license constraints |
 | L11 | [PDF link curation](../../pdf-link-curation.txt) | URI annotation scope and bounded collection behaviour |
 | L12 | [Forge checkpoint](../../forge-curation-checkpoint.txt) | Prior UI/runtime proof boundaries and retained evidence |
+| L13 | [Sulong scalar proof](../../sulong-bitcode/proof.txt) and [identity metadata](../../sulong-bitcode/proof.json) | Historical actual primitive calls and restricted-profile refusals; no MLIR-Nix, JIT or full evaluator claim |
+| L14 | [Retained legal candidate workflow](../../english-legal-patterns.txt) and [v58 evidence](../../evidence/2026-11-04/english-legal-candidates/README.txt) | Scoped source/role/quantity API, LCNC and browser evidence tied to frozen artifacts; no general legal accuracy or production airgap claim |
 
 Source-code seams and inspected limits are enumerated in [the repository baseline](01-repository-baseline.md). Source code outranks stale historical summaries when they disagree about current mechanics; acceptance reports remain tied to the build they actually exercised.
 

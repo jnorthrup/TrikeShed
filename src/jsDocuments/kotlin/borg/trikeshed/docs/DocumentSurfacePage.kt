@@ -83,19 +83,7 @@ object DocumentSurfacePage {
         val root = document.getElementById(DocumentSurface.ROOT_ID) as HTMLElement
         root.innerHTML = DocumentSurface.layout()
         DocumentsUpload.mount()
-<<<<<<< HEAD
-<<<<<<< HEAD
         window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear(); DocumentsCorpus.clear() })
-||||||| 62eb34b08
-        window.addEventListener("pagehide", { DocumentsPdfLinks.clear() })
-=======
-        window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear() })
->>>>>>> 6bc57dbcbd743793fb3096ae68afebf3a2330e1d
-||||||| 5878d7d14
-        window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear() })
-=======
-        window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear(); DocumentsCorpus.clear() })
->>>>>>> 287a790d26f59f5619606287092225c4946faf8f
         root.addEventListener("click", { e -> onClick(e) })
         root.addEventListener("submit", { e -> onSubmit(e) })
         root.addEventListener("input", { e -> onInput(e) })
@@ -436,18 +424,8 @@ object DocumentSurfacePage {
         setHtml(DocumentSurface.SIDE_ID, DocumentSurface.sidebarHtml(projects, project, docs, selectedId, curationMode))
         if (curationMode) {
             DocumentsPdfLinks.clear()
-<<<<<<< HEAD
             DocumentsEnglish.clear()
-<<<<<<< HEAD
             DocumentsCorpus.clear()
-||||||| 62eb34b08
-=======
-            DocumentsEnglish.clear()
->>>>>>> 6bc57dbcbd743793fb3096ae68afebf3a2330e1d
-||||||| 5878d7d14
-=======
-            DocumentsCorpus.clear()
->>>>>>> 287a790d26f59f5619606287092225c4946faf8f
             setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.curationCrumbHtml(curationResult))
             setHtml(DocumentSurface.CONTENT_ID, DocumentSurface.curationHtml(
                 curationAvailable, curationDestination, curationRecords,
@@ -478,7 +456,6 @@ object DocumentSurfacePage {
             document.getElementById(DocumentSurface.CONTENT_ID)?.appendChild(host)
             DocumentsPdfLinks.mount(host, pdf, ticket) { generation == ticket && !curationMode && view == SurfaceView.PAGE && project == pdf.project && pdfSelection == pdf }
         } else DocumentsPdfLinks.clear()
-<<<<<<< HEAD
         val english = doc?.takeIf { DocumentsEnglish.selection(it) != null }
         if (view == SurfaceView.PAGE && english != null) {
             val ticket = generation
@@ -497,7 +474,6 @@ object DocumentSurfacePage {
                 document.getElementById(DocumentSurface.CONTENT_ID)?.appendChild(note)
             }
         }
-<<<<<<< HEAD
         val corpusProject = project
         if (corpusProject != null) {
             val ticket = generation
@@ -508,40 +484,6 @@ object DocumentSurfacePage {
                 generation == ticket && !curationMode && project == corpusProject && (doc?.sourceRevision ?: pdfSelection) == selected
             }
         } else DocumentsCorpus.clear()
-||||||| 62eb34b08
-=======
-        val english = doc?.takeIf { DocumentsEnglish.selection(it) != null }
-        if (view == SurfaceView.PAGE && english != null) {
-            val ticket = generation
-            val host = document.createElement("div") as HTMLElement
-            document.getElementById(DocumentSurface.CONTENT_ID)?.let { content -> content.insertBefore(host, content.firstChild) }
-            DocumentsEnglish.mount(host, english, ticket) {
-                generation == ticket && !curationMode && view == SurfaceView.PAGE && project == english.project &&
-                    doc?.sourceRevision == english.sourceRevision && doc?.displayTextRevision == english.displayTextRevision
-            }
-        } else {
-            DocumentsEnglish.clear()
-            if (view == SurfaceView.PAGE && pdf != null && doc == null) {
-                val note = document.createElement("p") as HTMLElement
-                note.className = "ds-empty"
-                note.textContent = "English inspection needs stored text from this PDF. No scanner or model is run automatically."
-                document.getElementById(DocumentSurface.CONTENT_ID)?.appendChild(note)
-            }
-        }
->>>>>>> 6bc57dbcbd743793fb3096ae68afebf3a2330e1d
-||||||| 5878d7d14
-=======
-        val corpusProject = project
-        if (corpusProject != null) {
-            val ticket = generation
-            val selected = doc?.sourceRevision ?: pdfSelection
-            val host = document.createElement("div") as HTMLElement
-            document.getElementById(DocumentSurface.CONTENT_ID)?.let { content -> content.insertBefore(host, content.firstChild) }
-            DocumentsCorpus.mount(host, corpusProject, selected, ticket) {
-                generation == ticket && !curationMode && project == corpusProject && (doc?.sourceRevision ?: pdfSelection) == selected
-            }
-        } else DocumentsCorpus.clear()
->>>>>>> 287a790d26f59f5619606287092225c4946faf8f
         val p = project
         val wanted = if (p == null) "" else "#" + encode(p) + (selectedId?.let { "/" + encode(it) } ?: "")
         if (!keepLocation) setHash(wanted)

@@ -32,7 +32,7 @@
 | Exhaustive implementation documents | Mechanism chapters, schemas, experiments and 25 handoffs | This package | Link, arithmetic and coverage review |
 | Frontier AI round-the-clock timeline | Work estimate, capacity ceiling, tariff assumptions and recalibration | Programme owner | First-48-hour actual usage report |
 | D3M integration endorsement | PRELOAD contract with distribution/fetch and conflict preservation | Integration owner | Branch manifest, conflict archive, verified remote OID |
-| MLIR-Nix JVM Polyglot pivot | Binary module path, versioned ABI, explicit allocation ownership, mode/target policy | WP15 with WP02/WP09/WP11/WP23/WP24 | E09, V26 and P00–P08; full Nix requires separate semantic evidence |
+| MLIR-Nix JVM Polyglot pivot | [Deliverable/ABI gates](22-mlir-nix-polyglot.md) and [bitcode build/ownership contract](22-sulong-bitcode.md): binary module, explicit UTF-8/handle release, mode/target policy and owned commonMain drain | WP15 with WP02/WP09/WP11/WP23/WP24 | E09, V26, P00–P08 and the bitcode acceptance ladder; scalar/scanner proof does not establish full Nix or Horn integration |
 
 ## Invariant ownership
 
