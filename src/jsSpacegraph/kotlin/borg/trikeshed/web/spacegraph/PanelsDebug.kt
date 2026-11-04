@@ -19,16 +19,17 @@ class PanelsDebug(private val panels: Panels) {
     private var ended = false
     private var available = false
     private var runId = ""
+    private var activity: Any = Any()
     private var coordinates = VmSourceCoordinates.AUTHORED
 
-    fun start(): String {
-        open(str(js("crypto.randomUUID()")), "")
+    fun start(activity: Any): String {
+        open(str(js("crypto.randomUUID()")), "", activity)
         return token
     }
 
     /** Observation belongs to this page, not a new execution or a detached poller. */
     suspend fun attach(token: String, run: String) = coroutineScope {
-        open(token, run)
+        open(token, run, panels.trace.reserve())
         val target = panel
         val stop = document.createElement("button").asDynamic()
         stop.textContent = "Stop observing"
@@ -45,7 +46,8 @@ class PanelsDebug(private val panels: Panels) {
         if (panel != null && !ended) end("Observation stopped; the run was not cancelled or resumed.")
     }
 
-    private fun open(value: String, run: String) {
+    private fun open(value: String, run: String, activity: Any) {
+        this.activity = activity
         token = value; runId = run; available = false
         state = null; pending = null; lastText = ""; observedPause = false; ended = false
         coordinates = VmSourceCoordinates.AUTHORED
@@ -158,6 +160,7 @@ class PanelsDebug(private val panels: Panels) {
     suspend fun observe(reconnecting: Boolean = false) {
         val target = panel
         val requestToken = token
+        val observedActivity = activity
         fun current(): Boolean = !ended && !panels.page.closing && panel === target && token == requestToken
         while (current()) {
             try {
@@ -188,7 +191,7 @@ class PanelsDebug(private val panels: Panels) {
                     val newPause = snapshot.state == "paused" && (state?.state != "paused" || state?.ordinal != snapshot.ordinal)
                     if (snapshot.state == "paused" && snapshot.site != null) observedPause = true
                     state = snapshot
-                    panels.trace.observe(str(snapshot.runId), str(snapshot.programCid), snapshot)
+                    panels.trace.observe(observedActivity, str(snapshot.runId), str(snapshot.programCid), snapshot)
                     val source = snapshot.site?.kind == "source"
                     sourceView(resetLine = newPause)
                     if (newPause || restored) panel.querySelector("[data-debug-error]").textContent =
@@ -218,7 +221,7 @@ class PanelsDebug(private val panels: Panels) {
             catch (e: dynamic) {
                 if (!current()) return
                 available = false; buttons()
-                panels.trace.unavailable("Observation unavailable; last activity is recorded")
+                panels.trace.unavailable(observedActivity, "Observation unavailable; last activity is recorded")
                 panel.querySelector("[data-debug-error]").textContent = "Observation unavailable; controls disabled, snapshot not live: " + failureText(e)
             }
             delay(300)
@@ -280,7 +283,7 @@ class PanelsDebug(private val panels: Panels) {
             evidenceError = "Retained evidence refused: " + failureText(e)
         }
         ended = true; available = false
-        panels.trace.recorded("Observation ended; remaining activity is recorded")
+        panels.trace.recorded(activity, "Observation ended; remaining activity is recorded")
         state = null
         buttons()
         val accepted = retained && evidenceError.isEmpty()

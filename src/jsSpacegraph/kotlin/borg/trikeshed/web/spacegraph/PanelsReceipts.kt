@@ -164,17 +164,18 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                             "This is execution evidence, not breakpoint control or proof of external effects.", target)
                         if (evidence.observationSchema == "lcnc-observations/1") {
                             button("Replay recorded wire activity", {
+                                val activity = panels.trace.reserve()
                                 panels.launchJs {
                                     try {
                                         val frozen = content(str(run.programCid))
-                                        if (!current(ticket)) return@launchJs
+                                        if (!current(ticket) || !panels.trace.owns(activity)) return@launchJs
                                         val program = LcncProgramConfix.fromJson(str(run.program), JSON.stringify(frozen))
                                         val canvas = LcncProgramConfix.fromJson(str(panels.panelName().value).ifBlank { "canvas" }, JSON.stringify(panels.toConfix()))
                                         require(LcncProgramConfix.sameDefinition(program, canvas)) { "Load the frozen program before replaying its wire activity" }
-                                        panels.trace.start(program)
-                                        panels.trace.observe(str(run.runId), str(run.programCid), evidence, replay = true)
+                                        panels.trace.start(activity, program)
+                                        panels.trace.observe(activity, str(run.runId), str(run.programCid), evidence, replay = true)
                                     } catch (e: CancellationException) { throw e }
-                                    catch (e: dynamic) { if (current(ticket)) text("Activity replay unavailable: " + failureText(e), target) }
+                                    catch (e: dynamic) { if (current(ticket) && panels.trace.owns(activity)) text("Activity replay unavailable: " + failureText(e), target) }
                                 }
                             }, target)
                             text("Display only; no nodes execute. Motion duration is presentation policy, not engine duration.", target)

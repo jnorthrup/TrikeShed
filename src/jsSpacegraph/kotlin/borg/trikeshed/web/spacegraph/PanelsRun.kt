@@ -54,11 +54,11 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
         val base = selected.baseReceipt
         if (!isPulse) stopSources()
         val sourceEpoch = sourceRevision
-        trace.start(program)
+        val activity = trace.start(program)
         val request = JSON.stringify(objOf {
             it.name = name; it.document = JSON.parse(document); it.inputs = obj()
             if (isPulse) { it.baseReceiptCid = base; it.pulse = pulse }
-            if (debug) it.debugToken = debugger.start()
+            if (debug) it.debugToken = debugger.start(activity)
         })
         // No unknown or failed outcome can continue from an earlier base.
         pulseReceipt = null; pulseProgram = null
@@ -93,34 +93,36 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
                     if (result.invocationsCid != null) try {
                         val retained = fetchJson("/api/lcnc/content?cid=" + encodeURIComponent(str(result.invocationsCid)))
                         require(retained.runId == result.runId && retained.programCid == result.programCid) { "Invocation identity changed" }
-                        trace.observe(str(result.runId), str(result.programCid), retained, replay = true)
-                    } catch (e: CancellationException) { throw e } catch (_: dynamic) { trace.unavailable("Recorded activity unavailable; inspect the retained receipt") }
+                        trace.observe(activity, str(result.runId), str(result.programCid), retained, replay = true)
+                    } catch (e: CancellationException) { throw e } catch (_: dynamic) { trace.unavailable(activity, "Recorded activity unavailable; inspect the retained receipt") }
                 } }
                 catch (e: CancellationException) { throw e }
                 catch (e: dynamic) { displayError = " · canvas output display failed: " + failureText(e) }
-                facets.selectedReceipt = result
-                facets.tab = "execution"
-                if (!isPulse && facets.drawer == null) facets.toggle()
-                else if (facets.drawer != null) facets.show("execution")
+                if (trace.owns(activity)) {
+                    facets.selectedReceipt = result
+                    facets.tab = "execution"
+                    if (!isPulse && facets.drawer == null) facets.toggle()
+                    else if (facets.drawer != null) facets.show("execution")
+                }
                 if (pulseReceipt == null) stopSources()
                 else if (live && sourceRevision == sourceEpoch) armSources()
                 status((if (isPulse) "Pulse " else "Program ") + str(result.status) + " · " + str(result.runId) +
                     " · receipt in Evidence" + (if (pulseReceipt == null) " · no resumable frame; sources stopped" else "") + displayError)
             } else {
                 stopSources()
-                trace.unavailable("No completed receipt; execution outcome is unconfirmed")
+                trace.unavailable(activity, "No completed receipt; execution outcome is unconfirmed")
                 status("Request returned HTTP " + str(response.status) + " without a receipt: " +
                     str(result?.error ?: result?.detail ?: "unrecognized response") + ". No automatic retry.")
             }
             return result
         } catch (e: CancellationException) {
             pulseReceipt = null; pulseProgram = null; stopSources()
-            trace.unavailable("Response interrupted; execution outcome is unconfirmed")
+            trace.unavailable(activity, "Response interrupted; execution outcome is unconfirmed")
             status("Response interrupted; daemon outcome is unknown. Inspect run records before retrying.")
             throw e
         } catch (e: dynamic) {
             pulseReceipt = null; pulseProgram = null; stopSources()
-            trace.unavailable("Response unavailable; execution outcome is unconfirmed")
+            trace.unavailable(activity, "Response unavailable; execution outcome is unconfirmed")
             status("Response unavailable; daemon outcome is unknown: " + failureText(e) +
                 ". Inspect run records before retrying; no automatic retry.")
         } finally {
@@ -360,6 +362,7 @@ class PanelsHistory(private val p: Panels) {
 fun Panels.load(data: dynamic): Boolean {
     if (page.closing) return false
     loadFailure(data)?.let { return refuseLoad(it) }
+    trace.clear()
     byId("panelLoadRefusal")?.remove()
     pulseReceipt = null; pulseProgram = null; sourceRevision++
     shakeOwner.parentRevision++
