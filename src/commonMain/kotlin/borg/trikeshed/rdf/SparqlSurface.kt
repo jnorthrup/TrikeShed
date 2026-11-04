@@ -72,11 +72,19 @@ class SparqlSurface(val store: QuadStore, val compiler: ExprCompiler = ClosureEx
 
     fun answer(text: String, defaults: List<String>, named: List<String>, format: String?, accept: String, live: Cursor? = null, selected: SparqlSource = SparqlSource.UNION): PostgrestReply {
         val query = try { SparqlQuery.parse(text, defaults, named) } catch (e: SparqlError) { return refuse(400, "Virtuoso 37000 Error SP030: SPARQL compiler, ${e.message}") }
+        return answerSource(query, format, accept) { quads(live, selected) }
+    }
+
+    /** Execute this parsed query against the exact caller-owned snapshot; never resample the store or live rows. */
+    fun answer(query: SparqlQuery, source: Cursor, format: String?, accept: String): PostgrestReply =
+        answerSource(query, format, accept) { source }
+
+    private fun answerSource(query: SparqlQuery, format: String?, accept: String, snapshot: () -> Cursor): PostgrestReply {
         val media = (if (query.graphResult) graphMediaType(format, accept) else mediaType(format, accept))
             ?: return refuse(406, "none of these media types are available: ${format ?: accept}")
         // The plan and its rows are produced here, so a planner's or evaluator's refusal is this reply, never a dropped request.
         val body = try {
-            val source = quads(live, selected)
+            val source = snapshot()
             val rows = query.plan(source, compiler = compiler)
             when {
                 query.graphResult -> query.triples(rows, source).let { if (media == SparqlResults.NTRIPLES) SparqlResults.nTriples(it) else SparqlResults.turtle(it) }
