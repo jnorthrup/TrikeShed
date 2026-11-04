@@ -11,6 +11,8 @@ import borg.trikeshed.narsese.GroupCoherenceEnactment
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
 import borg.trikeshed.narsese.BeliefAdmissionRefused
+import borg.trikeshed.narsese.BeliefAttentionRequest
+import borg.trikeshed.narsese.BeliefsNodes
 import borg.trikeshed.narsese.KgRetentionIssue
 import borg.trikeshed.narsese.KgRetentionRefused
 import borg.trikeshed.narsese.ingestKg
@@ -33,6 +35,7 @@ import kotlinx.coroutines.CancellationException
  *   POST /api/beliefs/tick          one DecayTick (curation pulse, on demand — demos/tests)
  *   POST /api/beliefs/teach         {impulses:[{kind,subject,rationale}], scenarios:[...]} → curator hindsight pass (W5.3)
  *   POST /api/beliefs/query         {pattern:"kif"} → bank solver query (W5.3)
+ *   POST /api/beliefs/attend        {angular,propositionCid,p?,d?,q?} → processed attention, evidence unchanged
  *
  * The loop, drivable end-to-end: mint (seed/pen/user) → review (induction) →
  * tick (attention decay → floor crossings → eviction/spill) → render (bounded
@@ -216,12 +219,14 @@ class BeliefWire(
             method == "POST" && p == "/api/beliefs/resonate" -> {
                 val req = parse(text)
                 val goal = req["goal"]?.toString() ?: return json(mapOf("error" to "goal required"), 400)
-                val k = (req["k"] as? Number)?.toInt() ?: 8
+                val k = try { BeliefsNodes.resonanceCount(req["k"]) }
+                catch (_: IllegalArgumentException) { return json(_m["error" j "invalid_resonance_limit"], 400) }
                 val centroid = borg.trikeshed.narsese.AngularCodec.encode(
                     relation = borg.trikeshed.narsese.RelationKind.CAUSALITY,
                     taxonomyKey = req["taxonomy"]?.toString(),
                     subjectTerm = goal,
                 )
+                val identity = bag.sourceContexts()
                 if (req["mode"]?.toString() == "whitened") {
                     // NAL-9 path: Mahalanobis over the moment field, β from the temperature seam
                     val r = bag.resonateWhitened(centroid, k)
@@ -233,7 +238,7 @@ class BeliefWire(
                         "pri" to pk.pri,
                         "frequency" to pk.freq,
                         "level" to bag.levelOf(pk.angular),
-                    )
+                    ) + identity(bag.signalOf(pk.angular))
                     return json(mapOf(
                         "mode" to "whitened",
                         "synonymPeaks" to r.synonyms.map(::wrow),
@@ -249,11 +254,23 @@ class BeliefWire(
                     "pri" to s.pri,
                     "level" to bag.levelOf(s.angular),
                     "relation" to s.signal.relation.name,
-                )
+                ) + identity(s.signal)
                 json(mapOf(
                     "synonymPeaks" to r.synonyms.map(::row),
                     "antonymPeaks" to r.antonyms.map(::row),
                 ))
+            }
+
+            method == "POST" && p == "/api/beliefs/attend" -> {
+                val command = try { BeliefAttentionRequest.parse(rawBody(text)) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { return json(_m["error" j "invalid_attention_request"], 400) }
+                try {
+                    json(_m["attended" j bag.submit(command).report()])
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (refused: BeliefAdmissionRefused) {
+                    json(_m["error" j "attention_refused", "issue" j refused.issue.name, "processed" j false], 409)
+                } catch (_: IllegalStateException) { json(_m["error" j "belief_owner_unavailable"], 503) }
             }
 
             // NAL-9 introspection: the system's beliefs about its own belief field
