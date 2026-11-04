@@ -11,10 +11,10 @@ class MlxTensorOwnershipTest {
             val foreign = first.tensor(_a[1f, 2f], s_[1, 2])
             val local = second.tensor(_a[3f, 4f], s_[1, 2])
             fun reject(block: () -> Unit) {
-                val mark = second.mark()
+                val mark = second.allocationCount
                 val error = assertFailsWith<IllegalArgumentException> { block() }
                 assertContains(error.message.orEmpty(), "owned")
-                assertEquals(mark, second.mark(), "a rejected operation must not allocate")
+                assertEquals(mark, second.allocationCount, "a rejected operation must not allocate")
             }
             reject { second.negate(foreign) }
             reject { second.add(foreign, local) }
@@ -58,9 +58,9 @@ class MlxTensorOwnershipTest {
         try {
             val released = session.tensor(_a[1f], s_[1])
             session.release(released)
-            val mark = session.mark()
+            val mark = session.allocationCount
             assertFailsWith<IllegalStateException> { session.negate(released) }
-            assertEquals(mark, session.mark())
+            assertEquals(mark, session.allocationCount)
         } finally { session.close() }
     }
 }

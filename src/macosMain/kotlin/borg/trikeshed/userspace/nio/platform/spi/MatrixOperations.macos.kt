@@ -106,7 +106,10 @@ class MlxMatrixOperations(
  * the algebra; the graph is evaluated when a cell is first read. Float32, BFloat16 and Float16 arrays read as Float;
  * packed integer arrays (quantized weights) have no scalar cells and refuse to be read. The session owns the handle.
  */
-internal class MlxAllocation(internal var value: CValue<mlx_array_>?)
+internal class MlxAllocation(internal val sequence: Long, internal var value: CValue<mlx_array_>?)
+
+/** An allocation boundary owned by one matrix session. */
+class MlxMark internal constructor(internal val owner: Any, internal val sequence: Long)
 
 class MlxTensor internal constructor(
     private val session: MlxMatrixSession,
@@ -165,6 +168,8 @@ class MlxMatrixSession internal constructor(
 ) : MatrixSession {
     private var owner: Any? = owner
     private val owned = ArrayList<MlxAllocation>()
+    private val markOwner = Any()
+    private var sequence = 0L
     private val readers = ArrayList<Join<CValue<mlx_io_reader_>, MlxVerifiedReader>>()
     val fileIdentity: String get() { checkReaders(); return readers.single().b.identity }
     internal fun checkReaders() { for ((_, reader) in readers) reader.check() }
@@ -174,7 +179,14 @@ class MlxMatrixSession internal constructor(
         return checkNotNull(stream) { "Matrix session is closed" }
     }
 
-    private fun own(handle: CValue<mlx_array_>): CValue<mlx_array_> = handle.also { owned += MlxAllocation(it) }
+    private fun own(handle: CValue<mlx_array_>): CValue<mlx_array_> {
+        if (sequence == Long.MAX_VALUE) {
+            mlx_array_free(handle)
+            error("MLX allocation sequence exhausted")
+        }
+        owned += MlxAllocation(sequence++, handle)
+        return handle
+    }
 
     /** The latest owned result is the handle returned by the immediately preceding MLX call. */
     internal fun allocation(handle: CValue<mlx_array_>): MlxAllocation {
@@ -189,8 +201,11 @@ class MlxMatrixSession internal constructor(
         mlx_array_free(handle)
     }
 
-    /** Position in the owned handles; pair with [settle]. */
-    fun mark(): Int { gpu(); return owned.size }
+    /** Stable allocation boundary; pair with [settle] on this session. */
+    fun mark(): MlxMark { gpu(); return MlxMark(markOwner, sequence) }
+
+    /** Current number of owned array handles. */
+    val allocationCount: Int get() { gpu(); return owned.size }
 
     /** Release an evaluated tensor once no subsequent graph needs it. */
     internal fun release(tensor: MlxTensor) {
@@ -204,9 +219,9 @@ class MlxMatrixSession internal constructor(
      * Without it a long sequence keeps every intermediate of every step alive until the scope closes. Tensors made
      * since [mark] other than [keep] must not be used afterwards.
      */
-    fun settle(mark: Int, vararg keep: MlxTensor) {
+    fun settle(mark: MlxMark, vararg keep: MlxTensor) {
         gpu()
-        require(mark in 0..owned.size) { "Invalid MLX allocation mark" }
+        require(mark.owner === markOwner && mark.sequence in 0..sequence) { "Invalid MLX allocation mark" }
         for (tensor in keep) {
             tensor.requireOwner(this)
             require(owned.any { it === tensor.allocation }) { "Tensor is not owned by this session" }
@@ -216,20 +231,22 @@ class MlxMatrixSession internal constructor(
             checkReaders()
         }
         val kept = keep.map { tensor -> tensor.allocation }
-        val survivors = ArrayList<MlxAllocation>()
-        while (owned.size > mark) {
-            val allocation = owned.removeAt(owned.lastIndex)
-            if (kept.any { it === allocation }) survivors += allocation else free(allocation)
+        for (i in owned.lastIndex downTo 0) {
+            val allocation = owned[i]
+            if (allocation.sequence < mark.sequence) break
+            if (kept.none { it === allocation }) {
+                owned.removeAt(i)
+                free(allocation)
+            }
         }
-        owned.addAll(survivors.reversed())
     }
 
     /** Handles made inside [block] are freed when it returns; the result must be copied out of the device before then. */
     fun <R> scoped(block: () -> R): R {
         gpu()
-        val mark = owned.size
+        val mark = sequence
         try { return block() } finally {
-            while (owned.size > mark) free(owned.removeAt(owned.lastIndex))
+            while (owned.lastOrNull()?.sequence?.let { it >= mark } == true) free(owned.removeAt(owned.lastIndex))
         }
     }
 
