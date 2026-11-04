@@ -7,9 +7,11 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.view
 import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.nlp.NlpDocument
+import borg.trikeshed.nlp.hasCopiedNodes
 
 /** CIDs identify original bytes and exact UTF-8 extracted text; offsets below are UTF-16. */
 data class DocumentSource(
@@ -167,8 +169,13 @@ val DocumentCurationRecord.nlpAxioms: Series<NlpcoreAxiom>
         val document = nlp ?: return emptySeriesOf()
         if (reasons.values().any { "source CID" in it }) return emptySeriesOf()
         if (curationIndex().facet(DocumentCurationIndexK.NlpStatus) != DocumentNlpStatus.AVAILABLE) return emptySeriesOf()
-        // The gate above applies to persisted candidates exactly as to recomputed ones.
-        axioms?.let { return it }
+        // Retained candidates cannot bypass a recognizer's unsupported copy-node boundary on replay.
+        axioms?.let { retained ->
+            val copied = document.sentences.view.filter { it.hasCopiedNodes() }
+            return retained.view.filter { axiom -> copied.none { sentence ->
+                sentence.index == axiom.sentenceIndex || sentence.begin < axiom.end && sentence.end > axiom.begin
+            } }.toSeries()
+        }
         return NlpcoreAxiomatics.recognize(document, source.originalCid.value)
     }
 
