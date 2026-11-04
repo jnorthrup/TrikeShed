@@ -1,0 +1,112 @@
+English declarations for reviewed taxonomy
+==========================================
+
+This pilot turns explicit reviewer declarations about a small English fragment into
+one source-linked KIF carrier. It does not infer a taxonomy from English alone.
+The original English inspection remains an unreviewed observation receipt.
+
+Documents workflow
+------------------
+In Documents, inspect the complete extracted English text (at most 16,384 UTF-16
+characters), then open "Review taxonomy translation" below the English controls.
+Authenticate an existing configured reviewer. Select eligible occurrences and
+declare a context IRI, relation, exact subject/object IRIs, and term sorts:
+
+  instance: individual -> class
+  subclass: class -> class
+
+Every field starts empty. A source noun, filename, parser tag or SUMO suggestion
+does not choose a term identity or sort. Full absolute IRIs must also round-trip
+as exact supported ground KIF constants; no prefix or Unicode normalization is
+performed. An IRI cannot be both a class and an individual in the same carrier.
+
+Prepare the preview, inspect its English quotations, generated KIF and full parser
+bindings, then freeze the exact selected KIF occurrences. Use the existing review
+ledger to draft, approve, reject or correct the selection. After current approval,
+"Inspect reviewed support" queries the existing pure taxonomy plan. Both the
+English and KIF quotations remain visible with the context and approval identity.
+Reviewer credentials stay in the current tab's controller memory. Editing the
+credential, source/range, declarations, context or frozen selection clears the
+local downstream state; no credential is stored in CAS, graph data or browser
+storage by this workflow.
+
+Controlled source profile
+-------------------------
+The complete source must contain 1 to 32 simple present nominal copulas, with
+whitespace between sentences. The accepted token pattern is:
+
+  [a|an|the] NOUN is|are [a|an|the] NOUN .
+
+The receipt must report token-index+copy-count/1 identity. Each sentence must have
+exact root, nominal-subject, copula, determiner and punctuation bindings. Other
+edges, missing coverage, copy nodes, unknown identity, lexical conditions,
+exceptions, negation, modality, definitions, references, nested/quoted forms,
+coordination and non-present constructions refuse the translation profile.
+The raw English observations remain available. This is a deliberately small
+controlled fragment, not a general grammar or a claim of legal applicability.
+
+Example explicit choices for one source:
+
+  Tenant is a Person. A Person is an Agent.
+
+  sentence:0 instance urn:legal:Tenant urn:legal:Person
+              individual             class
+  sentence:1 subclass urn:legal:Person urn:legal:Agent
+              class                  class
+  context urn:agreement:pilot
+
+After explicit approval of both selected occurrences, the pure plan can witness
+instance(Tenant, Agent) using the two declared KIF forms. They are two occurrence
+witnesses from ONE document, not independent documents or NARS evidence. Without
+declarations/current approval this workflow displays no positive support.
+
+Retained chain and currentness
+-----------------------------
+The declaration sidecar names the English inspection, exact English source
+quotations/full node bindings, explicit choices, context and generated KIF CID.
+KIF is a separate retained source artifact. A carrier DocumentCurationRecord names
+that KIF and the declaration; it never presents an English quotation as KIF. The
+existing review snapshot and private WAL establish approval. No declaration CID
+refers to a future approval, so the chain has no CID cycle.
+
+Prepare, freeze, decisions and pure reads recheck the original project's document
+and extraction snapshots, retained artifacts and source metadata. Generated
+project-less KIF is not sufficient evidence of original-source currentness.
+The family is stable for project/document plus exact declared context: preparing
+another translation alone does not withdraw approval; freezing a new selection
+in the same family supersedes it. Another context has a separate approval and no
+implicit union. Legacy hash-only material is not backfilled or promoted.
+
+This pilot permits one carrier and the pure taxonomy plan only. Native taxonomy,
+Horn, union and chain exporters refuse English carriers, including one-reference
+requests, because those exports do not preserve the English sidecars. Manual KIF
+review and book-norm exclusions keep their prior semantics. No world, NARS bag,
+Rete rule, sink permit or model call is introduced. Marker/sidecar corruption fails
+closed rather than falling back to ordinary KIF review.
+
+Bounds and verification state
+-----------------------------
+Generated KIF and declaration each have a 64 KiB cap; the carrier has a 256 KiB
+cap. Reads are bounded, hashed, structurally decoded and compared with rebuilt
+canonical artifacts. The shared taxonomy-record reader now uses the existing
+structural CBOR decoder's 16 MiB ceiling (previously a raw 32 MiB read); oversized
+records refuse explicitly. Nested English candidate values use the canonical
+integer representation, preserving equality through the existing review WAL.
+
+Pre-integration checks on 2026-11-04 passed 13 focused JVM source-overlay methods:
+six carrier/refusal/tamper/bounds tests, four shared export guards and three real
+receipt-producer/private-WAL/authenticated-host tests with explicitly SYNTHETIC
+syntax. No actual parser/model call ran in those fixtures. The source checks
+compiled new production files plus unchanged internal dependencies against the
+immutable v67 JAR, without friend access; they are not final-artifact validation.
+
+A SEPARATE one-read immutable-v68 CoreNLP 4.6 experiment produced the exact 41-byte
+example, two sentences and 11 source tokens. Its retained receipt is:
+  sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d
+Its source is:
+  sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883
+Its graphs match the controlled profile. A new-helper source-overlay replay
+verified eligibility and D/K/R retention; it did not exercise host approval or a
+browser. No private PDFs were inputs to this pilot. Coordinated full JVM/common-JS
+checks and exact final-artifact Documents proof remain required before claiming
+the shipped workflow is verified.
