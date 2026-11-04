@@ -7,13 +7,16 @@ through GraalVM LLVM. Its fixed ABI is `i32(i32,i32)`. The LCNC graph supplies
 two integers; it cannot select a path, export, native-access grant or verifier
 setting. No new Graal dependencies are needed.
 
-Verified on 4 November 2026 at `a42b35616ce4262ae2ff03e82351b66cb238cb02`:
-all three stages below passed, including execution and a fresh MLIR rebuild
-without an external network route. The
-[verification manifest](evidence/2026-11-04/verification.json) records source
-hashes, platform scope and the 13 focused regressions. JVM main and all test
-sources, JS, Wasm-JS, Wasm-WASI and Linux x64 main sources compiled without
-exclusions. Load the retained [two-node program](evidence/2026-11-04/program.json)
+Verified on 4 November 2026 at `0ae529c1a7fc1cd8f289b15e23d8e87f86d82760`,
+after the second D3M integration: all three stages below passed. The
+[publication manifest](evidence/2026-11-04/publication/verification.json)
+records the exact combined source, 19 passing current regressions and execution
+without an external network route. JVM main and all test sources, JS, Wasm-JS,
+Wasm-WASI and Linux x64 main sources compiled without exclusions. The
+[earlier manifest](evidence/2026-11-04/verification.json) separately retains the
+forced offline MLIR rebuild and first 13-test checkpoint; its compiler and
+fixture inputs are unchanged. Load the retained
+[two-node program](evidence/2026-11-04/publication/program.json)
 into LCNC after configuring the operator profile below.
 
 The demonstrator has three cumulative acceptance stages:
@@ -132,8 +135,8 @@ Those are the exact CAS bytes identified by their CIDs. The separate
 `response-preview.json` is a reserialized HTTP response preview and is not the
 object identified by `receiptCid`.
 
-The retained run's [receipt](evidence/2026-11-04/receipt.json) and
-[invocation ledger](evidence/2026-11-04/invocations.json) show both completed
+The retained run's [receipt](evidence/2026-11-04/publication/receipt.json) and
+[invocation ledger](evidence/2026-11-04/publication/invocations.json) show both completed
 nodes, the module CID and real boundary timings. The restart test opened fresh
 CAS/Couch/blackboard/route owners and recovered these identities without an
 LLVM runner. This demonstrates retained execution evidence, not native heap
@@ -208,6 +211,12 @@ The SDK and dependency caches had already been staged; this is not a
 clean-machine distribution-closure certificate. Preserve the invoking UID:
 an initial root-mapped namespace selected an inaccessible `/root/.cache` for
 Graal resources; keeping the current UID corrected that launch failure.
+
+Concurrent Gradle builds on opposite sides of that network boundary need
+separate Gradle user homes. Their lock-owner coordination cannot cross the
+namespace. The publication check used a separately staged cache through
+`--gradle-user-home /workspace/gradle-offline-cache`; it did not relax network
+isolation or change source to resolve the initial shared-cache lock timeout.
 
 Before expanding the ABI, select a real bounded upstream kernel, retain its
 source revision and license, enumerate native dependencies, and verify its
