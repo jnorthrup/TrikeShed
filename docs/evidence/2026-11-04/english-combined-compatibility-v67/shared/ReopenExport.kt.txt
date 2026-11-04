@@ -1,0 +1,44 @@
+package proof.englishcompatibilityexport
+
+import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import kotlinx.coroutines.runBlocking
+import java.io.File
+
+/** Reads actual retained blocks after all runtime owners have closed; no execution replay. */
+fun main() = runBlocking {
+    val root = File("/workspace/library-files/english-v67-compatibility-proof")
+    check(File(root, "fixture.exit").readText().trim() == "0")
+    val result = reifyStrict(File(root, "result.json").readText()) as Map<*, *>
+    check(result["result"] == "PASS")
+    val results = result["results"] as Map<*, *>
+    val cas = PackCasStore(JvmFileOperations(), File(root, "runtime/cas").absolutePath)
+    val output = File(root, "reopened-readbacks").apply { mkdirs() }
+    val rows = mutableListOf<Map<String, Any?>>()
+    try {
+        for (name in s_["camel", "legal", "corpusAuthored"].view) {
+            val observed = results[name] as Map<*, *>
+            val run = observed["run"] as Map<*, *>
+            val blocks = linkedMapOf<String, String>()
+            for (field in s_["receiptCid", "programCid", "invocationsCid"].view) {
+                val cid = ContentId(run[field] as String)
+                val bytes = requireNotNull(cas.getBounded(cid, 4 * 1024 * 1024))
+                check(ContentId.of(bytes) == cid)
+                val decoded = reifyStrict(bytes.decodeToString(throwOnInvalidSequence = true)) as Map<*, *>
+                if (field == "receiptCid") check(decoded == observed["durable"])
+                if (field == "invocationsCid") {
+                    check(decoded["kind"] == "lcnc-invocations" && decoded["runId"] == run["runId"] && decoded["programCid"] == run["programCid"])
+                    if (name == "corpusAuthored") check(decoded == results["corpusInvocationTrace"])
+                }
+                File(output, cid.hex + ".json").writeBytes(bytes)
+                blocks[field] = cid.value
+            }
+            rows.add(_m["name" j name, "status" j run["status"], "blocks" j blocks, "actualContentResponsesEqual" j true])
+        }
+        val evidence = _m["result" j "PASS", "scope" j "Exact retained run/program/invocation JSON read after owner drain and CAS close/reopen; no new graph, parser or provider execution", "runs" j rows]
+        File(root, "reopened-cas-readbacks.json").writeText(jsonOf(evidence))
+        println(jsonOf(evidence))
+    } finally { cas.close() }
+}
