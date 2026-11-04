@@ -118,6 +118,9 @@ object RouteManifest {
         ("EnglishLegalPatternsWire" j _l[
             RouteEntry("POST", "/api/documents/english/legal-patterns", "source-bound modal roles and quantity-language candidates from a retained English inspection; no legal admission"),
         ]).pair,
+        ("EnglishLegalQueryWire" j _l[
+            RouteEntry("POST", "/api/documents/english/legal-patterns/query", "bounded visual SPARQL over source-linked parser-role and quantity candidates; no legal applicability or global graph admission"),
+        ]).pair,
         "DocumentPdfLinksWire" to listOf(
             RouteEntry("POST", "/api/documents/pdf-links", "retain unreviewed URI annotation candidates from an exact current PDF revision; no fetch or model"),
             RouteEntry("POST", "/api/documents/pdf-links/collect", "collect selected host-issued PDF links under existing egress policy into the same manual project; source-linked and unreviewed"),
