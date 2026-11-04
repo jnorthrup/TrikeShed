@@ -1,0 +1,29 @@
+SOURCE borg.trikeshed.lcnc.EnglishTaxonomyCarrier /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.lcnc.DocumentTaxonomyCandidate /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.lcnc.CurationReview /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.lcnc.ReviewedTaxonomyPlan /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.lcnc.ReviewedKifHornPlan /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.lcnc.ReviewedKifUnion /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.forge.server.DocumentReviewWire /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.forge.server.DocumentEnglishWire /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.forge.server.EnglishObservationCurrent /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.rdf.EnglishObservationGraph /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.narsese.DocumentCuratorCodec /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.narsese.DocumentSource /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.nlp.EnglishInspection /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.kif.KifTaxonomySnapshot /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+SOURCE borg.trikeshed.lcnc.NativeHornQuery /workspace/library-files/english-reviewed-taxonomy-v70-proof/snapshot/main.jar
+PASS EnglishTaxonomyCarrierTest.declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields
+PASS EnglishTaxonomyCarrierTest.deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound
+PASS EnglishTaxonomyCarrierTest.exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars
+PASS EnglishTaxonomyCarrierTest.familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval
+PASS EnglishTaxonomyCarrierTest.sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed
+PASS EnglishTaxonomyCarrierTest.sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations
+PASS EnglishTaxonomyExportGuardTest.anyCarrierRefusesMultipleReviewedHeadsInEitherOrder
+PASS EnglishTaxonomyExportGuardTest.eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports
+PASS EnglishTaxonomyExportGuardTest.manualKifRetainsSingleAndMultipleSnapshotExports
+PASS EnglishTaxonomyExportGuardTest.persistedCarrierReadDoesNotSupplyMissingTranslationProvenance
+PASS EnglishTaxonomyWireTest.authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses
+PASS EnglishTaxonomyWireTest.prepareDoesNotSupersedeApprovalButSameContextFreezeDoesAndOtherContextsStaySeparate
+PASS EnglishTaxonomyWireTest.staleEnglishRefusesAnExistingCarrierAtFreezeApprovalAndQuery
+PASS 13 exact-main-JAR synthetic helper+privateWAL+host+nativeguard methods; no production overlays/friend/parser/browser

@@ -1,0 +1,73 @@
+Exact v70 English reviewed-taxonomy JVM contracts — PASS
+========================================================
+
+Date: 2026-11-04 UTC
+Source: 243db15b73636742e57d4319f01ef8db3230c657
+Frozen main JAR SHA-256:
+  77b02c2619ee94ad74de7fc0584a45e7b3d3d50701287d7104cd5d6913d4632a
+Classpath: 120 immutable JAR files (main plus 119 dependencies).
+Result: 13/13 methods PASS, first exact-artifact attempt, JVM exit 0 in 4.498 s.
+
+Only the four committed test/fixture files and an external proof runner were
+compiled. No production source overlay, friend access, Gradle invocation, actual
+parser execution, model call or browser execution was part of this proof.
+The runner asserted 15 production CodeSources against the frozen main JAR, then
+invoked the original focused test methods. Fixture actors, WALs and module scopes
+were drained by their existing finally paths; the owned child exited.
+Compiler and FFM warnings are retained rather than suppressed.
+
+Six carrier methods verify:
+- exact two-occurrence English/KIF quotations, full node bindings and separately
+  resolvable generated KIF/declaration/carrier artifacts;
+- refusal of lexical guards, negation, modality, non-present forms, quotes,
+  coordination, copied nodes, unknown identity, incomplete or oversized profiles;
+- exact absolute IRI/KIF round-trips, explicit sorts, no implicit normalization,
+  no metaclass punning, and refusal of undeclared approval fields;
+- sidecar quotation/node/declaration/KIF-identity tamper and missing-marker refusal;
+- stable project/document/context families and proposed-only preparation;
+- structural depth limits in the carrier and preliminary record reader.
+
+Four shared export methods verify:
+- authenticated private-WAL reads cannot substitute markers for actual D/I/K/R;
+- either carrier marker refuses single-reference native/Horn and union exports;
+- mixed multi-head reads containing a carrier refuse in either order;
+- ordinary reviewed KIF single/multiple snapshot exports keep working.
+
+Three real host-boundary methods verify:
+- real DocumentEnglishWire receipt production with explicitly SYNTHETIC syntax,
+  configured synthetic reviewer authentication, freeze/draft/approve, pure support,
+  and two exact English/KIF witnesses through the review routes and private WAL;
+- source mutation blocks preparation, freeze, approval and positive reads while
+  retaining historical artifacts;
+- preparation alone does not supersede approval, same-context freeze does,
+  different contexts remain separate, and pure reads do not append WAL decisions
+  or alter the post-open blackboard baseline.
+
+All syntax annotations in these methods are explicitly synthetic. A synthetic
+reviewer tests authentication and WAL mechanics; it is not a human legal review.
+SUPPORTED is relative to explicit reviewed translation assumptions, not English
+entailment, legal force or external truth. Two occurrence witnesses from one
+source are not independent documents or NARS evidence. No bag/world/Rete admission
+or sink permit is introduced.
+
+Scope boundaries
+----------------
+This is an independent focused exact-main-JAR contract rerun, not 13 additional
+new cases beyond the combined build. It does not exercise configured native
+machine-code execution, real CoreNLP accuracy, OCR/extraction, public providers,
+a browser, a user credential or a deployment. The separate fresh actual CoreNLP
+pilot and final Documents browser interaction have their own evidence identities.
+The previous 41-byte immutable-v68 receipt remains preliminary; it is not claimed
+as a fresh inspection on this v70 artifact.
+
+Preliminary history
+-------------------
+Earlier source-overlay checks were development checks, not release proof. They
+caught a syntax bracket, a fixture's omitted closing quote, an invalid 32 MiB
+structural-decoder argument (the existing ceiling is 16 MiB), and a JSON-map
+set-hashing fixture assumption. Independent review caught nested Int/Long WAL
+equality and unbounded record decoding. Those were corrected before this artifact.
+Failing preliminary logs remain outside Git under:
+  /workspace/library-files/english-taxonomy-source-proof
+The final-artifact attempt reported here passed without production overlays or a
+runtime workaround. External harness scripts remain outside the repository.
