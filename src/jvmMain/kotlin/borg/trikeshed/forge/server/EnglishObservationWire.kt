@@ -101,11 +101,12 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     private val statistics = EnglishCorpusWire(ctx, corpus)
     private val runner = LcncNodeRunner { node, inputs ->
-        val request = _m["receiptCid" j (inputs["receiptCid"] ?: node.params["receiptCid"]),
-            "mode" j (inputs["mode"] ?: node.params["mode"]),
-            "program" j (inputs["program"] ?: node.params["program"]?.let { raw ->
+        fun parameter(key: String): Any? = if (key in inputs) inputs[key] else node.params[key]?.let { raw ->
+            if (key != "program") raw else {
                 require(raw.encodeToByteArray().size <= 65_536) { "English query program limit" }; reifyStrict(raw)
-            })]
+            }
+        }
+        val request = _m["receiptCid" j parameter("receiptCid"), "mode" j parameter("mode"), "program" j parameter("program")]
         val reply = submit(jsonOf(request))
         val output = reifyStrict(reply.body) as? Map<*, *> ?: error("English observation query returned invalid JSON")
         require(reply.status == 200) { output["error"]?.toString() ?: "English observation query refused" }
