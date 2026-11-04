@@ -31,3 +31,32 @@ CR/CRLF/LF values. The annotated coroutine test now has an explicit Unit/void
 return; the source driver checks that discovery contract before invocation.
 v61 compiled but ran 160 instead of 161 methods and is incomplete, not GREEN.
 Final coordinated artifact evidence will be appended only after a new valid run.
+
+Immutable v62 INTERMEDIATE artifact (before external master and CAS retention)
+
+Source 4e87c9380cd766c2343f88e5c6097b1be8f3327c, production main.jar SHA256
+ a9deb460d43ed52139ab8b5ba02a1b94f03146d0f1c21c7fd4612b832a0c9c1c,
+was frozen after root recorded 162 successful JUnit checks and all three JS checks.
+The external proof compiled TESTS/drivers only. No production overlays, friend
+paths, build class directories or ABI shims were used; every checked production
+CodeSource points to that exact frozen JAR and its hash stayed unchanged.
+
+All 32 fixed-input methods pass and every annotated method has a JVM void return:
+seven RDF methods and 25 existing identity/admission/KIF/readback controls. Runtime
+0.885452988s. Pure comparisons pass, 0.787635615s: the same 12 original immutable-v59
+RDF inputs, raw short CR/TAB, and the three source-overlay structural BEFORE cases.
+The latter are explicitly source-overlay evidence, not an immutable baseline JAR.
+Their actual rows change [0,1,1] to [1,2,1]. Additional mixed structural endings and
+long-literal CR/CRLF/LF controls pass with exact literal content.
+
+IRI/literal term identity, punctuation, escape/language/datatype and namespace
+fidelity improve through the bounded KG profile; malformed/unsupported input
+refuses. Other permissive API outputs on the same inputs remain unchanged. Real
+text intake/replay, no partial parsing mint, old codec/KIF, bag guards and readback
+controls pass. All isolated jobs close; no models, NLP parsers, private corpus or
+live state are involved. v61 remains incomplete (160 of 161 JUnit checks), not GREEN.
+
+This is an INTERMEDIATE checkpoint before external master8a and source-definition
+retention integration. It is not final combined-master verification, full RDF
+conformance, source authentication, general inference, retraction, or same-angular
+coexistence. Later combined-artifact evidence must be recorded separately.

@@ -1,0 +1,36 @@
+{
+  "sourceCommit": "a6ab66b43770821d4f5a90777e2006decd83e28a",
+  "sources": {
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/KgRdfFidelityTest.kt": {
+      "committedSha256": "5ac424917de4ddebeb9de4baf3299837aeda6f63148bff6d7ae1f1e2e9c5dcd4",
+      "compiledTestSha256": "480ceb26acc796ba5b9fa7c6d0488e79b0909f546432e11670e8f189b8070c26",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/KgPropositionIdentityTest.kt": {
+      "committedSha256": "9b72846dce69c90efb88739a35d371c603789d38af13df773c66ba644cb0a24f",
+      "compiledTestSha256": "c4a4f1bd9a518bfdd1c0353dc5162ea681b9c0ebc2cbb5f361b1e9f8538c2507",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/BeliefAdmissionTest.kt": {
+      "committedSha256": "460318d7e06eec15b2bb628b6e824ea6619e269cb0fa28ce7dc2720445f98905",
+      "compiledTestSha256": "cca9e9f73468525792264aea60d100607d6e9e2bea060251f76370bf52c970da",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/memory/HermesMemoryFeedbackTest.kt": {
+      "committedSha256": "ecdfc791e8c628588ac6d47fba1feeded4065612e36e111046cf6c6051653dc6",
+      "compiledTestSha256": "4a28b31cc82dc6947ade53787379cca760ebeb3a059e45ebe3dc07e20880927b",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/commonTest/kotlin/borg/trikeshed/kif/KifSemanticTest.kt": {
+      "committedSha256": "a9c3fb64db63c552b8830e7cbb6c7f4e346ccf7ec7bb77b29e20301c0c73267c",
+      "compiledTestSha256": "d08b58738b1e408e7e7af28f659c78a2d7e8ceab46e75ffe3e7b1eaaa5a04412",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    },
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/PropositionReadbackTest.kt": {
+      "committedSha256": "b9bd3162cae10ff0c71c3bff691969d549fdc889147a8b3bf21df7850d606d3c",
+      "compiledTestSha256": "95a2a4cb49bba55043db744b84ba71c478d9afc40290ee0f43c2984bfdb586d9",
+      "alteration": "Test package relocated with explicit original-package imports; behavior unchanged"
+    }
+  },
+  "productionOverlays": false
+}

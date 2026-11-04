@@ -1,0 +1,33 @@
+{
+  "source": "4e87c9380cd766c2343f88e5c6097b1be8f3327c",
+  "mainJar": "/workspace/library-files/nars-rdf-fidelity-v62-proof/snapshot/main.jar",
+  "mainJarSha256": "a9deb460d43ed52139ab8b5ba02a1b94f03146d0f1c21c7fd4612b832a0c9c1c",
+  "snapshotManifestSha256": "2641d8a7857835249c79497bb60df2f3b954be8445013a87c034035df2e43073",
+  "classpathSha256": "c865805944a896357a2194c4c26210e5e7e8a2e9cb86710114a0a3e4ba602d7e",
+  "compiledTestSources": {
+    "Runner.kt": "73d5178b8df5524b0ffc11c86902192921966f792f75dd20ec478fbdc654ebb7",
+    "KgRdfFidelityTest.kt": "480ceb26acc796ba5b9fa7c6d0488e79b0909f546432e11670e8f189b8070c26",
+    "KgPropositionIdentityTest.kt": "c4a4f1bd9a518bfdd1c0353dc5162ea681b9c0ebc2cbb5f361b1e9f8538c2507",
+    "BeliefAdmissionTest.kt": "cca9e9f73468525792264aea60d100607d6e9e2bea060251f76370bf52c970da",
+    "HermesMemoryFeedbackTest.kt": "4a28b31cc82dc6947ade53787379cca760ebeb3a059e45ebe3dc07e20880927b",
+    "KifSemanticTest.kt": "d08b58738b1e408e7e7af28f659c78a2d7e8ceab46e75ffe3e7b1eaaa5a04412",
+    "PropositionReadbackTest.kt": "95a2a4cb49bba55043db744b84ba71c478d9afc40290ee0f43c2984bfdb586d9",
+    "RdfAfter.kt": "8cc1306c8789396f9bbbac4991e63f2c384bf2c98f9b0b8937d116cc1327098e",
+    "RawLiteralAfter.kt": "a2318e6376cc3407eb9612c5557c66294511a01b72bed377c9d19c95c0689b09",
+    "CrAfter.kt": "edc0ae14eb54ed658bb53330665a8c09a23fd8ecf99ee1f89cf4c0b14d00b4fd"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "maximumHeap": "512m",
+  "nativeMemoryLimit": false,
+  "wallTimeoutSeconds": 45,
+  "attempt": 1,
+  "startedAt": "2026-11-04T20:15:00.383634+00:00",
+  "runtimeSeconds": 0.8854529879972688,
+  "runtimeExit": 0,
+  "finishedAt": "2026-11-04T20:15:10.409073+00:00",
+  "structuralEolSourceOverlayBeforeSha256": "e978f11d892e95c802a93ab1866a3ac69673435a9491e6c256fc2dfb2fe0e040",
+  "comparisonRuntimeSeconds": 0.7876356149972707,
+  "rdfBaselineResultSha256": "af0f19ef4d45f4f52f70b49632b6a59e03802802dbf5718e4b34e16f93ea0bed",
+  "shortLiteralBaselineSha256": "be5478621494b05561f897bcf274864c15d3d064390c3f28c38835dc80460578"
+}

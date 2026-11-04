@@ -1,11 +1,19 @@
 {
-  "method.txt": "fc8aba1144c674ed13595130776096ad583d34c31cff246c62423df11aed914d",
+  "v62-intermediate-tests-result.json": "803a96e35876693cf26c74d89370089175e4e5a8c3eca1edfba6f2059a9e40a2",
+  "method.txt": "aa511b04db8b98a99e583bc7b5b779bc79dfecc66aae9030092a77322d374e24",
+  "v62-intermediate-rdf-after.json": "ba0ba4551ae88d6835c49ce9baef7680450265f86619b0d9725ed2e3720667a2",
   "baseline-v59-short-literal-result.json": "be5478621494b05561f897bcf274864c15d3d064390c3f28c38835dc80460578",
   "baseline-v59-result.json": "af0f19ef4d45f4f52f70b49632b6a59e03802802dbf5718e4b34e16f93ea0bed",
+  "v62-intermediate-identity.json": "ca4528896fade66d5c05fbd86a2007a539cb4cd25982afb533262e51ef08662b",
   "baseline-v59-identity.json": "790cdd24593d208bdff061799e65557c5941451a67525eccbd68df9bd352c04b",
   "structural-eol-source-after-identity.json": "43f7ceafc5a5abaef178a9d38d1a8c24b768a51188eb7db84102c7e5140fb421",
+  "v62-intermediate-structural-eol-after.json": "93d1af58b7d152e6b4cb25a4ed01176551a8dd3f8ec0340ecc25706af6baa3d8",
   "structural-eol-source-after-result.json": "15e324f432a45a24b3c1fe4bbbd3017e281d3292ed603c1d1a4e6b96fdb3b98f",
   "structural-eol-source-before-identity.json": "a6c65d9975f970fa0f1d2d58fba5546f27f509704c14eb1fe2c1c4aff99893c9",
+  "v62-intermediate-short-literal-after.json": "cd73d7fd1d8d90883e6ddcdef93e1d21a00bda0bc14edfa4033fabbb0188f40a",
+  "v62-intermediate-comparison.json": "a4c2a9a262e5abed49d73a5b3d4e4c4ca9431b73b69694deda711645990423dc",
   "baseline-v59-short-literal-identity.json": "2f12354d823650e54242a405614244cc42b7d8d00038c82d5280f1b4e0bfe82f",
-  "structural-eol-source-before-result.json": "e978f11d892e95c802a93ab1866a3ac69673435a9491e6c256fc2dfb2fe0e040"
+  "v62-intermediate-test-source-identity.json": "69a0384aec68ea0d23b32171b2ecf7192aceda1d4fe01481b8367e10d11d6bb5",
+  "structural-eol-source-before-result.json": "e978f11d892e95c802a93ab1866a3ac69673435a9491e6c256fc2dfb2fe0e040",
+  "v62-intermediate-verification.json": "93927e43615910be5f4935ef53d64f77799494990b04153ea70da1d41bcb02de"
 }
