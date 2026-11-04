@@ -55,5 +55,31 @@
     "logsRetainedExternally": true,
     "successfulAttempt": 2
   },
-  "finalV55Revalidation": "Pending final immutable artifact; this evidence records v54 exactly and is not relabeled as v55"
+  "finalV55Revalidation": {
+    "source": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+    "mainJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+    "sameSyntheticHarnessSha256AsV54": true,
+    "sameFocusedTestSourceSha256AsV54": true,
+    "sameNineCases": {
+      "originalFailuresFixedByExplicitRefusal": 3,
+      "supportedControlsRetained": 4,
+      "unsupportedStillExplicit": 2,
+      "supportedRegressions": 0,
+      "missingCases": 0
+    },
+    "combinedExperiment": {
+      "supported": 11,
+      "failures": 0,
+      "unsupported": 2,
+      "runtimeSeconds": 0.7881677170007606
+    },
+    "separateFocusedTests": {
+      "pass": 11,
+      "fail": 0,
+      "runtimeSeconds": 0.6023121510006604
+    },
+    "productionSourceOverlays": false,
+    "friendPaths": false,
+    "newDirectoriesPreserveV54Artifacts": true
+  }
 }

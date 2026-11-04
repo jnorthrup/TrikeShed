@@ -62,3 +62,19 @@ Both runs used bounded child JVMs with 512m maximum heap and 45s wall timeout,
 without a native memory cap or network-denial profile. No models, provider calls,
 training, mass seeding or live-state changes occurred. v54 is the measured build;
 final v55 rerun evidence will be recorded separately rather than replacing it.
+
+Final v55 rerun (separate artifact, 2026-11-04)
+
+Source aaba7d5504d516e4ff6a68c19db11630e16c22ef and production main.jar SHA256
+c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1
+were frozen separately. Both proofs ran in new directories, preserving every v54
+result and failed preparation log. The comparison harness hash and all three
+focused-test/driver source hashes exactly match v54. No production overlays or
+friend paths were used, and actual production CodeSource checks point to the
+final v55 snapshot JAR. All workers/supervisors were drained and temporary memory
+files removed. The same nine cases again retain four controls, fix three failed
+invariants by typed refusal, and leave two unsupported capabilities explicit;
+the four additional controls pass. Experiment total: eleven SUPPORTED, zero FAIL,
+two UNSUPPORTED, runtime 0.788167717 s. The separate eleven focused tests all pass,
+runtime 0.602312151 s. These are synthetic invariant checks, not evidence of new
+semantic inference, authenticated source independence or legal comprehension.

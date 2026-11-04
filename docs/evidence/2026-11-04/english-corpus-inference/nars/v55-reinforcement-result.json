@@ -1,0 +1,71 @@
+{
+  "result": "PASS",
+  "tests": [
+    {
+      "name": "structureRefusalPreservesResidentAndMetadataAndTheActorKeepsWorking",
+      "status": "PASS",
+      "runtimeNanos": 215527416
+    },
+    {
+      "name": "unknownEmptyAndLegacyAncestryCannotBecomeIndependentSupport",
+      "status": "PASS",
+      "runtimeNanos": 9946769
+    },
+    {
+      "name": "onlyNonemptyDisjointExactLeavesIncreaseEvidence",
+      "status": "PASS",
+      "runtimeNanos": 16773925
+    },
+    {
+      "name": "spillRevivalChecksPriorIdentityAndRevisesExactlyOnce",
+      "status": "PASS",
+      "runtimeNanos": 9563261
+    },
+    {
+      "name": "replayPreservesHistoryButDoesNotInventLostExactAncestry",
+      "status": "PASS",
+      "runtimeNanos": 6688521
+    },
+    {
+      "name": "receiptArchivedAfterPlacementRejectionCannotBeCountedAgain",
+      "status": "PASS",
+      "runtimeNanos": 18078719
+    },
+    {
+      "name": "unavailableHistoryCannotBeResetByAnIncomingObservation",
+      "status": "PASS",
+      "runtimeNanos": 6084033
+    },
+    {
+      "name": "reinforcementRequiresReceiptsAndNeverTurnsRepeatedSourcesIntoNewEvidence",
+      "status": "PASS",
+      "runtimeNanos": 13927171
+    },
+    {
+      "name": "reinforcementCannotBypassUnknownAncestryAfterLegacyAdmissionOrWalReplay",
+      "status": "PASS",
+      "runtimeNanos": 7457696
+    },
+    {
+      "name": "lcncReinforcementRequiresSourceFieldsAndReportsOnlyProcessedCommands",
+      "status": "PASS",
+      "runtimeNanos": 107759642
+    },
+    {
+      "name": "deletingRetrievedMemoryDemotesAttentionWithoutRefutingItsProposition",
+      "status": "PASS",
+      "runtimeNanos": 21271424
+    }
+  ],
+  "productionCodeSources": {
+    "BeliefBagElement": "file:/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+    "BeliefsNodes": "file:/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+    "HermesMemoryFiles": "file:/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar"
+  },
+  "productionOverlays": false,
+  "friendPaths": false,
+  "modelCalls": 0,
+  "liveBagAccess": false,
+  "sourceIndependenceAuthority": "Declared synthetic exact leaves; not source authentication",
+  "walScope": "Actual frame codec/replay through in-memory log; not disk/CRC/process restart durability"
+}
