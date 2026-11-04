@@ -15,7 +15,7 @@ typedef struct {
     int32_t total, fault, at, room;
     int32_t *spans; uint8_t *tags; int32_t *depths, *starts, *kids, *work;
 } Flat;
-typedef struct { Chars source; Flat flat; uint64_t bytes; } Scan;
+typedef struct { Chars source; Flat flat; uint64_t bytes; uint64_t *guards[14]; } Scan;
 _Static_assert(sizeof(void *) == 8, "This retained profile requires 64-bit pointers");
 _Static_assert(sizeof(Chars) == 32 && offsetof(Chars, data) == 8, "CharSeries ABI");
 _Static_assert(sizeof(Flat) == 64 && offsetof(Flat, spans) == 16 && offsetof(Flat, work) == 56, "Flat ABI");
@@ -23,7 +23,17 @@ extern int32_t confix_scan_json(Chars *, Flat *);
 extern int32_t confix_scan_cbor(Chars *, Flat *);
 extern int32_t confix_scan_yaml(Chars *, Flat *);
 static uint64_t live_bytes;
+static const uint64_t guard = 0x6c636e636f6e6669ull;
 static uint64_t aligned(uint64_t n) { return (n + 7u) & ~7ull; }
+static void *region(Scan *s, uint8_t **cursor, uint64_t bytes, int32_t index) {
+    uint64_t *before = (uint64_t *)*cursor;
+    uint8_t *data = *cursor + 8;
+    uint64_t *after = (uint64_t *)(data + aligned(bytes));
+    *before = guard; *after = guard;
+    s->guards[2*index] = before; s->guards[2*index+1] = after;
+    *cursor = (uint8_t *)(after + 1);
+    return data;
+}
 
 int32_t confix_abi(void) { return 1; }
 uint64_t confix_live_bytes(void) { return live_bytes; }
@@ -33,21 +43,26 @@ Scan *confix_open(int32_t size, int32_t room) {
     if (size < 0 || size > 65536 || room < 1 || room > 16384) return NULL;
     uint64_t n = (uint32_t)size, r = (uint32_t)room;
     uint64_t work = 9 * (n + 1) > 3 * r ? 9 * (n + 1) : 3 * r;
-    uint64_t bytes = aligned(sizeof(Scan)) + aligned(n) + aligned(8*r) + aligned(r)
+    uint64_t bytes = aligned(sizeof(Scan)) + 14*8 + aligned(n) + aligned(8*r) + aligned(r)
         + aligned(4*r) + aligned(4*(r+1)) + aligned(4*r) + aligned(4*work);
     Scan *s = calloc(1, (size_t)bytes);
     if (!s) return NULL;
     uint8_t *p = (uint8_t *)s + aligned(sizeof(Scan));
-    s->source.size = size; s->source.data = p; s->source.limit = size; p += aligned(n);
+    s->source.size = size; s->source.data = region(s, &p, n, 0); s->source.limit = size;
     s->flat.room = room;
-    s->flat.spans = (int32_t *)p; p += aligned(8*r);
-    s->flat.tags = p; p += aligned(r);
-    s->flat.depths = (int32_t *)p; p += aligned(4*r);
-    s->flat.starts = (int32_t *)p; p += aligned(4*(r+1));
-    s->flat.kids = (int32_t *)p; p += aligned(4*r);
-    s->flat.work = (int32_t *)p;
+    s->flat.spans = region(s, &p, 8*r, 1);
+    s->flat.tags = region(s, &p, r, 2);
+    s->flat.depths = region(s, &p, 4*r, 3);
+    s->flat.starts = region(s, &p, 4*(r+1), 4);
+    s->flat.kids = region(s, &p, 4*r, 5);
+    s->flat.work = region(s, &p, 4*work, 6);
     s->bytes = bytes; live_bytes += bytes;
     return s;
+}
+int32_t confix_guards(Scan *s) {
+    if (!s) return 0;
+    for (int32_t i=0; i<14; i++) if (*s->guards[i] != guard) return 0;
+    return 1;
 }
 
 /* Packed little-endian transport lanes; this is independent of host endian. */
