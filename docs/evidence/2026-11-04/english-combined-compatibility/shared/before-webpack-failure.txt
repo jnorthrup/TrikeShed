@@ -1,0 +1,30 @@
+Module not found: Error: Can't resolve 'vm' in '/workspace/TrikeShed/build/js/packages/TrikeShed-spacegraph/kotlin'
+
+BREAKING CHANGE: webpack < 5 used to include polyfills for node.js core modules by default.
+This is no longer the case. Verify if you need this module and configure a polyfill for it.
+
+If you want to include a polyfill, you need to:
+	- add a fallback 'resolve.fallback: { "vm": require.resolve("vm-browserify") }'
+	- install 'vm-browserify'
+If you don't want to include a polyfill, you can use an empty module like this:
+	resolve.fallback: { "vm": false }
+Critical dependency: the request of a dependency is an expression
+Critical dependency: the request of a dependency is an expression
+asset spacegraph.js 36.7 MiB [emitted] (name: main)
+runtime modules 1.19 KiB 4 modules
+orphan modules 220 bytes [orphan] 2 modules
+modules by path ../../node_modules/lucide/dist/esm/icons/*.js 832 KiB 1544 modules
+modules by path ../../node_modules/d3-quadtree/src/*.js 11.5 KiB 15 modules
+modules by path ../../node_modules/d3-force/src/*.js 17.7 KiB
+  ../../node_modules/d3-force/src/index.js 406 bytes [built] [code generated]
+  + 11 modules
+modules by path ./kotlin/ 15.9 MiB
+  ./kotlin/TrikeShed-spacegraph.js 1.69 MiB [built] [code generated] [32 warnings]
+  + 7 modules
+modules by path ../../node_modules/lucide/dist/esm/*.js 207 KiB
+  ../../node_modules/lucide/dist/esm/lucide.js 103 KiB [built] [code generated]
+  + 4 modules
++ 4 modules
+webpack 5.108.1 compiled with 1 error and 2 warnings in 5638 ms
+
+> Task :jsBrowserSpacegraphDevelopmentWebpack FAILED

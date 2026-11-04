@@ -1,0 +1,9 @@
+function (src, ms) {
+      var vm = require('vm');
+      try {
+        var r = vm.runInNewContext(src, {}, ms > 0 ? {timeout: Number(ms)} : {});
+        return JSON.stringify(r === undefined ? null : r);
+      } catch (e) {
+        throw new Error('GUEST_ERROR: ' + String(e && e.message ? e.message : e));
+      }
+    }(source, toNumber(wallMillis));
