@@ -1,6 +1,7 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.web.*
 
 /** Text from a retained invocation; reading it never enters the guest or infers missing counters. */
 internal fun llvmObservation(runtime: dynamic): List<String> {
