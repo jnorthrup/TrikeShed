@@ -1,13 +1,8 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.kif.CycLToKif
-import borg.trikeshed.kif.KifExpr
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.job.*
+import borg.trikeshed.kif.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.ontology.SumoOntology
 
 /**
@@ -28,7 +23,8 @@ import borg.trikeshed.ontology.SumoOntology
  *
  * Parsers are deliberately minimal (statement-level Turtle with prefix/;/,
  * support; s-expression KIF) — the bridge's value is the MAPPING, not a
- * conformance suite. Unparseable statements are skipped, never guessed.
+ * conformance suite. The legacy KIF triplet crossing accepts only bounded, ground
+ * binary scalar predicates; unsupported scope/arity refuses the entire crossing.
  */
 object KgNalBridge {
 
@@ -42,6 +38,30 @@ object KgNalBridge {
         fun gloss(): String = when (copula) {
             NalCopula.PRODUCT -> "(*, ${triplet.subject}, ${triplet.obj}) --> ${triplet.predicate}"
             else -> "${triplet.subject} ${copula.symbol} ${triplet.obj}"
+        }
+
+        private fun temporal(sourceCid: String): TemporalSignal? = triplet.temporal
+            ?: if (copula.isTemporal) TemporalSignal(TemporalGrade.RELATIVE, sourceCid = sourceCid) else null
+
+        /**
+         * Exact lexical proposition in a DECLARED source context, independent of confidence,
+         * evidence, observation receipts and attention. Different documents are conservatively
+         * distinct contexts; this does not authenticate the source or retain this payload in CAS.
+         * Raw triple terms retain the existing parser's limits (including RDF term-kind fidelity).
+         */
+        fun propositionCid(sourceCid: String): ContentId {
+            val qualification = temporal(sourceCid)
+            for (value in s_[sourceCid, triplet.subject, triplet.predicate, triplet.obj, triplet.subjectCid,
+                triplet.objectCid, qualification?.validFrom, qualification?.validUntil, qualification?.sourceCid].view)
+                value?.encodeToByteArray(throwOnInvalidSequence = true)
+            return ContentId.of(CanonicalCbor.encodeMap(_m[
+                "kind" j "kg-source-proposition/1", "sourceContext" j sourceCid,
+                "predicate" j triplet.predicate, "subject" j triplet.subject, "object" j triplet.obj,
+                "subjectCid" j triplet.subjectCid, "objectCid" j triplet.objectCid,
+                "copula" j copula.name, "relation" j relation.name,
+                "temporal" j qualification?.let { _m["grade" j it.grade.name, "validFrom" j it.validFrom,
+                    "validUntil" j it.validUntil, "sourceCid" j it.sourceCid] },
+            ]))
         }
 
         /**
@@ -69,9 +89,9 @@ object KgNalBridge {
             relation = relation,
             subjectCid = triplet.subjectCid ?: sourceCid,
             objectCid = triplet.objectCid,
-            temporal = triplet.temporal
-                ?: if (copula.isTemporal) TemporalSignal(TemporalGrade.RELATIVE, sourceCid = sourceCid) else null,
+            temporal = temporal(sourceCid),
             provenanceCid = provenanceCid,
+            propositionCid = propositionCid(sourceCid).value,
         )
     }
 
@@ -302,67 +322,18 @@ object KgNalBridge {
     // ── KIF-lite ──────────────────────────────────────────────────────
 
     fun parseKif(text: String, confidence: Float = 0.9f): List<KgTriplet> {
-        val out = ArrayList<KgTriplet>()
-        for (expr in topLevelSexprs(text)) {
-            val parts = sexprParts(expr) ?: continue
-            if (parts.size < 3) continue
-            val head = parts[0].lowercase()
-            when (head) {
-                "instance", "subclass", "=>", "<=>" -> out.add(
-                    KgTriplet(parts[1], head, parts[2], confidence = confidence),
-                )
-                else -> if (parts.size >= 3) out.add(
-                    KgTriplet(parts[1], parts[0], parts[2], confidence = confidence),
-                )
+        // Decode/bound the COMPLETE input before returning any row. No negative/modal/conditional
+        // wrapper, additional argument or malformed tail may silently become a positive triplet.
+        return KifSemantic.decodeAll(text).map { decoded ->
+            val predicate = decoded.formula as? KifFormula.Predicate
+                ?: throw IllegalArgumentException("Legacy KG triplets do not interpret scoped KIF formulas")
+            require(predicate.arguments.size == 2 && decoded.freeVariables.isEmpty() &&
+                predicate.arguments.all { it is KifTerm.Constant || it is KifTerm.Literal }) {
+                "Legacy KG triplets require ground binary scalar KIF predicates"
             }
+            val syntax = decoded.syntax as KifExpr.ListExpr
+            KgTriplet(syntax.elements[1].toKifString(), predicate.name, syntax.elements[2].toKifString(), confidence = confidence)
         }
-        return out
     }
 
-    private fun topLevelSexprs(text: String): List<String> {
-        val out = ArrayList<String>()
-        var depth = 0
-        var start = -1
-        for (i in text.indices) {
-            when (text[i]) {
-                '(' -> { if (depth == 0) start = i; depth++ }
-                ')' -> {
-                    depth--
-                    if (depth == 0 && start >= 0) { out.add(text.substring(start, i + 1)); start = -1 }
-                }
-            }
-        }
-        return out
-    }
-
-    /** Split one s-expr into head + args; nested exprs stay as their own text. */
-    private fun sexprParts(expr: String): List<String>? {
-        val inner = expr.trim().removePrefix("(").removeSuffix(")").trim()
-        if (inner.isEmpty()) return null
-        val parts = ArrayList<String>()
-        var i = 0
-        while (i < inner.length) {
-            when {
-                inner[i].isWhitespace() -> i++
-                inner[i] == '(' -> {
-                    var depth = 0
-                    var j = i
-                    while (j < inner.length) {
-                        if (inner[j] == '(') depth++
-                        if (inner[j] == ')') { depth--; if (depth == 0) break }
-                        j++
-                    }
-                    parts.add(inner.substring(i, minOf(j + 1, inner.length)))
-                    i = j + 1
-                }
-                else -> {
-                    var j = i
-                    while (j < inner.length && !inner[j].isWhitespace()) j++
-                    parts.add(inner.substring(i, j))
-                    i = j
-                }
-            }
-        }
-        return parts
-    }
 }

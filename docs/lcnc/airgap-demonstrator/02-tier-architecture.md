@@ -95,4 +95,6 @@ Unrelated scopes continue when their input identities and dependencies are uncha
 
 Start with a single workstation, local browser, host daemon, isolated parser/solver workers and local content store. This minimizes distributed coordination while exercising the same artifact and event contracts. Add additional CPU workers only after one-host accounting, replay and invalidation work.
 
+For compatible `mlir-nix` bitcode, the intended embedding route is now an owned in-process JVM Polyglot context, following the [Sulong pivot](22-mlir-nix-polyglot.md). Engine descriptors distinguish that trusted profile from workers requiring process containment. A binary kernel, a bitcode evaluator and complete dialect lowering are separate capabilities; none acquires another's semantic or resource guarantees merely by using LLVM. Retain the existing supervised solver as an explicitly named backend until the replacement meets its acceptance gates.
+
 Connected acquisition and frontier development run in a separate environment. Transfer reviewed, hash-verified bundles into the offline runtime. An air-gapped lane cannot silently ask a remote provider for help when an optional local model is absent; it returns unavailable, or the operator chooses an explicitly supported deterministic alternative.

@@ -32,6 +32,7 @@
 | Exhaustive implementation documents | Mechanism chapters, schemas, experiments and 25 handoffs | This package | Link, arithmetic and coverage review |
 | Frontier AI round-the-clock timeline | Work estimate, capacity ceiling, tariff assumptions and recalibration | Programme owner | First-48-hour actual usage report |
 | D3M integration endorsement | PRELOAD contract with distribution/fetch and conflict preservation | Integration owner | Branch manifest, conflict archive, verified remote OID |
+| MLIR-Nix JVM Polyglot pivot | Binary module path, versioned ABI, explicit allocation ownership, mode/target policy | WP15 with WP02/WP09/WP11/WP23/WP24 | E09, V26 and P00–P08; full Nix requires separate semantic evidence |
 
 ## Invariant ownership
 

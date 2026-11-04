@@ -1,0 +1,81 @@
+Source-context proposition identity at the existing KG crossing
+
+The immutable v55 counterexample showed pays(Tenant,Landlord) and
+owes(Tenant,Landlord) mapping to the same natural angular coordinate and identical
+SemanticSignal bytes. The old signal had no predicate identity. It also showed
+(transfers Tenant Landlord Dollar) and the Euro variant becoming identical legacy
+triplets because the third argument was discarded. These are bridge losses, not
+proof of full NARS reasoning, a discovered hash collision, or model training.
+
+The existing KgNalBridge.signal now carries an optional propositionCid. Its
+canonical CBOR digest includes the complete retained lexical predicate, ordered
+subject/object terms and available role CIDs, copula, relation, full available
+temporal qualification, and DECLARED source context. Invalid UTF-16 is refused
+before identity encoding. Confidence, evidence, budget, observation receipt and
+Bloom hints are excluded. This digest identifies the declared projection; the
+pure bridge does not store its canonical payload in CAS or authenticate it.
+The current source-context parameter is the caller's sourceCid, so different
+source content remains conservatively separate rather than automatically joined
+as independent evidence. Identical source bytes can share a content context.
+This is not authenticated document/jurisdiction context or cross-document entity
+resolution. Existing Turtle lexical parsing still has limited RDF term-kind
+fidelity; the new digest does not silently turn that parser into a full RDF model.
+
+The owning bag compares known proposition IDs before same-receipt replay, source
+basis revision, or resident/archive mutation. Different known IDs refuse with
+PROPOSITION_MISMATCH; one known and one unknown ID refuse with
+UNRESOLVED_PROPOSITION. Resident signal/evidence/gloss/budget and history remain
+unchanged, and the worker continues. Exact matching IDs still require the existing
+receipt and ancestry checks. Both-null legacy signals retain their current
+subject/object/relation/temporal guard, with no full proposition-identity claim.
+Reinforce preserves the resident identity through its existing guarded path.
+Angular routing remains bounded attention; this repair refuses conflation rather
+than retaining two distinct propositions in a single angular cell.
+
+SignalCodec appends a twelfth field only when propositionCid is present. Null
+signals retain identical eleven-field bytes and historical CAS identities. New
+readers accept historical ten-field, eleven-field, and identified twelve-field
+records; a ten-field read still has the pre-existing upgrade to an eleven-field
+write. Old readers cannot read twelve fields. Adding the trailing optional Kotlin
+data field preserves source construction defaults, not JVM binary compatibility:
+all JVM consumers must rebuild together. CAS/WAL replay retains the field. The
+older StateNodes freeze/thaw format already omits object/temporal qualification;
+it also restores an unknown proposition identity. New known-identity revisions
+therefore refuse rather than upgrading that history. This slice does not rewrite
+legacy snapshots, live CAS/WAL history, or historical evidence.
+
+The legacy KIF-to-triplet crossing now uses strict KifSemantic decoding with
+whole-input bounds: 65536 UTF-16 characters, nesting64 and syntax nodes8192 total.
+Only ground binary predicates with scalar constant/literal arguments cross.
+Additional arguments, variables/functions, negation, modal/context operators,
+implication/equivalence, quoted forms, malformed tails and oversized inputs refuse
+the complete crossing. A valid prefix is not partially minted when another form
+is unsupported. Full syntax and operators remain available to KifSemantic; they
+are not interpreted as unconditional triplets. This deliberately narrows imports
+through kg.ingest / nal.rules.fromKg. Explicit EternalRule.fromKif, reviewed native
+Horn/KIF, positive taxonomy review and their authority policies remain separate.
+No source approval, conditional applicability or world truth follows from syntax.
+
+Existing real consumers call the repaired signal crossing: text KG intake used
+by HTTP/LCNC, cursor KG intake, document attribution and production-event mappings.
+Other signal producers remain legacy-null unless they supply their own correctly
+scoped exact identity. No new corpus API or review-admission lane was added.
+The uncalled legacy pure reviseInto map fold also refuses crossing/erasing a known
+ID; it still has no owner-side ancestry policy and is not the production bag.
+
+Focused synthetic regressions cover the actual natural predicate collision,
+known/unknown replay in both directions, ordered roles/context/temporal identity,
+historical codec bytes, strict syntax/arity losses, real text/cursor callers,
+and actual CAS plus in-memory WAL-frame replay. In-memory replay is not a disk,
+CRC or process-restart durability proof. Standalone source-overlay checks are
+pre-integration evidence; a coordinated immutable-JAR run remains necessary.
+Semantic role unification/querying, source retraction, full KIF inference and
+source-authority authentication remain outside this repair.
+
+Pre-integration check: 24 methods passed in the standalone source-overlay run
+(seven new KG identity methods, eleven prior admission/reinforcement/memory methods,
+and six existing KifSemantic methods). It used the exact cached Kotlin/Compose
+compiler2.4.21 and immutable v55 dependencies, no friend access or Gradle. The first
+run lacked Compose's generated stability field; that fixture ABI failure was
+retained and corrected by using the actual compiler plugin, without changing
+production behavior. These source checks are not a final immutable-JAR claim.

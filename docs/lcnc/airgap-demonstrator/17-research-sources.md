@@ -34,6 +34,21 @@ Sources were inspected on 4 November 2026. The register states what each source 
 | R26 | [Coinbase US user agreement](https://www.coinbase.com/legal/user_agreement/united_states) | Concrete complex-source candidate | No evidentiary capture or applicability finding made here |
 | R27 | [Coinbase v. Suski official opinion](https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf) | Conflicting-agreement authority-mapping fixture | Historical question; no current-law completeness claim |
 
+## Polyglot pivot sources
+
+The subsequent [Polyglot RFC revision](22-mlir-nix-polyglot.md) adds this source set, inspected on 4 November 2026. Its code inventory pins `mlir-nix` independently from the existing SUMO-Nix bridge; no runtime benchmark or upstream build was executed for the revision.
+
+| ID | Primary source | Supported use | Boundary |
+|---|---|---|---|
+| R28 | [GraalVM native/managed execution](https://www.graalvm.org/latest/reference-manual/llvm/NativeExecution/) | Allocation, native-call and mode distinctions | Rolling docs do not certify the pinned runtime or containment |
+| R29 | [LLVM interoperability](https://www.graalvm.org/latest/reference-manual/llvm/Interoperability/) | JVM embedding and explicit guest interop | No automatic evaluator ABI or measured zero-copy claim |
+| R30 | [LLVM compatibility](https://www.graalvm.org/latest/reference-manual/llvm/Compatibility/) | Need for actual producer/reader verification | Published older version range must not be treated as a current-runtime test |
+| R31 | [MLIR LLVM IR target](https://mlir.llvm.org/docs/TargetLLVMIR/) | Lowering/translation split and C wrappers | Does not supply a Nix semantic conversion pass |
+| R32 | [Bitcode build formats](https://www.graalvm.org/latest/reference-manual/llvm/Compiling/) | Plain bitcode versus embedded-bitcode containers | Dependency closure remains an artifact-specific obligation |
+| R33 | [Polyglot Source API](https://www.graalvm.org/sdk/javadoc/org/graalvm/polyglot/Source.html) and [Context builder](https://www.graalvm.org/sdk/javadoc/org/graalvm/polyglot/Context.Builder.html) | Binary Sources and explicit privilege policy | Illustrative adapter statements are not implemented code |
+| R34 | [Polyglot C header](https://github.com/oracle/graal/blob/master/sulong/projects/com.oracle.truffle.llvm.libraries.graalvm.llvm/include/graalvm/llvm/polyglot.h) | Explicit string conversion and length semantics | Header at inspected default branch; deployment must pin its own compatible version |
+| R35 | [mlir-nix at 571b57d3](https://github.com/jnorthrup/mlir-nix/tree/571b57d3ebdcdabe7ac76765b2875de7b98b9dab) | Inspected C API, pass registry, guarded JIT and build definitions | No full repository audit, Sulong port or claim that prior bridge pins changed |
+
 ## Repository evidence register
 
 These records are first-party project evidence, read as reports tied to their stated commits and fixtures. The planning task did not rerun their experiments.

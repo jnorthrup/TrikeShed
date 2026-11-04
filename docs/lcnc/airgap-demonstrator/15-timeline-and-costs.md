@@ -67,6 +67,10 @@ At the base Fast mixed rate, that effort costs **$7,603–$14,602** in model usa
 
 These work-based totals can be lower than the round-the-clock ceiling because agents waiting for integration, soak tests or a domain decision need not keep generating tokens. Avoid idle conversations that repeatedly re-read unchanged context.
 
+## Polyglot pivot increment
+
+The later [Polyglot pivot](22-mlir-nix-polyglot.md) adds **112–224 active hours** for a bounded compatible-kernel path, or **168–336** with the same 50% effort reserve. At the existing rates and 30% price/token contingency, that increment is **$1,048–$2,097 base** or **$3,243–$6,486 heavy**. The baseline 25-package total above excludes it. Baseline plus this increment is 1,168–2,252 hours before effort reserve, or 1,752–3,378 hours after reserve. Full Nix evaluator/runtime compilation or general dialect lowering is unestimated additional scope; the original milestone dates do not promise those capabilities. The first 16–32-hour compatibility experiment determines whether and how the pivot affects the critical path.
+
 ## Calendar spending ceilings
 
 The following assumes all six lanes maintain 65% active time for every calendar day in the period and adds 30% model-cost contingency. It is a capacity ceiling for planning, not the same estimate as package-based effort.
