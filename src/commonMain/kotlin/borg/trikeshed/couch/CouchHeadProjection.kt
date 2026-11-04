@@ -7,6 +7,8 @@ import borg.trikeshed.collections.mutableSeriesOf
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.ColumnMeta
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 /**
  * A committed frame representing a document mutation.
@@ -19,20 +21,28 @@ data class CouchCommittedFrame(
     val doc: Document?
 )
 
+/** Immutable attachment metadata captured at the head publication boundary. */
+data class CouchHeadSlot(
+    val docId: String, val rev: String, val sequence: Long, val deleted: Boolean,
+    val contentId: String?, val contentType: String?, val length: String?,
+    val attachmentDeleted: Boolean, val ambiguous: Boolean,
+)
+
 /**
  * CouchHeadProjection - Replayable projection of the current document state.
  */
 class CouchHeadProjection {
+    private val gate = SynchronizedObject()
     private val docs = mutableSeriesOf<Document>()
     private val docIndex = mutableMapOf<String, Int>() // docId -> index in docs
     private val fieldIndex = mutableMapOf<String, MutableMap<Any, MutableSet<String>>>()
     private val indexQueryCache = mutableMapOf<Pair<String, Any>, IntArray>()
 
     // docId -> current committed frame (including tombstones)
-    private val frames = mutableMapOf<String, CouchCommittedFrame>()
+    private val frames = mutableMapOf<String, CouchHeadSlot>()
     private var lastSequence: Long = -1L
 
-    fun applyCommit(frame: CouchCommittedFrame) {
+    fun applyCommit(frame: CouchCommittedFrame) = synchronized(gate) {
         val existingFrame = frames[frame.docId]
         if (existingFrame != null) {
             require(frame.sequence > existingFrame.sequence) { "stale revision rejected" }
@@ -51,7 +61,7 @@ class CouchHeadProjection {
             "Insert/Update frame docId must match document id"
         }
 
-        frames[frame.docId] = frame
+        frames[frame.docId] = slot(frame)
         indexQueryCache.clear()
 
         if (frame.deleted) {
@@ -127,6 +137,37 @@ class CouchHeadProjection {
     fun all(): List<Document> = docs.sequence().toList()
 
     fun ids(): Join<Int, (Int) -> String> = docs.α { it.id }
+
+    /** Capture the slot count, then read each immutable committed identity atomically. */
+    fun slots(): Series<CouchHeadSlot> = synchronized(gate) {
+        docs.a j { index: Int -> synchronized(gate) { requireNotNull(frames[docs[index].id]) } }
+    }
+
+    /** Read one immutable committed identity without exposing the mutable head body. */
+    fun slot(docId: String): CouchHeadSlot? = synchronized(gate) { frames[docId] }
+
+    private fun slot(frame: CouchCommittedFrame): CouchHeadSlot {
+        var cid: Field? = null
+        var type: Field? = null
+        var length: Field? = null
+        var deleted: Field? = null
+        var hidden = false
+        var ambiguous = false
+        for (field in frame.doc?.fields.orEmpty()) {
+            when (field.name) {
+                "_id" -> ambiguous = true
+                "contentId" -> if (cid == null) cid = field else ambiguous = true
+                "contentType" -> if (type == null) type = field else ambiguous = true
+                "length" -> if (length == null) length = field else ambiguous = true
+                "deleted" -> {
+                    if (deleted == null) deleted = field else ambiguous = true
+                    if ((field.value as? String) == "true") hidden = true
+                }
+            }
+        }
+        return CouchHeadSlot(frame.docId, frame.rev, frame.sequence, frame.deleted,
+            cid?.value as? String, type?.value as? String, length?.value as? String, hidden, ambiguous)
+    }
 
     fun query(): QueryResult {
         val cursor = buildCursorFromDocs(docs)
