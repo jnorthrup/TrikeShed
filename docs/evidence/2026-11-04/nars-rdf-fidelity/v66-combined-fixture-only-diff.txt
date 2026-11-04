@@ -1,0 +1,22 @@
+--- v62/KgRdfFidelityTest.kt
++++ combined/KgRdfFidelityTest.kt
+@@ -128,7 +128,7 @@
+ 
+     @Test fun actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate(): Unit = runBlocking {
+         withTimeout(10_000) {
+-            val bag = BeliefBagElement(parentJob = currentCoroutineContext()[Job]); bag.open()
++            val bag = BeliefBagElement(cas = KgRetentionFixtureCas(), parentJob = currentCoroutineContext()[Job]); bag.open()
+             try {
+                 assertFailsWith<IllegalArgumentException> { bag.ingestKg("<urn:valid> <urn:p> <urn:o> .\n<urn:s> <urn:p> \"hello\"garbage .") }
+                 assertEquals(0, bag.size)
+--- v62/KgPropositionIdentityTest.kt
++++ combined/KgPropositionIdentityTest.kt
+@@ -137,7 +137,7 @@
+ 
+     @Test fun realTextAndCursorConsumersCannotCrossPredicatesOrPartiallyMintMalformedKif() = runBlocking {
+         withTimeout(10_000) {
+-            withBag { bag ->
++            withBag(cas = KgRetentionFixtureCas()) { bag ->
+                 assertFailsWith<IllegalArgumentException> { bag.ingestKg("(pays Tenant Landlord) (not (pays Tenant Landlord))") }
+                 assertEquals(0, bag.size)
+                 val report = bag.ingestKg("(pays Tenant Landlord)")

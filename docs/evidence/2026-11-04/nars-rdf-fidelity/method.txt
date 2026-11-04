@@ -60,3 +60,35 @@ This is an INTERMEDIATE checkpoint before external master8a and source-definitio
 retention integration. It is not final combined-master verification, full RDF
 conformance, source authentication, general inference, retraction, or same-angular
 coexistence. Later combined-artifact evidence must be recorded separately.
+
+Immutable v66 combined artifact
+
+Source 61411d3617d5d6d4083ba2df42bd6c1500cb6d36 and main.jar SHA256
+e1b67bdfd151ce3bd999f6083997fa0aa0d902bc8c7f19814d159c9b68683397
+were selected after root recorded 326 successful checks and all three JS builds.
+The external proof compiles TESTS and drivers only, without production overlays,
+friend access, build class directories or ABI shims. All checked production
+CodeSources resolve to that exact JAR; its hash and test-source hashes stay stable.
+
+All 32 fixed-input methods pass, with every annotated method's JVM return type
+void: seven RDF and 25 prior PID/admission/KIF/readback controls. Runtime 1.261274447s.
+The original-input RDF/short-literal/structural comparisons pass, 0.766103177s.
+IRI/literal term IDs, punctuation, language/datatype and namespace cases preserve
+complete terms; malformed or unsupported input refuses. CR header/body/CRLF rows
+are [1,2,1], with mixed structural endings and exact long CR/CRLF/LF controls also
+passing. The CR structural BEFORE remains explicitly source-overlay evidence;
+the original 12 RDF and raw short-literal BEFORE files remain immutable-v59 data.
+
+Assertions and input cases are unchanged from v62. Only two consumer fixture
+constructors gain a bounded in-memory test CAS to satisfy the new retention
+boundary. Its unchanged test-only helper body, source file/commit and hashes are
+recorded; the exact two-line fixture diff is included. This is not a production
+shim or an assertion relaxation. Retention-specific contracts have a separate
+proof and are not newly counted as these 32 checks.
+
+All isolated bags/review jobs close and temporary memory files are removed.
+No models, NLP parsers, private corpus or live state are used. The v62 intermediate
+and v61 incomplete identities/statuses remain unchanged. This combined artifact
+run does not claim general RDF conformance, source authenticity, legal authority,
+role inference, retraction, corpus training or same-angular coexistence. Parent
+publication of master follows the complete integration proof set separately.
