@@ -83,7 +83,7 @@ object DocumentSurfacePage {
         val root = document.getElementById(DocumentSurface.ROOT_ID) as HTMLElement
         root.innerHTML = DocumentSurface.layout()
         DocumentsUpload.mount()
-        window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear() })
+        window.addEventListener("pagehide", { DocumentsPdfLinks.clear(); DocumentsEnglish.clear(); DocumentsCorpus.clear() })
         root.addEventListener("click", { e -> onClick(e) })
         root.addEventListener("submit", { e -> onSubmit(e) })
         root.addEventListener("input", { e -> onInput(e) })
@@ -425,6 +425,7 @@ object DocumentSurfacePage {
         if (curationMode) {
             DocumentsPdfLinks.clear()
             DocumentsEnglish.clear()
+            DocumentsCorpus.clear()
             setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.curationCrumbHtml(curationResult))
             setHtml(DocumentSurface.CONTENT_ID, DocumentSurface.curationHtml(
                 curationAvailable, curationDestination, curationRecords,
@@ -473,6 +474,16 @@ object DocumentSurfacePage {
                 document.getElementById(DocumentSurface.CONTENT_ID)?.appendChild(note)
             }
         }
+        val corpusProject = project
+        if (corpusProject != null) {
+            val ticket = generation
+            val selected = doc?.sourceRevision ?: pdfSelection
+            val host = document.createElement("div") as HTMLElement
+            document.getElementById(DocumentSurface.CONTENT_ID)?.let { content -> content.insertBefore(host, content.firstChild) }
+            DocumentsCorpus.mount(host, corpusProject, selected, ticket) {
+                generation == ticket && !curationMode && project == corpusProject && (doc?.sourceRevision ?: pdfSelection) == selected
+            }
+        } else DocumentsCorpus.clear()
         val p = project
         val wanted = if (p == null) "" else "#" + encode(p) + (selectedId?.let { "/" + encode(it) } ?: "")
         if (!keepLocation) setHash(wanted)
