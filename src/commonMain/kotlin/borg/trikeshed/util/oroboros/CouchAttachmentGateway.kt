@@ -27,6 +27,7 @@ class CouchAttachmentGateway(
 ) {
     internal fun uses(store: CouchStore): Boolean = couchStore === store
     internal fun uses(reader: BoundedCasReader): Boolean = (casStore as Any) === reader
+    internal fun usesCas(cas: CasStore): Boolean = casStore === cas
 
     /** [source]: the file [bytes] were read from; the CAS then names it in place rather than copying it. */
     fun putAttachment(ref: OroborosAttachmentRef, bytes: ByteArray, source: String? = null) {
