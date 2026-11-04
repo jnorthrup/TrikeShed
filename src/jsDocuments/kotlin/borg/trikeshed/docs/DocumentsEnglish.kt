@@ -8,6 +8,7 @@ import kotlinx.browser.window
 import kotlinx.coroutines.*
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.HTMLSelectElement
 import org.w3c.fetch.Headers
 import org.w3c.fetch.RequestInit
 
@@ -46,7 +47,13 @@ internal object DocumentsEnglish {
         private var failure: String? = null
         private var result: Map<*, *>? = null
         private var corpusNotice: String? = null
-        fun close() { abort?.abort(); job.cancel() }
+        private var legalAbort: dynamic = null
+        private var legalEpoch = 0
+        private var legalMode = "current"
+        private var legalPending = false
+        private var legalFailure: String? = null
+        private var legalResult: Map<*, *>? = null
+        fun close() { abort?.abort(); resetLegal(); job.cancel() }
         private fun present() = owner === this && job.isActive && current() && host.asDynamic().isConnected == true
         private fun splitScalar(at: Int) = at in 1 until preview.length && preview[at - 1].isHighSurrogate() && preview[at].isLowSurrogate()
         private fun text(parent: HTMLElement, tag: String, value: String, className: String? = null): HTMLElement =
@@ -131,6 +138,7 @@ internal object DocumentsEnglish {
         private fun inspect() {
             if (!validRange()) { failure = "Choose a nonempty range of at most 16,384 characters without splitting a character."; render(); return }
             val requestedBegin = begin; val requestedEnd = end
+            resetLegal()
             pending = true; failure = null; render()
             scope.launch {
                 try {
@@ -147,6 +155,106 @@ internal object DocumentsEnglish {
                 catch (error: Throwable) { if (present()) failure = error.message ?: "Local English inspection is unavailable" }
                 finally { if (present()) { pending = false; render() } }
             }
+        }
+        private fun resetLegal() {
+            legalEpoch++; legalAbort?.abort(); legalAbort = null
+            legalPending = false; legalFailure = null; legalResult = null
+        }
+        private fun legalPatterns(inspection: Map<*, *>) {
+            val receipt = inspection["receiptCid"] as String
+            val mode = legalMode; val ticket = ++legalEpoch
+            fun selected() = present() && legalEpoch == ticket && result?.get("receiptCid") == receipt
+            legalPending = true; legalFailure = null; legalResult = null; render()
+            scope.launch {
+                try {
+                    if (!selected()) return@launch
+                    val controller: dynamic = js("new AbortController()")
+                    legalAbort = controller
+                    val init = RequestInit(method = "POST", body = jsonOf(_m["receiptCid" j receipt, "mode" j mode]),
+                        headers = Headers().apply { append("Content-Type", "application/json") })
+                    init.asDynamic().signal = controller.signal
+                    val response = window.fetch("/api/documents/english/legal-patterns", init).await()
+                    val body = response.text().await()
+                    require(body.length <= 4 * 1024 * 1024 && body.encodeToByteArray().size <= 4 * 1024 * 1024) { "Legal language response exceeds the display bound" }
+                    val value = reifyStrict(body) as? Map<*, *> ?: error("Unreadable legal language candidate response")
+                    require(response.ok && value["error"] == null) { (value["error"] ?: "Legal language inspection failed (HTTP ${response.status})").toString() }
+                    validateLegal(value, inspection, mode)
+                    if (selected()) legalResult = value
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Throwable) { if (selected()) legalFailure = error.message ?: "Legal language candidates are unavailable" }
+                finally { if (selected()) { legalAbort = null; legalPending = false; render() } }
+            }
+        }
+        private fun legalRows(value: Any?, limit: Int = 32_768): List<Map<*, *>> {
+            val rows = value as? List<*> ?: error("Legal language candidate rows are unavailable")
+            require(rows.size <= limit) { "Legal language candidate display bound exceeded" }
+            return rows.map { it as? Map<*, *> ?: error("Invalid legal language candidate row") }
+        }
+        private fun unresolved(value: Any?): String {
+            val rows = value as? List<*> ?: error("Unresolved candidate scope is unavailable")
+            require(rows.size <= 64 && rows.all { it is String }) { "Invalid unresolved candidate scope" }
+            return rows.joinToString(" · ").ifBlank { "No additional scope reported" }
+        }
+        private fun validateLegal(value: Map<*, *>, inspection: Map<*, *>, mode: String) {
+            require(value["schema"] == "trikeshed.english-legal-patterns.v1" && value["reviewStatus"] == "unreviewed" &&
+                value["authority"] == "parser-role-and-quantity-candidates-only" && value["producerAuthority"] == "not-established" &&
+                value["parserExecution"] == "not-reverified" && value["countsAreEvidenceConfidence"] == false) { "Unexpected legal language candidate authority or schema" }
+            require(value["inspectionCid"] == inspection["receiptCid"] && cid(value["receiptCid"]) &&
+                value["originalCid"] == source.cid && value["extractedTextCid"] == displayed.cid && matches(value["selection"]) &&
+                value["range"] == inspection["range"]) { "Legal language candidates differ from the selected inspection" }
+            val descriptor = value["source"] as? Map<*, *> ?: error("Legal language source descriptor is unavailable")
+            require(descriptor["receiptCid"] == inspection["receiptCid"] && descriptor["originalCid"] == source.cid &&
+                descriptor["extractedTextCid"] == displayed.cid && descriptor["mode"] == mode && descriptor["historical"] == (mode == "snapshot") &&
+                descriptor["reviewStatus"] == "unreviewed" && descriptor["semanticAuthority"] == "not-established" &&
+                descriptor["currentness"] == if (mode == "current") "checked-before-and-after-inspection" else "not-checked") { "Legal language source mode or identity differs from the request" }
+            unresolved(value["unresolved"])
+            val retained = legalRows(inspection["sentences"], 512); val sentences = legalRows(value["sentences"], 512)
+            require(sentences.size == retained.size) { "Legal language sentence coverage differs from the inspection" }
+            var actions = 0; var durations = 0
+            for ((ordinal, sentence) in sentences.withIndex()) {
+                val original = retained[ordinal]
+                require(s_["index", "begin", "end", "quote", "quotation", "markers"].view.all { sentence[it] == original[it] }) { "Legal language quotation differs from the retained sentence" }
+                val nodes = DocumentsSyntaxGraph.nodes(original).associateBy { it["id"] }
+                require(legalRows(sentence["nodes"]) == nodes.values.toList()) { "Legal language parser nodes differ from the retained inspection" }
+                fun node(raw: Any?) { val item = raw as? Map<*, *> ?: error("Parser role node is unavailable"); require(nodes[item["id"]] == item) { "Parser role node differs from its retained full identity" } }
+                fun key(edge: Map<*, *>) = Triple(DocumentsSyntaxGraph.nodeId(edge, "governor"), edge["relation"], DocumentsSyntaxGraph.nodeId(edge, "dependent"))
+                val edges = legalRows(original["dependencies"]).map(::key).toSet()
+                fun bindings(raw: Any?) { for (edge in legalRows(raw)) require(key(edge) in edges) { "Candidate dependency differs from the retained parser edge" } }
+                bindings(sentence["dependencies"]); unresolved(sentence["unresolved"])
+                for (action in legalRows(sentence["modalActions"], 1024)) {
+                    actions++; require(actions <= 1024 && action["status"] == "parser-role-candidate")
+                    node(action["modal"]); node(action["action"]); bindings(_l[action["dependency"]]); bindings(action["relatedDependencies"])
+                    val modal = action["modal"] as Map<*, *>; val verb = action["action"] as Map<*, *>
+                    val auxiliary = action["dependency"] as Map<*, *>
+                    require(auxiliary["governorNode"] == verb["id"] && auxiliary["dependentNode"] == modal["id"] && auxiliary["relation"] == "aux")
+                    for (role in s_["subjects", "objects"].view) for (row in legalRows(action[role])) {
+                        node(row["node"]); bindings(_l[row["dependency"]])
+                        val subject = row["node"] as Map<*, *>; val edge = row["dependency"] as Map<*, *>
+                        require(edge["governorNode"] == verb["id"] && edge["dependentNode"] == subject["id"] && edge["relation"] == row["relation"] &&
+                            row["relation"] in if (role == "subjects") _s["nsubj", "nsubj:pass"] else _s["obj", "dobj", "iobj"])
+                    }
+                    unresolved(action["unresolved"])
+                }
+                val quote = original["quote"] as String; val base = number(original["begin"])
+                fun span(row: Map<*, *>, lo: String, hi: String, field: String) {
+                    val a = number(row[lo]) - base; val b = number(row[hi]) - base
+                    require(a >= 0 && b in a..quote.length && quote.substring(a, b) == row[field]) { "Quantity language differs from its retained quotation" }
+                }
+                for (duration in legalRows(sentence["durations"], 1024)) {
+                    durations++; require(durations <= 1024 && duration["status"] in _s["lexical-integer-candidate", "unresolved-quantity-candidate"])
+                    span(duration, "begin", "end", "quote"); span(duration, "quantityBegin", "quantityEnd", "quantityLiteral")
+                    duration["integerValue"]?.let { require(number(it) <= 9999) }
+                    if (duration["integerValue"] == null) require(duration["status"] == "unresolved-quantity-candidate")
+                    require(duration["quantityAuthority"] == "bounded-lexical-reading-only" && duration["unitLiteral"] is String && duration["unitLemma"] is String)
+                    for (reading in legalRows(duration["numberReadings"], 24)) { span(reading, "begin", "end", "quote"); reading["integerValue"]?.let { require(number(it) <= 9999) } }
+                    for (field in s_["unitNodes", "modifiers"].view) for (item in legalRows(duration[field])) node(item)
+                    duration["temporalMarker"]?.let(::node)
+                    for (field in s_["numberDependencies", "markerDependencies", "attachments"].view) bindings(duration[field])
+                    unresolved(duration["unresolved"])
+                }
+            }
+            val counts = value["counts"] as? Map<*, *> ?: error("Candidate counts are unavailable")
+            require(number(counts["modalActions"]) == actions && number(counts["durations"]) == durations) { "Candidate counts differ from the displayed observations" }
         }
         private fun rangeInput(parent: HTMLElement, label: String, attribute: String, value: Int, assign: (Int) -> Unit) {
             val holder = text(parent, "label", label, "ds-curate-label")
@@ -195,7 +303,69 @@ internal object DocumentsEnglish {
                 }
             })
             corpusNotice?.let { text(section, "p", it, "ds-curate-label").setAttribute("role", "status") }
+            legalControls(section, value)
             for (raw in value["sentences"] as List<*>) sentence(section, raw as Map<*, *>)
+        }
+        private fun legalControls(parent: HTMLElement, inspection: Map<*, *>) {
+            val section = text(parent, "section", "")
+            section.setAttribute("data-english-legal-patterns", "1")
+            text(section, "p", "Inspect modal words, parser roles and number/unit language from this retained inspection. The parser is not rerun; legal force, deadlines and guard scope remain unresolved.", "ds-curate-label")
+            val controls = text(section, "div", ""); controls.style.cssText = "display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0"
+            val label = text(controls, "label", "Source mode ", "ds-curate-label")
+            val mode = document.createElement("select") as HTMLSelectElement
+            mode.setAttribute("data-english-legal-mode", "1"); mode.setAttribute("aria-label", "Legal language source mode")
+            for ((key, title) in _l["current" j "Check current source", "snapshot" j "Retained historical snapshot"]) {
+                text(mode, "option", title).setAttribute("value", key)
+            }
+            mode.value = legalMode; mode.disabled = pending || legalPending; label.appendChild(mode)
+            mode.addEventListener("change", { if (present() && !pending && !legalPending) { resetLegal(); legalMode = mode.value; render() } })
+            val button = text(controls, "button", "Inspect legal roles and quantities", "ds-curate-submit")
+            button.setAttribute("type", "button"); button.setAttribute("data-english-legal-inspect", "1")
+            button.style.cssText = "margin:0;padding:8px 12px"; button.asDynamic().disabled = pending || legalPending
+            button.addEventListener("click", { if (present() && !pending && !legalPending) legalPatterns(inspection) })
+            if (legalMode == "snapshot") text(section, "p", "Historical snapshot mode does not check current source revisions.", "ds-curate-label")
+            if (legalPending) text(section, "p", "Reading retained legal language candidates…").setAttribute("role", "status")
+            legalFailure?.let { text(section, "p", it, "ds-curate-error").setAttribute("role", "status") }
+            legalResult?.let { legalResult(section, it) }
+        }
+        private fun legalNode(raw: Any?): String {
+            val node = raw as Map<*, *>
+            return "${node["word"]} · ${node["id"]} · ${node["kind"]} · lemma ${node["lemma"]} · ${node["begin"]}–${node["end"]}"
+        }
+        private fun legalResult(parent: HTMLElement, value: Map<*, *>) {
+            val section = text(parent, "section", "", "ds-run"); section.setAttribute("data-english-legal-result", "1")
+            text(section, "h3", "Unreviewed legal language candidates", "ds-curate-h3")
+            val source = value["source"] as Map<*, *>
+            text(section, "p", "Mode: ${source["mode"]} · currentness: ${source["currentness"]} · parser execution: ${value["parserExecution"]}", "ds-curate-label")
+            text(section, "p", "Parent inspection: ${value["inspectionCid"]}\nCandidate receipt: ${value["receiptCid"]}\nOriginal source: ${value["originalCid"]}\nExtracted text: ${value["extractedTextCid"]}", "ds-cid").style.whiteSpace = "pre-wrap"
+            text(section, "p", "Unresolved: ${unresolved(value["unresolved"])}", "ds-curate-label")
+            text(section, "p", "Full parser IDs include copy counts. Copies reuse source words and can repeat roles; they are not additional word occurrences. Integer readings do not establish deadlines, and months are not converted to days.", "ds-curate-label")
+            for (sentence in legalRows(value["sentences"], 512)) {
+                val row = text(section, "section", "", "ds-run"); row.setAttribute("data-english-legal-sentence", sentence["index"].toString())
+                text(row, "p", "Sentence ${sentence["index"]} · text ${sentence["begin"]}–${sentence["end"]}", "ds-curate-label")
+                text(row, "blockquote", sentence["quote"] as String).style.cssText = "white-space:pre-wrap;margin:10px 0;font-size:16px;line-height:1.6"
+                text(row, "p", "Unresolved: ${unresolved(sentence["unresolved"])}", "ds-curate-label")
+                val actions = legalRows(sentence["modalActions"], 1024)
+                if (actions.isEmpty()) text(row, "p", "No modal/action parser-role candidate in this sentence.", "ds-curate-label")
+                else {
+                    val table = table(row, s_["Modal word", "Parser action", "Parser subject", "Parser object"])
+                    for (action in actions) {
+                        fun roles(key: String) = legalRows(action[key]).joinToString("\n") { "${it["relation"]}: ${legalNode(it["node"])}" }.ifBlank { "Not reported" }
+                        cells(table, s_[legalNode(action["modal"]), legalNode(action["action"]), roles("subjects"), roles("objects")])
+                        text(row, "p", "Parser-role candidate · unresolved: ${unresolved(action["unresolved"])}", "ds-curate-label")
+                    }
+                }
+                val durations = legalRows(sentence["durations"], 1024)
+                if (durations.isEmpty()) text(row, "p", "No supported number/unit language candidate in this sentence.", "ds-curate-label")
+                for (duration in durations) {
+                    val item = text(row, "section", ""); item.setAttribute("data-english-legal-duration", "1")
+                    text(item, "blockquote", duration["quote"] as String).style.whiteSpace = "pre-wrap"
+                    text(item, "p", "${duration["status"]} · literal: ${duration["quantityLiteral"]} · integer reading: ${duration["integerValue"]?.let { number(it).toString() } ?: "unresolved"} · unit: ${duration["unitLiteral"]} (${duration["unitLemma"]})")
+                    text(item, "p", "Unit nodes: ${legalRows(duration["unitNodes"]).joinToString("; ", transform = ::legalNode)}\nModifiers: ${legalRows(duration["modifiers"]).joinToString("; ", transform = ::legalNode).ifBlank { "None reported" }}\nTemporal marker: ${duration["temporalMarker"]?.let(::legalNode) ?: "None reported"}", "ds-curate-label").style.whiteSpace = "pre-wrap"
+                    for (reading in legalRows(duration["numberReadings"], 24)) text(item, "p", "Number form: “${reading["quote"]}” · integer reading: ${reading["integerValue"]?.let { number(it).toString() } ?: "unresolved"} · ${reading["begin"]}–${reading["end"]}", "ds-curate-label")
+                    text(item, "p", "Unresolved: ${unresolved(duration["unresolved"])}", "ds-curate-label")
+                }
+            }
         }
         private fun sentence(parent: HTMLElement, value: Map<*, *>) {
             val section = text(parent, "section", "", "ds-run")
