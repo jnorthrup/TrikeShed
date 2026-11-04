@@ -18,7 +18,7 @@ class EnglishTaxonomyCarrierTest {
     private val context = "urn:agreement:pilot"
     private fun parsed(source: String, identity: String? = "token-index+copy-count/1",
         copied: Boolean = false, swapped: Boolean = false): NlpDocument {
-        val sentences = Regex("[^.]+\\.").findAll(source).mapIndexed { sentenceIndex, raw ->
+        val sentences = Regex("[^.]+\\.\"?").findAll(source).mapIndexed { sentenceIndex, raw ->
             val begin = raw.range.first + raw.value.indexOfFirst { !it.isWhitespace() }
             val end = raw.range.last + 1
             val tokens = Regex("[\\p{L}]+|[^\\s\\p{L}]").findAll(source.substring(begin, end)).mapIndexed { i, match ->
@@ -47,12 +47,13 @@ class EnglishTaxonomyCarrierTest {
         return NlpDocument(source, sentences.toSeries(), NlpMetadata("synthetic-fixture", "EnglishTaxonomyCarrierTest",
             if (identity == null) emptyMap() else _m["dependencyNodeIdentity" j identity]))
     }
-    private fun snapshot(cas: BoundedMemory, source: String = text, parsed: NlpDocument = parsed(source)): EnglishObservationGraph.Snapshot {
+    private fun snapshot(cas: BoundedMemory, source: String = text, end: Int = source.length,
+        parsed: NlpDocument = parsed(source.substring(0, end))): EnglishObservationGraph.Snapshot {
         val cid = cas.put(source.encodeToByteArray())
         val revision = DocumentRevision("legal", "agreement.txt", cid.value, "1-fixture", 1)
         val document = DocumentSource(cid, cid, source, "agreement.txt", "text/plain", "synthetic-fixture",
             project = revision, extraction = revision)
-        val inventory = EnglishInspection.inspect(document, parsed, 0, source.length)
+        val inventory = EnglishInspection.inspect(document, parsed, 0, end)
         val row = ProjectDoc("legal", "agreement.txt", cid.value, revision.rev, revision.seq, source.encodeToByteArray().size.toLong(), "text/plain")
         val receipt = cas.put(CanonicalCbor.encodeMap(inventory + _m["source" j (DocumentCuratorCodec.source(document) - "text"),
             "selection" j revision.toMap(), "sourceSnapshots" j _l[row.toMap()]]))
@@ -116,6 +117,10 @@ class EnglishTaxonomyCarrierTest {
             assertTrue(EnglishTaxonomyCarrier.inspect(origin).exclusions.isNotEmpty())
             assertEquals(2, (origin.inventory["sentences"] as List<*>).size)
         }
+        val partial = snapshot(BoundedMemory(), end = text.indexOf('.') + 1)
+        assertTrue(EnglishTaxonomyCarrier.inspect(partial).exclusions.contains("complete-current-English-inspection-required"))
+        val many = snapshot(BoundedMemory(), "Tenant is a Person. ".repeat(33))
+        assertTrue(EnglishTaxonomyCarrier.inspect(many).exclusions.contains("choose-a-source-of-1-to-32-simple-sentences"))
     }
 
     @Test fun declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields() {
