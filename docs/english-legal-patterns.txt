@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 English legal-language candidates
 
 EnglishLegalPatterns.inspect(source, parsed, begin, end) is a pure, bounded
@@ -42,3 +43,59 @@ Synthetic helper evidence is in:
 It records the first actual CoreNLP 4.6 helper miss, a narrowly corrected replay
 of unchanged annotations, and later standalone JVM portability checks. Host/API,
 UI, commonJS, and final release behavior require their own coordinated proofs.
+||||||| 8486ae5f0
+=======
+English legal-language candidates
+
+EnglishLegalPatterns.inspect(source, parsed, begin, end) is a pure, bounded
+common helper. It requires parsed.text to exactly equal the selected source
+substring and reuses EnglishInspection source/CID, Unicode, graph, and quotation
+validation. Returned spans are global UTF16 offsets into that same extracted
+text. It calls no model, parser, reasoner, network, or world-fact store.
+
+The output authority is parser-role-and-quantity-candidates-only and its review
+status is unreviewed. A modal/action candidate retains the literal modal, its
+lemma, the actual dependency edge, and all observed subject/object role nodes.
+Enhanced++ node IDs include token index and copy count; copies retain their
+original source anchor without inventing extra occurrences of a word.
+
+Duration-language candidates preserve their exact source quotation, number
+forms, unit, business/calendar/working modifiers, temporal-marker observations,
+and dependency direction. A bounded lexical grammar can read ASCII digits or
+ordinary English cardinals from 0 through 9999. Matching thirty (30) may yield
+the lexical integer 30; conflicting thirty (60), unsupported number language,
+and copied quantity scope remain unresolved. Month/year units are never turned
+into days. This is not a legal deadline or a calendar computation.
+
+Every sentence and its lexical guard/exception/negation markers remain visible.
+Parser roles, numeric readings, and SUMO/NARS legal facts are different claims:
+this helper does not admit facts or establish an obligation, legal force,
+negation/exception application, coordination scope, cross-sentence scope, or
+parser accuracy. Existing copied/legacy-node inference gates are unchanged.
+
+Additional bounds: 1024 modal candidates, 1024 duration candidates, 32768 emitted
+dependency binding references, 24 number-language tokens, 8192 aggregate quoted
+layout-anchor references, and 4 MiB canonical CBOR output. EnglishInspection's
+source/token/node/edge bounds apply first. Invalid source identities or graphs
+are refused; a missing candidate is not evidence that a clause has no effect.
+
+Synthetic helper evidence is in:
+  evidence/2026-11-04/english-legal-patterns/helper/method.txt
+  evidence/2026-11-04/english-legal-patterns/helper/eight-cases.json
+  evidence/2026-11-04/english-legal-patterns/helper/numeric-head-counterexample.json
+  evidence/2026-11-04/english-legal-patterns/helper/execution-identity.json
+  evidence/2026-11-04/english-legal-patterns/helper/fixture-verification.json
+
+It records the first actual CoreNLP 4.6 helper miss, a narrowly corrected replay
+of unchanged annotations, and later standalone JVM portability checks. Host/API,
+UI, commonJS, and final release behavior require their own coordinated proofs.
+
+Documents and LCNC
+After Inspect English locally, choose Inspect legal roles and quantities beside the corpus action. Current-source mode is the default; retained historical snapshot mode is explicit. The result preserves parent inspection and derived receipt identities, exact sentence/quantity wording, full copied-node identities, all reported modal/action subject/object roles, and unresolved conditions. A new English inspection invalidates the earlier candidate request; navigation ignores aborted or late responses.
+
+POST /api/documents/english/legal-patterns requires exactly receiptCid and mode (current or snapshot). document.english.patterns is the registered typed LCNC equivalent. Both use the existing bounded receipt/source verifier and the same owned request path, recheck currentness around derivation and retention, and retain/read back canonical candidate bytes. They do not rerun NLP or approve/admit facts.
+
+Coordinated v58 at8486ae5f0547c49bf1013a472eda3f505d7c58ac passed137 selected JVM checks with zero failures/errors/skips and built Documents, Pages and Spacegraph. The prior v57 commonJS build correctly rejected a JVM-only regex capture range; portable source offsets and Unicode/CRLF/tab regressions replaced it without excluding targets.
+
+Actual new-bundle browser verification passed under an external fixture outbound-denial filter using local CoreNLP4.6.0. Three native uploaded synthetic texts required exactly three explicit parses. Later role/quantity requests and three typed LCNC procedures reused retained observations; twelve CAS readbacks covered seven unique exact receipts. An independent Node/CBOR/SHA auditor checked complete directed dependencies,70 original tokens versus71 parser nodes, quantities and source spans, current409/historical modes, and negative tamper controls. All owners drained. One actual copy node occurred in a separate static phrase; this is not coverage of copied modal-action interpretation. Public synthetic evidence: docs/evidence/2026-11-04/english-legal-candidates. General English/legal accuracy and a production-wide OS air gap remain unestablished.
+>>>>>>> 3dddf65343e21c4a0e398a962ecf24f8c97bc42a
