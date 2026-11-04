@@ -94,3 +94,12 @@ before invoking it. A new structural-line regression brings the fixed-input set
 to 32 methods; all 32 pass, including exact before/after counterexamples changing
 [0,1,1] rows to [1,2,1]. These are source-overlay checks. No v61 GREEN or final
 artifact claim is made; coordinated v62 validation remains required.
+
+The intermediate immutable v62 artifact passed the 32-method external proof and
+same-input RDF/short-literal/structural comparisons against source
+4e87c9380cd766c2343f88e5c6097b1be8f3327c, JAR SHA256
+a9deb460d43ed52139ab8b5ba02a1b94f03146d0f1c21c7fd4612b832a0c9c1c.
+Only tests/drivers were compiled; production CodeSource/JAR hashes were checked,
+without overlays or friends. Evidence is labeled v62-intermediate under the RDF
+fidelity evidence directory. External-master and CAS-retention integration still
+require a later combined-artifact run. No final-master verification is claimed.
