@@ -191,4 +191,22 @@ class EnglishObservationWireTest {
             request(wire, cid, markerProgram("negation"), "current", 409)
         } finally { wire.drain(); f.owner.complete(); f.owner.join() }
     }
+
+    @Test fun explicitlyWiredNullInputsCannotFallBackToAuthoredSnapshotParameters(): Unit = runBlocking {
+        val f = fixture("explicit-query-null", coroutineContext[Job]); val wire = EnglishObservationWire(f.ctx, f.corpus)
+        try {
+            wire.attach(); val cid = f.cas.put(CanonicalCbor.encodeMap(f.receipt))
+            val node = LcncNode("query", EnglishObservationWire.TYPE, _m["receiptCid" j cid.value,
+                "mode" j "snapshot", "program" j jsonOf(markerProgram("negation"))])
+            f.corpus.put("legal", f.row.id, "A changed source.".encodeToByteArray())
+            val runner = assertNotNull(f.ctx.lcncRunners[EnglishObservationWire.TYPE])
+            val authored = runner.run(node, emptyMap())
+            assertEquals(true, (authored["source"] as Map<*, *>)["historical"])
+            for (key in s_["mode", "receiptCid", "program"].view) {
+                assertFailsWith<IllegalArgumentException>("Explicit null $key must not use an authored parameter") {
+                    runner.run(node, _m[key j null])
+                }
+            }
+        } finally { wire.drain(); f.owner.complete(); f.owner.join() }
+    }
 }
