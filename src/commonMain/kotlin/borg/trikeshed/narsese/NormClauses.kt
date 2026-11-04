@@ -37,24 +37,9 @@ data class NormClause(
     val predicate: String get() = listOfNotNull(verb, obj).joinToString("_") { it.replace(' ', '_') }
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 /** Unsupported norm interpretation; the exact sentence and parser observations remain available for review. */
 enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED, COPIED_NODE, UNREPORTED_IDENTITY }
 
-||||||| 62eb34b08
-=======
-/** A guarded sentence omitted from norm interpretation; its source remains available for review. */
-enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED }
-||||||| 095fa0d30
-/** A guarded sentence omitted from norm interpretation; its source remains available for review. */
-enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED }
-=======
-/** Unsupported norm interpretation; the exact sentence and parser observations remain available for review. */
-enum class NormConditionIssue { NEGATED, MODAL, PASSIVE, MULTIPLE, COORDINATED, UNSUPPORTED, COPIED_NODE, UNREPORTED_IDENTITY }
->>>>>>> 9b5a3881d62f25d4dcf34bfd3129f08bf91afe13
-
->>>>>>> 5bfdb2d61b063f83a4cd37e2f6497d8e50598ab4
 object NormClauses {
     private val modals = setOf("will", "must", "may", "shall", "should", "can", "cannot", "would", "ought")
     private val negators = setOf("not", "never", "no", "n't")
@@ -284,22 +269,9 @@ object NormClauses {
         // Every other asserted clause, as OpenIE reads it: (subject; relation; object) with the relation's
         // own polarity. A modal clause is already above; a coreferent subject reads as its chain's name.
         for (s in doc.sentences.values()) {
-<<<<<<< HEAD
             // Relation triples do not establish guard scope, even when a simple dependency norm is supported.
             // Never let an alternate OpenIE/KBP reading erase the sentence's qualification.
             if (doc.projectionIssue(s) != null || hasCondition(doc, s)) continue
-||||||| 62eb34b08
-=======
-            // Relation triples do not establish guard scope, even when a simple dependency norm is supported.
-            // Never let an alternate OpenIE/KBP reading erase the sentence's qualification.
-<<<<<<< HEAD
-            if (hasCondition(doc, s)) continue
->>>>>>> 5bfdb2d61b063f83a4cd37e2f6497d8e50598ab4
-||||||| 095fa0d30
-            if (hasCondition(doc, s)) continue
-=======
-            if (doc.projectionIssue(s) != null || hasCondition(doc, s)) continue
->>>>>>> 9b5a3881d62f25d4dcf34bfd3129f08bf91afe13
             if (s.relations.isEmpty() && s.kbp.isEmpty()) continue
             val tokens = s.tokens.values().associateBy { it.index }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
@@ -369,7 +341,6 @@ object NormClauses {
     }
 
     /**
-<<<<<<< HEAD
      * The existing condition tuple supports one active, present-tense `if`/`unless` premise only.
      * Negation, voice, modality, coordination and omitted complements must not be flattened into
      * that positive premise. A diagnostic suppresses interpretation of the entire sentence, including
@@ -437,76 +408,6 @@ object NormClauses {
             otherConditions.containsMatchIn(doc.text.substring(sentence.begin, sentence.end))
 
     /**
-||||||| 62eb34b08
-=======
-     * The existing condition tuple supports one active, present-tense `if`/`unless` premise only.
-     * Negation, voice, modality, coordination and omitted complements must not be flattened into
-     * that positive premise. A diagnostic suppresses interpretation of the entire sentence, including
-     * OpenIE/KBP alternatives, rather than guessing which predicate a guard scopes over. Callers may
-     * display the diagnostic beside the unchanged source. Null is not proof of complete English coverage.
-     */
-    fun conditionIssue(doc: NlpDocument, sentence: NlpSentence,
-                       parties: Map<String, PartyAliases.Party> = emptyMap()): NormConditionIssue? {
-        when (doc.projectionIssue(sentence)) {
-            NlpProjectionIssue.COPIED_NODE -> return NormConditionIssue.COPIED_NODE
-            NlpProjectionIssue.UNREPORTED_IDENTITY -> return NormConditionIssue.UNREPORTED_IDENTITY
-            null -> Unit
-        }
-        val tokens = sentence.tokens.values().associateBy { it.index }
-        val deps = sentence.dependencies.values()
-        fun word(token: NlpToken) = token.word.lowercase().replace('’', '\'')
-        val marks = tokens.values.filter { it.lemma.lowercase() in conditionMarks || word(it) in conditionMarks }
-        val text = if (sentence.begin >= 0 && sentence.end in sentence.begin..doc.text.length)
-            doc.text.substring(sentence.begin, sentence.end) else return NormConditionIssue.UNSUPPORTED
-        val otherGuard = otherConditions.containsMatchIn(text)
-        if (marks.isEmpty() && !otherGuard) return null
-        if (otherGuard) return NormConditionIssue.UNSUPPORTED
-        if (marks.size != 1) return NormConditionIssue.MULTIPLE
-        val mark = marks.single()
-        if (mark.lemma.lowercase() !in _s["if", "unless"]) return NormConditionIssue.UNSUPPORTED
-        val guard = deps.singleOrNull { it.dependent == mark.index && it.relation.lowercase() in _s["mark", "advmod"] }
-            ?.governor ?: return NormConditionIssue.UNSUPPORTED
-        if (deps.count { it.dependent == guard && it.relation.lowercase().startsWith("advcl") } != 1)
-            return NormConditionIssue.UNSUPPORTED
-        val members = mutableSetOf<Int>()
-        val pending = mutableListOf(guard)
-        while (pending.isNotEmpty()) {
-            val head = pending.removeAt(pending.lastIndex)
-            if (members.add(head)) for (edge in deps) if (edge.governor == head) pending.add(edge.dependent)
-        }
-        val inside = tokens.values.filter { it.index in members }
-        val edges = deps.filter { it.governor in members }
-        if (inside.any { word(it) in negators || it.lemma.lowercase() in negators || word(it).endsWith("n't") ||
-                it.lemma.lowercase() in _s["none", "neither", "nor", "without"] } ||
-            edges.any { it.relation.lowercase().startsWith("neg") }) return NormConditionIssue.NEGATED
-        if (inside.any { it.tag == "MD" || it.lemma.lowercase() in modals }) return NormConditionIssue.MODAL
-        if (edges.any { it.relation.lowercase() in _s["aux:pass", "nsubj:pass", "auxpass", "nsubjpass"] })
-            return NormConditionIssue.PASSIVE
-        if (deps.any { it.relation.lowercase().startsWith("conj") || it.relation.lowercase() == "cc" })
-            return NormConditionIssue.COORDINATED
-        val subject = edges.filter { it.governor == guard && it.relation.lowercase() == "nsubj" }
-            .singleOrNull()?.let { tokens[it.dependent] } ?: return NormConditionIssue.UNSUPPORTED
-        if (subject.tag.startsWith("PRP") && subject.lemma.lowercase() !in parties)
-            return NormConditionIssue.UNSUPPORTED
-        val allowed = _s["mark", "advmod", "nsubj", "cop", "det", "compound", "amod", "nmod:poss", "nummod", "obj", "dobj", "aux", "punct"]
-        if (edges.any { it.relation.lowercase() !in allowed ||
-                it.relation.lowercase() == "advmod" && it.dependent != mark.index } ||
-            inside.any { it.tag in _s["VBD", "VBN"] || it.tag == "PRP$" && it.lemma.lowercase() !in parties } ||
-            edges.count { it.governor == guard && it.relation.lowercase() in _s["obj", "dobj"] } > 1 ||
-            edges.any { it.relation.lowercase() in _s["compound", "amod", "nmod:poss"] && it.dependent >= it.governor } ||
-            edges.any { edge -> edge.relation.lowercase() == "det" &&
-                tokens[edge.dependent]?.lemma?.lowercase() !in _s["a", "an", "the"] })
-            return NormConditionIssue.UNSUPPORTED
-        return null
-    }
-
-    private fun hasCondition(doc: NlpDocument, sentence: NlpSentence): Boolean =
-        sentence.tokens.values().any { it.lemma.lowercase() in conditionMarks || it.word.lowercase() in conditionMarks } ||
-            sentence.begin >= 0 && sentence.end in sentence.begin..doc.text.length &&
-            otherConditions.containsMatchIn(doc.text.substring(sentence.begin, sentence.end))
-
-    /**
->>>>>>> 5bfdb2d61b063f83a4cd37e2f6497d8e50598ab4
      * A deliberately conservative exclusion filter, not proof that a remaining sentence is true.
      * Reject the entire sentence when it contains an overt negation, hypothetical/modal context,
      * question, quoted assertion, or attribution/uncertainty cue. This avoids promoting an embedded

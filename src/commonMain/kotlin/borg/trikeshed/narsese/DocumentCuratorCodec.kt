@@ -53,23 +53,9 @@ internal object DocumentCuratorCodec {
             "tokens" to s.tokens.values { t -> mapOf("index" to t.index, "begin" to t.begin,
                 "end" to t.end, "word" to t.word, "lemma" to t.lemma, "tag" to t.tag, "ner" to t.ner) },
             "dependencies" to s.dependencies.values { d -> mapOf("governor" to d.governor,
-<<<<<<< HEAD
-<<<<<<< HEAD
                 "dependent" to d.dependent, "relation" to d.relation,
                 "governorCopy" to d.governorCopy, "dependentCopy" to d.dependentCopy) },
             "relations" to s.relations.map(::nlpRelation), "kbp" to s.kbp.map(::nlpRelation),
-||||||| 095fa0d30
-                "dependent" to d.dependent, "relation" to d.relation) },
-=======
-                "dependent" to d.dependent, "relation" to d.relation,
-                "governorCopy" to d.governorCopy, "dependentCopy" to d.dependentCopy) },
->>>>>>> c355209b1b13964ec0da94c72d432855c780c9e7
-||||||| 5e8cff8ce
-                "dependent" to d.dependent, "relation" to d.relation) },
-=======
-                "dependent" to d.dependent, "relation" to d.relation,
-                "governorCopy" to d.governorCopy, "dependentCopy" to d.dependentCopy) },
->>>>>>> 273a6f1f87d0e77c2297f9f9a7197bf986bf5edf
         ) },
         "metadata" to doc.metadata?.let { m -> mapOf("processor" to m.processor, "implementation" to m.implementation,
             "runtime" to m.runtime, "configuration" to m.configuration) },
@@ -99,39 +85,15 @@ internal object DocumentCuratorCodec {
         "columns" to mapOf(
             "sentence" to _l["index", "begin", "end", "tokens", "dependencies", "relations", "kbp"],
             "token" to listOf("index", "begin", "end", "word", "lemma", "tag", "ner"),
-<<<<<<< HEAD
-<<<<<<< HEAD
             "dependency" to listOf("governor", "dependent", "relation", "governorCopy", "dependentCopy"),
             "relation" to _l["subjectFirstToken", "subjectLastToken", "relationFirstToken", "relationLastToken",
                 "objectFirstToken", "objectLastToken", "subjectText", "relationText", "objectText", "confidence"],
             "mention" to _l["sentence", "firstToken", "lastToken", "text", "chain", "representative"],
-||||||| 095fa0d30
-            "dependency" to listOf("governor", "dependent", "relation"),
-=======
-            "dependency" to listOf("governor", "dependent", "relation", "governorCopy", "dependentCopy"),
->>>>>>> c355209b1b13964ec0da94c72d432855c780c9e7
-||||||| 5e8cff8ce
-            "dependency" to listOf("governor", "dependent", "relation"),
-=======
-            "dependency" to listOf("governor", "dependent", "relation", "governorCopy", "dependentCopy"),
->>>>>>> 273a6f1f87d0e77c2297f9f9a7197bf986bf5edf
         ),
         "sentences" to doc.sentences.values { s -> listOf(s.index, s.begin, s.end,
             s.tokens.values { t -> listOf(t.index, t.begin, t.end, t.word, t.lemma, t.tag, t.ner) },
-<<<<<<< HEAD
-<<<<<<< HEAD
             s.dependencies.values { d -> listOf(d.governor, d.dependent, d.relation, d.governorCopy, d.dependentCopy) },
             s.relations.map(::relationRow), s.kbp.map(::relationRow),
-||||||| 095fa0d30
-            s.dependencies.values { d -> listOf(d.governor, d.dependent, d.relation) },
-=======
-            s.dependencies.values { d -> listOf(d.governor, d.dependent, d.relation, d.governorCopy, d.dependentCopy) },
->>>>>>> c355209b1b13964ec0da94c72d432855c780c9e7
-||||||| 5e8cff8ce
-            s.dependencies.values { d -> listOf(d.governor, d.dependent, d.relation) },
-=======
-            s.dependencies.values { d -> listOf(d.governor, d.dependent, d.relation, d.governorCopy, d.dependentCopy) },
->>>>>>> 273a6f1f87d0e77c2297f9f9a7197bf986bf5edf
         ) },
         "mentions" to doc.mentions.map { _l[it.sentence, it.span.first, it.span.last, it.text, it.chain, it.representative] },
     )
@@ -261,25 +223,9 @@ internal object DocumentCuratorCodec {
                     NlpToken(t.int("index"), t.int("begin"), t.int("end"), t.str("word"),
                         t.str("lemma"), t.str("tag"), t.str("ner"))
                 } }.toSeries(), sentence.array("dependencies").map { edge -> (edge as Map<*, *>).let { e ->
-<<<<<<< HEAD
-<<<<<<< HEAD
                     NlpDependency(e.int("governor"), e.int("dependent"), e.str("relation"),
                         e.copyCount("governorCopy"), e.copyCount("dependentCopy"))
                 } }.toSeries(), sentence.nlpRelations("relations"), sentence.nlpRelations("kbp"))
-||||||| 095fa0d30
-                    NlpDependency(e.int("governor"), e.int("dependent"), e.str("relation"))
-||||||| 5e8cff8ce
-                    NlpDependency(e.int("governor"), e.int("dependent"), e.str("relation"))
-=======
-                    NlpDependency(e.int("governor"), e.int("dependent"), e.str("relation"),
-                        e.copyCount("governorCopy"), e.copyCount("dependentCopy"))
->>>>>>> 273a6f1f87d0e77c2297f9f9a7197bf986bf5edf
-                } }.toSeries())
-=======
-                    NlpDependency(e.int("governor"), e.int("dependent"), e.str("relation"),
-                        e.copyCount("governorCopy"), e.copyCount("dependentCopy"))
-                } }.toSeries())
->>>>>>> c355209b1b13964ec0da94c72d432855c780c9e7
         }.toSeries(), (d["metadata"] as? Map<*, *>)?.let { meta -> NlpMetadata(meta.str("processor"), meta.str("implementation"),
             meta.obj("runtime").mapValues { (_, v) -> v as String },
             meta.obj("configuration").mapValues { (_, v) -> v as String }) }, d.nlpMentions()) }
@@ -321,8 +267,6 @@ internal object DocumentCuratorCodec {
 
     private fun Map<*, *>.str(key: String) = this[key] as String
     private fun Map<*, *>.int(key: String) = (this[key] as Number).toInt()
-<<<<<<< HEAD
-<<<<<<< HEAD
     private fun observationInt(value: Any?): Int {
         val number = (value as? Number)?.toDouble() ?: error("NLP observation integer required")
         require(number.isFinite() && number >= Int.MIN_VALUE && number <= Int.MAX_VALUE && number == number.toInt().toDouble()) {
@@ -365,28 +309,6 @@ internal object DocumentCuratorCodec {
         }
         return number.toInt()
     }
-||||||| 095fa0d30
-=======
-    private fun Map<*, *>.copyCount(key: String): Int {
-        if (!containsKey(key)) return 0 // Historical records did not retain copied-node identity.
-        val number = (this[key] as? Number)?.toDouble() ?: error("Dependency copy count must be an integer")
-        require(number.isFinite() && number >= 0 && number <= Int.MAX_VALUE && number == number.toInt().toDouble()) {
-            "Dependency copy count must be a nonnegative integer"
-        }
-        return number.toInt()
-    }
->>>>>>> c355209b1b13964ec0da94c72d432855c780c9e7
-||||||| 5e8cff8ce
-=======
-    private fun Map<*, *>.copyCount(key: String): Int {
-        if (!containsKey(key)) return 0 // Historical records did not retain copied-node identity.
-        val number = (this[key] as? Number)?.toDouble() ?: error("Dependency copy count must be an integer")
-        require(number.isFinite() && number >= 0 && number <= Int.MAX_VALUE && number == number.toInt().toDouble()) {
-            "Dependency copy count must be a nonnegative integer"
-        }
-        return number.toInt()
-    }
->>>>>>> 273a6f1f87d0e77c2297f9f9a7197bf986bf5edf
     private fun Map<*, *>.array(key: String) = this[key] as List<*>
     private fun Map<*, *>.obj(key: String) = (this[key] as Map<*, *>).entries.associate { it.key as String to it.value }
     private fun Map<*, *>.cids(key: String) = array(key).let { arr -> arr.size j { i -> ContentId(arr[i] as String) } }
