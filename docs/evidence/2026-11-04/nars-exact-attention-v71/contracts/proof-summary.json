@@ -1,0 +1,24 @@
+{
+  "passed": 6,
+  "failed": 0,
+  "artifactSource": "4bdcc227781fa68b07c0105655a19f3e0c11959f",
+  "mainJarSha256": "6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355",
+  "productionCodeSourcesVerified": 26,
+  "frozenJarCount": 120,
+  "dependencyHashesMatchSnapshotManifest": true,
+  "testSourceMatchesFrozenGitCommit": true,
+  "sourceOverlays": false,
+  "friendPaths": false,
+  "compiledClassCount": 26,
+  "scope": "Six exact public manual-KG contracts against frozen v71 JARs, including production DocumentAppendLog replay. Separate production PackCAS writer/reopener proof is outside this runner.",
+  "files": {
+    "Run.kt": "c0e6dd2536a5939f542e4477b8f86ce03263918e9bd8eea8262dce3d0cdb6f60",
+    "command-and-input-identity.json": "4efd290ec28a8c66ee78ac8f61927a922bf7f508851889ec7e3df54b6f0354da",
+    "compiled-class-inventory.json": "4fdef22a47d3b10a1ec5a7db2749d647a4696e8ff7c37eb19363e47c5d601af1",
+    "runtime-identity.json": "150e7489f1df6babfe1e4299bb35de25648963c2bde7b47843ca0a67d4b4f3c9",
+    "PropositionAttentionTest.kt": "e6ceb6a93e13e67c159fd16749f5016f61147434f8edbd932535d434db4e2924",
+    "output.log": "ba5e9956b4612985a8226abac9546cf928dfb76b7769c6ea02b8daf32a606ecc",
+    "compile-and-run.sh": "8b770ca9d224278f71dd39bd5d94f6fe50b63df4e1e22eff8acfd2031d4ee93f",
+    "results.json": "6ab8f38f7f725e7b64fa430f8aeb6c61d4c6c6b45cd495032557e4a7e284561e"
+  }
+}
