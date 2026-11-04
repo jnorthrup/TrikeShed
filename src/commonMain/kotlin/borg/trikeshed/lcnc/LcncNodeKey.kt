@@ -213,6 +213,9 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     SQL_LOGIC(SqlGraph.LOGIC),
     SQL_AS_CONDITION(SqlGraph.AS_CONDITION),
     SQL_AS_VALUE(SqlGraph.AS_VALUE),
+    ENGLISH_ROUTE(EnglishLcncPreset.ROUTE),
+    ENGLISH_EVIDENCE(EnglishLcncPreset.EVIDENCE),
+    ENGLISH_QUERY(EnglishObservationContract.TYPE),
     WIKI_PROPOSE(LcncContracts.WIKI_PROPOSE);
 
     fun construct(node: LcncNode, inputs: Map<String, Any?>, runner: LcncNodeRunner, parent: Job): LcncNodeElement {

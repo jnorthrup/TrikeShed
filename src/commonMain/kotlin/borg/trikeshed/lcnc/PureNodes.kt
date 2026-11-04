@@ -252,5 +252,5 @@ object PureNodes {
             }
         },
         "gauge" to LcncPureRunner { _, inputs -> mapOf("x" to inputs["x"]) },
-    ) + ViewNodes.registry()
+    ) + ViewNodes.registry() + EnglishLcncPreset.registry()
 }
