@@ -1,0 +1,34 @@
+{
+  "routed": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+  "ok": true,
+  "error": "",
+  "receipt": {
+    "status": "Started",
+    "routes": [
+      "lcnc:36d6f27a-0eb6-494c-8a96-6727234aebd4"
+    ],
+    "from": "direct:english-evidence",
+    "reply": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+    "headers": {
+      "EvidenceCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+    },
+    "plan": {
+      "from": "direct:english-evidence",
+      "steps": [
+        {
+          "setHeader": {
+            "name": "EvidenceCid",
+            "value": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+          }
+        },
+        {
+          "setBody": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+        },
+        {
+          "to": "mock:english-evidence"
+        }
+      ]
+    }
+  },
+  "text": "{\"status\":\"Started\", \"routes\":[\"lcnc:36d6f27a-0eb6-494c-8a96-6727234aebd4\"], \"from\":\"direct:english-evidence\", \"reply\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\", \"headers\":{\"EvidenceCid\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}, \"plan\":{\"from\":\"direct:english-evidence\", \"steps\":[{\"setHeader\":{\"name\":\"EvidenceCid\", \"value\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}}, {\"setBody\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}, {\"to\":\"mock:english-evidence\"}]}}"
+}

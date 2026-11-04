@@ -1,0 +1,60 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const {chromium}=require('playwright');
+async function main(){
+ const target=new URL(process.argv[2]);assert.equal(target.protocol,'http:');assert.equal(target.hostname,'127.0.0.1');
+ const base=target.origin,art=__dirname,errors=[],writes=[],external=[];let browser,page;
+ const programWrites=()=>writes.filter(w=>w.path==='/api/lcnc/run'&&JSON.parse(w.body).document);
+ const get=async p=>{const r=await fetch(base+p);assert.equal(r.status,200,p);return r.json();};
+ try{
+  const meta=await get('/_fixture/meta');assert.equal(meta.source.cid,'sha256:'+crypto.createHash('sha256').update(meta.sourceText).digest('hex'));
+  assert.equal(meta.inspection.receiptCid,meta.evidenceCid);assert.match(meta.parser,/synthetic/i);assert.match(meta.engine.class,/DefaultCamelContext$/);assert.match(meta.engine.jar,/camel-core-engine/);
+  browser=await chromium.launch({headless:true,executablePath:'/usr/bin/chromium',args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1920,height:1500},reducedMotion:'reduce'});
+  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{const url=new URL(r.url());if(url.origin!==base)external.push(r.url());else if(r.method()==='POST')writes.push({path:url.pathname,body:r.postData()});});
+  await page.goto(base+'/panels?load=english-camel-proof',{waitUntil:'domcontentloaded'});
+  await page.locator('.node[data-id="query"]').waitFor({timeout:45000});assert.equal(await page.locator('.node').count(),meta.program.nodes.length);
+  assert.equal(programWrites().length,0,'loading the graph does not admit the authored program');
+  assert(writes.filter(w=>w.path==='/api/lcnc/run').every(w=>JSON.parse(w.body).type==='vm.camel.catalog'),'only read-only catalog calls are allowed during load');
+  const palette=page.locator('#palette');if((await palette.getAttribute('class')||'').includes('open'))await page.locator('#paletteBtn').click();
+  await page.locator('#fitBtn').click();await page.screenshot({path:path.join(art,'camel-exact-receipt-inert-preset.png'),fullPage:true});
+  const runPromise=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/lcnc/run'&&r.request().method()==='POST'&&r.request().postDataJSON().document,{timeout:120000});
+  await page.locator('#runBtn').click();const response=await runPromise;const run=await response.json();fs.writeFileSync(path.join(art,'run.json'),JSON.stringify(run,null,2));
+  assert.equal(response.status(),200);assert.equal(run.ok,true,JSON.stringify(run));assert.equal(run.status,'completed');assert.match(run.receiptCid,/^sha256:[a-f0-9]{64}$/);
+  const outputs=run.outputs,dispatch=outputs.dispatch,transport=dispatch.receipt,query=outputs.query;
+  assert.equal(dispatch.routed,meta.evidenceCid);assert.equal(transport.reply,meta.evidenceCid);assert.equal(transport.headers.EvidenceCid,meta.evidenceCid);assert.equal(transport.from,'direct:english-evidence');
+  assert.equal(query.dataset,'english-receipt-observations');assert.equal(query.source.receiptCid,meta.evidenceCid);assert.equal(query.source.mode,'snapshot');assert.equal(query.source.reviewStatus,'unreviewed');assert.equal(query.source.semanticAuthority,'not-established');
+  const bindings=query.results.results.bindings;assert.equal(bindings.length,1);assert.equal(bindings[0].quote.value,'not');
+  assert.deepEqual(outputs.bindings.x,query.results);assert.deepEqual(outputs.source.x,query.source);assert.deepEqual(outputs.transport.x,transport);
+  const retained=await get('/api/lcnc/content?cid='+encodeURIComponent(run.receiptCid));assert.equal(retained.lcncRun.runId,run.runId);assert.equal(retained.lcncRun.programCid,run.programCid);
+  assert.deepEqual(retained.lcncRun.outputs.query,query);assert.deepEqual(retained.lcncRun.outputs.dispatch,dispatch);
+  const drawer=page.getByRole('region',{name:'Workspace facets'});await drawer.waitFor({timeout:30000});
+  await drawer.getByRole('region',{name:'Durable run inspection'}).waitFor({timeout:30000});
+  await drawer.getByRole('button',{name:'Inspect receipt',exact:true}).click();
+  await drawer.getByText(/Recorded node outputs/).waitFor({timeout:30000});
+  for(const id of ['dispatch','query'])await drawer.locator('summary').filter({hasText:new RegExp('^'+id+'$')}).click();
+  await drawer.getByText('Receipt: '+run.receiptCid,{exact:false}).scrollIntoViewIfNeeded();
+  await page.screenshot({path:path.join(art,'camel-durable-receipt-evidence.png'),fullPage:true});
+  await page.getByRole('button',{name:'Close facets',exact:true}).click();await page.locator('.node[data-id="query"] .result').waitFor({timeout:15000});
+  await page.locator('#fitBtn').click();await page.screenshot({path:path.join(art,'camel-completed-exact-receipt-query.png'),fullPage:true});
+  const displayProof={};for(const id of ['dispatch','transport','verify','query','bindings','source']){
+   await page.locator('#fitBtn').click();const node=page.locator('.node[data-id="'+id+'"]');
+   const original=await node.evaluate(el=>({x:parseFloat(el.style.left),y:parseFloat(el.style.top)}));
+   let header=await node.locator(':scope > .hd b').boundingBox();await page.mouse.move(header.x+Math.min(20,header.width/2),header.y+header.height/2);await page.mouse.down();await page.mouse.move(300,160,{steps:12});await page.mouse.up();
+   for(let step=0;step<6;step++){const scale=await page.locator('#world').evaluate(el=>new DOMMatrixReadOnly(getComputedStyle(el).transform).a);if(scale>=1.1)break;const box=await node.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+Math.min(50,box.height/2));await page.mouse.wheel(0,-140);await page.waitForTimeout(80);}
+   for(let step=0;step<30;step++){const closed=node.locator('.result .ctree-tw:visible').filter({hasText:'▸'});if(!await closed.count())break;await closed.first().click();}
+   displayProof[id]=await node.locator('.result').innerText();assert(displayProof[id].length>0);
+   if(id==='bindings')await node.locator('.result .leaf').filter({hasText:'value: "not"'}).scrollIntoViewIfNeeded();
+   await node.screenshot({path:path.join(art,'camel-output-'+id+'.png')});
+   await page.locator('#fitBtn').click();const current=await node.evaluate(el=>({x:parseFloat(el.style.left),y:parseFloat(el.style.top)}));const scale=await page.locator('#world').evaluate(el=>new DOMMatrixReadOnly(getComputedStyle(el).transform).a);header=await node.locator(':scope > .hd b').boundingBox();const hx=header.x+Math.min(20,header.width/2),hy=header.y+header.height/2;await page.mouse.move(hx,hy);await page.mouse.down();await page.mouse.move(hx+(original.x-current.x)*scale,hy+(original.y-current.y)*scale,{steps:12});await page.mouse.up();
+  }
+  assert(displayProof.transport.includes(meta.evidenceCid));assert(displayProof.query.includes('english-receipt-observations'));assert(displayProof.bindings.includes('not'));assert(displayProof.source.includes(meta.evidenceCid));
+  const hostile=await get('/_fixture/hostile');assert.equal(hostile.result,'REFUSED');assert.equal(hostile.queryDispatched,false);assert.match(hostile.error,/changed/i);assert.notEqual(hostile.actualEngineOutput.routed,meta.evidenceCid);assert.equal(hostile.actualEngineOutput.receipt.headers.EvidenceCid,meta.evidenceCid);
+  const drain=await get('/_fixture/drain');assert.equal(drain.result,'PASS');assert.equal(drain.waiterCancelled,true);assert.equal(drain.drainWaitedForAdmittedDispatch,true);assert.equal(drain.ownerClosed,true);assert.equal(drain.actualEngineOutput.routed,meta.evidenceCid);assert(drain.postDrainAdmissionRefused);
+  const evidence=await get('/_fixture/evidence');assert.equal(evidence.sourceRetained,true);assert.equal(evidence.receiptIdentityVerified,true);assert.equal(evidence.modelConfigured,false);assert.equal(evidence.modelCalls,0);assert.equal(evidence.reviewOwnerPresent,false);assert.equal(evidence.beliefBagPresent,false);assert.equal(evidence.engine.moduleManifestVerified,true);
+  await page.goto(base+'/_fixture/observations',{waitUntil:'domcontentloaded'});await page.waitForSelector('body[data-loaded="true"]',{timeout:20000});await page.screenshot({path:path.join(art,'camel-actual-engine-refusal-and-drain.png'),fullPage:true});
+  assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.equal(programWrites().length,1);
+  const result={result:'PASS',scope:'Actual immutable LCNC canvas and KanbanModule durable execution, installed classloader Camel local direct/mock route, exact retained CID body/header/reply verification and DocumentEnglishWire receipt query owner. Synthetic source/parser fixture. No model provider; no GraalJS isolation or arbitrary EIP network claim.',meta,run,retained,displayProof,hostile,drain,evidence,browserErrors:errors,externalBrowserRequests:external,writes};
+  fs.writeFileSync(path.join(art,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify({result:'PASS',evidenceCid:meta.evidenceCid,runReceiptCid:run.receiptCid,engine:meta.engine,changedCidRefused:true,drainWaited:true}));
+ }catch(error){fs.writeFileSync(path.join(art,'failure-observations.json'),JSON.stringify({error:String(error),writes,errors,external},null,2));if(page)await page.screenshot({path:path.join(art,'failure.png'),fullPage:true}).catch(()=>{});throw error;}
+ finally{if(browser)await browser.close();await get('/_fixture/finish').catch(()=>{});}
+}
+main().catch(error=>{console.error(error.stack||error);process.exitCode=1;});

@@ -1,0 +1,27 @@
+{
+  "source": "46da66cdb28e650e71490ae48741e6f5dcfa0563",
+  "mainJar": "/workspace/library-files/english-corpus-browser-proof/snapshot/main.jar",
+  "mainJarSha256": "c753a967ff83be0652c219b010d7100fcc50d34bcae0132ab7a8a11ff4421361",
+  "harnessSha256": "97f1247d8ffa5fcd9c4016c9b3f3e8b62c043c85f93dccddc5bbb08d4f1752a4",
+  "snapshotManifestSha256": "8828ddf9414891913f00a646a83574b1318f67a1b2894130a55f61a322985c2d",
+  "classpathSha256": "cbb4cfc2fc28d96d27b2af14470a67dcaed98a6de11eed049785e483cea47384",
+  "baselineSource": "095fa0d305c55362b4656fb661cc2cb088772e84",
+  "baselineResultSha256": "8e2538916e7d1b152abd045f468113bcd7890b77098a87f70bccaaec0c95c3f2",
+  "baselineHarnessSha256": "ccb09db5a0cf460ff5e68aab37d303d4c57b510d0c8324e51125c4987b44f204",
+  "productionClassOverlays": false,
+  "friendPaths": false,
+  "syntheticOnly": true,
+  "liveBagAccess": false,
+  "attempt": 1,
+  "compiledSources": [
+    "/workspace/library-files/nars-admission-proof-final/AdvancedNarsProbe.kt"
+  ],
+  "wallTimeoutSeconds": 45,
+  "maximumHeap": "512m",
+  "nativeMemoryLimit": false,
+  "startedAt": "2026-11-04T18:09:05.841270+00:00",
+  "runtimeSeconds": 0.6293896829993173,
+  "runtimeExit": 0,
+  "productionCodeSource": "file:/workspace/library-files/english-corpus-browser-proof/snapshot/main.jar",
+  "finishedAt": "2026-11-04T18:09:14.011353+00:00"
+}

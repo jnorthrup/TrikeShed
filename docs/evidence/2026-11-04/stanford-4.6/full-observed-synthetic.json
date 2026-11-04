@@ -1,0 +1,495 @@
+{
+  "reviewStatus": "unreviewed",
+  "authority": "parser-observations-only-not-legal-assertions",
+  "version": "4.6.0",
+  "sourceHead": "5878d7d14095cf0aa8fda5d997ffb35cacf73c5c",
+  "hostJarSha256": "f575d402f9b84bacab0cb805636571eab973e4e18212733ec6a67b8a891d28b8",
+  "cases": [
+    {
+      "id": "positive-if",
+      "observed": {
+        "text": "Tenant must pay rent if payment is due.",
+        "sentences": [
+          {
+            "index": 0,
+            "begin": 0,
+            "end": 39,
+            "tokens": [
+              {
+                "index": 1,
+                "begin": 0,
+                "end": 6,
+                "word": "Tenant",
+                "lemma": "tenant",
+                "tag": "NN",
+                "ner": "O"
+              },
+              {
+                "index": 2,
+                "begin": 7,
+                "end": 11,
+                "word": "must",
+                "lemma": "must",
+                "tag": "MD",
+                "ner": "O"
+              },
+              {
+                "index": 3,
+                "begin": 12,
+                "end": 15,
+                "word": "pay",
+                "lemma": "pay",
+                "tag": "VB",
+                "ner": "O"
+              },
+              {
+                "index": 4,
+                "begin": 16,
+                "end": 20,
+                "word": "rent",
+                "lemma": "rent",
+                "tag": "NN",
+                "ner": "O"
+              },
+              {
+                "index": 5,
+                "begin": 21,
+                "end": 23,
+                "word": "if",
+                "lemma": "if",
+                "tag": "IN",
+                "ner": "O"
+              },
+              {
+                "index": 6,
+                "begin": 24,
+                "end": 31,
+                "word": "payment",
+                "lemma": "payment",
+                "tag": "NN",
+                "ner": "O"
+              },
+              {
+                "index": 7,
+                "begin": 32,
+                "end": 34,
+                "word": "is",
+                "lemma": "be",
+                "tag": "VBZ",
+                "ner": "O"
+              },
+              {
+                "index": 8,
+                "begin": 35,
+                "end": 38,
+                "word": "due",
+                "lemma": "due",
+                "tag": "JJ",
+                "ner": "O"
+              },
+              {
+                "index": 9,
+                "begin": 38,
+                "end": 39,
+                "word": ".",
+                "lemma": ".",
+                "tag": ".",
+                "ner": "O"
+              }
+            ],
+            "dependencies": [
+              {
+                "governor": 0,
+                "dependent": 3,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "root"
+              },
+              {
+                "governor": 3,
+                "dependent": 1,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "nsubj"
+              },
+              {
+                "governor": 3,
+                "dependent": 2,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "aux"
+              },
+              {
+                "governor": 3,
+                "dependent": 4,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "obj"
+              },
+              {
+                "governor": 8,
+                "dependent": 5,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "mark"
+              },
+              {
+                "governor": 8,
+                "dependent": 6,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "nsubj"
+              },
+              {
+                "governor": 8,
+                "dependent": 7,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "cop"
+              },
+              {
+                "governor": 3,
+                "dependent": 8,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "advcl:if"
+              },
+              {
+                "governor": 3,
+                "dependent": 9,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "punct"
+              }
+            ],
+            "openie": [
+              {
+                "subject": [
+                  1,
+                  1
+                ],
+                "relation": [
+                  2,
+                  3
+                ],
+                "object": [
+                  4,
+                  4
+                ],
+                "subjectText": "Tenant",
+                "relationText": "must pay",
+                "objectText": "rent",
+                "confidence": 1.0
+              },
+              {
+                "subject": [
+                  6,
+                  6
+                ],
+                "relation": [
+                  7,
+                  7
+                ],
+                "object": [
+                  5,
+                  8
+                ],
+                "subjectText": "payment",
+                "relationText": "is",
+                "objectText": "if due",
+                "confidence": 1.0
+              },
+              {
+                "subject": [
+                  1,
+                  1
+                ],
+                "relation": [
+                  2,
+                  4
+                ],
+                "object": [
+                  5,
+                  8
+                ],
+                "subjectText": "Tenant",
+                "relationText": "must pay rent",
+                "objectText": "if due",
+                "confidence": 1.0
+              },
+              {
+                "subject": [
+                  1,
+                  1
+                ],
+                "relation": [
+                  2,
+                  4
+                ],
+                "object": [
+                  8,
+                  8
+                ],
+                "subjectText": "Tenant",
+                "relationText": "must pay rent",
+                "objectText": "due",
+                "confidence": 1.0
+              },
+              {
+                "subject": [
+                  6,
+                  6
+                ],
+                "relation": [
+                  7,
+                  7
+                ],
+                "object": [
+                  8,
+                  8
+                ],
+                "subjectText": "payment",
+                "relationText": "is",
+                "objectText": "due",
+                "confidence": 1.0
+              }
+            ],
+            "kbp": []
+          }
+        ]
+      }
+    },
+    {
+      "id": "named-negated-exception",
+      "observed": {
+        "text": "Alice must notify Acme Corporation unless notice is not due.",
+        "sentences": [
+          {
+            "index": 0,
+            "begin": 0,
+            "end": 60,
+            "tokens": [
+              {
+                "index": 1,
+                "begin": 0,
+                "end": 5,
+                "word": "Alice",
+                "lemma": "Alice",
+                "tag": "NNP",
+                "ner": "PERSON"
+              },
+              {
+                "index": 2,
+                "begin": 6,
+                "end": 10,
+                "word": "must",
+                "lemma": "must",
+                "tag": "MD",
+                "ner": "O"
+              },
+              {
+                "index": 3,
+                "begin": 11,
+                "end": 17,
+                "word": "notify",
+                "lemma": "notify",
+                "tag": "VB",
+                "ner": "O"
+              },
+              {
+                "index": 4,
+                "begin": 18,
+                "end": 22,
+                "word": "Acme",
+                "lemma": "Acme",
+                "tag": "NNP",
+                "ner": "ORGANIZATION"
+              },
+              {
+                "index": 5,
+                "begin": 23,
+                "end": 34,
+                "word": "Corporation",
+                "lemma": "Corporation",
+                "tag": "NNP",
+                "ner": "ORGANIZATION"
+              },
+              {
+                "index": 6,
+                "begin": 35,
+                "end": 41,
+                "word": "unless",
+                "lemma": "unless",
+                "tag": "IN",
+                "ner": "O"
+              },
+              {
+                "index": 7,
+                "begin": 42,
+                "end": 48,
+                "word": "notice",
+                "lemma": "notice",
+                "tag": "NN",
+                "ner": "O"
+              },
+              {
+                "index": 8,
+                "begin": 49,
+                "end": 51,
+                "word": "is",
+                "lemma": "be",
+                "tag": "VBZ",
+                "ner": "O"
+              },
+              {
+                "index": 9,
+                "begin": 52,
+                "end": 55,
+                "word": "not",
+                "lemma": "not",
+                "tag": "RB",
+                "ner": "O"
+              },
+              {
+                "index": 10,
+                "begin": 56,
+                "end": 59,
+                "word": "due",
+                "lemma": "due",
+                "tag": "JJ",
+                "ner": "O"
+              },
+              {
+                "index": 11,
+                "begin": 59,
+                "end": 60,
+                "word": ".",
+                "lemma": ".",
+                "tag": ".",
+                "ner": "O"
+              }
+            ],
+            "dependencies": [
+              {
+                "governor": 0,
+                "dependent": 3,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "root"
+              },
+              {
+                "governor": 3,
+                "dependent": 1,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "nsubj"
+              },
+              {
+                "governor": 3,
+                "dependent": 2,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "aux"
+              },
+              {
+                "governor": 5,
+                "dependent": 4,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "compound"
+              },
+              {
+                "governor": 3,
+                "dependent": 5,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "obj"
+              },
+              {
+                "governor": 10,
+                "dependent": 6,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "mark"
+              },
+              {
+                "governor": 10,
+                "dependent": 7,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "nsubj"
+              },
+              {
+                "governor": 10,
+                "dependent": 8,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "cop"
+              },
+              {
+                "governor": 10,
+                "dependent": 9,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "advmod"
+              },
+              {
+                "governor": 3,
+                "dependent": 10,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "advcl:unless"
+              },
+              {
+                "governor": 3,
+                "dependent": 11,
+                "governorCopy": 0,
+                "dependentCopy": 0,
+                "relation": "punct"
+              }
+            ],
+            "openie": [
+              {
+                "subject": [
+                  1,
+                  1
+                ],
+                "relation": [
+                  2,
+                  5
+                ],
+                "object": [
+                  9,
+                  10
+                ],
+                "subjectText": "Alice",
+                "relationText": "must notify Acme Corporation",
+                "objectText": "not due",
+                "confidence": 1.0
+              },
+              {
+                "subject": [
+                  1,
+                  1
+                ],
+                "relation": [
+                  2,
+                  5
+                ],
+                "object": [
+                  6,
+                  10
+                ],
+                "subjectText": "Alice",
+                "relationText": "must notify Acme Corporation",
+                "objectText": "unless not due",
+                "confidence": 1.0
+              }
+            ],
+            "kbp": []
+          }
+        ]
+      }
+    }
+  ]
+}

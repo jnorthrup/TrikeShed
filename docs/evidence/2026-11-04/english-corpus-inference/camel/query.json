@@ -1,0 +1,46 @@
+{
+  "dataset": "english-receipt-observations",
+  "query": "SELECT ?marker ?quote WHERE { ?marker <urn:trikeshed:english:observation:markerKind> \"negation\" . ?marker <urn:trikeshed:english:observation:quote> ?quote . }",
+  "results": {
+    "head": {
+      "vars": [
+        "marker",
+        "quote"
+      ]
+    },
+    "results": {
+      "bindings": [
+        {
+          "marker": {
+            "type": "uri",
+            "value": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53/sentence/0/marker/3"
+          },
+          "quote": {
+            "type": "literal",
+            "value": "not"
+          }
+        }
+      ]
+    }
+  },
+  "source": {
+    "selected": "english-receipt-observations",
+    "receiptCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+    "namedGraph": "urn:trikeshed:english:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+    "originalCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+    "extractedTextCid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+    "mode": "snapshot",
+    "historical": true,
+    "reviewStatus": "unreviewed",
+    "scope": "recorded-lexical-and-parser-claims",
+    "semanticAuthority": "not-established",
+    "producerAuthority": "not-established",
+    "parserExecution": "not-reverified",
+    "dependencyNodeIdentity": "recorded-index-and-copy",
+    "parserDependencyNodeIdentity": null,
+    "parserNodeIdentityReported": false,
+    "bindingProvenance": "receipt-named-resources-and-exact-source-spans",
+    "quads": 244,
+    "currentness": "not-checked"
+  }
+}

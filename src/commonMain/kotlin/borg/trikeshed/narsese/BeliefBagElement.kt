@@ -43,8 +43,9 @@ sealed class BeliefIntake {
         val completion: CompletableDeferred<Unit>? = null,
     ) : BeliefIntake()
 
-    /** Evidence delta onto an existing angular; budget untouched. */
-    data class Reinforce(val angular: Long, val delta: EvidenceCoord, val receiptCid: ContentId? = null) : BeliefIntake()
+    /** Receipted observation onto an existing resident; exact ancestry is required and budget is untouched. */
+    data class Reinforce(val angular: Long, val delta: EvidenceCoord, val receiptCid: ContentId? = null,
+        val evidenceBasis: EvidenceBasis? = null, val completion: CompletableDeferred<Unit>? = null) : BeliefIntake()
 
     /** Attention change only: rekey to the new budget; evidence untouched. */
     data class Attend(val angular: Long, val budget: BudgetCoord) : BeliefIntake()
@@ -63,6 +64,12 @@ sealed class BeliefEvent {
     data class Evicted(val angular: Long, val spillCid: ContentId?) : BeliefEvent()
     data class Contradicted(val angular: Long, val subjectCid: String) : BeliefEvent()
 }
+
+enum class BeliefAdmissionIssue { STRUCTURE_MISMATCH, UNRESOLVED_BASIS, ARCHIVE_UNAVAILABLE, RECEIPT_REQUIRED, RESIDENT_REQUIRED }
+
+/** Per-command refusal; unlike a failed WAL append, this does not stop the owning intake worker. */
+class BeliefAdmissionRefused(val angular: Long, val issue: BeliefAdmissionIssue, cause: Throwable? = null) :
+    IllegalArgumentException("Belief admission refused for $angular: ${issue.name}", cause)
 
 /**
  * BeliefBagElement — the daemon-owned NarseseBag as a CCEK element.
@@ -115,6 +122,9 @@ class BeliefBagElement(
 
     private val _events = MutableSharedFlow<BeliefEvent>(replay = 0, extraBufferCapacity = 1024)
     val beliefEvents: SharedFlow<BeliefEvent> get() = _events
+    /** Diagnostic for unacknowledged legacy sends; submit's exceptional acknowledgement is authoritative. */
+    @Volatile var lastAdmissionRefusal: BeliefAdmissionRefused? = null
+        private set
 
     // The attention table: funnel-probe geometry × stochastic hijack replacement
     // (narchy HijackBag × Krapivin funnel — see HijackBeliefBag). The intake
@@ -162,12 +172,16 @@ class BeliefBagElement(
                 for (cmd in intake) {
                     val completion = when (cmd) {
                         is BeliefIntake.Mint -> cmd.completion
+                        is BeliefIntake.Reinforce -> cmd.completion
                         is BeliefIntake.Fence -> cmd.completion
                         else -> null
                     }
                     try {
                         handle(cmd)
                         completion?.complete(Unit)
+                    } catch (refused: BeliefAdmissionRefused) {
+                        lastAdmissionRefusal = refused
+                        completion?.completeExceptionally(refused)
                     } catch (t: Throwable) {
                         failure = t
                         completion?.completeExceptionally(t)
@@ -187,6 +201,7 @@ class BeliefBagElement(
                     val pending = intake.tryReceive().getOrNull() ?: break
                     val completion = when (pending) {
                         is BeliefIntake.Mint -> pending.completion
+                        is BeliefIntake.Reinforce -> pending.completion
                         is BeliefIntake.Fence -> pending.completion
                         else -> null
                     }
@@ -198,6 +213,14 @@ class BeliefBagElement(
 
     /** Await the existing single writer, including its WAL append/flush policy. */
     suspend fun submit(cmd: BeliefIntake.Mint) {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(cmd.copy(completion = completion))
+        completion.await()
+    }
+
+    /** The same processed acknowledgement/refusal boundary for a receipted evidence revision. */
+    suspend fun submit(cmd: BeliefIntake.Reinforce) {
         check(worker != null) { "Belief bag is not open" }
         val completion = CompletableDeferred<Unit>()
         intake.send(cmd.copy(completion = completion))
@@ -294,7 +317,7 @@ class BeliefBagElement(
     private suspend fun handle(cmd: BeliefIntake) {
         when (cmd) {
             is BeliefIntake.Mint -> mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis, cmd.gloss)
-            is BeliefIntake.Reinforce -> reinforce(cmd.angular, cmd.delta)
+            is BeliefIntake.Reinforce -> reinforce(cmd)
             is BeliefIntake.Attend -> attend(cmd.angular, cmd.budget)
             BeliefIntake.DecayTick -> decayAll()
             is BeliefIntake.Fence -> return
@@ -311,37 +334,38 @@ class BeliefBagElement(
         gloss: String? = null,
     ) {
         val angular = incoming.angular
-        if (gloss != null) glossByAngular[angular] = gloss
-        val shown = glossByAngular[angular]
         val incomingReceipt = receiptCid ?: ContentId.of(SignalCodec.encode(incoming))
+        val resident = hijack.get(angular)
+        val prior = resident?.signal ?: archivedSignal(angular)
+        if (prior == null && counted[angular]?.isNotEmpty() == true)
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.ARCHIVE_UNAVAILABLE)
+        // Angular is an attention-routing coordinate, not a complete proposition identity. This
+        // checks only structure available in the current signal schema, not English predicate/context unification.
+        if (prior != null && (prior.subjectCid != incoming.subjectCid || prior.objectCid != incoming.objectCid ||
+                prior.relation != incoming.relation || prior.temporal != incoming.temporal))
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.STRUCTURE_MISMATCH)
         // The same observation minted again (a restart's seed, a retried send) renews attention, never evidence.
         val already = counted[angular]?.contains(incomingReceipt.hex) == true
-        val revived = if (hijack.get(angular) == null && cas != null) reviveFromCas(incoming, already) else incoming
-        val existing = hijack.get(angular)
-        val explicitRevision = existing != null && evidenceBasis != null && !already
-        val prepared = if (explicitRevision) {
+        val prepared = if (prior != null && already) prior else if (prior != null) {
             val decision = OverlapSafeRevision.revise(
                 receiptByAngular[angular],
                 incomingReceipt,
-                existing!!.signal.evidence,
-                revived.evidence,
+                prior.evidence,
+                incoming.evidence,
                 basisByAngular[angular],
                 evidenceBasis,
             )
-            if (!decision.accepted) return
-            revived.copy(evidence = decision.evidence)
-        } else revived
+            if (!decision.accepted) throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.UNRESOLVED_BASIS)
+            incoming.copy(evidence = decision.evidence, basisBloom = prior.basisBloom or incoming.basisBloom)
+        } else incoming
+        if (!already && gloss != null) glossByAngular[angular] = gloss
+        val shown = glossByAngular[angular]
         val outcome = hijack.put(HijackBeliefBag.Slot(angular, budget, prepared)) { existing, inc ->
-            // NARS revision at the cell: evidence union + basis Bloom union, incoming metadata wins
+            // Evidence was revised against the exact prior resident/archive before any state changed.
             HijackBeliefBag.Slot(
                 angular,
                 inc.budget,
                 inc.signal.copy(
-                    evidence = when {
-                        already -> existing.signal.evidence
-                        explicitRevision -> inc.signal.evidence
-                        else -> revise(existing.signal.evidence, inc.signal.evidence)
-                    },
                     basisBloom = existing.signal.basisBloom or inc.signal.basisBloom,
                 ),
             )
@@ -352,7 +376,8 @@ class BeliefBagElement(
         }
         when (outcome) {
             is HijackBeliefBag.Put.Placed -> {
-                recordBasis(angular, incomingReceipt, evidenceBasis)
+                spillCids = spillCids - angular
+                if (!already) recordBasis(angular, incomingReceipt, evidenceBasis)
                 walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
                 _events.tryEmit(
                     if (outcome.merged) BeliefEvent.Revised(angular, outcome.slot.signal.evidence, shown)
@@ -360,7 +385,8 @@ class BeliefBagElement(
                 )
             }
             is HijackBeliefBag.Put.Hijacked -> {
-                recordBasis(angular, incomingReceipt, evidenceBasis)
+                spillCids = spillCids - angular
+                if (!already) recordBasis(angular, incomingReceipt, evidenceBasis)
                 walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
                 _events.tryEmit(BeliefEvent.Minted(angular, receiptCid, shown))
                 spill(outcome.victim)
@@ -368,6 +394,12 @@ class BeliefBagElement(
             is HijackBeliefBag.Put.Rejected -> {
                 // lost the roulette at every funnel level: attention refused, evidence preserved
                 spill(outcome.incoming)
+                if (cas != null && !already) {
+                    // The archived bytes already contain this observation. A retry must not count it again.
+                    recordBasis(angular, incomingReceipt, evidenceBasis)
+                    counted.getOrPut(angular) { HashSet() }.add(incomingReceipt.hex)
+                    walAppend("R:$angular:${incomingReceipt.hex}")
+                }
             }
         }
         if (incoming.relation == RelationKind.CONTRADICTION && outcome !is HijackBeliefBag.Put.Rejected) {
@@ -377,7 +409,7 @@ class BeliefBagElement(
 
     private fun recordBasis(angular: Long, receiptCid: ContentId, basis: EvidenceBasis?) {
         receiptByAngular[angular] = receiptCid
-        if (basis != null) {
+        if (basis != null && basis.leaves.size > 0) {
             val prior = basisByAngular[angular]
             basisByAngular[angular] = if (prior == null) basis else unionBasis(prior, basis)
         }
@@ -393,12 +425,15 @@ class BeliefBagElement(
         return EvidenceBasis.of(*leaves.toTypedArray())
     }
 
-    private fun reinforce(angular: Long, delta: EvidenceCoord) {
-        val existing = hijack.get(angular) ?: return
-        val merged = existing.signal.copy(evidence = revise(existing.signal.evidence, delta))
-        hijack.put(HijackBeliefBag.Slot(angular, existing.budget, merged)) { _, inc -> inc }
-        walAppend("B:${existing.budget.packed}:" + SignalCodec.encode(merged).decodeToString())
-        _events.tryEmit(BeliefEvent.Revised(angular, merged.evidence))
+    private fun reinforce(command: BeliefIntake.Reinforce) {
+        val receipt = command.receiptCid ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.RECEIPT_REQUIRED)
+        val basis = command.evidenceBasis?.takeIf { it.leaves.size > 0 }
+            ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.UNRESOLVED_BASIS)
+        val existing = hijack.get(command.angular)
+            ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.RESIDENT_REQUIRED)
+        // Reuse exactly the structural, duplicate, ancestry, CAS and WAL path used by Mint.
+        // No relevance or user-memory deletion can become independent evidence through this command.
+        mint(existing.signal.copy(evidence = command.delta, provenanceCid = receipt.value), existing.budget, receipt, basis)
     }
 
     private fun attend(angular: Long, budget: BudgetCoord) {
@@ -433,13 +468,16 @@ class BeliefBagElement(
         _events.tryEmit(BeliefEvent.Evicted(slot.angular, spillCid))
     }
 
-    /** A re-mint of a previously spilled angular revives its permanent evidence; an observation it already holds adds none. */
-    private fun reviveFromCas(incoming: SemanticSignal, already: Boolean): SemanticSignal {
-        val spilled = spillCids[incoming.angular] ?: return incoming
-        spillCids = spillCids - incoming.angular
-        val bytes = cas?.get(spilled) ?: return incoming
-        val prior = runCatching { SignalCodec.decode(bytes) }.getOrNull() ?: return incoming
-        return incoming.copy(evidence = if (already) prior.evidence else revise(prior.evidence, incoming.evidence))
+    /** Read history without consuming it. Only an accepted placement removes the archive index. */
+    private fun archivedSignal(angular: Long): SemanticSignal? {
+        val spilled = spillCids[angular] ?: return null
+        return try {
+            val bytes = checkNotNull(cas?.get(spilled)) { "Archived signal bytes unavailable" }
+            check(ContentId.of(bytes) == spilled) { "Archived signal digest differs" }
+            SignalCodec.decode(bytes).also { check(it.angular == angular) { "Archived routing address differs" } }
+        } catch (failure: Exception) {
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.ARCHIVE_UNAVAILABLE, failure)
+        }
     }
 
     @Volatile private var spillCids: Map<Long, ContentId> = emptyMap()

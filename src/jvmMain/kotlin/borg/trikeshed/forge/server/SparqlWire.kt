@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.ReifiedSplitSeries2
 import borg.trikeshed.cursor.query.*
 import borg.trikeshed.lcnc.LcncProgramConfix
 import borg.trikeshed.lcnc.SparqlGraph
@@ -99,16 +100,22 @@ class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, 
             // Avoid constructing the combined cursor when the selected inputs already exceed the budget.
             if ((if (selected.stored) surface.store.size.toLong() else 0L) + (rows?.size ?: 0).toLong() > VISUAL_SOURCE_ROWS)
                 return@withLock error(413, "Selected dataset exceeds the visual query source limit")
-            val source = surface.quads(rows, selected)
+            val checkedLive: Cursor?
+            val source: Cursor
+            try {
+                checkedLive = if (candidateVariable != null) rows?.let(::visualSnapshot) else rows
+                source = visualSnapshot(surface.quads(checkedLive, selected))
+            } catch (limit: VisualLimit) { return@withLock error(413, limit.message ?: "Visual source limit") }
+              catch (failure: Exception) { return@withLock error(400, failure.message ?: "Invalid quad source") }
             val refusal = try { visualWorkRefusal(query, source, candidateVariable != null) }
                 catch (e: Exception) { return@withLock error(400, e.message ?: "Invalid quad source") }
             if (refusal != null) return@withLock error(413, refusal)
-            val result = surface.answer(query.text, emptyList(), emptyList(), "json", "", rows, selected)
+            val result = surface.answer(query, source, "json", "")
             if (result.status != 200) error(result.status, result.body)
             else {
                 val results = reifyStrict(result.body)
                 val candidateContext = if (candidateVariable == null) emptyMap() else try {
-                    mapOf("candidateContext" to VisualCandidateContext.extract(candidateVariable, results, requireNotNull(rows)))
+                    mapOf("candidateContext" to VisualCandidateContext.extract(candidateVariable, results, requireNotNull(checkedLive)))
                 } catch (e: Exception) { return@withLock error(400, e.message ?: "Cannot inspect live proposal fields") }
                 val response = jsonOf(mapOf("dataset" to dataset, "query" to query.text,
                     "results" to results, "source" to selected.descriptor(rows != null)) + candidateContext)
@@ -155,67 +162,87 @@ class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, 
             return true // strict parsing diagnoses incomplete strings and mismatched delimiters
         }
 
+        private class VisualLimit(message: String) : IllegalArgumentException(message)
+
+        /** Capture bounded immutable quad lexemes once, before either the guard or executor reads them. */
+        private fun visualSnapshot(source: Cursor): Cursor {
+            if (source.size.toLong() > VISUAL_SOURCE_ROWS) throw VisualLimit("Selected dataset exceeds the visual query source limit")
+            if (source.size == 0) return emptySeriesOf()
+            val names = source.names
+            val ord = IntArray(4) { i -> (0 until names.size).firstOrNull {
+                names[it].contentEquals(QUAD_COLUMNS[i]) || names[it].endsWith("." + QUAD_COLUMNS[i])
+            } ?: error("a graph pattern needs a ${QUAD_COLUMNS[i]} column") }
+            val cells = Array(4) { arrayOfNulls<String>(source.size) }
+            var chars = 0L
+            for (row in 0 until source.size) {
+                val values = source[row].values
+                for (column in 0..3) {
+                    val raw = values[ord[column]] ?: continue
+                    if (raw is CharSequence && raw.length > VISUAL_TERM_CHARS)
+                        throw VisualLimit("Selected dataset has a term too large for visual query")
+                    val cell = scalarText(raw)
+                    if (cell.length > VISUAL_TERM_CHARS) throw VisualLimit("Selected dataset has a term too large for visual query")
+                    chars += cell.length
+                    if (chars > VISUAL_SOURCE_CHARS) throw VisualLimit("Selected dataset exceeds the visual query text limit")
+                    cells[column][row] = cell
+                }
+            }
+            val metas = 4 j { column: Int -> ColumnMeta(QUAD_COLUMNS[column], IOMemento.IoString).let { metadata -> { metadata } } }
+            return source.size j { row: Int -> ReifiedSplitSeries2(4 j { column: Int -> cells[column][row] as Any? }, metas) }
+        }
+
         /**
-         * Each join's rows are bounded by the product of the number of source quads matching
-         * each preceding pattern. Count constants and graph scope, but deliberately ignore
-         * shared-variable selectivity: the resulting upper bound may refuse a selective query.
-         * LIMIT does not help because the graph stage materializes joins before projection.
+         * Every prior binding matches at most the largest bucket keyed by all already-bound
+         * variables. Multi-valued keys retain their full fanout; an unshared pattern stays a
+         * Cartesian product. Per-variable widths bound final projection values independently
+         * of unrelated source literals. These are upper bounds, not estimates or functional keys.
          */
         private fun visualWorkRefusal(query: SparqlQuery, source: Cursor, withCandidates: Boolean): String? {
-            // JSON escaping needs at most six bytes per UTF-16 code unit. Reserve space
-            // for the generated query, result header and outer response before row data.
             val fixed = query.text.length.toLong() * 6L + query.variables.sumOf { it.length.toLong() * 6L } + 8_192L +
                 if (withCandidates) VISUAL_CANDIDATE_RESERVE_BYTES else 0L
             if (fixed >= VISUAL_RESPONSE_BYTES) return "Visual query may exceed the response size limit"
             if (source.size == 0) return null
-            val names = source.names
-            val columns = arrayOf("G", "S", "P", "O")
-            val ord = IntArray(4) { i -> (0 until names.size).firstOrNull {
-                names[it].contentEquals(columns[i]) || names[it].endsWith("." + columns[i])
-            } ?: error("a graph pattern needs a ${columns[i]} column") }
+            val boundVariables = mutableSetOf<String>()
+            val variableLengths = mutableMapOf<String, Int>()
             var bound = 1L
-            var longest = 0
-            var sourceChars = 0L
-            // The boxed graph path materializes all source terms before filtering graph or
-            // constants, so screen every term, including those in unselected graphs.
-            for (r in 0 until source.size) {
-                val values = source[r].values
-                for (i in 0..3) {
-                    val raw = values[ord[i]] ?: continue
-                    if (raw is CharSequence && raw.length > VISUAL_TERM_CHARS)
-                        return "Selected dataset has a term too large for visual query"
-                    val cell = scalarText(raw)
-                    if (cell.length > VISUAL_TERM_CHARS) return "Selected dataset has a term too large for visual query"
-                    sourceChars += cell.length
-                    if (sourceChars > VISUAL_SOURCE_CHARS) return "Selected dataset exceeds the visual query text limit"
-                    longest = maxOf(longest, cell.length)
-                }
-            }
-            // Keys repeat on every binding, not only in the header. Reserve conservative
-            // per-cell overhead for type, language/datatype metadata, JSON and separators.
-            val width = 1L + query.variables.sumOf { (it.length.toLong() + longest.toLong()) * 6L + 160L }
             for (pattern in query.graph.patterns.view) {
                 val slots = pattern.slots
-                var matches = 0L
-                for (r in 0 until source.size) {
-                    val values = source[r].values
-                    val graph = values[ord[0]]?.let(::scalarText) ?: continue
+                val variables = slots.map { it?.takeIf { term -> term.isVariable }?.name }
+                val shared = variables.filterNotNull().filter { it in boundVariables }.distinct()
+                val keySlots = shared.map { name -> variables.indexOf(name) }
+                val buckets = mutableMapOf<String, Int>()
+                val lengths = mutableMapOf<String, Int>()
+                var fanout = 0
+                row@ for (row in 0 until source.size) {
+                    val values = source[row].values
+                    val graph = values[0] as? String ?: continue
                     if (!query.graph.allows(pattern, graph)) continue
-                    var fits = true
-                    for (i in 0..3) {
-                        val cell = values[ord[i]]?.let(::scalarText)
-                        if (cell == null) { fits = false; break }
-                        val constant = slots[i]?.takeIf { !it.isVariable }?.text
-                        if (constant != null && constant != cell) fits = false
+                    for (slot in 0..3) {
+                        val cell = values[slot] as? String ?: continue@row
+                        val constant = slots[slot]?.takeIf { !it.isVariable }?.text
+                        if (constant != null && constant != cell) continue@row
+                        val variable = variables[slot]
+                        if (variable != null) for (other in slot + 1..3)
+                            if (variables[other] == variable && values[other] != cell) continue@row
                     }
-                    if (fits) matches++
+                    val key = graphJoinKey(keySlots.size) { values[keySlots[it]] as String }
+                    val count = (buckets[key] ?: 0) + 1
+                    buckets[key] = count; fanout = maxOf(fanout, count)
+                    for (slot in 0..3) variables[slot]?.let { name ->
+                        lengths[name] = maxOf(lengths[name] ?: 0, (values[slot] as String).length)
+                    }
                 }
-                if (matches > 0 && bound > VISUAL_JOIN_ROWS / matches)
+                if (fanout > 0 && bound > VISUAL_JOIN_ROWS / fanout)
                     return "Visual query may exceed the intermediate join limit; narrow its patterns"
-                bound *= matches
-                if (bound > (VISUAL_RESPONSE_BYTES - fixed) / width)
-                    return "Visual query may exceed the result size limit; narrow its patterns"
+                bound *= fanout.toLong()
+                for (name in variables.filterNotNull()) {
+                    boundVariables.add(name)
+                    variableLengths[name] = minOf(variableLengths[name] ?: Int.MAX_VALUE, lengths[name] ?: 0)
+                }
             }
+            val width = 1L + query.variables.sumOf { (it.length.toLong() + (variableLengths[it] ?: 0).toLong()) * 6L + 160L }
+            if (bound > (VISUAL_RESPONSE_BYTES - fixed) / width)
+                return "Visual query may exceed the result size limit; narrow its patterns"
             return null
         }
 

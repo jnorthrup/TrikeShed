@@ -23,12 +23,14 @@ class DocumentEnglishWire(
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     private val suppliedReader = readerFactory != null
     private val reader = lazy { readerFactory?.invoke() ?: CoreNlpRuntime(CoreNlpRuntime.Profile.SYNTAX) }
+    private val observations = EnglishObservationWire(ctx, corpus)
 
-    fun attach() { ctx.routes.claim(OWNER, PATH, route = ::route) }
+    fun attach() { ctx.routes.claim(OWNER, PATH, route = ::route); observations.attach() }
 
     /** CoreNLP's synchronous call has no wall deadline; accepted calls finish before its owner closes. */
     suspend fun drain() {
         ctx.routes.release(OWNER)
+        observations.drain()
         requests.drain()
         if (reader.isInitialized()) (reader.value as? AutoCloseable)?.close()
     }
@@ -143,7 +145,8 @@ class DocumentEnglishWire(
         val inventory = EnglishInspection.inspect(source, parsed, begin, end)
         val receipt = inventory + _m["selection" j _m["project" j expected.project, "id" j expected.id,
             "cid" j expected.cid, "rev" j expected.rev, "seq" j expected.seq],
-            "source" j (DocumentCuratorCodec.source(source) - "text")]
+            "source" j (DocumentCuratorCodec.source(source) - "text"),
+            "sourceSnapshots" j (retained.revisions α { it.toMap() }).toList()]
         val bytes = CanonicalCbor.encodeMap(receipt)
         require(bytes.size <= MAX_RECEIPT) { "English inspection receipt exceeds 8MiB" }
         val cid = ctx.casStore.put(bytes); ctx.casStore.sync()

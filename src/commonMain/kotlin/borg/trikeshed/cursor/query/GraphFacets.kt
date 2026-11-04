@@ -39,6 +39,14 @@ fun QueryK.Graph.allows(pattern: TriplePattern, g: String?): Boolean {
     }
 }
 
+/** Length framing keeps distinct accepted term tuples distinct, even when a term contains NUL. */
+internal fun graphJoinKey(size: Int, value: (Int) -> String): String = buildString {
+    for (index in 0 until size) {
+        val cell = value(index)
+        append(cell.length); append(':'); append(cell)
+    }
+}
+
 /** The closure path: any Cursor with the four quad columns. */
 fun Cursor.graph(stage: QueryK.Graph): Cursor {
     val vars = stage.variables()
@@ -67,11 +75,11 @@ fun Cursor.graph(stage: QueryK.Graph): Cursor {
                 val v = slotVar[i]
                 if (v >= 0) for (j in i + 1..3) if (slotVar[j] == v && cells[j][r] != cell) continue@row
             }
-            index.getOrPut(keySlot.joinToString("\u0000") { cells[it][r]!! }) { IntArrayList() }.add(r)
+            index.getOrPut(graphJoinKey(keySlot.size) { cells[keySlot[it]][r]!! }) { IntArrayList() }.add(r)
         }
         val next = ArrayList<Array<String?>>()
         for (binding in bindings) {
-            val matches = index[keyVars.joinToString("\u0000") { binding[it]!! }] ?: continue
+            val matches = index[graphJoinKey(keyVars.size) { binding[keyVars[it]]!! }] ?: continue
             for (i in 0 until matches.size) {
                 val r = matches[i]
                 val out = binding.copyOf()

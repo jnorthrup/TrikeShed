@@ -1,0 +1,23 @@
+{
+  "state": "EXECUTED",
+  "source": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+  "mainJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+  "probeSha256": "b7a7ccb9ed9ed2cb303b896156f05e64a903031867799a4b2ebc2cb7a2e89463",
+  "javaBridgeSha256": "96724f650585db03815c38227ff8a283ca03f8aa0bfa3ed5725ca380e7a63c04",
+  "productionClassOverlays": false,
+  "friendAccess": false,
+  "privateReflection": false,
+  "actualProducerExecuted": true,
+  "priorV54ArtifactsUnchanged": true,
+  "exit": 0,
+  "timedOut": false,
+  "externalProcessTimeoutMillis": 240000,
+  "processMillis": 31476,
+  "maxHeapBytes": 4294967296,
+  "outboundDenyWrapperSha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84",
+  "outboundDenyReceiptSha256": "fa9995b05612912be0a6fc8e47bea57a7d41ab5cf0ef4b7d8ee1a8af00a5d810",
+  "run": "v55",
+  "v56JvmJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+  "v56JvmRuntimeByteIdentical": true,
+  "v56Scope": "Documents JS open-state correction only; FULL evidence retains its actual v55 source identity."
+}

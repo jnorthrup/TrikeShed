@@ -1,0 +1,22 @@
+{
+  "source": "aaba7d5504d516e4ff6a68c19db11630e16c22ef",
+  "mainJar": "/workspace/library-files/english-corpus-inference-final-proof/snapshot/main.jar",
+  "mainJarSha256": "c95b96cba473abdb412b04baed9f23fd915f25aba50d92a3d74a519648df0bf1",
+  "snapshotManifestSha256": "e2590c33fc37418a6cd893fc8b9a316e12707679f0d81a79eb1c6ff38b770bfe",
+  "classpathSha256": "0cdbe8c9e44f916b6805cb736e0a8e2a04e33cef0335e8f8cbed3989777df7f0",
+  "compiledTestSources": {
+    "Runner.kt": "b1ff85d28472e83f86a9ed34be3f98479297eed6ff5e73c1316ccd503b8d5b09",
+    "BeliefAdmissionTest.kt": "ed28beb878dece2e480436f0eb1e335cdbfa1232a361d88083dfad8bae83d9c2",
+    "HermesMemoryFeedbackTest.kt": "bdbba3b5a92a0dfedea1a119b7f543a13f108038d564645f00f8202ec667b0ed"
+  },
+  "productionSourceOverlays": false,
+  "friendPaths": false,
+  "maximumHeap": "512m",
+  "nativeMemoryLimit": false,
+  "wallTimeoutSeconds": 45,
+  "attempt": 1,
+  "startedAt": "2026-11-04T18:12:28.319734+00:00",
+  "runtimeSeconds": 0.6023121510006604,
+  "runtimeExit": 0,
+  "finishedAt": "2026-11-04T18:12:37.962764+00:00"
+}

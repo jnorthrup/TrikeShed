@@ -1,0 +1,71 @@
+{
+  "scope": "Exact synthetic final v55 CAS bytes; hashes verified against each filename. No private source corpus.",
+  "entries": [
+    {
+      "cid": "sha256:d959743cf0ea180c33460465bb1e27c98cba10520c503d44172a57b72a2316b4",
+      "file": "cas/d959743cf0ea180c33460465bb1e27c98cba10520c503d44172a57b72a2316b4.json",
+      "bytes": 10109,
+      "role": "completed durable command receipt"
+    },
+    {
+      "cid": "sha256:e9296609211d01fabade9a86dbd1336c3def1f600b5d95342d93978ce18979d0",
+      "file": "cas/e9296609211d01fabade9a86dbd1336c3def1f600b5d95342d93978ce18979d0.json",
+      "bytes": 5928,
+      "role": "frozen executed program"
+    },
+    {
+      "cid": "sha256:5e752e4b50b37154a7eb74d28c83e63fc0672e4e2866ae371a649124aa2f075a",
+      "file": "cas/5e752e4b50b37154a7eb74d28c83e63fc0672e4e2866ae371a649124aa2f075a.json",
+      "bytes": 5695,
+      "role": "synthetic fixture CAS intermediate or attachment metadata"
+    },
+    {
+      "cid": "sha256:5fa5340b2d0866d81267ba5e8724e39c7aa9d964bf4047c078031ca6f0775431",
+      "file": "cas/5fa5340b2d0866d81267ba5e8724e39c7aa9d964bf4047c078031ca6f0775431.json",
+      "bytes": 902,
+      "role": "synthetic fixture CAS intermediate or attachment metadata"
+    },
+    {
+      "cid": "sha256:334c189c7bb19293897fb1a16f92513cb4b5a4c5848ecfacb106c6141a94f6fa",
+      "file": "cas/334c189c7bb19293897fb1a16f92513cb4b5a4c5848ecfacb106c6141a94f6fa.cbor",
+      "bytes": 233,
+      "role": "synthetic fixture CAS intermediate or attachment metadata"
+    },
+    {
+      "cid": "sha256:2a5fb03f1d7fedfc7b6ad06254fac5257d2b579d55210ddc298ae76fe961b1b1",
+      "file": "cas/2a5fb03f1d7fedfc7b6ad06254fac5257d2b579d55210ddc298ae76fe961b1b1.cbor",
+      "bytes": 5771,
+      "role": "retained root frame CBOR"
+    },
+    {
+      "cid": "sha256:776662471bbe9f3919a057205a8ef6044bdf09264d8354bfa8b998fddf028c85",
+      "file": "cas/776662471bbe9f3919a057205a8ef6044bdf09264d8354bfa8b998fddf028c85.json",
+      "bytes": 1521,
+      "role": "synthetic fixture CAS intermediate or attachment metadata"
+    },
+    {
+      "cid": "sha256:f3ca618879950fa0217c3fe3ae3a2b7b602b12733c6ef35341e218164174710f",
+      "file": "cas/f3ca618879950fa0217c3fe3ae3a2b7b602b12733c6ef35341e218164174710f.json",
+      "bytes": 11599,
+      "role": "node invocation ledger"
+    },
+    {
+      "cid": "sha256:1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce",
+      "file": "cas/1e9c5a01910343af4cd3858298ff1ce05ced1b7a5640b9d5bf0e46150d6a43ce.txt",
+      "bytes": 41,
+      "role": "synthetic source UTF-8"
+    },
+    {
+      "cid": "sha256:1e238a1d4f7865b5241ae1aa0234a6fbec03c2d17df6f5aba39f3a6fe6871e97",
+      "file": "cas/1e238a1d4f7865b5241ae1aa0234a6fbec03c2d17df6f5aba39f3a6fe6871e97.json",
+      "bytes": 36674,
+      "role": "retained execution debugger record"
+    },
+    {
+      "cid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+      "file": "cas/151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53.cbor",
+      "bytes": 4964,
+      "role": "retained English inspection CBOR"
+    }
+  ]
+}

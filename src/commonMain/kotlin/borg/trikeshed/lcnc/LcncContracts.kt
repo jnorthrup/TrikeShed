@@ -130,7 +130,7 @@ object LcncContracts {
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
      *  is invisible to drag-to-empty-space. */
-    fun all(): List<LcncPortContract> = SqlGraph.contracts() + SparqlGraph.contracts() + HeadhunterWorkflow.contracts() + listOf(
+    fun all(): List<LcncPortContract> = SqlGraph.contracts() + SparqlGraph.contracts() + HeadhunterWorkflow.contracts() + EnglishLcncPreset.contracts() + listOf(
         // ── §4: concentric scope — the call, the binding, the return ──
         // A scope's REAL ports are declared by its child (`scope.in`/`scope.out`
         // names); the generic args?/returns pair is the declared wire spelling —
@@ -1144,12 +1144,14 @@ object LcncContracts {
                 "d" to LcncPortContract.LcncParamSpec(ph = "durability 0..1"),
                 "q" to LcncPortContract.LcncParamSpec(ph = "quality 0..1"),
             ), isEffect = true),
-        LcncPortContract("nal.reinforce", "reinforce (evidence delta, budget untouched)",
-            listOf("angular?"), listOf("revised"),
-            inputKinds = mapOf("angular" to "id"),
+        LcncPortContract("nal.reinforce", "reinforce (receipted source observation; budget untouched)",
+            _l["angular?", "receiptCid?", "basis?"], _l["revised"],
+            inputKinds = _m["angular" j "id", "receiptCid" j "id", "basis" j "json"],
             outputKinds = mapOf("revised" to "json"),
             params = mapOf(
                 "angular" to LcncPortContract.LcncParamSpec(ph = "angular (decimal string) when none is wired"),
+                "receiptCid" to LcncPortContract.LcncParamSpec(ph = "required explicit observation receipt CID (or wire it)"),
+                "basis" to LcncPortContract.LcncParamSpec(ph = "required JSON array of source leaf CIDs (or wire it)"),
                 "wPlus" to LcncPortContract.LcncParamSpec(v = "1"),
                 "wMinus" to LcncPortContract.LcncParamSpec(v = "0"),
             ), isEffect = true),

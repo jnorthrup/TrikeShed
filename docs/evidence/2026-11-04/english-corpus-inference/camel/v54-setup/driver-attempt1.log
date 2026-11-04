@@ -1,0 +1,7 @@
+AssertionError [ERR_ASSERTION]: loading the graph is inert
+
+1 !== 0
+
+    at main (/workspace/library-files/english-camel-browser-proof/driver.cjs:14:10)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at process.processImmediate (node:internal/timers:502:9)

@@ -1,0 +1,40 @@
+{
+  "result": "REFUSED",
+  "expectedCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53",
+  "actualEngineOutput": {
+    "routed": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ok": true,
+    "error": "",
+    "receipt": {
+      "status": "Started",
+      "routes": [
+        "lcnc:6a3cc085-2ed8-4bd1-9a44-a2b50e11fc76"
+      ],
+      "from": "direct:english-evidence",
+      "reply": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "headers": {
+        "EvidenceCid": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+      },
+      "plan": {
+        "from": "direct:english-evidence",
+        "steps": [
+          {
+            "setHeader": {
+              "name": "EvidenceCid",
+              "value": "sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53"
+            }
+          },
+          {
+            "setBody": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          {
+            "to": "mock:english-evidence"
+          }
+        ]
+      }
+    },
+    "text": "{\"status\":\"Started\", \"routes\":[\"lcnc:6a3cc085-2ed8-4bd1-9a44-a2b50e11fc76\"], \"from\":\"direct:english-evidence\", \"reply\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\", \"headers\":{\"EvidenceCid\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}, \"plan\":{\"from\":\"direct:english-evidence\", \"steps\":[{\"setHeader\":{\"name\":\"EvidenceCid\", \"value\":\"sha256:151f4d3e166f6c6c3eab5bdcc879a58a916b01b1299dd10e9d618c8813ad3e53\"}}, {\"setBody\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}, {\"to\":\"mock:english-evidence\"}]}}"
+  },
+  "error": "Camel transport changed the selected evidence CID",
+  "queryDispatched": false
+}

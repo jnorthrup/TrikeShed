@@ -283,7 +283,7 @@ object LcncPresets {
             see = "A per-module verdict, and the mismatches if there are any.",
             tweakFirst = "Nothing — read it first; it only reports.",
         ),
-    ) + LcncWorkspacePresets.catalog
+    ) + LcncWorkspacePresets.catalog + EnglishLcncPreset.info
 
     /**
      * TURBOHAUL, AS AN ORG CHART — a STRAWMAN, not a release.
@@ -405,6 +405,7 @@ object LcncPresets {
 
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
+        EnglishLcncPreset.NAME to LcncProgramConfix.toJson(EnglishLcncPreset.build()),
         "preset-finance-reconcile" to financeReconcile(),
         "preset-kif-structure" to kifStructure(),
         "preset-sparql-quad" to LcncProgramConfix.toJson(LcncProgram("sparql-quad", _l[
