@@ -5,6 +5,8 @@ import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.withContext
+import borg.trikeshed.kernel.*
+import borg.trikeshed.lib.*
 
 /**
  * JVM wiring for the daemon's LCNC store legos (PromptNodes/PromptStore/
@@ -14,6 +16,26 @@ import kotlinx.coroutines.withContext
  * Called from the daemon with resolved jvm values.
  */
 object OroborosLcncWiring {
+    /** Optional trusted scalar backend; caller retains the root until all LCNC consumers drain. */
+    internal suspend fun llvm(context: ModuleContext,
+                              config: String? = HostSystem.getenv("TRIKESHED_LLVM_SCALAR_PROFILE")): Join<KernelElement, LlvmScalar>? {
+        if (config == null) return null
+        require(config.isNotBlank() && java.nio.file.Path.of(config).isAbsolute) {
+            "TRIKESHED_LLVM_SCALAR_PROFILE requires an absolute operator configuration path"
+        }
+        val files = checkNotNull(context.scope.coroutineContext[FileOperations])
+        val profile = withContext(fileIoContext) {
+            LlvmScalarProfile.parse(LlvmScalarProfile.read(files, files.canonicalPath(config), 16 * 1024)
+                .decodeToString(throwOnInvalidSequence = true))
+        }
+        val kernel = KernelElement(context.scope.coroutineContext, KernelId("llvm"))
+        try { return kernel j LlvmScalar.open(kernel, KernelId("scalar"), profile, files) }
+        catch (failure: Throwable) {
+            try { kernel.drain() } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+            throw failure
+        }
+    }
+
     /** Only the operator's startup environment selects native code; request bodies cannot. */
     suspend fun documentReview(
         context: ModuleContext,

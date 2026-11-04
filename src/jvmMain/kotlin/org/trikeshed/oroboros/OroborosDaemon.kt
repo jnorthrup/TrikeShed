@@ -369,16 +369,20 @@ object OroborosDaemon {
                 // the same idiom each element uses for its own supervisor.
                 val daemonScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
                 val ipnsNodes = mutableListOf<borg.trikeshed.ipns.IpnsNode>()
+                val cleanups = mutableListOf<suspend () -> Unit>()
                 try {
-                    with(daemonScope) { mainImpl(args, config) { ipnsNodes.add(it) } }
+                    with(daemonScope) { mainImpl(args, config, { ipnsNodes.add(it) }, { cleanups.add(it) }) }
                 } finally {
-                    try {
+                    try { withContext(NonCancellable) {
                         var failure: Throwable? = null
                         for (node in ipnsNodes.asReversed()) try { node.close() } catch (caught: Throwable) {
                             if (failure == null) failure = caught else failure.addSuppressed(caught)
                         }
+                        for (cleanup in cleanups.asReversed()) try { cleanup() } catch (caught: Throwable) {
+                            if (failure == null) failure = caught else failure.addSuppressed(caught)
+                        }
                         failure?.let { throw it }
-                    }
+                    } }
                     finally { daemonScope.cancel() }
                 }
             }
@@ -664,6 +668,7 @@ object OroborosDaemon {
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(
         args: Array<String>, config: DaemonConfig, ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
+        ownCleanup: (suspend () -> Unit) -> Unit,
     ) {
         // One lane order for the daemon and bin/mux: keymux.operatorKeyMux (harness env, dotenv and
         // auth files, raw env, hermes credential pool); without explicit fileOps the file lanes read nothing.
@@ -1638,7 +1643,9 @@ object OroborosDaemon {
         }
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
-        borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        val llvmScalar = borg.trikeshed.lcnc.OroborosLcncWiring.llvm(moduleContext)
+        llvmScalar?.let { owned -> ownCleanup { owned.a.drain() } }
+        borg.trikeshed.lcnc.SubVmLegos.register(moduleContext, llvmScalar?.b?.runner())
         // uring legos: the ring as palette nodes — SQE in, CQE out, through the
         // facade's probed backend; contracts in LcncContracts, one registration site.
         borg.trikeshed.lcnc.UringLegos.register(moduleContext)
@@ -2023,6 +2030,8 @@ object OroborosDaemon {
             },
         )
         val moduleWire = borg.trikeshed.forge.server.ModuleWire(moduleSupervisor, moduleRoutes)
+        var moduleStartup: Job? = null
+        ownCleanup { moduleStartup?.join(); moduleSupervisor.drainAll() }
         val webhookRuntime = borg.trikeshed.forge.server.couchWebhookRuntime(
             couchStore, daemonBlackboard, jfile(forgeHome),
             runners = moduleContext.lcncRunners,
@@ -2072,7 +2081,7 @@ object OroborosDaemon {
         runCatching { programLedger.thaw() }
             .onSuccess { restored -> HostSystem.err("[OROBOROS] programs: $restored head(s) restored from the ledger") }
             .onFailure { HostSystem.err("[OROBOROS] programs: ledger thaw FAILED (${it.message}); the daemon boots without the ledger's heads") }
-        launch {
+        moduleStartup = launch {
             // KanbanModule is the point of the module system: attached by DEFAULT (the WAL-backed
             // board replaces the fossil plan-parser). TRIKESHED_NO_KANBAN_MODULE=1 opts out.
             if (HostSystem.getenv("TRIKESHED_NO_KANBAN_MODULE") != "1") {
@@ -2478,6 +2487,7 @@ object OroborosDaemon {
                 // The follow/Wiki producer stops at its admission boundary and settles its
                 // current pass before the runner registry, model clients, or stores close.
                 drainCuration(curatorFollowJob, curationIntake, moduleSupervisor, moduleContext)
+                llvmScalar?.a?.drain()
                 // Join accepted route commands, then consumers and their final facts. A failed
                 // stop is not permission to close the observation dependencies underneath it.
                 drainCamel(moduleContext, blackboardFacts, graalFacts, jvmVitals)

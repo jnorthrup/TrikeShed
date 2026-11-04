@@ -58,15 +58,20 @@ class LlvmScalarRunTest {
         try {
             first.open(bitcode)
             val program = LcncProgram("llvm-mlir-demo",
-                s_[LcncNode("sum", LlvmScalarContract.TYPE, _m["left" j "19", "right" j "23"])], emptySeriesOf())
+                s_[LcncNode("sum", LlvmScalarContract.TYPE, _m["left" j "19", "right" j "23"]),
+                    LcncNode("total", LlvmScalarContract.TYPE, _m["right" j "-2"])],
+                s_[LcncWire("sum", "value", "total", "left?")])
             receipt = first.request("POST", "/api/lcnc/run", jsonOf(_m["name" j program.name,
                 "document" j reify(LcncProgramConfix.toJson(program))]))
             assertEquals("completed", receipt["status"])
             val outputs = receipt["outputs"] as Map<*, *>
             assertEquals(42, ((outputs["sum"] as Map<*, *>)["value"] as Number).toInt())
+            assertEquals(40, ((outputs["total"] as Map<*, *>)["value"] as Number).toInt())
             for (key in s_["programCid", "receiptCid", "invocationsCid"].view) ContentId(receipt[key] as String)
             evidence = first.request("GET", "/api/lcnc/content?cid=${receipt["invocationsCid"]}")
-            val entry = (evidence["entries"] as List<*>).single() as Map<*, *>
+            val entries = evidence["entries"] as List<*>
+            assertEquals(2, entries.size)
+            val entry = entries.first() as Map<*, *>
             assertEquals(LlvmScalarContract.TYPE, entry["type"])
             assertEquals("completed", entry["status"])
             val runtime = entry["runtime"] as Map<*, *>

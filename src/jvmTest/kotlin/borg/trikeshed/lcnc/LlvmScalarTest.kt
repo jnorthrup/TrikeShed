@@ -115,6 +115,8 @@ class LlvmScalarTest {
                 assertFails { runner.execute(node, _m["left" j value]) }
             assertFails { runner.execute(node.copy(params = node.params + _m["module" j "/arbitrary.bc"]), emptyMap()) }
             assertFails { runner.execute(node, _m["export" j "arbitrary"]) }
+            assertFails { runner.execute(node, _m["left" j 1, "left?" j 2]) }
+            assertEquals(42, runner.execute(node, _m["left?" j 20, "right?" j 22])["value"])
             assertEquals(42, runner.execute(node, emptyMap())["value"])
         } finally { kernel.drain() }
     }

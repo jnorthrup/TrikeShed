@@ -3,7 +3,6 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kernel.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.DocumentResult
 import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.userspace.nio.process.KernelSeat
 import kotlinx.coroutines.*
@@ -75,18 +74,23 @@ class LlvmScalar private constructor(
         // Native execution has no hard cancellation guarantee. An admitted effect must settle
         // before the caller writes its final receipt or snapshots the invocation ledger.
         val result = withContext(NonCancellable) { accepted.await() }
-        invocation?.runtime { result.getOrNull()?.get("runtime") ?: (metadata + _m["callOutcome" j "failed"]) }
+        invocation?.runtime { result.getOrNull()?.get("runtime") ?: (metadata + _m["completionOutcome" j "failed"]) }
         currentCoroutineContext().ensureActive()
         return result.getOrThrow()
     }
 
     fun runner() = LcncNodeRunner { node, inputs ->
         val names = _s["left", "right"]
-        require(inputs.keys.all { it in names } && node.params.keys.all { it in names }) {
+        require(inputs.keys.all { it.removeSuffix("?") in names } && node.params.keys.all { it in names }) {
             "LLVM scalar inputs are left and right; module authority belongs to the operator"
         }
         fun argument(name: String): Int {
-            val value = if (inputs.containsKey(name)) inputs[name] else node.params[name]
+            require(!(inputs.containsKey(name) && inputs.containsKey("$name?"))) { "Ambiguous LLVM input $name" }
+            val value = when {
+                inputs.containsKey(name) -> inputs[name]
+                inputs.containsKey("$name?") -> inputs["$name?"]
+                else -> node.params[name]
+            }
             return when (value) {
                 is String -> value.toIntOrNull()
                 is Byte, is Short, is Int -> (value as Number).toInt()
