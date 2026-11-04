@@ -80,7 +80,8 @@ class EnglishCamelPresetExecutionTest {
             val source = query["source"] as Map<*, *>
             assertEquals(f.receipt, source["receiptCid"]); assertEquals("snapshot", source["mode"])
             assertEquals("unreviewed", source["reviewStatus"]); assertEquals("not-established", source["semanticAuthority"])
-            val rows = ((query["results"] as Map<*, *>)["bindings"] as List<*>)
+            val sparql = query["results"] as Map<*, *>
+            val rows = ((sparql["results"] as Map<*, *>)["bindings"] as List<*>)
             assertEquals("not", (((rows.single() as Map<*, *>)["quote"] as Map<*, *>)["value"]))
             assertEquals(query["results"], result.nodeOutputs.getValue("bindings")["x"])
             assertEquals(query["source"], result.nodeOutputs.getValue("source")["x"])
