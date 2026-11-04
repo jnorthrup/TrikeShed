@@ -49,6 +49,26 @@ ModelMux calls, review admission or live corpus imports. The outbound check is
 limited to these fixture processes, not full OS or production daemon isolation.
 Samples do not establish whole-PDF OCR completeness, legal truth or parser accuracy.
 
+FULL compatibility follow-up
+Before installation promotion, the same frozen host JAR also executed FULL in
+two fresh JVMs on two short synthetic legal-language sentences per version.
+Both passed exact source/token/copy-graph checks with the unchanged FULL
+configuration(tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp;
+kbp.maxlen100). Sentence lengths were9and11tokens. Each version emitted seven
+actual OpenIE triples; their token spans/glosses/confidences were retained and
+structurally checked. The named example produced PERSON and ORGANIZATION tags.
+KBP ran but emitted zero relations, so nonempty KBP slot output is not validated.
+The positive-if candidate retained its condition; the negated-unless example
+emitted no interpreted norm despite two raw OpenIE triples. All remain unreviewed.
+
+Both FULL children exited0 without timeout under the same4GiBheap/180s/outbound
+denial bounds. Observed wall times22.756s/17.561s and kernel peakRSS
+3,159,492/2,897,564KiB are single observations, not comparative performance claims.
+The two observed structural output pairs were identical; general FULL/KBP parity,
+long-document performance and legal interpretation are not established. No private
+PDF was parsed with FULL, and no NARS, ModelMux, review or corpus admission occurred.
+See full-smoke.json and full-observed-synthetic.json in the evidence directory.
+
 Offline provisioning
 On a staging/build machine resolve the declared bundle explicitly:
   ./gradlew -p utils/subvm installCorenlp
