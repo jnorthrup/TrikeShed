@@ -52,7 +52,8 @@ object EnglishTaxonomyCarrier {
         if (range["complete"] != true || int(range["begin"]) != 0 || int(range["end"]) != snapshot.source.text.length)
             reasons.add("complete-current-English-inspection-required")
         if (snapshot.source.text.length > MAX_TEXT) reasons.add("English-source-exceeds-16KiB-character-profile")
-        if (snapshot.legacyIdentity || map(inventory["coverage"])["parserNodeIdentityReported"] != true)
+        if (snapshot.legacyIdentity || map(inventory["coverage"])["parserNodeIdentityReported"] != true ||
+            map(inventory["coverage"])["parserDependencyNodeIdentity"] != "token-index+copy-count/1")
             reasons.add("reported-full-dependency-node-identity-required")
         val sentences = list(inventory["sentences"]).map(::map)
         if (sentences.isEmpty() || sentences.size > MAX_FORMS) reasons.add("choose-a-source-of-1-to-32-simple-sentences")
@@ -272,6 +273,11 @@ object EnglishTaxonomyCarrier {
         if (!isCarrier(candidate)) return null
         val verified = verify(cas, candidate.curationReceiptCid)
         val wanted = candidate.selections.view.map { it.id }.toSet()
+        val expected = candidate(cas, candidate.curationReceiptCid, wanted.toList(), retainPolicy = false, kind = candidate.kind)
+        require(candidate.kind == expected.kind && candidate.family == expected.family &&
+            candidate.curationReceiptCid == expected.curationReceiptCid && candidate.ontologyCid == expected.ontologyCid &&
+            candidate.sourceRevision == expected.sourceRevision && candidate.runReceiptCid == expected.runReceiptCid &&
+            candidate.selections.view.toList() == expected.selections.view.toList()) { "Reviewed English translation candidate differs from retained evidence" }
         return _m["translationDecisionCid" j verified.declarationCid.value,
             "inspectionCid" j verified.built.snapshot.receiptCid.value,
             "contextIri" j verified.built.declaration["contextIri"], "contextKey" j verified.built.contextKey.value,
