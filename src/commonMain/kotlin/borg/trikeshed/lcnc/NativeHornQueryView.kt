@@ -87,7 +87,7 @@ object NativeHornQueryView {
                 val id = text(rawSource)
                 expectedRows.add(_m["use" j uri("$iri/use/$ordinal"), "ordinal" j _m["type" j "literal", "value" j ordinal.toString(), "datatype" j (RdfVocab.XSD + "integer")],
                     "child" j uri(NativeHornProofGraph.stepIri(projection.graph, path)), "childForm" j literal(child["normalForm"]),
-                    "kind" j literal(child["kind"]), "source" j uri(source(id)), "sourceCid" j sourceCid(id), "form" j literal(map(sources[id])["text"])))
+                    "kind" j literal(child["kind"]), "source" j uri(source(id)), "sourceCid" j sourceCid(id), "form" j literal(map(sources[id])["text"])])
             }
         }
         val result = map(value["results"])
