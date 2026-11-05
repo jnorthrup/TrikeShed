@@ -1,0 +1,112 @@
+"""Read-only audit of retained observations; no parser/JVM execution."""
+from pathlib import Path
+import hashlib,json,struct
+from urllib.parse import urlparse,unquote
+P=Path(__file__).resolve().parent
+S=Path('/workspace/library-files/english-corpus-topics-v76-proof/snapshot')
+def digest(b):return hashlib.sha256(b).hexdigest()
+def cid(b):return 'sha256:'+digest(b)
+def load(p):return json.loads(p.read_text())
+def need(c,msg):
+ if not c:raise AssertionError(msg)
+def u16(t):return len(t.encode('utf-16-le'))//2
+def sub(t,a,b):return t.encode('utf-16-le')[2*a:2*b].decode('utf-16-le')
+def head(m,n):
+ if n<24:return bytes([m*32+n])
+ for a,w in [(24,1),(25,2),(26,4),(27,8)]:
+  if n<1<<(8*w):return bytes([m*32+a])+n.to_bytes(w,'big')
+ raise AssertionError('CBOR integer bound')
+def encode(x):
+ if x is None:return b'\xf6'
+ if x is True:return b'\xf5'
+ if x is False:return b'\xf4'
+ if isinstance(x,int):return head(0,x) if x>=0 else head(1,-1-x)
+ if isinstance(x,str):b=x.encode('utf8');return head(3,len(b))+b
+ if isinstance(x,list):return head(4,len(x))+b''.join(encode(y) for y in x)
+ if isinstance(x,dict):return head(5,len(x))+b''.join(encode(k)+encode(x[k]) for k in sorted(x,key=encode))
+ raise AssertionError('Unexpected CBOR shape '+str(type(x)))
+def decode(b):
+ at=0
+ def take(n):
+  nonlocal at
+  need(at+n<=len(b),'truncated CBOR');r=b[at:at+n];at+=n;return r
+ def item(depth=0):
+  need(depth<=32,'CBOR depth');tag=take(1)[0];m,a=tag>>5,tag&31
+  if m==7:
+   if a in (20,21,22):return {20:False,21:True,22:None}[a]
+   raise AssertionError('Unexpected CBOR simple/float')
+  n=a if a<24 else int.from_bytes(take({24:1,25:2,26:4,27:8}[a]),'big')
+  if m==0:return n
+  if m==1:return -1-n
+  if m==3:return take(n).decode('utf8')
+  if m==4:return [item(depth+1) for _ in range(n)]
+  if m==5:
+   out={}
+   for _ in range(n):
+    k=item(depth+1);need(isinstance(k,str) and k not in out,'CBOR duplicate/nonstring key');out[k]=item(depth+1)
+   return out
+  raise AssertionError('Unexpected CBOR major type')
+ out=item();need(at==len(b),'CBOR trailing bytes');return out
+freeze=load(P/'frozen-inputs.json');need(freeze['sourceHead']=='0219223a3846887fe283b93598942de332214cd2','source pin')
+need(len(freeze['classpathEntries'])==120,'120 JARs')
+for row in freeze['classpathEntries']+freeze['moduleFiles']:
+ f=Path(row['file']);need(f.stat().st_size==row['bytes'] and digest(f.read_bytes())==row['sha256'],'artifact drift '+str(f))
+need(freeze['classpathEntries'][0]['sha256']=='d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636','main pin')
+manifest=load(P/'inputs/guard-fixtures.json');cases={r['id']:r for r in manifest['cases']}
+results=[];counts={'sources':0,'sentences':0,'tokens':0,'nodes':0,'dependencies':0,'markers':0,'copies':0,'utf8Bytes':0};checks=0
+for attempt in ['attempt-first-G01','attempt-remaining']:
+ a=P/attempt
+ for origin in load(a/'origins.json').values():need(Path(unquote(urlparse(origin).path)).resolve()==S.joinpath('main.jar').resolve(),'production overlay/origin')
+ ident=load(a/'runtime-identity.json');need(ident['airgapConfigured'] and ident['airgapActive'] and ident['processors']==2 and ident['maxHeap']<=3*1024**3,'runtime budget/airgap')
+ for r in load(a/'results.json'):
+  c=a/'cases'/r['id'];body=load(c/'response.json');source=(c/'source.txt').read_bytes();text=source.decode('utf8');request=load(c/'request.json');row=load(c/'source-row.json')
+  need((c/'status.txt').read_text().strip()=='200','actual status')
+  expected=cases[r['id']]['sourceTextCid'] if r['id']!='S12' else 'sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac'
+  need(cid(source)==expected==row['cid']==request['cid']==body['originalCid']==body['extractedTextCid'],'source identity')
+  inputfile=P/'inputs'/('sources/S12.txt' if r['id']=='S12' else cases[r['id']]['file']);need(inputfile.read_bytes()==source,'input bytes')
+  need(body['selection']=={k:request[k] for k in ('project','id','cid','rev','seq')},'source row request/receipt')
+  need(all(body['selection'][k]==row[k] for k in body['selection']),'actual retained metadata')
+  need(body['source']['project']==body['selection']==body['source']['extraction'],'identity text revision chain')
+  need(len(body['sourceSnapshots'])==1 and body['sourceSnapshots'][0]==row,'source snapshots')
+  need(body['range']=={'begin':request['begin'],'end':request['end'],'totalLength':u16(text),'complete':request['begin']==0 and request['end']==u16(text)},'range')
+  receipt=(c/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor')).read_bytes();need(cid(receipt)==body['receiptCid'],'receipt raw hash')
+  decoded=decode(receipt);need(encode(decoded)==receipt,'independent canonical CBOR reencode');need(decoded=={k:v for k,v in body.items() if k!='receiptCid'},'receipt response exact equality')
+  need((c/'cas-readbacks'/(expected[7:]+'.txt')).read_bytes()==source,'source readback')
+  runtime=body['parser']['runtime'];need(runtime['profile']=='syntax-v1' and runtime['packageVersion']=='4.6.0' and runtime['dependencyNodeIdentity']=='token-index+copy-count/1','actual parser metadata')
+  need(runtime['manifestCid']==cid((a/'module-MANIFEST.tsv').read_bytes()) and runtime['manifestCid']==ident['moduleManifestCid'],'manifest identity')
+  need(body['parser']['configuration']=={'annotators':'tokenize,ssplit,pos,lemma,depparse,ner','threads':'1'},'unchanged syntax profile')
+  selected=sub(text,request['begin'],request['end']);need(runtime['sourceTextCid']==cid(selected.encode('utf8')),'selected-range source hash')
+  # None of these inputs triggers all-capital sentence normalization. Source words still include uppercase proper terms.
+  need(runtime['parserNormalization']=='identity/1' and runtime['parserInputCid']==runtime['sourceTextCid'],'actual normalization')
+  local={'sentences':len(body['sentences']),'tokens':0,'nodes':0,'dependencies':0,'markers':0};copies=0;observed=[]
+  for sentence in body['sentences']:
+   need(sub(text,sentence['begin'],sentence['end'])==sentence['quote']==sentence['quotation']['quote'],'sentence exact quote')
+   need(sentence['quotation']['originalCid']==expected and sentence['quotation']['extractedTextCid']==expected,'quotation identity')
+   nodes={n['id']:n for n in sentence['nodes']};need(len(nodes)==len(sentence['nodes']),'distinct full nodes')
+   for token in sentence['tokens']:need(sub(text,token['begin'],token['end'])==token['word'],'token exact span')
+   for node in nodes.values():
+    need(node['id']==str(node['index'])+':'+str(node['copy']) and sub(text,node['begin'],node['end'])==node['word'],'node span/full identity');copies+=int(node['copy']>0)
+   for edge in sentence['dependencies']:
+    need(edge['governorNode']==str(edge['governor'])+':'+str(edge['governorCopy']) and edge['dependentNode']==str(edge['dependent'])+':'+str(edge['dependentCopy']),'edge full node identity')
+    need(edge['governorNode']=='0:0' or edge['governorNode'] in nodes,'edge governor');need(edge['dependentNode'] in nodes,'edge dependent')
+    if edge['relation'].startswith(('advcl','mark','advmod','neg','conj','cc','aux')):
+     observed.append({'sentence':sentence['index'],'governor':edge['governorNode'],'governorWord':'ROOT' if edge['governorNode']=='0:0' else nodes[edge['governorNode']]['word'],'relation':edge['relation'],'dependent':edge['dependentNode'],'dependentWord':nodes[edge['dependentNode']]['word']})
+   for marker in sentence['markers']:need(sub(text,marker['begin'],marker['end'])==marker['quote'],'marker exact span')
+   for k in ('tokens','nodes','dependencies','markers'):local[k]+=len(sentence[k])
+  need(local==body['counts'],'observed counts');need(copies==r['copiedNodes'] and r['copyCoverage']==('NOT_EXERCISED' if copies==0 else 'OBSERVED'),'copy coverage')
+  need(r['graph']=='urn:trikeshed:english:'+body['receiptCid'][7:],'receipt local graph')
+  results.append({'id':r['id'],'inspectionCid':body['receiptCid'],'graph':r['graph'],'sourceCid':expected,'counts':local,'copiedNodes':copies,'copyCoverage':r['copyCoverage'],'conditionDiagnostics':load(c/'condition-diagnostics.json'),'actualAttachmentEdges':observed,'response':str(c/'response.json'),'canonicalReceipt':str(c/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor'))})
+  counts['sources']+=1;counts['utf8Bytes']+=len(source);counts['copies']+=copies
+  for k,v in local.items():counts[k]+=v
+  checks+=1
+need(checks==18 and {r['id'] for r in results}==set(cases)|{'S12'},'exactly all18 sources')
+invariants=load(P/'attempt-remaining/invariants.json');need(all(invariants[k]==0 for k in ('automaticIntake','reviewIntake','reteFacts','blackboardEntries')),'global mutation')
+need(invariants['attachedRunnersUnchanged'] and invariants['airgapActive'],'stable read-only registrations')
+axioms=load(P/'attempt-remaining/cases/S12/nlpcore-axiomatics.json');need(axioms['status']=='OBSERVED' and axioms['count']==5 and axioms['admission']=='not-performed','recognizer observation')
+need([(a['antecedent'],a['consequent']) for a in axioms['candidates']]==[('ALPHA','BETA'),('BETA','GAMMA'),('EPSILON','GAMMA'),('EPSILON','DELTA'),('ALPHA','BETA')],'actual recognizer rows')
+for ax in axioms['candidates']:
+ need(ax['rule']['positive']==900 and ax['rule']['negative']==0 and ax['rule']['copula']=='IMPLICATION','actual structural evidence')
+ need(ax['rule']['provenanceCid']==axioms['sourceCidArgument'],'same source provenance')
+need(axioms['candidates'][0]['rule']['ruleCid']==axioms['candidates'][4]['rule']['ruleCid'],'same-source repeated rule identity')
+report={'status':'PASS_RECORDED_DATA_AUDIT','parserRerun':False,'counts':counts,'records':results,'scope':'18 genuine source-retained parser observations; first process failed after successful G01 on observer-only runner-registration assertion, remaining17 process passed. No pre-parse expectations or legal/inference accuracy scoring. All actual copy coverage NOT_EXERCISED.','recognizerS12':{'count':5,'uniqueRuleCids':len({a['rule']['ruleCid'] for a in axioms['candidates']}),'admission':'not-performed','sameSourceOccurrences':'not-independent-evidence'}}
+(P/'audit-result.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n');print(json.dumps({'status':report['status'],'counts':counts,'S12':report['recognizerS12']}))

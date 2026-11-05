@@ -1,0 +1,51 @@
+{
+  "sourceHead": "0219223a3846887fe283b93598942de332214cd2",
+  "mainJarSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+  "java": {
+    "file": "/workspace/.trikeshed-cloud/toolchains/graalvm-25/bin/java",
+    "sha256": "12af243cba3b835fa518eda24743d10e7c243ff057be3463b90acaa2c81e39bb"
+  },
+  "compiler": {
+    "file": "/workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21/3cd9c37c505fb9879e03ebeaf91d9c9500ab6eca/kotlin-compiler-embeddable-2.4.21.jar",
+    "sha256": "ef19419c765e7ac8404465fa026ca8fc4dbb8a822de0fc79aa53c8dce29f1d02"
+  },
+  "runs": [
+    {
+      "name": "first-G01",
+      "exitCode": 1,
+      "producerStatus": "200 retained G01; observer runner-registration invariant failed afterwards",
+      "observerSource": "compile-attempt2/Observer.kt",
+      "observerSourceSha256": "ea65683e12c96c80bcd0c497d7ac990b4da762b74fdf3d91d0cb40fe1ff65a6a",
+      "classes": "classes-02",
+      "launch": "run-first.sh",
+      "stdout": "first02.stdout",
+      "stderr": "first02.stderr",
+      "actualParserDocuments": 1
+    },
+    {
+      "name": "remaining17",
+      "exitCode": 0,
+      "producerStatus": "17 retained observations plus unchanged-owner invariants",
+      "observerSource": "Observer.kt",
+      "observerSourceSha256": "9b8bf46eb58e2899f0330f574f48563c00db4ef53c54b466285595338dfc3f19",
+      "classes": "classes-03",
+      "launch": "run-remaining.sh",
+      "stdout": "remaining.stdout",
+      "stderr": "remaining.stderr",
+      "actualParserDocuments": 17
+    }
+  ],
+  "failedPreparation": [
+    {
+      "phase": "compile-attempt1",
+      "exitCode": 1,
+      "jvmParserExecuted": false
+    },
+    {
+      "phase": "launch-attempt1",
+      "exitCode": 127,
+      "jvmParserExecuted": false
+    }
+  ],
+  "scope": "Observed default-owner route calls and existing pure recognizer/diagnostics only; no admission, NAL, quad query, HTTP transport, browser or legal accuracy claims"
+}

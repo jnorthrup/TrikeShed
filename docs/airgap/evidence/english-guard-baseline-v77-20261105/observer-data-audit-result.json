@@ -1,0 +1,1052 @@
+{
+  "status": "PASS_RECORDED_DATA_AUDIT",
+  "parserRerun": false,
+  "counts": {
+    "sources": 18,
+    "sentences": 23,
+    "tokens": 201,
+    "nodes": 201,
+    "dependencies": 203,
+    "markers": 48,
+    "copies": 0,
+    "utf8Bytes": 996
+  },
+  "records": [
+    {
+      "id": "G01",
+      "inspectionCid": "sha256:9ee6a4c328fe5bff1dd898019e51ff862032992985f4a3c3270c100f4e4e27c2",
+      "graph": "urn:trikeshed:english:9ee6a4c328fe5bff1dd898019e51ff862032992985f4a3c3270c100f4e4e27c2",
+      "sourceCid": "sha256:33739ec22bf33c7433aee82d0325108428f02a922a840c664746198b7b8fa4b0",
+      "counts": {
+        "sentences": 1,
+        "tokens": 8,
+        "nodes": 8,
+        "dependencies": 8,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "7:0",
+          "dependentWord": "approves"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-first-G01/cases/G01/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-first-G01/cases/G01/cas-readbacks/9ee6a4c328fe5bff1dd898019e51ff862032992985f4a3c3270c100f4e4e27c2.cbor"
+    },
+    {
+      "id": "G02",
+      "inspectionCid": "sha256:fa3d2d3849ab51a6c5210344c2031a93f31b2cc7d8fbbcd519822eeb048f6f6b",
+      "graph": "urn:trikeshed:english:fa3d2d3849ab51a6c5210344c2031a93f31b2cc7d8fbbcd519822eeb048f6f6b",
+      "sourceCid": "sha256:c7d8d37966a4bbeabb3712e475c1da6d1a30b0fd40cb953261c3051c0ab4422b",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "1:0",
+          "dependentWord": "Unless"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "pay",
+          "relation": "advcl:unless",
+          "dependent": "3:0",
+          "dependentWord": "approves"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "6:0",
+          "dependentWord": "must"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G02/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G02/cas-readbacks/fa3d2d3849ab51a6c5210344c2031a93f31b2cc7d8fbbcd519822eeb048f6f6b.cbor"
+    },
+    {
+      "id": "G03",
+      "inspectionCid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+      "graph": "urn:trikeshed:english:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+      "sourceCid": "sha256:c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "4:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "4:0",
+          "governorWord": "pay",
+          "relation": "advmod",
+          "dependent": "3:0",
+          "dependentWord": "not"
+        },
+        {
+          "sentence": 0,
+          "governor": "8:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "6:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "4:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "8:0",
+          "dependentWord": "approves"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G03/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G03/cas-readbacks/da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85.cbor"
+    },
+    {
+      "id": "G04",
+      "inspectionCid": "sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+      "graph": "urn:trikeshed:english:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+      "sourceCid": "sha256:873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "9:0",
+          "governorWord": "approve",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "9:0",
+          "governorWord": "approve",
+          "relation": "aux",
+          "dependent": "7:0",
+          "dependentWord": "does"
+        },
+        {
+          "sentence": 0,
+          "governor": "9:0",
+          "governorWord": "approve",
+          "relation": "advmod",
+          "dependent": "8:0",
+          "dependentWord": "not"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "9:0",
+          "dependentWord": "approve"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G04/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G04/cas-readbacks/f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec.cbor"
+    },
+    {
+      "id": "G05",
+      "inspectionCid": "sha256:3f6a61f63f1e1c992e26433d28124f1c6b831828b895760696e5f67f37618966",
+      "graph": "urn:trikeshed:english:3f6a61f63f1e1c992e26433d28124f1c6b831828b895760696e5f67f37618966",
+      "sourceCid": "sha256:8746e685e05ce171025dd01d6f723b2405967b63e5926090d2a846f99720dc8a",
+      "counts": {
+        "sentences": 1,
+        "tokens": 12,
+        "nodes": 12,
+        "dependencies": 12,
+        "markers": 5
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "5:0",
+          "governorWord": "approve",
+          "relation": "mark",
+          "dependent": "1:0",
+          "dependentWord": "Unless"
+        },
+        {
+          "sentence": 0,
+          "governor": "5:0",
+          "governorWord": "approve",
+          "relation": "aux",
+          "dependent": "3:0",
+          "dependentWord": "does"
+        },
+        {
+          "sentence": 0,
+          "governor": "5:0",
+          "governorWord": "approve",
+          "relation": "advmod",
+          "dependent": "4:0",
+          "dependentWord": "not"
+        },
+        {
+          "sentence": 0,
+          "governor": "10:0",
+          "governorWord": "pay",
+          "relation": "advcl:unless",
+          "dependent": "5:0",
+          "dependentWord": "approve"
+        },
+        {
+          "sentence": 0,
+          "governor": "10:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "8:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "10:0",
+          "governorWord": "pay",
+          "relation": "advmod",
+          "dependent": "9:0",
+          "dependentWord": "not"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G05/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G05/cas-readbacks/3f6a61f63f1e1c992e26433d28124f1c6b831828b895760696e5f67f37618966.cbor"
+    },
+    {
+      "id": "G06",
+      "inspectionCid": "sha256:a141006cbbcc8dd16ec63b89aac37d0a00e42a1e42ad6acc0548dbb8229f71b1",
+      "graph": "urn:trikeshed:english:a141006cbbcc8dd16ec63b89aac37d0a00e42a1e42ad6acc0548dbb8229f71b1",
+      "sourceCid": "sha256:e8f2cb6cde19bcf7cb08c5a88628365fb31fa225b2346b099b0c4341ae461e09",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 11,
+        "markers": 4
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "MULTIPLE"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "7:0",
+          "dependentWord": "approves"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G06/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G06/cas-readbacks/a141006cbbcc8dd16ec63b89aac37d0a00e42a1e42ad6acc0548dbb8229f71b1.cbor"
+    },
+    {
+      "id": "G07",
+      "inspectionCid": "sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+      "graph": "urn:trikeshed:english:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+      "sourceCid": "sha256:a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 12,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "COORDINATED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "7:0",
+          "dependentWord": "approves"
+        },
+        {
+          "sentence": 0,
+          "governor": "9:0",
+          "governorWord": "Trustee",
+          "relation": "cc",
+          "dependent": "8:0",
+          "dependentWord": "or"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "9:0",
+          "dependentWord": "Trustee"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "approves",
+          "relation": "conj:or",
+          "dependent": "9:0",
+          "dependentWord": "Trustee"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G07/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G07/cas-readbacks/1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608.cbor"
+    },
+    {
+      "id": "G08",
+      "inspectionCid": "sha256:cc6273262c54146d75eb3389f0b96a19d5d4f78c903aa05b48a8319b27ede086",
+      "graph": "urn:trikeshed:english:cc6273262c54146d75eb3389f0b96a19d5d4f78c903aa05b48a8319b27ede086",
+      "sourceCid": "sha256:15b1e924998c9d497801edc831802082f3d63843381a2eafd2af2b53ab1dcd62",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 12,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "COORDINATED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "6:0",
+          "governorWord": "retain",
+          "relation": "cc",
+          "dependent": "5:0",
+          "dependentWord": "and"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "conj:and",
+          "dependent": "6:0",
+          "dependentWord": "retain"
+        },
+        {
+          "sentence": 0,
+          "governor": "10:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "8:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "10:0",
+          "dependentWord": "approves"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G08/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G08/cas-readbacks/cc6273262c54146d75eb3389f0b96a19d5d4f78c903aa05b48a8319b27ede086.cbor"
+    },
+    {
+      "id": "G09",
+      "inspectionCid": "sha256:ab402d273364ff305b4afc7a6f30f23504f6c4f002616aa2dee8793f6f9dcaac",
+      "graph": "urn:trikeshed:english:ab402d273364ff305b4afc7a6f30f23504f6c4f002616aa2dee8793f6f9dcaac",
+      "sourceCid": "sha256:f852cbbb0a7033f34dc6e4f7f581b77f16ff1bd44f9315ae7c144f8895abc0da",
+      "counts": {
+        "sentences": 1,
+        "tokens": 15,
+        "nodes": 15,
+        "dependencies": 15,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "MULTIPLE"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "7:0",
+          "dependentWord": "approves"
+        },
+        {
+          "sentence": 0,
+          "governor": "11:0",
+          "governorWord": "fees",
+          "relation": "cc",
+          "dependent": "9:0",
+          "dependentWord": "and"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "conj:and",
+          "dependent": "11:0",
+          "dependentWord": "fees"
+        },
+        {
+          "sentence": 0,
+          "governor": "14:0",
+          "governorWord": "consents",
+          "relation": "mark",
+          "dependent": "12:0",
+          "dependentWord": "if"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G09/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G09/cas-readbacks/ab402d273364ff305b4afc7a6f30f23504f6c4f002616aa2dee8793f6f9dcaac.cbor"
+    },
+    {
+      "id": "G10",
+      "inspectionCid": "sha256:585fa8d8599a814b4fcc8be0641ecb0b25aa625b72fcd7c01a88c6f27060a173",
+      "graph": "urn:trikeshed:english:585fa8d8599a814b4fcc8be0641ecb0b25aa625b72fcd7c01a88c6f27060a173",
+      "sourceCid": "sha256:f7a8d61b4dc83852865769ccfa14fc8c4cd7355ba5e3ab406172d85eaa2ed538",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "PASSIVE"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "8:0",
+          "governorWord": "received",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "8:0",
+          "governorWord": "received",
+          "relation": "aux:pass",
+          "dependent": "7:0",
+          "dependentWord": "is"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "8:0",
+          "dependentWord": "received"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G10/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G10/cas-readbacks/585fa8d8599a814b4fcc8be0641ecb0b25aa625b72fcd7c01a88c6f27060a173.cbor"
+    },
+    {
+      "id": "G11",
+      "inspectionCid": "sha256:352c60ea812a4e508693250f4eb53a8427452952e545a76fdba9cb3898e6d411",
+      "graph": "urn:trikeshed:english:352c60ea812a4e508693250f4eb53a8427452952e545a76fdba9cb3898e6d411",
+      "sourceCid": "sha256:5995d8e351d4cad2fb25d12c4886084f90cc90d3c42226c3416fa4f34c4efde6",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "MODAL"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "8:0",
+          "governorWord": "approve",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "8:0",
+          "governorWord": "approve",
+          "relation": "aux",
+          "dependent": "7:0",
+          "dependentWord": "may"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "8:0",
+          "dependentWord": "approve"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G11/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G11/cas-readbacks/352c60ea812a4e508693250f4eb53a8427452952e545a76fdba9cb3898e6d411.cbor"
+    },
+    {
+      "id": "G12",
+      "inspectionCid": "sha256:05cf5b172f1e344b3c935295e8749d0b64ec7c6315634cd2fb739d5ffba6561a",
+      "graph": "urn:trikeshed:english:05cf5b172f1e344b3c935295e8749d0b64ec7c6315634cd2fb739d5ffba6561a",
+      "sourceCid": "sha256:3eea29778e9b588d4d0097f10ee960589d35691dd7d320623c9419d0c18ec2d4",
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "UNSUPPORTED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "write",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "9:0",
+          "governorWord": "record",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "write",
+          "relation": "advcl:in",
+          "dependent": "9:0",
+          "dependentWord": "record"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G12/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G12/cas-readbacks/05cf5b172f1e344b3c935295e8749d0b64ec7c6315634cd2fb739d5ffba6561a.cbor"
+    },
+    {
+      "id": "G13",
+      "inspectionCid": "sha256:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+      "graph": "urn:trikeshed:english:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+      "sourceCid": "sha256:72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4",
+      "counts": {
+        "sentences": 1,
+        "tokens": 13,
+        "nodes": 13,
+        "dependencies": 13,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "record",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "5:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "record",
+          "relation": "advcl:if",
+          "dependent": "7:0",
+          "dependentWord": "approves"
+        },
+        {
+          "sentence": 0,
+          "governor": "7:0",
+          "governorWord": "approves",
+          "relation": "advcl:without",
+          "dependent": "10:0",
+          "dependentWord": "acting"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G13/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G13/cas-readbacks/bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39.cbor"
+    },
+    {
+      "id": "G14",
+      "inspectionCid": "sha256:46b56be81b98a04d2dcef74695bdadb311ff752bf09191d0036e5686a4db4dfa",
+      "graph": "urn:trikeshed:english:46b56be81b98a04d2dcef74695bdadb311ff752bf09191d0036e5686a4db4dfa",
+      "sourceCid": "sha256:8717ddd3a9b3f3da4dd854da0a7ce3395c9b0fc1b08972667bc4a41b149e57db",
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "UNSUPPORTED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "enter",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G14/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G14/cas-readbacks/46b56be81b98a04d2dcef74695bdadb311ff752bf09191d0036e5686a4db4dfa.cbor"
+    },
+    {
+      "id": "G15",
+      "inspectionCid": "sha256:56ebb71c3c738683877ee5cb3edd5cb7dcf67a299431f190a8bf4c5ec7a1f55b",
+      "graph": "urn:trikeshed:english:56ebb71c3c738683877ee5cb3edd5cb7dcf67a299431f190a8bf4c5ec7a1f55b",
+      "sourceCid": "sha256:587b149912575230241d887ac2a592dd06562205a50d11664e6209f69153f3a1",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "UNSUPPORTED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "8:0",
+          "governorWord": "approves",
+          "relation": "advmod",
+          "dependent": "5:0",
+          "dependentWord": "only"
+        },
+        {
+          "sentence": 0,
+          "governor": "8:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "6:0",
+          "dependentWord": "if"
+        },
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "advcl:if",
+          "dependent": "8:0",
+          "dependentWord": "approves"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G15/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G15/cas-readbacks/56ebb71c3c738683877ee5cb3edd5cb7dcf67a299431f190a8bf4c5ec7a1f55b.cbor"
+    },
+    {
+      "id": "G16",
+      "inspectionCid": "sha256:444c3c09b2b79b1e364176277964e708fbcf76411c45b7ad701c17ef6758f0f3",
+      "graph": "urn:trikeshed:english:444c3c09b2b79b1e364176277964e708fbcf76411c45b7ad701c17ef6758f0f3",
+      "sourceCid": "sha256:dc69d52e88735cb38066271d42d663345a9712de00c5499da668954abbaa48dd",
+      "counts": {
+        "sentences": 2,
+        "tokens": 14,
+        "nodes": 14,
+        "dependencies": 14,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 1,
+          "conditionIssue": null
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "3:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 1,
+          "governor": "3:0",
+          "governorWord": "approves",
+          "relation": "mark",
+          "dependent": "1:0",
+          "dependentWord": "If"
+        },
+        {
+          "sentence": 1,
+          "governor": "6:0",
+          "governorWord": "keeps",
+          "relation": "advcl:if",
+          "dependent": "3:0",
+          "dependentWord": "approves"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G16/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G16/cas-readbacks/444c3c09b2b79b1e364176277964e708fbcf76411c45b7ad701c17ef6758f0f3.cbor"
+    },
+    {
+      "id": "G17",
+      "inspectionCid": "sha256:48593709c7fc945ae540728f47bc11e5cf13c10e2fa1d3256b49b45e72c246ae",
+      "graph": "urn:trikeshed:english:48593709c7fc945ae540728f47bc11e5cf13c10e2fa1d3256b49b45e72c246ae",
+      "sourceCid": "sha256:02bc8a36e287ef31f140acb15e0a678f3be93450464e7de3154824fc85950d4e",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 11,
+        "markers": 5
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "actualAttachmentEdges": [
+        {
+          "sentence": 0,
+          "governor": "4:0",
+          "governorWord": "pay",
+          "relation": "aux",
+          "dependent": "2:0",
+          "dependentWord": "must"
+        },
+        {
+          "sentence": 0,
+          "governor": "4:0",
+          "governorWord": "pay",
+          "relation": "advmod",
+          "dependent": "3:0",
+          "dependentWord": "not"
+        },
+        {
+          "sentence": 0,
+          "governor": "10:0",
+          "governorWord": "approve",
+          "relation": "mark",
+          "dependent": "6:0",
+          "dependentWord": "unless"
+        },
+        {
+          "sentence": 0,
+          "governor": "10:0",
+          "governorWord": "approve",
+          "relation": "aux",
+          "dependent": "8:0",
+          "dependentWord": "does"
+        },
+        {
+          "sentence": 0,
+          "governor": "10:0",
+          "governorWord": "approve",
+          "relation": "advmod",
+          "dependent": "9:0",
+          "dependentWord": "not"
+        },
+        {
+          "sentence": 0,
+          "governor": "4:0",
+          "governorWord": "pay",
+          "relation": "advcl:unless",
+          "dependent": "10:0",
+          "dependentWord": "approve"
+        }
+      ],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G17/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/G17/cas-readbacks/48593709c7fc945ae540728f47bc11e5cf13c10e2fa1d3256b49b45e72c246ae.cbor"
+    },
+    {
+      "id": "S12",
+      "inspectionCid": "sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+      "graph": "urn:trikeshed:english:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+      "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+      "counts": {
+        "sentences": 5,
+        "tokens": 20,
+        "nodes": 20,
+        "dependencies": 20,
+        "markers": 0
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 1,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 2,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 3,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 4,
+          "conditionIssue": null
+        }
+      ],
+      "actualAttachmentEdges": [],
+      "response": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/S12/response.json",
+      "canonicalReceipt": "/workspace/library-files/english-guard-attachment-v76-baseline/attempt-remaining/cases/S12/cas-readbacks/b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0.cbor"
+    }
+  ],
+  "scope": "18 genuine source-retained parser observations; first process failed after successful G01 on observer-only runner-registration assertion, remaining17 process passed. No pre-parse expectations or legal/inference accuracy scoring. All actual copy coverage NOT_EXERCISED.",
+  "recognizerS12": {
+    "count": 5,
+    "uniqueRuleCids": 4,
+    "admission": "not-performed",
+    "sameSourceOccurrences": "not-independent-evidence"
+  }
+}

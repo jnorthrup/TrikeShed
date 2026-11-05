@@ -1,0 +1,3 @@
+Independent English baseline recorded-data verification: PASS_RECORDED_DATA_CONSISTENCY
+Independent retained bytes/metadata consistency only. No Stanford accuracy, semantic truth, legal interpretation, parser/runtime/HTTP rerun, NAL execution, query execution, admission or OS airgap claim.
+18 canonical materialized receipts/sources; full request/range/UTF16/node-copy endpoints;120 JARs +29 module files hashed. First observer process exit1 remains failed after valid G01; remaining17 exited0. Actual copied vertices0: NOT_EXERCISED. S12 has5 observed candidates/4 rule CIDs and shared-source duplicates, with GAMMA surface preserved across differing lemmas.
