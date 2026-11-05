@@ -1,0 +1,29 @@
+[
+  {
+    "ref": "refs/remotes/origin/codex/kg-kif-comment-sniff-20261105",
+    "commit": "a587b2a1df44854b2dd8b170e554625ed219c7c0",
+    "time": 1793838303,
+    "before": "51bde43bec02ef1506c8f246f0ef6b2a15d02bcc",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n src/commonMain/kotlin/borg/trikeshed/kif/Kif.kt    |  18 +++-\n .../kotlin/borg/trikeshed/narsese/KgNalBridge.kt   |   5 +\n .../borg/trikeshed/narsese/KgKifCommentTest.kt     | 101 +++++++++++++++++++++\n 3 files changed, 121 insertions(+), 3 deletions(-)\n create mode 100644 src/jvmTest/kotlin/borg/trikeshed/narsese/KgKifCommentTest.kt\n",
+    "after": "d9132a50e49499bf9528bb43093a18f6c2825205"
+  },
+  {
+    "ref": "refs/remotes/origin/feat/legal-required-anchor-coverage-20261105",
+    "commit": "c8d1022350e418d80aedfe013c3cb80aba2d7966",
+    "time": 1793838474,
+    "before": "d9132a50e49499bf9528bb43093a18f6c2825205",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../legal-required-anchor-coverage/README.md       |  84 ++++\n .../expectation.json                               |  51 +++\n .../full-anchor-predictions.json                   |  30 ++\n .../legal-required-anchor-coverage/manifest.json   | 451 +++++++++++++++++++++\n .../borg/trikeshed/narsese/LegalNarsEvaluation.kt  |  48 ++-\n .../narsese/LegalRequiredAnchorCoverageTest.kt     | 136 +++++++\n .../trikeshed/narsese/LegalNarsEvaluationCli.kt    |  31 +-\n .../narsese/LegalRequiredAnchorCoverageCliTest.kt  |  79 ++++\n 8 files changed, 899 insertions(+), 11 deletions(-)\n create mode 100644 docs/fixtures/2026-11-05/legal-required-anchor-coverage/README.md\n create mode 100644 docs/fixtures/2026-11-05/legal-required-anchor-coverage/expectation.json\n create mode 100644 docs/fixtures/2026-11-05/legal-required-anchor-coverage/full-anchor-predictions.json\n create mode 100644 docs/fixtures/2026-11-05/legal-required-anchor-coverage/manifest.json\n create mode 100644 src/commonTest/kotlin/borg/trikeshed/narsese/LegalRequiredAnchorCoverageTest.kt\n create mode 100644 src/jvmTest/kotlin/borg/trikeshed/narsese/LegalRequiredAnchorCoverageCliTest.kt\n",
+    "after": "8b04dcd066cdcdac39ed093d24ef48bb86235a8e"
+  },
+  {
+    "ref": "refs/remotes/origin/codex/english-inference-coverage-integration-20261105",
+    "commit": "3c9b5e0f551f29bd63acfe4216670fa961a2b239",
+    "time": 1793838536,
+    "before": "8b04dcd066cdcdac39ed093d24ef48bb86235a8e",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n",
+    "after": "118e00220cbd64d98c1e7cd4ae16b98a21acc32d"
+  }
+]

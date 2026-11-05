@@ -5,7 +5,7 @@ real LLVM Confix scanning, deterministic passage selection and browser source
 inspection. This is a document traversal increment. It does not decide the
 legal dispute, evaluate a Nix expression or replace the curator's managed NLP
 and review owners. The bounded Linux x86-64 increment is verified; its
-[exact evidence](evidence/r3b-20261105/verification.json) and
+[final combined evidence](evidence/r3b-cutoff-20261105/verification.json) and
 [D3M record](../d3m/2026-11-05-airgap-r3b.md) distinguish accepted runs,
 failed attempts and remaining gates.
 
@@ -265,3 +265,25 @@ aliases, and a JVM access error in deferred recursive array projection. A
 successful but clipped screenshot precedes the final readable browser build.
 The verification manifest qualifies each artifact; no earlier failure is
 relabelled as acceptance.
+
+## Final D3M cutoff verification
+
+The frozen all-head cutoff added KIF comment detection and independent required
+annotation-anchor coverage. The resulting executable source is
+`7a6d7b25e076af6b955c5dfc9902c9613140215c`. A fresh combined build passed **201 selected JVM
+regressions**, including the earlier 149 plus relevant KIF/RDF/intake and
+annotation-coverage checks. All listed target compiles passed. The actual PDF
+traversal and all nine document browser cases ran again on these new JVM/JS
+artifacts, as did all 11 animation/replay cases. There were no failures, errors
+or skips in that selected JVM run.
+
+The [earlier evidence packet](evidence/r3b-20261105/verification.json) remains
+unchanged; it records its own artifact identities, repair history and the
+incomplete socket-hang-up attempt. The [cutoff packet](evidence/r3b-cutoff-20261105/verification.json)
+records the final combined source, exact artifacts and repeated execution.
+It does not retroactively change the standing of an earlier run.
+
+The cutoff inventory contains 521 refs: 511 remote branches, nine local branches
+and origin/HEAD. Eleven sequential ordinary merges completed without textual
+conflicts. Later remote branch arrivals belong to the next D3M cycle; remote
+master ancestry is checked again before the ordinary publication push.

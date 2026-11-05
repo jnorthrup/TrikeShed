@@ -10,7 +10,7 @@ and D3M integration record. A planned gate is not a completed release.
 | R1: owned scalar execution | Standard MLIR arithmetic through a pinned Sulong module, two wired LCNC nodes, durable receipt reopening | [Verified runbook](../sulong-bitcode/README.md); published master `26d5bf3db` |
 | R2: owned Confix scanning | Execute the real pinned upstream JSON/CBOR/YAML scanner, copy bounded rows, release native buffers, compare Kotlin results, retain a whole-program LCNC receipt | [Verified runbook](02-confix.md), [exact evidence](evidence/r2-20261104/verification.json), [D3M record](../d3m/2026-11-04-airgap-r2.md) |
 | R3a: observed transfers | Actual selected-wire sparks, recorded LLVM flyovers, reduced motion and immutable receipt playback | [Implemented contract and evidence](04-observed-transfers.md); bounded precursor to full R3 |
-| R3b: retained document traversal | Real 12-page PDF, production extraction, bounded passage, LLVM geometry selection, verified source/quotation and reopening without LLVM | [Verified increment](05-document-traversal.md), [exact evidence](evidence/r3b-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r3b.md); dense recursive visualization remains open |
+| R3b: retained document traversal | Real 12-page PDF, production extraction, bounded passage, LLVM geometry selection, verified source/quotation and reopening without LLVM | [Verified increment](05-document-traversal.md), [final combined evidence](evidence/r3b-cutoff-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r3b.md); dense recursive visualization remains open |
 | R4: offline release closure | Reproducible packaged runtime, verified dependency closure and clean-machine startup without external networking | Planned; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
@@ -80,9 +80,9 @@ indexed selection and browser source verification. The exact 177-unit quote
 retains physical-page anchors and separate original/extraction identities.
 Eight consumed wires are observed; both project revisions are recorded.
 
-The combined code passed 149 selected JVM regressions, the listed platform
+The final combined code passed 201 selected JVM regressions, the listed platform
 compiles, nine document browser cases and 11 animation/replay regressions.
-The final D3M inventory contains 508 remote branches and nine local branches
+The frozen D3M inventory contains 511 remote branches and nine local branches
 plus origin/HEAD; no conflict or branch deletion occurred. Reopening without
 LLVM happens within one JVM. The evidence does not claim clean-machine closure,
 general Nix evaluation, legal adjudication or exhaustive all-page processing.
