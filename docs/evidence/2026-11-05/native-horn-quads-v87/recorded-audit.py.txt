@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""V87 recorded-data audit. Never launches Java, native code, SPARQL, browser or build."""
+from pathlib import Path
+import argparse,base64,copy,hashlib,json,re,sys
+import checks as H
+need=H.need;cid=H.cid;load=H.C['load'];decode=H.C['C']['decode_cbor']
+def stamp(raw):return {'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}
+def refusal(c):
+    requests={r['label']:r for r in c['requests']}
+    for label,status in [('unauthorized-native-query',401),('null-program',400),('wrong-graph',409),('stale-source-query',409)]:
+        r=requests[label];need(r['status']==status and not any(k in r['response'] for k in ['quadQuery','results','bindings','proof']),'Actual refusal has no successful rows/proof fallback: '+label)
+    need(requests['wrong-graph']['response']['code']=='native_horn_projection_changed','Wrong graph explicitly refuses, not empty matches')
+    need(requests['unauthorized-native-query']['authenticated'] is False and all(requests[n]['authenticated'] for n in ['bindings-query','premises-query','null-program','wrong-graph','stale-source-query']),'Actual protected API authorization scope')
+def core_checks(c,input_raw,source_raw):
+    plain=c['plain'];data=H.certificate_check(plain,input_raw,source_raw);mlir=data['mlirNixRevision'];p=c['projection']
+    need(H.projection(plain,mlir)==p['cid'] and p['graph']==H.PREFIX+p['cid'][7:],'Complete selection context canonical graph identity')
+    need(H.projection(c['repeatPlain'],mlir)==p['cid'] and all('quadQuery' not in c[k] for k in ['plain','repeatPlain']),'No-program behavior remains plain native report; volatile asOf is not graph identity')
+    d=p['descriptor'];catalog=plain['checkedProof']['sources'];quad_count=2+sum(4 if v['id'].startswith('host-rule:') else 10 for v in catalog.values())
+    for step in plain['checkedProof']['steps']:
+        quad_count+=4+3*len(step['arguments'])+len(step['sourceNodeIds' if step['kind']=='asserted' else 'ruleSourceNodeIds'])
+        if step['kind']=='asserted':quad_count+=1
+        else:quad_count+=1+3*len(step['premises'])+sum(4+len(x['ruleSourceNodeIds'])+len(x['originalVariableSourceNodeIds']) for x in step['bindings'])
+    need(d['projectionCid']==p['cid'] and d['graph']==p['graph'] and d['quads']==p['quads']==quad_count==86 and d['schema']==H.SCHEMA and d['dataset']==H.DATASET and d['sourceReferenceMode']=='checked-first-proof-with-complete-selection-context','Actual complete bounded graph descriptor/cardinality')
+    need(p['presentInCasHttpStatus']==404 and d['persistence']=='request-local','Computed projection is not a persisted CAS report')
+    for field in H.FIELDS:
+        if field not in ['proof','checkedProof','sourceEvidence','hostRules']:need(d[field]==plain[field],'Descriptor exact native context '+field)
+    sizes={v:H.view_check(plain,c[v],v,p['cid'],d,mlir) for v in ['bindings','premises']}
+    need(sizes=={'bindings':3,'premises':2},'Three rule bindings and two ordered premise uses')
+    approved=c['approved'];frozen=c['snapshot'];selected=approved['snapshot']['selections']
+    need(approved['snapshot']==frozen['snapshot'] and approved['revision']==2 and frozen['revision']==1 and approved['sourceCurrent'] is True and approved['current'] is True and approved['synthetic'] is True,'Actual freeze and authenticated synthetic approval remain distinct')
+    need(plain['snapshotCid']==approved['snapshotCid']==frozen['snapshotCid'] and plain['approvalCid']==plain['decisionCid']==approved['decisionCid'] and plain['reviewer']==approved['reviewer'] and plain['synthetic']==approved['synthetic'],'Fresh native report binds actual protected review owner')
+    for q in plain['sourceEvidence'].values():
+        matches=[s for s in selected if s['id']==q['selectionId']]
+        need(len(matches)==1 and matches[0]['quotation']=={'originalCid':q['originalCid'],'extractedTextCid':q['textCid'],'begin':q['begin'],'end':q['end'],'quote':q['quote']},'Every complete frozen selection exactly joins quotation metadata')
+    need(len(selected)==3,'Full approved selection, not display pagination')
+    refusal(c)
+    before,after=c['beforeQueries'],c['afterQueries']
+    for k in ['pack','reviewWal','sourceFiles','nativeRow','nativeMirror','reteFacts','blackboard','journal','rows']:need(before[k]==after[k],'Read-only native/quad query group leaves '+k+' unchanged')
+    need(after['nativeCurrentnessReads']>before['nativeCurrentnessReads'],'Actual currentness owner reads observed across fresh query group')
+    amended=c['sourceAmendment'];raw=amended['requestText'].encode();row=amended['after']['nativeRow']
+    need(row['cid']==cid(raw) and row['cid']!=before['nativeRow']['cid'] and amended['upload']=={'verdict':'ok','cid':cid(raw),'bytes':len(raw)},'Real source amendment has distinct current CID')
+    need(c['final']['reviewWal']==amended['after']['reviewWal']==after['reviewWal'] and c['final']['pack']==amended['after']['pack'],'Stale source refusal has no new persistence writes')
+    return data,sizes
+def main(args):
+    p=Path(args.proof).resolve();out=Path(args.out).resolve();out.mkdir(parents=True,exist_ok=True)
+    c=load(p/'client-result.json');b=load(p/'browser-result.json');r=load(p/'reopened.json');start=load(p/'startup.json');close=load(p/'cleanup.json');go=load(p/'GO.json')
+    expected={'main.jar':args.main_sha,'documents.js':args.documents_sha,'spacegraph.js':args.panels_sha,'pages.js':'4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5'}
+    need(go['source']==args.source_head and go['artifacts']==expected and start['go']==go,'Explicit frozen root source/artifact pins')
+    closed_path=p.parent/'closed-record-manifest.json';closed=load(closed_path)
+    need(stamp(closed_path.read_bytes())['sha256']=='f20360b00fbb084f29d44f3defa8647437f77f9a9ca22f6afc26b823d78ddecd' and closed['source']==args.source_head and closed['mainSha256']==args.main_sha and len(closed['files'])==188,'Stable closed-record manifest source/hash binding')
+    for name,fp in closed['files'].items():need(stamp((p/name).read_bytes())==fp,'Closed selected-record byte hash '+name)
+    need(go['checks']=={'tests':538,'failures':0,'errors':0,'skipped':0},'Actual 538 cohort metadata, not old test results')
+    cp=load(p/'classpath.json');need(cp['productionDependencyJars']==120 and len(cp['productionClasspath'])==120 and len({x['path'] for x in cp['productionClasspath']})==120,'Actual final main plus 119 immutable dependency metadata')
+    need(cp['productionClasspath'][0]['sha256']==args.main_sha and all(re.fullmatch('[0-9a-f]{64}',x['sha256']) for x in cp['productionClasspath']),'Production classpath recorded hashes')
+    if args.check_external_artifacts:
+        for e in cp['productionClasspath']:need(stamp(Path(e['path']).read_bytes())['sha256']==e['sha256'],'Optional external artifact byte hash')
+        for name,digest in expected.items():need(stamp((Path(go['snapshot'])/name).read_bytes())['sha256']==digest,'Optional frozen artifact hash')
+    for origin_map in [start['origins'],r['origins']]:
+        need(all(v.rstrip('/').endswith('/snapshot/main.jar') and go['snapshot'] in v for v in origin_map.values()),'Actual code sources are final production main, not observer overlay')
+    need(set(['NativeHornQuery','NativeHornProofGraph','NativeHornQueryView','DocumentReviewWire','SparqlWire','SparqlSurface','QuadStore']).issubset(start['origins']),'Actual owner/projector/query engine production origins captured')
+    carrier=c['meta']['carrierConstruction'];need('DocumentCuratorCodec.encode(' in carrier['method'] and carrier['origin']==start['origins']['DocumentReviewWire'],'Bounded reflected host codec only; approval is separate actual HTTP')
+    for name in ['writer','client','browser','reader','namespace']:need((p/(name+'.exit')).read_text().strip()=='0','Actual closed '+name+' exit')
+    need(c['result']==b['result']==r['result']=='PASS' and close['pid']==r['writerPid']!=r['readerPid'] and c['pid'] not in [close['pid'],r['readerPid']],'Distinct actual owner/client/after-close reader PIDs')
+    need(close['remainingChildren']==r['remainingChildren']==0 and all(close[k] is True for k in ['listenerJoined','moduleDrained','reviewWireDrained','booksDrained','scopesDrained','ownerCompleted','casClosed','guestModulesClosed']) and all(r[k] is True for k in ['boardOwnerCompleted','ownerCompleted','casClosed','guestModulesClosed']),'Actual owner lifecycle completion')
+    manifest=load(p/'observer-inputs/manifest.json')
+    for name,fp in manifest.items():need(stamp((p/'observer-inputs'/name).read_bytes())==fp,'Exact executed observer input '+name)
+    for request in c['requests']:
+        label=request['label'];raw=(p/(label+'-response.bin')).read_bytes();wire=(p/(label+'-http-response.bin')).read_bytes();header,body=wire.split(b'\r\n\r\n',1)
+        need(stamp(raw)=={'bytes':request['responseBytes'],'sha256':request['responseSha256']} and body==raw and int(header.split(b' ',2)[1])==request['status'],'Literal one-request HTTP response binds actual body/status '+label)
+        req=(p/(label+'-http-request.bin')).read_bytes();need(req.split(b'\r\n',1)[0]==(request['method']+' '+request['path']+' HTTP/1.1').encode(),'Actual request line '+label)
+        if (p/(label+'-request.bin')).exists():
+            posted=(p/(label+'-request.bin')).read_bytes();need(req.split(b'\r\n\r\n',1)[1]==posted,'Exact posted request bytes '+label)
+            need((posted.decode() if isinstance(request['request'],str) else json.loads(posted))==request['request'],'Recorded posted payload equals actual request preimage '+label)
+        if not label.startswith('cas-'):
+            decoded=json.loads(raw);need(decoded==request['response'],'Recorded structured response equals raw HTTP body '+label)
+    requests={x['label']:x for x in c['requests']}
+    for label,record in [('meta',c['meta']),('snapshot',c['snapshot']),('approve',c['approved']),('plain-native-query',c['plain']),('repeat-no-program',c['repeatPlain'])]:need(requests[label]['response']==record,'Named result binds actual HTTP response '+label)
+    for view in ['bindings','premises']:
+        actual=requests[view+'-query'];need(actual['response']==c[view]['response'] and actual['request']['program']==c[view]['program']==load(p/(view+'-program.json')),'Typed answer/report/program bind actual HTTP '+view)
+    index=load(p/'readback-index.json');blocks={}
+    for e in index:
+        raw=(p/e['file']).read_bytes();need(stamp(raw)=={'bytes':e['bytes'],'sha256':e['sha256']} and cid(raw)==e['cid'],'Actual selected fetched CAS bytes '+e['role']);blocks[e['cid']]=raw
+    need(len(index)==len(r['readbacks'])==15,'All 15 selected actual block fetches reopened')
+    for e in r['readbacks']:need((p/e['file']).read_bytes()==blocks[e['cid']] and stamp(blocks[e['cid']])=={'bytes':e['bytes'],'sha256':e['sha256']},'Separate final-JAR reader exact retained block '+e['role'])
+    source_cid='sha256:1f3ea0d40ae890046b811f4891f9bc67cbaee38b1ccf910c1551beed00cc608e';source_raw=blocks[source_cid];input_raw=(p/'native-inputs'/(c['plain']['inputCid'][7:]+'.json')).read_bytes()
+    data,sizes=core_checks(c,input_raw,source_raw)
+    snapshot=decode(blocks[c['snapshot']['snapshotCid']]);need(snapshot==c['snapshot']['snapshot']==c['approved']['snapshot'],'Actual retained canonical full review snapshot is the frozen/approved report snapshot')
+    read_domain={'kind':'curation-taxonomy-read/1','snapshotCid':c['plain']['snapshotCid'],'approvalCid':c['plain']['approvalCid'],'decisionCid':c['plain']['decisionCid'],'revision':int(c['plain']['revision']),'sourceRevision':snapshot['sourceRevision'],'curationReceiptCid':snapshot['curationReceiptCid'],'ontologyCid':snapshot['ontologyCid']}
+    need(cid(H.canonical(read_domain))==c['plain']['readCid'],'Canonical approved taxonomy read identity, no volatile timestamp in domain')
+    projection_raw=(p/'derived-projection-domain-preimage.cbor').read_bytes();projection_domain={'kind':H.SCHEMA,'context':{**{k:c['plain'].get(k) for k in H.FIELDS},'mlirNixRevision':data['mlirNixRevision']}}
+    need(cid(projection_raw)==c['projection']['cid'] and decode(projection_raw)==H.normalized(projection_domain),'Supplied derived projection preimage equals independently assembled complete context domain; not CAS/stdout')
+    frame=r['derivedFramePreimage'];frame_raw=(p/frame['file']).read_bytes();need(frame['frameId']==c['plain']['frameId']==cid(frame_raw) and frame['inputCid']==cid(input_raw) and len(frame_raw)==frame['bytes'] and decode(frame_raw)==H.normalized({k:v for k,v in data.items() if k!='frameId'}),'After-close derived canonical frame preimage, explicitly not CAS/stdout')
+    capture=load(p/'native-input-capture.json');execution=load(p/'native-execution-index.json');trace=(p/'process.trace').read_text()
+    need(capture['errors']==[] and len(capture['captures'])==execution['initialNativeExecutions']==6 and execution['samePidSelfExecs']==6,'Six fresh native owner evaluations observed, not six independent sources')
+    for e in execution['executions']:
+        need(e['initialExecve'] in trace and e['inputPath'] in capture['captures'] and e['exit']==0 and e['samePidSelfExecCount']==1 and e['inputCid']==cid(input_raw) and e['bytes']==len(input_raw) and (p/e['file']).read_bytes()==input_raw,'Exact native execve/input PID/capture/exit binding')
+        need(re.search(r'\b'+str(e['pid'])+r' .*exited with 0',trace) is not None,'Actual native PID exit0 in raw trace')
+    need(r['beforeOpen']==r['afterClose'] and close['closedPack']==r['beforeOpen']['pack'],'After-close reader leaves CAS/board/review WAL bytes unchanged')
+    review=(p/'after-close-readbacks/review.wal').read_bytes();board=(p/'after-close-readbacks/board.wal').read_bytes();rf=H.wal_frames(review,True);bf=H.wal_frames(board)
+    need(stamp(review)==r['beforeOpen']['reviewWal'] and stamp(board)==r['beforeOpen']['wal'] and len(rf)==2 and len(bf)==3,'Independent CRC-framed review and board journals')
+    need([{'sequence':f['sequence'],'sha256':stamp(f['payload'])['sha256'],'payloadBase64':base64.b64encode(f['payload']).decode()} for f in rf]==r['reviewFrames'],'Exact production review replay matches WAL bytes')
+    need([f['payload'].decode() for f in rf]==[c['snapshot']['decisionCid'],c['approved']['decisionCid']],'Snapshot then real approval, no rollback or query journal event')
+    for f in rf:
+        event_cid=f['payload'].decode();event=decode(blocks[event_cid]);history=next(x for x in c['approved']['history'] if x['cid']==event_cid)
+        need(event==H.normalized({k:v for k,v in history.items() if k!='cid'}) and event['snapshotCid']==c['plain']['snapshotCid'] and cid(H.canonical(event))==event_cid,'Actual canonical snapshot/approval event blocks and protected history')
+    need([{'sequence':f['sequence'],'payloadUtf8':f['payload'].decode(),'sha256':stamp(f['payload'])['sha256']} for f in bf]==r['frames'],'Actual production board replay exact three command pointer frames')
+    need(len(r['cards'])==len(b['presetRuns'])==1,'One separate corpus UI run, no native canvas proof action')
+    run=b['presetRuns'][0];reply=run['http']['response'];card=r['cards'][0];command=card['command']['lcncRun']
+    need(run['http']['status']==200 and reply['status']=='completed' and reply['ok'] is True and card['jobId']==reply['jobId'] and card['commandCid']==reply['receiptCid'] and command['runId']==reply['runId'] and command['programCid']==reply['programCid'],'Actual separate public corpus run command recovered')
+    report=run['ownerReport'];need(run['complete']['outputs']['corpus']==report and report['source']['historical'] is True and report['source']['mode']=='snapshot' and report['search']['authority']=='lexical-match-only' and len(report['search']['hits'])==5,'Separate existing retained corpus snapshot output, no new native workflow')
+    need(b['errors']==b['external']==[] and len([x for x in b['requests'] if x.get('path')=='/api/lcnc/run' and x.get('method')=='POST'])==1 and not any(x.get('path')=='/api/documents/english' and x.get('method')=='POST' for x in b['requests']),'One explicit public Run and no fresh English parse')
+    before_fit,after_fit=b['observed']['beforeFit'],b['observed']['afterFit'];v=after_fit['viewport'];need(len(before_fit['nodes'])==len(after_fit['nodes'])==14 and {n['id'] for n in before_fit['nodes']}=={n['id'] for n in after_fit['nodes']} and after_fit['paletteOpen'] is False,'Actual post-result public Fit measures same14nodes')
+    for n in after_fit['nodes']:
+        q=n['rect'];need(q['left']>=v['left']-1 and q['right']<=v['right']+1 and q['top']>=v['top']-1 and q['bottom']<=v['bottom']+1,'Measured post-result Fit includes node '+n['id'])
+    note=b['observed']['note'];need(note['runtimeBadgeCount']==0 and 'UnavailableNoRuntimeOwner' not in note['text'],'Actual note badge removed; note is not an executable owner')
+    for state in [c['beforeQueries'],c['afterQueries'],c['final'],run['before'],run['after']]:need(state['guestInstalled']==state['guestMounted']==[] and state['beliefBagPresent'] is False and state['kifBankPresent'] is False and state['narsRetePresent'] is False and state['configuredModelCount']==0 and state['modelEndpointsPresent'] is False,'Actual empty SDK/no model/admission configuration')
+    amended=c['sourceAmendment']['requestText'].encode();need((p/'after-close-readbacks/actual-amended-native-proof.kif').read_bytes()==amended and r['currentAmendedRow']['cid']==cid(amended)==c['final']['nativeRow']['cid'] and r['currentAmendedRow']['rev']==c['final']['nativeRow']['rev'],'Actual amended current mirror/head, old report only immutable history')
+    network=load(p/'network.json');need(json.loads(network['routes'])==[] and [x['ifname'] for x in json.loads(network['interfaces'])]==['lo'] and network['externalTcp']['errno']==101 and network['networkNamespace']!=load(p/'controller-before-netns.json')['networkNamespace'],'Recorded private loopback namespace scope, not a general escape proof')
+    controls=[]
+    def reject(name,mutate):
+        changed=copy.deepcopy(c);mutate(changed)
+        try:core_checks(changed,input_raw,source_raw)
+        except (H.AuditError,KeyError,TypeError,ValueError,IndexError):controls.append({'label':name,'rejected':True});return
+        raise H.AuditError('Mutated control was accepted: '+name)
+    reject('binding-constant-mislabelled-as-uri',lambda x:x['bindings']['response']['quadQuery']['results']['results']['bindings'][0]['value'].update(type='uri'))
+    reject('premise-ordinal-substituted',lambda x:x['premises']['response']['quadQuery']['results']['results']['bindings'][1]['ordinal'].update(value='0'))
+    reject('source-quotation-substituted',lambda x:next(iter(x['plain']['sourceEvidence'].values())).update(quote='(instance Tenant Other)'))
+    reject('unused-approved-selection-omitted',lambda x:x['plain']['sourceEvidence'].pop(next(k for k,vv in x['plain']['sourceEvidence'].items() if vv['selectionId']=='kif:49:75')))
+    reject('raw-quad-source-claims-review-authority',lambda x:x['bindings']['response']['quadQuery']['physicalSource'].update(reviewAuthority='established'))
+    reject('stale-source-response-replays-success',lambda x:next(a for a in x['requests'] if a['label']=='stale-source-query').update(status=200,response=x['premises']['response']))
+    hashes={name:stamp((p/name).read_bytes())['sha256'] for name in ['GO.json','startup.json','client-result.json','browser-result.json','cleanup.json','reopened.json','native-execution-index.json','process.trace','after-close-readbacks/review.wal','after-close-readbacks/board.wal','native-corpus-completed-after-fit.png','native-note-without-runtime-badge.png']}
+    hashes['../closed-record-manifest.json']=stamp(closed_path.read_bytes())['sha256']
+    result={'result':'PASS','kind':'native-horn-quads-independent-recorded-audit/1','source':args.source_head,'artifacts':expected,'actual':{'writerPid':close['pid'],'readerPid':r['readerPid'],'selected':3,'used':2,'typedRows':sizes,'projectionCid':c['projection']['cid'],'frameId':c['plain']['frameId'],'inputCid':c['plain']['inputCid'],'nativeExecutions':6,'reviewFrames':2,'boardFrames':3,'selectedReadbacks':15,'separateCorpusRuns':1,'postFitNodesInside':14,'noteRuntimeBadges':0},'mutatedCopyControls':controls,'recordHashes':hashes,'scope':'Recorded-byte, finite supplied-certificate and typed-row consistency. Authenticated synthetic host review over authored KIF assumptions; request-local computed graph is not CAS or sink authority. Separate existing corpus snapshot Run note/Fit observations; no new native Docs/canvas action. No independent proof search, legal accuracy, source authentication, native-library closure, executable portability or general isolation proof. Default public replay authenticates supplied selected records; omitted full packs/external REF paths/JAR/native availability are not rechecked.'}
+    (out/'audit-result.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n');(out/'audit-report.txt').write_text('PASS: v87 actual selected attempt5 recorded data, six rejected mutated-copy controls.\n3 approved sources, 2 used; 3 typed bindings and 2 premise rows; 6 actual fresh native evaluations of one input.\nExact review/source/context/frame identities and no-query writes verified; real source change refuses.\nAfter-close 15 selected blocks plus 2 review and 3 board CRC frames match production replay.\nSeparate corpus UI: one snapshot Run, five lexical hits, 14 measured nodes inside viewport after public Fit, note runtime badge absent.\n'+result['scope']+'\n');print(json.dumps({'result':'PASS','mutatedControls':len(controls),'resultSha256':stamp((out/'audit-result.json').read_bytes())['sha256']}))
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();parser.add_argument('proof');parser.add_argument('--source-head',required=True);parser.add_argument('--main-sha',required=True);parser.add_argument('--documents-sha',required=True);parser.add_argument('--panels-sha',required=True);parser.add_argument('--out',required=True);parser.add_argument('--check-external-artifacts',action='store_true');args=parser.parse_args()
+    try:main(args)
+    except Exception as e:
+        out=Path(args.out);out.mkdir(parents=True,exist_ok=True);(out/'audit-failure.json').write_text(json.dumps({'result':'FAIL','errorType':type(e).__name__,'error':str(e)},indent=2)+'\n');raise
