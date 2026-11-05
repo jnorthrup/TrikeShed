@@ -31,6 +31,15 @@
   "independentPublicResultSha256": "4dcb5174c9805d14131953015ca0431bd9438c6ca31a674fa51557f464c35b77",
   "strictLocalArtifactHashMode": "EXECUTEDPASS120JAR+assetpins/defaultrecordedresultidentical; no native library closure claim",
   "publicEvidence": "../native-horn-quads-v87/README.md",
-  "rootFreshPublicReplay": "PENDING_PACKAGE",
-  "scope": "Actual public auth/review/native/query withhost-fixture carrier encoded byproductioncodec viaoneexactreflection; NOTpubliccuratorintake/nativeDocsaction/canvasRun/Englishaccuracy/worldlegaltruth. Semantic16MISSING16/scored0."
+  "rootFreshPublicReplay": "PASS exact4dcb5174c9805d14131953015ca0431bd9438c6ca31a674fa51557f464c35b77",
+  "scope": "Actual public auth/review/native/query withhost-fixture carrier encoded byproductioncodec viaoneexactreflection; NOTpubliccuratorintake/nativeDocsaction/canvasRun/Englishaccuracy/worldlegaltruth. Semantic16MISSING16/scored0.",
+  "publicArchiveSha256": "26a13a149c1a1f4090ca4ad6559fff05a9dca48ac5762aabb3300df10856c09a",
+  "publicArchiveMembers": 424,
+  "publicArchiveRawBytes": 16788157,
+  "frozenPublicationRefs": 729,
+  "frozenPublicationUniqueTips": 559,
+  "documentationMerge": "f28e7ea8d251011790f073b7cbbab68393d62dc2",
+  "inheritedAlreadyPublishedMaster": "ede90ff334e54c73e1d560ca0abda8a1a5b8bfd0",
+  "productionDifferenceFromAlreadyPublishedMaster": [],
+  "inheritedSourceScope": "Parallel R3e wire/endpoint geometry, common LinearArrayMap entry equals/hashCode fix with2newtests, removal ofnow-redundant localrowcopy preservingstrictguard, PRELOAD runtimeboundary clarification. Currentdocs changesno production relative toalreadypublicede. V87proof remains973/main6040; nextcombined540build verifieslatestglobalcontract+nativeUI."
 }

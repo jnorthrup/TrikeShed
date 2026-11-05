@@ -24,13 +24,13 @@ use one canonical identity domain across host maps and parsed JSON. The CID is
 computed, not a retained CAS receipt. Genuine reviewed quotation spans and
 normalized host rules remain separate. Repeated witnesses are alternatives.
 
-All538 selected checks and three browser builds pass. A separate closed fixture
+All 538 selected checks and three browser builds pass. A separate closed fixture
 used actual authenticated approval and native evaluation: three selections/two
 used, three typed substitutions and two ordered premises for Tenant-instance-
 Person / Person-subclass-Agent. Auth, null-program, wrong-graph and real-source-
 amendment controls refuse; query state stays unchanged. Fifteen objects and both
 review/board journals verify after reopen. The corpus regression also shows the
-static note without a false runtime-owner warning and all14 expanded cards inside
+static note without a false runtime-owner warning and all 14 expanded cards inside
 the viewport after public Fit. Four earlier external harness failures and three
 failed build stages remain recorded under evidence/2026-11-05/native-horn-quads-v87.
 
