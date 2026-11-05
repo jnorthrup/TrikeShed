@@ -29,7 +29,7 @@ class PresetAssemblyTest {
                 "preset-sql-quad",
                 "preset-sparql-quad",
                 "preset-finance-reconcile", "preset-kif-structure", EnglishLcncPreset.NAME,
-                EnglishLcncPreset.COPULAR_NAME, EnglishLcncPreset.COPULAR_PATTERN_NAME, EnglishNalPreset.NAME, EnglishCorpusPreset.NAME,
+                EnglishLcncPreset.COPULAR_NAME, EnglishLcncPreset.COPULAR_PATTERN_NAME, EnglishNalPreset.NAME, EnglishCorpusPreset.NAME, CamelCorpusRouting.NAME,
                 "preset-hermes", "preset-tribunal", "preset-curator",
                 "preset-tribunal-case", "preset-legal-tribunal-case",
                 "preset-tribunal-case-v2", "preset-legal-tribunal-case-v2",
