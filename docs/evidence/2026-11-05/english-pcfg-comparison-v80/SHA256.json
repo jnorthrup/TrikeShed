@@ -1,0 +1,26 @@
+{
+  "schema": "english-pcfg-public-package/1",
+  "archiveMembers": 116,
+  "files": [
+    {
+      "file": "README.md",
+      "bytes": 4950,
+      "sha256": "5a4a8cebced0644571a9a3e198e2d7da50255913092079476d3dfe19ff35fe25"
+    },
+    {
+      "file": "replay-recorded.py.txt",
+      "bytes": 17355,
+      "sha256": "2e8765cbe9eb6fe8a84bfade65a6413972ce75b27216766ec6385e2c54f89f45"
+    },
+    {
+      "file": "records-manifest.json",
+      "bytes": 22334,
+      "sha256": "6f4df93962d69f80520df74f8ca5cd77e78b229570f1c8a9b3f9087fbf9d62d8"
+    },
+    {
+      "file": "records.tar.gz",
+      "bytes": 87437,
+      "sha256": "7283b10dba8996aaceba6d40e4d622e6fa7485015edc07d31f619b0e5488378b"
+    }
+  ]
+}
