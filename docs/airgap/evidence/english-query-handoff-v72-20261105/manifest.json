@@ -1,0 +1,47 @@
+{
+  "scope": "Compact documentation-only v72 evidence; SHA256 covers every sibling artifact except this manifest itself",
+  "frozenSourceHead": "c8b7f5e8a5d0dad8e6352d2fc1c733df7d69e563",
+  "selectedAttempt": "native-attempt4",
+  "files": {
+    "README.md": {
+      "bytes": 5051,
+      "sha256": "6545c22635e7007cc56570916838b57a1ca8a87a679da01435ca6a152a12a622"
+    },
+    "audit-report.txt": {
+      "bytes": 1050,
+      "sha256": "1161695aa5e9f7a49823c26b5de97a06b8c9f845053dbd2fec937bb1288b4ede"
+    },
+    "audit-result.json": {
+      "bytes": 20838,
+      "sha256": "fac6ca09410c710492e2cb5f8aacbf9da094d83d7329dae3bf2dda7e22dabc99"
+    },
+    "audit-usage.txt": {
+      "bytes": 2070,
+      "sha256": "a9055be628d36e9e8616f42ad2d71a2a2d6dcb168e34c96ac220541f19be7fdb"
+    },
+    "audit.py.txt": {
+      "bytes": 31913,
+      "sha256": "ea9671f8fd2c40fd064af8b1ca3b91bd733d17671929340a5423123ea55c1a2c"
+    },
+    "extracted-records-audit-result.json": {
+      "bytes": 21703,
+      "sha256": "d7d2ddec8d26b734df29139e7ff19f6b847c2e4eb25832340ac714ae2301306e"
+    },
+    "native-A_failure-cannot-replace-B-activity.png": {
+      "bytes": 327180,
+      "sha256": "a5e1e857c553d373f05074a5eb2ca6bca1bf7067b538789b5db251f94c3efa85"
+    },
+    "native-retained-handoff-loaded-before-run.png": {
+      "bytes": 240565,
+      "sha256": "ff89e4d5b6cb528b78a931f8d95f33a3aed0be7a78db5e74479954211031e480"
+    },
+    "records.tar.gz": {
+      "bytes": 669277,
+      "sha256": "beecb31eb49e7ffb198bcd6474175378553c56a18fb90a96334c8c0e7752b425"
+    },
+    "summary.json": {
+      "bytes": 8823,
+      "sha256": "a270191f56cf30ab7cc216a2fbc495dce472079cacbbafb32f48e6c9e606b7b6"
+    }
+  }
+}

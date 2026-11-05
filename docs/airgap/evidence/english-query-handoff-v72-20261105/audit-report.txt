@@ -1,0 +1,13 @@
+Independent recorded-data audit: PASS
+
+Selected records: /workspace/library-files/english-query-handoff-final-proof/native-attempt4
+
+- Frozen source, main JAR, three JS artifacts and static snapshot hash manifest
+- Exact eight-field action, inert offered current construction/context, ten labelled native negatives, three actual same-program runs, two held A/B ownership controls
+- Original seven-file archive identity; protected source/head/manifest/guard and CAS pack prefix preserved
+- Original 3f958 canonical CBOR round trip, source CID/quotations and retained source snapshots
+- Every run receipt/program/ledger and both held actual A200 byte bodies match content-addressed CAS exports
+- Three run records, empty SDK/no fresh NLP or provider, original source currentness, drained owners and production after-close retained-reader bindings
+- Eight mutated-copy controls rejected by the same verifier
+
+This audits recorded evidence only. It does not claim semantic entailment, producer authentication, fresh parser validation or a global airgap.
