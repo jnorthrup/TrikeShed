@@ -1,0 +1,93 @@
+{
+  "kind": "english-corpus-topics-port-public-observer/1",
+  "result": "RED_THEN_GREEN",
+  "scope": "Public production API and LCNC wiring; canonical POST handler in-process, no socket HTTP/browser/fresh parser/model claim",
+  "observerSourceSha256": "3f7f0538d14a8fa5dfe115ef9dfc2fdd9fe71c49b0bbe8ff607879d93a0d6a0a",
+  "compileAttempt1": "Failed observer syntax only; exact source/log preserved",
+  "compileAttempt2": "Corrected classes emitted and used unchanged in four zero-exit processes",
+  "compileCommand": "bash /workspace/library-files/english-corpus-topics-port-proof/compile.sh /workspace/library-files/reviewed-proof-query-v75-proof/snapshot /workspace/library-files/english-corpus-topics-port-proof/classes-attempt2",
+  "inputArchiveSha256": "51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc",
+  "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+  "cases": [
+    {
+      "case": "red-v75-attempt1",
+      "sourceHead": "9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3",
+      "mainJarSha256": "a15bee549a19af990aa57a34cccde775737633bb11418e116ace183c8dc2f867",
+      "snapshot": "/workspace/library-files/reviewed-proof-query-v75-proof/snapshot",
+      "classpathEntries": 121,
+      "productionDependencyJars": 120,
+      "observerClassDirectories": 1,
+      "result": "RED_REPRODUCED",
+      "checks": {
+        "aliasConfigMatchesCanonicalHttpRoute": false,
+        "aliasNullOverridesAuthored": false,
+        "canonicalNullWinsAlias": true,
+        "invalidAliasesRefuse": false
+      },
+      "writerExit": 0,
+      "readerExit": 0,
+      "canonicalTopicCid": "sha256:974a6278d9a14b49fec408f23fe5f5b57f8186fbe88af0f64cff17208e034090",
+      "wiredTopicCid": null,
+      "canonicalReceiptCid": "sha256:df26801c501f8a21c35ee726cda2669cfd995bf72236dc8acccd374cd9f76fbb",
+      "wiredReceiptCid": "sha256:55a13bb76a5ca056e46b9b5e6d6ce54f1d90da149ee35c2b70b48e42f4cacf85",
+      "readerResult": "PASS",
+      "boundedVerifiedBlocks": 7,
+      "cleanup": {
+        "corpusWireDrained": true,
+        "routesRemoved": true,
+        "runnerRemoved": true,
+        "projectScopesDrained": true,
+        "ownerCompleted": true,
+        "remainingChildren": 0,
+        "casClosed": true,
+        "originalSourceAndHeadsUnchanged": true,
+        "inputCasPrefixUnchanged": true,
+        "inputCasBytes": 7666
+      },
+      "commands": [
+        "EXPECTED_SOURCE_HEAD=9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3 EXPECTED_MAIN_SHA256=a15bee549a19af990aa57a34cccde775737633bb11418e116ace183c8dc2f867 bash /workspace/library-files/english-corpus-topics-port-proof/run-observer.sh /workspace/library-files/english-corpus-topics-port-proof/red-v75-attempt1 /workspace/library-files/reviewed-proof-query-v75-proof/snapshot /workspace/library-files/english-corpus-topics-port-proof/classes-attempt2 writer red",
+        "EXPECTED_SOURCE_HEAD=9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3 EXPECTED_MAIN_SHA256=a15bee549a19af990aa57a34cccde775737633bb11418e116ace183c8dc2f867 bash /workspace/library-files/english-corpus-topics-port-proof/run-observer.sh /workspace/library-files/english-corpus-topics-port-proof/red-v75-attempt1 /workspace/library-files/reviewed-proof-query-v75-proof/snapshot /workspace/library-files/english-corpus-topics-port-proof/classes-attempt2 reopen red"
+      ]
+    },
+    {
+      "case": "green-v76-attempt1",
+      "sourceHead": "0219223a3846887fe283b93598942de332214cd2",
+      "mainJarSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+      "snapshot": "/workspace/library-files/english-corpus-topics-v76-proof/snapshot",
+      "classpathEntries": 121,
+      "productionDependencyJars": 120,
+      "observerClassDirectories": 1,
+      "result": "GREEN",
+      "checks": {
+        "aliasConfigMatchesCanonicalHttpRoute": true,
+        "aliasNullOverridesAuthored": true,
+        "canonicalNullWinsAlias": true,
+        "invalidAliasesRefuse": true
+      },
+      "writerExit": 0,
+      "readerExit": 0,
+      "canonicalTopicCid": "sha256:974a6278d9a14b49fec408f23fe5f5b57f8186fbe88af0f64cff17208e034090",
+      "wiredTopicCid": "sha256:974a6278d9a14b49fec408f23fe5f5b57f8186fbe88af0f64cff17208e034090",
+      "canonicalReceiptCid": "sha256:df26801c501f8a21c35ee726cda2669cfd995bf72236dc8acccd374cd9f76fbb",
+      "wiredReceiptCid": "sha256:df26801c501f8a21c35ee726cda2669cfd995bf72236dc8acccd374cd9f76fbb",
+      "readerResult": "PASS",
+      "boundedVerifiedBlocks": 7,
+      "cleanup": {
+        "corpusWireDrained": true,
+        "routesRemoved": true,
+        "runnerRemoved": true,
+        "projectScopesDrained": true,
+        "ownerCompleted": true,
+        "remainingChildren": 0,
+        "casClosed": true,
+        "originalSourceAndHeadsUnchanged": true,
+        "inputCasPrefixUnchanged": true,
+        "inputCasBytes": 7666
+      },
+      "commands": [
+        "EXPECTED_SOURCE_HEAD=0219223a3846887fe283b93598942de332214cd2 EXPECTED_MAIN_SHA256=d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636 bash /workspace/library-files/english-corpus-topics-port-proof/run-observer.sh /workspace/library-files/english-corpus-topics-port-proof/green-v76-attempt1 /workspace/library-files/english-corpus-topics-v76-proof/snapshot /workspace/library-files/english-corpus-topics-port-proof/classes-attempt2 writer green",
+        "EXPECTED_SOURCE_HEAD=0219223a3846887fe283b93598942de332214cd2 EXPECTED_MAIN_SHA256=d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636 bash /workspace/library-files/english-corpus-topics-port-proof/run-observer.sh /workspace/library-files/english-corpus-topics-port-proof/green-v76-attempt1 /workspace/library-files/english-corpus-topics-v76-proof/snapshot /workspace/library-files/english-corpus-topics-port-proof/classes-attempt2 reopen green"
+      ]
+    }
+  ]
+}

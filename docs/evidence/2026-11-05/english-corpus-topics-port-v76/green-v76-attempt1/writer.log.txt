@@ -1,0 +1,7 @@
+Picked up JAVA_TOOL_OPTIONS: -Duser.home=/workspace/.trikeshed-cloud/home -Djavax.net.ssl.trustStore=/workspace/.trikeshed-cloud/trust/cacerts
+WARNING: A restricted method in java.lang.foreign.Linker has been called
+WARNING: java.lang.foreign.Linker::downcallHandle has been called by borg.trikeshed.userspace.LibcDowncall in an unnamed module (file:/workspace/library-files/english-corpus-topics-v76-proof/snapshot/main.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+{"result":"GREEN", "checks":{"aliasConfigMatchesCanonicalHttpRoute":true, "aliasNullOverridesAuthored":true, "canonicalNullWinsAlias":true, "invalidAliasesRefuse":true}}

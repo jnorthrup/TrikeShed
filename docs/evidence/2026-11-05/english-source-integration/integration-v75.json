@@ -1,0 +1,311 @@
+{
+  "kind": "english-combined-checkpoint/75",
+  "at": "2026-11-05T02:50:06.152204+00:00",
+  "testedSource": "9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3",
+  "build": {
+    "totals": {
+      "tests": 469,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "allJvmTestSourcesCompiled": true,
+    "allThreeBrowserBuilds": "PASS",
+    "failedBuildAttempts": [
+      {
+        "attempt": 1,
+        "source": "392f405ed2e86cce01d9cb82f828bb228c68fc73",
+        "result": "TEST_SOURCE_COMPILE_FAILURE",
+        "errors": [
+          "ProofGraphTest nested map closing bracket",
+          "EnglishTaxonomyWireTest typed map key cast",
+          "ReviewedTaxonomyWireTest duplicate local name"
+        ],
+        "productionAndAllThreeJs": "PASS",
+        "testsExecuted": false,
+        "log": "build-v75-attempt1.log",
+        "stalePriorXmlNotCounted": true
+      }
+    ]
+  },
+  "artifacts": {
+    "main.jar": "a15bee549a19af990aa57a34cccde775737633bb11418e116ace183c8dc2f867",
+    "documents.js": "0a113702e34733420087b52780d42f2ad0bed3a890b9b9fa5aacac609072822d",
+    "spacegraph.js": "2d8701a34a13623179d04e4f109fc851aecb96a22cf8b07647fbbbd232e6a18d",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "frozenRefCount": 665,
+  "sourceOrdinaryMerges": 3,
+  "behavior": "Documents per-proof inspection-only LCNC starters query complete reviewed English/KIF evidence through a bounded request-local QuadStore and existing SPARQL engine. Existing authenticated owner rechecks approval and source currentness after execution.",
+  "bounds": {
+    "sourceQuads": 20000,
+    "sourceChars": 4000000,
+    "serializedTermChars": 4096,
+    "visualBGPs": 8,
+    "hostReplyBytes": 1048576
+  },
+  "actualNative": {
+    "sourceBytes": 41,
+    "originalArchiveFiles": 7,
+    "canonicalRetainedArtifacts": 8,
+    "httpStatuses": [
+      {
+        "method": "POST",
+        "path": "/api/documents/english/retained",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/documents/review/session",
+        "status": 401
+      },
+      {
+        "method": "GET",
+        "path": "/api/documents/review/session",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/english-taxonomy-candidates",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/english-taxonomy",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/snapshot",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 409
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/decision",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 401
+      },
+      {
+        "method": "GET",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 405
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 400
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 413
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 409
+      }
+    ],
+    "sourceProfileLimits": {
+      "maxAssertions": 256,
+      "maxTotalChars": 1048576,
+      "maxSteps": 10000,
+      "maxProofs": 128
+    },
+    "queryCases": [
+      {
+        "status": "SUPPORTED",
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "planSources": 2,
+        "displayedSources": 2,
+        "premiseCounts": [
+          2
+        ]
+      },
+      {
+        "status": "UNKNOWN",
+        "goal": {
+          "predicate": "subclass",
+          "subject": "urn:legal:Agent",
+          "object": "urn:legal:Person"
+        },
+        "planSources": 2,
+        "displayedSources": 2,
+        "premiseCounts": []
+      },
+      {
+        "status": "SUPPORTED",
+        "goal": {
+          "predicate": "subclass",
+          "subject": "urn:legal:Person",
+          "object": "urn:legal:Person"
+        },
+        "planSources": 2,
+        "displayedSources": 2,
+        "premiseCounts": [
+          1,
+          1
+        ]
+      }
+    ],
+    "evidenceQueries": [
+      {
+        "label": "kif-six-pattern",
+        "english": false,
+        "patterns": 6,
+        "rows": 2,
+        "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "checkedAsOf": 123,
+        "quadsHostDescriptor": 107
+      },
+      {
+        "label": "english-kif-eight-pattern",
+        "english": true,
+        "patterns": 8,
+        "rows": 2,
+        "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "checkedAsOf": 123,
+        "quadsHostDescriptor": 107
+      },
+      {
+        "label": "restored-before-source-amendment",
+        "english": true,
+        "patterns": 8,
+        "rows": 2,
+        "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "checkedAsOf": 123,
+        "quadsHostDescriptor": 107
+      }
+    ],
+    "directQueryRefusals": [
+      {
+        "label": "missing-host-auth",
+        "status": 401,
+        "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result"
+      },
+      {
+        "label": "wrong-host-method",
+        "status": 405,
+        "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result"
+      },
+      {
+        "label": "forged-noninspection-program",
+        "status": 400,
+        "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result"
+      },
+      {
+        "label": "forged-nine-pattern-program",
+        "status": 413,
+        "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result"
+      }
+    ],
+    "queryStateChecks": 8,
+    "typedRowFocusActions": 6,
+    "globalQuadStoreScope": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+    "sourceFocusActions": 4,
+    "readonlyWalCaptures": 7,
+    "writerPid": "106034",
+    "readerPid": "106400",
+    "wal": {
+      "bytes": 194,
+      "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545"
+    },
+    "casPack": {
+      "bytes": 20863,
+      "sha256": "527e09acb596815273312c92a19a85ea8ef7716743fc31c3e8efafeb58773b35"
+    },
+    "currentSourceBefore": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+      "seq": 0,
+      "length": 41,
+      "contentType": "text/plain"
+    },
+    "currentSourceAfter": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db",
+      "rev": "2-sha256:70e5198c7aa3a7476b914822feb6d4282bacd9136cc484fd9fe5ba25d1ef4f41",
+      "seq": 1,
+      "length": 80,
+      "contentType": "text/plain"
+    },
+    "historicalInspectionCurrentAfterAmendment": false,
+    "staleSourceCurrentText": "Snapshot: sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3 \u00b7 revision 2 \u00b7 source current: unconfirmed",
+    "pinnedClasspathJars": 120,
+    "dependencyHashesVerified": 119
+  },
+  "rootPublicAudit": {
+    "result": "PASS",
+    "verifiedPublicFiles": 12,
+    "manifestSha256": "76ab77c411ff76ed52f6595125f58462bb5f3e2cfe54525b5bc87424c7efdf6a",
+    "archiveSha256": "1ab2879afd0180c1195970c5c5060786eea19411de5e8d14db0409c003b94bed",
+    "archiveBytes": 1185440,
+    "safelyExtractedRegularMembers": 67,
+    "safeDirectoryEntries": 1,
+    "independentAuditResultSha256": "a4775ccca30d528a5431902d1e78db74c3a31e6234d1f7fb8b986314bf5b5428",
+    "mutatedCopyRefusals": 26,
+    "sourceHead": "9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3",
+    "scriptSha256": "6594c0776046f8f927dda7196444b90deff8e95e5798f024d566e6bb7e8b39f5"
+  },
+  "publicEvidence": "docs/airgap/evidence/reviewed-proof-query-v75-20261105",
+  "limits": [
+    "Positive ground taxonomy paths use explicit reviewed translation assumptions; this is not English/legal entailment or a new NARS inference engine.",
+    "Synthetic reviewer; fixture-controlled checkedAsOf=123; actual retained CoreNLP receipt reused with empty SDK and no fresh parser/model call.",
+    "Physical engine metadata remains raw/not-established, distinct from authenticated host review provenance; request-local graph is not persisted or assumed CAS-fetchable.",
+    "The 107-quad descriptor is host reported, not independently reprojected by the recorded-data audit.",
+    "Actual direct401/405/400/413 tests do not establish all native controller-error paths or every size bound.",
+    "Clean-close reopen is not crash recovery. This v75 proof does not itself establish OS containment; concurrently preserved R4a is a separate, narrower packaged document/native-LCNC checkpoint."
+  ],
+  "publication": "PENDING final all-ref D3M; source-specific proof is not relabeled to the later LDA artifact."
+}

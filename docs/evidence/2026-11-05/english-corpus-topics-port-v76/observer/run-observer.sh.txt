@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+export PROOF_ROOT=${1:?fresh prepared archive case required}
+export PROOF_SNAPSHOT=${2:?immutable snapshot required}
+export PROOF_OBSERVER_CLASSES=${3:?observer class directory required}
+export PROOF_STAGE=${4:?writer or reopen required}
+export PROOF_EXPECT=${5:?red or green required}
+: "${EXPECTED_SOURCE_HEAD:?pinned source required}"
+: "${EXPECTED_MAIN_SHA256:?pinned main JAR hash required}"
+export EXPECTED_SOURCE_HEAD EXPECTED_MAIN_SHA256
+corpus_cp=$(cat "$PROOF_SNAPSHOT/classpath.txt")
+timeout 120s java -Xmx768m -cp "$PROOF_OBSERVER_CLASSES:$corpus_cp" proof.englishcorpusport.ObserverKt

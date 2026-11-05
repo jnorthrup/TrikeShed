@@ -1,0 +1,65 @@
+{
+  "kind": "english-combined-checkpoint/76",
+  "at": "2026-11-05T02:50:06.152549+00:00",
+  "testedSource": "0219223a3846887fe283b93598942de332214cd2",
+  "sourceRefFreeze": {
+    "refs": 669,
+    "ordinaryMerges": 2,
+    "allContained": true
+  },
+  "concurrentMasterPreserved": "d563bd6fc9ebfb51a1744406f4542f8c5ff3dee8",
+  "productionDiffFromV75": [
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/EnglishCorpusWire.kt: honor topics? after canonical presence and before authored fallback"
+  ],
+  "build": {
+    "totals": {
+      "tests": 470,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "allJvmTestSourcesCompiled": true,
+    "allThreeBrowserBuilds": "PASS"
+  },
+  "artifacts": {
+    "main.jar": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+    "documents.js": "0a113702e34733420087b52780d42f2ad0bed3a890b9b9fa5aacac609072822d",
+    "spacegraph.js": "2d8701a34a13623179d04e4f109fc851aecb96a22cf8b07647fbbbd232e6a18d",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "ldaPort": {
+    "result": "PASS",
+    "scope": "Actual recorded program/response/CAS joins; canonical POST handler runs in process, no socket HTTP or fresh parser claim.",
+    "oldSource": "9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3",
+    "newSource": "0219223a3846887fe283b93598942de332214cd2",
+    "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+    "sourceCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "topicCid": "sha256:974a6278d9a14b49fec408f23fe5f5b57f8186fbe88af0f64cff17208e034090",
+    "corpusReceiptCid": "sha256:df26801c501f8a21c35ee726cda2669cfd995bf72236dc8acccd374cd9f76fbb",
+    "actualAliasBugReproduced": true,
+    "actualNewAliasConfigurationAndNullPrecedence": true,
+    "oldInvalidAliasesIgnored": 3,
+    "newInvalidAliasesRefused": 3,
+    "hashVerifiedCasObjectsPerReopen": 7,
+    "originalSourceStoredAs": "one verified PackREF to retained original source path; not a self-contained pack export",
+    "sourceBytes": 41
+  },
+  "publicEvidence": "docs/evidence/2026-11-05/english-corpus-topics-port-v76",
+  "publicFiles": 33,
+  "publicManifestSha256": "ddcbaf4fe1f7427f68de7496d0f539d5f443756b7f9aebe2b7f7092a741a4514",
+  "v75QueryWorkflow": "Separate immutable9a4/a15/Docs0a113 checkpoint; all469 cases also pass in this470-case source. Browser artifacts are unchanged between v75/v76.",
+  "concurrentR4a": "Preserved packaged Linux PDF/native5-nodeLCNC/Spacegraph and graceful inspector evidence. Read-only review verified455 public hashes+27CAS objects; large runtime/source tarballs and application ZIP unavailable locally, no sealed-runtime rerun. Documents/English/review/CurationReview and fresh parser/model closure remain separate composition work.",
+  "limits": [
+    "LDA, TF/wordclouds and retrieval are descriptive; no label accuracy/comprehension/evidence confidence is inferred.",
+    "Canonical comparison uses the real in-process POST route handler; this is not a socket HTTP or browser proof.",
+    "Same genuine retained CoreNLP receipt reused; no fresh parser execution or model call in this LDA proof.",
+    "One original source object is a verified PackREF with an external retained path; this pack is not a self-contained portable export.",
+    "The final Java artifact differs from v75 only in the topic-input production lookup; v75 native screenshots remain pinned to their actual earlier artifact."
+  ],
+  "activeNextSlices": [
+    "Use genuine observed CoreNLP guard attachments and full copy-aware spans before extending legal candidate structure; zero observed copied vertices is not copy coverage.",
+    "Connect genuine retained atomic implication candidates to existing bounded NAL deduction/induction primitives, retaining source/context identities and separating weak induction from supported derivations.",
+    "Compose existing sealed runtime bootstrap with Documents, English/review owners and explicit context/session/tool boundaries."
+  ],
+  "publication": "PENDING final all-ref D3M"
+}
