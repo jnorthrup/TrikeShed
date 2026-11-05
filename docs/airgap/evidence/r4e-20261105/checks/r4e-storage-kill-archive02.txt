@@ -1,0 +1,43 @@
+{
+  "fault": "kill",
+  "error": null,
+  "driverExit": 0,
+  "injection": {
+    "javaPid": 100110,
+    "tracerPid": 100312,
+    "allObservedThreadsAttached": true,
+    "threadsAtAttach": 33,
+    "fault": "kill"
+  },
+  "processes": [
+    {
+      "mode": "run",
+      "hostPid": 100108,
+      "startedMonotonic": 46690.936585657,
+      "resourceEvidence": "state/run-status.txt; state-before-crash.json processCpuNanos",
+      "readySeconds": 3.6520013350018417,
+      "boot": "77addc25-00ea-4843-94ef-8c9f5fdaa4d2",
+      "exit": 137,
+      "elapsedSeconds": 10.70024363900302,
+      "expectedCrash": true,
+      "javaReaped": true,
+      "cleanupRan": false,
+      "signal": "SIGKILL",
+      "point": "Final receipt WAL fsync after complete frame write"
+    },
+    {
+      "mode": "inspect",
+      "hostPid": 100317,
+      "startedMonotonic": 46701.637104506,
+      "resourceEvidence": "state/inspect-status.txt; state/state-inspect.json processCpuNanos",
+      "readySeconds": 2.4831186800001888,
+      "boot": "88f596d0-976e-45b9-9f3b-19dee55bc166",
+      "finishRequest": {
+        "status": 200,
+        "body": "{\"finished\":true}"
+      },
+      "exit": 0,
+      "elapsedSeconds": 7.151002405997133
+    }
+  ]
+}

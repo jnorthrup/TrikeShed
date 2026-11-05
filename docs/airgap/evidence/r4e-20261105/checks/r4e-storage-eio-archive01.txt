@@ -1,0 +1,45 @@
+{
+  "fault": "eio",
+  "error": null,
+  "driverExit": 0,
+  "injection": {
+    "javaPid": 95041,
+    "tracerPid": 95243,
+    "allObservedThreadsAttached": true,
+    "threadsAtAttach": 34,
+    "fault": "eio"
+  },
+  "processes": [
+    {
+      "mode": "run",
+      "hostPid": 95039,
+      "startedMonotonic": 45671.013293595,
+      "resourceEvidence": "state/run-status.txt; state-before-crash.json processCpuNanos",
+      "readySeconds": 3.241440812998917,
+      "boot": "eb948ab1-bb92-40eb-a301-f567e8c26f80",
+      "finishRequest": {
+        "status": 200,
+        "body": "{\"finished\":true}"
+      },
+      "exit": 1,
+      "elapsedSeconds": 8.80900781499804,
+      "expectedFailure": true,
+      "shutdownErrorPropagated": true,
+      "cleanupReportAvailable": false
+    },
+    {
+      "mode": "inspect",
+      "hostPid": 95251,
+      "startedMonotonic": 45679.82259108,
+      "resourceEvidence": "state/inspect-status.txt; state/state-inspect.json processCpuNanos",
+      "readySeconds": 2.0464237310006865,
+      "boot": "a46c47ce-8fb8-40dc-8dcd-d7f656802b9b",
+      "finishRequest": {
+        "status": 200,
+        "body": "{\"finished\":true}"
+      },
+      "exit": 0,
+      "elapsedSeconds": 5.82577961700008
+    }
+  ]
+}

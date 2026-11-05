@@ -1,0 +1,7 @@
+{
+  "path": "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt",
+  "base": "Multiple merge bases produced a virtual base containing prior resolution alternatives; all index stages retained.",
+  "sharedIntent": "Encoded String input must preserve byte geometry; structured inputs must use jsonOf.",
+  "resolution": "Equivalent string-preservation and structured-JSON branches combined: source identifier, cast/fallback expression, and geometry validation comment. Retain all guard, corpus and palette-fit changes; no side preference.",
+  "mergeCommit": "b06bbcc0a3bb4b996bb737ad96c5759f9d7511f2"
+}

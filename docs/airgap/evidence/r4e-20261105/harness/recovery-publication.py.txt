@@ -1,0 +1,51 @@
+from pathlib import Path
+import subprocess,json,hashlib,shutil,sys,time,urllib.request,struct,os
+h=Path('/workspace/airgap-r4e-proof');base=h/'storage-kill-archive02';out=h/sys.argv[1];out.mkdir();command=json.loads((base/'processes.json').read_text())['processes'][-1]['command'];original=(base/'state/runtime/.kanban/board.wal').read_bytes();browser=json.loads((base/'browser.json').read_text());completed=browser['recovered'];running=browser['running'];assert len(original)==417
+network={'namespace':os.readlink('/proc/self/ns/net'),'routes':json.loads(subprocess.check_output(['ip','-j','route']))};assert not network['routes'];(out/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+http=urllib.request.build_opener(urllib.request.ProxyHandler({}));url='http://127.0.0.1:18764';results=[]
+def sha(b):return hashlib.sha256(b).hexdigest()
+def inventory(root):return {p.relative_to(root).as_posix():sha(p.read_bytes()) for p in sorted(root.rglob('*')) if p.is_file()}
+def decode(data):
+ rows=[];i=0
+ while i<len(data):
+  assert i+18<=len(data);magic,version,sequence,size=struct.unpack_from('>4sHQI',data,i);assert magic==b'WAL1' and version==1;end=i+18+size;assert end+4<=len(data);crc=0xffffffff
+  for b in data[i:end]:
+   crc^=b
+   for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+  assert crc^0xffffffff==struct.unpack_from('>I',data,end)[0];job,cid=data[i+18:end].decode().rsplit('\t',1);rows.append({'sequence':sequence,'job':job,'cid':cid,'offset':i});i=end+4
+ return rows
+frames=decode(original);assert len(frames)==3;start=frames[-1]['offset'];assert start==278
+for name in ['short-header','short-payload','complete-crc-corruption','missing-payload','changed-payload']:
+ a=out/name;a.mkdir();state=a/'state';state.mkdir();shutil.copytree(base/'state/runtime',state/'runtime');wal=state/'runtime/.kanban/board.wal';(a/'wal-original.bin').write_bytes(original);expect=None
+ if name=='short-header':wal.write_bytes(original[:start+9])
+ elif name=='short-payload':wal.write_bytes(original[:start+18+30])
+ elif name=='complete-crc-corruption':wal.write_bytes(original[:-1]+bytes([original[-1]^1]));expect='Board WAL checksum mismatch'
+ else:
+  digest=frames[-1]['cid'].removeprefix('sha256:');p=state/'runtime/cas/sha256'/digest[0]/digest[1]/digest[2]/digest[3]/digest[4:];assert sha(p.read_bytes())==digest
+  (a/'payload-original.bin').write_bytes(p.read_bytes())
+  if name=='missing-payload':p.unlink();expect='Missing board WAL payload'
+  else:p.write_bytes(p.read_bytes()+b' ');expect='digest mismatch: stored blob does not match CID'
+ (a/'wal-before.bin').write_bytes(wal.read_bytes());before=inventory(state/'runtime');cmd=command.copy();cmd[cmd.index('--bind')+1]=str(state);cmd[cmd.index('--hostname')+1]='airgap-r4e-recovery';log=(a/'process.txt').open('w');proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT);ready=None;error=None;finishReply=None
+ try:
+  deadline=time.monotonic()+45
+  while proc.poll() is None and time.monotonic()<deadline:
+   try:
+    with http.open(url+'/__proof/state',timeout=1) as response:ready=json.load(response)
+    break
+   except OSError:time.sleep(.1)
+  if expect:
+   assert ready is None,'Corrupt state reached HTTP admission';proc.wait(timeout=15);assert proc.returncode!=0;assert expect in (a/'process.txt').read_text();assert before==inventory(state/'runtime'),'Refusal changed runtime bytes'
+  else:
+   assert ready is not None;assert ready['mode']=='inspect' and not ready['minerInstalled'] and not ready['llvmInstalled'];assert len(ready['runs'])==1;row=next(iter(ready['runs'].values()));assert row['runId']==completed['runId'] and row['programCid']==completed['programCid'];assert row['status']=='interrupted' and row['error']=='runtime_restarted' and row['ok']==False and row['previousReceiptCid']==running['receiptCid'];assert 'outputs' not in row and 'invocationsCid' not in row
+   (a/'ready.json').write_text(json.dumps(ready,indent=2)+'\n')
+   try:
+    with http.open(urllib.request.Request(url+'/__proof/finish',data=b'',method='POST'),timeout=3) as response:finishReply={'status':response.status,'body':response.read().decode()}
+   except OSError as e:finishReply={'transportError':repr(e)}
+   proc.wait(timeout=20);assert proc.returncode==0;assert all(json.loads((state/'cleanup-inspect.json').read_text()).values());after=wal.read_bytes();assert after[:start]==original[:start];rows=decode(after);assert len(rows)==3 and [r['sequence'] for r in rows]==[1,2,3] and rows[-1]['cid']==row['receiptCid'] and rows[-1]['cid']!=frames[-1]['cid']
+   digest=frames[-1]['cid'].removeprefix('sha256:');p=state/'runtime/cas/sha256'/digest[0]/digest[1]/digest[2]/digest[3]/digest[4:];assert sha(p.read_bytes())==digest,'Unreferenced completed command was discarded'
+ except BaseException as e:error=repr(e)
+ finally:
+  if proc.poll() is None:proc.terminate();proc.wait(timeout=10)
+  log.close();(a/'wal-after.bin').write_bytes(wal.read_bytes());record={'case':name,'exit':proc.returncode,'command':cmd,'expectedRefusal':expect,'reachedAdmission':ready is not None,'finishRequest':finishReply,'error':error,'beforeRuntimeSha256':before,'afterRuntimeSha256':inventory(state/'runtime'),'result':'PASS' if error is None else 'FAIL'};(a/'result.json').write_text(json.dumps(record,indent=2)+'\n');results.append({k:v for k,v in record.items() if k not in ['command','beforeRuntimeSha256','afterRuntimeSha256']});(out/'results.json').write_text(json.dumps(results,indent=2)+'\n')
+ assert error is None,(name,error)
+ print(name,'PASS',flush=True)

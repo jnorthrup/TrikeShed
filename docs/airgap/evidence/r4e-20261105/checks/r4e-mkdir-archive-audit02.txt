@@ -1,0 +1,7 @@
+{
+  "newCasShardDirectories": 91,
+  "parentsSyncedBeforeDescendantPublication": 91,
+  "missingParentSyncs": 0,
+  "kernelRingSetupObserved": true,
+  "scope": "Observed syscall order in a completed packaged traversal; no power-loss or vendor filesystem guarantee"
+}

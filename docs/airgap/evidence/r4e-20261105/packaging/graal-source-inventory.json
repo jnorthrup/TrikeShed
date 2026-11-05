@@ -1,0 +1,17 @@
+{
+  "sources": [
+    {
+      "file": "labs-openjdk-f471c3eca821.tar.gz",
+      "url": "https://codeload.github.com/graalvm/labs-openjdk/tar.gz/f471c3eca821",
+      "bytes": 119713368,
+      "sha256": "115242fe84e1ab0903a9037b91d606fca158c69b36a66ca097563db20a235f3f"
+    },
+    {
+      "file": "graal-7b025988a922a73286d1326e1eddc1ca39d3f569.tar.gz",
+      "url": "https://codeload.github.com/oracle/graal/tar.gz/7b025988a922a73286d1326e1eddc1ca39d3f569",
+      "bytes": 51557964,
+      "sha256": "7bff4672bf430a4538317fc22bb0a9c8cc8d19da4b55dd49f7b2a721b8ba5174"
+    }
+  ],
+  "limit": "SOURCE metadata marks the JDK checkout with +; no assertion that upstream archives reconstruct all vendor build modifications."
+}

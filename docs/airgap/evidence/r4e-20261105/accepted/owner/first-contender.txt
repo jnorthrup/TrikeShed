@@ -1,0 +1,1 @@
+LEASE_REFUSED: java.lang.IllegalStateException: Filesystem lease is already held: /state/runtime/.kanban/board.wal.lock

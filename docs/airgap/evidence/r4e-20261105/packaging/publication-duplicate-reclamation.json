@@ -1,0 +1,12 @@
+{
+  "removedScratch": {
+    "file": "/workspace/airgap-r4e-proof/reproducibility-second.tar.gz",
+    "bytes": 460613917,
+    "sha256": "c95a4bb318f2f89eb88a2bb2179604483d531e30b30e2c534dd84e6a06c8f254"
+  },
+  "retainedPrimary": {
+    "file": "/workspace/library-files/airgap-document-r4e-linux-x64-2026-11-05.tar.gz",
+    "bytes": 460613917,
+    "sha256": "c95a4bb318f2f89eb88a2bb2179604483d531e30b30e2c534dd84e6a06c8f254"
+  }
+}

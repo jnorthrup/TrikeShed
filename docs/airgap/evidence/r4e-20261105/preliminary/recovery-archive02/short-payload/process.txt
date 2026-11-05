@@ -1,0 +1,15 @@
+Replayed 0 nodes into CausalGraphNodeIndex
+multicast join failed: No multicast-capable interface found
+multicast joined: 0 groups
+trikeshed-kanban: listening on :18764  donor=<none>
+Endpoints (CCEK): GET / (Forge PWA) /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor /api/invoke
+[BIND] accepted conn=1
+[BIND] conn=1 frame complete proto=Http bytes=132 seq-alloc
+[BIND] conn=1 accept ok=true
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/opt/trikeshed/lib/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[BIND] accepted conn=2
+[BIND] conn=2 frame complete proto=Http bytes=202 seq-alloc
+[BIND] conn=2 accept ok=true

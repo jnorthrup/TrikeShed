@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4e-proof/package.py", line 26, in <module>
+    for name,sha in expected.items():assert digest(root/name)==sha,'Release manifest digest differs: '+name
+                                            ^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Release manifest digest differs: package-identity.json

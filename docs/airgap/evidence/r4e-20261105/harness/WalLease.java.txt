@@ -1,0 +1,16 @@
+import borg.trikeshed.kanban.BoardFileWal;
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations;
+import java.util.Locale;
+public class WalLease {
+    public static void main(String[] args) {
+        try {
+            var wal = new BoardFileWal(new JvmFileOperations(), args[0]);
+            wal.close();
+            System.out.println("WAL_OPENED_AND_CLOSED");
+        } catch (IllegalStateException failure) {
+            if (!String.valueOf(failure.getMessage()).toLowerCase(Locale.ROOT).contains("lease")) throw failure;
+            System.out.println("LEASE_REFUSED: " + failure.getClass().getName() + ": " + failure.getMessage());
+            System.exit(42);
+        }
+    }
+}

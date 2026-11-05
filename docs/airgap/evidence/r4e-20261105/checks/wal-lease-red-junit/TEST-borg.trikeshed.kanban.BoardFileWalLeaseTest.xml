@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="BoardFileWalLeaseTest[jvm]" tests="4" skipped="0" failures="2" errors="0" timestamp="2026-11-05T04:56:06.539Z" hostname="0d6dfba25614" time="0.299">
+  <properties/>
+  <testcase name="directoryAliasesShareOwnershipWhileDistinctDirectoriesRemainIndependent()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.241">
+    <failure message="org.opentest4j.AssertionFailedError: Expected an exception to be thrown, but was completed successfully." type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: Expected an exception to be thrown, but was completed successfully.
+	at org.junit.jupiter.api.AssertionUtils.fail(AssertionUtils.java:38)
+	at org.junit.jupiter.api.Assertions.fail(Assertions.java:138)
+	at kotlin.test.junit5.JUnit5Asserter.fail(JUnitSupport.kt:56)
+	at kotlin.test.AssertionsKt__AssertionsKt.checkResultIsFailure(Assertions.kt:1431)
+	at kotlin.test.AssertionsKt.checkResultIsFailure(Unknown Source)
+	at borg.trikeshed.kanban.BoardFileWalLeaseTest.directoryAliasesShareOwnershipWhileDistinctDirectoriesRemainIndependent(BoardFileWalLeaseTest.kt:75)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="corruptFrameRefusalReleasesTheLeaseWithoutChangingTheWal()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.021"/>
+  <testcase name="channelOpenFailureReleasesTheLease()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.009"/>
+  <testcase name="anotherOwnerCannotRecoverOrOverwriteTheActiveWal()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.015">
+    <failure message="org.opentest4j.AssertionFailedError: Expected an exception to be thrown, but was completed successfully." type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: Expected an exception to be thrown, but was completed successfully.
+	at org.junit.jupiter.api.AssertionUtils.fail(AssertionUtils.java:38)
+	at org.junit.jupiter.api.Assertions.fail(Assertions.java:138)
+	at kotlin.test.junit5.JUnit5Asserter.fail(JUnitSupport.kt:56)
+	at kotlin.test.AssertionsKt__AssertionsKt.checkResultIsFailure(Assertions.kt:1431)
+	at kotlin.test.AssertionsKt.checkResultIsFailure(Unknown Source)
+	at borg.trikeshed.kanban.BoardFileWalLeaseTest.anotherOwnerCannotRecoverOrOverwriteTheActiveWal(BoardFileWalLeaseTest.kt:23)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

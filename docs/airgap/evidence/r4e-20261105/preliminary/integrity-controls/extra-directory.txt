@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4e-proof/package.py", line 29, in <module>
+    assert directories()==record['directories'],'Package directory membership or mode differs'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Package directory membership or mode differs

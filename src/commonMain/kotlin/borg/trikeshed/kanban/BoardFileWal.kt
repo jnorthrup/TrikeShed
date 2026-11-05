@@ -6,6 +6,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.file.spi.FileLease
 import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 
 /** Legacy WAL1 frames over positional userspace I/O; the board element owns serialization and batches. */
@@ -13,11 +14,12 @@ class BoardFileWal internal constructor(
     private val channel: FileChannel,
     override val durability: StorageDurability,
     private val syncParent: () -> Unit,
+    private val lease: FileLease? = null,
 ) : BoardWalPort {
     constructor(files: FileOperations, directory: String) : this(open(files, directory), files.durability)
 
-    private constructor(opened: Join<FileChannel, () -> Unit>, durability: StorageDurability) :
-        this(opened.a, durability, opened.b)
+    private constructor(opened: Join<FileChannel, Join<() -> Unit, FileLease>>, durability: StorageDurability) :
+        this(opened.a, durability, opened.b.a, opened.b.b)
 
     private var end = 0L
     private var sequence = 0L
@@ -27,7 +29,7 @@ class BoardFileWal internal constructor(
     companion object {
         private const val MAX_PAYLOAD = 10 * 1024 * 1024
 
-        private fun open(files: FileOperations, directory: String): Join<FileChannel, () -> Unit> {
+        private fun open(files: FileOperations, directory: String): Join<FileChannel, Join<() -> Unit, FileLease>> {
             val path = files.canonicalPath(files.resolvePath(directory))
             val created = mutableListOf<String>()
             if (files.durability == StorageDurability.DURABLE) {
@@ -42,10 +44,18 @@ class BoardFileWal internal constructor(
             }
             files.mkdirs(path)
             for (entry in created.asReversed()) syncDirectory(files.resolvePath(entry, ".."))
-            val channel = FileChannel.open(files.resolvePath(path, "board.wal"),
-                StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
-            val syncParent: () -> Unit = { syncDirectory(path) }
-            return channel j syncParent
+            // A separate stable inode avoids releasing a POSIX record lock when the WAL
+            // descriptor closes. Never remove the lease file while owners may open it.
+            val lease = files.acquireExclusiveLease(files.resolvePath(path, "board.wal.lock"))
+            try {
+                val channel = FileChannel.open(files.resolvePath(path, "board.wal"),
+                    StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE)
+                val syncParent: () -> Unit = { syncDirectory(path) }
+                return channel j (syncParent j lease)
+            } catch (caught: Throwable) {
+                try { lease.close() } catch (cleanup: Throwable) { if (cleanup !== caught) caught.addSuppressed(cleanup) }
+                throw caught
+            }
         }
 
         private fun syncDirectory(path: String) = FileChannel.open(path, StandardOpenOption.READ).use { it.force(true) }
@@ -65,7 +75,7 @@ class BoardFileWal internal constructor(
             channel.force(true)
             syncParent()
         } catch (caught: Throwable) {
-            try { channel.close() } catch (cleanup: Throwable) { if (cleanup !== caught) caught.addSuppressed(cleanup) }
+            try { close() } catch (cleanup: Throwable) { if (cleanup !== caught) caught.addSuppressed(cleanup) }
             throw caught
         }
     }
@@ -109,7 +119,12 @@ class BoardFileWal internal constructor(
     override fun close() {
         if (closed) return
         closed = true
-        channel.close()
+        val channelFailure = runCatching { channel.close() }.exceptionOrNull()
+        try { lease?.close() } catch (cleanup: Throwable) {
+            if (channelFailure == null) throw cleanup
+            if (cleanup !== channelFailure) channelFailure.addSuppressed(cleanup)
+        }
+        channelFailure?.let { throw it }
     }
 
     /** Only a short final header/payload is recoverable; a complete corrupt frame is an error. */

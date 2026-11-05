@@ -1,0 +1,13 @@
+{
+  "counts": {
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "sourceSha256": {
+    "src/commonMain/kotlin/borg/trikeshed/kanban/BoardFileWal.kt": "12d8c99dbe122e700d1c74274fbca74267fbbf3011d183cb8270c8b23a6c0db2",
+    "src/jvmTest/kotlin/borg/trikeshed/kanban/BoardFileWalLeaseTest.kt": "c912fad9f18f251ded5dd5387ac57f7ae7398037ab80bbcbec0d7919b2c5d59e"
+  },
+  "standing": "Focused red/green against real filesystem owners; combined-source and packaged multi-process checks still required"
+}
