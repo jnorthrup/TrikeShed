@@ -1,0 +1,37 @@
+{
+  "reason": "Only redundant generated patch staging files removed after byte-for-byte archive verification. All archives, identities and source manifests retained.",
+  "files": [
+    {
+      "path": "/workspace/airgap-r3e-proof/source-final-update/trikeshed.patch",
+      "bytes": 61065296,
+      "sha256": "5d862bda516cf87ce3cb0f1aad3a39817fd9a059238c24e3dffd6c074c3262ce",
+      "archive": "/workspace/library-files/airgap-document-r3e-sources-update-2026-11-05.tar.gz",
+      "archiveSha256": "38f09655a32e0a43ccade56a8553f32d2f32caaf15f93f96dc8fbc893eea9105",
+      "member": "airgap-document-source-update/trikeshed.patch"
+    },
+    {
+      "path": "/workspace/airgap-r3e-proof/final-source-update/trikeshed.patch",
+      "bytes": 61065310,
+      "sha256": "648d35e6376c0890f8108295fd43ca272388577df0238c967c4f4922221f69d5",
+      "archive": "/workspace/library-files/airgap-document-r3e-final-sources-update-2026-11-05.tar.gz",
+      "archiveSha256": "bcef7f2000025f3e2a807bb0536ea84c19d6e48180d2e55fc8dc0568d3cfac75",
+      "member": "airgap-document-source-update/trikeshed.patch"
+    },
+    {
+      "path": "/workspace/airgap-r3d-proof/source-final-update/trikeshed.patch",
+      "bytes": 21095629,
+      "sha256": "fc6d1917d9b2ce6226d2ecb2c7cb759b3adc758f88d3ec89f666f27c93fa6de4",
+      "archive": "/workspace/library-files/airgap-document-r3d-final-sources-update-2026-11-05.tar.gz",
+      "archiveSha256": "a57105c0fbf9fea0f2d9b3a0bfbc566eeeaf531df75d52b7e1ef543c566ce1c6",
+      "member": "airgap-document-source-update/trikeshed.patch"
+    },
+    {
+      "path": "/workspace/airgap-r3d-proof/source-update/trikeshed.patch",
+      "bytes": 21095407,
+      "sha256": "1d8f536bac2353ac6712e25500e36b0a10f7f18f54222aecc8ea0e6e658968e4",
+      "archive": "/workspace/library-files/airgap-document-r3d-sources-update-2026-11-05.tar.gz",
+      "archiveSha256": "a8f428acd3623478c46a0562fc321afdc039a1c4662fbf10b42385cb1c421905",
+      "member": "airgap-document-source-update/trikeshed.patch"
+    }
+  ]
+}

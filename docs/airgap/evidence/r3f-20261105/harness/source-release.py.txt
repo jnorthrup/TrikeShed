@@ -1,0 +1,30 @@
+from pathlib import Path
+import subprocess,json,hashlib,os,tarfile,gzip
+h=Path('/workspace/airgap-r3f-proof');repo=Path('/workspace/TrikeShed');out=h/'release-source-update';out.mkdir();base='5fdd0472c115922287ba46a4977cb1134aa9017a'
+def git(*args,env=None):return subprocess.check_output(['git',*args],cwd=repo,env=env).strip()
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+head=git('rev-parse','HEAD').decode();tree=git('rev-parse',head+'^{tree}').decode();patch=out/'trikeshed.patch'
+with patch.open('wb') as f:subprocess.run(['git','diff','--binary','--full-index',base,head],cwd=repo,stdout=f,check=True)
+env=os.environ.copy();env['GIT_INDEX_FILE']=str(h/'release-source-update.index');git('read-tree',base,env=env);git('apply','--cached','--binary',str(patch),env=env);assert git('write-tree',env=env).decode()==tree
+bases=[{'file':'airgap-document-r4e-sources-2026-11-05.tar.gz','sha256':'a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61'},{'file':'airgap-document-r4f-sources-update-2026-11-05.tar.gz','sha256':'57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f'}]
+bases.append({'file':'airgap-document-r3c-final-sources-update-2026-11-05.tar.gz','sha256':'dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f'})
+bases.append({'file':'airgap-document-r3d-final-sources-update-2026-11-05.tar.gz','sha256':'a57105c0fbf9fea0f2d9b3a0bfbc566eeeaf531df75d52b7e1ef543c566ce1c6'})
+bases.append({'file':'airgap-document-r3e-final-sources-update-2026-11-05.tar.gz','sha256':'bcef7f2000025f3e2a807bb0536ea84c19d6e48180d2e55fc8dc0568d3cfac75'})
+for r in bases:assert sha(Path('/workspace/library-files')/r['file'])==r['sha256']
+record={'baseSourceCommit':base,'targetSourceCommit':head,'targetTree':tree,'requiredSourceChain':bases,'patchSha256':sha(patch),'verifiedAppliedTreeMatches':True,'dependencyChanges':[],'scope':'Apply after the R3e final source update, following R3d final, R3c final and R4f on the R4e source base. Do not separately apply the R3e strict-row validation supplement; its assertions are already included here. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.'}
+(out/'source-update.json').write_text(json.dumps(record,indent=2)+'\n');(out/'README.md').write_text("""# R3f source update
+
+Apply the exact source archives named and hashed in source-update.json: R4e source base, R4f update, R3c final update, R3d final update, R3e final update. This yields 5fdd0472c115922287ba46a4977cb1134aa9017a. Do not separately apply the R3e strict-row validation supplement; its added assertions are included in this full patch.
+
+Apply trikeshed.patch with git apply --binary. The temporary index verifies the exact target tree, including the R3e publication evidence, later strict-row assertions, and R3f page-owned wire editing and verified aggregate output projection. The runtime overlay changes only the web jar and manifests; JVM, dependency and native bytes remain identical to the R3e installation. Later R3f publication evidence is supplied separately. Full vendor/native source rebuild closure remains open.
+""")
+(out/'SHA256.json').write_text(json.dumps({p.name:sha(p) for p in out.iterdir() if p.is_file()},indent=2)+'\n')
+dest=Path('/workspace/library-files/airgap-document-r3f-release-sources-update-2026-11-05.tar.gz');assert not dest.exists()
+with dest.open('wb') as raw,gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0,compresslevel=6) as gz,tarfile.open(fileobj=gz,mode='w|',format=tarfile.PAX_FORMAT) as tar:
+ for p in sorted(out.iterdir()):
+  info=tar.gettarinfo(str(p),arcname='airgap-document-source-update/'+p.name);info.uid=info.gid=0;info.uname=info.gname='';info.mtime=0;info.pax_headers={}
+  with p.open('rb') as f:tar.addfile(info,f)
+with tarfile.open(dest) as tar:
+ for name,digest in json.loads((out/'SHA256.json').read_text()).items():assert hashlib.sha256(tar.extractfile('airgap-document-source-update/'+name).read()).hexdigest()==digest
+record['archive']={'file':str(dest),'bytes':dest.stat().st_size,'sha256':sha(dest)};(h/'release-source-update.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record,indent=2))

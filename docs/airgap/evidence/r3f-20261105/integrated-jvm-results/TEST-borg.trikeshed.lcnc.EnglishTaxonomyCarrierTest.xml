@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishTaxonomyCarrierTest[jvm]" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:56:17.946Z" hostname="0d6dfba25614" time="0.145">
+  <properties/>
+  <testcase name="deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest" time="0.002"/>
+  <testcase name="sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest" time="0.076"/>
+  <testcase name="exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest" time="0.024"/>
+  <testcase name="familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest" time="0.009"/>
+  <testcase name="sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest" time="0.025"/>
+  <testcase name="declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

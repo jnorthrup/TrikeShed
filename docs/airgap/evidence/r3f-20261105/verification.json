@@ -1,0 +1,1022 @@
+{
+  "release": "R3f wire lifetime and retained outputs",
+  "createdAt": "2026-11-05T11:11:25.720878+00:00",
+  "testedSourceCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+  "testedSourceTree": "89e6ee8737b1b47c3ef5421da022636c487c6d2b",
+  "integration": {
+    "integratedCommit": "97fbadd1bc018c6daa8410627a79631843fd0b7b",
+    "testedCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+    "frozenRefCounts": [
+      557,
+      559,
+      560
+    ],
+    "latestInventory": {
+      "local": 9,
+      "remoteBranchHeads": 550,
+      "remoteHeadAliases": 1
+    },
+    "merges": 4,
+    "conflictedFiles": 0,
+    "allFrozenTipsAreAncestors": true,
+    "sourceContinuity": "../../../airgap/evidence/r3f-20261105/release-target-source-continuity.json",
+    "localMachine": "Cloud checkout /workspace/TrikeShed; Jim Mac unchanged",
+    "pushPolicy": "Ordinary master push; no force, pruning or branch deletion. Final remote readback recorded separately.",
+    "publicationContinuation": "92510e6a1 merged at 97fbadd1b; documentation-only integration evidence. Tested production source and build inputs unchanged."
+  },
+  "sourceSha256": {
+    "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40",
+    "PRELOAD.md": "e38152b70185bb433c48c64d21d01d44781bc091b7ebc001251c5f5ebcc30119",
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "gradle.properties": "2b288c27e97606c41f9a74b9ab3734b0ee06f7dc60c1147b861722bfe2dec51e",
+    "release/airgap-document/README.md": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13",
+    "settings.gradle.kts": "35a1e6101800fabb05bc43e460e649e3b8b53611011d6d6dc23e5158263c8315",
+    "src/commonMain/kotlin/borg/trikeshed/collections/associative/trie/ArrayMap.kt": "ab0b62a37ebf5d3984bdc66d0481c1bb4f09aa4265bc1322549e2facf003e36f",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishCorpusContract.kt": "0b76e0be21cefeb897bdbd471dd6f447ba008bdad58f1546752c4a91e6b6d00b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishCorpusPreset.kt": "60cd1203bb8d659abf0a2489c60e9829a709638c4feabfa64903af8c28418e27",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "f799e4dd7f6a6257e4ce34bf0987ce9c26ab480e53c4922933d7ff6fa085e2ae",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt": "d4e292c671e12875b1311b38784bd7a4e7101a02cc592f458fecaaae84c90b1b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncPresets.kt": "03d3e8ec933e94fc3ed1e112d74608669d287f89ddba70d283eedb82c13c5fe4",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornProofGraph.kt": "f9fe8ab08cd9487af221f280e999130fce082f05110c10cfcdf0bbdf87ea45ba",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornQueryView.kt": "7846b03c951a776261cb77fa9a7d30fca3a6fa622eae27f0860fb8edff839a70",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt": "5ee7b106022b5ef569e286e51eeac027ecd3be749d631182bfc7fc61974d1238",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefsNodes.kt": "46100f3cb0301112306404bf95df5ab95be98deba4a72f14e8641c1fd7afa33c",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/KgRetention.kt": "bdf611b11f86565f58f0838987c3a6dafba1cdb5e87c9d54fd147aa0ee3cfb0d",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/NalNodes.kt": "d45721713515bfa44fb11d2078d82ed63222a65faf03e4e9141c07a0e1465b8d",
+    "src/commonTest/kotlin/borg/trikeshed/collections/LinearArrayMapTest.kt": "2efeb86ce401c0dc4fc00d1dfe1ac3a751708b67ca9605b1f3333796b59449ab",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/EnglishCorpusPresetTest.kt": "1ddbe31d98507da17bcccbbcfc45f61977fd3be3861c146fbf92007a9b9614bb",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt": "9f92a9c7e92fb1accf30bb1be7a2950d822d50d4fcc042893312aae60b0ed69c",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt": "0c2a511e38cdf99d6328d0de855193db8ddcf96003a87088346ad4407d7e5f5c",
+    "src/jsMain/kotlin/borg/trikeshed/web/PatchNavigation.kt": "27745544236b5bf04e7af94f2b7bcd2fed5b8acc09e312807bf28b33840c802f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Main.kt": "829ec2ce9a34f19434662d4d233c837690c919deebba966a58ed98e12bedebbc",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt": "dd6a1ad0921eb459a884d2036eb1fdbf36417701b5fde13461943eab63e703b0",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "2488553641ed399c6636d8105a50f08104f9f8fb312652d565ea7a9926158c93",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDocuments.kt": "6872112437b087a01d93c0e75e70615dccce3bf1c6c75660303511200f3e67d2",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsNode.kt": "ff8863db0e186f2c22431ab941e0dd0dfe3c23985f44521527560f94e342fa43",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt": "dfedb5e8ffa56f68b8f59770a0660a711c5ae043ed56fcb34f3a5a873021d280",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "a7b4d82826a654dede2edce223a6150db9d9ac7097b54a33ad998a957704b8c2",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "f2cf9082c70a4d4b907958a590bd134c68851b37a34f14c1fb0c581a049135ca",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt": "c2cd7b6030689103fb8518c4924409e58b81091f2b8814261d92ef5da056732b",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsUi.kt": "d011e5bff271cd7a08d469acda163df4286e94ffd72cd9ba6718fa8373e85be7",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt": "ce0ec579d58d70ebffcf0efb62a33be4762fbc2a8918d09325612fa33cd8fcd5",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/EnglishCorpusWire.kt": "7cd2405363aefda8b64a028930788e8c75315efdd61ebbd7cf1a2d2e5f74dc88",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt": "ef3fc4f0bd53310af9a296f483ac328c407b1c0863cad6787150b3ba1e2f23e9",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishCorpusWireTest.kt": "301dcd3f0d28a6fe5bd7a95b2a2cbf656fd2c3c20abb1e4f6ccde6c6eeef6d23",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/ReviewedKifWireTest.kt": "7831c0e6cbf985bcfab01a5f3f6e50b594ebc8b2b79c3c5c2b8d033a0fb5ad57",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "739b5cb6a03c4e9c1e10eb5d07b0e30fb4fb13c0858afb9b414346d65eac209b",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornCertificateTest.kt": "c2c5d0b005d355f33c437d4dbe7ecddeb42acec97bbc162ff8b287381e172800",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt": "95ab7d8d1f5340941160a49431265f3b1d3afd90308fb0f1666d92f367e97b1c",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/ExactRoleRecallTest.kt": "1d6ded7f3f906276f5e0e87bb2892fbe9a4989fd86499d683b82a854be6ab97d"
+  },
+  "testTotals": {
+    "tests": 323,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "suites": 59,
+    "passed": 316
+  },
+  "browser": {
+    "passed": 74,
+    "measurementsRecorded": 15,
+    "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+    "cases": {
+      "release-aggregate02": {
+        "cases": {
+          "automaticProjection": "PASS",
+          "retainedInspection": "PASS",
+          "changedDuringRead": "PASS",
+          "restoredDefinition": "PASS"
+        },
+        "audit": {
+          "kind": "aggregate-output-ownership",
+          "casObjectsVerified": 32,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:b78057eed3ba0bb07a7b9a0f551b593c141cae5fd0a8f259b4a3ca150dd35d13",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:8b8056e56c75265a6c0b7f1906e8a012b5016057b16f58b2a319279d3cb65bbf",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:b10a9dd49cd6f4ccf52dc4841f8e2cd00e8f7c2936b9d092aa5413dddfdb40a3",
+              "status": "completed"
+            }
+          ],
+          "runId": "a32d41a8-51f1-42d1-813b-f5491ac394cd",
+          "programCid": "sha256:0ba1b13ab24f05d3fe84705bed3a9ba515891743422f265eac6a0ea76c76ec72",
+          "retainedMapCid": "sha256:024d4d6dbd294190061173fb9f1494bf8a89686fcb41bcba4d1120dfd1776663",
+          "retainedMapBytes": 119878,
+          "actualNativeNodes": 257,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "runSubmissions": 1,
+          "retainedReads": 3,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "scope": "257 real native calls; all values independently checked against the SHA-256 verified retained map and both actual canvas projections. Second GET delayed until an ordinary parameter edit, then continued unchanged; projection refused. Third GET follows restored definition and succeeds. No fabricated response or repeat execution."
+        },
+        "evidence": "accepted/release-aggregate02"
+      },
+      "release-document": {
+        "cases": {
+          "continuousClock": "PASS",
+          "pausedCamera": "PASS",
+          "pauseIsPresentationOnly": "PASS",
+          "retainedTable": "PASS",
+          "keyboardInspection": "PASS",
+          "idleEditInvalidation": "PASS",
+          "reducedReplay": "PASS",
+          "hide": "PASS",
+          "quote": "PASS",
+          "reopenedInspection": "PASS"
+        },
+        "audit": {
+          "kind": "document",
+          "casObjectsVerified": 27,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:77927115fdc8ac5e3295357dd2d0770c972e17848b3048033115a01ba28186e0",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:a9ecd2cd27cbdf65c61feaa294fb3a472d052483e66f7d7e55285a028f06d843",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:66d72d786c19958d86958c90a9396eb9d8bb77e817c56737aa6af13850deca5d",
+              "status": "completed"
+            }
+          ],
+          "runId": "0bfda2a1-84a0-4780-80aa-8eade5c7534d",
+          "programCid": "sha256:e996d9781900f194abcd747d3f2ac8d7cb4d6b8560070832870305b3c692708c",
+          "receiptCid": "sha256:66d72d786c19958d86958c90a9396eb9d8bb77e817c56737aa6af13850deca5d",
+          "mappedReceivedSelections": 8,
+          "mappedWires": 8,
+          "ownerOmissionsInFinalLedger": 0,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0,
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {},
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-document"
+      },
+      "release-ownership": {
+        "cases": {
+          "recordedReference": "PASS",
+          "layoutChange": "PASS",
+          "changedDuringRead": "PASS",
+          "restoredDefinition": "PASS"
+        },
+        "audit": {
+          "kind": "retained-reference-ownership",
+          "casObjectsVerified": 33,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:c6f68e9e3e7ecdc5ac0d1ce5809054b77c11ef6e3742839ca8067c4e07922033",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:e5ca1fb15e47dc08abf57354d8b30b8c01538f008c40aecb8963e50325d53b1a",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:25cd6a53f76a6dd1318b218e78817404ea47673ff5cfdcb76fa00f6f38998168",
+              "status": "completed"
+            },
+            {
+              "cid": "sha256:1ad749bcab7ab4ad1b23a9dc4a6f619b33ae345138f1b4da6ebc5a0dd1b249cc",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:74e3ed4d1a9c15721b5ebdd3664cedfcfd77f893cd7509521534d2cd0d454402",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:aba6bdbac5548eb4bd3ef4b9e2c1d892682aac8c5f3b37f57cb3f3f600e2b9e7",
+              "status": "completed"
+            }
+          ],
+          "runIds": [
+            "f1bbfbe1-22d2-43a1-ae77-e618558fae45",
+            "8c9128f3-9444-4811-897a-aacdb6454034"
+          ],
+          "programCids": [
+            "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+            "sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b"
+          ],
+          "sourceReadSha256": "1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "runSubmissions": 2,
+          "retainedReads": 4,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "scope": "Two real commonMain JSON literal runs and four actual CAS GET requests. The third request is delayed, then continued unchanged, to edit the canvas during an awaited read. No response fabrication or additional execution."
+        },
+        "evidence": "accepted/release-ownership"
+      },
+      "release-lifetime": {
+        "cases": {
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "redrawLifetime": "RECORDED",
+          "closedWire": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:6292d48d74bd40d68e7574f589e9ce1bf08ecf42478d19a5ea7bd1b9db1e62f6",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:fc4c315cdc75c6bbeb1e1d57f6b098591453b50f5911c5e9d5802e07d684bafa",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:626ac0c41e7cf7aeed8ea94b7cf71e329ef84272663be46822877e709f2217a1",
+              "status": "completed"
+            }
+          ],
+          "runId": "692062e8-2f77-40de-97c9-0389280cde29",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:626ac0c41e7cf7aeed8ea94b7cf71e329ef84272663be46822877e709f2217a1",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 163,
+            "p50": 16.699999999999818,
+            "p95": 33.30000000000018,
+            "maximum": 116.69999999999982,
+            "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-lifetime"
+      },
+      "release-scale65-01": {
+        "cases": {
+          "canvasProjection": "PASS",
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:620976f105ad70e0881705576970815ddc69d29f7a696a683a5e196a2bc6b224",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:accbe35363a438579ea51fe4639f95de193a59808ddf7eab73cb3ba8bed00a71",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:993bba12eff101aa3262c972ac4bb47382be084dae67045d0256c9d82d993bc2",
+              "status": "completed"
+            }
+          ],
+          "runId": "6a9ba7cc-e4b8-4bf0-a294-6102a1bcc965",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:993bba12eff101aa3262c972ac4bb47382be084dae67045d0256c9d82d993bc2",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 67,
+            "p50": 16.699999999999818,
+            "p95": 33.400000000000546,
+            "maximum": 116.70000000000073,
+            "scope": "External requestAnimationFrame intervals from native execution continuation through 500 ms after both verified canvas projection and post-receipt keyboard controls settle; variable-length 65-node window, not isolated preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-scale65-01"
+      },
+      "release-scale257-01": {
+        "cases": {
+          "canvasProjection": "PASS",
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 32,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:98829b132732e548639ea28adf5beee0270ee8146e28d0fe9842018b91e405f4",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:d98473a4e6e77623d7960a14608c2b66fbb26f87385aef13e70d047a0bbd3fcd",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:c9c5479bb6cf4462d8a8d6e9f7f8026bddab8565744c5f9c21c25e444ecaf6f9",
+              "status": "completed"
+            }
+          ],
+          "runId": "c2fffa88-6042-4640-9dcd-8574c400133a",
+          "programCid": "sha256:ef21765d0e60b22b8fbcf85642af826489abaf25339ee779d2a4c8c9765f8cda",
+          "receiptCid": "sha256:c9c5479bb6cf4462d8a8d6e9f7f8026bddab8565744c5f9c21c25e444ecaf6f9",
+          "mappedReceivedSelections": 28,
+          "mappedWires": 28,
+          "ownerOmissionsInFinalLedger": 741,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 72,
+            "p50": 16.700000000000728,
+            "p95": 50.100000000000364,
+            "maximum": 383.2999999999993,
+            "scope": "External requestAnimationFrame intervals from native execution continuation through 500 ms after both verified canvas projection and post-receipt keyboard controls settle; variable-length 257-node window, not isolated preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-scale257-01"
+      },
+      "release-scale257-02": {
+        "cases": {
+          "canvasProjection": "PASS",
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 32,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:ba7601ffa04a5618c4bedec24c2ff86f4d77470cfbd37f9e7109aa3016a32a9e",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:5479b69837e889192093f3c38e29ae6e1d1d9234cc8468d91cbab54492f5323b",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:4b90c2531bb8bded08de077bbecb48d90af5600086b6931bd0c88614a17a450a",
+              "status": "completed"
+            }
+          ],
+          "runId": "1922320a-d839-42bb-98b0-d00f89fb6fcb",
+          "programCid": "sha256:ef21765d0e60b22b8fbcf85642af826489abaf25339ee779d2a4c8c9765f8cda",
+          "receiptCid": "sha256:4b90c2531bb8bded08de077bbecb48d90af5600086b6931bd0c88614a17a450a",
+          "mappedReceivedSelections": 29,
+          "mappedWires": 29,
+          "ownerOmissionsInFinalLedger": 741,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 50,
+            "p50": 16.700000000000728,
+            "p95": 83.39999999999964,
+            "maximum": 383.1999999999989,
+            "scope": "External requestAnimationFrame intervals from native execution continuation through 500 ms after both verified canvas projection and post-receipt keyboard controls settle; variable-length 257-node window, not isolated preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-scale257-02"
+      },
+      "release-scale65-02": {
+        "cases": {
+          "canvasProjection": "PASS",
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:a83cace9711d69ba275ea526cc2af43fe42615e793d81eb60c5bbe15ba1d0e88",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:e8a6f348c3ebe4202e9dd84e8c6fa6b91cc5ebe18a1b22267ba4d8ce65532f38",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:09fbeeadde639b090b7388ccd27b6067c8103fec90b93d10f6af1c4491d8cdc6",
+              "status": "completed"
+            }
+          ],
+          "runId": "cc24a382-9e44-419d-ae5f-0dbaa1123873",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:09fbeeadde639b090b7388ccd27b6067c8103fec90b93d10f6af1c4491d8cdc6",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 63,
+            "p50": 16.699999999999818,
+            "p95": 50,
+            "maximum": 116.69999999999982,
+            "scope": "External requestAnimationFrame intervals from native execution continuation through 500 ms after both verified canvas projection and post-receipt keyboard controls settle; variable-length 65-node window, not isolated preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-scale65-02"
+      },
+      "release-scale65-03": {
+        "cases": {
+          "canvasProjection": "PASS",
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:df04df6e77f80d9e1965fd46b050da5178fe9196d3d0ef625a0a343a62087402",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:db380a6b542f72b669f8f997bce4b6a4da05192768a496f50502e4c7e263144a",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:d5e5ba310bd0dbe1e7279a83826177bfee6575d67138c5752234a4853145e136",
+              "status": "completed"
+            }
+          ],
+          "runId": "4de4a641-c70b-4299-a711-6426a31134ac",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:d5e5ba310bd0dbe1e7279a83826177bfee6575d67138c5752234a4853145e136",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 53,
+            "p50": 16.699999999999818,
+            "p95": 50,
+            "maximum": 133.39999999999964,
+            "scope": "External requestAnimationFrame intervals from native execution continuation through 500 ms after both verified canvas projection and post-receipt keyboard controls settle; variable-length 65-node window, not isolated preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-scale65-03"
+      },
+      "release-scale257-03": {
+        "cases": {
+          "canvasProjection": "PASS",
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 32,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:c142afbb80ff7c2741f4d57a74203dc523b7632e7705ed29de9f618d948279df",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:39ab22a8658bb36bfba91dbd4a879738702013f99483c2dde876e88dc583b6bf",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:840d9565b490252d6c7fdf4912955e593ef7351354a278a4ba8d0626b6b674a8",
+              "status": "completed"
+            }
+          ],
+          "runId": "12a74070-1940-4c31-b6e3-02c4330443be",
+          "programCid": "sha256:ef21765d0e60b22b8fbcf85642af826489abaf25339ee779d2a4c8c9765f8cda",
+          "receiptCid": "sha256:840d9565b490252d6c7fdf4912955e593ef7351354a278a4ba8d0626b6b674a8",
+          "mappedReceivedSelections": 29,
+          "mappedWires": 29,
+          "ownerOmissionsInFinalLedger": 741,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 64,
+            "p50": 16.700000000000728,
+            "p95": 66.70000000000073,
+            "maximum": 350.10000000000036,
+            "scope": "External requestAnimationFrame intervals from native execution continuation through 500 ms after both verified canvas projection and post-receipt keyboard controls settle; variable-length 257-node window, not isolated preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/release-scale257-03"
+      }
+    }
+  },
+  "comparison": {
+    "protocol": "Same final package, six fresh JVM/browser/store runs, 65/257, 257/65, 65/257 order. rAF window begins before Continue and ends 500 ms after both real canvas projection and post-receipt keyboard controls. No build, compression or profiler during these six cases.",
+    "interpretation": "Two cardinalities, not a before/after speedup trial. Larger graph has materially longer frame gaps. Variable-length windows and thresholded keyboard entries do not establish sustained rendering, physical-input latency or dense recursive capacity.",
+    "rows": [
+      {
+        "case": "release-scale65-01",
+        "nodes": 65,
+        "samples": 67,
+        "p50": 16.699999999999818,
+        "p95": 33.400000000000546,
+        "maximum": 116.70000000000073,
+        "windowIntervalSumMs": 1383.3000000000002,
+        "keyboardDurationsMs": [
+          80,
+          72,
+          64,
+          56
+        ],
+        "handlerToCallbackMs": [
+          10.800000004470348,
+          6.100000001490116,
+          13.299999997019768,
+          12.200000002980232
+        ],
+        "cdpRoundTripMs": 12.920441,
+        "geometry": [
+          {
+            "label": "fit",
+            "paths": 64,
+            "eligible": 64,
+            "clipped": 0,
+            "maxError": 5.434072916209426e-05
+          },
+          {
+            "label": "zoom",
+            "paths": 64,
+            "eligible": 25,
+            "clipped": 39,
+            "maxError": 6.121145032509726e-05
+          },
+          {
+            "label": "resize",
+            "paths": 64,
+            "eligible": 17,
+            "clipped": 47,
+            "maxError": 9.716041184702633e-05
+          }
+        ],
+        "observationCount": 29,
+        "ownerOmissions": 165,
+        "mappedWires": 19,
+        "retainedMap": null,
+        "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+      },
+      {
+        "case": "release-scale257-01",
+        "nodes": 257,
+        "samples": 72,
+        "p50": 16.700000000000728,
+        "p95": 50.100000000000364,
+        "maximum": 383.2999999999993,
+        "windowIntervalSumMs": 2199.9040000000005,
+        "keyboardDurationsMs": [
+          96,
+          88,
+          112,
+          112
+        ],
+        "handlerToCallbackMs": [
+          1.5999999940395355,
+          0.3999999985098839,
+          5.700000002980232,
+          7.600000001490116
+        ],
+        "cdpRoundTripMs": 7.244111,
+        "geometry": [
+          {
+            "label": "fit",
+            "paths": 256,
+            "eligible": 256,
+            "clipped": 0,
+            "maxError": 9.110374921703689e-05
+          },
+          {
+            "label": "zoom",
+            "paths": 256,
+            "eligible": 99,
+            "clipped": 157,
+            "maxError": 0.00013758683679562566
+          },
+          {
+            "label": "resize",
+            "paths": 256,
+            "eligible": 51,
+            "clipped": 205,
+            "maxError": 8.762880300243441e-05
+          }
+        ],
+        "observationCount": 29,
+        "ownerOmissions": 741,
+        "mappedWires": 28,
+        "retainedMap": {
+          "cid": "sha256:602f7d6f327c0de5800572825ff01b16bcc6afc754a5dda0505762496898388e",
+          "bytes": 119915
+        },
+        "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+      },
+      {
+        "case": "release-scale257-02",
+        "nodes": 257,
+        "samples": 50,
+        "p50": 16.700000000000728,
+        "p95": 83.39999999999964,
+        "maximum": 383.1999999999989,
+        "windowIntervalSumMs": 1766.5680000000011,
+        "keyboardDurationsMs": [
+          104,
+          96,
+          352,
+          248
+        ],
+        "handlerToCallbackMs": [
+          16.30000000447035,
+          14.700000002980232,
+          48.100000001490116,
+          3.600000001490116
+        ],
+        "cdpRoundTripMs": 2.934844,
+        "geometry": [
+          {
+            "label": "fit",
+            "paths": 256,
+            "eligible": 256,
+            "clipped": 0,
+            "maxError": 9.110374921703689e-05
+          },
+          {
+            "label": "zoom",
+            "paths": 256,
+            "eligible": 110,
+            "clipped": 146,
+            "maxError": 8.872287898237522e-05
+          },
+          {
+            "label": "resize",
+            "paths": 256,
+            "eligible": 54,
+            "clipped": 202,
+            "maxError": 8.419264825029482e-05
+          }
+        ],
+        "observationCount": 29,
+        "ownerOmissions": 741,
+        "mappedWires": 29,
+        "retainedMap": {
+          "cid": "sha256:1aba304c9d775b857101de2c6f872e347a6cae62532a8ee0c6f302b699872466",
+          "bytes": 119935
+        },
+        "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+      },
+      {
+        "case": "release-scale65-02",
+        "nodes": 65,
+        "samples": 63,
+        "p50": 16.699999999999818,
+        "p95": 50,
+        "maximum": 116.69999999999982,
+        "windowIntervalSumMs": 1383.3000000000002,
+        "keyboardDurationsMs": [
+          56,
+          104,
+          72,
+          88
+        ],
+        "handlerToCallbackMs": [
+          0.7000000029802322,
+          0.8999999985098839,
+          6.300000004470348,
+          2.5
+        ],
+        "cdpRoundTripMs": 23.235944,
+        "geometry": [
+          {
+            "label": "fit",
+            "paths": 64,
+            "eligible": 64,
+            "clipped": 0,
+            "maxError": 5.434072916209426e-05
+          },
+          {
+            "label": "zoom",
+            "paths": 64,
+            "eligible": 25,
+            "clipped": 39,
+            "maxError": 7.414566315059786e-05
+          },
+          {
+            "label": "resize",
+            "paths": 64,
+            "eligible": 15,
+            "clipped": 49,
+            "maxError": 9.234782720605737e-05
+          }
+        ],
+        "observationCount": 29,
+        "ownerOmissions": 165,
+        "mappedWires": 19,
+        "retainedMap": null,
+        "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+      },
+      {
+        "case": "release-scale65-03",
+        "nodes": 65,
+        "samples": 53,
+        "p50": 16.699999999999818,
+        "p95": 50,
+        "maximum": 133.39999999999964,
+        "windowIntervalSumMs": 1266.6679999999997,
+        "keyboardDurationsMs": [
+          80,
+          112,
+          120,
+          104
+        ],
+        "handlerToCallbackMs": [
+          4.799999997019768,
+          0.8000000044703484,
+          39.399999998509884,
+          25.69999999552965
+        ],
+        "cdpRoundTripMs": 35.735414,
+        "geometry": [
+          {
+            "label": "fit",
+            "paths": 64,
+            "eligible": 64,
+            "clipped": 0,
+            "maxError": 5.434072916209426e-05
+          },
+          {
+            "label": "zoom",
+            "paths": 64,
+            "eligible": 25,
+            "clipped": 39,
+            "maxError": 0.00012730263532142124
+          },
+          {
+            "label": "resize",
+            "paths": 64,
+            "eligible": 17,
+            "clipped": 47,
+            "maxError": 7.633416176544802e-05
+          }
+        ],
+        "observationCount": 29,
+        "ownerOmissions": 165,
+        "mappedWires": 19,
+        "retainedMap": null,
+        "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+      },
+      {
+        "case": "release-scale257-03",
+        "nodes": 257,
+        "samples": 64,
+        "p50": 16.700000000000728,
+        "p95": 66.70000000000073,
+        "maximum": 350.10000000000036,
+        "windowIntervalSumMs": 2049.8680000000004,
+        "keyboardDurationsMs": [
+          440,
+          232,
+          144,
+          160
+        ],
+        "handlerToCallbackMs": [
+          47.100000001490116,
+          1.0999999940395355,
+          3.600000001490116,
+          3.7000000029802322
+        ],
+        "cdpRoundTripMs": 363.747135,
+        "geometry": [
+          {
+            "label": "fit",
+            "paths": 256,
+            "eligible": 256,
+            "clipped": 0,
+            "maxError": 9.110374921703689e-05
+          },
+          {
+            "label": "zoom",
+            "paths": 256,
+            "eligible": 94,
+            "clipped": 162,
+            "maxError": 0.00010545963710218817
+          },
+          {
+            "label": "resize",
+            "paths": 256,
+            "eligible": 46,
+            "clipped": 210,
+            "maxError": 7.069804533332793e-05
+          }
+        ],
+        "observationCount": 29,
+        "ownerOmissions": 741,
+        "mappedWires": 29,
+        "retainedMap": {
+          "cid": "sha256:010d04cab7eb9c779be09f96f9273affcdbbf0c0c43c759a3b517780391b95e5",
+          "bytes": 119907
+        },
+        "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+      }
+    ]
+  },
+  "preliminaryRuns": [
+    "aggregate-pilot02",
+    "aggregate-pilot03",
+    "final-aggregate",
+    "final-lifetime",
+    "final-scale257-pilot",
+    "release-aggregate",
+    "scale257-pilot"
+  ],
+  "runtimeUpdate": {
+    "baseArchive": {
+      "file": "airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+      "bytes": 36928779,
+      "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006"
+    },
+    "requiredRuntimeChain": [
+      {
+        "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+        "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+      },
+      {
+        "file": "airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+        "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006"
+      }
+    ],
+    "targetSourceCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+    "basePackageSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+    "files": {
+      "SHA256SUMS": {
+        "before": "0195f2d597367b9a3a4588eae425768b711d0714f777b5de131ca0c602a70341",
+        "after": "04558bd3b335d53b4a1ec7130b99b98f475d3eb4ff1d38e1f8165880f8dab9d8"
+      },
+      "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+        "before": "4a6fbcf3d7a6d8a10f678938aa24a2e599842c027f4c238052526795889f07db",
+        "after": "b9882602c6c0653f1c2df307ac7d8a700c2afd2400d1350717f35dd34394fc91"
+      },
+      "package-identity.json": {
+        "before": "db1cc17a1b94ef22a4c8b2446f5de9e2bbbb645cb216c0b110a426206e8e60fa",
+        "after": "09cb4d6d4d36c6c776ad3f4352cb76d38846819846a726522a6591fd660fac36"
+      }
+    },
+    "scope": "Browser-only overlay over the exact R3e final installation, itself over R4f. Only the Spacegraph web jar and root manifests change. One SVG-level pointer handler uses the existing page owner, replacing direct handlers on disposable wire paths. Aggregate retained output maps are bounded to 1 MiB, verified against declared bytes and SHA-256, and projected only while the canvas definition and owner remain current. JVM jars, dependencies, native modules and durable storage bytes are unchanged.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3f-release-runtime-update-2026-11-05.tar.gz",
+      "sha256": "8f52d2c1007efbdc43f10366b45e236799189d72553046df4892ca70c5c57887",
+      "bytes": 2439287
+    },
+    "identicalTwoAssemblies": true,
+    "installedRoot": "/workspace/airgap-r3f-proof/installed-release/airgap-document-rootfs",
+    "installation": "Verified immutable R3e final root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete combined membership/mode/hash verification passes. No mutation of the R3e or R4f roots."
+  },
+  "sourceUpdate": {
+    "baseSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+    "targetSourceCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+    "targetTree": "89e6ee8737b1b47c3ef5421da022636c487c6d2b",
+    "requiredSourceChain": [
+      {
+        "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+        "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+      },
+      {
+        "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+        "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+      },
+      {
+        "file": "airgap-document-r3c-final-sources-update-2026-11-05.tar.gz",
+        "sha256": "dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f"
+      },
+      {
+        "file": "airgap-document-r3d-final-sources-update-2026-11-05.tar.gz",
+        "sha256": "a57105c0fbf9fea0f2d9b3a0bfbc566eeeaf531df75d52b7e1ef543c566ce1c6"
+      },
+      {
+        "file": "airgap-document-r3e-final-sources-update-2026-11-05.tar.gz",
+        "sha256": "bcef7f2000025f3e2a807bb0536ea84c19d6e48180d2e55fc8dc0568d3cfac75"
+      }
+    ],
+    "patchSha256": "dc81a8dfa5c11884fa35cc889f031de4ca1740ef5ff63baf29e53e31bd15db66",
+    "verifiedAppliedTreeMatches": true,
+    "dependencyChanges": [],
+    "scope": "Apply after the R3e final source update, following R3d final, R3c final and R4f on the R4e source base. Do not separately apply the R3e strict-row validation supplement; its assertions are already included here. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3f-release-sources-update-2026-11-05.tar.gz",
+      "bytes": 41963794,
+      "sha256": "30600d0ed5f7e9eefa3b9cd355853d645d647a7041a80884c025b9e238369029"
+    }
+  },
+  "limits": [
+    "Two flat fixtures, 65 and 257 nodes; no dense recursive or 10k/50k capacity claim. Frame gaps are observations, not acceptance of smooth sustained rendering.",
+    "Forced-GC sampling across 100 redraws does not establish absence of memory leaks. Wire closure is fixed; closure of all other controls is not established.",
+    "Retained JSON presentation is bounded to 1 MiB; larger maps are refused, not partially claimed as complete. Existing execution/retention budgets remain unchanged.",
+    "Native KIF inspection controls from D3M compile in this exact bundle; new authenticated native-solver action flows are not exercised by these browser fixtures. Seven conditional external solver checks are skipped.",
+    "Event Timing is thresholded/quantized; rAF frame timestamp, callback clock and paint latency are distinct. Inputs are dispatched after receipt delivery.",
+    "Missing observed transfers are reported, never inferred from successful values.",
+    "Pinned-byte packaging does not close full vendor/native source rebuild provenance or machine power-loss durability."
+  ],
+  "reproduction": "../../16-wire-lifetime-and-retained-outputs.md",
+  "evidenceStanding": "Preserved baseline closure defect, failed/incomplete harness cases, retained-map pilot and frozen-program work-limit refusal; candidate archive identities remain distinct. Authored whitespace checks exclude exact raw evidence paths; manifests verify complete membership and bytes."
+}

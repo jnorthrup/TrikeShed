@@ -499,7 +499,6 @@ class Panels : PatchSurface {
                 path.classList.add("refused")
                 val t = svg("title"); t.textContent = "refused by the daemon: $refused"; path.appendChild(t)
             }
-            on(path, "pointerdown", { e -> e.stopPropagation(); graph.wires.splice(idx, 1); redraw(); save() })
             fragment.appendChild(path)
             if (board.cables.containsKey(bk)) {
                 val ty = board.cables[bk]

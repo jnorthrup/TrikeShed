@@ -1,0 +1,92 @@
+[
+  {
+    "case": "release-aggregate02",
+    "startedAt": "2026-11-05T11:03:15.320696+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 4,
+    "recorded": 0,
+    "finishedAt": "2026-11-05T11:03:47.425985+00:00"
+  },
+  {
+    "case": "release-document",
+    "startedAt": "2026-11-05T11:03:47.426404+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 10,
+    "recorded": 0,
+    "finishedAt": "2026-11-05T11:04:04.920995+00:00"
+  },
+  {
+    "case": "release-ownership",
+    "startedAt": "2026-11-05T11:04:04.921205+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 4,
+    "recorded": 0,
+    "finishedAt": "2026-11-05T11:04:12.542929+00:00"
+  },
+  {
+    "case": "release-lifetime",
+    "startedAt": "2026-11-05T11:04:12.543150+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 8,
+    "recorded": 3,
+    "finishedAt": "2026-11-05T11:04:28.422998+00:00"
+  },
+  {
+    "case": "release-scale65-01",
+    "startedAt": "2026-11-05T11:04:28.423233+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 8,
+    "recorded": 2,
+    "finishedAt": "2026-11-05T11:04:40.176548+00:00"
+  },
+  {
+    "case": "release-scale257-01",
+    "startedAt": "2026-11-05T11:04:40.176788+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 8,
+    "recorded": 2,
+    "finishedAt": "2026-11-05T11:05:02.488625+00:00"
+  },
+  {
+    "case": "release-scale257-02",
+    "startedAt": "2026-11-05T11:05:02.488895+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 8,
+    "recorded": 2,
+    "finishedAt": "2026-11-05T11:05:23.295948+00:00"
+  },
+  {
+    "case": "release-scale65-02",
+    "startedAt": "2026-11-05T11:05:23.296215+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 8,
+    "recorded": 2,
+    "finishedAt": "2026-11-05T11:05:34.965029+00:00"
+  },
+  {
+    "case": "release-scale65-03",
+    "startedAt": "2026-11-05T11:05:34.965292+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 8,
+    "recorded": 2,
+    "finishedAt": "2026-11-05T11:05:46.523911+00:00"
+  },
+  {
+    "case": "release-scale257-03",
+    "startedAt": "2026-11-05T11:05:46.524155+00:00",
+    "runExit": 0,
+    "auditExit": 0,
+    "passes": 8,
+    "recorded": 2,
+    "finishedAt": "2026-11-05T11:06:08.214933+00:00"
+  }
+]

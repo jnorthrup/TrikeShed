@@ -1,0 +1,11 @@
+{
+  "currentSourceCommit": "f536cc763cd0fbe9fdfafc5cc6649955fbdd7dc4",
+  "previousFinalValidationCommit": "cf544ffd37f291287ea7ec09aa1a538db5ce7893",
+  "changedRuntimeFiles": [
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Main.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt"
+  ],
+  "sourceCoverage": "Only Spacegraph changes; final installation builds its production bundle. All common, JS main, Documents, Wasm-JS, Wasm-WASI and Linux x64 production source/build inputs retain the previously verified R3e identities. The retained stricter Horn tests run in the current full selected JVM suite."
+}

@@ -34,16 +34,23 @@ The curve helper has a measured-width/height overload. The original overload
 still reads its supplied viewport for temporary drag wires and existing
 callers. Curve shape, camera transformation and viewport clipping remain the
 existing algorithm. Paths, mismatch/refusal titles, typed cable labels and
-existing page-owned pointer handlers are built on one document fragment,
+existing direct pointer handlers are built on one document fragment,
 which is attached after the loop. Wire-box growth still uses actual endpoints;
 verdict positioning and observed-spark layout still run afterward.
 
 There is no additional executor, observation stream, frame scheduler or
 persistent geometry owner. Pairwise node overlap remains quadratic, and
 whole-canvas serialization remains in the validity check. The existing
-page-owned listener registrations are also retained; long-session allocation
+direct listener registrations are also retained; long-session allocation
 and listener retention need separate measurement before any lifetime claim.
 This bounded change does not establish dense recursive or 10k-node capacity.
+
+R3f corrects the earlier description of these handlers as page-owned. The
+call resolves to the top-level `PatchJs.on`, not `PanelsPage.on`. Forced-GC
+sampling did not demonstrate redraw listener accumulation, but an actual wire
+click after awaited page shutdown still changed the graph and saved scratch.
+The [R3f runbook](16-wire-lifetime-and-retained-outputs.md) records that distinct
+ownership defect, its correction and the larger-graph experiment.
 
 The first extracted runtime failed the retained-document preset load. An
 infix `j` call on the `dynamic` endpoint was compiled as a JavaScript method

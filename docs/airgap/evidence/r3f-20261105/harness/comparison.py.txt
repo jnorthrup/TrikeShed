@@ -1,0 +1,19 @@
+from pathlib import Path
+import json
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+h=Path('/workspace/airgap-r3f-proof');order=[r for r in json.loads((h/'acceptance-sequence.json').read_text()) if '-scale' in r['case']];assert len(order)==6;rows=[]
+for r in order:
+ b=json.loads((h/r['case']/'browser.json').read_text());rows.append({'case':r['case'],'nodes':len(b['canvasOutputs']),'samples':b['frameIntervals']['samples'],'p50':b['frameIntervals']['p50'],'p95':b['frameIntervals']['p95'],'maximum':b['frameIntervals']['maximum'],'windowIntervalSumMs':sum(b['frameIntervals']['raw']),'keyboardDurationsMs':[e['duration'] for e in b['receiptControlTimings']],'handlerToCallbackMs':[e['handlerToCallback'] for e in b['controlProbe']['events']],'cdpRoundTripMs':b['controlDispatchRoundTripMs'],'geometry':[{'label':g['label'],'paths':g['paths'],'eligible':len(g['rows']),'clipped':g['clippedEndpointPairs'],'maxError':max(v for r in g['rows'] for v in r['errors'])} for g in b['geometry']],'observationCount':len(b['ledger']['observations']),'ownerOmissions':b['ledger']['observationsDropped'],'mappedWires':b['cases']['receivedCoverage']['mappedConsumedEvents'],'retainedMap':b.get('retainedMap'),'bundleSha256':b['bundleSha256']})
+assert len({r['bundleSha256'] for r in rows})==1
+record={'protocol':'Same final package, six fresh JVM/browser/store runs, 65/257, 257/65, 65/257 order. rAF window begins before Continue and ends 500 ms after both real canvas projection and post-receipt keyboard controls. No build, compression or profiler during these six cases.','interpretation':'Two cardinalities, not a before/after speedup trial. Larger graph has materially longer frame gaps. Variable-length windows and thresholded keyboard entries do not establish sustained rendering, physical-input latency or dense recursive capacity.','rows':rows};(h/'scale-comparison.json').write_text(json.dumps(record,indent=2)+'\n')
+fig,axes=plt.subplots(1,2,figsize=(10,4.2));colors={65:'#246b8d',257:'#bc542b'}
+for size in [65,257]:
+ group=sorted([r for r in rows if r['nodes']==size],key=lambda r:r['case'])
+ for ax,key,title in zip(axes,['maximum','p95'],['Maximum frame interval','95th percentile frame interval']):ax.plot([1,2,3],[r[key] for r in group],marker='o',color=colors[size],label=str(size)+' nodes');ax.set_title(title);ax.set_ylabel('Milliseconds');ax.set_xticks([1,2,3]);ax.set_xlabel('Repetition');ax.grid(alpha=.2);ax.set_ylim(bottom=0)
+
+for ax,key in zip(axes,['maximum','p95']):ax.set_ylim(0,max(r[key] for r in rows)*1.12)
+axes[0].legend();fig.suptitle('Same R3f runtime: flat native graphs at two sizes');fig.text(.5,.015,'Variable-length execution-to-projection windows. Observed gaps; not a smooth-rendering acceptance threshold.',ha='center',fontsize=9);fig.tight_layout(rect=[0,.05,1,.93])
+for ext in ['png','svg','pdf']:fig.savefig(h/('scale-comparison.'+ext),dpi=160)
+print(json.dumps(rows,indent=2))

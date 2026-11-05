@@ -1,0 +1,34 @@
+from pathlib import Path
+import json,sys,hashlib,struct,re
+h=Path('/workspace/airgap-r3f-proof');a=h/sys.argv[1];kind=sys.argv[2];b=json.loads((a/'browser.json').read_text());proc=json.loads((a/'processes.json').read_text());cas=a/'state/runtime/cas/sha256';count=0
+def read(cid):
+ d=cid.removeprefix('sha256:');assert re.fullmatch('[0-9a-f]{64}',d);data=(cas/d[0]/d[1]/d[2]/d[3]/d[4:]).read_bytes();assert hashlib.sha256(data).hexdigest()==d;return data
+for p in cas.rglob('*'):
+ if p.is_file():d=''.join(p.relative_to(cas).parts);assert re.fullmatch('[0-9a-f]{64}',d) and hashlib.sha256(p.read_bytes()).hexdigest()==d;count+=1
+def crc(data):
+ c=0xffffffff
+ for byte in data:
+  c^=byte
+  for _ in range(8):c=(c>>1)^(0x82f63b78 if c&1 else 0)
+ return c^0xffffffff
+wal=(a/'state/runtime/.kanban/board.wal').read_bytes();at=0;frames=[]
+while at<len(wal):
+ magic,version,sequence,n=struct.unpack_from('>4sHQI',wal,at);end=at+18+n;assert magic==b'WAL1' and version==1 and sequence==len(frames)+1 and end+4<=len(wal);assert crc(wal[at:end])==struct.unpack_from('>I',wal,end)[0];job,cid=wal[at+18:end].decode().split('\t');command=json.loads(read(cid));assert command['jobId']==job;frames.append({'cid':cid,'status':command['lcncRun']['status']});at=end+4
+assert [r['status'] for r in frames]==['queued','running','completed']
+run=json.loads(read(frames[-1]['cid']))['lcncRun'];assert run['status']=='completed' and run['ok'];assert b['receipt']['receiptCid']==frames[-1]['cid'] and b['receipt']['runId']==run['runId'];assert run['outputs']==b['receipt']['outputs']
+program=json.loads(read(run['programCid']));ledger=json.loads(read(run['invocationsCid']));assert len(program['nodes'])==257 and len(program['wires'])==256 and ledger['attempted']==257;assert ledger['runId']==run['runId'] and ledger['programCid']==run['programCid']
+ref=run['outputs'];assert run['outputPreview'] and ref['previewOnly'];data=read(ref['retainedCid']);assert len(data)==ref['bytes']<=1048576;outputs=json.loads(data);assert len(outputs)==257 and outputs['source']['value']==2
+for i in range(256):assert outputs['sum'+str(i)]['value']==i+2
+for name in ['initialOutputs','restoredOutputs']:
+ assert len(b[name])==257
+ for n in b[name]:assert n['ok'] and n['value']==outputs[n['id']]['value'] and str(n['value']) in n['shown']
+assert b['cases']['changedDuringRead']['returnedSha256']==hashlib.sha256(data).hexdigest();assert b['cases']['changedDuringRead']['returnedBytes']==len(data)
+assert len(b['cases'])==4 and all(v['result']=='PASS' for v in b['cases'].values())
+assert proc['error'] is None and proc['driverExit']==0 and not b.get('error') and not b['errors'];assert all(p['exit']==0 and not p.get('forcedTermination') for p in proc['processes'])
+for p in proc['processes']:assert all(json.loads((a/('state/cleanup-'+p['mode']+'.json')).read_text()).values())
+assert b['bundleSha256']==json.loads((a/'identity.json').read_text())['bundleSha256']
+initial=json.loads((a/'run-ready.json').read_text());last=json.loads((a/'state/state-run.json').read_text());assert initial['documents']==last['documents'] and len(last['documents'])==6 and len(last['runs'])==1
+assert len([r for r in b['requests'] if r['method']=='POST' and r['url'].endswith('/api/lcnc/run')])==1
+assert len([r for r in b['requests'] if r['method']=='GET' and '/api/v0/block/get?' in r['url'] and __import__('urllib.parse',fromlist=['parse_qs']).parse_qs(__import__('urllib.parse',fromlist=['urlparse']).urlparse(r['url']).query).get('arg')==[ref['retainedCid']]])==3
+result={'kind':'aggregate-output-ownership','casObjectsVerified':count,'walFramesVerified':frames,'runId':run['runId'],'programCid':run['programCid'],'retainedMapCid':ref['retainedCid'],'retainedMapBytes':len(data),'actualNativeNodes':257,'allSixDocumentsUnchanged':True,'processExits':[p['exit'] for p in proc['processes']],'runSubmissions':1,'retainedReads':3,'bundleSha256':b['bundleSha256'],'scope':'257 real native calls; all values independently checked against the SHA-256 verified retained map and both actual canvas projections. Second GET delayed until an ordinary parameter edit, then continued unchanged; projection refused. Third GET follows restored definition and succeeds. No fabricated response or repeat execution.'}
+(a/'independent-audit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))

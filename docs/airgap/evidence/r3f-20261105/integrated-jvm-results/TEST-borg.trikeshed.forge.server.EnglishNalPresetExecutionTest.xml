@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishNalPresetExecutionTest[jvm]" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:56:08.630Z" hostname="0d6dfba25614" time="0.309">
+  <properties/>
+  <testcase name="currentMutationRefusesButExplicitHistoricalModeKeepsTheExactReport()[jvm]" classname="borg.trikeshed.forge.server.EnglishNalPresetExecutionTest" time="0.093"/>
+  <testcase name="unsupportedRecordedEnglishIsAWholeFrameStatusWithoutFallback()[jvm]" classname="borg.trikeshed.forge.server.EnglishNalPresetExecutionTest" time="0.017"/>
+  <testcase name="unknownNullAndMissingInputsRefuseAndDrainRemovesOnlyItsOwnRegistration()[jvm]" classname="borg.trikeshed.forge.server.EnglishNalPresetExecutionTest" time="0.067"/>
+  <testcase name="actualRegisteredPresetKeepsExactReportAndEverySameSourceOccurrence()[jvm]" classname="borg.trikeshed.forge.server.EnglishNalPresetExecutionTest" time="0.04"/>
+  <testcase name="postEvaluationCurrentnessCheckRejectsAChangedSource()[jvm]" classname="borg.trikeshed.forge.server.EnglishNalPresetExecutionTest" time="0.031"/>
+  <testcase name="productionLargeOutputReferencesPreserveTheFullReportAcrossFileStoreReopen()[jvm]" classname="borg.trikeshed.forge.server.EnglishNalPresetExecutionTest" time="0.057"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

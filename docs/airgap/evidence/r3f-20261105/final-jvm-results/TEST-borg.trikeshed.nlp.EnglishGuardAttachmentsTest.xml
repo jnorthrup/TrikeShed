@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishGuardAttachmentsTest[jvm]" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:34:21.738Z" hostname="0d6dfba25614" time="0.114">
+  <properties/>
+  <testcase name="overlappingUnlessMarkerLabelsKeepBothOrdinalsAndOneObservedAttachment()[jvm]" classname="borg.trikeshed.nlp.EnglishGuardAttachmentsTest" time="0.002"/>
+  <testcase name="fullCopiedIdentityAndPartialUnicodeRangeRemainSourceObservationsOnly()[jvm]" classname="borg.trikeshed.nlp.EnglishGuardAttachmentsTest" time="0.004"/>
+  <testcase name="coordinatedUnmarkedTargetAndQuotedNestedAttachmentAreNeverChosenOrRewritten()[jvm]" classname="borg.trikeshed.nlp.EnglishGuardAttachmentsTest" time="0.002"/>
+  <testcase name="completeAttachmentBudgetRefusesBeforeReturningAnIncompleteSection()[jvm]" classname="borg.trikeshed.nlp.EnglishGuardAttachmentsTest" time="0.089"/>
+  <testcase name="legacyAbsenceProjectsWhilePresentUnknownMissingDuplicatedAndSubstitutedBindingsRefuse()[jvm]" classname="borg.trikeshed.nlp.EnglishGuardAttachmentsTest" time="0.009"/>
+  <testcase name="pinnedMatrixAndGuardNegationHaveDifferentDirectHeadsAndExistingDiagnostics()[jvm]" classname="borg.trikeshed.nlp.EnglishGuardAttachmentsTest" time="0.002"/>
+  <testcase name="quadEngineReturnsBothTypedAttachmentRowsWithFixtureInspectionProvenance()[jvm]" classname="borg.trikeshed.nlp.EnglishGuardAttachmentsTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

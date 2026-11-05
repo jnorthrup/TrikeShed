@@ -1,0 +1,623 @@
+package borg.trikeshed.narsese
+
+import borg.trikeshed.context.Drain
+import borg.trikeshed.couch.isam.DurableAppendLog
+import borg.trikeshed.cursor.BudgetCoord
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
+import kotlin.coroutines.CoroutineContext
+
+/** One unit of work for the bag. Guest-facing paths clamp evidence before minting. */
+sealed class BeliefIntake {
+    /** New signal at a budget; same angular revises (evidence union), never duplicates. */
+    data class Mint(
+        val signal: SemanticSignal,
+        val budget: BudgetCoord,
+        val receiptCid: ContentId? = null,
+        val evidenceBasis: EvidenceBasis? = null,
+        /** The Narsese surface of the signal, when the minter knows it. A belief
+         *  shown as a bare angular is a mistake; carry the expression with it. */
+        val gloss: String? = null,
+        /** Optional processed acknowledgement; admission alone is not completion. */
+        val completion: CompletableDeferred<Unit>? = null,
+    ) : BeliefIntake()
+
+    /** Receipted observation onto an existing resident; exact ancestry is required and budget is untouched. */
+    data class Reinforce(val angular: Long, val delta: EvidenceCoord, val receiptCid: ContentId? = null,
+        val evidenceBasis: EvidenceBasis? = null, val completion: CompletableDeferred<Unit>? = null) : BeliefIntake()
+
+    /** Legacy angular-only calls retain their no-op behavior for an absent resident. */
+    data class Attend(val angular: Long, val budget: BudgetCoord? = null,
+        val propositionCid: ContentId? = null, val p: Float? = null, val d: Float? = null, val q: Float? = null,
+        val completion: CompletableDeferred<BeliefAttention>? = null) : BeliefIntake()
+
+    /** Curation pulse: decay every budget via the element's decayFn, then evict below floor. */
+    data object DecayTick : BeliefIntake()
+
+    /** FIFO processing fence. Completion does not imply a durable WAL flush. */
+    data class Fence(val completion: CompletableDeferred<Unit>) : BeliefIntake()
+
+    /** Exact source/definition artifacts must complete retention before imported assertions start. */
+    data class RetainKg(val artifacts: KgRetention.Batch, val completion: CompletableDeferred<Unit>? = null) : BeliefIntake()
+}
+
+sealed class BeliefEvent {
+    data class Minted(val angular: Long, val receiptCid: ContentId?, val gloss: String? = null) : BeliefEvent()
+    data class Revised(val angular: Long, val evidence: EvidenceCoord, val gloss: String? = null) : BeliefEvent()
+    data class Attended(val angular: Long, val budget: BudgetCoord) : BeliefEvent()
+    data class Evicted(val angular: Long, val spillCid: ContentId?) : BeliefEvent()
+    data class Contradicted(val angular: Long, val subjectCid: String) : BeliefEvent()
+}
+
+enum class BeliefAdmissionIssue { STRUCTURE_MISMATCH, UNRESOLVED_BASIS, ARCHIVE_UNAVAILABLE, RECEIPT_REQUIRED, RESIDENT_REQUIRED,
+    PROPOSITION_MISMATCH, UNRESOLVED_PROPOSITION, INVALID_BUDGET }
+
+/** Captured by the existing writer after attention processing; no evidence or flush authority. */
+data class BeliefAttention(val angular: Long, val identity: Map<String, Any?>,
+    val budget: BudgetCoord?, val changed: Boolean) {
+    fun report(): Map<String, Any?> = identity + _m["angular" j angular.toString(),
+        "p" j budget?.pf, "d" j budget?.df, "q" j budget?.qf,
+        "resident" j (budget != null), "changed" j changed, "processed" j true,
+        "durability" j "processing-only-no-flush-requested"]
+}
+
+/** Per-command refusal; unlike a failed WAL append, this does not stop the owning intake worker. */
+class BeliefAdmissionRefused(val angular: Long, val issue: BeliefAdmissionIssue, cause: Throwable? = null) :
+    IllegalArgumentException("Belief admission refused for $angular: ${issue.name}", cause)
+
+/**
+ * BeliefBagElement — the daemon-owned NarseseBag as a CCEK element.
+ *
+ * AIKR bounds made physical: bounded intake channel (backpressure, never
+ * UNLIMITED), bounded bag [capacity], and eviction that is ATTENTION-zero,
+ * never evidence-loss — the victim's canonical bytes go to CAS and a re-mint
+ * of the same angular revives them by fetch + revise. "Evidence never decays,
+ * only attention does", literally.
+ *
+ * The bag map itself is the existing `Map<Join<Long,Long>, SemanticSignal>`
+ * algebra (reviseInto / recallNear / recallByExpectation reused verbatim);
+ * budget rides in the key, so an internal angular→key index keeps attention
+ * changes from orphaning entries.
+ *
+ * WAL: thin ordering log over [DurableAppendLog] (CRC frames, torn-tail
+ * truncate) — group-committed (flush every [flushEvery] appends and at
+ * drain/DecayTick), CAS-addressed payloads per the durability contract.
+ */
+class BeliefBagElement(
+    val capacity: Int = 4096,
+    private val cas: CasStore? = null,
+    private val wal: DurableAppendLog? = null,
+    private val flushEvery: Int = 32,
+    /** Phase-3 seam: AttentionEconomy::decay lands here; identity until then. */
+    private val decayFn: (BudgetCoord) -> BudgetCoord = { it },
+    /** Eviction floor applied on DecayTick: priority below this is archive-eligible. */
+    private val priorityFloor: Float = 0.0f,
+    /**
+     * β inverse-temperature supplier — the daemon wires quota/lease pressure;
+     * the pristine resonance layer will consume it. Never WAL'd.
+     */
+    private val temperature: () -> Float = { 1f },
+    /**
+     * Post-tick hook, invoked at the END of every DecayTick — derived-state
+     * rebuild seam (e.g. moments). Never WAL'd.
+     */
+    private val afterTick: () -> Unit = {},
+    parentJob: Job? = null,
+) : CoroutineContext.Element, Drain {
+
+    companion object Key : CoroutineContext.Key<BeliefBagElement>
+
+    override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** The intake's single writer, launched at [open]. */
+    var worker: Job? = null
+
+    val intake: Channel<BeliefIntake> = Channel(capacity = 256)
+
+    private val _events = MutableSharedFlow<BeliefEvent>(replay = 0, extraBufferCapacity = 1024)
+    val beliefEvents: SharedFlow<BeliefEvent> get() = _events
+    /** Diagnostic for unacknowledged legacy sends; submit's exceptional acknowledgement is authoritative. */
+    @Volatile var lastAdmissionRefusal: BeliefAdmissionRefused? = null
+        private set
+    @Volatile var lastRetentionRefusal: KgRetentionRefused? = null
+        private set
+
+    // The attention table: funnel-probe geometry × stochastic hijack replacement
+    // (narchy HijackBag × Krapivin funnel — see HijackBeliefBag). The intake
+    // channel is its single writer; readers cross its volatile stamp.
+    private val hijack = HijackBeliefBag(capacity)
+    /** Exact ancestry is retained when supplied; Bloom remains the fast hint. */
+    private val basisByAngular = HashMap<Long, EvidenceBasis>()
+    private val receiptByAngular = HashMap<Long, ContentId>()
+    /**
+     * Per angular, every receipt whose evidence its cell holds, kept in the WAL (`R:` records) so it survives restarts:
+     * NARS revises only on disjoint evidence, and a receipt is one observation, so its evidence counts once however
+     * often it is minted (the boot seed re-mints every remembered entry on each start).
+     */
+    private val counted = HashMap<Long, HashSet<String>>()
+    // angular → the Narsese surface the minter supplied; revisions keep the
+    // latest one so a receipt can always show the expression, not a coordinate.
+    private val glossByAngular = HashMap<Long, String>()
+
+    /** The expression minted under [angular], when any minter supplied one. */
+    fun glossOf(angular: Long): String? = glossByAngular[angular]
+
+    // ── NAL-9: the moment field — the bag's self-model, rebuilt lazily on a
+    // dirty flag (derived state: never WAL'd, milliseconds at d=64, n≤capacity).
+    private val moments = MomentField()
+    private val momentsMutex = Mutex()
+    @Volatile private var momentsDirty = true
+    private var walSeq = 0L
+    private var unflushed = 0
+
+    val size: Int get() = hijack.size
+
+    /** Current β inverse-temperature (live supplier read; not a cached value). */
+    fun temperatureNow(): Float = temperature()
+
+    // ── lifecycle ─────────────────────────────────────────────────────
+
+    suspend fun open() {
+        wal?.replay { seq, payload ->
+            if (seq > walSeq) walSeq = seq
+            applyWalRecord(payload)
+        }
+        worker = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
+            var failure: Throwable? = null
+            try {
+                for (cmd in intake) {
+                    val completion = when (cmd) {
+                        is BeliefIntake.Mint -> cmd.completion
+                        is BeliefIntake.Reinforce -> cmd.completion
+                        is BeliefIntake.Fence -> cmd.completion
+                        is BeliefIntake.RetainKg -> cmd.completion
+                        is BeliefIntake.Attend -> cmd.completion
+                        else -> null
+                    }
+                    try {
+                        val attended = handle(cmd)
+                        when (cmd) {
+                            is BeliefIntake.Attend -> cmd.completion?.complete(checkNotNull(attended))
+                            is BeliefIntake.Mint -> cmd.completion?.complete(Unit)
+                            is BeliefIntake.Reinforce -> cmd.completion?.complete(Unit)
+                            is BeliefIntake.Fence -> cmd.completion.complete(Unit)
+                            is BeliefIntake.RetainKg -> cmd.completion?.complete(Unit)
+                            else -> Unit
+                        }
+                    } catch (refused: BeliefAdmissionRefused) {
+                        lastAdmissionRefusal = refused
+                        completion?.completeExceptionally(refused)
+                    } catch (refused: KgRetentionRefused) {
+                        lastRetentionRefusal = refused
+                        completion?.completeExceptionally(refused)
+                    } catch (t: Throwable) {
+                        failure = t
+                        completion?.completeExceptionally(t)
+                        if (completion == null || t is CancellationException) throw t
+                        // A failed append may follow an in-memory mutation. Stop the
+                        // writer; the finally block fails all admitted acknowledgements.
+                        break
+                    }
+                }
+            } catch (t: Throwable) {
+                failure = t
+                throw t
+            } finally {
+                intake.close(failure)
+                val stopped = failure ?: IllegalStateException("belief intake closed")
+                while (true) {
+                    val pending = intake.tryReceive().getOrNull() ?: break
+                    val completion = when (pending) {
+                        is BeliefIntake.Mint -> pending.completion
+                        is BeliefIntake.Reinforce -> pending.completion
+                        is BeliefIntake.Fence -> pending.completion
+                        is BeliefIntake.RetainKg -> pending.completion
+                        is BeliefIntake.Attend -> pending.completion
+                        else -> null
+                    }
+                    completion?.completeExceptionally(stopped)
+                }
+            }
+        }
+    }
+
+    /** Await the existing single writer, including its WAL append/flush policy. */
+    suspend fun submit(cmd: BeliefIntake.Mint) {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(cmd.copy(completion = completion))
+        completion.await()
+    }
+
+    /** The same processed acknowledgement/refusal boundary for a receipted evidence revision. */
+    suspend fun submit(cmd: BeliefIntake.Reinforce) {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(cmd.copy(completion = completion))
+        completion.await()
+    }
+
+    suspend fun submit(cmd: BeliefIntake.Attend): BeliefAttention {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<BeliefAttention>()
+        intake.send(cmd.copy(completion = completion))
+        return completion.await()
+    }
+
+    /** A current resident identity is checked inside the writer; archived beliefs are never revived. */
+    suspend fun attendProposition(angular: Long, propositionCid: ContentId,
+        p: Float? = null, d: Float? = null, q: Float? = null): BeliefAttention =
+        submit(BeliefIntake.Attend(angular, propositionCid = propositionCid, p = p, d = d, q = q))
+
+    /** Bounded per-response source verification, shared by HTTP and LCNC resonance. */
+    fun sourceContexts(): (SemanticSignal?) -> Map<String, Any?> = KgRetention.sourceContexts(cas)
+
+    /** Documentary role selection observes residency only; explicit attention rechecks inside the writer. */
+    fun recallRoles(request: Any?): Map<String, Any?> = KgRetention.selectRoles(cas, KgRetention.roleRequest(request), ::signalOf)
+
+    /** The same channel owns CAS writes, acknowledgements, refusals, and drain as the belief work. */
+    suspend fun retainKg(artifacts: KgRetention.Batch): borg.trikeshed.userspace.nio.file.spi.StorageDurability {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(BeliefIntake.RetainKg(artifacts, completion))
+        completion.await()
+        return checkNotNull(cas).durability
+    }
+
+    /**
+     * Await commands sent before this fence on the single intake channel. This
+     * is a processing boundary, not an atomic snapshot or durability guarantee;
+     * work sent later, or sent by downstream consumers, may still be pending.
+     */
+    suspend fun awaitProcessed() {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(BeliefIntake.Fence(completion))
+        completion.await()
+    }
+
+    override suspend fun drain() {
+        intake.close()
+        // The consumer loop drains the closed channel under the element supervisor.
+        supervisor.complete()
+        supervisor.join()
+        wal?.flush()
+    }
+
+    // ── reads (COW: the map reference is immutable, superseded on write) ──
+
+    fun snapshot(): Map<Twin<Long>, SemanticSignal> {
+        val out = HashMap<Twin<Long>, SemanticSignal>(hijack.size)
+        hijack.forEach { s -> out[s.angular j s.budget.packed] = s.signal }
+        return out
+    }
+
+    fun recallNear(centroid: Long, maxDistance: Int): Series<SemanticSignal> {
+        val near = ArrayList<HijackBeliefBag.Slot>()
+        hijack.forEach { s -> if (hamming(s.angular, centroid) <= maxDistance) near.add(s) }
+        near.sortBy { hamming(it.angular, centroid) }
+        return near.size j { i: Int -> near[i].signal }
+    }
+
+    /** Top-k by expectation × priority — the render/selection ranking (deterministic). */
+    fun recallTop(k: Int): Series<Join<SemanticSignal, BudgetCoord>> {
+        val all = ArrayList<HijackBeliefBag.Slot>(hijack.size)
+        hijack.forEach { all.add(it) }
+        all.sortWith(compareByDescending<HijackBeliefBag.Slot> { it.pri }.thenBy { it.angular })
+        val ranked = all.take(k)
+        return ranked.size j { i: Int -> ranked[i].signal j ranked[i].budget }
+    }
+
+    /** Primacy-weighted stochastic attention sample (the hijack/funnel recall). */
+    fun recallSample(k: Int): Series<Join<SemanticSignal, BudgetCoord>> {
+        val picked = hijack.sample(k)
+        return picked.size j { i: Int -> picked[i].signal j picked[i].budget }
+    }
+
+    /** Funnel depth of a belief — its attention standing, physically. -1 = not resident. */
+    fun levelOf(angular: Long): Int = hijack.levelOf(angular)
+
+    /**
+     * One flat autovec sweep over every action potential: the support front
+     * (synonym peaks, positive evidence) and refutation front (antonym peaks,
+     * negative evidence) of a solver proposal. Frontier additions participate
+     * with zero lag — the vector plane mirrors at write time.
+     */
+    fun resonate(centroid: Long, k: Int = 8): HijackBeliefBag.Resonance = hijack.resonate(centroid, k)
+
+    /** The self-model, rebuilt if any intake landed since the last build. */
+    suspend fun field(): MomentField {
+        if (momentsDirty) momentsMutex.withLock {
+            if (momentsDirty) {
+                moments.rebuild(hijack)
+                momentsDirty = false
+            }
+        }
+        return moments
+    }
+
+    /**
+     * Mahalanobis resonance over the moment field — whitening replaces the s⁴
+     * contrast hack from first principles; β comes from the temperature seam
+     * (quota pressure: hot = exploratory, cold = sharp).
+     */
+    suspend fun resonateWhitened(centroid: Long, k: Int = 8): MomentField.Resonance =
+        field().resonate(centroid, k, beta = temperatureNow())
+
+    fun budgetOf(angular: Long): BudgetCoord? = hijack.get(angular)?.budget
+
+    /** The resident signal under [angular], so a receipt can name what it is about. */
+    fun signalOf(angular: Long): SemanticSignal? = hijack.get(angular)?.signal
+
+    // ── intake processing (single consumer: the bag's serial spine) ────
+
+    private suspend fun handle(cmd: BeliefIntake): BeliefAttention? {
+        val attended = when (cmd) {
+            is BeliefIntake.Mint -> { mint(cmd.signal, cmd.budget, cmd.receiptCid, cmd.evidenceBasis, cmd.gloss); null }
+            is BeliefIntake.Reinforce -> { reinforce(cmd); null }
+            is BeliefIntake.Attend -> attend(cmd)
+            BeliefIntake.DecayTick -> { decayAll(); null }
+            is BeliefIntake.Fence -> return null
+            is BeliefIntake.RetainKg -> { KgRetention.retain(cas, cmd.artifacts); return null }
+        }
+        momentsDirty = true
+        maybeFlush()
+        return attended
+    }
+
+    private fun mint(
+        incoming: SemanticSignal,
+        budget: BudgetCoord,
+        receiptCid: ContentId?,
+        evidenceBasis: EvidenceBasis?,
+        gloss: String? = null,
+    ) {
+        val angular = incoming.angular
+        val incomingReceipt = receiptCid ?: ContentId.of(SignalCodec.encode(incoming))
+        val resident = hijack.get(angular)
+        val prior = resident?.signal ?: archivedSignal(angular)
+        if (prior == null && counted[angular]?.isNotEmpty() == true)
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.ARCHIVE_UNAVAILABLE)
+        // Validate exact identity before receipt replay can renew or revise resident/archive state.
+        // Both-null legacy signals retain only the available structural checks below; replay never
+        // upgrades that historical identity. The CID declares context, not source/review authority.
+        if (prior != null && prior.propositionCid != incoming.propositionCid) {
+            val issue = if (prior.propositionCid == null || incoming.propositionCid == null)
+                BeliefAdmissionIssue.UNRESOLVED_PROPOSITION else BeliefAdmissionIssue.PROPOSITION_MISMATCH
+            throw BeliefAdmissionRefused(angular, issue)
+        }
+        // Angular is an attention-routing coordinate, not a complete proposition identity. This
+        // checks only structure available in the current signal schema, not English predicate/context unification.
+        if (prior != null && (prior.subjectCid != incoming.subjectCid || prior.objectCid != incoming.objectCid ||
+                prior.relation != incoming.relation || prior.temporal != incoming.temporal))
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.STRUCTURE_MISMATCH)
+        // The same observation minted again (a restart's seed, a retried send) renews attention, never evidence.
+        val already = counted[angular]?.contains(incomingReceipt.hex) == true
+        val prepared = if (prior != null && already) prior else if (prior != null) {
+            val decision = OverlapSafeRevision.revise(
+                receiptByAngular[angular],
+                incomingReceipt,
+                prior.evidence,
+                incoming.evidence,
+                basisByAngular[angular],
+                evidenceBasis,
+            )
+            if (!decision.accepted) throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.UNRESOLVED_BASIS)
+            incoming.copy(evidence = decision.evidence, basisBloom = prior.basisBloom or incoming.basisBloom)
+        } else incoming
+        if (!already && gloss != null) glossByAngular[angular] = gloss
+        val shown = glossByAngular[angular]
+        val outcome = hijack.put(HijackBeliefBag.Slot(angular, budget, prepared)) { existing, inc ->
+            // Evidence was revised against the exact prior resident/archive before any state changed.
+            HijackBeliefBag.Slot(
+                angular,
+                inc.budget,
+                inc.signal.copy(
+                    basisBloom = existing.signal.basisBloom or inc.signal.basisBloom,
+                ),
+            )
+        }
+        if (!already && outcome !is HijackBeliefBag.Put.Rejected) {
+            counted.getOrPut(angular) { HashSet() }.add(incomingReceipt.hex)
+            walAppend("R:$angular:${incomingReceipt.hex}")
+        }
+        when (outcome) {
+            is HijackBeliefBag.Put.Placed -> {
+                spillCids = spillCids - angular
+                if (!already) recordBasis(angular, incomingReceipt, evidenceBasis)
+                walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
+                _events.tryEmit(
+                    if (outcome.merged) BeliefEvent.Revised(angular, outcome.slot.signal.evidence, shown)
+                    else BeliefEvent.Minted(angular, receiptCid, shown),
+                )
+            }
+            is HijackBeliefBag.Put.Hijacked -> {
+                spillCids = spillCids - angular
+                if (!already) recordBasis(angular, incomingReceipt, evidenceBasis)
+                walAppend("B:${outcome.slot.budget.packed}:" + SignalCodec.encode(outcome.slot.signal).decodeToString())
+                _events.tryEmit(BeliefEvent.Minted(angular, receiptCid, shown))
+                spill(outcome.victim)
+            }
+            is HijackBeliefBag.Put.Rejected -> {
+                // lost the roulette at every funnel level: attention refused, evidence preserved
+                spill(outcome.incoming)
+                if (cas != null && !already) {
+                    // The archived bytes already contain this observation. A retry must not count it again.
+                    recordBasis(angular, incomingReceipt, evidenceBasis)
+                    counted.getOrPut(angular) { HashSet() }.add(incomingReceipt.hex)
+                    walAppend("R:$angular:${incomingReceipt.hex}")
+                }
+            }
+        }
+        if (incoming.relation == RelationKind.CONTRADICTION && outcome !is HijackBeliefBag.Put.Rejected) {
+            _events.tryEmit(BeliefEvent.Contradicted(angular, incoming.subjectCid))
+        }
+    }
+
+    private fun recordBasis(angular: Long, receiptCid: ContentId, basis: EvidenceBasis?) {
+        receiptByAngular[angular] = receiptCid
+        if (basis != null && basis.leaves.size > 0) {
+            val prior = basisByAngular[angular]
+            basisByAngular[angular] = if (prior == null) basis else unionBasis(prior, basis)
+        }
+    }
+
+    private fun unionBasis(a: EvidenceBasis, b: EvidenceBasis): EvidenceBasis {
+        val seen = HashSet<ContentId>()
+        val leaves = mutableListOf<ContentId>()
+        for (source in listOf(a, b)) for (i in 0 until source.leaves.size) {
+            val leaf = source.leaves[i]
+            if (seen.add(leaf)) leaves.add(leaf)
+        }
+        return EvidenceBasis.of(*leaves.toTypedArray())
+    }
+
+    private fun reinforce(command: BeliefIntake.Reinforce) {
+        val receipt = command.receiptCid ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.RECEIPT_REQUIRED)
+        val basis = command.evidenceBasis?.takeIf { it.leaves.size > 0 }
+            ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.UNRESOLVED_BASIS)
+        val existing = hijack.get(command.angular)
+            ?: throw BeliefAdmissionRefused(command.angular, BeliefAdmissionIssue.RESIDENT_REQUIRED)
+        // Reuse exactly the structural, duplicate, ancestry, CAS and WAL path used by Mint.
+        // No relevance or user-memory deletion can become independent evidence through this command.
+        mint(existing.signal.copy(evidence = command.delta, provenanceCid = receipt.value), existing.budget, receipt, basis)
+    }
+
+    private fun attend(command: BeliefIntake.Attend): BeliefAttention {
+        val angular = command.angular
+        val parts = _l[command.p, command.d, command.q]
+        if (parts.any { it != null && !it.isFinite() } || command.budget != null && parts.any { it != null })
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.INVALID_BUDGET)
+        val existing = hijack.get(angular)
+        if (command.propositionCid != null) {
+            if (existing == null) throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.RESIDENT_REQUIRED)
+            if (existing.signal.propositionCid == null)
+                throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.UNRESOLVED_PROPOSITION)
+            if (existing.signal.propositionCid != command.propositionCid.value)
+                throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.PROPOSITION_MISMATCH)
+        }
+        val identity = sourceContexts()(existing?.signal) + _m[
+            "identityScope" j if (command.propositionCid == null) "legacy-angular" else "exact-resident-proposition"]
+        if (existing == null) return BeliefAttention(angular, identity, null, false)
+        val base = existing.budget
+        fun part(value: Float?, retained: Int) = value?.let {
+            (it.coerceIn(0f, 1f) * BudgetCoord.SCALE).toInt()
+        } ?: retained
+        val budget = command.budget ?: BudgetCoord(part(command.p, base.p), part(command.d, base.d), part(command.q, base.q))
+        val changed = base.packed != budget.packed
+        if (changed) {
+            hijack.put(HijackBeliefBag.Slot(angular, budget, existing.signal)) { _, inc -> inc }
+            walAppend("A:$angular:${budget.packed}")
+            _events.tryEmit(BeliefEvent.Attended(angular, budget))
+        }
+        return BeliefAttention(angular, identity, budget, changed)
+    }
+
+    private fun decayAll() {
+        // one in-place pass, one WAL group: attention decays, floors evict (ARCHIVED = spill)
+        val evicted = hijack.updateEach { s ->
+            val decayed = decayFn(s.budget)
+            when {
+                priorityFloor > 0f && decayed.pf < priorityFloor -> null
+                decayed.packed == s.budget.packed -> s
+                else -> {
+                    walAppend("A:${s.angular}:${decayed.packed}")
+                    HijackBeliefBag.Slot(s.angular, decayed, s.signal)
+                }
+            }
+        }
+        walAppend("D:$walSeq")
+        for (v in evicted) spill(v)
+        afterTick() // post-tick seam: derived state (e.g. moments) rebuilds AFTER spills settle
+    }
+
+    // ── spill: attention lost, evidence preserved in CAS ─────────────
+
+    private fun spill(slot: HijackBeliefBag.Slot) {
+        val spillCid = cas?.put(SignalCodec.encode(slot.signal))
+        if (spillCid != null) spillCids = spillCids + (slot.angular to spillCid)
+        walAppend("E:${slot.angular}:${spillCid?.hex ?: ""}")
+        _events.tryEmit(BeliefEvent.Evicted(slot.angular, spillCid))
+    }
+
+    /** Read history without consuming it. Only an accepted placement removes the archive index. */
+    private fun archivedSignal(angular: Long): SemanticSignal? {
+        val spilled = spillCids[angular] ?: return null
+        return try {
+            val bytes = checkNotNull(cas?.get(spilled)) { "Archived signal bytes unavailable" }
+            check(ContentId.of(bytes) == spilled) { "Archived signal digest differs" }
+            SignalCodec.decode(bytes).also { check(it.angular == angular) { "Archived routing address differs" } }
+        } catch (failure: Exception) {
+            throw BeliefAdmissionRefused(angular, BeliefAdmissionIssue.ARCHIVE_UNAVAILABLE, failure)
+        }
+    }
+
+    @Volatile private var spillCids: Map<Long, ContentId> = emptyMap()
+
+    // ── WAL ───────────────────────────────────────────────────────────
+
+    private fun walAppend(payload: String) {
+        wal?.append(++walSeq, payload.encodeToByteArray())
+        unflushed++
+    }
+
+    private fun maybeFlush() {
+        if (unflushed >= flushEvery) {
+            wal?.flush()
+            unflushed = 0
+        }
+    }
+
+    private fun applyWalRecord(payload: ByteArray) {
+        val text = payload.decodeToString()
+        when {
+            text.startsWith("B:") -> {
+                val rest = text.substring(2)
+                val colon = rest.indexOf(':')
+                if (colon <= 0) return
+                val budget = rest.substring(0, colon).toLongOrNull() ?: return
+                val signal = runCatching { SignalCodec.decode(rest.substring(colon + 1).encodeToByteArray()) }.getOrNull() ?: return
+                // deterministic replay: force-place, no roulette; late displacements were E-recorded anyway
+                hijack.place(HijackBeliefBag.Slot(signal.angular, BudgetCoord(budget), signal))
+            }
+            text.startsWith("A:") -> {
+                val parts = text.substring(2).split(':')
+                if (parts.size != 2) return
+                val angular = parts[0].toLongOrNull() ?: return
+                val budget = parts[1].toLongOrNull() ?: return
+                val existing = hijack.get(angular) ?: return
+                hijack.place(HijackBeliefBag.Slot(angular, BudgetCoord(budget), existing.signal))
+            }
+            text.startsWith("E:") -> {
+                val parts = text.substring(2).split(':', limit = 2)
+                val angular = parts[0].toLongOrNull() ?: return
+                hijack.remove(angular)
+                if (parts.size == 2 && parts[1].isNotEmpty()) {
+                    spillCids = spillCids + (angular to ContentId("sha256:" + parts[1]))
+                }
+            }
+            text.startsWith("R:") -> {
+                val cut = text.indexOf(':', 2)
+                val angular = if (cut > 2) text.substring(2, cut).toLongOrNull() else null
+                if (angular != null) counted.getOrPut(angular) { HashSet() }.add(text.substring(cut + 1))
+            }
+            // "D:" decay markers are group boundaries; B/A records carry exact budget state.
+        }
+    }
+}

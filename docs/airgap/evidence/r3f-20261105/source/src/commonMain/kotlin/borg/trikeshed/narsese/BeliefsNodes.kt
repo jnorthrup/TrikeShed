@@ -1,0 +1,283 @@
+package borg.trikeshed.narsese
+
+import borg.trikeshed.parse.reify
+
+import borg.trikeshed.cursor.BudgetCoord
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.boundLcnc
+import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.reactor.MuxReactorElement
+import kotlinx.coroutines.currentCoroutineContext
+import kotlin.math.abs
+
+/**
+ * Belief-field LCNC nodes — the BeliefWire HTTP behaviors (`/api/beliefs/
+ * introspect`, `/resonate`, `/review`) as first-class node runners, plus the
+ * missing composability legos over [BeliefIntake] and [AngularCodec]:
+ * `nal.attend` (budget rekey), `nal.reinforce` (evidence delta), and
+ * `nal.encode` (mint the 64-bit centroid `nal.recall mode=near` demands).
+ *
+ * commonMain by construction: the jvm-only gloss store (HermesMemoryFiles)
+ * enters through the [glossOf]/[glossSink] seams, never as a dependency.
+ */
+object BeliefsNodes {
+
+    /** Public resonance boundaries validate before the underlying top-k arrays are allocated. */
+    fun resonanceCount(value: Any?, fallback: Int = 8): Int {
+        val count = when (value) {
+            null -> fallback
+            is String -> value.takeIf { it.length <= 32 }?.toIntOrNull()
+            is Number -> value.toDouble().let {
+                require(it.isFinite() && it % 1.0 == 0.0 && it in 1.0..64.0) { "k must be a whole integer from 1 to 64" }
+                it.toInt()
+            }
+            else -> null
+        }
+        require(count != null && count in 1..64) { "k must be a whole integer from 1 to 64" }
+        return count
+    }
+
+    /** BeliefWire's hard-coded pen cohort — the legion-alarm default. */
+    private val PEN_COHORT = listOf("mux_converse", "bag_recall", "bag_assert", "crumb_walk", "skill_scribe")
+        .map { "pen/$it" }
+
+    /** Ports arrive as authored — a wire into `goal?` keys the map with the `?`. */
+    private fun port(inputs: Map<String, Any?>, name: String): Any? =
+        inputs[name] ?: inputs["$name?"]
+
+    private fun parseAngular(raw: Any?): Long? = when (raw) {
+        is Long -> raw
+        is Number -> raw.toLong()
+        else -> raw?.toString()?.trim()?.toLongOrNull()
+    }
+
+    /**
+     * `beliefs.introspect` — NAL-9 introspection over the moment field
+     * (BeliefWire GET /api/beliefs/introspect): crux-axis top bits, principal
+     * concepts, cohort Hotelling T². `cohortTaxonomy` (comma-separated
+     * taxonomy keys) overrides the pen-cohort default.
+     */
+    fun introspectRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, _ ->
+        val field = bag.field()
+        val cruxTop = node.params["cruxTop"]?.toIntOrNull() ?: 6
+        val conceptsK = node.params["concepts"]?.toIntOrNull() ?: 3
+        val axis = field.cruxAxis()
+        val cruxBits = axis.withIndex().sortedByDescending { abs(it.value) }.take(cruxTop)
+            .map { mapOf("bit" to it.index, "loading" to it.value) }
+        val concepts = field.principalConcepts(conceptsK).map { (eigenvalue, vec) ->
+            mapOf(
+                "variance" to eigenvalue,
+                "topBits" to vec.withIndex().sortedByDescending { abs(it.value) }.take(cruxTop)
+                    .map { mapOf("bit" to it.index, "loading" to it.value) },
+            )
+        }
+        val cohortKeys = node.params["cohortTaxonomy"]?.split(',')
+            ?.map { it.trim() }?.filter { it.isNotEmpty() }?.takeIf { it.isNotEmpty() }
+            ?: PEN_COHORT
+        val cohortSigs = cohortKeys.map { AngularCodec.taxonomySigOfKey(it) }.toSet()
+        val cohortT2 = field.hotelling { coord -> AngularCodec.Fields.taxonomySigOf(coord) in cohortSigs }
+        mapOf(
+            "field" to mapOf(
+                "size" to field.n,
+                "cruxBits" to cruxBits,
+                "concepts" to concepts,
+                "cohortT2" to cohortT2,
+            ),
+        )
+    }
+
+    /**
+     * `beliefs.resonate` — support/refutation fronts of a goal term
+     * (BeliefWire POST /api/beliefs/resonate): the centroid is encoded
+     * server-side from goal + taxonomy, `mode=whitened` takes the Mahalanobis
+     * path over the moment field, anything else the raw hamming sweep.
+     * Contract-name aliases `synonyms`/`antonyms` ride along.
+     */
+    fun resonateRunner(
+        bag: BeliefBagElement,
+        glossOf: (Long) -> String? = { null },
+    ): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
+        val goal = port(inputs, "goal")?.toString()?.takeIf { it.isNotBlank() }
+            ?: node.params["goal"]?.takeIf { it.isNotBlank() }
+            ?: node.params["subject"]?.takeIf { it.isNotBlank() }
+            ?: return@boundLcnc mapOf(
+                "synonymPeaks" to emptyList<Any?>(),
+                "antonymPeaks" to emptyList<Any?>(),
+                "error" to "goal required",
+            )
+        val k = resonanceCount(node.params["k"])
+        val mode = node.params["mode"] ?: "whitened"
+        val centroid = AngularCodec.encode(
+            relation = RelationKind.CAUSALITY,
+            taxonomyKey = node.params["taxonomy"],
+            subjectTerm = goal,
+        )
+        val identity = bag.sourceContexts()
+        val (syn, ant) = if (mode == "whitened") {
+            val r = bag.resonateWhitened(centroid, k)
+            fun wrow(pk: MomentField.Peak) = mapOf(
+                "angular" to pk.angular.toString(),
+                "gloss" to glossOf(pk.angular),
+                "mahalanobis" to pk.distance,
+                "activation" to pk.activation,
+                "pri" to pk.pri,
+                "frequency" to pk.freq,
+                "level" to bag.levelOf(pk.angular),
+            ) + identity(bag.signalOf(pk.angular))
+            r.synonyms.map(::wrow) to r.antonyms.map(::wrow)
+        } else {
+            val r = bag.resonate(centroid, k)
+            fun row(s: HijackBeliefBag.Slot) = mapOf(
+                "angular" to s.angular.toString(),
+                "gloss" to glossOf(s.angular),
+                "expectation" to Nal.truthOf(s.signal.evidence).expectation(),
+                "frequency" to Nal.truthOf(s.signal.evidence).frequency,
+                "pri" to s.pri,
+                "level" to bag.levelOf(s.angular),
+                "relation" to s.signal.relation.name,
+            ) + identity(s.signal)
+            r.synonyms.map(::row) to r.antonyms.map(::row)
+        }
+        mapOf(
+            "mode" to mode,
+            "synonymPeaks" to syn,
+            "antonymPeaks" to ant,
+            "synonyms" to syn,
+            "antonyms" to ant,
+        )
+    }
+
+    /**
+     * `beliefs.review` — the pure induction pass (BeliefWire POST
+     * /api/beliefs/review): `facts` is a list of {verb, ok, context, object?}
+     * (a raw JSON string is parsed; anything else lands zero facts and the
+     * node still completes — the preset's introspect→review wire degrades,
+     * never dies). Landed glosses go through [glossSink].
+     */
+    fun reviewRunner(
+        review: TurnReviewElement,
+        glossSink: (Long, String) -> Unit = { _, _ -> },
+    ): LcncNodeRunner = boundLcnc(review) { review, node, inputs ->
+        val turnSucceeded = node.params["turnSucceeded"]?.toBooleanStrictOrNull() ?: true
+        val raw = port(inputs, "facts")
+        val list = when (raw) {
+            is List<*> -> raw
+            is String -> runCatching { reify(raw) as? List<*> }.getOrNull().orEmpty()
+            else -> emptyList<Any?>()
+        }
+        val facts = list.mapNotNull { f ->
+            val m = f as? Map<*, *> ?: return@mapNotNull null
+            TurnReviewElement.TurnFact(
+                verb = m["verb"]?.toString() ?: return@mapNotNull null,
+                ok = m["ok"] as? Boolean ?: true,
+                contextTerm = m["context"]?.toString() ?: return@mapNotNull null,
+                objectTerm = m["object"]?.toString(),
+            )
+        }
+        // Who guided this induction, resolved the way every other lego resolves a model
+        // (BrainMuxNodes:51): the card's own `model` param first, then the LIVE mux from the
+        // reactor context -- the one the daemon rebuilds when Hermes' state.db changes, so a
+        // /model switch in the Hermes CLI is reflected here on the next call. Blank means
+        // nothing guided it and the pass stays pure, which is the reproducible kind.
+        val guiding = node.params["model"]?.takeIf { it.isNotBlank() }
+            ?: currentCoroutineContext()[MuxReactorElement]?.modelMux()?.defaultModel
+        val identity = guiding?.takeIf { it.isNotBlank() }
+            ?.let { Evaluator.model(it) } ?: review.evaluatorIdentity
+        val landed = review.reviewTurn(facts, turnSucceeded, identity)
+        for ((angular, gloss) in landed) glossSink(angular, gloss)
+        mapOf(
+            "landed" to landed.map { (angular, gloss) ->
+                mapOf("angular" to angular.toString(), "gloss" to gloss)
+            },
+            "glosses" to landed.map { it.second },
+            "factsParsed" to facts.size,
+            "evaluator" to identity.toString(),
+            "reproducible" to identity.reproducible,
+        )
+    }
+
+    /**
+     * `nal.attend` — [BeliefIntake.Attend] as a lego: rekey an angular to a
+     * new budget, evidence untouched. The writer resolves missing components
+     * and acknowledges processing. A supplied propositionCid requires that
+     * exact current resident; angular-only legacy calls retain their absent no-op.
+     * An explicitly null wired identity refuses before authored fallback or writer admission.
+     */
+    fun attendRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
+        for (name in s_["angular", "propositionCid"].view)
+            if ((name in inputs && inputs[name] == null) || ("$name?" in inputs && inputs["$name?"] == null))
+                return@boundLcnc _m["attended" j _m["error" j "$name required"]]
+        val request = mutableMapOf<String, Any?>()
+        for (name in s_["angular", "propositionCid", "p", "d", "q"].view)
+            (port(inputs, name) ?: node.params[name]?.takeIf { it.isNotBlank() })?.let { request[name] = it }
+        if ("angular" !in request) return@boundLcnc _m["attended" j _m["error" j "angular required"]]
+        val attended = bag.submit(BeliefAttentionRequest.parse(request, requireProposition = false))
+        _m["attended" j attended.report()]
+    }
+
+    /**
+     * `nal.reinforce` — a processed receipted observation, not an unrestricted evidence delta.
+     * Explicit receipt/source-leaf CIDs declare ancestry; they do not authenticate source independence.
+     * `wPlus`/`wMinus` are observation units (scaled by [Nal.UNIT] like [Nal.observe]).
+     */
+    fun reinforceRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
+        val rawAngular = port(inputs, "angular") ?: node.params["angular"]
+        if (rawAngular is Number && rawAngular !is Long) {
+            val number = rawAngular.toDouble()
+            require(number.isFinite() && number % 1.0 == 0.0 && abs(number) <= 9_007_199_254_740_991.0) {
+                "angular must be an exact integer; use a decimal string for 64-bit coordinates"
+            }
+        }
+        val angular = parseAngular(rawAngular)
+            ?: throw IllegalArgumentException("angular required")
+        val receipt = ContentId(requireNotNull((port(inputs, "receiptCid") ?: node.params["receiptCid"]) as? String) {
+            "receiptCid required for an evidence revision"
+        })
+        val rawBasis = port(inputs, "basis") ?: node.params["basis"]?.let(::reify)
+        val leaves = requireNotNull(rawBasis as? List<*>) { "basis must be a nonempty JSON array of source leaf CIDs" }
+        require(leaves.size in 1..256 && leaves.all { it is String } && leaves.distinct().size == leaves.size) {
+            "basis must contain 1..256 distinct source leaf CIDs"
+        }
+        val basis = EvidenceBasis.of(*leaves.map { ContentId(it as String) }.toTypedArray())
+        fun units(name: String, fallback: Double): Double {
+            val raw = node.params[name]
+            val value = if (raw == null) fallback else requireNotNull(raw.toDoubleOrNull()) { "$name must be numeric" }
+            require(value.isFinite() && value >= 0 && value * Nal.UNIT <= 0xFFFFFFFFL.toDouble()) { "$name outside evidence range" }
+            return value
+        }
+        val wPlus = units("wPlus", 1.0)
+        val wMinus = units("wMinus", 0.0)
+        val delta = EvidenceCoord((wPlus * Nal.UNIT).toLong(), (wMinus * Nal.UNIT).toLong())
+        bag.submit(BeliefIntake.Reinforce(angular, delta, receipt, basis))
+        _m["revised" j _m["angular" j angular.toString(), "requestedWPlus" j delta.positive,
+            "requestedWMinus" j delta.negative, "receiptCid" j receipt.value, "basis" j leaves,
+            "processed" j true, "resident" j (bag.budgetOf(angular) != null)]]
+    }
+
+    /**
+     * `nal.encode` — [AngularCodec.encode] exposed: mints the feature-coded
+     * 64-bit centroid that `nal.recall mode=near` and `beliefs.resonate`
+     * address by. Decimal-string output so the coordinate survives JSON
+     * (64-bit longs overflow JS doubles) and pastes into a `centroid` param.
+     */
+    fun encodeRunner(): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+        val subject = port(inputs, "subject")?.toString()?.takeIf { it.isNotBlank() }
+            ?: node.params["subject"]?.takeIf { it.isNotBlank() }
+            ?: return@LcncNodeRunner mapOf("centroid" to null, "error" to "subject required")
+        val relation = node.params["relation"]?.let { r ->
+            RelationKind.entries.firstOrNull { it.name.equals(r, ignoreCase = true) }
+        } ?: RelationKind.CAUSALITY
+        val grade = node.params["grade"]?.let { g ->
+            TemporalGrade.entries.firstOrNull { it.name.equals(g, ignoreCase = true) }
+        } ?: TemporalGrade.NONE
+        val centroid = AngularCodec.encode(
+            relation = relation,
+            taxonomyKey = node.params["taxonomy"],
+            subjectTerm = subject,
+            objectTerm = node.params["object"]?.takeIf { it.isNotBlank() },
+            grade = grade,
+        )
+        mapOf("centroid" to centroid.toString())
+    }
+}

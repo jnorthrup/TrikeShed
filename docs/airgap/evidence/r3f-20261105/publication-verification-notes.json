@@ -1,0 +1,4 @@
+{
+  "initialStagingRefusal": "Independent index check found aggregate-before-edit.png absent because a repository ignore rule excluded new images. All raw evidence directories were then explicitly staged with git add -f; every manifest member and index blob matched before commit.",
+  "noAcceptanceFromExitAlone": true
+}

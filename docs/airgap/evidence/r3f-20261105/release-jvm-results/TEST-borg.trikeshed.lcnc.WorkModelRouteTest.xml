@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="WorkModelRouteTest[jvm]" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-05T11:00:19.167Z" hostname="0d6dfba25614" time="0.067">
+  <properties/>
+  <testcase name="selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm]" classname="borg.trikeshed.lcnc.WorkModelRouteTest" time="0.049"/>
+  <testcase name="selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm]" classname="borg.trikeshed.lcnc.WorkModelRouteTest" time="0.016"/>
+  <system-out><![CDATA[WorkModelRouteTest paid: mode=pinned-fixture-503; fakeHtxCalls=1
+WorkModelRouteTest keyless HTTP: mode=pinned-fixture-success; fakeHtxCalls=1; empty-offer-and-invalid-selection-checks=executed
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

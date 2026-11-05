@@ -1,0 +1,29 @@
+[
+  {
+    "ref": "refs/remotes/origin/codex/native-horn-quads-v87-evidence-20261105",
+    "commit": "6c2d706f0607b3fa984870750ab40d9c4842b2c7",
+    "time": 1793875469,
+    "before": "f536cc763cd0fbe9fdfafc5cc6649955fbdd7dc4",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../2026-11-05/native-horn-quads-v87/README.md     |   61 +\n .../2026-11-05/native-horn-quads-v87/SHA256.json   |   19 +\n .../auditor-source-manifest.json                   |   57 +\n .../native-horn-quads-v87/certificate-core.py.txt  |  114 ++\n .../2026-11-05/native-horn-quads-v87/checks.py.txt |  124 ++\n .../native-corpus-completed-after-fit.png          |  Bin 0 -> 291678 bytes\n .../native-note-without-runtime-badge.png          |  Bin 0 -> 7009 bytes\n .../native-horn-quads-v87/receipt-core.py.txt      |  398 +++++\n .../recorded-audit-report.txt                      |    6 +\n .../recorded-audit-result.json                     |   73 +\n .../native-horn-quads-v87/recorded-audit-usage.txt |   18 +\n .../native-horn-quads-v87/recorded-audit.py.txt    |  139 ++\n .../native-horn-quads-v87/records-manifest.json    | 1698 ++++++++++++++++++++\n .../native-horn-quads-v87/records.tar.gz           |  Bin 0 -> 2415106 bytes\n .../native-horn-quads-v87/replay-recorded.py.txt   |   51 +\n .../native-horn-quads-v87/strict-audit-report.txt  |    6 +\n .../native-horn-quads-v87/strict-audit-result.json |   73 +\n .../native-horn-quads-v87/verification.json        |  109 ++\n 18 files changed, 2946 insertions(+)\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/README.md\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/SHA256.json\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/auditor-source-manifest.json\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/certificate-core.py.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/checks.py.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/native-corpus-completed-after-fit.png\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/native-note-without-runtime-badge.png\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/receipt-core.py.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/recorded-audit-report.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/recorded-audit-result.json\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/recorded-audit-usage.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/recorded-audit.py.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/records-manifest.json\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/records.tar.gz\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/replay-recorded.py.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/strict-audit-report.txt\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/strict-audit-result.json\n create mode 100644 docs/evidence/2026-11-05/native-horn-quads-v87/verification.json\n",
+    "after": "45b002791456ea6a0e90abf4cd46cc1969597b67"
+  },
+  {
+    "ref": "refs/remotes/origin/feat/native-kif-inspection-actions-20261105",
+    "commit": "6e748e24203cb8fbd5b7e4e7f1bbf5280d3954d9",
+    "time": 1793875613,
+    "before": "45b002791456ea6a0e90abf4cd46cc1969597b67",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../trikeshed/web/spacegraph/PanelsDocuments.kt    | 320 ++++++++++++++++++---\n 1 file changed, 284 insertions(+), 36 deletions(-)\n",
+    "after": "0dfb4e49bf307ec0a93f820b3f504293bebff83b"
+  },
+  {
+    "ref": "refs/remotes/origin/HEAD",
+    "commit": "55d110f1d486862e480cc214b89dd3700294131d",
+    "time": 1793875986,
+    "before": "0dfb4e49bf307ec0a93f820b3f504293bebff83b",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../english-source-integration/delivery-v87.json   |   45 +\n .../verification-v87.json                          | 1400 ++++++++++++++++++++\n docs/native-horn-query.txt                         |   39 +\n 3 files changed, 1484 insertions(+)\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/delivery-v87.json\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/verification-v87.json\n",
+    "after": "a49058908288ad70a8bf1aab0eb8bb4e220e7ff9"
+  }
+]

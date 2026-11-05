@@ -1,0 +1,15 @@
+from pathlib import Path
+import subprocess,os,json,datetime
+h=Path('/workspace/airgap-r3f-proof');root=h/'installed-release/airgap-document-rootfs';env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(root);env['TRIKESHED_WIRE_EXPECTATION']='closed'
+cases=[('release-aggregate02','aggregate','aggregate-audit.py','aggregate',4,0),('release-document','browser','audit.py','document',10,0),('release-ownership','ownership','ownership-audit.py','ownership',4,0),('release-lifetime','lifetime','audit.py','fanout',8,3)]
+for size,rep in [(65,1),(257,1),(257,2),(65,2),(65,3),(257,3)]:cases.append((f'release-scale{size}-{rep:02}',f'scale{size}',f'audit-scale{size}.py','fanout',8,2))
+record=[]
+for name,driver,audit,kind,passes,recorded in cases:
+ print('START',name,flush=True);item={'case':name,'startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()};record.append(item)
+ cmd=['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','airgap-r3f','python3',str(h/'run.py'),name,driver]
+ with (h/(name+'-run.txt')).open('w') as f:r=subprocess.run(cmd,env=env,stdout=f,stderr=subprocess.STDOUT)
+ item['runExit']=r.returncode;assert r.returncode==0,(name,(h/(name+'-run.txt')).read_text())
+ with (h/(name+'-audit.txt')).open('w') as f:r=subprocess.run(['python3',str(h/audit),name,kind],stdout=f,stderr=subprocess.STDOUT)
+ item['auditExit']=r.returncode;assert r.returncode==0,(name,(h/(name+'-audit.txt')).read_text())
+ b=json.loads((h/name/'browser.json').read_text());results=[v['result'] for v in b['cases'].values()];assert len(results)==passes+recorded and results.count('PASS')==passes and results.count('RECORDED')==recorded,(name,results)
+ item.update(passes=passes,recorded=recorded,finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat());(h/'acceptance-sequence.json').write_text(json.dumps(record,indent=2)+'\n');print('PASS',name,passes,recorded,flush=True)
