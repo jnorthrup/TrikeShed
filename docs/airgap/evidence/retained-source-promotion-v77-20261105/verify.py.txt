@@ -1,0 +1,77 @@
+"""Recorded-data verification only; never launches JVMs or namespaces."""
+from pathlib import Path
+import hashlib,json,struct,sys,tarfile,io
+r=Path(sys.argv[1]);a=r/'attempt2'
+def check(v,reason):
+ if not v:raise ValueError(reason)
+def digest(b):return hashlib.sha256(b).hexdigest()
+def load(p):return json.loads(p.read_text())
+def stamp(p):
+ b=p.read_bytes();return {'bytes':len(b),'sha256':digest(b)}
+def records(b):
+ out=[];at=0
+ while at<len(b):
+  check(at+37<=len(b),'torn pack header');k=b[at];n=struct.unpack_from('>i',b,at+1)[0]
+  check(k in (1,2) and n>=0 and at+37+n<=len(b),'invalid pack frame')
+  cid=b[at+5:at+37].hex();payload=b[at+37:at+37+n]
+  if k==1:check(digest(payload)==cid,'blob hash')
+  out.append((at,k,n,cid,payload));at+=37+n
+ return out
+for name,entry in load(r/'records-manifest.json')['files'].items():
+ check(not Path(name).is_absolute() and '..' not in Path(name).parts,'manifest path')
+ check(stamp(r/name)==entry,'record manifest '+name)
+S='efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883'
+I='3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d'
+HEAD='0219223a3846887fe283b93598942de332214cd2';MAIN='d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636'
+old='/workspace/library-files/english-taxonomy-v68-fresh-proof/runtime/files/english-taxonomy-fresh-profile-proof'
+archive=a/'original-input.tar.gz';check(digest(archive.read_bytes())=='51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc','original archive hash')
+with tarfile.open(archive) as t:
+ ms=t.getmembers();check(len(ms)==7 and all(m.isfile() and not m.name.startswith('/') and '..' not in Path(m.name).parts for m in ms),'archive membership')
+ original={m.name:t.extractfile(m).read() for m in ms}
+before=original['runtime/cas/pack'];after=(a/'runtime/cas/pack').read_bytes()
+check(before==(a/'input-cas-prefix.bin').read_bytes() and after[:len(before)]==before,'original pack prefix')
+b=records(before);p=records(after)
+check(len(before)==7666 and len(after)==7744 and len(b)==4 and len(p)==5,'pack sizes/counts')
+check(b[0][:4]==(0,2,163,S) and b[0][4][16:].decode()==old+'/synthetic taxonomy copular clauses.txt','original REF path')
+check(p[-1][:4]==(7666,1,41,S),'exact promoted BLOB')
+source=b'Tenant is a Person. A Person is an Agent.'
+check(p[-1][4]==source and digest(source)==S,'source exact bytes')
+receipt=next(x[4] for x in b if x[3]==I);check(len(receipt)==6838 and digest(receipt)==I,'receipt bytes')
+check((r/'post-close-pack-exports/source.txt').read_bytes()==source and (r/'post-close-pack-exports/receipt.cbor').read_bytes()==receipt,'postclose pack exports')
+protocol=load(a/'protocol.json');result=load(a/'result.json');reports={m:load(a/(m+'.json')) for m in ['before','promote','after']}
+check(protocol['sourceHead']==result['sourceHead']==HEAD and protocol['mainSha256']==result['mainSha256']==MAIN,'artifact pins')
+cp=protocol['classpath'];check(len(cp)==120 and len({x['path'] for x in cp})==120 and all(x['path'].endswith('.jar') and len(x['sha256'])==64 for x in cp),'recorded classpath manifest')
+check(cp[0]['path']=='/workspace/library-files/english-corpus-topics-v76-proof/snapshot/main.jar' and cp[0]['sha256']==MAIN,'recorded main origin')
+check(len({x['pid'] for x in reports.values()})==3,'distinct JVM PIDs')
+for mode,x in reports.items():
+ check(x['mode']==mode and x['sourceHead']==HEAD and x['expectedMainSha256']==MAIN,'child pins')
+ check(x['namespace']['mnt']!=protocol['parentMountNamespace'] and not x['oldProducerVisible'],'child shadow namespace')
+ mounts=[t.split(' ') for t in x['mounts']]
+ check(any(t[4]=='/' and 'ro' in t[5].split(',') for t in mounts),'read-only root')
+ check(any(t[4]==old and x['mounts'][i].split(' - ')[1].split(' ')[0]=='tmpfs' for i,t in enumerate(mounts)),'old directory tmpfs shadow')
+ check(all(v=='file:'+cp[0]['path'] for v in x['codeSources'].values()) and set(x['codeSources'])=={'PackCasStore','EnglishObservationGraph','JvmProjectCorpus','ProjectScopes','GuestModules'},'five production class origins')
+ check(x['immutableBefore']==x['immutableAfter']==reports['before']['immutableBefore'],'unchanged identities')
+ check(x['receiptBefore']==x['receiptAfter']=={'bytes':6838,'sha256':I},'child receipt readback')
+ check(not x['guestModulesInstalled'] and not x['guestModulesMounted'],'empty SDK')
+ check(x['closed']['cas'] and x['closed']['remainingChildren']==0,'owner cleanup')
+ check((a/(mode+'.exit')).read_text().strip()=='0','child exit')
+ cmd=load(a/(mode+'-command.json'))
+ check(cmd[:5]==['bwrap','--die-with-parent','--ro-bind','/','/'] and cmd[cmd.index('--tmpfs')+1]==old,'actual namespace command')
+check(reports['before']['sourceBefore'] is None and reports['before']['readStatus']=='REFUSED_EXPECTED_MISSING_SOURCE' and reports['before']['failure']['message']=='Retained English source or receipt unavailable','actual prepromotion refusal')
+check(reports['before']['packBefore']==reports['before']['packAfterClose']=={'bytes':7666,'sha256':digest(before)},'pre no mutation')
+check(reports['promote']['sourceBefore'] is None,'promotion needed')
+for mode in ['promote','after']:
+ x=reports[mode];check(x['readStatus']=='OPENED_GENUINE_RETAINED_INSPECTION' and x['closed']['projectScopesDrained'],'read/drain')
+ expected={'project':'english-taxonomy-fresh-profile-proof','id':'synthetic taxonomy copular clauses.txt','cid':'sha256:'+S,'rev':'1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8','seq':0}
+ check(x['selection']==expected and all(x['actualCurrentRow'][k]==v for k,v in expected.items()),'actual source row')
+ check(x['retainedSource']=={'bytes':41,'sha256':S,'text':source.decode()},'child source readback')
+ check(x['packAfterClose']=={'bytes':7744,'sha256':digest(after)},'closed promoted pack')
+check(reports['after']['packBefore']==reports['after']['packAfterClose'],'afterclose reader immutability')
+check(protocol['oldProducerBefore']==result['oldProducerAfter'],'recorded untouched producer bytes/mtime')
+for n in ['runtime/files/english-taxonomy-fresh-profile-proof/synthetic taxonomy copular clauses.txt','runtime/project-couch/english-taxonomy-fresh-profile-proof/HEAD','runtime/project-manifests/english-taxonomy-fresh-profile-proof.tsv','runtime/projects.tsv']:
+ check(original[n]==(a/n).read_bytes(),'original source/head/manifest/ledger bytes')
+for n,x in result['observerSources'].items():check(stamp(r/n)==x,'observer source manifest '+n)
+check((r/'compile-attempt2.exit').read_text().strip()=='0' and (r/'failed-compile-attempt1/compile-attempt1.exit').read_text().strip()!='0','compile provenance')
+check("unresolved reference 'setProperty'" in (r/'failed-compile-attempt1/compile-attempt1.log').read_text(),'actual compile failure')
+check((r/'failed-compile-attempt1/Observer.kt').read_text().replace('System.setProperty(', 'java.lang.System.setProperty(')==(r/'Observer.kt').read_text(),'only external qualification fix')
+print(json.dumps({'result':'PASS','scope':'Recorded exact-pack/source/receipt/row, child mount/PID/origin and after-close checks. No new runtime, dependency rehash, sealed network or parser/authority claim.','sourceHead':HEAD,'mainSha256':MAIN,'pids':{m:x['pid'] for m,x in reports.items()},'originalPrefixBytes':len(before),'finalPack':stamp(a/'runtime/cas/pack')},indent=2))
