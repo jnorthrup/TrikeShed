@@ -23,7 +23,7 @@ object CamelCorpusRoutingRunner {
             val receipt = ContentId(lcncInputValue(node, inputs, "receiptCid") as? String ?: error("Corpus receipt CID required"))
             val mode = lcncInputValue(node, inputs, "mode") as? String ?: error("Explicit corpus mode required")
             require(mode in _s["snapshot", "current"]) { "Explicit current or snapshot corpus mode required" }
-            val bytes = ctx.casStore.getBounded(receipt, REPORT_LIMIT) ?: error("Retained corpus search receipt missing")
+            val bytes = read(ctx, receipt, REPORT_LIMIT) ?: error("Retained corpus search receipt missing")
             require(ContentId.of(bytes) == receipt) { "Corpus receipt digest differs" }
             val retained = CanonicalCbor.decodeMapBounded(bytes, REPORT_LIMIT, maxDepth = 32, maxItems = 200_000)
             require(CanonicalCbor.encodeMap(retained).contentEquals(bytes)) { "Canonical corpus receipt required" }
@@ -83,11 +83,15 @@ object CamelCorpusRoutingRunner {
             }
         })
 
+    private fun read(ctx: ModuleContext, cid: ContentId, limit: Int): ByteArray? =
+        (ctx.casStore as? BoundedCasReader ?: throw UnsupportedOperationException("Bounded corpus CAS reads unavailable"))
+            .getBounded(cid, limit)
+
     private suspend fun retain(ctx: ModuleContext, owner: CamelRouteElement, terminal: Map<String, Any?>): String {
         val bytes = CanonicalCbor.encodeMap(terminal)
         require(bytes.size <= 512 * 1024) { "Corpus route terminal record limit" }
         val cid = ctx.casStore.put(bytes)
-        require(ContentId.of(bytes) == cid && ctx.casStore.getBounded(cid, 512 * 1024)?.contentEquals(bytes) == true) { "Corpus terminal CAS readback differs" }
+        require(ContentId.of(bytes) == cid && read(ctx, cid, 512 * 1024)?.contentEquals(bytes) == true) { "Corpus terminal CAS readback differs" }
         ctx.casStore.sync()
         owner.observe { ctx.blackboard.put(LATEST, _m["kind" j CamelCorpusRouting.KIND,
             "terminalCid" j cid.value, "outcome" j terminal["outcome"], "postCheck" j terminal["postCheck"]], "camel") }

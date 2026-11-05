@@ -11,6 +11,7 @@ import borg.trikeshed.userspace.nio.process.ProcessCaptureChannel
 import borg.trikeshed.vm.*
 import kotlinx.coroutines.*
 import java.io.File
+import java.lang.System as JvmSystem
 import java.io.ByteArrayInputStream
 import java.net.URLClassLoader
 import java.util.jar.Manifest
@@ -46,13 +47,13 @@ class CamelCorpusProcess private constructor(
         val input = jsonOf(request).encodeToByteArray(throwOnInvalidSequence = true)
         require(input.size <= JSON_LIMIT) { "Camel worker request limit" }
         verify()
-        val started = System.nanoTime()
+        val started = JvmSystem.nanoTime()
         val pipes = withTimeout(wallMillis) { JvmProcessProtocolPipes.open(
             command = { _, _ -> _l[java, "-Xmx256m", "-XX:ActiveProcessorCount=2", "-cp",
                 classPath.joinToString(File.pathSeparator), workerClass] },
             environment = _m["TRIKESHED_AIRGAP" j "1", GuestModules.HOME_ENV j moduleHome], mergeError = true) }
         val capture = try {
-            val elapsed = (System.nanoTime() - started) / 1_000_000
+            val elapsed = (JvmSystem.nanoTime() - started) / 1_000_000
             val remaining = wallMillis - elapsed
             if (remaining <= 0) {
                 withContext(NonCancellable) { pipes.revoke(0); pipes.close() }
@@ -70,7 +71,7 @@ class CamelCorpusProcess private constructor(
                 "processId" j pipes.processId, "exit" j exit, "joined" j cleanup.isSuccess,
                 "capture" j "refused-before-complete-capture", "error" j failure::class.java.name,
                 "wallLimitMillis" j wallMillis, "outputLimitBytes" j OUTPUT_LIMIT,
-                "elapsedNanos" j (System.nanoTime() - started), "requestCid" j ContentId.of(input).value,
+                "elapsedNanos" j (JvmSystem.nanoTime() - started), "requestCid" j ContentId.of(input).value,
                 "profileCheckedBefore" j true, "profileCheckedAfter" j runCatching { verify() }.isSuccess,
                 "profile" j descriptor()]
             if (failure is CancellationException) throw Cancelled(record, failure)
@@ -81,7 +82,7 @@ class CamelCorpusProcess private constructor(
         val record = _m["kind" j "bounded-camel-child-execution/1", "phase" j "ROUTE_EXECUTION",
             "processId" j pipes.processId, "exit" j capture.exit, "timedOut" j capture.timedOut,
             "joined" j true, "keptBytes" j capture.kept, "droppedBytes" j capture.dropped,
-            "wallLimitMillis" j wallMillis, "outputLimitBytes" j OUTPUT_LIMIT, "elapsedNanos" j (System.nanoTime() - started),
+            "wallLimitMillis" j wallMillis, "outputLimitBytes" j OUTPUT_LIMIT, "elapsedNanos" j (JvmSystem.nanoTime() - started),
             "output" j utf8.getOrNull(), "outputUtf8Valid" j utf8.isSuccess,
             "outputBase64" j if (utf8.isFailure) Base64.getEncoder().encodeToString(capture.bytes) else null,
             "requestCid" j ContentId.of(input).value,
@@ -141,7 +142,7 @@ class CamelCorpusProcess private constructor(
         fun packaged(files: FileOperations): CamelCorpusProcess {
             val main = files.canonicalPath(File(CamelCorpusProcess::class.java.protectionDomain.codeSource.location.toURI()).path)
             require(files.isFile(main) && main.endsWith(".jar")) { "Bounded Camel requires an immutable packaged main JAR" }
-            val cp = System.getProperty("java.class.path").split(File.pathSeparator).map(files::canonicalPath)
+            val cp = requireNotNull(JvmSystem.getProperty("java.class.path")) { "Deployment classpath is unavailable" }.split(File.pathSeparator).map(files::canonicalPath)
             require(main in cp && cp.isNotEmpty() && cp.size <= 256 && cp.toSet().size == cp.size &&
                 cp.all { files.isFile(it) && it.endsWith(".jar") }) { "Bounded Camel requires a fixed JAR-only deployment classpath" }
             return capture(files, cp, emptySet(), WORKER, false)
@@ -156,7 +157,7 @@ class CamelCorpusProcess private constructor(
                 loader = loader.parent
             }
             s_[CamelCorpusProcess::class.java, fixture, worker].view.forEach { paths.add(File(it.protectionDomain.codeSource.location.toURI()).path) }
-            System.getProperty("java.class.path").split(File.pathSeparator).filter(String::isNotBlank).forEach(paths::add)
+            requireNotNull(JvmSystem.getProperty("java.class.path")) { "Deployment classpath is unavailable" }.split(File.pathSeparator).filter(String::isNotBlank).forEach(paths::add)
             val cp = paths.map(files::canonicalPath).distinct()
             require(cp.size in 1..256)
             val dirs = cp.filter(files::isDir).toSet()
@@ -165,7 +166,7 @@ class CamelCorpusProcess private constructor(
         }
 
         private fun capture(files: FileOperations, cp: List<String>, dirs: Set<String>, worker: String, test: Boolean): CamelCorpusProcess {
-            val java = files.canonicalPath(files.resolvePath(System.getProperty("java.home"), "bin", "java"))
+            val java = files.canonicalPath(files.resolvePath(requireNotNull(JvmSystem.getProperty("java.home")) { "Java runtime home is unavailable" }, "bin", "java"))
             require(cp.joinToString(File.pathSeparator).encodeToByteArray().size <= 65_536) { "Camel deployment classpath limit" }
             val home = files.canonicalPath(requireNotNull(GuestModules.root()) { "Installed Camel module required" }.path)
             val pins = snapshot(files, java, cp, home, dirs)
@@ -224,8 +225,8 @@ class CamelCorpusProcess private constructor(
 /** Fixed entrypoint: the parent supplies only checked CIDs and one two-valued lexical signal. */
 object CamelCorpusWorker {
     @JvmStatic fun main(args: Array<String>) {
-        require(args.isEmpty() && System.getenv("TRIKESHED_AIRGAP") == "1") { "Fixed airgapped worker invocation required" }
-        val bytes = System.`in`.readNBytes(CamelCorpusProcess.JSON_LIMIT + 1)
+        require(args.isEmpty() && JvmSystem.getenv("TRIKESHED_AIRGAP") == "1") { "Fixed airgapped worker invocation required" }
+        val bytes: ByteArray = JvmSystem.`in`.readNBytes(CamelCorpusProcess.JSON_LIMIT + 1)
         require(bytes.size <= CamelCorpusProcess.JSON_LIMIT) { "Camel worker request limit" }
         val value = DocumentResult.parse(bytes.decodeToString(throwOnInvalidSequence = true))
         require(value.keys == _s["kind", "receiptCid", "corpusCid", "matrixCid", "topicCid", "signal"] &&
