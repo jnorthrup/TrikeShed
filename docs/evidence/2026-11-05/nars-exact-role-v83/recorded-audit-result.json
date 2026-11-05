@@ -1,0 +1,128 @@
+{
+  "result": "PASS_RECORDED_EXACT_ROLE_CONSISTENCY",
+  "sourceHead": "87e7bb3e945546137c595ff5aaf53781f4168275",
+  "mainSha256": "f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff",
+  "documentsSha256": "ecfb8d28d05fd609f477287db7ae3fd50acd6700cfadeef3d7560b48f3c6cbd7",
+  "panelsSha256": "b5687bffb634f5436b61187629617fd501f573a1e91b11bc84e9fe9eaa1ac797",
+  "writerPid": 149040,
+  "readerPid": 149240,
+  "ownerConfiguration": {
+    "moduleTurnReviewPresent": false,
+    "beliefWireReviewOpened": true,
+    "moduleReviewBridge": "not configured: optional ctx.turnReview=null; actual BeliefWire has separate real opened owner",
+    "priorityFloor": 0.5,
+    "decay": "identity",
+    "flushEvery": 1000,
+    "beliefWal": "/workspace/library-files/nars-exact-role-v83-native-proof/native-attempt4/runtime/beliefs.wal",
+    "sourceAdmission": "manual KIF claims; actual production HTTP intake occurs after startup"
+  },
+  "C2sourceCid": "sha256:856e48302ec7ce9e8db378cad6244b49c8510d80376b914c95c37a811420ba05",
+  "paysPropositionCid": "sha256:b3f9cff6fb9790f8298668c7e8bd32fc83469da0b527c496db4709a57bdf15d3",
+  "owesPropositionCid": "sha256:a6e013e14b24b76899fc7c9beb496538ee6db4ece44a6f78f8f86b34437cacb4",
+  "angular": "4616048923953881095",
+  "runs": 14,
+  "runStatusPopulation": {
+    "completed": 11,
+    "failed": 3
+  },
+  "selectionStatusPopulation": {
+    "MATCHES_IN_COMPLETE_SOURCE": 5,
+    "NO_MATCH_IN_COMPLETE_SOURCE": 1,
+    "UNSUPPORTED_SOURCE_PROFILE": 1,
+    "UNVERIFIED_SOURCE": 1,
+    "BOUNDED": 1
+  },
+  "primitiveBoundaries": 16,
+  "readbacks": 117,
+  "retainedControlDefinitions": 65,
+  "beliefWal": {
+    "bytes": 637,
+    "sha256": "b03f753a36f90c205fb45d9f67c4ee5736a0779118341b3789fc30abfaf32da4"
+  },
+  "beliefWalProjection": {
+    "events": [
+      "R",
+      "B",
+      "A",
+      "A",
+      "D",
+      "E"
+    ],
+    "receiptRecords": 1,
+    "resident": {},
+    "spill": {
+      "4616048923953881095": "sha256:ce05118cfa852ac9a0fea51347413911b12e8698aae10c5c896901b66cad82a8"
+    }
+  },
+  "boardWal": {
+    "bytes": 5838,
+    "sha256": "eb04f8089e2231334d3b29ef67bd9e5861491dbf63590aa45d6d641f4d164cdd"
+  },
+  "boardFrames": 42,
+  "mutatedCopyControls": [
+    {
+      "mutation": "substituted-definition-source-context",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "lexical-object-substituted-as-IRI",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "typed-identity-for-documentary-PID-mismatch",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "null-wire-reactivates-authored-identity",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "attention-adds-evidence",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "bounded-source-relabelled-complete",
+      "result": "REJECTED"
+    }
+  ],
+  "recordSha256": {
+    "GO.json": "c2e9c2624954b19a53d7f5b010ee5de5dfe151ac8133c2b821fa466bcf00bf2f",
+    "startup.json": "d9553f2584c0a6f7589a7f99d2df697c835fc28b174111a175524b19be81b5e2",
+    "http-result.json": "ee9136cbbc03155776d38143c1d69337c86dea0883973c4b1d501ab0cbc49d50",
+    "browser-primary-result.json": "cf48bb00d54fb5fc343a167a96c7d1d383518fa65243ccd6f1b48c1180460d11",
+    "primitive-boundaries.json": "0091921575770e80a09be8c8cce98fae79d554e0a09f7e2ca6f9837ce7b45122",
+    "cleanup.json": "c292a9ea980c38cdc7a099f8801dbb35ac806fdfaa264b2d7454213e7bc4c370",
+    "reopened.json": "125df1a2872b547dcbc9fb66a8c99cbce7956c2ebe3abe5643226be73b95ec0e",
+    "readback-index.json": "04d38dbf08ee501ab6d6424a4a203e3ec927d4ca0afe42fb3cb2f5743fd61b63",
+    "classpath.json": "955e5a62aa66336be867b63eb2992ab30e0a4875dd4af7bc17b7d11ece86b666",
+    "writer-command.json": "281cb1afa80f3ae5c8fe42c92a79201b3c8d137ffec6a016942b9617a0b3ce53",
+    "reader-command.json": "fd1468e254dff554629e98bbf39891c415bc26eeb7f37cbd5f1fdf1d5a64dd67",
+    "network.json": "f06719af99f63a7073853cd7827ef6cc3a0c559bc7aa805ae633919e52aee043"
+  },
+  "inputSha256": {
+    "C2.kif": "856e48302ec7ce9e8db378cad6244b49c8510d80376b914c95c37a811420ba05",
+    "bounded-65.kif": "8f0afce44cb2c4e05feec5e4d871a43e4b23fc09758c4d49467c4970b462e487",
+    "missing-definition.kif": "bbb94787b0005dd68f02889f0258c5098c0221cc9dae2b6fe0d8dca2445dc6a1",
+    "unsupported.kif": "8f910c2ad0705dda6efd12dd4a9bab93f619a397e8f6680fdfec9783a078eba6"
+  },
+  "observerSourceSha256": {
+    "Fixture.kt": "a01d6eda8eb8fe2952a06f46a1248462b903eb56cb38b96ec895ef2434308c80",
+    "Reopen.kt": "c4b8521e6863bdd8cbffce534af2353e66cda676b1695c76011d25798f22b0fd",
+    "browser-primary.cjs": "f7a45fe004152306b426444f3b6859b4b26dea63ef14e0505a9683cfa91c5d2a",
+    "compile.sh": "9d3c77a7dcefc010ccdd6a926be8d14f6362bb912ff7a4059a14823cf4e74df4",
+    "drive.py": "f3ca827b846209917fa312729d7e60535f8247a3e39aa58b2a5113ff5dd5cc16",
+    "preparation.json": "2decf1c219baa0019e5b208c1a507a91952830f855d63439ef35255f8957c368",
+    "protocol.txt": "9a0b078a035789d142558bb00b343d70a42b5d1863bb04bafe8dd16de4ca229e",
+    "run-proof.py": "665e5e5ce5dd92e3f71829fbe800dbf56e83986acbe3954394749f2f5806cc67"
+  },
+  "imageSha256": {
+    "native-typed-exact-role-selection-and-explicit-attention.png": "d312a0cc5c4c9bd6413774e90df39f6f4ceac0bb03fefe71e466c629da39d5da"
+  },
+  "artifactVerification": "recorded metadata only; external JAR/fullpack availability not checked",
+  "scope": "Source-local manual-KIF lexical selection and exact current resident eligibility, explicit budget-only attention and configured WAL replay. Final optional module board-review bridge absent; separate real BeliefWire review owner remained open/drained. Earlier attempt3 enabled bridge and admitted five unrelated workflow-review signals, preserved under that different configuration. No semantic/legal accuracy, parser/LLM/model execution, source authentication/currentness/review authority, inference truth, generic admission or full R4 rootfs/hardware/crash durability claim.",
+  "auditScriptSha256": "9f9ce88d5900d8ca1ef0568b2e4df3ade267256e5a9cd901ec4e1072ac1a22fd",
+  "supportSha256": {
+    "checks.py": "821d31b608d0d39e0cd90a8cbafab3470bcd53a6d24abd7a7b369497987ed73c",
+    "receipt-core.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+  }
+}
