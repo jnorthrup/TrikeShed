@@ -1,0 +1,11 @@
+{
+  "compiledSource": "97df0b59e5445e318f7f337ea0d4c395d17428ce",
+  "finalSource": "792a14c3b982956df3a139661797e171cba9b963",
+  "changedPaths": [
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornCertificateTest.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt"
+  ],
+  "nonJvmSourceAndBuildInputsIdentical": true,
+  "standing": "Reuse successful JS/Documents, Wasm-JS, Wasm-WASI and Linux target compilation because the subsequent integration changes only JVM main/tests and documentation. Final JVM compilation and regressions run separately."
+}

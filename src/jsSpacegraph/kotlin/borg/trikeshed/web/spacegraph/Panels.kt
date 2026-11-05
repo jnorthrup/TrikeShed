@@ -494,6 +494,7 @@ class Panels : PatchSurface {
         // endpoints are the truth: a cable into a deeply nested, zoomed ring can sit outside the prediction
         if (ends.isNotEmpty() && growWireBox(ends)) applyWireBox()
         shake.positionVerdicts()
+        trace.layout()
     }
 
     // ── camera ────────────────────────────────────────────────────────────

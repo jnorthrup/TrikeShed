@@ -45,6 +45,14 @@ the saved scratch canvas unchanged and waits for an explicit Run or Debug
 action. Debug lets the operator step through the nodes and inspect observed
 wire transfers before the native selection completes.
 
+The **Pause display** control freezes wire motion only. The debugger still
+owns execution controls; received observations continue updating the bounded
+transfer table. **Inspect observed transfers** retains counts and measured
+sequence/time endpoints after motion ends. Selecting a wire pins its last
+received observation until another selection. Display speed changes preserve
+the current trajectory position. Editing the programme invalidates the old
+display mapping; layout and camera changes preserve a matching definition.
+
 `POST /__proof/finish` exports a state report and drains the
 owned modules, listener, native seats and stores. These local test controls
 have no authentication; run only in an isolated network namespace with a

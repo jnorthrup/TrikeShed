@@ -1,0 +1,405 @@
+{
+  "sourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+  "totals": {
+    "tests": 309,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 6,
+    "passed": 303
+  },
+  "skipped": [
+    "ReviewedTaxonomyWireTest[jvm].configuredNativeEndpointRunsActualReviewedQuery()[jvm]",
+    "NativeHornQueryTest[jvm].incorrectExecutablePinRefusesExecution()[jvm]",
+    "NativeHornQueryTest[jvm].observationWallLimitIncludesPostQueryRecheck()[jvm]",
+    "NativeHornQueryTest[jvm].realNativeReviewQueryAndNoProofKeepWorldUnknown()[jvm]",
+    "NativeHornQueryTest[jvm].realNativeManualRoleJoinKeepsSourcesBindingsAndNegativeControlsSeparate()[jvm]",
+    "NativeHornQueryTest[jvm].observationWallLimitIncludesReviewedSourcePreparation()[jvm]"
+  ],
+  "suites": [
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "CurationIntakeEligibilityTest[jvm]"
+    },
+    {
+      "tests": 37,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "CurationIntakeTest[jvm]"
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "DocumentEnglishRetainedWireTest[jvm]"
+    },
+    {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishCorpusWireTest[jvm]"
+    },
+    {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishLegalPatternsWireTest[jvm]"
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishNalPresetExecutionTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishTaxonomyWireTest[jvm]"
+    },
+    {
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ProjectCorpusVisitTest[jvm]"
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ProjectDbBindingTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ReviewedTaxonomyQuadQueryWireTest[jvm]"
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suite": "ReviewedTaxonomyWireTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "BoardFileWalLeaseTest[jvm]"
+    },
+    {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KanbanPinnedDispatchTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LlvmConfixRunTest[jvm]"
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LlvmScalarRunTest[jvm]"
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "CurationReviewedReadTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "DocumentSpansTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishCopularPresetExecutionTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishGuardQueryViewTest[jvm]"
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishNalPresetTest[jvm]"
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishTaxonomyCarrierTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishTaxonomyExportGuardTest[jvm]"
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "FinanceKifPresetExecutionTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LcncConfixPickPathContractTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LcncConfixSelectionTest[jvm]"
+    },
+    {
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LcncConsumptionTest[jvm]"
+    },
+    {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LcncPinnedBindingTest[jvm]"
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LlvmConfixTest[jvm]"
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LlvmScalarTest[jvm]"
+    },
+    {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "NativeHornCertificateTest[jvm]"
+    },
+    {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 5,
+      "suite": "NativeHornQueryTest[jvm]"
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "PresetAssemblyTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ReviewedTaxonomyProofGraphTest[jvm]"
+    },
+    {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ReviewedTaxonomyProofPathsReadTest[jvm]"
+    },
+    {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ReviewedTaxonomyProofPathsTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ReviewedTaxonomyQueryViewTest[jvm]"
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "WorkModelRouteTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "WorkSelectNodeTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KgHttpUtf8Test[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "AceContextNodesTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "BreadcrumbContextNodesTest[jvm]"
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "ExactRoleRecallTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KgKifCommentTest[jvm]"
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KgPredicateNamespaceTest[jvm]"
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KgPropositionIdentityTest[jvm]"
+    },
+    {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KgRdfFidelityTest[jvm]"
+    },
+    {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KgRetentionTest[jvm]"
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "KgRouteErrorTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LegalRequiredAnchorCoverageCliTest[jvm]"
+    },
+    {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "LegalRequiredAnchorCoverageTest[jvm]"
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "PropositionAttentionTest[jvm]"
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "RetainedNalImplicationTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "SyntheticNalExperimentCliTest[jvm]"
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "EnglishGuardAttachmentsTest[jvm]"
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suite": "FilePublicationTest[jvm]"
+    }
+  ]
+}

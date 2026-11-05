@@ -1,0 +1,196 @@
+{
+  "release": "R3c human-paced transfer inspection",
+  "previousPublishedCommit": "a22a377c972558315beb1d80977e864c275b8e81",
+  "testedSourceCommit": "06da928c627b16db79abc97becaab483874102da",
+  "unchangedJvmSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "sourceSha256": {
+    "release/airgap-document/README.md": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt": "0015f7276533b8f07428649b61f95452d37bc292b15bd37b34e4724176affc27",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "80d9eb6c2f573cecff3dd875a31b7d5d68312f5c5eba0659d8da1ebe01614e1f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "f2cf9082c70a4d4b907958a590bd134c68851b37a34f14c1fb0c581a049135ca",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt": "c2cd7b6030689103fb8518c4924409e58b81091f2b8814261d92ef5da056732b",
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "gradle.properties": "2b288c27e97606c41f9a74b9ab3734b0ee06f7dc60c1147b861722bfe2dec51e",
+    "settings.gradle.kts": "35a1e6101800fabb05bc43e460e649e3b8b53611011d6d6dc23e5158263c8315",
+    "PRELOAD.md": "28b3044a14053b4755e48ce9284451e0c2868e21b3c8d78c5141bde5c25e33f1",
+    "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "739b5cb6a03c4e9c1e10eb5d07b0e30fb4fb13c0858afb9b414346d65eac209b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt": "d4e292c671e12875b1311b38784bd7a4e7101a02cc592f458fecaaae84c90b1b",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "2488553641ed399c6636d8105a50f08104f9f8fb312652d565ea7a9926158c93"
+  },
+  "changedSourceAndBuildPaths": [
+    "release/airgap-document/README.md",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt"
+  ],
+  "build": {
+    "record": "checks/build03.json",
+    "workingTreeInputs": "candidate-files.json",
+    "standing": "Exact candidate file hashes match the committed source. Offline Spacegraph production compilation/webpack/staging and dedicated web JAR task pass; no exclusions. Unchanged JVM/common/native/build inputs are not relabeled as a new unit-test or cross-target run."
+  },
+  "testTotals": {
+    "packagedScenarios": 2,
+    "browserAssertionsPassed": 13,
+    "frameMeasurementCases": 1,
+    "normalJvmExits": 3,
+    "newJvmUnitTestRun": false
+  },
+  "browser": {
+    "bundle": {
+      "sha256": "e698fc73adab72a1459e826a558c93f7461c537b00d08aabbf95c26ff4f883cd"
+    },
+    "document": {
+      "kind": "document",
+      "casObjectsVerified": 27,
+      "walFramesVerified": [
+        {
+          "cid": "sha256:55f3fdacec3d8cb08710c09ab9d263c66c67805af5c882b7c50e4140e70b3a64",
+          "status": "queued"
+        },
+        {
+          "cid": "sha256:8646a2fa53771bb14d8817bf38ee401daa267e5f7906c93cf1d8c6448ed978f7",
+          "status": "running"
+        },
+        {
+          "cid": "sha256:8e0ae237b227b427fab5720f9f749d3a5cd73735e138fa2989cce8ea226f59a4",
+          "status": "completed"
+        }
+      ],
+      "runId": "5a34ed79-805e-4fb0-a816-60c6fff2b4f7",
+      "programCid": "sha256:f82a56003dbf9be4e7fb538ffd6dfc75180ee0f89cd6f26d9242d9f9dad14982",
+      "receiptCid": "sha256:8e0ae237b227b427fab5720f9f749d3a5cd73735e138fa2989cce8ea226f59a4",
+      "mappedReceivedSelections": 8,
+      "mappedWires": 8,
+      "ownerOmissionsInFinalLedger": 0,
+      "allSixDocumentsUnchanged": true,
+      "processExits": [
+        0,
+        0
+      ],
+      "oneRunSubmission": true,
+      "bundleSha256": "e698fc73adab72a1459e826a558c93f7461c537b00d08aabbf95c26ff4f883cd",
+      "frameIntervals": {},
+      "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+    },
+    "fanout": {
+      "kind": "fanout",
+      "casObjectsVerified": 26,
+      "walFramesVerified": [
+        {
+          "cid": "sha256:88de4158a15ee2d43556785f57fc9b5c6ff843445547d5f7860ef4b5cc1f5c15",
+          "status": "queued"
+        },
+        {
+          "cid": "sha256:ee97956782395bc5f5c3c9ddccba7214e3eb4b749fcb509d16ca2742cac9b86b",
+          "status": "running"
+        },
+        {
+          "cid": "sha256:e1df143459c4b246eb6173572e857839e05afce569be59257d03af4779589457",
+          "status": "completed"
+        }
+      ],
+      "runId": "94de24ef-0ab3-49bd-abaf-962d1c99da11",
+      "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+      "receiptCid": "sha256:e1df143459c4b246eb6173572e857839e05afce569be59257d03af4779589457",
+      "mappedReceivedSelections": 19,
+      "mappedWires": 19,
+      "ownerOmissionsInFinalLedger": 165,
+      "allSixDocumentsUnchanged": true,
+      "processExits": [
+        0
+      ],
+      "oneRunSubmission": true,
+      "bundleSha256": "e698fc73adab72a1459e826a558c93f7461c537b00d08aabbf95c26ff4f883cd",
+      "frameIntervals": {
+        "unit": "ms",
+        "samples": 112,
+        "p50": 16.699999999999818,
+        "p95": 33.399999999999636,
+        "maximum": 1016.6000000000004,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+    }
+  },
+  "runtimeUpdate": {
+    "baseArchive": {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "bytes": 460778817,
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    "targetSourceCommit": "06da928c627b16db79abc97becaab483874102da",
+    "unchangedJvmSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "files": {
+      "SHA256SUMS": {
+        "before": "e93c64c20797875170cbe1f52e1b062e57a0a08fb44ced42e23e44666dec1115",
+        "after": "8d39573c25d3fc3894ffa6e9510d107f7329b51ae50690f79d3d7c3e53c181f5"
+      },
+      "opt/trikeshed/README.md": {
+        "before": "c3e4ca1db3af4a4fda1bf1deec036b38aca4c8fcc552b38f5f3d729756608bdd",
+        "after": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13"
+      },
+      "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+        "before": "b65eddc8f95bc93bb7ff1f1431d0dedc904c8bd6b55af818bd37f8513e6d022a",
+        "after": "24f0c8432b96a94733b4420cc20f26e47164aa85d1786a083c997db1d033e098"
+      },
+      "package-identity.json": {
+        "before": "ee6456520a5e7c99e752e1759416d95aac81d9bbf1b4e989c327095965c12271",
+        "after": "ebc9d5d3206cfe6205b5f1ed92d29da609e39364bc325a8a452df90f93d99bae"
+      }
+    },
+    "scope": "Layered runtime update. Requires the exact immutable R4f runtime; only the Spacegraph jar, runtime instructions and package manifests change. No new engine, JVM, native module or dependency.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3c-runtime-update-2026-11-05.tar.gz",
+      "sha256": "41a3acc274685e8afdcfa70ab31f6cb44e64d8e8fe5e163d6dc42a0fdc5e2a1a",
+      "bytes": 2263306
+    },
+    "identicalTwoAssemblies": true,
+    "installedRoot": "/workspace/airgap-r3c-proof/installed/airgap-document-rootfs",
+    "installation": "Verified immutable R4f root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete final membership/mode/hash verification passes. No mutation of the R4f root."
+  },
+  "sourceUpdate": {
+    "baseSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "targetSourceCommit": "06da928c627b16db79abc97becaab483874102da",
+    "targetTree": "a57ec88df23303981fdba9d87987785223ae692e",
+    "requiredSourceChain": [
+      {
+        "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+        "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+      },
+      {
+        "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+        "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+      }
+    ],
+    "patchSha256": "16bf077161f27d4fb3592982e139d94eff2ec14792f073a7f65ce198c124412e",
+    "verifiedAppliedTreeMatches": true,
+    "dependencyChanges": [],
+    "scope": "Apply after the R4f source update on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3c-sources-update-2026-11-05.tar.gz",
+      "bytes": 38393268,
+      "sha256": "266f73dda1f07d39a47fb0e4c494b1ab88976d6647e794b3d1da574c94078798"
+    }
+  },
+  "inventory": {
+    "files": 1355,
+    "bytes": 998165432,
+    "modesMembershipAndHashesVerified": true
+  },
+  "d3m": {
+    "frozenRefs": 545,
+    "merges": 0,
+    "conflicts": 0,
+    "noBranchesDeleted": true
+  },
+  "limits": [
+    "Linux host and external Chromium; no machine power-loss proof",
+    "65-node fixture, not 10k/50k or recursive-scope rendering closure",
+    "One-second observed frame gap remains open; rAF intervals are not isolated preparation measurements",
+    "Table retains at most 256 mapped wire aggregates and one last observation per row; full histories remain bounded at owner",
+    "Runtime/source updates require exact separately published bases",
+    "Vendor/native source rebuild closure and general Nix evaluation remain open"
+  ]
+}

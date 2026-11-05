@@ -1,0 +1,5 @@
+{
+  "exactManifestPathsAddedDespiteIgnoreRules": [],
+  "count": 0,
+  "method": "Add only immutable evidence files listed in SHA256.json; preserve repository ignore rules"
+}

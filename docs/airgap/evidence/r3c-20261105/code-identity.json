@@ -1,0 +1,12 @@
+{
+  "commit": "06da928c627b16db79abc97becaab483874102da",
+  "files": {
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "f2cf9082c70a4d4b907958a590bd134c68851b37a34f14c1fb0c581a049135ca",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt": "c2cd7b6030689103fb8518c4924409e58b81091f2b8814261d92ef5da056732b",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "80d9eb6c2f573cecff3dd875a31b7d5d68312f5c5eba0659d8da1ebe01614e1f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt": "0015f7276533b8f07428649b61f95452d37bc292b15bd37b34e4724176affc27",
+    "release/airgap-document/README.md": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13"
+  },
+  "build": "build03.json",
+  "basis": "Exact authored file hashes match the successful offline build worktree; JVM/common/native/build inputs unchanged."
+}

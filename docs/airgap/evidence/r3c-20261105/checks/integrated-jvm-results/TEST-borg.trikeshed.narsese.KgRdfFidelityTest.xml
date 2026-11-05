@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="KgRdfFidelityTest[jvm]" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:48:23.700Z" hostname="0d6dfba25614" time="0.022">
+  <properties/>
+  <testcase name="unsupportedAndMalformedInputNeverYieldsAValidPrefix()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.007"/>
+  <testcase name="prefixesShorthandAndPredicateIriMappingRemainExplicit()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.0"/>
+  <testcase name="actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.005"/>
+  <testcase name="languageDatatypeAndLexicalSpellingRemainPartOfTheTerm()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.001"/>
+  <testcase name="textConsumerTreatsInterchangeMarkersInsideRdfLiteralsAsData()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.005"/>
+  <testcase name="iriLiteralAndBlankNodeKindsDoNotCollapseInTheSameSourceContext()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.001"/>
+  <testcase name="punctuationEscapesAndUnicodeRemainOneCompleteLiteral()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.001"/>
+  <testcase name="structuralCommentLineEndingsPreserveAllTriplesAndLongLiteralContent()[jvm]" classname="borg.trikeshed.narsese.KgRdfFidelityTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,39 @@
+from pathlib import Path
+import hashlib,json,shutil,subprocess
+h=Path('/workspace/airgap-r3c-proof');r=Path('/workspace/TrikeShed');e=r/'docs/airgap/evidence/r3c-20261105';d=r/'docs/d3m/evidence/2026-11-05-airgap-r3c'
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def copy(src,dest):dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dest)
+head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip();assert head=='792a14c3b982956df3a139661797e171cba9b963'
+for source,label in [('document-integrated01','integrated-document'),('fanout-integrated01','integrated-fanout'),('document-final01','final-document'),('fanout-final01','final-fanout')]:shutil.copytree(h/source,e/'accepted'/label)
+for name in ['integrated-jvm','integrated-targets','final-jvm']:
+ for ext in ['txt','json']:copy(h/(name+'.'+ext),e/'checks'/(name+'.'+ext))
+for name in ['integrated-jvm-results','final-jvm-results']:shutil.copytree(h/name,e/'checks'/name)
+for name in ['integrated-tests.json','final-tests.json','target-input-continuity.json','runtime-integrated-update.json','source-integrated-update.json','source-integrated-update-initial.json','source-integrated-readme-initial.md','integrated-package-digests.json','runtime-final-update.json','source-final-update.json','final-package-digests.json','scratch-root-reclamation.json','scratch-patch-reclamation.json','reference-host.json','integrated-update-build.txt','source-integrated-build.txt','final-update-build.txt','source-final-build.txt']:copy(h/name,e/name)
+for name in ['verify-integrated.py','update-integrated.py','package-integrated.py','source-integrated.py','source-integrated-readme-fix.py','reclaim-roots.py','plot-integrated.py','verify-final.py','update-final.py','package-final.py','source-final.py','plot-final.py','evidence-final.py','audit.py']:copy(h/name,e/'harness'/(name+'.txt'))
+for phase in ['integrated','final']:
+ for name in ['package-identity.json','SHA256SUMS']:copy(h/('installed-'+phase)/'airgap-document-rootfs'/name,e/'packaging'/(phase+'-'+name))
+ for name in ['UPDATE.json','README.md']:copy(h/('runtime-'+phase+'-update')/name,e/'packaging'/(phase+'-runtime-update-'+name))
+ for name in ['source-update.json','README.md','SHA256.json']:copy(h/('source-'+phase+'-update')/name,e/'packaging'/(phase+'-source-update-'+name))
+ for ext in ['svg','pdf','png']:copy(h/('observation-coverage-'+phase+'.'+ext),e/('observation-coverage-'+phase+'.'+ext))
+v=json.loads((e/'verification.json').read_text());copy(e/'verification.json',e/'preliminary/initial-verification.json');v['initialDisplaySourceCommit']=v['testedSourceCommit'];v['testedSourceCommit']=head;v['previousJvmSourceCommit']=v.pop('unchangedJvmSourceCommit')
+v['publicationContinuation']={'initialEvidenceCommit':'c43d035114b7f0bf052a89a258aafeda5a9eec98','firstMergeCommit':'97df0b59e5445e318f7f337ea0d4c395d17428ce','nativeHornMergeCommit':'56af0795fe948c41e12a6eb1519e792d1f401177','finalMergeCommit':head,'incomingMaster':'c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2','frozenRefs':547,'merges':3,'conflicts':0,'intent':'Retain read-only exact source-local KG role recall, typed unique resident attention targets and refusal of null wired identities before authored fallback. Retain native Horn certificate projections with rule-scoped bindings and source references; explicit host assumptions do not confer review authority or world applicability. Incoming English WAL and exact-role replay evidence retains its original source identities.'}
+changed=subprocess.check_output(['git','diff','--name-only','4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab',head,'--','src','release','build.gradle.kts','gradle','settings.gradle.kts','gradle.properties','PRELOAD.md','AGENTS.md'],cwd=r,text=True).splitlines();v['changedSourceAndBuildPaths']=changed
+for name in sorted(set(v['sourceSha256'])|set(changed)):copy(r/name,e/'source'/name);v['sourceSha256'][name]=sha(r/name)
+tests=json.loads((h/'final-tests.json').read_text())['totals'];assert tests=={'tests':309,'failures':0,'errors':0,'skipped':6,'passed':303}
+for name in ['integrated-jvm','integrated-targets','final-jvm']:assert json.loads((h/(name+'.json')).read_text())['exit']==0
+v['build']={'sourceCommit':head,'jvm':'checks/final-jvm.json','targets':'checks/integrated-targets.json','targetInputContinuity':'target-input-continuity.json','standing':'Offline final JVM main/all test-source compilation, application install and selected regressions. Spacegraph production and JS/Documents, Wasm-JS, Wasm-WASI and Linux x64 compilation passed at 97df; subsequent source changes are exclusively JVM main/tests, with non-JVM/build input continuity verified. No source/test exclusions.'}
+v['testTotals'].update(jvmPassed=303,jvmSkipped=6,jvmFailures=0,jvmErrors=0,newJvmUnitTestRun=True)
+v['limits'].append('Six external native-endpoint tests are conditionally skipped because the separately configured executable is unavailable. Nine native certificate/preparation tests pass; no new end-to-end native Horn execution is claimed.')
+doc=json.loads((e/'accepted/final-document/independent-audit.json').read_text());fan=json.loads((e/'accepted/final-fanout/independent-audit.json').read_text());assert doc['bundleSha256']==fan['bundleSha256'];v['browser']={'bundle':{'sha256':doc['bundleSha256']},'document':doc,'fanout':fan,'acceptedPaths':['accepted/final-document','accepted/final-fanout'],'earlierCandidatePaths':['accepted/document','accepted/fanout','accepted/integrated-document','accepted/integrated-fanout']}
+v['runtimeUpdate']=json.loads((h/'runtime-final-update.json').read_text());v['sourceUpdate']=json.loads((h/'source-final-update.json').read_text());package=json.loads((e/'packaging/final-package-identity.json').read_text());v['inventory']={'files':len(package['files']),'bytes':package['totalBytes'],'modesMembershipAndHashesVerified':True,'manifest':'packaging/final-package-identity.json'};v['d3m']={'initialRefs':545,'firstPublicationRefs':545,'recheckRefs':546,'finalRefs':547,'merges':3,'conflicts':0,'noBranchesDeleted':True}
+(e/'verification.json').write_text(json.dumps(v,indent=2)+'\n')
+visual=json.loads((e/'visual-review.json').read_text());visual['integratedReview']=['accepted/integrated-document/transfer-table.png','accepted/integrated-fanout/fanout-observation-coverage.png','observation-coverage-integrated.png'];visual['finalReview']=['accepted/final-document/transfer-table.png','accepted/final-fanout/fanout-observation-coverage.png','observation-coverage-final.png'];(e/'visual-review.json').write_text(json.dumps(visual,indent=2)+'\n')
+copy(d/'manifest-files-matched-by-ignore-rules.json',d/'initial-manifest-files-matched-by-ignore-rules.json')
+for phase in ['recheck','final']:
+ for kind in ['remote-heads','fetch','inputs']:copy(h/('publication-'+phase+'-'+kind+'.json'),d/('publication-'+phase+'-'+kind+'.json'))
+ for kind in ['fetch','integrate']:copy(h/(kind+'-'+phase+'.py'),d/(kind+'-'+phase+'.py.txt'))
+ copy(r/('.git/d3m/airgap-human-rate-inspection-'+phase+'-20261105/integration-steps.json'),d/('publication-'+phase+'-steps.json'))
+dv=json.loads((d/'verification.json').read_text());dv.update(testedSourceCommit=head,finalRefs=547,merges=3,conflicts=0,incomingMaster='c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2');(d/'verification.json').write_text(json.dumps(dv,indent=2)+'\n')
+for folder in [e,d]:(folder/'SHA256.json').write_text(json.dumps({p.relative_to(folder).as_posix():sha(p) for p in sorted(folder.rglob('*')) if p.is_file() and p!=folder/'SHA256.json'},indent=2)+'\n')
+print(json.dumps({'source':head,'tests':v['testTotals'],'runtime':v['runtimeUpdate']['archive'],'sourceUpdate':v['sourceUpdate']['archive']},indent=2))

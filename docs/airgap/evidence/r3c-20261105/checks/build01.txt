@@ -1,0 +1,136 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: airgapDocumentPagesJar stageKotlinJs
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :kotlinKotlinNpmCachesSetup
+> Task :kotlinRestoreYarnLock UP-TO-DATE
+> Task :kotlinNodeJsSetup UP-TO-DATE
+> Task :jsBenchPackageJson UP-TO-DATE
+> Task :jsDocumentsPackageJson UP-TO-DATE
+> Task :kotlinYarnSetup UP-TO-DATE
+> Task :jsForgePackageJson UP-TO-DATE
+> Task :jsGraalPackageJson UP-TO-DATE
+> Task :jsHarnessPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPackageJson UP-TO-DATE
+> Task :jsPackageJson UP-TO-DATE
+> Task :jsSpacegraphPackageJson UP-TO-DATE
+> Task :jsPagesPackageJson UP-TO-DATE
+> Task :jsTestPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPackageJson UP-TO-DATE
+> Task :jsViewserverPackageJson UP-TO-DATE
+> Task :jsDocumentsPublicPackageJson UP-TO-DATE
+> Task :jsBenchPublicPackageJson UP-TO-DATE
+> Task :jsForgePublicPackageJson UP-TO-DATE
+> Task :jsHarnessPublicPackageJson UP-TO-DATE
+> Task :jsGraalPublicPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsPublicPackageJson UP-TO-DATE
+> Task :jsPagesPublicPackageJson UP-TO-DATE
+> Task :jsSpacegraphPublicPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsTestPublicPackageJson UP-TO-DATE
+> Task :jsViewserverPublicPackageJson UP-TO-DATE
+> Task :kotlinPackageJsonUmbrella UP-TO-DATE
+> Task :rootPackageJson UP-TO-DATE
+> Task :kotlinNpmInstall UP-TO-DATE
+> Task :unpackSkikoWasmRuntime SKIPPED
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :checkJsMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsSpacegraph NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJsMain NO-SOURCE
+> Task :assembleJsSpacegraphResources UP-TO-DATE
+> Task :copyNonXmlValueResourcesForJsMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsMain NO-SOURCE
+> Task :generateResourceAccessorsForJsMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :jsSpacegraphProcessResources UP-TO-DATE
+> Task :generateComposeResClass SKIPPED
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJsMain SKIPPED
+> Task :checkJsSpacegraphComposeLibrariesCompatibility
+> Task :generateResourceAccessorsForJsSpacegraph SKIPPED
+> Task :jsResolveResourcesFromDependencies UP-TO-DATE
+> Task :assembleJsMainResources UP-TO-DATE
+> Task :jsResolveSelfResourcesCopyHierarchicalMultiplatformResources UP-TO-DATE
+> Task :jsAggregateResources UP-TO-DATE
+> Task :generateForgeAssets UP-TO-DATE
+> Task :jsProcessResources UP-TO-DATE
+> Task :kotlinStoreYarnLock UP-TO-DATE
+> Task :compileKotlinJs UP-TO-DATE
+> Task :jsMainClasses UP-TO-DATE
+
+> Task :compileSpacegraphKotlinJs
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///workspace/TrikeShed-target-checks/src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt:50:68 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed-target-checks/src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRunners.kt:16:130 Expression is unused.
+
+> Task :jsSpacegraphClasses
+> Task :compileSpacegraphProductionExecutableKotlinJs
+> Task :jsSpacegraphSpacegraphProductionExecutableCompileSync
+
+> Task :jsBrowserSpacegraphProductionWebpack
+asset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
+This can impact web performance.
+Assets: 
+  spacegraph.js (1.73 MiB)
+entrypoint size limit: The following entrypoint(s) combined asset size exceeds the recommended limit (244 KiB). This can impact web performance.
+Entrypoints:
+  main (1.73 MiB)
+      spacegraph.js
+webpack performance recommendations: 
+You can limit the size of your bundles by using import() or require.ensure to lazy load some parts of your application.
+For more info visit https://webpack.js.org/guides/code-splitting/
+asset spacegraph.js 1.73 MiB [emitted] [minimized] [big] (name: main) 2 related assets
+orphan modules 969 KiB [orphan] 1576 modules
+runtime modules 1.07 KiB 3 modules
+cacheable modules 5.07 MiB
+  modules with warnings 4.02 MiB [true warnings]
+    ./kotlin/TrikeShed-spacegraph.js 1.58 MiB [built] [code generated] [33 warnings]
+    ./kotlin/kotlin-kotlin-stdlib.js 406 KiB [built] [code generated] [14 warnings]
+    ./kotlin/TrikeShed.js 1.72 MiB [built] [code generated] [39 warnings]
+    ./kotlin/kotlinx-coroutines-core.js 316 KiB [built] [code generated] [80 warnings]
+    ./kotlin/kotlinx-atomicfu.js 9.43 KiB [built] [code generated] [5 warnings]
+  modules by path ../../node_modules/ 1.05 MiB
+    modules by path ../../node_modules/d3-quadtree/src/*.js 11.5 KiB
+      ../../node_modules/d3-quadtree/src/index.js 51 bytes [built] [code generated]
+      ../../node_modules/d3-quadtree/src/quadtree.js + 13 modules 11.4 KiB [built] [code generated]
+    ../../node_modules/lucide/dist/esm/lucide.js + 1548 modules 1.01 MiB [built] [code generated]
+    ../../node_modules/d3-force/src/index.js + 13 modules 23.2 KiB [built] [code generated]
+webpack 5.108.1 compiled with 3 warnings in 26707 ms
+
+> Task :stageKotlinJs
+> Task :airgapDocumentPagesJar
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed-target-checks/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 24s
+48 actionable tasks: 9 executed, 39 up-to-date
+Configuration cache entry stored.

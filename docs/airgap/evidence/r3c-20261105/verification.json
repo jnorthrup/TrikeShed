@@ -1,0 +1,255 @@
+{
+  "release": "R3c human-paced transfer inspection",
+  "previousPublishedCommit": "a22a377c972558315beb1d80977e864c275b8e81",
+  "testedSourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+  "sourceSha256": {
+    "release/airgap-document/README.md": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt": "0015f7276533b8f07428649b61f95452d37bc292b15bd37b34e4724176affc27",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "80d9eb6c2f573cecff3dd875a31b7d5d68312f5c5eba0659d8da1ebe01614e1f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "f2cf9082c70a4d4b907958a590bd134c68851b37a34f14c1fb0c581a049135ca",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt": "c2cd7b6030689103fb8518c4924409e58b81091f2b8814261d92ef5da056732b",
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "gradle.properties": "2b288c27e97606c41f9a74b9ab3734b0ee06f7dc60c1147b861722bfe2dec51e",
+    "settings.gradle.kts": "35a1e6101800fabb05bc43e460e649e3b8b53611011d6d6dc23e5158263c8315",
+    "PRELOAD.md": "28b3044a14053b4755e48ce9284451e0c2868e21b3c8d78c5141bde5c25e33f1",
+    "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "739b5cb6a03c4e9c1e10eb5d07b0e30fb4fb13c0858afb9b414346d65eac209b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt": "d4e292c671e12875b1311b38784bd7a4e7101a02cc592f458fecaaae84c90b1b",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "2488553641ed399c6636d8105a50f08104f9f8fb312652d565ea7a9926158c93",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "f799e4dd7f6a6257e4ce34bf0987ce9c26ab480e53c4922933d7ff6fa085e2ae",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt": "5ee7b106022b5ef569e286e51eeac027ecd3be749d631182bfc7fc61974d1238",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefsNodes.kt": "46100f3cb0301112306404bf95df5ab95be98deba4a72f14e8641c1fd7afa33c",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/KgRetention.kt": "bdf611b11f86565f58f0838987c3a6dafba1cdb5e87c9d54fd147aa0ee3cfb0d",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/NalNodes.kt": "d45721713515bfa44fb11d2078d82ed63222a65faf03e4e9141c07a0e1465b8d",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt": "ef3fc4f0bd53310af9a296f483ac328c407b1c0863cad6787150b3ba1e2f23e9",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornCertificateTest.kt": "c2c5d0b005d355f33c437d4dbe7ecddeb42acec97bbc162ff8b287381e172800",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt": "95ab7d8d1f5340941160a49431265f3b1d3afd90308fb0f1666d92f367e97b1c",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/ExactRoleRecallTest.kt": "1d6ded7f3f906276f5e0e87bb2892fbe9a4989fd86499d683b82a854be6ab97d"
+  },
+  "changedSourceAndBuildPaths": [
+    "release/airgap-document/README.md",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefsNodes.kt",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/KgRetention.kt",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/NalNodes.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornCertificateTest.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/ExactRoleRecallTest.kt"
+  ],
+  "build": {
+    "sourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+    "jvm": "checks/final-jvm.json",
+    "targets": "checks/integrated-targets.json",
+    "targetInputContinuity": "target-input-continuity.json",
+    "standing": "Offline final JVM main/all test-source compilation, application install and selected regressions. Spacegraph production and JS/Documents, Wasm-JS, Wasm-WASI and Linux x64 compilation passed at 97df; subsequent source changes are exclusively JVM main/tests, with non-JVM/build input continuity verified. No source/test exclusions."
+  },
+  "testTotals": {
+    "packagedScenarios": 2,
+    "browserAssertionsPassed": 13,
+    "frameMeasurementCases": 1,
+    "normalJvmExits": 3,
+    "newJvmUnitTestRun": true,
+    "jvmPassed": 303,
+    "jvmSkipped": 6,
+    "jvmFailures": 0,
+    "jvmErrors": 0
+  },
+  "browser": {
+    "bundle": {
+      "sha256": "7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74"
+    },
+    "document": {
+      "kind": "document",
+      "casObjectsVerified": 27,
+      "walFramesVerified": [
+        {
+          "cid": "sha256:902fc82f9ae389488dbcd3d7878dc6b8ff35699b99637ad19596f3cf747198bc",
+          "status": "queued"
+        },
+        {
+          "cid": "sha256:8128db3308dea90f7eb52bc2dd67cb14d3a0b44999dfd9971be08f4edbd4b843",
+          "status": "running"
+        },
+        {
+          "cid": "sha256:9d04a1e7310646589cf6558fb5090523e08167b6a245328a6c0c5ba1b2f1739d",
+          "status": "completed"
+        }
+      ],
+      "runId": "c7414d06-130c-4395-afb9-3ee43f98ed8a",
+      "programCid": "sha256:cd61518f42a8807f830add3291d8d3d2c1a707d20bec6cda1a7b4fbf3a07647e",
+      "receiptCid": "sha256:9d04a1e7310646589cf6558fb5090523e08167b6a245328a6c0c5ba1b2f1739d",
+      "mappedReceivedSelections": 8,
+      "mappedWires": 8,
+      "ownerOmissionsInFinalLedger": 0,
+      "allSixDocumentsUnchanged": true,
+      "processExits": [
+        0,
+        0
+      ],
+      "oneRunSubmission": true,
+      "bundleSha256": "7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74",
+      "frameIntervals": {},
+      "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+    },
+    "fanout": {
+      "kind": "fanout",
+      "casObjectsVerified": 26,
+      "walFramesVerified": [
+        {
+          "cid": "sha256:e686ca947614ce5791b2d70ddf92ff63f16e4e78a15bec2e7c236b044160d359",
+          "status": "queued"
+        },
+        {
+          "cid": "sha256:15fc89e34ce1b1ec900c724117339e5c203923c88986984716b8cf2ff693bb8e",
+          "status": "running"
+        },
+        {
+          "cid": "sha256:95d09ef397284b4bbacc0f4fdfe97ad47cb7930afd173916af695568b87b431c",
+          "status": "completed"
+        }
+      ],
+      "runId": "e608c0a0-4930-4e22-b51a-66952f477e4c",
+      "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+      "receiptCid": "sha256:95d09ef397284b4bbacc0f4fdfe97ad47cb7930afd173916af695568b87b431c",
+      "mappedReceivedSelections": 19,
+      "mappedWires": 19,
+      "ownerOmissionsInFinalLedger": 165,
+      "allSixDocumentsUnchanged": true,
+      "processExits": [
+        0
+      ],
+      "oneRunSubmission": true,
+      "bundleSha256": "7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74",
+      "frameIntervals": {
+        "unit": "ms",
+        "samples": 107,
+        "p50": 16.699999999999818,
+        "p95": 33.30000000000018,
+        "maximum": 1050,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+    },
+    "acceptedPaths": [
+      "accepted/final-document",
+      "accepted/final-fanout"
+    ],
+    "earlierCandidatePaths": [
+      "accepted/document",
+      "accepted/fanout",
+      "accepted/integrated-document",
+      "accepted/integrated-fanout"
+    ]
+  },
+  "runtimeUpdate": {
+    "baseArchive": {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "bytes": 460778817,
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    "targetSourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+    "previousJvmSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "files": {
+      "SHA256SUMS": {
+        "before": "e93c64c20797875170cbe1f52e1b062e57a0a08fb44ced42e23e44666dec1115",
+        "after": "6448a67bf269fbb29b774c23d2357c5753723d544cd16ae144fa18de8dbf4869"
+      },
+      "opt/trikeshed/README.md": {
+        "before": "c3e4ca1db3af4a4fda1bf1deec036b38aca4c8fcc552b38f5f3d729756608bdd",
+        "after": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13"
+      },
+      "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+        "before": "b65eddc8f95bc93bb7ff1f1431d0dedc904c8bd6b55af818bd37f8513e6d022a",
+        "after": "45ab445668ff01bd55435eda6539c3d7b6d48a8b54c91242f075c7bcb1f817e3"
+      },
+      "opt/trikeshed/lib/TrikeShed-jvm-0.1.0-SNAPSHOT.jar": {
+        "before": "5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c",
+        "after": "a02c27f9a6153376ab6b73ae10c481c6a0e549f2d282510db834962fe21e9cf2"
+      },
+      "package-identity.json": {
+        "before": "ee6456520a5e7c99e752e1759416d95aac81d9bbf1b4e989c327095965c12271",
+        "after": "2c53a73c8cac3d2cf5c6fa7a46cc786482ced30df7db6e314cff87e22457e6e2"
+      }
+    },
+    "scope": "Layered runtime update. Requires the exact immutable R4f runtime; the production JVM and Spacegraph jars are rebuilt from combined D3M source, retaining the runtime instructions and exact manifests. Incoming exact-role NARS selection, null wired-identity refusal and checked native Horn proof projections are included. No new dependency or native module.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3c-final-runtime-update-2026-11-05.tar.gz",
+      "sha256": "19ee8d8ea105f85784838f2c7799400fb9b2ca86c824db2344b0ec5e097fe018",
+      "bytes": 36867527
+    },
+    "identicalTwoAssemblies": true,
+    "installedRoot": "/workspace/airgap-r3c-proof/installed-final/airgap-document-rootfs",
+    "installation": "Verified immutable R4f root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete final membership/mode/hash verification passes. No mutation of the R4f root."
+  },
+  "sourceUpdate": {
+    "baseSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "targetSourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+    "targetTree": "7a5d4193ce991cea407e02e99263c668645cc2cb",
+    "requiredSourceChain": [
+      {
+        "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+        "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+      },
+      {
+        "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+        "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+      }
+    ],
+    "patchSha256": "45be5cc336d1c0e81c789b685534770a57d4e4f0cd7c841722603f95a466f492",
+    "verifiedAppliedTreeMatches": true,
+    "dependencyChanges": [],
+    "scope": "Apply after the R4f source update on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3c-final-sources-update-2026-11-05.tar.gz",
+      "bytes": 71803616,
+      "sha256": "dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f"
+    }
+  },
+  "inventory": {
+    "files": 1355,
+    "bytes": 998199499,
+    "modesMembershipAndHashesVerified": true,
+    "manifest": "packaging/final-package-identity.json"
+  },
+  "d3m": {
+    "initialRefs": 545,
+    "firstPublicationRefs": 545,
+    "recheckRefs": 546,
+    "finalRefs": 548,
+    "merges": 4,
+    "conflicts": 0,
+    "noBranchesDeleted": true,
+    "preSealedRefs": 547
+  },
+  "limits": [
+    "Linux host and external Chromium; no machine power-loss proof",
+    "65-node fixture, not 10k/50k or recursive-scope rendering closure",
+    "One-second observed frame gap remains open; rAF intervals are not isolated preparation measurements",
+    "Table retains at most 256 mapped wire aggregates and one last observation per row; full histories remain bounded at owner",
+    "Runtime/source updates require exact separately published bases",
+    "Vendor/native source rebuild closure and general Nix evaluation remain open",
+    "Six external native-endpoint tests are conditionally skipped because the separately configured executable is unavailable. Nine native certificate/preparation tests pass; no new end-to-end native Horn execution is claimed."
+  ],
+  "initialDisplaySourceCommit": "06da928c627b16db79abc97becaab483874102da",
+  "previousJvmSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "publicationContinuation": {
+    "initialEvidenceCommit": "c43d035114b7f0bf052a89a258aafeda5a9eec98",
+    "firstMergeCommit": "97df0b59e5445e318f7f337ea0d4c395d17428ce",
+    "nativeHornMergeCommit": "56af0795fe948c41e12a6eb1519e792d1f401177",
+    "finalMergeCommit": "792a14c3b982956df3a139661797e171cba9b963",
+    "incomingMaster": "c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2",
+    "frozenRefs": 548,
+    "merges": 4,
+    "conflicts": 0,
+    "intent": "Retain read-only exact source-local KG role recall, typed unique resident attention targets and refusal of null wired identities before authored fallback. Retain native Horn certificate projections with rule-scoped bindings and source references; explicit host assumptions do not confer review authority or world applicability. Incoming English WAL and exact-role replay evidence retains its original source identities.",
+    "sealedMergeCommit": "08e8830a4e89b5bc025c150f492c90192ffc0dda",
+    "sealedIncomingMaster": "bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70",
+    "sealedSourceBuildInputsUnchanged": true
+  }
+}

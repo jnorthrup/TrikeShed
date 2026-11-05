@@ -1,0 +1,12 @@
+from pathlib import Path
+import hashlib,json,shutil,stat
+h=Path('/workspace/airgap-r3c-proof');rows=[]
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+for release,wanted in [('d','79a46f04b12ddcba0d5e89f9d9e4c43a4ffcde705ec89ab19a9fb5c9d917df86'),('e','c95a4bb318f2f89eb88a2bb2179604483d531e30b30e2c534dd84e6a06c8f254')]:
+ archive=Path(f'/workspace/library-files/airgap-document-r4{release}-linux-x64-2026-11-05.tar.gz');assert sha(archive)==wanted
+ root=Path(f'/workspace/airgap-r4{release}-proof/rootfs');record=json.loads((root/'package-identity.json').read_text());actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file()};assert actual=={x['path'] for x in record['files']}|{'SHA256SUMS','package-identity.json'}
+ for r in record['files']:
+  p=root/r['path'];assert sha(p)==r['sha256'] and stat.S_IMODE(p.stat().st_mode)==r['mode']
+ rows.append({'removedSupersededScratchRoot':str(root),'retainedArchive':str(archive),'sha256':wanted,'inventoryFilesVerified':len(record['files'])});shutil.rmtree(root)
+ (h/'scratch-root-reclamation.json').write_text(json.dumps(rows,indent=2)+'\n');print('Verified and reclaimed',root,flush=True)
