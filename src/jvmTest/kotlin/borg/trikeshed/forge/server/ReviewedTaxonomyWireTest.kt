@@ -94,10 +94,10 @@ class ReviewedTaxonomyWireTest {
                 LcncNode("pattern", SparqlGraph.PATTERN, _m["subject" j "?subject", "predicate" j "<urn:test:predicate>", "object" j "?object"])],
                 s_[LcncWire("variable", "variable", "select", "variables"), LcncWire("pattern", "pattern", "select", "patterns")],
                 controls = LcncConfixControls(inspectionOnly = true))))
-            val unavailable = request("taxonomy-plan", goal(approved["revision"]) + _m["program" j program], status = 409)
-            assertEquals("reviewed_taxonomy_query_refused", unavailable["error"])
-            assertEquals("reviewed_taxonomy_source_unavailable", unavailable["code"])
-            assertFalse("results" in unavailable || "quadQuery" in unavailable)
+            val queryUnavailable = request("taxonomy-plan", goal(approved["revision"]) + _m["program" j program], status = 409)
+            assertEquals("reviewed_taxonomy_query_refused", queryUnavailable["error"])
+            assertEquals("reviewed_taxonomy_source_unavailable", queryUnavailable["code"])
+            assertFalse("results" in queryUnavailable || "quadQuery" in queryUnavailable)
             assertEquals(walSize, Files.size(wal), "An unavailable optional query cannot spend the norm permit")
             val page = first["page"] as Map<*, *>
             assertEquals(0, (page["offset"] as Number).toInt())
