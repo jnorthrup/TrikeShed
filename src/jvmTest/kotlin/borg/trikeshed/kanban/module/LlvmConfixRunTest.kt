@@ -20,7 +20,7 @@ class LlvmConfixRunTest {
             val scanner = LlvmConfix.open(checkNotNull(session.kernel), KernelId("scan"),
                 LlvmConfixTest.profile(), LlvmScalarTest.files(LlvmConfixTest.bytes()))
             session.ctx.lcncRunners[LlvmConfixContract.TYPE] = scanner.runner(session.cas)
-            val json = "{\"quote\":\"é水🙂\",\"page\":12}"
+            val json = "{\"quote\":\"é水🙂\",\"page\":12,\"anchors\":[{\"page\":12,\"box\":[1,2,3,4]}]}"
             val program = LcncProgram("native-selection-optional-ports", s_[
                 LcncNode("text", "text.value", _m["value" j json]),
                 LcncNode("scan", LlvmConfixContract.TYPE, _m["format" j "JSON"]),
@@ -37,6 +37,9 @@ class LlvmConfixRunTest {
             val value = selection["value"] as Map<*, *>
             assertEquals("é水🙂", value["quote"])
             assertEquals(12.0, (value["page"] as Number).toDouble())
+            val anchor = (value["anchors"] as List<*>).single() as Map<*, *>
+            assertEquals(12.0, (anchor["page"] as Number).toDouble())
+            assertEquals(_l[1.0, 2.0, 3.0, 4.0], (anchor["box"] as List<*>).map { (it as Number).toDouble() })
         } finally { session.close() }
     }
 

@@ -28,6 +28,9 @@ class LcncConfixSelectionTest {
         val sheet = selected["sheet"] as Map<*, *>
         assertTrue(jsonOf(sheet).contains("35"))
         assertEquals("native", selected["geometry"])
+        val root = LcncConfixSelection.select(json, "/", scan["rows"], cid, true, "JSON")
+        val serialized = reify(jsonOf(root["value"])) as Map<*, *>
+        assertEquals("é水🙂 \"x\"", ((serialized["spans"] as List<*>).single() as Map<*, *>)["quote"])
         assertEquals(false, LcncConfixSelection.select(json, "spans.-1", scan["rows"], cid, true, "JSON")["found"])
         assertEquals(false, LcncConfixSelection.select(json, "flag", scan["rows"], cid, true, "JSON")["value"])
         assertEquals(null, LcncConfixSelection.select(json, "absent", scan["rows"], cid, true, "JSON")["value"])

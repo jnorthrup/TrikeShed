@@ -96,6 +96,21 @@ object LcncConfixSelection {
         return Syntax.JSON.indexed(flat, source) j source
     }
 
+    internal fun value(cell: ConfixCell): Any? = when (cell.row.tag) {
+        IOMemento.IoObject -> {
+            val result = linkedMapOf<String, Any?>()
+            val kids = cell.cellKids
+            for (k in 0 until kids.size step 2) {
+                val key = kids[k].reify() as String
+                require(key !in result) { "Duplicate JSON key in selected value" }
+                result[key] = value(kids[k + 1])
+            }
+            result
+        }
+        IOMemento.IoArray -> (cell.cellKids α { value(it) }).toList()
+        else -> scalar(cell)
+    }
+
     fun select(json: String, path: String, rows: Any?, sourceCid: Any?, ok: Any?, format: Any?): Map<String, Any?> {
         var cell = indexed(json, rows, sourceCid, ok, format).rootCell
         for (segment in path.trim().removePrefix("/").replace('/', '.').split('.').filter(String::isNotEmpty)) {
@@ -104,20 +119,6 @@ object LcncConfixSelection {
                 IOMemento.IoArray -> segment.toIntOrNull()?.takeIf { it >= 0 }?.let { parent[it] }
                 else -> null
             } }
-        }
-        fun value(cell: ConfixCell): Any? = when (cell.row.tag) {
-            IOMemento.IoObject -> {
-                val result = linkedMapOf<String, Any?>()
-                val kids = cell.cellKids
-                for (k in 0 until kids.size step 2) {
-                    val key = kids[k].reify() as String
-                    require(key !in result) { "Duplicate JSON key in selected value" }
-                    result[key] = value(kids[k + 1])
-                }
-                result
-            }
-            IOMemento.IoArray -> (cell.cellKids α { value(it) }).toList()
-            else -> scalar(cell)
         }
         val family = cell?.let { confixCellSheets("confix/$path", path, it, scalar = ::scalar) }.orEmpty()
         return _m["found" j (cell != null), "path" j path, "value" j cell?.let(::value),
