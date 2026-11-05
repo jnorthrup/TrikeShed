@@ -1,0 +1,19 @@
+from pathlib import Path
+import os,subprocess,json,datetime
+h=Path('/workspace/airgap-r3d-proof')
+roots={'baseline':Path('/workspace/airgap-r3c-proof/installed-final/airgap-document-rootfs'),'final':h/'installed-combined/airgap-document-rootfs'}
+order=[('baseline',1),('final',1),('final',2),('baseline',2),('baseline',3),('final',3)]
+rows=[]
+for kind,n in order:
+ case=f'{kind}-fanout{n:02d}'
+ env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(roots[kind])
+ command=['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','airgap-r3d','python3',str(h/'run.py'),case,'fanout']
+ started=datetime.datetime.now(datetime.timezone.utc).isoformat()
+ result=subprocess.run(command,env=env,check=False)
+ row={'case':case,'kind':kind,'startedAt':started,'finishedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'command':command,'exit':result.returncode}
+ rows.append(row);(h/'comparison-runs.json').write_text(json.dumps(rows,indent=2)+'\n')
+ assert result.returncode==0,case
+ subprocess.run(['python3',str(h/'audit.py'),case,'fanout'],check=True)
+ browser=json.loads((h/case/'browser.json').read_text());row['frames']={k:v for k,v in browser['frameIntervals'].items() if k!='raw'};row['checks']={k:v['result'] for k,v in browser['cases'].items()}
+ assert all(v=='PASS' for k,v in row['checks'].items() if k!='frameMeasurement')
+ (h/'comparison-runs.json').write_text(json.dumps(rows,indent=2)+'\n');print(json.dumps(row),flush=True)

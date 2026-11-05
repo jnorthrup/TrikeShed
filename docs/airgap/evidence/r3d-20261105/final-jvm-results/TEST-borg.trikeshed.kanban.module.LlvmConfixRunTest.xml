@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LlvmConfixRunTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:54:43.404Z" hostname="0d6dfba25614" time="3.409">
+  <properties/>
+  <testcase name="failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm]" classname="borg.trikeshed.kanban.module.LlvmConfixRunTest" time="1.269"/>
+  <testcase name="sourceGeometryAndScalarSummarySurviveReopening()[jvm]" classname="borg.trikeshed.kanban.module.LlvmConfixRunTest" time="1.359"/>
+  <testcase name="nativeSelectionConsumesOptionalPortSpellingsThroughTheActualRoute()[jvm]" classname="borg.trikeshed.kanban.module.LlvmConfixRunTest" time="0.777"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

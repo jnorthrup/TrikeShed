@@ -1,0 +1,654 @@
+{
+  "bundleSha256": "82c4db3c712d72804bc16bc4acec39f544606602dc8f446363416808eb2266c0",
+  "selfSamples": [
+    {
+      "ms": 1884.176,
+      "id": 10,
+      "function": "(idle)",
+      "url": ""
+    },
+    {
+      "ms": 794.039,
+      "id": 2,
+      "function": "(program)",
+      "url": ""
+    },
+    {
+      "ms": 28.565,
+      "id": 259,
+      "function": "X.u3u",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 192,
+      "column": 5,
+      "name": "resolveTopLevelOverlaps",
+      "text": "fun resolveTopLevelOverlaps() {"
+    },
+    {
+      "ms": 23.017,
+      "id": 16,
+      "function": "query",
+      "url": ""
+    },
+    {
+      "ms": 18.971,
+      "id": 412,
+      "function": "getTotalLength",
+      "url": ""
+    },
+    {
+      "ms": 18.599,
+      "id": 299,
+      "function": "getBoundingClientRect",
+      "url": ""
+    },
+    {
+      "ms": 16.358,
+      "id": 4,
+      "function": "requestAnimationFrame",
+      "url": ""
+    },
+    {
+      "ms": 14.953,
+      "id": 431,
+      "function": "getElementLabels",
+      "url": ""
+    },
+    {
+      "ms": 9.727,
+      "id": 332,
+      "function": "getAttribute",
+      "url": ""
+    },
+    {
+      "ms": 9.584,
+      "id": 34,
+      "function": "requestAnimationFrame",
+      "url": ""
+    },
+    {
+      "ms": 8.332,
+      "id": 30,
+      "function": "dispatchEvent",
+      "url": ""
+    },
+    {
+      "ms": 7.204,
+      "id": 40,
+      "function": "elementsFromPoint",
+      "url": ""
+    },
+    {
+      "ms": 6.41,
+      "id": 421,
+      "function": "getExplicitAriaRole",
+      "url": ""
+    },
+    {
+      "ms": 6.034,
+      "id": 334,
+      "function": "elementSafeTagName",
+      "url": ""
+    },
+    {
+      "ms": 5.982,
+      "id": 143,
+      "function": "(garbage collector)",
+      "url": ""
+    },
+    {
+      "ms": 4.964,
+      "id": 24,
+      "function": "checkVisibility",
+      "url": ""
+    },
+    {
+      "ms": 4.628,
+      "id": 18,
+      "function": "getAriaRole",
+      "url": ""
+    },
+    {
+      "ms": 4.38,
+      "id": 356,
+      "function": "",
+      "url": ""
+    },
+    {
+      "ms": 4.342,
+      "id": 359,
+      "function": "",
+      "url": ""
+    },
+    {
+      "ms": 4.294,
+      "id": 429,
+      "function": "query",
+      "url": ""
+    },
+    {
+      "ms": 4.116,
+      "id": 20,
+      "function": "",
+      "url": ""
+    },
+    {
+      "ms": 3.611,
+      "id": 333,
+      "function": "getImplicitAriaRole",
+      "url": ""
+    },
+    {
+      "ms": 3.246,
+      "id": 21,
+      "function": "isElementHiddenForAria",
+      "url": ""
+    },
+    {
+      "ms": 3.242,
+      "id": 257,
+      "function": "$d",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRender.kt",
+      "line": 13,
+      "column": 1,
+      "name": "renderTree",
+      "text": "fun Panels.renderTree(v: dynamic, key: String, depth: Int): dynamic {"
+    },
+    {
+      "ms": 3.229,
+      "id": 293,
+      "function": "zh.o16",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt",
+      "line": 111,
+      "column": 14,
+      "name": "get",
+      "text": "operator fun get(key: K): V? {"
+    },
+    {
+      "ms": 3.227,
+      "id": 408,
+      "function": "",
+      "url": ""
+    },
+    {
+      "ms": 3.224,
+      "id": 19,
+      "function": "computeAriaRole",
+      "url": ""
+    },
+    {
+      "ms": 3.216,
+      "id": 153,
+      "function": "Be",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "compare",
+      "text": ""
+    },
+    {
+      "ms": 3.171,
+      "id": 17,
+      "function": "match",
+      "url": ""
+    },
+    {
+      "ms": 3.02,
+      "id": 27,
+      "function": "belongsToDisplayNoneOrAriaHiddenOrNonSlotted",
+      "url": ""
+    },
+    {
+      "ms": 2.634,
+      "id": 137,
+      "function": "SM",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 27,
+      "column": 5,
+      "name": "reify$value",
+      "text": "fun value(k: Int): Any? {"
+    },
+    {
+      "ms": 2.535,
+      "id": 218,
+      "function": "Qe",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "add",
+      "text": ""
+    },
+    {
+      "ms": 2.499,
+      "id": 263,
+      "function": "zh.u39",
+      "source": "webpack:///../src/jsMain/kotlin/borg/trikeshed/web/PatchNavigation.kt",
+      "line": 21,
+      "column": 5,
+      "name": "projectWires",
+      "text": "fun projectWires(svg: Element, viewport: dynamic, view: dynamic) {"
+    },
+    {
+      "ms": 2.155,
+      "id": 355,
+      "function": "querySelectorAll",
+      "url": ""
+    },
+    {
+      "ms": 2.013,
+      "id": 415,
+      "function": "",
+      "url": ""
+    }
+  ],
+  "inclusiveSamples": [
+    {
+      "ms": 3003.548,
+      "id": 1,
+      "function": "(root)",
+      "url": ""
+    },
+    {
+      "ms": 1884.176,
+      "id": 10,
+      "function": "(idle)",
+      "url": ""
+    },
+    {
+      "ms": 794.039,
+      "id": 2,
+      "function": "(program)",
+      "url": ""
+    },
+    {
+      "ms": 152.664,
+      "id": 6,
+      "function": "evaluate",
+      "url": ""
+    },
+    {
+      "ms": 150.561,
+      "id": 5,
+      "function": "",
+      "url": ""
+    },
+    {
+      "ms": 132.037,
+      "id": 11,
+      "function": "callMatchedElements",
+      "url": ""
+    },
+    {
+      "ms": 123.191,
+      "id": 49,
+      "function": "En.k8",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": null,
+      "text": ""
+    },
+    {
+      "ms": 123.191,
+      "id": 48,
+      "function": "En.o8",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": null,
+      "text": ""
+    },
+    {
+      "ms": 123.191,
+      "id": 47,
+      "function": "Pt.vp",
+      "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/common/src/internal/DispatchedTask.kt",
+      "line": 77,
+      "column": 20,
+      "name": "run",
+      "text": ""
+    },
+    {
+      "ms": 123.191,
+      "id": 46,
+      "function": "Pt.k13",
+      "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/web/src/internal/JSDispatcher.kt",
+      "line": 122,
+      "column": 5,
+      "name": "process",
+      "text": ""
+    },
+    {
+      "ms": 123.191,
+      "id": 45,
+      "function": "",
+      "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/js/src/JSDispatcher.kt",
+      "line": 55,
+      "column": 36,
+      "name": "WindowMessageQueue$schedule$lambda$lambda",
+      "text": ""
+    },
+    {
+      "ms": 121.54,
+      "id": 13,
+      "function": "_queryEngineAll",
+      "url": ""
+    },
+    {
+      "ms": 121.54,
+      "id": 12,
+      "function": "querySelectorAll",
+      "url": ""
+    },
+    {
+      "ms": 113.546,
+      "id": 119,
+      "function": "X.l8",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 40,
+      "column": 18,
+      "name": "doResume",
+      "text": "internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynamic {"
+    },
+    {
+      "ms": 94.192,
+      "id": 15,
+      "function": "queryRole",
+      "url": ""
+    },
+    {
+      "ms": 94.192,
+      "id": 14,
+      "function": "queryAll",
+      "url": ""
+    },
+    {
+      "ms": 93.891,
+      "id": 16,
+      "function": "query",
+      "url": ""
+    },
+    {
+      "ms": 92.535,
+      "id": 177,
+      "function": "X.l8",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 141,
+      "column": 9,
+      "name": "doResume",
+      "text": "suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {"
+    },
+    {
+      "ms": 92.535,
+      "id": 176,
+      "function": "fv",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 141,
+      "column": 9,
+      "name": "programOutputs",
+      "text": "suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {"
+    },
+    {
+      "ms": 68.719,
+      "id": 17,
+      "function": "match",
+      "url": ""
+    },
+    {
+      "ms": 43.732,
+      "id": 18,
+      "function": "getAriaRole",
+      "url": ""
+    },
+    {
+      "ms": 39.104,
+      "id": 19,
+      "function": "computeAriaRole",
+      "url": ""
+    },
+    {
+      "ms": 35.112,
+      "id": 261,
+      "function": "X.k3u",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 458,
+      "column": 5,
+      "name": "redrawWires",
+      "text": "fun redrawWires() {"
+    },
+    {
+      "ms": 35.112,
+      "id": 260,
+      "function": "X.l36",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 78,
+      "column": 14,
+      "name": "redraw",
+      "text": "override fun redraw() = redrawWires()"
+    },
+    {
+      "ms": 28.565,
+      "id": 259,
+      "function": "X.u3u",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 192,
+      "column": 5,
+      "name": "resolveTopLevelOverlaps",
+      "text": "fun resolveTopLevelOverlaps() {"
+    },
+    {
+      "ms": 21.009,
+      "id": 411,
+      "function": "",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt",
+      "line": 200,
+      "column": 13,
+      "name": "draw",
+      "text": "private fun draw(now: Double) {"
+    },
+    {
+      "ms": 21.009,
+      "id": 410,
+      "function": "",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt",
+      "line": 89,
+      "column": 109,
+      "name": "PanelsTrace$draw$ref$lambda",
+      "text": "if (frame == 0 && (pending.isNotEmpty() || visible.isNotEmpty())) frame = panels.page.frame(::draw)"
+    },
+    {
+      "ms": 21.009,
+      "id": 409,
+      "function": "",
+      "source": "webpack:///../src/jsMain/kotlin/borg/trikeshed/web/PanelsPage.kt",
+      "line": 78,
+      "column": 47,
+      "name": "PanelsPage$frame$lambda$lambda",
+      "text": "handle = window.requestAnimationFrame { time -> frames.remove(handle); if (!closing) block(time) }"
+    },
+    {
+      "ms": 19.247,
+      "id": 425,
+      "function": "queryAll",
+      "url": ""
+    },
+    {
+      "ms": 18.971,
+      "id": 412,
+      "function": "getTotalLength",
+      "url": ""
+    },
+    {
+      "ms": 18.799,
+      "id": 298,
+      "function": "X.d3a",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 412,
+      "column": 14,
+      "name": "portCenter",
+      "text": "override fun portCenter(nodeId: String, dir: String, name: String): dynamic {"
+    },
+    {
+      "ms": 18.599,
+      "id": 299,
+      "function": "getBoundingClientRect",
+      "url": ""
+    },
+    {
+      "ms": 17.423,
+      "id": 3,
+      "function": "frame",
+      "url": ""
+    },
+    {
+      "ms": 16.358,
+      "id": 4,
+      "function": "requestAnimationFrame",
+      "url": ""
+    },
+    {
+      "ms": 15.495,
+      "id": 192,
+      "function": "Fv",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 149,
+      "column": 5,
+      "name": "programOutputs$current",
+      "text": "fun current(): Boolean {"
+    }
+  ],
+  "traceInclusiveMilliseconds": {
+    "Layerize": 172.346,
+    "RunMicrotasks": 135.599,
+    "Paint": 67.975,
+    "FunctionCall": 46.607,
+    "FireAnimationFrame": 39.826,
+    "UpdateLayoutTree": 39.038,
+    "Layout": 36.56,
+    "HitTest": 24.791,
+    "PrePaint": 23.252,
+    "EventDispatch": 14.95,
+    "V8.StackGuard": 10.363,
+    "V8.HandleInterrupts": 8.847,
+    "V8.BytecodeBudgetInterrupt": 6.179,
+    "MinorGC": 4.301,
+    "V8.GC_SCAVENGER": 3.913,
+    "V8.GC_SCAVENGER_SCAVENGE": 3.854,
+    "V8.GC_BACKGROUND_SAFEPOINT": 2.729,
+    "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL": 2.461,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE": 2.247,
+    "V8.GC_BACKGROUND_UNPARK": 1.621,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL": 1.285,
+    "V8.GC_BACKGROUND_YOUNG_ARRAY_BUFFER_SWEEP": 0.958,
+    "TimerFire": 0.831,
+    "V8.GC_SCAVENGER_SCAVENGE_WEAK_GLOBAL_HANDLES_PROCESS": 0.54,
+    "V8.GC_SCAVENGER_SCAVENGE_ROOTS": 0.446
+  },
+  "largestLayoutStacks": [
+    {
+      "ms": 16.96,
+      "stack": [
+        {
+          "function": "X.u3u",
+          "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+          "line": 201,
+          "column": 30,
+          "name": "offsetWidth",
+          "text": "val w = n.el.offsetWidth; val h = n.el.offsetHeight"
+        },
+        {
+          "function": "X.l8",
+          "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+          "line": 224,
+          "column": 20,
+          "name": "u3u",
+          "text": "if (current()) resolveTopLevelOverlaps()"
+        },
+        {
+          "function": "fv",
+          "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+          "line": 1,
+          "column": 1,
+          "name": "$completion",
+          "text": ""
+        },
+        {
+          "function": "X.l8",
+          "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+          "line": 93,
+          "column": 21,
+          "name": "programOutputs",
+          "text": "programOutputs(result, JSON.stringify(toConfix())) { trace.owns(activity) }"
+        },
+        {
+          "function": "En.k8",
+          "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+          "line": 1,
+          "column": 1,
+          "name": "l8",
+          "text": ""
+        },
+        {
+          "function": "En.o8",
+          "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+          "line": 1,
+          "column": 1,
+          "name": "k8",
+          "text": ""
+        },
+        {
+          "function": "Pt.vp",
+          "source": "webpack:///src/kotlin/coroutines/Continuation.kt",
+          "line": 45,
+          "column": 5,
+          "name": "o8",
+          "text": ""
+        },
+        {
+          "function": "Pt.k13",
+          "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/web/src/internal/JSDispatcher.kt",
+          "line": 127,
+          "column": 25,
+          "name": "vp",
+          "text": ""
+        },
+        {
+          "function": "",
+          "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/js/src/JSDispatcher.kt",
+          "line": 55,
+          "column": 38,
+          "name": "k13",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "ms": 1.42,
+      "stack": []
+    },
+    {
+      "ms": 1.25,
+      "stack": []
+    },
+    {
+      "ms": 1.194,
+      "stack": []
+    },
+    {
+      "ms": 1.14,
+      "stack": []
+    },
+    {
+      "ms": 0.936,
+      "stack": []
+    },
+    {
+      "ms": 0.868,
+      "stack": []
+    },
+    {
+      "ms": 0.668,
+      "stack": []
+    }
+  ],
+  "scope": "Sampled CPU attribution through the exact packaged source map. Inclusive values overlap; timeline categories also overlap. This diagnostic run includes profiler overhead."
+}

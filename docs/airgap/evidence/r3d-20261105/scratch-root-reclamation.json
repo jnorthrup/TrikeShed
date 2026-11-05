@@ -1,0 +1,32 @@
+[
+  {
+    "root": "/workspace/airgap-r3c-proof/integrated-rootfs",
+    "retainedUpdate": {
+      "file": "/workspace/library-files/airgap-document-r3c-integrated-runtime-update-2026-11-05.tar.gz",
+      "sha256": "ee9d4cb3bb5cb18d978d7d8118c531d6f22824ed0899b03d51a51d20c49567b1",
+      "bytes": 36850821
+    },
+    "baseRuntime": {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "bytes": 460778817,
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    "installedProofRootRetained": "/workspace/airgap-r3c-proof/installed-integrated/airgap-document-rootfs",
+    "membershipModesHashesVerifiedBeforeRemoval": true
+  },
+  {
+    "root": "/workspace/airgap-r3c-proof/final-rootfs",
+    "retainedUpdate": {
+      "file": "/workspace/library-files/airgap-document-r3c-final-runtime-update-2026-11-05.tar.gz",
+      "sha256": "19ee8d8ea105f85784838f2c7799400fb9b2ca86c824db2344b0ec5e097fe018",
+      "bytes": 36867527
+    },
+    "baseRuntime": {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "bytes": 460778817,
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    "installedProofRootRetained": "/workspace/airgap-r3c-proof/installed-final/airgap-document-rootfs",
+    "membershipModesHashesVerifiedBeforeRemoval": true
+  }
+]

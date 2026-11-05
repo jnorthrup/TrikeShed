@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="RetainedNalImplicationTest[jvm]" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:54:51.523Z" hostname="0d6dfba25614" time="0.174">
+  <properties/>
+  <testcase name="directionAndMissingPremiseDiscriminateDeductionFromWeakInduction()[jvm]" classname="borg.trikeshed.narsese.RetainedNalImplicationTest" time="0.009"/>
+  <testcase name="partialCopiedUnreportedAndNormalizedFramesRefuseBeforePairExecution()[jvm]" classname="borg.trikeshed.narsese.RetainedNalImplicationTest" time="0.01"/>
+  <testcase name="heldOutDeductionKeepsExactSourceAndFullIdentityPreimages()[jvm]" classname="borg.trikeshed.narsese.RetainedNalImplicationTest" time="0.003"/>
+  <testcase name="rawClauseBoundPrecedesDeduplicationAndCapsOrderedPairs()[jvm]" classname="borg.trikeshed.narsese.RetainedNalImplicationTest" time="0.099"/>
+  <testcase name="anyUnaccountedNegativeModalQuotationRoleOrContextRefusesWholeFrame()[jvm]" classname="borg.trikeshed.narsese.RetainedNalImplicationTest" time="0.021"/>
+  <testcase name="separateInspectionsNeverSupplyACombinedFrameOrSurfaceIdentity()[jvm]" classname="borg.trikeshed.narsese.RetainedNalImplicationTest" time="0.004"/>
+  <testcase name="s12OccurrencesRemainDependentAndOnlyOriginalPremisesFeedOneLevel()[jvm]" classname="borg.trikeshed.narsese.RetainedNalImplicationTest" time="0.025"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

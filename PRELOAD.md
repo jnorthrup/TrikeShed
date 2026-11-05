@@ -472,3 +472,13 @@ ordering; use commit ID then ref name to break equal-time ties. Verify every
 frozen tip is an ancestor of the result before the ordinary master push.
 Retain conflict index stages and base/left/right contents before resolving
 intent; never use blanket side preference, force push or branch deletion.
+
+Git requires a resolved index before the next sequential merge. Retain the
+conflicted working file as well as stages 1/2/3, record each side's intent,
+then resolve the minimum necessary to continue. Audit the complete merged
+result at the end. Equivalent independently written fixes need one coherent
+implementation with both histories retained; differing variable names are
+not a reason to duplicate effects. Keep failed verification evidence and the
+reason for its correction. Record tested commit/tree identities separately
+from later documentation-only publication commits, and verify that tested
+source and build inputs remain unchanged before relying on earlier checks.

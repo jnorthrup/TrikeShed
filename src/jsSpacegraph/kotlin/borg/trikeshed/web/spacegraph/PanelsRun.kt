@@ -143,8 +143,21 @@ suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> B
     val canvas = graph
     val projected = nodes().filter { !truthy(it._parentScope) }
     val definition = LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, document)
-    fun current(): Boolean = owned() && !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(definition,
-        LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, JSON.stringify(toConfix())))
+    var snapshot: String? = null
+    var snapshotName: String? = null
+    var matching = false
+    fun current(): Boolean {
+        if (!owned() || page.closing || graph !== canvas) return false
+        val name = str(panelName().value).ifBlank { "canvas" }
+        val data = JSON.stringify(toConfix())
+        // Compare every current snapshot, including edits that have not reached save().
+        // Reuse only the semantic comparison of identical serialized input and name.
+        if (data != snapshot || name != snapshotName) {
+            matching = LcncProgramConfix.sameDefinition(definition, LcncProgramConfix.fromJson(name, data))
+            snapshot = data; snapshotName = name
+        }
+        return matching
+    }
     if (!current()) return
     // Replace display snapshots before asynchronous reads; these never feed execution.
     for (n in projected) {

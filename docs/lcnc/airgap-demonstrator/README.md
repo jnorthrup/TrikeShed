@@ -25,10 +25,12 @@ and compilation of all affected targets. This closes a bounded transport
 milestone; the full evaluator and visual acceptance gates remain as specified.
 
 The [airgap release index](../../airgap/README.md) reaches R4g storage evidence
-and the subsequent [R3c human-paced inspection](../../airgap/13-human-rate-inspection.md)
-increment. R3c adds a continuous display clock and pinned transfer table,
-verifies 65 actual native calls, and retains the measured rendering stall as
-an open gate. R2 executes
+and subsequent [R3c human-paced inspection](../../airgap/13-human-rate-inspection.md)
+and [R3d receipt rendering](../../airgap/14-receipt-rendering.md). R3c adds a
+continuous display clock and pinned transfer table. R3d reduces repeated
+graph comparisons and layout work: the matched 65-node runs record maximum
+frame gaps of 983–1,050 ms before and 117–150 ms after, with stale-read
+refusal preserved. Sustained frame performance remains open. R2 executes
 the actual upstream Confix scanner with bounded native ownership; R3a adds
 observed wire sparks and native flyovers; R3b traverses a retained 12-page
 PDF and verifies an exact passage. R4a packages that path and verifies a
