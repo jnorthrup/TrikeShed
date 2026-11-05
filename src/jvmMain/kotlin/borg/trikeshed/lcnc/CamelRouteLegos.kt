@@ -91,6 +91,7 @@ object CamelRouteLegos {
         check(ctx.camelRoutes == null) { "Camel routes already registered for this host" }
         val owner = CamelRouteElement(ctx.scope.coroutineContext.job)
         ctx.camelRoutes = owner
+        CamelCorpusRoutingRunner.register(ctx, owner)
         ctx.lcncRunners[SubVmLegos.CAMEL]?.let { dispatch ->
             ctx.lcncRunners[SubVmLegos.CAMEL] = owned(ctx, owner, dispatch)
         }
