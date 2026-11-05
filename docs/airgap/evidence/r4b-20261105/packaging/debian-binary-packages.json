@@ -1,0 +1,464 @@
+[
+  {
+    "package": "coreutils",
+    "version": "9.7-3",
+    "source": "coreutils",
+    "sourceVersion": "9.7-3"
+  },
+  {
+    "package": "dash",
+    "version": "0.5.12-12",
+    "source": "dash",
+    "sourceVersion": "0.5.12-12"
+  },
+  {
+    "package": "findutils",
+    "version": "4.10.0-3",
+    "source": "findutils",
+    "sourceVersion": "4.10.0-3"
+  },
+  {
+    "package": "fontconfig-config",
+    "version": "2.15.0-2.3",
+    "source": "fontconfig",
+    "sourceVersion": "2.15.0-2.3"
+  },
+  {
+    "package": "fonts-dejavu-core",
+    "version": "2.37-8",
+    "source": "fonts-dejavu",
+    "sourceVersion": "2.37-8"
+  },
+  {
+    "package": "fonts-dejavu-extra",
+    "version": "2.37-8",
+    "source": "fonts-dejavu",
+    "sourceVersion": "2.37-8"
+  },
+  {
+    "package": "fonts-dejavu-mono",
+    "version": "2.37-8",
+    "source": "fonts-dejavu",
+    "sourceVersion": "2.37-8"
+  },
+  {
+    "package": "libacl1:amd64",
+    "version": "2.3.2-2+b1",
+    "source": "acl",
+    "sourceVersion": "2.3.2-2"
+  },
+  {
+    "package": "libasound2t64:amd64",
+    "version": "1.2.14-1+deb13u1",
+    "source": "alsa-lib",
+    "sourceVersion": "1.2.14-1+deb13u1"
+  },
+  {
+    "package": "libassuan9:amd64",
+    "version": "3.0.2-2",
+    "source": "libassuan",
+    "sourceVersion": "3.0.2-2"
+  },
+  {
+    "package": "libbrotli1:amd64",
+    "version": "1.1.0-2+b7",
+    "source": "brotli",
+    "sourceVersion": "1.1.0-2"
+  },
+  {
+    "package": "libbz2-1.0:amd64",
+    "version": "1.0.8-6",
+    "source": "bzip2",
+    "sourceVersion": "1.0.8-6"
+  },
+  {
+    "package": "libc6:amd64",
+    "version": "2.41-12+deb13u4",
+    "source": "glibc",
+    "sourceVersion": "2.41-12+deb13u4"
+  },
+  {
+    "package": "libcap2:amd64",
+    "version": "1:2.75-10+deb13u1+b3",
+    "source": "libcap2",
+    "sourceVersion": "1:2.75-10+deb13u1"
+  },
+  {
+    "package": "libcom-err2:amd64",
+    "version": "1.47.2-3+b12",
+    "source": "e2fsprogs",
+    "sourceVersion": "1.47.2-3"
+  },
+  {
+    "package": "libcurl3t64-gnutls:amd64",
+    "version": "8.14.1-2+deb13u5",
+    "source": "curl",
+    "sourceVersion": "8.14.1-2+deb13u5"
+  },
+  {
+    "package": "libdeflate0:amd64",
+    "version": "1.23-2",
+    "source": "libdeflate",
+    "sourceVersion": "1.23-2"
+  },
+  {
+    "package": "libexpat1:amd64",
+    "version": "2.8.3-1~deb13u1",
+    "source": "expat",
+    "sourceVersion": "2.8.3-1~deb13u1"
+  },
+  {
+    "package": "libffi8:amd64",
+    "version": "3.4.8-2",
+    "source": "libffi",
+    "sourceVersion": "3.4.8-2"
+  },
+  {
+    "package": "libfontconfig1:amd64",
+    "version": "2.15.0-2.3",
+    "source": "fontconfig",
+    "sourceVersion": "2.15.0-2.3"
+  },
+  {
+    "package": "libfreetype6:amd64",
+    "version": "2.13.3+dfsg-1+deb13u1",
+    "source": "freetype",
+    "sourceVersion": "2.13.3+dfsg-1+deb13u1"
+  },
+  {
+    "package": "libgcc-s1:amd64",
+    "version": "14.2.0-19",
+    "source": "gcc-14",
+    "sourceVersion": "14.2.0-19"
+  },
+  {
+    "package": "libgmp10:amd64",
+    "version": "2:6.3.0+dfsg-3",
+    "source": "gmp",
+    "sourceVersion": "2:6.3.0+dfsg-3"
+  },
+  {
+    "package": "libgnutls30t64:amd64",
+    "version": "3.8.9-3+deb13u4",
+    "source": "gnutls28",
+    "sourceVersion": "3.8.9-3+deb13u4"
+  },
+  {
+    "package": "libgpg-error0:amd64",
+    "version": "1.51-4",
+    "source": "libgpg-error",
+    "sourceVersion": "1.51-4"
+  },
+  {
+    "package": "libgpgme11t64:amd64",
+    "version": "1.24.2-3",
+    "source": "gpgme1.0",
+    "sourceVersion": "1.24.2-3"
+  },
+  {
+    "package": "libgpgmepp6t64:amd64",
+    "version": "1.24.2-3",
+    "source": "gpgme1.0",
+    "sourceVersion": "1.24.2-3"
+  },
+  {
+    "package": "libgssapi-krb5-2:amd64",
+    "version": "1.21.3-5+deb13u1",
+    "source": "krb5",
+    "sourceVersion": "1.21.3-5+deb13u1"
+  },
+  {
+    "package": "libhogweed6t64:amd64",
+    "version": "3.10.1-1",
+    "source": "nettle",
+    "sourceVersion": "3.10.1-1"
+  },
+  {
+    "package": "libidn2-0:amd64",
+    "version": "2.3.8-2",
+    "source": "libidn2",
+    "sourceVersion": "2.3.8-2"
+  },
+  {
+    "package": "libjbig0:amd64",
+    "version": "2.1-6.1+b2",
+    "source": "jbigkit",
+    "sourceVersion": "2.1-6.1"
+  },
+  {
+    "package": "libjpeg62-turbo:amd64",
+    "version": "1:2.1.5-4",
+    "source": "libjpeg-turbo",
+    "sourceVersion": "1:2.1.5-4"
+  },
+  {
+    "package": "libk5crypto3:amd64",
+    "version": "1.21.3-5+deb13u1",
+    "source": "krb5",
+    "sourceVersion": "1.21.3-5+deb13u1"
+  },
+  {
+    "package": "libkeyutils1:amd64",
+    "version": "1.6.3-6",
+    "source": "keyutils",
+    "sourceVersion": "1.6.3-6"
+  },
+  {
+    "package": "libkrb5-3:amd64",
+    "version": "1.21.3-5+deb13u1",
+    "source": "krb5",
+    "sourceVersion": "1.21.3-5+deb13u1"
+  },
+  {
+    "package": "libkrb5support0:amd64",
+    "version": "1.21.3-5+deb13u1",
+    "source": "krb5",
+    "sourceVersion": "1.21.3-5+deb13u1"
+  },
+  {
+    "package": "liblcms2-2:amd64",
+    "version": "2.16-2+deb13u2",
+    "source": "lcms2",
+    "sourceVersion": "2.16-2+deb13u2"
+  },
+  {
+    "package": "libldap2:amd64",
+    "version": "2.6.10+dfsg-1",
+    "source": "openldap",
+    "sourceVersion": "2.6.10+dfsg-1"
+  },
+  {
+    "package": "liblerc4:amd64",
+    "version": "4.0.0+ds-5",
+    "source": "lerc",
+    "sourceVersion": "4.0.0+ds-5"
+  },
+  {
+    "package": "liblzma5:amd64",
+    "version": "5.8.1-1+deb13u1",
+    "source": "xz-utils",
+    "sourceVersion": "5.8.1-1+deb13u1"
+  },
+  {
+    "package": "libnettle8t64:amd64",
+    "version": "3.10.1-1",
+    "source": "nettle",
+    "sourceVersion": "3.10.1-1"
+  },
+  {
+    "package": "libnghttp2-14:amd64",
+    "version": "1.64.0-1.1+deb13u1",
+    "source": "nghttp2",
+    "sourceVersion": "1.64.0-1.1+deb13u1"
+  },
+  {
+    "package": "libnghttp3-9:amd64",
+    "version": "1.8.0-1",
+    "source": "nghttp3",
+    "sourceVersion": "1.8.0-1"
+  },
+  {
+    "package": "libngtcp2-16:amd64",
+    "version": "1.11.0-1+deb13u1",
+    "source": "ngtcp2",
+    "sourceVersion": "1.11.0-1+deb13u1"
+  },
+  {
+    "package": "libngtcp2-crypto-gnutls8:amd64",
+    "version": "1.11.0-1+deb13u1",
+    "source": "ngtcp2",
+    "sourceVersion": "1.11.0-1+deb13u1"
+  },
+  {
+    "package": "libnspr4:amd64",
+    "version": "2:4.36-1",
+    "source": "nspr",
+    "sourceVersion": "2:4.36-1"
+  },
+  {
+    "package": "libnss3:amd64",
+    "version": "2:3.110-1+deb13u4",
+    "source": "nss",
+    "sourceVersion": "2:3.110-1+deb13u4"
+  },
+  {
+    "package": "libopenjp2-7:amd64",
+    "version": "2.5.3-2.1~deb13u2",
+    "source": "openjpeg2",
+    "sourceVersion": "2.5.3-2.1~deb13u2"
+  },
+  {
+    "package": "libp11-kit0:amd64",
+    "version": "0.25.5-3",
+    "source": "p11-kit",
+    "sourceVersion": "0.25.5-3"
+  },
+  {
+    "package": "libpcre2-8-0:amd64",
+    "version": "10.46-1~deb13u2",
+    "source": "pcre2",
+    "sourceVersion": "10.46-1~deb13u2"
+  },
+  {
+    "package": "libpng16-16t64:amd64",
+    "version": "1.6.48-1+deb13u5",
+    "source": "libpng1.6",
+    "sourceVersion": "1.6.48-1+deb13u5"
+  },
+  {
+    "package": "libpoppler147:amd64",
+    "version": "25.03.0-5+deb13u4",
+    "source": "poppler",
+    "sourceVersion": "25.03.0-5+deb13u4"
+  },
+  {
+    "package": "libpsl5t64:amd64",
+    "version": "0.21.2-1.1+b1",
+    "source": "libpsl",
+    "sourceVersion": "0.21.2-1.1"
+  },
+  {
+    "package": "librtmp1:amd64",
+    "version": "2.4+20151223.gitfa8646d.1-2+b5",
+    "source": "rtmpdump",
+    "sourceVersion": "2.4+20151223.gitfa8646d.1-2"
+  },
+  {
+    "package": "libsasl2-2:amd64",
+    "version": "2.1.28+dfsg1-9",
+    "source": "cyrus-sasl2",
+    "sourceVersion": "2.1.28+dfsg1-9"
+  },
+  {
+    "package": "libselinux1:amd64",
+    "version": "3.8.1-1",
+    "source": "libselinux",
+    "sourceVersion": "3.8.1-1"
+  },
+  {
+    "package": "libsharpyuv0:amd64",
+    "version": "1.5.0-0.1",
+    "source": "libwebp",
+    "sourceVersion": "1.5.0-0.1"
+  },
+  {
+    "package": "libssh2-1t64:amd64",
+    "version": "1.11.1-1+deb13u2",
+    "source": "libssh2",
+    "sourceVersion": "1.11.1-1+deb13u2"
+  },
+  {
+    "package": "libssl3t64:amd64",
+    "version": "3.5.7-1~deb13u2",
+    "source": "openssl",
+    "sourceVersion": "3.5.7-1~deb13u2"
+  },
+  {
+    "package": "libstdc++6:amd64",
+    "version": "14.2.0-19",
+    "source": "gcc-14",
+    "sourceVersion": "14.2.0-19"
+  },
+  {
+    "package": "libtasn1-6:amd64",
+    "version": "4.20.0-2+deb13u1",
+    "source": "libtasn1-6",
+    "sourceVersion": "4.20.0-2+deb13u1"
+  },
+  {
+    "package": "libtiff6:amd64",
+    "version": "4.7.0-3+deb13u3",
+    "source": "tiff",
+    "sourceVersion": "4.7.0-3+deb13u3"
+  },
+  {
+    "package": "libunistring5:amd64",
+    "version": "1.3-2",
+    "source": "libunistring",
+    "sourceVersion": "1.3-2"
+  },
+  {
+    "package": "libwebp7:amd64",
+    "version": "1.5.0-0.1",
+    "source": "libwebp",
+    "sourceVersion": "1.5.0-0.1"
+  },
+  {
+    "package": "libx11-6:amd64",
+    "version": "2:1.8.12-1",
+    "source": "libx11",
+    "sourceVersion": "2:1.8.12-1"
+  },
+  {
+    "package": "libxau6:amd64",
+    "version": "1:1.0.11-1",
+    "source": "libxau",
+    "sourceVersion": "1:1.0.11-1"
+  },
+  {
+    "package": "libxcb1:amd64",
+    "version": "1.17.0-2+b1",
+    "source": "libxcb",
+    "sourceVersion": "1.17.0-2"
+  },
+  {
+    "package": "libxdmcp6:amd64",
+    "version": "1:1.1.5-1",
+    "source": "libxdmcp",
+    "sourceVersion": "1:1.1.5-1"
+  },
+  {
+    "package": "libxext6:amd64",
+    "version": "2:1.3.4-1+b3",
+    "source": "libxext",
+    "sourceVersion": "2:1.3.4-1"
+  },
+  {
+    "package": "libxi6:amd64",
+    "version": "2:1.8.2-1",
+    "source": "libxi",
+    "sourceVersion": "2:1.8.2-1"
+  },
+  {
+    "package": "libxrender1:amd64",
+    "version": "1:0.9.12-1",
+    "source": "libxrender",
+    "sourceVersion": "1:0.9.12-1"
+  },
+  {
+    "package": "libxtst6:amd64",
+    "version": "2:1.2.5-1",
+    "source": "libxtst",
+    "sourceVersion": "2:1.2.5-1"
+  },
+  {
+    "package": "libzstd1:amd64",
+    "version": "1.5.7+dfsg-1",
+    "source": "libzstd",
+    "sourceVersion": "1.5.7+dfsg-1"
+  },
+  {
+    "package": "poppler-data",
+    "version": "0.4.12-1",
+    "source": "poppler-data",
+    "sourceVersion": "0.4.12-1"
+  },
+  {
+    "package": "poppler-utils",
+    "version": "25.03.0-5+deb13u4",
+    "source": "poppler",
+    "sourceVersion": "25.03.0-5+deb13u4"
+  },
+  {
+    "package": "sed",
+    "version": "4.9-2+deb13u1",
+    "source": "sed",
+    "sourceVersion": "4.9-2+deb13u1"
+  },
+  {
+    "package": "zlib1g:amd64",
+    "version": "1:1.3.dfsg+really1.3.1-1+b1",
+    "source": "zlib",
+    "sourceVersion": "1:1.3.dfsg+really1.3.1-1"
+  }
+]

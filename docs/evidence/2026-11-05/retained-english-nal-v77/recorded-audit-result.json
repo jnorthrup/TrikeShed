@@ -1,0 +1,135 @@
+{
+  "result": "PASS_RECORDED_NAL_APPLICATION_CONSISTENCY",
+  "sourceHead": "c23dd240190d8023437ba4121485b1c28ea42b89",
+  "mainSha256": "b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448",
+  "artifactVerification": "recorded metadata and class-load logs only; external JAR/Java/live REF availability not checked",
+  "mode": "recorded-only",
+  "commands": {
+    "commands": 14,
+    "pids": [
+      118614,
+      118635,
+      118656,
+      118681,
+      118706,
+      118731,
+      118756,
+      118781,
+      118802,
+      118823,
+      118844,
+      118865,
+      118890,
+      118911
+    ],
+    "zeroArgBytes": 25531,
+    "zeroArgSha256": "733716c1e44a3c43f2ba0e1854f334ea379ca42175157e26498ddced34e4bbbd"
+  },
+  "cases": {
+    "S12": {
+      "status": "EVALUATED",
+      "premises": 4,
+      "occurrences": 5,
+      "attemptedPairs": 12,
+      "results": [
+        [
+          "DEDUCTION",
+          "ALPHA",
+          "GAMMA",
+          289,
+          0
+        ],
+        [
+          "INDUCTION",
+          "DELTA",
+          "GAMMA",
+          224,
+          0
+        ],
+        [
+          "INDUCTION",
+          "GAMMA",
+          "DELTA",
+          224,
+          0
+        ]
+      ],
+      "basis": [
+        "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+      ]
+    },
+    "G01": {
+      "status": "UNSUPPORTED",
+      "issues": [
+        {
+          "code": "unaccounted-sentence",
+          "sentenceIndex": 0
+        }
+      ]
+    },
+    "G03": {
+      "status": "UNSUPPORTED",
+      "issues": [
+        {
+          "code": "unaccounted-sentence",
+          "sentenceIndex": 0
+        }
+      ]
+    },
+    "G04": {
+      "status": "UNSUPPORTED",
+      "issues": [
+        {
+          "code": "unaccounted-sentence",
+          "sentenceIndex": 0
+        }
+      ]
+    },
+    "G13": {
+      "status": "UNSUPPORTED",
+      "issues": [
+        {
+          "code": "unaccounted-sentence",
+          "sentenceIndex": 0
+        }
+      ]
+    }
+  },
+  "originalReferenceDependencies": 18,
+  "mutatedCopyControls": [
+    {
+      "mutation": "wrong-full-term-CID",
+      "result": "REJECTED",
+      "reason": "Surface atom full canonical identity"
+    },
+    {
+      "mutation": "reversed-ordered-deduction-premises",
+      "result": "REJECTED",
+      "reason": "Deduction shared middle term"
+    },
+    {
+      "mutation": "erased-shared-source-basis",
+      "result": "REJECTED",
+      "reason": "Actual rule direction, hypothesis scope and source ancestry"
+    },
+    {
+      "mutation": "changed-NAL-weight",
+      "result": "REJECTED",
+      "reason": "Existing Float32 NAL milli-evidence result"
+    },
+    {
+      "mutation": "weak-induction-upgraded-to-deduction",
+      "result": "REJECTED",
+      "reason": "Actual rule direction, hypothesis scope and source ancestry"
+    },
+    {
+      "mutation": "structural-point-nine-as-NAL-confidence",
+      "result": "REJECTED",
+      "reason": "Existing packed Float32 NAL truth coordinates"
+    }
+  ],
+  "inputsSha256": "c3d96e3a2eb4973899fe5ddae65579cae6d241e3741625cc306f244cc5779418",
+  "executionSha256": "d9d4579fb2f1de7be1c523f78d4fb4f3cb418fe55320f91b7aaaa7bbd51f1a4f",
+  "scope": "Recorded production CLI and identity/source/ordered-rule/Float32 NAL application consistency. This auditor launches no JVM/parser/build/query engine, generates no new inference closure, and grants no semantic truth, calibrated probability, current-source authority, independence, admission or OS seal. Original absolute REF targets remain JVM rerun dependencies; static comparisons use exact copied source bytes.",
+  "auditScriptSha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+}

@@ -574,8 +574,21 @@ val airgapDocumentPages = tasks.register<Jar>("airgapDocumentPagesJar") {
     isReproducibleFileOrder = true
 }
 
+val airgapDocumentLibraries = configurations.create("airgapDocumentLibraries") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+dependencies {
+    add(airgapDocumentLibraries.name, "org.jetbrains.kotlin:kotlin-stdlib:2.4.21")
+    add(airgapDocumentLibraries.name, "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$coroutinesVersion")
+    add(airgapDocumentLibraries.name, "org.jetbrains.kotlinx:atomicfu-jvm:0.33.0")
+    add(airgapDocumentLibraries.name, "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:$serializationVersion")
+    add(airgapDocumentLibraries.name, "org.jetbrains.kotlinx:kotlinx-datetime-jvm:$datetimeVersion")
+    add(airgapDocumentLibraries.name, "org.graalvm.polyglot:polyglot:$graalVersion")
+    add(airgapDocumentLibraries.name, "org.graalvm.polyglot:llvm-community:$graalVersion")
+}
 val airgapDocumentRuntime = files(tasks.named("jvmJar"), airgapDocumentEntry, airgapDocumentPages,
-    configurations.getByName("jvmRuntimeClasspath").filter { it.extension == "jar" })
+    airgapDocumentLibraries.filter { it.extension == "jar" })
 val airgapDocumentScripts = tasks.register<org.gradle.jvm.application.tasks.CreateStartScripts>("airgapDocumentStartScripts") {
     group = "distribution"
     applicationName = "airgap-document"

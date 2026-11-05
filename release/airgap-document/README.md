@@ -6,8 +6,9 @@ fixture admission and local lifecycle controls. It is not the full Oroboros
 daemon or a general Nix evaluator. No model inference is required.
 
 `./gradlew airgapDocumentZip` builds the application layer. This includes the
-production JVM jar, its resolved runtime jars, the production Spacegraph
-bundle, the small entry jar, two pinned LLVM bitcode modules, and the official
+production JVM jar, the production Spacegraph bundle, the small entry jar,
+23 resolved dependency jars for Kotlin/coroutines and the GraalVM LLVM runtime,
+two pinned LLVM bitcode modules, and the official
 12-page *Coinbase, Inc. v. Suski* opinion. Test framework jars and unrelated test
 classes are not included. The PDF's acquisition metadata is in `assets/`.
 
@@ -30,7 +31,13 @@ through the production runtime owner. Start with:
 
 `run` requires fresh state. `/panels` serves the production UI;
 `GET /__proof/state` supplies fixture admission metadata for the retained
-document graph. `POST /__proof/finish` exports a state report and drains the
+document graph. Open `/panels?load=airgap-document` to load the five-node,
+eight-wire demonstration through the existing preset-link flow. It leaves
+the saved scratch canvas unchanged and waits for an explicit Run or Debug
+action. Debug lets the operator step through the nodes and inspect observed
+wire transfers before the native selection completes.
+
+`POST /__proof/finish` exports a state report and drains the
 owned modules, listener, native seats and stores. These local test controls
 have no authentication; run only in an isolated network namespace with a
 trusted local browser. The application's airgap switch prohibits model
@@ -42,7 +49,8 @@ durable project commit chains, checks all six saved document revisions and
 their bytes, and reopens the LCNC receipt store. It has no miner or LLVM
 runners. The original installation assets and bitcode can be hidden for this
 second process. A browser can inspect and replay the recorded result without
-submitting a new run. Fresh-process evidence must identify both boots and
+submitting a new run. The same named-preset link loads the recovered document
+definition for matching-canvas receipt inspection. Fresh-process evidence must identify both boots and
 verify the exact receipt, invocation ledger, source bytes and quotation.
 
 The JVM uses a 768 MiB maximum heap and reports two processors. These settings
@@ -50,3 +58,7 @@ are not an OS memory limit or CPU quota. A native invocation can still run
 until its bounded computation returns; there is no hard native cancellation.
 The retained PDF has a text layer. OCR, arbitrary PDFs, model weights and the
 full daemon's optional services are outside this package's verified scope.
+The application dependency profile omits the full daemon's desktop Compose,
+Kotlin compiler, Python, Ruby and JavaScript-language distributions. The
+production Spacegraph browser bundle is still included. These omissions are
+a packaging boundary, not a restriction on the rest of the repository.

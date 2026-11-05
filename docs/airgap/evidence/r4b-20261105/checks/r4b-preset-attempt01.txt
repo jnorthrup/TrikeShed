@@ -1,0 +1,37 @@
+{
+  "driverExit": null,
+  "error": "RuntimeError('Fixture exited: 1')",
+  "processes": [
+    {
+      "mode": "run",
+      "hostPid": 62259,
+      "startedMonotonic": 35805.811431352,
+      "resourceEvidence": "state/run-status.txt; state-run.json processCpuNanos",
+      "exit": 1,
+      "elapsedSeconds": 1.6081634430011036
+    }
+  ]
+}
+run WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/opt/trikeshed/lib/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Exception in thread "main" java.lang.IllegalAccessError: class borg.trikeshed.lcnc.AirgapDocumentMainKt$main$3$invokeSuspend$$inlined$?$1 tried to access private method 'java.util.Map borg.trikeshed.lcnc.AirgapDocumentMainKt$main$3.invokeSuspend$wire(java.lang.String, java.lang.String, java.lang.String, java.lang.String)' (borg.trikeshed.lcnc.AirgapDocumentMainKt$main$3$invokeSuspend$$inlined$?$1 and borg.trikeshed.lcnc.AirgapDocumentMainKt$main$3 are in unnamed module of loader 'app')
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt$main$3$invokeSuspend$$inlined$?$1.invoke(Join.kt:200)
+	at borg.trikeshed.lib.SeriesKt$toList$1.get(Series.kt:42)
+	at kotlin.collections.AbstractList$IteratorImpl.next(AbstractList.kt:89)
+	at kotlin.jvm.internal.CollectionToArray.toArray(CollectionToArray.kt:97)
+	at kotlin.collections.AbstractCollection.toArray(AbstractCollection.kt:34)
+	at java.base/java.util.ArrayList.addAll(ArrayList.java:753)
+	at kotlin.collections.CollectionsKt___CollectionsKt.plus(_Collections.kt:3703)
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt$main$3.invokeSuspend(AirgapDocumentMain.kt:120)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt.main(AirgapDocumentMain.kt:36)
+

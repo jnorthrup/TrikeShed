@@ -1,0 +1,70 @@
+V77 retained NAL CLI independent audit — completed strict recorded-data PASS
+
+Root480 GREEN and explicit artifact GO preceded the 14 completed production CLI
+processes. The independent strict audit passed their closed records. This script launches no JVM, parser,
+build, browser or query engine. No production/source/ref files are written.
+
+Strict local-artifact invocation:
+python3 audit.py PROOF_ROOT EXECUTION_DIRECTORY --source-head EXACT_NEW_HEAD --main-sha EXACT_NEW_MAIN_SHA --out AUDIT_DIRECTORY
+
+PROOF_ROOT is /workspace/library-files/retained-nal-v77-cli-proof, containing
+inputs.json, actual selected materialized CBOR/source/request/metadata files and
+unaltered copied producer packs/trees. EXECUTION_DIRECTORY is the fresh directory
+chosen by Finish's production CLI run-proof.py and must contain execution.json plus each
+command's untouched record/stdout/stderr/class-load log. Old and new frozen
+snapshots and their exact120-JAR classpaths must be available for byte hashing.
+
+The verifier checks the genuine S12 receipt b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0, plus G01/G03/G04/G13 actual retained guard frames. It binds
+canonical frame/term/proposition/occurrence/annotation/contribution/evaluator and
+ordered DerivationReceipt identities, exact source quotations and schema-derived
+sentence/node role IRIs. It checks each reported original-premise application
+against the existing NAL Float32 operations, UINT32 packed TruthCoord round trip,
+and1000 milli-evidence horizon. It does not search for additional conclusions.
+
+S12 requires five dependent source occurrences, four original +900/-0 premises,
+12 ordered pairs, one ALPHA→GAMMA deduction hypothesis and two DELTA/GAMMA weak
+induction hypotheses. All inherit source ancestry; no independent observation is
+minted from a duplicate or derivation. Guard reports must be whole-frame
+UNSUPPORTED with no partial premises/results. Six copied-report mutations test
+identity/order/basis/weight/weak-status/confidence boundaries only.
+
+Actual direct commands must prove old/new zero-argument stdout byte equality,
+exact final-JAR class origins, fourteen distinct process records, ordinary
+exception refusals for malformed/missing/torn inputs, and unchanged full copied
+and original pack/tree/REF fingerprints around every phase. Input BLOB hashes,
+REF target size/mtime/hash and the single intentional0x7f torn byte are checked.
+The original absolute REF targets remain JVM execution dependencies. Copied
+sources let this static auditor compare bytes; the pack is not called relocated
+or self-contained. Quiescent input is required by the production CLI; no atomic
+concurrent-writer/path-replacement protection is inferred.
+
+The genuine Stanford producer's first G01 observer process remains failed after
+a valid retained parse; its failure is not relabeled green. All observations and
+CLI results remain historical: parser execution not reverified, currentness not
+checked, no review/live admission, no source independence, legal truth,
+calibrated probability, independent semantic entailment or OS-seal claim.
+
+Exact final artifact pins:
+source c23dd240190d8023437ba4121485b1c28ea42b89
+main SHA256 b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448
+Native execution directory: native-attempt1
+Final strict output: green-strict/{result.json,report.txt}
+
+Public recorded-only replay (no external JARs, Java executable, or live REF targets):
+python3 audit.py PROOF_ROOT PROOF_ROOT/native-attempt1 --recorded-only --source-head c23dd240190d8023437ba4121485b1c28ea42b89 --main-sha b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448 --out FRESH_AUDIT_OUTPUT
+
+This mode requires artifact-metadata/{old,new}/{source-head.txt,sha256.json} copied
+unchanged from each frozen snapshot. It verifies those recorded manifest/pin
+relationships and actual class-load logs, all materialized CBOR/source/copied
+pack bytes, every command/output/state invariant and all six mutations. It does
+not rehash unavailable JARs/Java or assert that recorded live REF targets remain
+available. The strict default additionally rehashes the actual local120-JAR
+classpaths and Java executable; it also launches no JVM.
+
+Audit attempt1/result.json is intentionally preserved FAIL: its prepared auditor
+expected the torn fixture to contain only cas/pack. Actual prepared/native data
+correctly used a full remaining-runtime copy. The corrected auditor checks every
+copied member against the original, permitting only the specified appended pack
+byte. No native command, receipt, result, source, or assertion was changed.
+Attempt1/audit.py.txt binds the exact initial failed script; attempt2 preserves
+the first passing strict script/report before adding the public replay mode.

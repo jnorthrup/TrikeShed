@@ -1,0 +1,26 @@
+from pathlib import Path
+import subprocess,json,os
+home=Path('/workspace/airgap-r4b-proof');root=home/'rootfs';out=home/'integrity-controls';out.mkdir(exist_ok=False)
+jar=next((root/'opt/trikeshed/lib').glob('*airgap-document-entry.jar'));manifest=root/'package-identity.json'
+results=[]
+def verify(name,expected):
+ p=subprocess.run(['python',str(home/'package.py'),'verify'],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+ (out/(name+'.txt')).write_text(p.stdout);assert (p.returncode==0)==expected,(name,p.stdout)
+ results.append({'case':name,'exit':p.returncode,'expectedAcceptance':expected,'result':'PASS'})
+data=jar.read_bytes()
+try:jar.write_bytes(data+b'x');verify('changed-jar',False)
+finally:jar.write_bytes(data)
+mode=jar.stat().st_mode
+try:jar.chmod(0o600 if mode&0o777!=0o600 else 0o644);verify('changed-mode',False)
+finally:jar.chmod(mode)
+p=root/'unexpected-file'
+try:p.write_text('extra');verify('extra-file',False)
+finally:p.unlink()
+p=root/'unexpected-directory'
+try:p.mkdir();verify('extra-directory',False)
+finally:p.rmdir()
+data=manifest.read_bytes()
+try:manifest.write_bytes(data+b' ');verify('changed-manifest',False)
+finally:manifest.write_bytes(data)
+verify('restored',True)
+(out/'results.json').write_text(json.dumps(results,indent=2)+'\n');print(json.dumps(results,indent=2))

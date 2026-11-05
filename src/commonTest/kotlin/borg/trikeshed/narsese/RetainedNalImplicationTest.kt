@@ -75,7 +75,7 @@ class RetainedNalImplicationTest {
         return EnglishObservationGraph.read(cas, receipt)
     }
 
-    private fun RetainedNalReport.results(kind: RuleIdentity, from: String, to: String) = derivations.view.filter {
+    private fun RetainedNalReport.results(kind: RuleIdentity, from: String, to: String): List<SyntheticNalDerivation> = derivations.toList().filter {
         it.kind == kind && termLabels[it.subject] == from && termLabels[it.predicate] == to
     }
     private fun refused(report: RetainedNalReport, status: RetainedNalStatus = RetainedNalStatus.UNSUPPORTED) {

@@ -1,0 +1,10 @@
+Independent retained NAL CLI recorded-data audit: PASS_RECORDED_NAL_APPLICATION_CONSISTENCY
+Recorded production CLI and identity/source/ordered-rule/Float32 NAL application consistency. This auditor launches no JVM/parser/build/query engine, generates no new inference closure, and grants no semantic truth, calibrated probability, current-source authority, independence, admission or OS seal. Original absolute REF targets remain JVM rerun dependencies; static comparisons use exact copied source bytes.
+Source: c23dd240190d8023437ba4121485b1c28ea42b89; main SHA256: b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448
+Artifact verification: recorded metadata and class-load logs only; external JAR/Java/live REF availability not checked.
+14 direct production CLI process records; old/new zero-argument stdout exactly equal (25531 bytes).
+S12: 5 exact source occurrences, 4 unique +900/-0 original premises, 12 ordered pairs; one deduction hypothesis and two weak-induction hypotheses.
+Every reported canonical identity, source/node role citation, ordered premise and inherited source basis verified; existing Float32/packed TruthCoord/milli-evidence calculations reproduced.
+Four genuine guard frames produce UNSUPPORTED with no partial premises or results. Malformed/missing/torn input cases refuse with empty stdout and unchanged historical packs/sources/REF targets.
+All original and copied phase fingerprints stay unchanged. 18 REF records retain original absolute-path dependencies; no relocation or parser re-execution claimed.
+Six mutated report copies rejected. Same-source duplication and derived ancestry establish no independent evidence or source truth.

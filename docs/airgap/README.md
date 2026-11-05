@@ -12,7 +12,8 @@ and D3M integration record. A planned gate is not a completed release.
 | R3a: observed transfers | Actual selected-wire sparks, recorded LLVM flyovers, reduced motion and immutable receipt playback | [Implemented contract and evidence](04-observed-transfers.md); bounded precursor to full R3 |
 | R3b: retained document traversal | Real 12-page PDF, production extraction, bounded passage, LLVM geometry selection, verified source/quotation and reopening without LLVM | [Verified increment](05-document-traversal.md), [final combined evidence](evidence/r3b-cutoff-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r3b.md); dense recursive visualization remains open |
 | R4a: packaged offline runtime | Generated launcher, sealed server filesystem, real PDF traversal and recovery in a second JVM without source assets or LLVM | [Verified increment](06-offline-runtime.md), [219 regressions and packaged proof](evidence/r4a-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4a.md) |
-| R4b: wider release closure | Minimal runtime profile, complete vendor/native rebuild provenance, crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
+| R4b: narrower profile and forced-exit recovery | 23 dependency jars, inert named preset, exact receipt recovery after SIGKILL at a completed receipt | [Verified increment](07-runtime-profile-recovery.md), [237 regressions and extracted-archive proof](evidence/r4b-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4b.md) |
+| R4c: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
 verifies the native inert Documents-to-Panels handoff, ten URL/ownership guards,
@@ -129,6 +130,22 @@ This is a Linux filesystem-namespace proof on the existing host kernel;
 the browser remains an external verification input. It does not establish
 bare-metal installation, power-loss recovery or a fully reproducible source
 build of the vendor JDK and every native dependency.
+
+## R4b acceptance
+
+The bounded document profile now contains 23 dependency jars instead of 107;
+the full JDK remains. The ordinary named-preset link loads five nodes and
+eight wires without altering scratch storage or running automatically. A
+writer killed after its completed receipt response performs no cleanup; a
+new inspector recovers the exact receipt, six revisions and quotation.
+
+The combined source passed 237 selected JVM regressions and the affected
+platform compiles. Eleven browser cases pass from the extracted runtime;
+startup/integrity refusals and independent CAS verification pass. D3M retains
+535 publication-cutoff refs through seven sequential merges without conflicts. The
+[runbook](07-runtime-profile-recovery.md) records hashes, measurements and
+limits. This does not close arbitrary-write crash safety, power-loss
+durability or the full vendor/native source-build gate.
 
 ## Retained-source deployment boundary
 

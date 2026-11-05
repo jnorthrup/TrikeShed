@@ -1,0 +1,9 @@
+{
+  "at": "2026-11-05T02:52:32.921567+00:00",
+  "action": "Terminate the owned secondary target Gradle daemon; rerun targets sequentially after JVM build",
+  "pid": 64590,
+  "memoryCurrent": "17179844608",
+  "memoryMax": "17179869184",
+  "memoryEvents": "low 0\nhigh 0\nmax 1972540\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "escalation": "SIGTERM did not release the Gradle worker; SIGKILL sent to the same owned target daemon and its webpack child"
+}
