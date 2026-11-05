@@ -15,6 +15,13 @@ import kotlinx.coroutines.*
 class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: ProjectCorpus) {
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     private val runner = LcncNodeRunner { node, inputs ->
+        fun queryParameter(): Any? {
+            if ("query" in inputs) return inputs["query"]
+            if ("query?" in inputs) return inputs["query?"]
+            val raw = node.params["in:query"] ?: node.params["query"] ?: return null
+            require(raw.encodeToByteArray().size <= 65_536) { "English corpus parameter limit" }
+            return reifyStrict(raw)
+        }
         fun parameter(key: String): Any? = if (key == "view") lcncInputValue(node, inputs, key)
         else if (key in inputs) inputs[key]
         else if (key == "topics" && "topics?" in inputs) inputs["topics?"] else node.params[key]?.let { raw ->
@@ -25,7 +32,9 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
         val request = _m["receiptCids" j parameter("receiptCids"), "mode" j parameter("mode"), "topics" j parameter("topics")] +
             if ("view" in inputs || "view?" in inputs || "in:view" in node.params || "view" in node.params)
                 _m["view" j parameter("view")] else emptyMap()
-        val reply = submit(jsonOf(request))
+        val fullRequest = request + if ("query" in inputs || "query?" in inputs || "in:query" in node.params || "query" in node.params)
+            _m["query" j queryParameter()] else emptyMap()
+        val reply = submit(jsonOf(fullRequest))
         val output = reifyStrict(reply.body) as? Map<*, *> ?: error("Invalid English corpus result")
         require(reply.status == 200) { output["error"]?.toString() ?: "English corpus request refused" }
         @Suppress("UNCHECKED_CAST")
@@ -47,8 +56,8 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
     private suspend fun submit(body: String): WireHttpResponse = try { requests.call {
         val request = DocumentReviewWire.taxonomyRequest(body)
         val required = _s["receiptCids", "mode", "topics"]
-        require(request.keys.containsAll(required) && request.keys.all { it in required || it == "view" }) {
-            "English corpus requires receiptCids, mode and topics, with optional view"
+        require(request.keys.containsAll(required) && request.keys.all { it in required || it == "view" || it == "query" }) {
+            "English corpus requires receiptCids, mode and topics, with optional view and query"
         }
         val view = if ("view" in request) EnglishCorpusView.parse(request["view"]) else EnglishCorpusView.ALL_LEXICAL
         val ids = request["receiptCids"] as? List<*> ?: error("English receiptCids array required")
@@ -56,6 +65,7 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
         val mode = request["mode"] as? String ?: error("English corpus mode required")
         require(mode in _s["snapshot", "current"]) { "English corpus mode must be snapshot or current" }
         val config = request["topics"]?.let(::topics)
+        val lexicalQuery = if ("query" in request) query(request["query"]) else null
         val snapshots = ids.map { ContentId(it as String) }.sortedBy { it.value }.map { EnglishObservationGraph.read(ctx.casStore, it) }.toSeries()
         EnglishObservationCurrent.check(corpus, snapshots, mode)
         val core = EnglishCorpus.build(snapshots α { observation(it) }, view.policy())
@@ -68,10 +78,17 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
                 "reviewStatus" j "unreviewed", "parserExecution" j "not-reverified", "producerAuthority" j "not-established",
                 "sources" j (snapshots α { it.descriptor(mode) }).toList()]] +
             if ("view" in request) _m["view" j view.wire] else emptyMap()
-        val encoded = CanonicalCbor.encodeMap(payload)
+        val result = payload + if (lexicalQuery != null) _m["search" j _m[
+            "schema" j "trikeshed.english-corpus-search.v1", "dataset" j "english-selected-corpus-retrieval",
+            "corpusCid" j core.cid.value, "matrixCid" j core.matrixCid.value,
+            "receiptCids" j payload["receiptCids"], "policy" j core.policy.toMap(),
+            "query" j _m["terms" j lexicalQuery.a, "limit" j lexicalQuery.b], "retrieval" j coreMap["retrieval"],
+            "source" j payload["source"], "authority" j "lexical-match-only", "countsAreEvidenceConfidence" j false,
+            "hits" j (core.search(lexicalQuery.a.toSeries(), lexicalQuery.b) α { it.toMap() }).toList()]] else emptyMap()
+        val encoded = CanonicalCbor.encodeMap(result)
         require(encoded.size <= MAX_RESPONSE) { "English corpus exceeds 4MiB; select fewer or shorter ranges" }
         val receiptCid = ContentId.of(encoded)
-        val response = jsonOf(payload + _m["receiptCid" j receiptCid.value])
+        val response = jsonOf(result + _m["receiptCid" j receiptCid.value])
         require(response.encodeToByteArray().size <= MAX_RESPONSE) { "English corpus JSON exceeds 4MiB; select fewer or shorter ranges" }
         EnglishObservationCurrent.check(corpus, snapshots, mode)
         retain(CanonicalCbor.encodeMap(matrix), core.matrixCid)
@@ -107,6 +124,18 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
                             EnglishObservationGraph.string(token["lemma"]), EnglishObservationGraph.string(token["pos"]))
                     })
             })
+    }
+
+    private fun query(value: Any?): Join<List<String>, Int> {
+        val fields = value as? Map<*, *> ?: error("English corpus query requires terms and limit; explicit null is invalid")
+        require(fields.keys == _s["terms", "limit"]) { "English corpus query requires exactly terms and limit" }
+        val raw = fields["terms"] as? List<*> ?: error("English corpus query terms array required")
+        require(raw.size in 1..64 && raw.all { it is String && it.isNotBlank() }) { "Select 1..64 nonblank reported lemma strings" }
+        val terms = raw.map { it as String }
+        terms.forEach(EnglishCorpus::field)
+        val limit = (fields["limit"] as? Number)?.toDouble() ?: error("English corpus query limit integer required")
+        require(limit.isFinite() && limit % 1.0 == 0.0 && limit in 1.0..256.0) { "English corpus query limit must be 1..256" }
+        return terms j limit.toInt()
     }
 
     private fun topics(value: Any): EnglishLdaConfig {

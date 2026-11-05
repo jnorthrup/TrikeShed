@@ -9,6 +9,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.module.*
 import borg.trikeshed.nlp.*
 import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
 import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
@@ -225,4 +226,226 @@ class EnglishCorpusWireTest {
             assertTrue((output["error"] as String).contains("4MiB")); assertEquals(before, retained())
         } finally { close(f) }
     }
+
+    /** The pre-query payload construction, using the verified snapshot's typed observations. */
+    private fun legacyPayload(f: Fixture, ids: List<String>, mode: String, topics: EnglishLdaConfig?): Map<String, Any?> {
+        val snapshots = ids.sorted().map { EnglishObservationGraph.read(f.cas, ContentId(it)) }.toSeries()
+        val core = EnglishCorpus.build(snapshots α { snapshot ->
+            val range = snapshot.inventory["range"] as Map<*, *>
+            EnglishObservationReceipt(snapshot.receiptCid, snapshot.source.originalCid, snapshot.source.extractedTextCid,
+                (range["begin"] as Number).toInt(), (range["end"] as Number).toInt(), (range["totalLength"] as Number).toInt(),
+                snapshot.selection, snapshot.parsed.sentences α { sentence ->
+                    EnglishObservationSentence(sentence.index, sentence.begin, sentence.end,
+                        snapshot.parsed.text.substring(sentence.begin, sentence.end), sentence.tokens α { token ->
+                            EnglishObservationToken(token.index, token.begin, token.end, token.word, token.lemma, token.tag)
+                        })
+                })
+        })
+        val model = topics?.let(core::lda)
+        return core.toMap() + _m["corpusCid" j core.cid.value, "receiptCids" j (snapshots α { it.receiptCid.value }).toList(),
+            "topics" j model?.toMap(), "topicCid" j model?.cid?.value,
+            "source" j _m["selected" j "english-receipt-corpus", "mode" j mode, "historical" j (mode == "snapshot"),
+                "currentness" j if (mode == "current") "checked-before-and-after-build" else "not-checked",
+                "reviewStatus" j "unreviewed", "parserExecution" j "not-reverified", "producerAuthority" j "not-established",
+                "sources" j (snapshots α { it.descriptor(mode) }).toList()]]
+    }
+
+    @Test fun optionalSearchPreservesLegacyBytesAndBindsOnlyItsQueryReceipt(): Unit = runBlocking {
+        val f = fixture("corpus-query-identities", coroutineContext[Job])
+        try {
+            val texts = _m["first.txt" j "Tenant must not have audit audit.", "second.txt" j "Owner keeps audit records."]
+            for ((id, text) in texts) put(f, id, text)
+            val ids = texts.map { (id, text) -> inspect(f, id, 0, text.length)["receiptCid"] as String }
+            val config = EnglishLdaConfig(2, 10, 7, .1, .01)
+            val legacy = request(f, ids, topics = config.toMap())
+            val oldPayload = legacyPayload(f, ids, "current", config)
+            val expected = CanonicalCbor.encodeMap(oldPayload)
+            val oldResponse = assertNotNull(f.ctx.routes.match(EnglishCorpusWire.PATH)).route("POST", EnglishCorpusWire.PATH,
+                jsonOf(_m["receiptCids" j ids, "mode" j "current", "topics" j config.toMap()]), null)
+            assertEquals(jsonOf(oldPayload + _m["receiptCid" j ContentId.of(expected).value]), assertNotNull(oldResponse).body,
+                "Omitted query also retains the pre-query HTTP JSON bytes")
+            assertFalse("search" in legacy)
+            assertEquals(ContentId.of(expected).value, legacy["receiptCid"], "Omitted query retains the pre-query canonical receipt identity")
+            assertContentEquals(expected, assertNotNull(f.cas.getBounded(ContentId(legacy["receiptCid"] as String), EnglishCorpusWire.MAX_RESPONSE)))
+            val query = _m["terms" j _l["audit"], "limit" j 32]
+            val searched = request(f, ids, topics = config.toMap(), extra = _m["query" j query])
+            val repeated = request(f, ids.reversed(), topics = config.toMap(), extra = _m["query" j query])
+            assertEquals(searched, repeated)
+            val search = searched["search"] as Map<*, *>
+            assertEquals("trikeshed.english-corpus-search.v1", search["schema"])
+            assertEquals("english-selected-corpus-retrieval", search["dataset"])
+            assertEquals(reifyStrict(jsonOf(query)), search["query"]); assertEquals("lexical-match-only", search["authority"])
+            assertEquals(false, search["countsAreEvidenceConfidence"])
+            for (key in s_["corpusCid", "matrixCid", "receiptCids", "retrieval", "source"].view) assertEquals(searched[key], search[key])
+            assertEquals((searched["matrix"] as Map<*, *>)["policy"], search["policy"])
+            for (key in s_["corpusCid", "matrixCid", "topicCid", "terms", "topics"].view) assertEquals(legacy[key], searched[key])
+            assertNotEquals(legacy["receiptCid"], searched["receiptCid"])
+            val hits = (search["hits"] as List<*>).map { it as Map<*, *> }
+            assertEquals(2, hits.size)
+            assertEquals(3, hits.sumOf { (it["matches"] as List<*>).size }, "Every original occurrence stays visible, not an extra evidence unit")
+            for (hit in hits) {
+                assertEquals("lexical-match-only", hit["authority"]); assertTrue((hit["score"] as Number).toDouble().isFinite())
+                val sentence = hit["sentence"] as Map<*, *>; val selection = sentence["selection"] as Map<*, *>
+                assertTrue(sentence["receiptCid"] in ids)
+                assertEquals(selection["cid"], hit["originalCid"]); assertEquals(hit["originalCid"], hit["extractedTextCid"])
+                val original = texts.getValue(selection["id"] as String)
+                assertEquals(original.substring((sentence["begin"] as Number).toInt(), (sentence["end"] as Number).toInt()), sentence["quote"])
+                for (raw in hit["matches"] as List<*>) {
+                    val match = raw as Map<*, *>; assertEquals(sentence["receiptCid"], match["receiptCid"])
+                    assertEquals(sentence["id"], match["sentenceId"]); assertEquals("audit", match["term"])
+                    assertEquals(match["word"], original.substring((match["begin"] as Number).toInt(), (match["end"] as Number).toInt()))
+                }
+            }
+            val limited = request(f, ids, topics = config.toMap(), extra = _m["query" j (query + _m["limit" j 1])])
+            assertEquals(1, ((limited["search"] as Map<*, *>)["hits"] as List<*>).size)
+            assertNotEquals(searched["receiptCid"], limited["receiptCid"])
+            for (key in s_["corpusCid", "matrixCid", "topicCid"].view) assertEquals(searched[key], limited[key])
+            val reopened = FileCasStore(JvmFileOperations(), f.casRoot.path)
+            val cid = ContentId(searched["receiptCid"] as String)
+            val bytes = assertNotNull(reopened.getBounded(cid, EnglishCorpusWire.MAX_RESPONSE))
+            assertEquals(cid, ContentId.of(bytes)); val retained = CanonicalCbor.decodeMap(bytes)
+            assertEquals(searched["search"], reifyStrict(jsonOf(retained["search"])))
+            assertTrue(f.ctx.blackboard.snapshot().values.isEmpty()); assertEquals(0, f.ctx.rete.snapshot().size)
+            assertNull(f.ctx.beliefBag); assertNull(f.ctx.documentReview)
+        } finally { close(f) }
+    }
+
+    @Test fun actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson(): Unit = runBlocking {
+        val f = fixture("corpus-query-ports", coroutineContext[Job])
+        try {
+            val text = "Tenant must not assign unless Owner consents."; put(f, "agreement.txt", text)
+            val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
+            val a = _m["terms" j _l["not"], "limit" j 8]; val b = _m["terms" j _l["unless"], "limit" j 1]
+            suspend fun wired(inputs: Map<String, Any?>, params: Map<String, String> = emptyMap()): Map<String, Any?> {
+                val nodes = mutableListOf(LcncNode("ids", "json.value", _m["value" j jsonOf(ids)]),
+                    LcncNode("mode", "text.value", _m["value" j "current"]), LcncNode("corpus", EnglishCorpusWire.TYPE, params),
+                    LcncNode("result", LcncContracts.SCOPE_OUT, _m["name" j "search", "kind" j "json"]))
+                val wires = mutableListOf(LcncWire("ids", "value", "corpus", "receiptCids"), LcncWire("mode", "value", "corpus", "mode"),
+                    LcncWire("corpus", "search", "result", "value"))
+                for ((i, input) in inputs.entries.withIndex()) {
+                    nodes.add(LcncNode("input-$i", "json.value", _m["value" j jsonOf(input.value)]))
+                    wires.add(LcncWire("input-$i", "value", "corpus", input.key))
+                }
+                val output = LcncRunner(PureNodes.registry { 123L } + f.ctx.lcncRunners)
+                    .runProcedure(LcncProgram("corpus-query-ports", nodes.toSeries(), wires.toSeries()))
+                val result = output.nodeOutputs.getValue("corpus")
+                if ("search" in result) assertEquals(result["search"], output.returns["search"])
+                return result
+            }
+            val expected = request(f, ids, extra = _m["query" j a])
+            assertEquals(expected, wired(_m["query?" j a]))
+            assertEquals(expected, wired(emptyMap(), _m["query" j jsonOf(a)]))
+            assertEquals(expected, wired(emptyMap(), _m["query" j jsonOf(b), "in:query" j jsonOf(a)]))
+            assertEquals(expected, wired(_m["query?" j a], _m["query" j "not-json"]))
+            assertEquals(expected, wired(_m["query" j a, "query?" j b]))
+            assertEquals(request(f, ids), wired(emptyMap()), "Omitted query has no search payload")
+            for (inputs in s_[_m["query?" j null], _m["query" j null, "query?" j a]].view)
+                assertFailsWith<IllegalArgumentException> { wired(inputs, _m["query" j jsonOf(a)]) }
+            assertFailsWith<IllegalArgumentException> { wired(emptyMap(), _m["query" j jsonOf(a), "in:query" j "null"]) }
+            assertFailsWith<IllegalArgumentException> { wired(emptyMap(), _m["query" j "x".repeat(65_537)]) }
+        } finally { close(f) }
+    }
+
+    @Test fun searchUsesTheSamePolicyAndExplicitNoMatchDatasetWithoutChangingTopics(): Unit = runBlocking {
+        val f = fixture("corpus-query-policy", coroutineContext[Job])
+        try {
+            val text = "Tenant must not have audit audit unless Owner consents."; put(f, "agreement.txt", text)
+            val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
+            suspend fun search(term: String, view: String): Map<*, *> = request(f, ids,
+                extra = _m["view" j view, "query" j _m["terms" j _l[term], "limit" j 32]])
+            val all = search("have", "all-lexical"); val filtered = search("have", "content")
+            assertEquals(1, ((all["search"] as Map<*, *>)["hits"] as List<*>).size)
+            assertEquals(0, ((filtered["search"] as Map<*, *>)["hits"] as List<*>).size)
+            assertNotEquals(all["matrixCid"], filtered["matrixCid"])
+            for (term in s_["not", "unless"].view) {
+                val result = search(term, "content"); val search = result["search"] as Map<*, *>
+                assertEquals((result["matrix"] as Map<*, *>)["policy"], search["policy"])
+                assertEquals(1, (search["hits"] as List<*>).size); assertNull(result["topics"]); assertNull(result["topicCid"])
+            }
+            for (term in s_["AUDIT", "not-in-this-dataset"].view) {
+                val result = search(term, "content"); val search = result["search"] as Map<*, *>
+                assertEquals(emptyList<Any?>(), search["hits"])
+                assertEquals(ids, search["receiptCids"]); assertEquals("lexical-match-only", search["authority"])
+                assertEquals(false, search["countsAreEvidenceConfidence"])
+            }
+        } finally { close(f) }
+    }
+
+    @Test fun currentSearchChecksBeforeAfterWorkAndAfterRetentionWhileSnapshotsStayHistorical(): Unit = runBlocking {
+        for (mutateAt in s_[1, 2, 3].view) {
+            val f = fixture("corpus-query-current-$mutateAt", coroutineContext[Job]); var reads = 0
+            val changed = object : ProjectCorpus by f.corpus {
+                override suspend fun document(project: String, id: String): ProjectDoc? {
+                    if (++reads == mutateAt) f.corpus.put(project, id, "Changed source.".encodeToByteArray())
+                    return f.corpus.document(project, id)
+                }
+            }
+            val wire = EnglishCorpusWire(f.ctx, changed)
+            try {
+                val text = "Tenant must not assign."; put(f, "agreement.txt", text)
+                val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
+                val query = _m["terms" j _l["not"], "limit" j 32]
+                fun body(mode: String) = jsonOf(_m["receiptCids" j ids, "mode" j mode, "topics" j null, "query" j query])
+                val failed = wire.route("POST", EnglishCorpusWire.PATH, body("current"), null)
+                assertEquals(409, failed.status); assertTrue(failed.body.contains("stale")); assertFalse(failed.body.contains("\"hits\""))
+                assertEquals(mutateAt, reads)
+                val historical = wire.route("POST", EnglishCorpusWire.PATH, body("snapshot"), null)
+                assertEquals(200, historical.status, historical.body); assertEquals(mutateAt, reads)
+                val output = reifyStrict(historical.body) as Map<*, *>; val search = output["search"] as Map<*, *>
+                assertEquals(true, (search["source"] as Map<*, *>)["historical"])
+                assertEquals("not-checked", (search["source"] as Map<*, *>)["currentness"])
+                assertEquals(1, (search["hits"] as List<*>).size)
+                assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
+            } finally { wire.drain(); close(f) }
+        }
+    }
+
+    @Test fun malformedAndOversizedSearchesRefuseWithoutPartialHitsOrNewDerivedReceipts(): Unit = runBlocking {
+        val f = fixture("corpus-query-bounds", coroutineContext[Job])
+        try {
+            val text = "Tenant must not assign."; put(f, "agreement.txt", text)
+            val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
+            fun retained() = f.casRoot.walkTopDown().filter { it.isFile }.map { it.relativeTo(f.casRoot).path }.toSet()
+            val boundary = request(f, ids, extra = _m["query" j _m["terms" j (0 until 64).map { "not" }, "limit" j 256]])
+            assertEquals(1, ((boundary["search"] as Map<*, *>)["hits"] as List<*>).size)
+            val before = retained(); val valid = _m["terms" j _l["not"], "limit" j 32]
+            val invalid = s_[null, "not", valid + _m["extra" j true], valid + _m["terms" j emptyList<String>()],
+                valid + _m["terms" j (0..64).map { "not" }], valid + _m["terms" j _l[null]],
+                valid + _m["terms" j _l[" "]], valid + _m["limit" j 0], valid + _m["limit" j 257],
+                valid + _m["limit" j 1.5], valid + _m["limit" j "32"]]
+            for (query in invalid.view) {
+                val refused = request(f, ids, status = 409, extra = _m["query" j query])
+                assertTrue("error" in refused); assertFalse("search" in refused); assertEquals(before, retained())
+            }
+            val large = "word ".repeat(9_000); put(f, "large.txt", large)
+            val receipts = (0 until 5).map { i -> inspect(f, "large.txt", i * 10_000, minOf((i + 1) * 10_000, large.length))["receiptCid"] as String }
+            val plain = request(f, receipts)
+            assertFalse("search" in plain, "The underlying corpus itself fits before adding the complete search witness set")
+            val inspected = retained()
+            val refused = request(f, receipts, status = 409, extra = _m["query" j _m["terms" j _l["word"], "limit" j 256]])
+            assertTrue((refused["error"] as String).contains("4MiB")); assertFalse("search" in refused)
+            assertEquals(inspected, retained(), "Full response bound is checked before retaining any partial derived result")
+        } finally { close(f) }
+    }
+
+    @Test fun offeredLocalCorpusPresetRunsTheRegisteredOwnerAndReturnsStatisticsWithSearch(): Unit = runBlocking {
+        val f = fixture("corpus-query-preset", coroutineContext[Job])
+        try {
+            val text = "Tenant must not assign unless Owner consents."; put(f, "agreement.txt", text)
+            val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
+            val program = EnglishCorpusPreset.build(ids, "current", _l["not"], 8)
+            assertTrue(LcncTypeCheck.check(program, LcncContracts.all().associateBy { it.type }, strict = true).isEmpty())
+            val result = LcncRunner(PureNodes.registry { 123L } + f.ctx.lcncRunners).runProcedure(program)
+            val output = result.nodeOutputs.getValue("corpus")
+            assertEquals(output["search"], result.returns["search"]); assertEquals(output["receiptCid"], result.returns["receiptCid"])
+            assertEquals(output["terms"], result.returns["terms"]); assertEquals(output["source"], result.returns["source"])
+            val search = result.returns["search"] as Map<*, *>; assertEquals(1, (search["hits"] as List<*>).size)
+            assertEquals("current", (search["source"] as Map<*, *>)["mode"])
+            assertEquals("unreviewed", (search["source"] as Map<*, *>)["reviewStatus"])
+            assertNull(output["topics"]); assertNull(output["topicCid"])
+            assertTrue(program.nodes.view.none { it.type.startsWith("vm.") || it.type == "chat" })
+            assertTrue(f.ctx.blackboard.snapshot().values.isEmpty()); assertEquals(0, f.ctx.rete.snapshot().size)
+        } finally { close(f) }
+    }
+
 }
