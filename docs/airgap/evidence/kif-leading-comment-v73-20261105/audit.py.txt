@@ -1,0 +1,406 @@
+#!/usr/bin/env python3
+"""Recorded KIF HTTP proof audit; Python standard library, no JVM/network/runtime.
+Usage: audit.py ATTEMPT SNAPSHOT --mode red|green [--main-sha SHA] [--out DIR]
+Green requires the caller's explicitly pinned final JAR SHA. Missing records stay PENDING.
+"""
+import argparse
+import base64
+import copy
+import hashlib
+import json
+import re
+import sys
+from pathlib import Path
+
+GREEN_HEAD = '08dd94f6cf88e1fb002291bcc3b2195a9f426608'
+RED_HEAD = 'c8b7f5e8a5d0dad8e6352d2fc1c733df7d69e563'
+RED_MAIN = 'b4744105e462d94767f84edf23b89f703ec517435f32bbcd8dd7c9090e819797'
+INPUTS = {
+    'commented': (77, 'fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802'),
+    'plain': (40, '6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42'),
+    'comment-only': (31, '02d5281bbc34b637189f1e8b9cdc38f33116c6b7439f9a6a27c8d48e2f9715a1'),
+    'unsupported-multiform': (61, '05919573a1176bfbb241f82f690776a46ca232c94f569aadb774203697382600'),
+    'malformed-multiform': (62, '37a9dc3fb665a6a60746b047785fa804a84f6697735551aae0b9bf26437d853b'),
+    'mixed-formats': (59, 'c4f732d3eb1c8c0b002af17572996d4da962bea1c176e23243e28201c311e2cd'),
+    'hash-is-not-kif-comment': (42, '8877c0c70c9b1a895ff76a502cc4714cef481504160e57dd0c7c84488bd920e5'),
+}
+NEGATIVES = list(INPUTS)[2:]
+PRODUCTION = {
+    'borg.trikeshed.forge.server.BeliefWire', 'borg.trikeshed.narsese.BeliefBagElement',
+    'borg.trikeshed.narsese.TurnReviewElement', 'borg.trikeshed.narsese.KgNalBridge',
+    'borg.trikeshed.kif.KifExpr', 'borg.trikeshed.kif.KifSemantic',
+    'borg.trikeshed.narsese.KgRetention', 'borg.trikeshed.narsese.SemanticSignal',
+    'borg.trikeshed.narsese.SignalCodec', 'borg.trikeshed.job.PackCasStore',
+    'borg.trikeshed.narsese.DocumentAppendLog', 'borg.trikeshed.userspace.nio.file.spi.JvmFileOperations',
+}
+
+class AuditError(Exception):
+    pass
+
+def need(value, message):
+    if not value:
+        raise AuditError(message)
+
+def sha(data):
+    return hashlib.sha256(data).hexdigest()
+
+def cid(data):
+    return 'sha256:' + sha(data)
+
+def un64(text):
+    return base64.b64decode(text, validate=True)
+
+def strict_json(data):
+    def pairs(rows):
+        result = {}
+        for k, v in rows:
+            need(k not in result, 'duplicate JSON key: ' + k)
+            result[k] = v
+        return result
+    return json.loads(data, object_pairs_hook=pairs,
+        parse_constant=lambda _: (_ for _ in ()).throw(AuditError('nonfinite JSON')))
+
+def load(path):
+    return strict_json(path.read_bytes().decode('utf-8', errors='strict'))
+
+def cbor_head(major, n):
+    if n < 24:
+        return bytes([(major << 5) | n])
+    for width, ai in [(1, 24), (2, 25), (4, 26), (8, 27)]:
+        if n < 1 << (8 * width):
+            return bytes([(major << 5) | ai]) + n.to_bytes(width, 'big')
+    raise AuditError('CBOR integer bound')
+
+def cbor(value):
+    if value is None:
+        return b'\xf6'
+    if isinstance(value, str):
+        b = value.encode('utf-8', errors='strict')
+        return cbor_head(3, len(b)) + b
+    if isinstance(value, dict):
+        return cbor_head(5, len(value)) + b''.join(cbor(k) + cbor(value[k]) for k in sorted(value, key=cbor))
+    raise AuditError('unsupported proposition CBOR value')
+
+def definition(source):
+    return cbor({'kind': 'kg-source-proposition/1', 'copula': 'PRODUCT',
+        'relation': 'MATCH', 'subject': 'Tenant', 'predicate': 'labels',
+        'object': '"notice; (exact) 📚"', 'subjectCid': None, 'objectCid': None,
+        'temporal': None, 'sourceContext': source})
+
+def signal_fields(data):
+    text = data.decode('utf-8', errors='strict')
+    # This fixture's serialized fields are ASCII; source literal stays in the separate definition.
+    need(text.isascii(), 'unexpected non-ASCII signal field representation')
+    at, values = 0, []
+    while at < len(text):
+        colon = text.find(':', at)
+        need(colon > at and re.fullmatch(r'0|[1-9][0-9]*', text[at:colon]) is not None, 'signal length prefix')
+        end = colon + 1 + int(text[at:colon])
+        need(end < len(text) and text[end] == ';', 'signal field delimiter')
+        values.append(text[colon+1:end])
+        at = end + 1
+    need(len(values) == 12, 'expected exact-proposition twelve-field signal')
+    return values
+
+def check_row(row, source, proposition, angular):
+    raw = un64(row['signalBase64'])
+    fields = signal_fields(raw)
+    need(row['angular'] == angular == fields[0] and row['propositionCid'] == proposition == fields[11], 'signal angular/proposition identity')
+    need(fields[2] == 'MATCH' and fields[3] == source and fields[4:10] == ['', '', '', '', '', ''] and fields[10] == '0', 'signal role/source/temporal identity')
+    need(fields[1] == row['evidencePacked'] and int(fields[1]) == (900 << 32) and
+         row['positive'] == 900 and row['negative'] == 0, 'signal evidence differs from one declared import')
+    need(re.fullmatch(r'[0-9]+', row['budgetPacked']) is not None, 'budget representation')
+    return raw
+
+def pack_blobs(data):
+    at, blocks = 0, {}
+    while at < len(data):
+        need(len(data) - at >= 37, 'torn CAS header')
+        kind, size = data[at], int.from_bytes(data[at+1:at+5], 'big')
+        identity = 'sha256:' + data[at+5:at+37].hex()
+        end = at + 37 + size
+        need(kind == 1 and end <= len(data), 'expected complete immutable BLOB pack records only')
+        block = data[at+37:end]
+        need(cid(block) == identity, 'CAS digest differs from actual blob bytes')
+        need(identity not in blocks, 'unexpected duplicate CAS BLOB record')
+        blocks[identity] = block
+        at = end
+    return blocks
+
+def crc32c(data):
+    value = 0xffffffff
+    for b in data:
+        value ^= b
+        for _ in range(8):
+            value = (value >> 1) ^ (0x82f63b78 if value & 1 else 0)
+    return value ^ 0xffffffff
+
+def wal_replay(data):
+    need(data[:8] == b'DOC-LOG1', 'WAL file type/version')
+    at, previous, frames, rows, receipts = 8, 0, [], {}, set()
+    while at < len(data):
+        need(len(data) - at >= 22 and data[at:at+4] == b'WAL1', 'WAL frame header')
+        version = int.from_bytes(data[at+4:at+6], 'big')
+        seq = int.from_bytes(data[at+6:at+14], 'big')
+        length = int.from_bytes(data[at+14:at+18], 'big')
+        end = at + 18 + length
+        need(version == 1 and seq > previous and end + 4 <= len(data), 'WAL version/sequence/length')
+        need(crc32c(data[at:end]) == int.from_bytes(data[end:end+4], 'big'), 'WAL CRC32C mismatch')
+        payload = data[at+18:end].decode('utf-8', errors='strict')
+        frame = {'sequence': seq, 'kind': payload[:1], 'bytes': length}
+        frames.append(frame)
+        if payload.startswith('B:'):
+            _, budget, signal = payload.split(':', 2)
+            fields = signal_fields(signal.encode())
+            rows[fields[0]] = (budget, signal.encode())
+            frame.update({'budgetPacked': budget, 'signalBase64': base64.b64encode(signal.encode()).decode()})
+        elif payload.startswith('A:'):
+            _, angular, budget = payload.split(':')
+            need(angular in rows, 'attention WAL references missing signal')
+            rows[angular] = (budget, rows[angular][1])
+            frame.update({'angular': angular, 'budgetPacked': budget})
+        elif payload.startswith('R:'):
+            _, angular, receipt = payload.split(':')
+            receipts.add((angular, 'sha256:' + receipt))
+            frame.update({'angular': angular, 'sourceCid': 'sha256:' + receipt})
+        elif payload.startswith('E:'):
+            rows.pop(payload.split(':', 2)[1], None)
+        else:
+            raise AuditError('unexpected fixture WAL operation')
+        previous, at = seq, end + 4
+    return rows, receipts, frames
+
+def hash_record(data):
+    return {'bytes': len(data), 'sha256': sha(data)}
+
+def check_hash_record(record, data, label):
+    need(record['bytes'] == len(data) and record['sha256'].removeprefix('sha256:') == sha(data), label + ' byte hash/size')
+
+def validate_model(m, rich):
+    writer, reopened, records, cleanup = (m[k] for k in ['writer', 'reopened', 'records', 'cleanup'])
+    mode, source, prop, angular = m['mode'], m['source'], m['proposition'], writer['angular']
+    need(writer['result'] == 'PASS' and writer['mode'] == ('red' if mode == 'red' else 'writer'), 'writer result/mode')
+    need(writer['sourceCid'] == source and writer['definitionCid'] == prop and writer['commentedSourceCid'] == 'sha256:' + INPUTS['commented'][1], 'writer source/definition/comment fixture CID')
+    need(un64(writer['acceptedSourceBase64']) == m['accepted'] and un64(writer['definitionBase64']) == definition(source), 'writer source/definition byte exports')
+    need(len(writer['bagRows']) == 1, 'expected full one-row final bag')
+    signal = check_row(writer['bagRows'][0], source, prop, angular)
+    need(all(cleanup.get(k) is True for k in ['listenerStopped', 'reviewDrained', 'bagWorkerCompleted',
+        'bagSupervisorCompleted', 'packSynced', 'walFlushed', 'packAndWalClosed']), 'writer owner/transport/storage cleanup')
+    need(all(v is True for v in cleanup.values()), 'a recorded transport/owner cleanup flag is false')
+    need(reopened['result'] == 'PASS' and reopened['sourceCid'] == source and reopened['definitionCid'] == prop and
+         reopened['writerPid'] == writer['pid'] and reopened['pid'] != writer['pid'], 'separate reader PID/source/definition binding')
+    need(all(reopened[k] is True for k in ['sourceAndDefinitionBytesPreserved', 'bagEvidenceSignalAndBudgetReplayed', 'ownersDrained']), 'after-close readback/replay/owner proof')
+    need(m['writerIdentity']['pid'] == writer['pid'] and m['readerIdentity']['pid'] == reopened['pid'], 'identity/result PID mismatch')
+    for r in records:
+        need(r['method'] == 'POST' and r['path'] in ['/api/beliefs/kg', '/api/beliefs/attend'], 'unexpected recorded HTTP action')
+        need(cid(un64(r['requestBase64'])) == r['requestCid'], 'HTTP request byte/CID mismatch')
+        need('observerFailure' not in r['response'], 'observer supplied a synthetic failure response')
+    expected = [('commented', 400), ('plain', 200), ('attend', 200)] if mode == 'red' else [('commented', 200), ('attend', 200)] + [item for n in NEGATIVES for item in [(n, 400), ('commented', 200)]]
+    need(len(records) == len(expected), 'HTTP request count does not match exact scope')
+    for r, (name, status) in zip(records, expected):
+        need(r['status'] == status, 'HTTP status mismatch: ' + name)
+        if name == 'attend':
+            request = strict_json(un64(r['requestBase64']).decode('utf8'))
+            need(r['path'] == '/api/beliefs/attend' and request == {'angular': angular, 'propositionCid': prop, 'p': 0.9}, 'attention request identity')
+            attended = r['response']['attended']
+            need(attended['sourceContext'] == source and attended['sourceContextStatus'] == 'verified-retained-kg' and
+                 attended['propositionCid'] == prop and attended['angular'] == angular and attended['processed'] is True and
+                 attended['identityScope'] == 'exact-resident-proposition' and attended['changed'] is True, 'attention response identity/processing')
+            need(0.89 < attended['p'] < 0.91 and attended['d'] == 0.4 and attended['q'] == 0.6, 'attention budget response')
+        else:
+            need(r['path'] == '/api/beliefs/kg' and un64(r['requestBase64']) == m['inputs'][name], 'HTTP exact fixture bytes: ' + name)
+            response = r['response']
+            if status == 400:
+                need(response == {'error': 'invalid_kg_input'}, 'negative response scope')
+            else:
+                need(response['format'] == 'KIF' and response['sourceCid'] == source and response['propositionCids'] == [prop] and
+                     all(response[k] == 1 for k in ['statements', 'minted', 'processedAssertions', 'globalResidentCountAfterImport']) and
+                     response['copulas'] == {'PRODUCT': 1}, 'accepted/replayed production response')
+                need(response['retention'] == {'status': 'sync-and-exact-bounded-readback-completed', 'storageDurability': 'DURABLE',
+                    'durabilityGuarantee': 'storage-dependent', 'sourceRepresentation': 'exact-accepted-text-utf8',
+                    'sourceAuthentication': 'not-established', 'reviewAuthority': 'not-established'}, 'retention source role/authority metadata')
+    if mode == 'red':
+        need(writer['checks'] == [{'case': 'v72-leading-comment-RED', 'status': 400, 'sourceNotRetained': True, 'bagUnchanged': True}], 'expected RED guard')
+    else:
+        need([c['case'] for c in writer['checks']] == NEGATIVES, 'five exact negative guards')
+        previous = writer['bagRowsAfterAttend'] if rich else None
+        for c, name in zip(writer['checks'], NEGATIVES):
+            need(c['status'] == 400 and c['healthyNextStatus'] == 200 and c['sourceCid'] == cid(m['inputs'][name]), 'negative/recovery scope')
+            need(all(c[k] is True for k in ['bagEvidenceAndBudgetUnchanged', 'casPackUnchangedOnRefusal', 'refusedSourceNotRetained']), 'negative changed state/retained rejected source')
+            if rich:
+                need(c['bagBefore'] == c['bagAfter'] == previous, 'negative full bag evidence/signal/budget changed')
+                need(len(c['bagAfterHealthy']) == 1 and
+                     [{k: v for k, v in row.items() if k != 'budgetPacked'} for row in c['bagAfterHealthy']] ==
+                     [{k: v for k, v in row.items() if k != 'budgetPacked'} for row in c['bagBefore']], 'healthy replay changed source/signal/evidence identity')
+                check_row(c['bagAfterHealthy'][0], source, prop, angular)
+                need(c['healthyEvidenceUnchanged'] is True and
+                     c['healthyBudgetScope'] == 'Explicit healthy KG replay renews attention; refused input changes no budget or evidence', 'healthy replay budget scope missing')
+                previous = c['bagAfterHealthy']
+                for key in ['casPackBefore', 'casPackAfter']:
+                    check_hash_record(c[key], m['pack'], 'negative ' + key)
+        if rich:
+            need(previous == writer['bagRows'], 'final full bag differs from final healthy replay')
+    if rich:
+        need(cleanup.get('httpClientClosed') is True and cleanup.get('executorTerminated') is True, 'HTTP client/executor closure absent')
+        need(writer['signalBeforeAttendBase64'] == writer['signalAfterAttendBase64'] == writer['bagRows'][0]['signalBase64'], 'attention changed signal/evidence bytes')
+        need(len(writer['bagRowsAfterAttend']) == 1 and
+             check_row(writer['bagRowsAfterAttend'][0], source, prop, angular) == signal, 'after-attend identity/evidence differs')
+        need(writer['bagRowsAfterAttend'][0]['budgetPacked'] != writer['bagRows'][0]['budgetPacked'], 'actual healthy replay budget renewal not distinguished from refusal')
+        need(reopened['bagRows'] == writer['bagRows'], 'after-close replayed full bag differs')
+        need(reopened['sourceContext'] == {'propositionCid': prop, 'sourceContext': source,
+             'sourceContextStatus': 'verified-retained-kg'}, 'after-close source context not verified against retained source')
+        need(writer['sourceReadback']['cid'] == reopened['sourceReadback']['cid'] == source and
+             writer['definitionReadback']['cid'] == reopened['definitionReadback']['cid'] == prop, 'actual readback CIDs differ from source/proposition')
+        check_hash_record(writer['sourceReadback'], m['accepted'], 'writer source readback')
+        check_hash_record(writer['definitionReadback'], definition(source), 'writer definition readback')
+        check_hash_record(writer['closedCasPack'], m['pack'], 'writer closed CAS pack')
+        check_hash_record(writer['closedWal'], m['wal'], 'writer closed WAL')
+        check_hash_record(reopened['sourceReadback'], m['accepted'], 'after-close source readback')
+        check_hash_record(reopened['definitionReadback'], definition(source), 'after-close definition readback')
+        check_hash_record(reopened['walBeforeOpen'], m['wal'], 'reader WAL before open')
+        check_hash_record(reopened['walAfterClose'], m['wal'], 'reader WAL after close')
+        check_hash_record(reopened['casPackAfterClose'], m['pack'], 'reader CAS pack after close')
+    return signal
+
+def controls(model, rich):
+    mutations = {
+        'wrong-source-context-CID': lambda m: m['writer'].__setitem__('sourceCid', 'sha256:' + '0'*64),
+        'wrong-HTTP-request-byte-hash': lambda m: m['records'][0].__setitem__('requestCid', 'sha256:' + '0'*64),
+        'negative-returned-200': lambda m: m['records'][0 if m['mode'] == 'red' else 2].__setitem__('status', 200),
+        'same-PID-reader': lambda m: m['reopened'].__setitem__('pid', m['writer']['pid']),
+        'wrong-readback-proposition': lambda m: m['reopened'].__setitem__('definitionCid', 'sha256:' + '0'*64),
+        'unclosed-bag-owner': lambda m: m['cleanup'].__setitem__('bagSupervisorCompleted', False),
+    }
+    if rich:
+        mutations['negative-changed-full-bag-budget'] = lambda m: m['writer']['checks'][0]['bagAfter'][0].__setitem__('budgetPacked', '0')
+        mutations['after-close-source-readback-hash'] = lambda m: m['reopened']['sourceReadback'].__setitem__('sha256', '0'*64)
+    results = []
+    for name, mutate in mutations.items():
+        value = copy.deepcopy(model)
+        mutate(value)
+        try:
+            validate_model(value, rich)
+        except AuditError as error:
+            results.append({'mutation': name, 'result': 'REJECTED', 'reason': str(error)})
+        else:
+            raise AuditError('mutated copy accepted: ' + name)
+    return results
+
+def audit(attempt, snapshot, mode, main_sha, source_head):
+    required = ['writer-result.json', 'reopen-result.json', 'http-records.json', 'cleanup.json',
+        ('red' if mode == 'red' else 'writer') + '-identity.json', 'reopen-identity.json',
+        'accepted-source.kif', 'definition.cbor', 'runtime/cas/pack', 'runtime/beliefs.wal']
+    missing = [str(attempt / f) for f in required if not (attempt / f).is_file()]
+    if missing:
+        return {'result': 'PENDING', 'missing': missing}
+    hashes, checks = {}, []
+    def data(path):
+        raw = path.read_bytes(); hashes[str(path)] = hash_record(raw); return raw
+    need(re.fullmatch('[0-9a-f]{64}', main_sha) is not None, 'explicit pinned main JAR hash required')
+    need((snapshot/'source-head.txt').read_text().strip() == source_head, 'snapshot source head')
+    need(sha(data(snapshot/'main.jar')) == main_sha, 'frozen final JAR bytes')
+    writer = load(attempt/'writer-result.json'); reopened = load(attempt/'reopen-result.json')
+    wi = load(attempt/(('red' if mode == 'red' else 'writer') + '-identity.json'))
+    ri = load(attempt/'reopen-identity.json')
+    for identity, role in [(wi, 'red' if mode == 'red' else 'writer'), (ri, 'reopen')]:
+        need(identity['mode'] == role and identity['sourceHead'] == source_head and identity['mainSha256'] == main_sha, 'identity frozen source/JAR/mode')
+        need(re.fullmatch('[0-9]+', identity['pid']) is not None and identity['overlays'] is False and identity['friends'] is False, 'PID/overlay/friend boundary')
+        origins = set(identity['productionCodeSources'].values())
+        need(set(identity['productionCodeSources']) == PRODUCTION and len(origins) == 1 and
+             all(Path(v).is_absolute() and Path(v).name == 'main.jar' for v in origins), 'production class code origins')
+        need(identity['frozenJars'] == 120 and identity['dependencyHashesVerified'] == 119, 'frozen classpath identity')
+    need(wi['productionCodeSources'] == ri['productionCodeSources'], 'writer/reader production origins differ')
+    checks.append('Frozen JAR/source head and all twelve production owner/codec class origins in two distinct processes')
+    inputs_root = attempt/'observer-inputs'
+    need(inputs_root.is_dir(), 'per-attempt frozen observer input copy required')
+    manifest = load(inputs_root/'input-manifest.json')
+    need(set(manifest) == set(INPUTS), 'exact seven-fixture manifest scope')
+    inputs = {}
+    for name, (size, digest) in INPUTS.items():
+        raw = data(inputs_root/'inputs'/ (name+'.kif'))
+        need(len(raw) == size and sha(raw) == digest and manifest[name]['bytes'] == size and manifest[name]['sha256'] == digest, 'exact pinned fixture ' + name)
+        raw.decode('utf-8', errors='strict')
+        inputs[name] = raw
+    accepted = inputs['plain' if mode == 'red' else 'commented']
+    need(data(attempt/'accepted-source.kif') == accepted and data(attempt/'commented.kif') == inputs['commented'] and data(attempt/'plain.kif') == inputs['plain'], 'exact exported source files')
+    source, expected_definition = cid(accepted), definition(cid(accepted))
+    proposition = cid(expected_definition)
+    need(data(attempt/'definition.cbor') == expected_definition, 'canonical definition CBOR roles/kind/source/literal bytes')
+    checks.append('Seven pinned fixtures and complete source bytes, canonical proposition CBOR and scalar constant/literal roles')
+    pack, wal = data(attempt/'runtime/cas/pack'), data(attempt/'runtime/beliefs.wal')
+    model = {'mode': mode, 'writer': writer, 'reopened': reopened, 'records': load(attempt/'http-records.json'),
+        'cleanup': load(attempt/'cleanup.json'), 'writerIdentity': wi, 'readerIdentity': ri,
+        'source': source, 'proposition': proposition, 'accepted': accepted, 'inputs': inputs, 'pack': pack, 'wal': wal}
+    rich = mode == 'green'
+    signal = validate_model(model, rich)
+    checks.append('Actual HTTP request byte identities/statuses, exact source-scoped import/replay/attention and closed owners')
+    blocks = pack_blobs(pack)
+    need(blocks == {source: accepted, proposition: expected_definition}, 'CAS pack contains unexpected/missing source or definition blobs')
+    if mode == 'red':
+        need(cid(inputs['commented']) not in blocks, 'RED refused commented source retained')
+    for name in NEGATIVES:
+        need(cid(inputs[name]) not in blocks, 'refused fixture retained in actual CAS pack')
+    checks.append('Entire actual closed CAS pack decoded and content-hashed: exact accepted source/definition only')
+    rows, receipts, frames = wal_replay(wal)
+    angular = writer['angular']
+    need(rows == {angular: (writer['bagRows'][0]['budgetPacked'], signal)}, 'independently replayed CRC-framed WAL differs from full bag signal/budget')
+    expected_kinds = ['R', 'B', 'A'] + ([] if mode == 'red' else ['B'] * len(NEGATIVES))
+    need(receipts == {(angular, source)} and [f['kind'] for f in frames] == expected_kinds, 'one source receipt, exact mint/attention/healthy replay WAL scope')
+    minted = [f for f in frames if f['kind'] == 'B']
+    need(all(un64(f['signalBase64']) == signal and f['budgetPacked'] == minted[0]['budgetPacked'] for f in minted), 'WAL healthy mint changed signal/evidence or incoming budget')
+    if rich:
+        need(minted[-1]['budgetPacked'] == writer['bagRows'][0]['budgetPacked'] and
+             frames[2]['budgetPacked'] == writer['bagRowsAfterAttend'][0]['budgetPacked'], 'actual attended/renewed budgets differ from WAL')
+    checks.append('Independent full WAL frame CRC32C/sequence validation and exact source receipt/signal/evidence/budget replay')
+    if rich:
+        checks.append('Five refusals preserve full bag and CAS bytes; explicit healthy replay preserves signal/evidence while renewing attention; actual after-close readbacks/WAL match')
+    mutations = controls(model, rich)
+    checks.append(str(len(mutations)) + ' mutated copies rejected by the same verifier')
+    for f in required:
+        data(attempt/f)
+    for name in ['Proof.kt', 'compile.sh', 'run.sh', 'input-manifest.json']:
+        data(inputs_root/name)
+    return {'result': 'RED_CONFIRMED' if mode == 'red' else 'PASS', 'mode': mode,
+        'attemptDirectory': str(attempt), 'snapshotDirectory': str(snapshot), 'sourceHead': source_head, 'mainSha256': main_sha,
+        'recordedProductionJar': next(iter(wi['productionCodeSources'].values())),
+        'commentedSourceCid': cid(inputs['commented']), 'acceptedSourceCid': source, 'definitionCid': proposition,
+        'writerPid': writer['pid'], 'readerPid': reopened['pid'], 'httpRequests': len(model['records']),
+        'afterAttendBudgetPacked': (writer['bagRowsAfterAttend'] if rich else writer['bagRows'])[0]['budgetPacked'],
+        'finalBudgetPacked': writer['bagRows'][0]['budgetPacked'],
+        'negativeBudgetTransitions': [] if not rich else [{'case': c['case'],
+            'beforeRefusal': c['bagBefore'][0]['budgetPacked'], 'afterRefusal': c['bagAfter'][0]['budgetPacked'],
+            'afterExplicitHealthyReplay': c['bagAfterHealthy'][0]['budgetPacked']} for c in writer['checks']],
+        'casBlobs': len(blocks), 'walFrames': frames, 'checks': checks, 'mutatedCopyControls': mutations,
+        'limits': ['Loopback HttpServer delegates to production BeliefWire; body UTF-8 decoding is done by the observer facade.',
+            'No malformed-raw-UTF8 transport or OS airgap claim.', 'Manual declared KG; no source authentication, semantic entailment, reasoner result or complete KIF conformance.',
+            'Clean separate-process close/reopen; no crash or power-loss recovery claim.'], 'artifactHashes': hashes}
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('attempt', type=Path); parser.add_argument('snapshot', type=Path)
+    parser.add_argument('--mode', choices=['red', 'green'], required=True)
+    parser.add_argument('--main-sha'); parser.add_argument('--source-head')
+    parser.add_argument('--out', type=Path, default=Path(__file__).resolve().parent)
+    args = parser.parse_args(); args.out.mkdir(parents=True, exist_ok=True)
+    try:
+        head = args.source_head or (RED_HEAD if args.mode == 'red' else GREEN_HEAD)
+        main_sha = args.main_sha or (RED_MAIN if args.mode == 'red' else '')
+        result = audit(args.attempt.resolve(), args.snapshot.resolve(), args.mode, main_sha, head)
+    except (AuditError, KeyError, TypeError, ValueError, OSError, IndexError) as error:
+        result = {'result': 'FAIL', 'mode': args.mode, 'error': str(error)}
+    result['auditScriptSha256'] = sha(Path(__file__).read_bytes())
+    (args.out/'audit-result.json').write_text(json.dumps(result, indent=2, ensure_ascii=False)+'\n')
+    text = ['Independent recorded KIF HTTP audit: ' + result['result'], 'Selected attempt: ' + str(args.attempt.resolve()), '']
+    text += ['- ' + c for c in result.get('checks', [])]
+    if result.get('missing'):
+        text += ['', 'Required final records absent; no green PASS issued.'] + result['missing']
+    if result.get('error'):
+        text += ['', result['error']]
+    text += ['', 'No semantic entailment, raw malformed-UTF8 HTTP, OS airgap or crash-recovery claim.']
+    (args.out/'report.txt').write_text('\n'.join(text)+'\n')
+    print(json.dumps({'result': result['result'], 'mode': args.mode, 'checks': len(result.get('checks', [])),
+        'mutationControls': len(result.get('mutatedCopyControls', [])), 'report': str(args.out/'audit-result.json')}))
+    return 0 if result['result'] in ['PASS', 'RED_CONFIRMED'] else (2 if result['result'] == 'PENDING' else 1)
+
+if __name__ == '__main__':
+    sys.exit(main())
