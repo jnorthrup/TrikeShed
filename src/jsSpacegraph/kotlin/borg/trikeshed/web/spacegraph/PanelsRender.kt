@@ -87,9 +87,40 @@ fun Panels.setResult(n: dynamic, v: dynamic) {
         // resizing/selecting a result pane must not bleed into a canvas pan
         on(el, "pointerdown", { e -> e.stopPropagation() })
     }
+    el.removeAttribute("data-gist")
     // JSON docs render as a cursor-tree; strings stay verbatim
     if (v != null && typeOf(v) == "object") { el.textContent = ""; el.appendChild(renderTree(v, "", 0)) }
     else el.textContent = if (typeOf(v) == "string") v else str(v)
+}
+
+/** A previewed node's authored gist before any run: a literal's text, carried through ring parameters. */
+fun Panels.staticGist(n: dynamic, depth: Int = 0): String? {
+    if (depth > 16) return null
+    return when (str(n.type)) {
+        "text.value" -> str(n.params?.value ?: "").ifEmpty { null }
+        "scope.in" -> {
+            val ring = n._parentScope ?: return null
+            val name = str(n.params?.name ?: "")
+            val w = arr(graph.wires).firstOrNull { it.to[0] == ring.id && str(it.to[1]).removeSuffix("?") == name } ?: return null
+            val source = node(w.from[0]) ?: return null
+            if (str(w.from[1]).removeSuffix("?") == "value") staticGist(source, depth + 1) else null
+        }
+        else -> null
+    }
+}
+
+/** Open previews show their authored gist as it is typed or wired, until a run fills them with its own values. */
+fun Panels.refreshPreviews() {
+    for (n in nodes()) {
+        if (!truthy(n.preview)) continue
+        val pane = n.el?.querySelector(":scope > .result") ?: continue
+        val authored = str(pane.dataset.gist ?: "") == "static"
+        if (!authored && str(pane.textContent).isNotEmpty()) continue
+        val gist = staticGist(n)
+        if (gist == null) { if (authored) { pane.textContent = ""; pane.removeAttribute("data-gist") }; continue }
+        if (str(pane.textContent) != gist) pane.textContent = gist
+        pane.dataset.gist = "static"
+    }
 }
 
 /**

@@ -68,6 +68,9 @@ button.stop{border-color:var(--err);color:var(--err)}
 .node .hd b{font-size:12px;flex:1;white-space:nowrap}
 .node .hd s{color:var(--dim);cursor:pointer;text-decoration:none;padding:0 3px}
 .node .hd s:hover{color:var(--err)}
+.node .hd s[aria-pressed="true"]{color:var(--ink)}
+.node.preview>.result{min-height:4.5em;white-space:pre-wrap;overflow-wrap:break-word;text-wrap:pretty}
+.node.preview>.result:empty::before{content:"Preview · filled when this node runs";color:var(--dim)}
 .node .body{padding:6px 0}
 .row{position:relative;display:flex;align-items:center;min-height:20px;padding:1px 12px;font-size:11px}
 .row.in{justify-content:flex-start;color:var(--ink)}
@@ -330,6 +333,7 @@ body.wiring .port.mateable{
 .node.starved{outline:1px dashed var(--err);outline-offset:2px}
 .node.starved>.hd b{color:var(--err)}
 #wires path.starved{stroke:var(--err)!important;opacity:.42;stroke-dasharray:2 7}
+#wires path.crossing{fill:none;stroke:#57d3ff;stroke-width:1.5;stroke-dasharray:3 5;opacity:.55;pointer-events:none}
 /* what the shake just closed, for a moment, so a whole-graph change is not a
    silent diff you have to hunt for */
 @keyframes shookflash{0%{box-shadow:0 0 0 0 var(--ok)}100%{box-shadow:0 0 0 14px transparent}}
@@ -352,6 +356,9 @@ body.wiring .port.scopeblock{opacity:.75;border-color:var(--vm);background:trans
 /* the palette: docked drag-source for the served vocabulary + the gallery */
 #palette{position:fixed;top:40px;left:0;bottom:0;width:216px;background:rgba(11,14,20,.96);border-right:1px solid var(--line);z-index:18;overflow-y:auto;padding:8px;display:none}
 #palette.open{display:block}
+#pointer{position:fixed;left:0;top:0;width:26px;height:26px;margin:-2px 0 0 -3px;z-index:2147483647;pointer-events:none;fill:#f4f7fb;stroke:#0b0e14;stroke-width:1.4;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))}
+#pointer.pressed{fill:#57d3ff}
+body.pointer,body.pointer *{cursor:none!important}
 #palette h5{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:8px 0 4px}
 #palette .pitem{padding:3px 8px;border:1px solid var(--line);border-radius:4px;margin:3px 0;font-size:11px;cursor:grab;background:var(--panel)}
 #palette .pitem:hover{border-color:var(--graal)}
@@ -415,7 +422,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <button class="run" id="runBtn" disabled aria-label="Run">▶ run</button>
   <button class="stop" id="stopBtn" aria-label="Stop timers">■ stop timers</button>
   <button id="addBtn" aria-label="Add node">+ node</button>
-  <button id="fdBtn" aria-label="Force directed layout" title="one-shot layout: layer by cable polarity, relax the rest, then STOP">↦ fd</button><button id="shakeBtn" aria-label="Treeshake" title="treeshake: pair every OPEN port in the graph with its closest legal open mate">shake</button><button id="fitBtn" aria-label="Fit graph" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
+  <button id="fdBtn" aria-label="Force directed layout" title="one-shot layout: layer by cable polarity, relax the rest, then STOP · shift: slow motion">↦ fd</button><button id="shakeBtn" aria-label="Treeshake" title="treeshake: pair every OPEN port in the graph with its closest legal open mate · shift: one cable at a time · alt: optional inputs too">shake</button><button id="fitBtn" aria-label="Fit graph" title="frame every node (F) — the top-level answer to the D-tab's ring fit">⤢ fit</button>
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px" aria-label="Panel name">
   <button id="storeSaveBtn" aria-label="Save to store" title="save construction as a replicated store document">⇪ store</button>
   <button id="storeLoadBtn" aria-label="Load from store" title="load a construction from the store">⇩ store</button>

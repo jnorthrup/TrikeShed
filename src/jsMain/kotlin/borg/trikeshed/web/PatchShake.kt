@@ -51,7 +51,7 @@ class PatchShake(private val s: PatchSurface, private val camera: PatchCamera) {
                 owner.message("Connections or selected parent changed during the check; run Shake again"); return null
             }
             if (parentId != null && result.parentId != parentId) throw Error("Server did not confirm the selected parent; use an updated server")
-            return apply(result, truthy(options?.optional), namespace)
+            return apply(result, truthy(options?.optional), namespace, truthy(options?.sequence))
         } catch (e: CancellationException) {
             throw e
         } catch (e: dynamic) {
@@ -127,7 +127,7 @@ class PatchShake(private val s: PatchSurface, private val camera: PatchCamera) {
         }
     }
 
-    fun apply(resIn: dynamic, @Suppress("UNUSED_PARAMETER") inclOptional: Boolean, programName: String?): Int {
+    fun apply(resIn: dynamic, @Suppress("UNUSED_PARAMETER") inclOptional: Boolean, programName: String?, sequence: Boolean = false): Int {
         var res = resIn
         if (programName != null) {
             val id = { local: dynamic -> programName + "::" + str(local) }
@@ -139,12 +139,38 @@ class PatchShake(private val s: PatchSurface, private val camera: PatchCamera) {
         clearVerdicts()
         val made = arr(res.made)
         val g = s.graph
-        for (m in made) {
-            val exists = arr(g.wires).any { w -> w.from[0] == m.fromNode && w.from[1] == m.fromPort && w.to[0] == m.toNode && w.to[1] == m.toPort }
-            if (!exists) g.wires.push(wire(m.fromNode, m.fromPort, m.toNode, m.toPort))
+        if (sequence && made.isNotEmpty() && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            // Shift: one cable at a time, each drawn out of its source before it lands; the verdicts follow the last.
+            fun next(i: Int) {
+                if (s.graph !== g) return
+                if (i == made.size) { judge(res, made, programName); return }
+                val m = made[i]
+                merged(m, 460.0)
+                window.setTimeout({
+                    if (s.graph === g) {
+                        if (s.node(m.fromNode) != null && s.node(m.toNode) != null && land(g, m)) { s.redraw(); s.save() }
+                        next(i + 1)
+                    }
+                }, 560)
+            }
+            next(0)
+            return made.size
         }
+        for (m in made) land(g, m)
         if (made.isNotEmpty()) { s.redraw(); s.save() }
+        judge(res, made, programName)
+        for (m in made) merged(m, 0.0)
+        return made.size
+    }
 
+    /** One made cable onto the board, unless the board already has it. */
+    private fun land(g: dynamic, m: dynamic): Boolean {
+        if (arr(g.wires).any { w -> w.from[0] == m.fromNode && w.from[1] == m.fromPort && w.to[0] == m.toNode && w.to[1] == m.toPort }) return false
+        g.wires.push(wire(m.fromNode, m.fromPort, m.toNode, m.toPort)); return true
+    }
+
+    /** The pass's verdicts, starved reach and summary over the board the made cables leave. */
+    private fun judge(res: dynamic, made: Array<dynamic>, programName: String?) {
         val vs = arr(res.verdicts)
         for (v in vs) {
             val nd = s.node(v.nodeId)
@@ -194,8 +220,11 @@ class PatchShake(private val s: PatchSurface, private val camera: PatchCamera) {
         val text = parts.joinToString(" · ")
         s.status(text)
         if (programName != null) s.showConnections(programName, res, text)
+    }
 
-        for (m in made) {
+    /** A made cable's moment: its spline drawn source → target over [drawMs], its target port flashing on arrival. */
+    private fun merged(m: dynamic, drawMs: Double) {
+        val flash = {
             for (el in arr(document.querySelectorAll(".port[data-port=\"" + js("CSS").escape(m.toPort) + "\"]"))) {
                 val nd = s.node(m.toNode)
                 if (nd != null && el.closest(".node") === nd.el) {
@@ -203,17 +232,25 @@ class PatchShake(private val s: PatchSurface, private val camera: PatchCamera) {
                     window.setTimeout({ el.classList.remove("just-shook") }, 1400)
                 }
             }
-            val a = s.portCenter(m.fromNode, "out", m.fromPort); val b = s.portCenter(m.toNode, "in", m.toPort)
-            if (a != null && b != null) {
-                val gp = document.createElementNS("http://www.w3.org/2000/svg", "path").asDynamic()
-                gp.classList.add("cand", "only", "just-merged")
-                PatchNavigation.wireCurve(gp, a, b, s.viewport, s.view)
-                gp.style.stroke = "var(--ok)"
-                s.wiresSvg.appendChild(gp)
-                window.setTimeout({ gp.remove() }, 1400)
-            }
         }
-        return made.size
+        if (drawMs > 0) window.setTimeout(flash, drawMs.toInt()) else flash()
+        val a = s.portCenter(m.fromNode, "out", m.fromPort); val b = s.portCenter(m.toNode, "in", m.toPort)
+        if (a != null && b != null) {
+            val gp = document.createElementNS("http://www.w3.org/2000/svg", "path").asDynamic()
+            gp.classList.add("cand", "only", "just-merged")
+            PatchNavigation.wireCurve(gp, a, b, s.viewport, s.view)
+            gp.style.stroke = "var(--ok)"
+            s.wiresSvg.appendChild(gp)
+            if (drawMs > 0) {
+                val length = num(gp.getTotalLength())
+                gp.style.animation = "none"; gp.style.strokeDasharray = "$length"
+                val from = obj(); from.strokeDashoffset = "$length"
+                val to = obj(); to.strokeDashoffset = "0"
+                val timing = obj(); timing.duration = drawMs; timing.easing = "cubic-bezier(.65,0,.35,1)"; timing.fill = "forwards"
+                gp.animate(arrayOf<dynamic>(from, to), timing)
+            }
+            window.setTimeout({ gp.remove() }, (drawMs + 1400).toInt())
+        }
     }
 
     private fun isInt(v: dynamic): Boolean = js("Number.isInteger(v)").unsafeCast<Boolean>()

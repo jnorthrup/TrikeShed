@@ -86,7 +86,7 @@ class Panels : PatchSurface {
 
     // ── PatchSurface ──
     override fun redraw() = redrawWires()
-    override fun save() = saveDoc()
+    override fun save() { orderStatements(); saveDoc(); refreshPreviews() }
     override fun status(text: String) { byId("status").textContent = text }
     override fun blipLeave() = blip.leave(null)
     override fun applyWireBox() = PatchNavigation.projectWires(wiresSvg, viewport, view)
@@ -397,6 +397,44 @@ class Panels : PatchSurface {
         graph.wires.push(wire(from[0], from[1], to[0], to[1])); redraw(); save(); return true
     }
 
+    /**
+     * Statements run in authored order, and the canvas shows no order: a cable drawn from a later statement into an
+     * earlier one (a backchained producer, a room added after the record it feeds) fails the run as use-before-def.
+     * Each level keeps its authored order except where a cable puts the producer first; a cycle stays as authored.
+     */
+    fun orderStatements() {
+        val all = nodes(); val byId = HashMap<String, dynamic>(); for (n in all) byId[str(n.id)] = n
+        fun ancestry(id: dynamic): List<dynamic> {
+            val out = ArrayList<dynamic>(); var n = byId[str(id)]
+            while (n != null) { out.add(0, n); n = if (truthy(n._parentScope)) n._parentScope else null }
+            return out
+        }
+        // each cable orders the two siblings its ends descend from, under their nearest common parent ("" = top level)
+        val cables = HashMap<String, ArrayList<Pair<String, String>>>()
+        for (w in arr(graph.wires)) {
+            val a = ancestry(w.from[0]); val b = ancestry(w.to[0])
+            var i = 0
+            while (i < a.size && i < b.size && a[i] === b[i]) i++
+            if (i == a.size || i == b.size) continue
+            cables.getOrPut(if (i == 0) "" else str(a[i - 1].id)) { ArrayList() }.add(str(a[i].id) to str(b[i].id))
+        }
+        for ((parent, pairs) in cables) {
+            val ring = if (parent.isEmpty()) null else byId[parent]
+            val kids = if (ring == null) all.filter { !truthy(it._parentScope) } else arr(ring.children).toList()
+            val at = HashMap<String, Int>(); kids.forEachIndexed { i, k -> at[str(k.id)] = i }
+            val next = Array(kids.size) { ArrayList<Int>() }; val needs = IntArray(kids.size)
+            for ((p, c) in pairs) { val x = at[p] ?: continue; val y = at[c] ?: continue; next[x].add(y); needs[y]++ }
+            val done = BooleanArray(kids.size); val ordered = ArrayList<dynamic>(kids.size)
+            repeat(kids.size) {
+                val k = kids.indices.firstOrNull { !done[it] && needs[it] <= 0 } ?: kids.indices.first { !done[it] }
+                done[k] = true; ordered.add(kids[k]); for (c in next[k]) needs[c]--
+            }
+            if (ordered.indices.all { ordered[it] === kids[it] }) continue
+            if (ring == null) graph.nodes = (ordered + all.filter { truthy(it._parentScope) }).toTypedArray()
+            else ring.children = ordered.toTypedArray()
+        }
+    }
+
     fun removeNode(id: dynamic) {
         val n = node(id) ?: return
         // a ring takes its whole subtree with it
@@ -552,10 +590,7 @@ class Panels : PatchSurface {
         }
         val width = maxOf(0.0, r.width - inset)
         val z = minOf(LandscapeNavigation.detailZoom, maxOf(LandscapeNavigation.minZoom, minOf((width - pad * 2) / maxOf(1.0, x1 - x0), (r.height - pad * 2) / maxOf(1.0, y1 - y0))))
-        view.z = z
-        view.x = inset + (width - (x1 - x0) * z) / 2 - x0 * z
-        view.y = (r.height - (y1 - y0) * z) / 2 - y0 * z
-        applyView(); camera.saveCameraSoon()
+        camera.glideTo(inset + (width - (x1 - x0) * z) / 2 - x0 * z, (r.height - (y1 - y0) * z) / 2 - y0 * z, z)
     }
 
     // ── minimap: world overview + click-to-jump ──

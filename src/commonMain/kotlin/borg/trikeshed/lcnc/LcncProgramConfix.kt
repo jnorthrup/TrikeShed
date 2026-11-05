@@ -30,7 +30,7 @@ object LcncProgramConfix {
     }
 
     fun definitionNodes(values: Series<LcncNode>): Series<LcncNode> = values α { node ->
-        node.copy(x = 0.0, y = 0.0, width = null, height = null, collapsed = false,
+        node.copy(x = 0.0, y = 0.0, width = null, height = null, collapsed = false, preview = false,
             children = definitionNodes(node.children))
     }
 
@@ -47,7 +47,7 @@ object LcncProgramConfix {
         // Concentric containment: a ring's statements nest INSIDE it — one
         // document, rings inside rings, recursively.
         "children" to (0 until n.children.size).map { nodeMap(n.children[it]) },
-    )
+    ).apply { if (n.preview) put("preview", true) }
 
     fun toJson(program: LcncProgram): String {
         val nodes = (0 until program.nodes.size).map { i -> nodeMap(program.nodes[i]) }
@@ -96,7 +96,8 @@ object LcncProgramConfix {
         return LcncNode(id, type, params, num(m["x"]), num(m["y"]), optionalNum(m["width"]), optionalNum(m["height"]),
             collapsed = boolean(m, "collapsed", false, path),
             subprogram = subprogram,
-            children = children.toSeries())
+            children = children.toSeries(),
+            preview = boolean(m, "preview", false, path))
     }
 
     /** reify backends reify arrays as List or Array — accept both. */

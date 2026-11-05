@@ -237,7 +237,8 @@ class ModelMux internal constructor(
     suspend fun session(modelId: String, expectedProvider: String? = null, expectedWireModel: String? = null,
                         expectedKeyless: Boolean = false): Result<borg.trikeshed.agent.modelmux.LlmSession> {
         borg.trikeshed.kernel.KernelExecution.require(borg.trikeshed.kernel.KernelCapability.MODEL)
-        runCatching { borg.trikeshed.agent.modelmux.Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
+        val scripted = ModelScript.owns(configuredBaseUrls[modelId])
+        if (!scripted) runCatching { borg.trikeshed.agent.modelmux.Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
         val entry = uniqueModel(modelId) ?: return Result.failure(
             if (models.view.any { it.a == modelId }) IllegalStateException("need(model): ambiguous model id: $modelId")
             else NoSuchElementException("need(model): model not found: $modelId"))
@@ -246,6 +247,8 @@ class ModelMux internal constructor(
             return Result.failure(IllegalStateException("Model provider changed; review the current provider before sending source material"))
         if (expectedWireModel != null && card.wireName != expectedWireModel)
             return Result.failure(IllegalStateException("Wire model changed; review the current model before sending source material"))
+        // A scripted endpoint answers in process: no credential, no destination beyond its identity.
+        if (scripted) return Result.success(borg.trikeshed.agent.modelmux.LlmSession(entry, null, configuredBaseUrls.getValue(modelId)))
         if (expectedKeyless && (auth(modelId) != LlmAuth.NONE || providerOnly(card) || configuredBaseUrls[modelId].isNullOrBlank()))
             return Result.failure(IllegalStateException("Expected an explicitly credential-free model"))
         if ((providerOnly(card) || expectedProvider != null && !expectedKeyless) && auth(modelId) != LlmAuth.REQUIRED)
@@ -360,7 +363,7 @@ class ModelMux internal constructor(
         // a guest-supplied model field, owns the wire model and credential binding.
         val wireModel = uniqueModel(modelId)?.b?.wireName ?: modelId
         val json = runCatching {
-            borg.trikeshed.agent.modelmux.Airgap.requireRemote()
+            if (!ModelScript.owns(configuredBaseUrls[modelId])) borg.trikeshed.agent.modelmux.Airgap.requireRemote()
             borg.trikeshed.agent.modelmux.acp.AcpCodec.encodeCompletion(request, wireModel)
         }
             .getOrElse { return Result.failure(it) }
@@ -397,7 +400,7 @@ class ModelMux internal constructor(
         var failure: Throwable? = null
         try {
             currentCoroutineContext().ensureActive()
-            borg.trikeshed.agent.modelmux.Airgap.requireRemote()
+            if (!ModelScript.owns(configuredBaseUrls[modelId])) borg.trikeshed.agent.modelmux.Airgap.requireRemote()
             if (breadcrumbs != null && breadcrumbId != null && admission == null) {
                 try {
                     withContext(NonCancellable) { breadcrumb = breadcrumbs.transact(breadcrumbId) { it } }
@@ -506,6 +509,23 @@ class ModelMux internal constructor(
             // strategy produced the hit: a ledger keyed by a relaxed bucket could
             // not be reconciled against the bytes actually sent.
             requestHash = cacheCascade.primary(json)
+            if (ModelScript.owns(session.baseUrl)) {
+                // In-process answer: the script speaks in turn order, so it is never served from the reply cache.
+                val script = checkNotNull(ModelScript.registered(session.baseUrl)) { "No model script registered for ${session.baseUrl}" }
+                val respBody = script.answer(json, card.wireName)
+                httpStatus = 200
+                val parsed = decode(respBody)
+                session.recordReceipt(
+                    ModelResponseReceipt.mint(
+                        modelId = modelId, providerId = card.id, requestHash = requestHash,
+                        action = "chat", httpStatus = 200, latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
+                        inputTokens = 0, outputTokens = 0, cachedHit = false,
+                        assessmentId = receiptAssessment, sessionId = session.sessionId,
+                        cacheReadTokens = 0, cacheWriteTokens = 0,
+                    )
+                )
+                return Result.success(parsed)
+            }
             // Every identity this mux is willing to answer from, exact first.
             // EXACT_ONLY (the default) makes this a one-element list and the
             // behaviour byte-identical to before strategies existed.

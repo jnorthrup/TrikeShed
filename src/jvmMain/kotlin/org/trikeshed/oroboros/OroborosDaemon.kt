@@ -1402,8 +1402,20 @@ object OroborosDaemon {
         // is the open inspectable answer to "what is the daemon running on".
         launchMuxBlackboardHome(muxReactor, quotaLegion, daemonBlackboard)
 
+        // Fake-AI mode: TRIKESHED_MODELMUX_SCRIPT names an operator model script. Every Brain and
+        // LCNC model call is then answered in process from it — no provider roster, no egress.
+        val modelScriptSpec = HostSystem.getenv("TRIKESHED_MODELMUX_SCRIPT")?.trim()?.takeIf { it.isNotEmpty() }?.let { path ->
+            val script = borg.trikeshed.agent.modelmux.ModelScript.parse(java.io.File(path).readText())
+            borg.trikeshed.agent.modelmux.ModelScript.register(script)
+            HostSystem.err("[OROBOROS] model script ${script.name} ($path): ${script.cues.size} cues answer every model call in process")
+            borg.trikeshed.modelmux.BrainClient.EndpointSpec(name = "script", envVar = "", base = script.url, model = script.name, provider = "script")
+        }
+
         suspend fun buildBrain(): Pair<borg.trikeshed.modelmux.BrainClient, Map<String, Any?>> {
             refreshQuotaLegion()
+            if (modelScriptSpec != null) return borg.trikeshed.modelmux.BrainClient(keyMux = baseKeyMux, endpointSpecs = listOf(modelScriptSpec),
+                errorSink = brainErrorSink, quotaLegion = quotaLegion) to
+                mapOf("pin" to null, "reason" to "model script ${modelScriptSpec.model}", "builtAtMs" to HostSystem.currentTimeMillis())
             val configuredModels = hermesCredentials.configuredModels().view.filter {
                 it.apiMode == "chat_completions" && it.baseUrl.isNotBlank() &&
                     runCatching { baseKeyMux.get("llm.${it.provider}.key") }.getOrNull()?.isNotBlank() == true
@@ -1751,6 +1763,14 @@ object OroborosDaemon {
         // LIVE: cards are rebuilt on the first mux call after Hermes' files
         // change, so the picklist shows a `/model` switch on its next open.
         suspend fun buildLcncMux(): borg.trikeshed.agent.modelmux.ModelMux {
+            if (modelScriptSpec != null) {
+                refreshQuotaLegion()
+                return borg.trikeshed.agent.modelmux.ModelMux(keyMux) {
+                    quota(quotaLegion)
+                    defaultModel(modelScriptSpec.model)
+                    model(id = modelScriptSpec.model, caps = setOf("chat", "conflict-resolve"), baseUrl = modelScriptSpec.base, provider = "script")
+                }
+            }
             val liveBrain = brainClient.live()
             val pin = brainClient.pin["pin"] as? Map<*, *>
             val pinnedModel = pin?.get("model") as? String

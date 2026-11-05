@@ -10,7 +10,7 @@ import kotlinx.browser.window
 class PanelsTrace(private val panels: Panels) {
     private class Spark(val index: Int, val wire: dynamic, var count: Int, var sequence: Double,
                         var elapsed: Double, var began: Double = -1.0, var dot: dynamic = null,
-                        var label: dynamic = null)
+                        var label: dynamic = null, val bound: Array<String>? = null, var track: dynamic = null)
     private val releases = mutableListOf<() -> Unit>()
     private val pending = mutableListOf<Spark>()
     private val visible = mutableListOf<Spark>()
@@ -42,7 +42,7 @@ class PanelsTrace(private val panels: Panels) {
         owner = Any()
         panels.page.cancelFrame(frame); frame = 0
         while (releases.isNotEmpty()) releases.removeAt(releases.lastIndex).invoke()
-        for (spark in visible) { spark.dot?.remove(); spark.label?.remove() }
+        for (spark in visible) { spark.dot?.remove(); spark.label?.remove(); spark.track?.remove() }
         pending.clear(); visible.clear()
         for (n in panels.nodes()) n.el?.removeAttribute("data-observed-phase")
         banner?.remove(); banner = null; caption = null
@@ -134,7 +134,7 @@ class PanelsTrace(private val panels: Panels) {
         if (!owns(ticket)) return
         panels.page.cancelFrame(frame); frame = 0
         omitted += pending.sumOf { it.count }; pending.clear()
-        for (spark in visible) { spark.dot?.remove(); spark.label?.remove() }
+        for (spark in visible) { spark.dot?.remove(); spark.label?.remove(); spark.track?.remove() }
         visible.clear()
         recorded(ticket, reason)
     }
@@ -169,6 +169,16 @@ class PanelsTrace(private val panels: Panels) {
             val ordinal = num(event.sequence)
             if (!ordinal.isFinite() || ordinal <= sequence || ordinal > 9_007_199_254_740_991.0 || ordinal % 1.0 != 0.0) continue
             sequence = ordinal
+            // A previewed node's gist lands in its open pane as it completes, ahead of the spark it sends on.
+            if (event.phase == "after" && event.status == "completed" && event.documentCid == cid && typeOf(event.preview) == "string") {
+                val node = panels.node(str(event.nodeId))
+                if (node != null && truthy(node.preview)) panels.setResult(node, event.preview)
+            }
+            if (event.phase == "after" && event.status == "completed" && event.documentCid == cid) {
+                val bound = crossing(str(event.nodeId))
+                if (bound != null) { if (pending.size < 256) pending.add(Spark(-1, null, 1, sequence, num(event.elapsedNanos), bound = bound)) else omitted++ }
+                continue
+            }
             if (event.phase != "consumed" || event.wire == null) continue
             if (event.documentCid != cid) { unmatched++; continue }
             val wire = event.wire
@@ -208,8 +218,8 @@ class PanelsTrace(private val panels: Panels) {
         while (iterator.hasNext()) {
             val spark = iterator.next()
             val fraction = ((clock - spark.began) / 1200.0).coerceIn(0.0, 1.0)
-            if (fraction >= 1) { spark.dot?.remove(); spark.label?.remove(); iterator.remove(); continue }
-            val path = panels.wiresSvg.querySelector("[data-wire-index='${spark.index}']").asDynamic()
+            if (fraction >= 1) { spark.dot?.remove(); spark.label?.remove(); spark.track?.remove(); iterator.remove(); continue }
+            val path = if (spark.bound != null) track(spark) else panels.wiresSvg.querySelector("[data-wire-index='${spark.index}']").asDynamic()
             if (path == null) continue
             val length = num(path.getTotalLength()); if (!length.isFinite() || length <= 0) continue
             val point = path.getPointAtLength(length * if (motion.matches) .5 else fraction)
@@ -219,7 +229,9 @@ class PanelsTrace(private val panels: Panels) {
                 spark.dot.setAttribute("data-observed-count", str(spark.count))
                 spark.dot.style.cssText = "fill:#80f4ff;filter:drop-shadow(0 0 5px #57d3ff);pointer-events:none"
                 val title = panels.svg("title")
-                title.textContent = str(spark.wire.fromNode) + "." + str(spark.wire.fromPort) + " → " + str(spark.wire.toNode) + "." + str(spark.wire.toPort) +
+                val bound = spark.bound
+                title.textContent = (if (bound != null) bound[0] + "." + bound[2] + " → " + bound[3] + "." + bound[5] + " · ring boundary"
+                    else str(spark.wire.fromNode) + "." + str(spark.wire.fromPort) + " → " + str(spark.wire.toNode) + "." + str(spark.wire.toPort)) +
                     " · " + spark.count + " observed selections · through sequence " + spark.sequence +
                     if (spark.elapsed.isFinite()) " · last observed at " + fixed(spark.elapsed / 1_000_000, 3) + " ms from walk start" else ""
                 spark.dot.appendChild(title); panels.wiresSvg.appendChild(spark.dot)
@@ -232,5 +244,32 @@ class PanelsTrace(private val panels: Panels) {
         }
         report()
         if (!paused && (pending.isNotEmpty() || visible.isNotEmpty())) frame = panels.page.frame(::draw)
+    }
+
+    /** A completed scope.in took its value across its ring's boundary from the ring's named input; a scope.out hands one back out. */
+    private fun crossing(nodeId: String): Array<String>? {
+        val node = panels.node(nodeId) ?: return null
+        val ring = node._parentScope
+        if (!truthy(ring)) return null
+        val name = str(node.params?.name ?: "").removeSuffix("?")
+        if (name.isEmpty()) return null
+        return when (str(node.type)) {
+            "scope.in" -> arrayOf(str(ring.id), "in", name, nodeId, "out", "value")
+            "scope.out" -> arrayOf(nodeId, "in", "value", str(ring.id), "out", name)
+            else -> null
+        }
+    }
+
+    /** The boundary a crossing spark rides, drawn between its two ports when it starts and gone when it lands. */
+    private fun track(spark: Spark): dynamic {
+        if (spark.track != null && truthy(spark.track.isConnected)) return spark.track
+        val b = spark.bound ?: return null
+        val from = panels.portCenter(b[0], b[1], b[2]) ?: return null
+        val to = panels.portCenter(b[3], b[4], b[5]) ?: return null
+        val path = panels.svg("path"); path.classList.add("crossing")
+        PatchNavigation.wireCurve(path, from, to, panels.viewport, panels.view)
+        panels.wiresSvg.insertBefore(path, panels.wiresSvg.firstChild)
+        spark.track = path
+        return path
     }
 }

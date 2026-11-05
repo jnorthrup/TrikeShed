@@ -15,6 +15,7 @@ import borg.trikeshed.agent.keymux.KeyMux
 import borg.trikeshed.agent.modelmux.Airgap
 import borg.trikeshed.agent.modelmux.ModelEntry
 import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelScript
 import borg.trikeshed.agent.modelmux.RosterEntry
 import borg.trikeshed.agent.modelmux.disambiguateModelIds
 import borg.trikeshed.agent.modelmux.acp.AcpMessage
@@ -219,6 +220,11 @@ open class BrainClient(
     private fun providerOnly(endpoint: EndpointSpec): Boolean =
         endpoint.envVar.startsWith("HERMES_CUSTOM_") && endpoint.envVar.endsWith("_API_KEY")
 
+    /** A roster of scripted endpoints answers in process; any other roster answers to the airgap. */
+    suspend fun requireEgress() {
+        if (endpoints.isEmpty() || !endpoints.all { ModelScript.owns(it.base) }) Airgap.requireRemote()
+    }
+
     private val endpoints: List<EndpointSpec> = endpointSpecs ?: when {
         apiKey != null -> listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
         // External keyMux: the full roster is admitted (env-present providers
@@ -354,7 +360,7 @@ open class BrainClient(
         temperature: Double = 0.2,
         contextId: String? = null,
     ): String {
-        Airgap.requireRemote()
+        requireEgress()
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
         return withTimeout(outerBudgetMs()) {
@@ -375,7 +381,7 @@ open class BrainClient(
         contextId: String? = null,
     ): Pair<String, String> {
         val selected = if (options.models.size == 0) null else selectEndpoints(options.models)
-        Airgap.requireRemote()
+        requireEgress()
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
         return withTimeout(outerBudgetMs()) {
             chatInner(messages, options.maxTokens, options.temperature, contextId, selected)
@@ -398,7 +404,7 @@ open class BrainClient(
             internalModelMux.auth(endpointIds.getValue(selected[0])) == borg.trikeshed.agent.keymux.LlmAuth.NONE)) {
             "Exact chat requires an endpoint-specific provider identity"
         }
-        Airgap.requireRemote()
+        requireEgress()
         return withTimeout(outerBudgetMs()) {
             chatInner(messages, options.maxTokens, options.temperature, contextId, selected, exact = true)
         }
@@ -412,7 +418,7 @@ open class BrainClient(
 
     /** Retry [attempt] through the backoff ladder while it fails rate-limited — single-endpoint lanes only. */
     private suspend fun <T> withRateLimitRetry(attempt: suspend () -> Result<T>): Result<T> {
-        Airgap.requireRemote()
+        requireEgress()
         var result = attempt()
         if (endpoints.size != 1) return result
         for (backoffMs in RATE_LIMIT_BACKOFF_MS) {
@@ -421,9 +427,9 @@ open class BrainClient(
             if (failure is Airgap.Rejection) throw failure
             val msg = failure.message ?: return result
             if (!isRetryableFailure(msg)) return result
-            Airgap.requireRemote()
+            requireEgress()
             kotlinx.coroutines.delay(backoffMs)
-            Airgap.requireRemote()
+            requireEgress()
             result = attempt()
         }
         return result
@@ -504,7 +510,7 @@ open class BrainClient(
         preferredModel: String? = null,
         timeoutMs: Long = HtxRequest.DEFAULT_TIMEOUT_MS,
     ): Pair<String, String> = withTimeout(outerBudgetMs()) {
-        Airgap.requireRemote()
+        requireEgress()
         chatSeatInner(messages, maxTokens, temperature, contextId, preferredModel, timeoutMs)
     }
 

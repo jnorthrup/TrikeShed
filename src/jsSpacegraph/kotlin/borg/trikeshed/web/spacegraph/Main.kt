@@ -29,6 +29,7 @@ private fun boot() {
         p.page.own { p.facets.close() }
         p.blip.install()
         p.camera.install()
+        if (URLSearchParams(window.location.search).has("pointer")) PanelsPointer(p).install()
         wire(p)
         val ws = SpaceGraphWorkspace(p); p.workspace = ws; ws.install()
         p.facets.install()
@@ -270,8 +271,8 @@ private fun wire(p: Panels) {
     p.page.on(window, "pointerdown", { e -> if (!p.menu.contains(e.target)) p.menu.style.display = "none" })
     p.page.on(byId("addBtn"), "click", { p.showMenu(60.0, 60.0) })
     p.page.on(byId("fitBtn"), "click", { p.fit() })
-    p.page.on(byId("shakeBtn"), "click", { e -> p.launchJs { p.shake.request(p.shakeOwner, objOf { it.optional = truthy(e.shiftKey) }) } })
-    p.page.on(byId("fdBtn"), "click", { p.launchJs { p.layout.settle(p.layoutOwner) } })
+    p.page.on(byId("shakeBtn"), "click", { e -> p.launchJs { p.shake.request(p.shakeOwner, objOf { it.optional = truthy(e.altKey); it.sequence = truthy(e.shiftKey) }) } })
+    p.page.on(byId("fdBtn"), "click", { e -> p.launchJs { p.layout.settle(p.layoutOwner, if (truthy(e.shiftKey)) 1400.0 else 200.0) } })
     byId("runBtn").title = "Run this authored program once in the daemon and inspect its durable receipt"
     p.page.on(byId("runBtn"), "click", { p.admitProgram() })
     p.installVisualQuery()

@@ -40,6 +40,8 @@ data class LcncNode(
      *  resolve `scope.in` names outward through the frame chain — nearest
      *  ring shadows. Only `scope.out` values leave the ring. */
     val children: Series<LcncNode> = emptySeriesOf(),
+    /** Preview state — the result pane stays open before and across runs, so output fills it in place. */
+    val preview: Boolean = false,
 )
 
 /** Viewport (pan/zoom) persisted with the program so a reload restores the exact camera. */

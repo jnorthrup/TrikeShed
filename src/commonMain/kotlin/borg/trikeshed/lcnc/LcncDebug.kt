@@ -62,8 +62,13 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
 
     private fun observe(fields: Map<String, Any?>) {
         observationLedger.observe(fields.filterKeys { it in _s["nodeId", "type", "path", "invocationOrdinal",
-            "parent", "iteration", "phase", "status", "reason", "frameId", "documentCid", "documentName", "locationOmitted"] })
+            "parent", "iteration", "phase", "status", "reason", "frameId", "documentCid", "documentName", "locationOmitted", "preview"] })
     }
+
+    /** A previewed node's gist for its canvas pane: its first text output, bounded; the run is unchanged. */
+    private fun preview(node: LcncNode, status: String, outputs: Map<String, Any?>?): String? =
+        if (!node.preview || status != "completed" || outputs == null) null
+        else sequenceOf("content", "value", "text", "x").firstNotNullOfOrNull { outputs[it] as? String }?.take(1024)
 
     internal suspend fun observeWith(ledger: LcncInvocationLedger) = gate.withLock {
         ledger.reset(); observationLedger = ledger
@@ -205,6 +210,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
             fields["status"] = status
             reason?.let { fields["reason"] = it.take(512) }
             LcncInvocationLedger.Invocation(fields).capture("result", outputs)
+            preview(node, status, outputs)?.let { fields["preview"] = it }
             site = fields.toMap()
             observe(fields)
             mutationMonitor.observe(path.joinToString("/"), node.id, status, after = fields)

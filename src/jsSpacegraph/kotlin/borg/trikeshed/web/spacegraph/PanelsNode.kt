@@ -64,7 +64,7 @@ fun Panels.buildNode(n: dynamic) {
         if (lane != null) el.dataset.lane = lane.id
     }
     val hd = document.createElement("div").asDynamic(); hd.className = "hd"
-    hd.innerHTML = "<i></i><b></b><s role=\"button\" tabindex=\"0\" aria-label=\"Collapse node\" title=\"collapse\">▤</s><s role=\"button\" tabindex=\"0\" aria-label=\"Delete node\" title=\"delete\">✕</s>"
+    hd.innerHTML = "<i></i><b></b><s role=\"button\" tabindex=\"0\" aria-label=\"Collapse node\" title=\"collapse\">▤</s><s role=\"button\" tabindex=\"0\" aria-label=\"Preview output\" aria-pressed=\"false\" title=\"preview\">◫</s><s role=\"button\" tabindex=\"0\" aria-label=\"Delete node\" title=\"delete\">✕</s>"
     hd.querySelector("b").textContent = if (isScope) str(n.id) else str(t.title)
     hd.title = str(t.title) + " · " + str(n.id)
     el.appendChild(hd)
@@ -108,6 +108,31 @@ fun Panels.buildNode(n: dynamic) {
     on(collapse, "click", { e -> e.stopPropagation(); toggleCollapse() })
     on(collapse, "keydown", { e ->
         if (e.key == "Enter" || e.key == " ") { e.preventDefault(); e.stopPropagation(); toggleCollapse() }
+    })
+    // Preview: the result pane opens before a run and stays open across runs, so output fills it in place.
+    val preview = hd.querySelector("[aria-label='Preview output']")
+    fun previewState() {
+        preview.setAttribute("aria-pressed", truthy(n.preview).toString())
+        el.classList.toggle("preview", truthy(n.preview))
+        val pane = el.querySelector(":scope > .result")
+        if (truthy(n.preview)) {
+            if (pane == null) setResult(n, "")
+            el.querySelector(":scope > .result").dataset.preview = "1"
+        } else if (pane != null) {
+            pane.removeAttribute("data-preview")
+            if (str(pane.textContent).isEmpty()) pane.remove()
+        }
+    }
+    fun togglePreview() {
+        n.preview = !truthy(n.preview)
+        previewState()
+        redraw()
+        save()
+    }
+    on(preview, "pointerdown", { e -> e.stopPropagation() })
+    on(preview, "click", { e -> e.stopPropagation(); togglePreview() })
+    on(preview, "keydown", { e ->
+        if (e.key == "Enter" || e.key == " ") { e.preventDefault(); e.stopPropagation(); togglePreview() }
     })
     if (isScope) {
         // the ring label: the frame identity — name + depth + the Key it runs under
@@ -271,6 +296,7 @@ fun Panels.buildNode(n: dynamic) {
     if (n.type == "program.ref") el.classList.add("ref")
     if (truthy(t.wide)) el.classList.add("wide")
     if (truthy(n.collapsed)) el.classList.add("collapsed")
+    if (truthy(n.preview)) previewState()
     el.style.left = "${n.x}px"; el.style.top = "${n.y}px"
     world.appendChild(el)
     on(hd, "dblclick", { e -> e.stopPropagation(); toggleCollapse() })

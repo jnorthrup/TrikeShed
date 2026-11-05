@@ -158,7 +158,29 @@ class PatchCamera(private val s: PatchSurface, private val harness: () -> dynami
     private val momentum = LandscapeMomentum(reducedMotion)
     private var momFrame = 0
 
-    fun killMomentum() = momentum.kill()
+    fun killMomentum() { momentum.kill(); window.cancelAnimationFrame(glideFrame); glideFrame = 0 }
+
+    private var glideFrame = 0
+
+    /** Carry the view to (x, y, z) at display rate: zoom geometric, centre linear, eased in and out. */
+    fun glideTo(x: Double, y: Double, z: Double, ms: Double = 700.0) {
+        killMomentum()
+        if (reducedMotion || ms <= 0) { view.x = x; view.y = y; view.z = z; applyView(); saveCameraSoon(); return }
+        val w = num(viewport.clientWidth); val h = num(viewport.clientHeight)
+        val z0 = num(view.z); val cx0 = (w / 2 - num(view.x)) / z0; val cy0 = (h / 2 - num(view.y)) / z0
+        val cx1 = (w / 2 - x) / z; val cy1 = (h / 2 - y) / z
+        val start = now()
+        lateinit var step: (Double) -> Unit
+        step = { t ->
+            val u = ((t - start) / ms).coerceIn(0.0, 1.0)
+            val e = if (u < .5) 4 * u * u * u else 1 - (-2 * u + 2).pow(3) / 2
+            val zz = z0 * (z / z0).pow(e)
+            view.z = zz; view.x = w / 2 - (cx0 + (cx1 - cx0) * e) * zz; view.y = h / 2 - (cy0 + (cy1 - cy0) * e) * zz
+            applyView()
+            glideFrame = if (u < 1) window.requestAnimationFrame(step) else { saveCameraSoon(); 0 }
+        }
+        glideFrame = window.requestAnimationFrame(step)
+    }
 
     private fun now(): Double = window.performance.now()
 

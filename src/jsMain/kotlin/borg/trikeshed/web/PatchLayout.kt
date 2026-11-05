@@ -209,7 +209,8 @@ class PatchLayout(private val s: PatchSurface) {
     }
 
     /** one-shot layout: layer by cable polarity, relax the rest, then STOP */
-    suspend fun settle(owner: PatchLayoutOwner?) {
+    /** fd: [ms] is the travel time of the boxes and their cables (the fd button: 200 ms, shift: 1400 ms). */
+    suspend fun settle(owner: PatchLayoutOwner?, ms: Double = 200.0) {
         if (busy) return
         val target: dynamic = owner?.parentTarget()
         if (owner != null && target == null) return
@@ -284,13 +285,27 @@ class PatchLayout(private val s: PatchSurface) {
                 val position = PatchPlacement.placement(bx, by, bw, bh, obstacles)
                 origin.x = num(origin.x) + position.first - bx; origin.y = num(origin.y) + position.second - by
             }
-            for (p in positions) {
-                val n = selected.getValue(str(p.id)); n.x = num(origin.x) + num(p.x); n.y = num(origin.y) + num(p.y)
-                n.el.style.left = "${n.x}px"; n.el.style.top = "${n.y}px"
+            // Boxes travel to their places at display rate; the cables follow every frame.
+            val moves = positions.map { p ->
+                val n = selected.getValue(str(p.id))
+                arrayOf<dynamic>(n, num(n.x), num(n.y), num(origin.x) + num(p.x), num(origin.y) + num(p.y))
             }
-            if (parent != null) { if (owner != null) owner.resizeParent(parent) else s.resizeParentFrames(parent) }
-            s.redraw(); s.save()
-            window.requestAnimationFrame { s.redraw(); if (owner == null || (owner.selected == name && owner.parentRevision == revision)) s.fitToContent() }
+            val still = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+            val start = window.performance.now()
+            lateinit var step: (Double) -> Unit
+            step = { t ->
+                val u = if (still || ms <= 0) 1.0 else ((t - start) / ms).coerceIn(0.0, 1.0)
+                val e = if (u < .5) 4 * u * u * u else 1 - (-2 * u + 2) * (-2 * u + 2) * (-2 * u + 2) / 2
+                for (m in moves) {
+                    val n = m[0]; n.x = num(m[1]) + (num(m[3]) - num(m[1])) * e; n.y = num(m[2]) + (num(m[4]) - num(m[2])) * e
+                    n.el.style.left = "${n.x}px"; n.el.style.top = "${n.y}px"
+                }
+                if (parent != null) { if (owner != null) owner.resizeParent(parent) else s.resizeParentFrames(parent) }
+                s.redraw()
+                if (u < 1) window.requestAnimationFrame(step)
+                else { s.save(); if (parent == null && (owner == null || (owner.selected == name && owner.parentRevision == revision))) s.fitToContent() }
+            }
+            window.requestAnimationFrame(step)
             s.status("fd: ${nodes.size} boxes, ${(result.links as Int) - (result.hints as Int)} cable links, ${result.segments} connected groups, ${result.hints} candidate pulls; cables unchanged$warning")
         } catch (e: CancellationException) {
             throw e
@@ -308,8 +323,9 @@ class PatchLayout(private val s: PatchSurface) {
         val kids = arr(n.children).filter { truthy(it.el) }
         val rings = kids.filter { it.children != null && num(it.children.length) > 0 }
         for (r in rings) ringLayout(r, preserve, resize, frame, applyRingView)
-        // Moving into a scaled host must not change shrink-to-fit widths mid-layout.
-        for (c in kids) c.el.style.width = "${if (truthy(c.el.offsetWidth)) c.el.offsetWidth else 210}px"
+        // Moving into a scaled host must not change shrink-to-fit widths mid-layout. A ring is sized by its own
+        // window floors, so its width is never frozen: a ring frozen while still empty would stay narrow.
+        for (c in kids) c.el.style.width = if (truthy(c._childHost)) "" else "${if (truthy(c.el.offsetWidth)) c.el.offsetWidth else 210}px"
         if (preserve && truthy(n._ringWorld)) {
             for (c in kids) {
                 c.el.classList.add("inring"); c.el.style.position = "absolute"; c.el.style.left = "${c.x}px"; c.el.style.top = "${c.y}px"

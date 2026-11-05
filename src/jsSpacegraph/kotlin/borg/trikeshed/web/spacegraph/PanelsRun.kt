@@ -67,7 +67,9 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
             n._lastOut = undefined; n.el.classList.remove("ok", "err")
             n._sheets = null; n._sheetRequest = null; n._sheetError = null; n._cur = null; n._orch = null
             n._groups = null; n._cols = null; n._lastMove = null; n._heap = null; n._standings = null
-            for (el in arr(n.el.querySelectorAll(".result,.csheet,.kboard,.kboard-status,.kboard-actions,canvas.heapmap,.heapstat"))) el.remove()
+            // An open preview pane survives the run; an earlier run's output is cleared, an authored gist stays.
+            for (el in arr(n.el.querySelectorAll(".result,.csheet,.kboard,.kboard-status,.kboard-actions,canvas.heapmap,.heapstat")))
+                if (!truthy(el.dataset?.preview)) el.remove() else if (str(el.dataset.gist ?: "") != "static") el.textContent = ""
             n.el.querySelector(".gaugeval")?.textContent = "—"
         }
         programRunning = true
@@ -230,7 +232,11 @@ suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> B
                 else -> {
                     val render = runners[str(n.type)]?.render
                     if (render != null) render(n, out)
-                    else if (keysOf(out).isNotEmpty()) setResult(n, out)
+                    // A preview shows the node's text, when it has one, instead of the whole output record.
+                    else if (keysOf(out).isNotEmpty()) {
+                        val gist = if (truthy(n.preview)) arrayOf("content", "value", "text").map { out[it] }.firstOrNull { typeOf(it) == "string" } else null
+                        setResult(n, gist ?: out)
+                    }
                 }
             }
             appendDocumentReviewReferences(n, out, ::current)
@@ -312,6 +318,7 @@ fun Panels.stopSources() {
 /** the tree survives the round trip: a ring emits its children recursively (one identity, no shadow copy) */
 fun nodeDoc(n: dynamic): dynamic {
     val d = obj(); d.id = n.id; d.type = n.type; d.x = n.x; d.y = n.y; d.params = n.params; d.collapsed = truthy(n.collapsed)
+    d.preview = if (truthy(n.preview)) true else undefined
     d.subprogram = if (truthy(n.subprogram)) n.subprogram else undefined
     d.children = if (truthy(n.children) && num(n.children.length) > 0) arr(n.children).map { nodeDoc(it) }.toTypedArray() else undefined
     return d
@@ -448,6 +455,7 @@ fun fromConfix(doc: dynamic): dynamic {
     fun nodeOf(n: dynamic): dynamic {
         val d = obj(); d.id = n.id; d.type = n.type; d.x = if (truthy(n.x)) n.x else 0; d.y = if (truthy(n.y)) n.y else 0
         d.params = if (truthy(n.params)) n.params else obj(); d.collapsed = truthy(n.collapsed)
+        if (truthy(n.preview)) d.preview = true
         d.subprogram = if (truthy(n.subprogram)) n.subprogram else undefined
         d.children = if (truthy(n.children) && num(n.children.length) > 0) arr(n.children).map { nodeOf(it) }.toTypedArray() else undefined
         return d
