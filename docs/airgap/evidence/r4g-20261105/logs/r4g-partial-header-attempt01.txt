@@ -1,0 +1,16 @@
+AssertionError()
+{
+  "cutBytes": 9,
+  "error": "AssertionError()",
+  "limited": false,
+  "killed": false,
+  "restarted": false,
+  "exits": [
+    0
+  ]
+}
+Traceback (most recent call last):
+  File "/workspace/airgap-r4g-proof/partial.py", line 95, in <module>
+    assert error is None,error
+           ^^^^^^^^^^^^^
+AssertionError: AssertionError()

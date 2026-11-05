@@ -1,0 +1,4 @@
+locale-hidden PASS
+ascii-locale PASS
+unknown-locale PASS
+utf8-control PASS

@@ -1,0 +1,2 @@
+strace: Process 115470 attached with 34 threads
+strace: dispatch_event: pid 115571 has delayed wait data set already

@@ -1,0 +1,14 @@
+{
+  "sourceDirectorySymlinks": {
+    "interop-attempt03/state/jvm-close-alias": "jvm-close",
+    "interop-archive01/state/native-close-alias": "native-close",
+    "interop-archive01/state/native-kill-alias": "native-kill",
+    "interop-archive01/state/jvm-kill-alias": "jvm-kill",
+    "interop-archive01/state/jvm-close-alias": "jvm-close",
+    "interop-attempt04/state/native-close-alias": "native-close",
+    "interop-attempt04/state/native-kill-alias": "native-kill",
+    "interop-attempt04/state/jvm-kill-alias": "jvm-kill",
+    "interop-attempt04/state/jvm-close-alias": "jvm-close"
+  },
+  "repositoryCopy": "shutil.copytree follows directory aliases to retain final file bytes; this listing preserves original alias identities. The controller created and exercised the symlinks in the actual proof workspace."
+}

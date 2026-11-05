@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4f-proof/interop.py", line 48, in <module>
+    original=(seed/'board.wal').read_bytes();expected=[{'sequence':i+1,'payload':p} for i,p in enumerate(payloads)];assert decode(original)==expected
+                                                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

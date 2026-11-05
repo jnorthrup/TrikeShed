@@ -1,0 +1,82 @@
+115553 1793860281.653089 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x14} ---
+115553 1793860281.701006 fsync(45</state/runtime/cas/sha256/1/7/4>) = 0 (DELAYED)
+115553 1793860281.923297 fsync(45</state/runtime/cas/sha256/1/7>) = 0 (DELAYED)
+115553 1793860282.130700 fsync(45</state/runtime/cas/sha256/1/7/4/1>) = 0 (DELAYED)
+115553 1793860282.333109 fsync(45</state/runtime/cas/sha256/1/7/4>) = 0 (DELAYED)
+115553 1793860282.534275 fsync(45</state/runtime/cas/sha256/1/7/4/1/.6d20917f294fe1f790aab531a6cfe7bb6de613aeac82fa78905f1ff353f6.454797570766724196.tmp>) = 0 (DELAYED)
+115553 1793860282.739344 fsync(45</state/runtime/cas/sha256/1/7/4/1>) = 0 (DELAYED)
+115571 1793860282.964083 fsync(45</state/runtime/cas/sha256/1/4>) = 0 (DELAYED)
+115571 1793860283.165321 fsync(45</state/runtime/cas/sha256/1>) = 0 (DELAYED)
+115571 1793860283.367640 fsync(45</state/runtime/cas/sha256/1/4/2>) = 0 (DELAYED)
+115571 1793860283.568590 fsync(45</state/runtime/cas/sha256/1/4>) = 0 (DELAYED)
+115571 1793860283.770313 fsync(45</state/runtime/cas/sha256/1/4/2/9>) = 0 (DELAYED)
+115571 1793860283.972313 fsync(45</state/runtime/cas/sha256/1/4/2>) = 0 (DELAYED)
+115571 1793860284.174102 fsync(45</state/runtime/cas/sha256/1/4/2/9/.ebe0f64561cf715ca8300979c59afbf413529c20c9f4c9bdc5dfe1f2ff88.9004772640720998485.tmp>) = 0 (DELAYED)
+115571 1793860284.376655 fsync(45</state/runtime/cas/sha256/1/4/2/9>) = 0 (DELAYED)
+115571 1793860284.585819 fsync(45</state/runtime/cas/sha256/0/4>) = 0 (DELAYED)
+115571 1793860284.787246 fsync(45</state/runtime/cas/sha256/0>) = 0 (DELAYED)
+115571 1793860284.995454 fsync(45</state/runtime/cas/sha256/0/4/d>) = 0 (DELAYED)
+115571 1793860285.196848 fsync(45</state/runtime/cas/sha256/0/4>) = 0 (DELAYED)
+115571 1793860285.397395 fsync(45</state/runtime/cas/sha256/0/4/d/c>) = 0 (DELAYED)
+115571 1793860285.598407 fsync(45</state/runtime/cas/sha256/0/4/d>) = 0 (DELAYED)
+115571 1793860285.799477 fsync(45</state/runtime/cas/sha256/0/4/d/c/.e1d518b3c4b83a2b9e4e006c4118826d3c6cca2149426682305fd943d773.14392052872203223978.tmp>) = 0 (DELAYED)
+115571 1793860286.001186 fsync(45</state/runtime/cas/sha256/0/4/d/c>) = 0 (DELAYED)
+115571 1793860286.215188 fsync(45</state/runtime/cas/sha256/4/a>) = 0 (DELAYED)
+115571 1793860286.416495 fsync(45</state/runtime/cas/sha256/4>) = 0 (DELAYED)
+115571 1793860286.617815 fsync(45</state/runtime/cas/sha256/4/a/a>) = 0 (DELAYED)
+115571 1793860286.818605 fsync(45</state/runtime/cas/sha256/4/a>) = 0 (DELAYED)
+115571 1793860287.020536 fsync(45</state/runtime/cas/sha256/4/a/a/3>) = 0 (DELAYED)
+115571 1793860287.221458 fsync(45</state/runtime/cas/sha256/4/a/a>) = 0 (DELAYED)
+115571 1793860287.422396 fsync(45</state/runtime/cas/sha256/4/a/a/3/.f7eb6a9441563736087a0e968c3a86faca41c89efe4896987cbee35e0685.7779405240788423629.tmp>) = 0 (DELAYED)
+115571 1793860287.624632 fsync(45</state/runtime/cas/sha256/4/a/a/3> <unfinished ...>
+115553 1793860287.777209 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115553 1793860287.779215 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115705 1793860287.782187 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115705 1793860287.786789 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115705 1793860287.788669 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115705 1793860287.788871 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115571 1793860287.828433 <... fsync resumed>) = 0 (DELAYED)
+115571 1793860287.830196 io_uring_enter(36<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0 <unfinished ...>
+115553 1793860288.100303 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115553 1793860288.100559 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115704 1793860288.101578 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115704 1793860288.101958 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115704 1793860288.102831 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115704 1793860288.103391 --- SIGXFSZ {si_signo=SIGXFSZ, si_code=SI_USER, si_pid=2, si_uid=65534} ---
+115571 1793860288.330328 <... io_uring_enter resumed>) = 1 (DELAYED)
+115571 1793860288.331141 fsync(37</state/runtime/.kanban/board.wal> <unfinished ...>
+116061 1793860288.339060 +++ killed by SIGKILL +++
+116051 1793860288.339091 +++ killed by SIGKILL +++
+115704 1793860288.339096 +++ killed by SIGKILL +++
+115623 1793860288.339099 +++ killed by SIGKILL +++
+115614 1793860288.339102 +++ killed by SIGKILL +++
+115575 1793860288.339106 +++ killed by SIGKILL +++
+115559 1793860288.339109 +++ killed by SIGKILL +++
+115556 1793860288.339112 +++ killed by SIGKILL +++
+115554 1793860288.339115 +++ killed by SIGKILL +++
+115553 1793860288.339118 +++ killed by SIGKILL +++
+116053 1793860288.339121 +++ killed by SIGKILL +++
+115547 1793860288.339125 +++ killed by SIGKILL +++
+115620 1793860288.339128 +++ killed by SIGKILL +++
+115545 1793860288.339131 +++ killed by SIGKILL +++
+115544 1793860288.339134 +++ killed by SIGKILL +++
+115537 1793860288.339137 +++ killed by SIGKILL +++
+115536 1793860288.339140 +++ killed by SIGKILL +++
+115535 1793860288.339143 +++ killed by SIGKILL +++
+115534 1793860288.339146 +++ killed by SIGKILL +++
+115533 1793860288.339149 +++ killed by SIGKILL +++
+115532 1793860288.339152 +++ killed by SIGKILL +++
+115524 1793860288.339155 +++ killed by SIGKILL +++
+115519 1793860288.339158 +++ killed by SIGKILL +++
+115512 1793860288.339161 +++ killed by SIGKILL +++
+115511 1793860288.339165 +++ killed by SIGKILL +++
+115509 1793860288.339168 +++ killed by SIGKILL +++
+115507 1793860288.339172 +++ killed by SIGKILL +++
+115514 1793860288.339191 +++ killed by SIGKILL +++
+115538 1793860288.339207 +++ killed by SIGKILL +++
+115570 1793860288.339233 +++ killed by SIGKILL +++
+115539 1793860288.339247 +++ killed by SIGKILL +++
+115705 1793860288.339262 +++ killed by SIGKILL +++
+115571 1793860288.339694 <... fsync resumed>) = ?
+115571 1793860288.562188 +++ killed by SIGKILL +++
+115470 1793860288.562235 +++ killed by SIGKILL +++

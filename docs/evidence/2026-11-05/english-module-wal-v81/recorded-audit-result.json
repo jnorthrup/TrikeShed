@@ -1,0 +1,138 @@
+{
+  "result": "PASS_RECORDED_MODULE_WAL_OWNERSHIP_CONSISTENCY",
+  "sourceHead": "7fb91a0b56cd860a13ce0af8eeef10205e586314",
+  "mainSha256": "5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c",
+  "documentsSha256": "c795ccc0168c36bf66b59a46acf07276b6813154e8515ef4ec018261f90d2086",
+  "panelsSha256": "d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b",
+  "writerPid": 143740,
+  "contenderPid": 143939,
+  "readerPid": 143962,
+  "directory": "/workspace/library-files/english-wal-v81-native-proof/native-attempt1/runtime/host/.kanban",
+  "wal": {
+    "bytes": 417,
+    "sha256": "8579ebcdd44ab7fabaa39e76f83b0f99c0046e3f9ac5c3db5a59c99d573cebcb"
+  },
+  "walFrames": [
+    {
+      "sequence": 1,
+      "payloadUtf8": "lcnc/run/9aa96dfb-cb0c-4046-9499-83e5a7d14f4e\tsha256:00395679e6d044981108353821c3a660c826cf5d3c02487fb2d8f71090a5283d",
+      "payloadSha256": "8a4e1c84ed5246bd2fc9519e9d9d7385ccdb8503d47cb061e62cebbf0709605b"
+    },
+    {
+      "sequence": 2,
+      "payloadUtf8": "lcnc/run/9aa96dfb-cb0c-4046-9499-83e5a7d14f4e\tsha256:a637fb44115ee0a52d6805eae6d092f2502df014c94bbc4dc3a504aa866add4d",
+      "payloadSha256": "fc7b2f6633f89adec2f8605a4a35fdf97e2c86a195431bf311ef432a94c586b0"
+    },
+    {
+      "sequence": 3,
+      "payloadUtf8": "lcnc/run/9aa96dfb-cb0c-4046-9499-83e5a7d14f4e\tsha256:2197a293663af9eccb7b041eee6c33128fcbe86b2378b0cf8a6d1dff88930c49",
+      "payloadSha256": "9c66e7dcb352b8dc039228f22b0dda2edef4142ac6767af225d24e78ce07a167"
+    }
+  ],
+  "recoveredCard": {
+    "jobId": "lcnc/run/9aa96dfb-cb0c-4046-9499-83e5a7d14f4e",
+    "col": "DONE",
+    "revision": 3,
+    "lastSequence": 3,
+    "commandCid": "sha256:2197a293663af9eccb7b041eee6c33128fcbe86b2378b0cf8a6d1dff88930c49"
+  },
+  "runId": "9aa96dfb-cb0c-4046-9499-83e5a7d14f4e",
+  "receiptCid": "sha256:2197a293663af9eccb7b041eee6c33128fcbe86b2378b0cf8a6d1dff88930c49",
+  "programCid": "sha256:b005844a0fcd4f3f4eb3a0f04aefc98280901c02c2b81332dc47fbdf3b221432",
+  "invocationsCid": "sha256:3774c816e22fd77db4bd8fc94c7f6cb69049cdb6f4b95b502f01ed001e5a75a3",
+  "nal": {
+    "status": "EVALUATED",
+    "premises": 4,
+    "occurrences": 5,
+    "attemptedPairs": 12,
+    "results": [
+      [
+        "DEDUCTION",
+        "ALPHA",
+        "GAMMA",
+        289,
+        0
+      ],
+      [
+        "INDUCTION",
+        "DELTA",
+        "GAMMA",
+        224,
+        0
+      ],
+      [
+        "INDUCTION",
+        "GAMMA",
+        "DELTA",
+        224,
+        0
+      ]
+    ],
+    "basis": [
+      "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+    ]
+  },
+  "guard": {
+    "rows": 2,
+    "candidateCid": "sha256:150a666f58928235d2964803e34f78734025855d6a8336f087fb46e4d0ba27a3",
+    "unmarkedOriginalTarget": "Trustee"
+  },
+  "readbacks": 8,
+  "mutatedCopyControls": [
+    {
+      "mutation": "wrong-active-journal-directory",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "contender-reuses-writer-PID",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "contender-changes-committed-WAL",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "corrupt-WAL-frame-checksum",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "recovery-substitutes-program-for-command",
+      "result": "REJECTED"
+    }
+  ],
+  "recordSha256": {
+    "GO.json": "0e8c57972086bc525bd66b662947540c2b5a4ba708fc25b6f3ce43d512fa34c9",
+    "startup.json": "f98b1d3927a5c1078f00bd207ca409c39976a2981d046d2a710821633d69d05a",
+    "browser-result.json": "bb39515c260158c9d309800e95747578f1a0e1221ebccad44ce7fabcafcd6b6a",
+    "holder-before-contend.json": "4984b7b4d02841439f76e5f92ad3f19d4bc4808bfc3545adccb3d0507f008400",
+    "holder-after-contend.json": "4984b7b4d02841439f76e5f92ad3f19d4bc4808bfc3545adccb3d0507f008400",
+    "contender.json": "3135070764b0b95f5e5e12727b829306db97c6f7549d1fe95577d265eb0ff70b",
+    "contender-controller-state.json": "5cd9733a31b701c3943f935256f48a9b3548ce46b4dc14b859eb3f1150fc667f",
+    "cleanup.json": "c19336b6ad38bb281c103caa642538358a8e1e2643d5aa9a4a4d74eac7d4b3d4",
+    "reopened.json": "42772d86422b2659cdb6eb4e7fc97f69c7541a4e63a0b123c0c52119456cdd28",
+    "classpath.json": "815e7d6bc81875198e71dc2e74c4e931a6ea4b9ede6a4fa81a6150bfa6cf41a5",
+    "network.json": "7840abbafa88fccccdfce2994a1230f425bce4242d95af380798778aaba9b042",
+    "writer-command.json": "70846b9b02f07fba70d575e8f20fa2d48a5f2a758e82027d159844ea483c6d18",
+    "reader-command.json": "a997927be2ef93270019448e8cc5c0b4836c9b690b5240a182906cb8766efb1f",
+    "contender-command.json": "96f417f1edeff83c6e10980da47f28abbc22ad6e26d748d819b55862fa5d8518",
+    "readback-index.json": "fd13b5562fbc473c7edf53e25a336fe92b1e2295e95703ef9da51a4131b15401"
+  },
+  "observerSourceSha256": {
+    "Fixture.kt": "db640c9598c090f5695c6c9e01b838886844ce4cf9b8b9e4e495d128d9110345",
+    "LeaseProbe.kt": "b0ac3682502b92d63622823a2946c805ff20a2bb1264a54c5f8e1d9bfad4d626",
+    "Reopen.kt": "2acb291ec7a9365f95bdbf3df43d8172fc68058440ef8c63372f18f143a7ec1c",
+    "compile.sh": "78563775b88ef0e6faf8ad63b890c83a21155cbfe42e197ebda7e75f94c0e426",
+    "driver.cjs": "8ea80b2ae77e6983115bf50b1c8fa2e72d19751327f1bdcc744490a55a0613a3",
+    "preparation.json": "d1df3bdc311b056a0aac96ac7fd3482ee74dec1d22d361149e26affd0ca1b5ca",
+    "protocol.txt": "e4c20324aa789f2ea8be1ba4590d84f56c909f8a0739bbe19b6cb0bd1f027a3c",
+    "run-proof.py": "7fb3d1fad2f8eb0694b263398ca1ac6362cbec066881dcea8cd47810b7a7e423"
+  },
+  "imageSha256": {
+    "native-one-retained-nal-run-wal.png": "0f200589b61a62dc8b139d327cb576fa7ad6f9f6bac173f87910d5728a136920",
+    "native-retained-G07-typed-query.png": "58b6a5dd67a45683454d7347fba7cacce330f69ae5b06335062f5f9cd347ba4c"
+  },
+  "artifactVerification": "recorded metadata only; external JAR/full-pack availability not checked",
+  "scope": "Recorded cooperating local JVM single-owner refusal and graceful lease handover/recovery; unchanged historical S12 hypotheses and G07 source observations only. No new parser/model execution, semantic/legal accuracy, independent source authentication, live observation admission, hostile-writer/lock replacement protection, power-loss/crash/physical-disk guarantees or full R4 rootfs seal. Prior v80 SDK/model proof remains at its original artifact pins. Public selected blocks/WAL are not a portable complete CAS/runtime.",
+  "auditScriptSha256": "25d188b2ad9d98df9be93719e0d100dd8f12b044ba93ef81cfb0c64621e647b3",
+  "receiptCoreSha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+}

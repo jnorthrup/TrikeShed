@@ -16,7 +16,9 @@ and D3M integration record. A planned gate is not a completed release.
 | R4c: interrupted execution | SIGKILL at three node boundaries, preserved interrupted receipts, explicit new execution and third-JVM inspection | [Verified increment](08-interrupted-execution.md), [247 regressions and three archive scenarios](evidence/r4c-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4c.md) |
 | R4d: storage publication | Parent-directory barriers, final-WAL-fsync EIO/SIGKILL and same-run inspection without retry | [Verified increment](09-storage-publication.md), [264 passing tests and 17 browser cases](evidence/r4d-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4d.md) |
 | R4e: exclusive WAL ownership | Lease before recovery, competing-process refusal, crash/close release and retained-store recovery boundaries | [Verified increment](10-wal-ownership.md), [287 passing tests and 21 browser cases](evidence/r4e-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4e.md) |
-| R4f: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
+| R4f: native WAL handoff and UTF-8 closure | JVM/native lease exclusion, process-death handoff, native receipt replay and Unicode path preservation | [Verified increment](11-native-handoff-utf8.md), [22 regressions and archive evidence](evidence/r4f-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4f.md) |
+| R4g: measured kernel short writes | Real partial ring writes, incomplete/full frame recovery and successful continuation under a restored limit | [Verified increment](12-kernel-short-writes.md), [five scenarios and 20 browser cases](evidence/r4g-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4g.md) |
+| R4h: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
 verifies the native inert Documents-to-Panels handoff, ten URL/ownership guards,
@@ -215,3 +217,37 @@ The final R4e publication also retains a clean D3M merge of Documents-only
 query column widths, with fresh Documents compilation. The packaged runtime
 inputs and runtime/source archive identities are unchanged; the runbook
 records the separate publication-source comparison.
+
+## R4f acceptance
+
+A measured missing-locale defect is fixed by packaging glibc C.utf8 and
+requiring UTF-8 native argument encoding before state admission. JVM/native
+WAL owners exclude one another through direct and alias paths, release on
+close or process death, recover only constructed short tails and continue
+sequence ordering. Actual native BoardStoreElement replay preserves a retained
+receipt and quotation with the JDK hidden. A separate fresh JVM/Sulong
+document traversal succeeds from a Unicode state directory.
+
+The [runbook](11-native-handoff-utf8.md) records 22 passing regressions,
+three locale refusals, a valid Unicode reopen, fresh traversal and CAS/WAL
+audits, 93/93 directory barriers, seven integrity refusals and the source
+update's required R4e base. D3M retains 545 refs through one conflict-free
+merge. Linux process ownership is measured; power-loss safety, wider deployment
+and complete vendor/native source rebuild remain open.
+
+## R4g acceptance
+
+Linux writes actual 9-, 48- and 137-byte prefixes of the final 139-byte WAL
+frame before the owned JVM is killed. Recovery preserves the prior frames
+and marks the same run interrupted while retaining the uncommitted completed
+CAS command. A complete-frame control recovers the unacknowledged completion.
+Restoring the limit after a nine-byte write lets the same append finish,
+flush and return one acknowledged receipt. Five packaged scenarios and
+20 browser cases pass with independent byte, CAS, trace and process audits.
+
+R4g reuses the exact R4f runtime and source chain. Application and build inputs remain unchanged; earlier JVM checks retain
+their own standing.
+D3M freezes 545 refs, already integrated, with zero new merges or conflicts.
+The [runbook](12-kernel-short-writes.md) retains preliminary log-limit effects
+and defines the surviving-kernel boundary. Power loss, wider storage/deployment
+and complete vendor/native rebuild provenance remain open.

@@ -1,0 +1,19 @@
+{
+  "casObjects": 27,
+  "walFrames": 3,
+  "receiptCid": "sha256:4a6026c082ea9d89d6e201099a2bfa1ac169564e58f716cf3ac3f94e2e674737",
+  "runId": "64aab747-ffa0-442d-9497-a3c95387eb1f",
+  "programCid": "sha256:3e1890547b279c83294cae205b8e47228dccbbfa72bd63dd7568bd1a78b0c369",
+  "originalPdfBytes": 111243,
+  "nativeRows": 151,
+  "nativeInputBytes": 2028,
+  "quotationUtf16": [
+    18477.0,
+    18654.0
+  ],
+  "quotation": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+  "nativeEncoding": "UTF-8",
+  "runtimePath": "/state/δοκιμή-α/runtime",
+  "normalClose": true,
+  "scope": "Fresh packaged JVM/Sulong document traversal under a Unicode state path; independent CAS, CRC32C, receipt and exact UTF-16 quote audit."
+}

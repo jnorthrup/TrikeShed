@@ -1,0 +1,12 @@
+{
+  "head": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "refs": 545,
+  "merges": 1,
+  "steps": [
+    {
+      "ref": "refs/remotes/origin/HEAD",
+      "commit": "7fb91a0b56cd860a13ce0af8eeef10205e586314",
+      "after": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab"
+    }
+  ]
+}

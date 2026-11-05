@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""Focused recorded-data consistency audit; no JVM/browser/parser/query execution."""
+import argparse,copy,hashlib,json,re,runpy,struct
+from pathlib import Path
+from urllib.parse import urlsplit,unquote
+CORE=Path(__file__).with_name('receipt-core.py.txt')
+assert hashlib.sha256(CORE.read_bytes()).hexdigest()=='8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763'
+C=runpy.run_path(str(CORE));need=C['need'];load=C['load'];cid=C['cid'];AuditError=C['AuditError']
+PINS={'sourceHead':'7fb91a0b56cd860a13ce0af8eeef10205e586314','mainSha256':'5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c','spacegraphSha256':'d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b','documentsSha256':'c795ccc0168c36bf66b59a46acf07276b6813154e8515ef4ec018261f90d2086'}
+ORIGINALS={'S12':'sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0','G07':'sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608'}
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def stamp(raw):return {'bytes':len(raw),'sha256':sha(raw)}
+def origins(values,main):need(values and all(unquote(urlsplit(v).path)==main for v in values.values()),'Actual production CodeSources are final main JAR')
+def block(attempt,identity):
+    need(isinstance(identity,str) and re.fullmatch(r'sha256:[a-f0-9]{64}',identity),'Full CAS content identity')
+    raw=(attempt/'cas-readbacks'/(identity[7:]+'.bin')).read_bytes();need(cid(raw)==identity,'Actual supplied CAS content hash');return raw
+def crc32c(raw):
+    value=0xffffffff
+    for byte in raw:
+        value^=byte
+        for _ in range(8):value=(value>>1)^(0x82f63b78 if value&1 else 0)
+    return value^0xffffffff
+def wal_frames(raw):
+    at=0;previous=0;frames=[]
+    while at<len(raw):
+        need(len(raw)-at>=22,'Complete WAL1 frame, no omitted/torn tail')
+        magic,version,sequence,length=struct.unpack_from('>4sHqi',raw,at)
+        need(magic==b'WAL1' and version==1 and sequence>previous and 0<=length<=10*1024*1024,'Actual WAL1 framing/version/strict sequence/bound')
+        end=at+18+length;need(end+4<=len(raw),'Complete WAL1 payload')
+        need(crc32c(raw[at:end])==struct.unpack_from('>I',raw,end)[0],'Independent WAL1 CRC32C')
+        payload=raw[at+18:end];text=payload.decode('utf8',errors='strict');job,identity=text.rsplit('\t',1)
+        need(job and re.fullmatch(r'sha256:[a-f0-9]{64}',identity),'Actual board command pointer, not computed report frame')
+        frames.append({'sequence':sequence,'payloadUtf8':text,'payloadSha256':sha(payload)})
+        previous=sequence;at=end+4
+    need(frames,'Actual completed run writes nonempty board journal');return frames
+def original(proof,label):
+    folder=proof/'inputs'/label;body=load(folder/'response.json');source=(folder/'source.txt').read_bytes()
+    need(body['receiptCid']==ORIGINALS[label],'Exact genuine original selected inspection')
+    raw=(folder/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor')).read_bytes()
+    need(cid(raw)==body['receiptCid'] and C['decode_cbor'](raw)=={k:v for k,v in body.items() if k!='receiptCid'} and C['canonical'](C['decode_cbor'](raw))==raw,'Original materialized canonical receipt bytes')
+    need(cid(source)==body['originalCid']==body['extractedTextCid'] and (folder/'cas-readbacks'/(body['extractedTextCid'][7:]+'.txt')).read_bytes()==source,'Exact original source bytes')
+    request=load(folder/'request.json');row=load(folder/'source-row.json')
+    need((folder/'status.txt').read_text().strip()=='200' and body['selection']=={k:request[k] for k in ['project','id','cid','rev','seq']} and body['sourceSnapshots']==[row],'Original producer selection/status provenance')
+    return body,source.decode('utf8',errors='strict'),row
+def envelope(output,body,text):
+    report=output['report'];summary=C['check_report'](report,body,text,True)
+    need(output['status']==report['status']=='EVALUATED' and output['frameCid']==report['frameCid'] and output['inspectionCid']==body['receiptCid'],'Outer owner forwards exact historical report')
+    source=output['source'];need(source['mode']=='current' and source['historical'] is False and source['currentness']=='checked-before-and-after-evaluation' and source['admission']=='not-performed','Actual current owner check, distinct from inner as-of report')
+    need(source['receiptCid']==body['receiptCid'] and source['originalCid']==body['originalCid'] and source['extractedTextCid']==body['extractedTextCid'] and source['namedGraph']==report['source']['graphIri'],'Owner source namespace and exact full identity')
+    need(source['parserExecution']=='not-reverified' and source['semanticAuthority']==source['producerAuthority']=='not-established' and source['reviewStatus']=='unreviewed','No historical observation authority upgrade')
+    expected=[]
+    for premise in report['premises']:
+        for occurrence in premise['occurrences']:
+            sentence=next(s for s in body['sentences'] if s['index']==occurrence['sentenceIndex'])
+            expected.append({**sentence['quotation'],'inspectionCid':body['receiptCid'],'frameCid':report['frameCid'],'occurrenceCid':occurrence['occurrenceCid'],'propositionCid':premise['propositionCid'],'annotationCid':occurrence['annotationCid'],'contributionCid':premise['contributionCid'],'sentenceIndex':occurrence['sentenceIndex'],'sentenceIri':occurrence['sentenceIri'],'subjectNodeIri':occurrence['subjectNodeIri'],'predicateNodeIri':occurrence['predicateNodeIri'],'objectNodeIri':occurrence['objectNodeIri'],'meaning':'same premise occurrence; presentation only, not another evidence unit'})
+    need(output['passages']==sorted(expected,key=lambda p:p['begin']),'All five exact original quotation projections in source order')
+    return summary
+def live_ownership(before,after,probe,controller,main):
+    directory=before['journal']['directory'];need(directory.endswith('/runtime/host/.kanban') and directory==after['journal']['directory']==probe['directory'],'Contender targets same actual module journal directory')
+    need(controller['writerAliveBeforeAndAfter'] is True and len({before['pid'],probe['pid'],controller['controllerPid']})==3 and after['pid']==before['pid'],'Distinct real contender/controller while same writer remains live')
+    for key in ['rows','pack','sourceFiles','journal','blackboard']:need(before[key]==after[key],'Contender preserves actual committed '+key)
+    need(probe['result']=='EXPECTED_LIVE_OWNER_LEASE_REFUSAL' and probe['before']==probe['after'] and controller['before']==controller['after'],'Actual refusal preserves WAL and stable sidecar bytes/inode')
+    refusal=probe['refusal'];need('lease' in refusal['message'].lower() and refusal['type'] and any('BoardFileWal' in x for x in refusal['stack']),'Actual production constructor lease refusal, not observer canned exit')
+    origins(probe['codeSources'],main)
+    for key,name in [('wal','board.wal'),('lease','board.wal.lock')]:
+        held=before['journal'][key];contended=probe['before'][key];external=controller['before'][name]
+        need(held['path']==contended['path']==external['path']==directory+'/'+name and held['fileKey']==contended['fileKey'],'Same active WAL/sidecar path and file identity')
+        need(int(re.search(r'ino=(\d+)',held['fileKey']).group(1))==external['inode'],'External controller inode equals actual JVM file identity')
+        need(contended['sha256']==external['sha256'] and contended['bytes']==held['bytes']==external['bytes'],'Non-owning process hashes same actual file')
+        if key=='lease':need('sha256' not in held and 'hashScope' in held,'Holder never reads/closes an additional lock-inode descriptor')
+        else:need(held['sha256']==external['sha256'],'Holder WAL bytes are separately observable')
+    return directory
+def artifact(attempt,args):
+    go=load(attempt/'GO.json');need(go['rootGreen'] is True and all(go[k]==v for k,v in PINS.items()),'Exact new v81 final frozen GO pins')
+    need(args.source_head==PINS['sourceHead'] and args.main_sha==PINS['mainSha256'] and args.documents_sha==PINS['documentsSha256'] and args.panels_sha==PINS['spacegraphSha256'],'Explicit audit final source/main/browser pins')
+    folder=attempt/'artifact-metadata' if args.recorded_only else Path(go['snapshot']);manifest=load(folder/'sha256.json')
+    need((folder/'source-head.txt').read_text().strip()==args.source_head and sha((folder/'source-head.txt').read_bytes())==manifest['source-head.txt'],'Frozen source head metadata')
+    for name,key in [('main.jar','mainSha256'),('documents.js','documentsSha256'),('spacegraph.js','spacegraphSha256')]:
+        need(manifest[name]==go[key],'Recorded artifact pin')
+        if not args.recorded_only:need(sha((folder/name).read_bytes())==go[key],'Actual frozen artifact bytes')
+    cp=load(attempt/'classpath.json');paths=[r['path'] for r in cp['productionClasspath']]
+    need(len(paths)==len(set(paths))==120 and len(manifest['dependencies'])==119 and cp['totalClasspathEntries']==122 and cp['totalJarCount']==121,'Final120production-JAR classpath plus external observer/assets')
+    need((folder/'classpath.txt').read_text().strip().split(':')==paths and paths[0]==str(Path(go['snapshot'])/'main.jar'),'Exact frozen classpath identities')
+    for row in cp['productionClasspath']:
+        wanted=args.main_sha if row['path']==paths[0] else manifest['dependencies'][row['path']]
+        need(row['sha256']==wanted,'Every recorded production JAR hash')
+        if not args.recorded_only:need(sha(Path(row['path']).read_bytes())==wanted,'Actual production JAR bytes')
+    need(set(cp['assetJar']['entries'])=={'web/kotlin/spacegraph/spacegraph.js','web/kotlin/documents/documents.js'},'Asset-only browser entry manifest')
+    for name,key in [('spacegraph','spacegraphSha256'),('documents','documentsSha256')]:need(cp['assetJar']['entries']['web/kotlin/'+name+'/'+name+'.js']['sha256']==go[key],'Actual browser asset hash')
+    for role,entry in [('writer','FixtureKt'),('reader','ReopenKt'),('contender','LeaseProbeKt')]:
+        command=load(attempt/(role+'-command.json'));position=command.index('-cp')
+        need(command[position+1].split(':')==[cp['observerClasses']]+paths+[cp['assetJar']['path']] and command[position+2]=='proof.englishwal.'+entry,'Actual '+role+' command final classpath/main')
+    return paths[0]
+def g07_query(guard,body):
+    candidate=guard['candidate']['response'];wire=guard['queried'];response=wire['response'];vocab='urn:trikeshed:english:legal:';graph=vocab+candidate['receiptCid'][7:]
+    need(guard['opened']['status']==guard['candidate']['status']==wire['status']==200 and candidate['inspectionCid']==body['receiptCid'] and candidate['originalCid']==body['originalCid'],'Actual retained G07 candidate/query source')
+    need(candidate['parserExecution']=='not-reverified' and candidate['reviewStatus']=='unreviewed' and candidate['authority']=='parser-role-and-quantity-candidates-only','G07 remains unreviewed parser observations')
+    sentence=body['sentences'][0];nodes={n['id']:n for n in sentence['nodes']};edges=sentence['dependencies'];links=[e for e in edges if e['relation'].lower().startswith('advcl')]
+    observed=candidate['guardAttachments']['sentences'][0]['attachments'];need(len(links)==len(observed)==2,'Actual G07 retains both original advcl targets')
+    for ordinal,(edge,item) in enumerate(zip(links,observed)):
+        need(item['ordinal']==ordinal and item['governorNodeId']==edge['governorNode'] and item['subordinateNodeId']==edge['dependentNode'] and item['dependency']=={k:edge[k] for k in ['governorNode','dependentNode','relation']},'G07 source edge order and roles unchanged')
+    need([a['markerBindingOrdinals'] for a in observed]==[[1],[]] and nodes[links[1]['dependentNode']]['word']=='Trustee','G07 unmarked Trustee target stays unmarked; no semantic repair')
+    variables=['attachment','governor','governorWord','subordinate','subordinateWord','relation','normIssue','sentence'];bindings=response['results']['results']['bindings']
+    need(response['results']['head']['vars']==variables and len(bindings)==len(guard['focus'])==2,'Actual two typed G07 rows and public source focuses')
+    source=response['source'];need(source['candidateCid']==source['receiptCid']==candidate['receiptCid'] and source['inspectionCid']==body['receiptCid'] and source['namedGraph']==graph and source['mode']=='current' and source['currentness']=='checked-before-and-after-query' and source['semanticAuthority']==source['producerAuthority']=='not-established','Exact current physical query owner envelope')
+    need(source['originalCid']==candidate['originalCid']==body['originalCid'] and source['extractedTextCid']==candidate['extractedTextCid']==body['extractedTextCid'],'Exact query/candidate original and extracted source identities')
+    need(wire['request']['program']['controls']['inspectionOnly'] is True and wire['request']['inspectionCid']==body['receiptCid'],'Explicit receipt-local inspection query')
+    patterns=[n for n in wire['request']['program']['nodes'] if n['type']=='sparql.pattern'];need(len(patterns)==8 and all(p['params']['graph']=='<'+graph+'>' for p in patterns),'Actual eight candidate-local graph patterns')
+    seen=set()
+    for binding in bindings:
+        ordinal=next((i for i in range(2) if binding['attachment']=={'type':'uri','value':graph+'/sentence/0/guard-attachment/'+str(i)}),None)
+        need(ordinal is not None and ordinal not in seen,'Unique full candidate attachment URI');seen.add(ordinal);edge=links[ordinal];s=graph+'/sentence/0'
+        expected={'attachment':('uri',s+'/guard-attachment/'+str(ordinal)),'governor':('uri',s+'/node/'+edge['governorNode']),'governorWord':('literal',nodes[edge['governorNode']]['word']),'subordinate':('uri',s+'/node/'+edge['dependentNode']),'subordinateWord':('literal',nodes[edge['dependentNode']]['word']),'relation':('literal',edge['relation']),'normIssue':('literal','COORDINATED'),'sentence':('uri',s)}
+        need(binding=={k:{'type':kind,'value':value} for k,(kind,value) in expected.items()},'Exact typed raw original role/word/diagnostic rows')
+    for ordinal,focus in enumerate(guard['focus']):
+        need(focus['target']=='english-guard-'+candidate['receiptCid'][7:]+'-0-'+str(ordinal) and focus['beforeUrl']==focus['afterUrl'] and nodes[links[ordinal]['dependentNode']]['word'] in focus['text'],'Actual matching source focus preserves route')
+    need('None reported for this target' in guard['focus'][1]['text'],'Unmarked second branch visible in source card')
+    return {'rows':2,'candidateCid':candidate['receiptCid'],'unmarkedOriginalTarget':'Trustee'}
+def recovery(reopened,cleanup,before,reply,command,raw_wal):
+    need(reopened['result']=='PASS' and reopened['writerPid']==cleanup['pid']==before['pid'] and reopened['readerPid']!=cleanup['pid'] and reopened['directory']==before['journal']['directory'],'Actual distinct post-close reader acquires same journal')
+    need(reopened['writerCleanup']==cleanup and all(cleanup[k] is True for k in ['listenerJoined','moduleDrained','englishDrained','scopesDrained','ownerCompleted','casClosed','guestModulesClosed']) and cleanup['remainingChildren']==0,'Actual graceful writer closure before reader')
+    need(all(reopened[k] is True for k in ['boardOwnerCompleted','parentOwnerCompleted','casClosed','guestModulesClosed']) and reopened['remainingChildren']==0,'Actual recovered owners drained/closed')
+    need(reopened['beforeOpen']==reopened['afterClose'] and stamp(raw_wal)==reopened['beforeOpen']['wal'],'Exact after-close WAL preimages and CAS/sidecar hash invariance')
+    need(reopened['beforeOpen']['pack']==cleanup['closedPack']==before['pack'],'Closed CAS bytes match live committed host')
+    need(reopened['sourceFilesBeforeOpen']==reopened['sourceFilesAfterClose']==before['sourceFiles'],'Original source ledger/HEAD/manifest bytes unchanged across reader')
+    lock=reopened['lockMetadataBeforeOpen'];need(lock==reopened['lockMetadataWhileHeld']==reopened['lockMetadataAfterClose'],'Stable same sidecar inode through new lease lifecycle')
+    for k in ['path','fileKey','bytes','mtimeMillis']:need(lock[k]==before['journal']['lease'][k],'Reader reuses original stable lock inode')
+    frames=wal_frames(raw_wal);need(frames==reopened['frames'],'Independent CRC32C/WAL1 parse equals production replay')
+    job='lcnc/run/'+reply['runId'];need(all(f['payloadUtf8'].rsplit('\t',1)[0]==job for f in frames) and frames[-1]['payloadUtf8']==job+'\t'+reply['receiptCid'],'Actual journal points to exact run and final retained command')
+    recovered=reopened['recovered'];card=recovered['card'];need(recovered['command']==command and recovered['cardCount']==1 and recovered['lastSequence']==card['lastSequence']==frames[-1]['sequence'] and card['jobId']==job and card['commandCid']==reply['receiptCid'] and card['col']=='DONE','Actual BoardStore projection recovers exact final command/card')
+    return frames
+def audit(proof,attempt,args):
+    main=artifact(attempt,args);start=load(attempt/'startup.json');browser=load(attempt/'browser-result.json');o=browser['observed'];cleanup=load(attempt/'cleanup.json');reopened=load(attempt/'reopened.json')
+    need(browser['result']=='PASS' and browser['errors']==browser['external']==[],'Actual successful browser with no external request/error')
+    origins(start['origins'],main);origins(reopened['codeSources'],main)
+    need({'BoardFileWal','BoardStoreElement','JvmFileOperations','JvmBoardWal','LcncRunService','SyntheticNalExperiment','SparqlWire','QuadStore','CouchWireRouter'}<=set(start['origins']),'Actual final owner/math/query/transport CodeSources captured')
+    for name,expected in [('writer',0),('reader',0),('browser',0),('namespace',0),('contender',42)]:need((attempt/(name+'.exit')).read_text().strip()==str(expected),'Actual '+name+' exit status')
+    cases={key:original(proof,key) for key in ORIGINALS};run=o['nalRun'];reply=run['reply'];complete=run['complete'];need(run['httpStatus']==200 and reply['ok'] is True and reply['status']=='completed','One actual completed explicit LCNC run')
+    need('outputCid' not in reply and complete==reply,'Ordinary inline result is actual full response, no computed-CID hydration')
+    command=json.loads(block(attempt,reply['receiptCid']));program=json.loads(block(attempt,reply['programCid']));invocations=json.loads(block(attempt,reply['invocationsCid']))
+    requested=run['request']['document'];expected_program={k:requested.get(k,default) for k,default in [('wires',[]),('controls',{}),('kanban',None),('view',None),('seq',1)]}
+    expected_program['nodes']=[{k:n.get(k,default) for k,default in [('id',None),('type',None),('params',{}),('x',0),('y',0),('width',None),('height',None),('collapsed',False),('subprogram',None),('children',[])]} for n in requested['nodes']]
+    need(program==expected_program and run['request']['name']=='english-nal-report','Retained admitted program matches actual UI document with explicit LcncProgramConfix defaults; name is separate request metadata')
+    expected_types={'instructions':'note','receipt':'scope.in','mode':'text.value','evaluate':'document.english.nal','report':'display','passage':'confix.pickPath','source':'display','report-out':'scope.out','passages-out':'scope.out','frame-out':'scope.out','source-out':'scope.out'}
+    need(len(program['nodes'])==len(expected_types) and {n['id']:n['type'] for n in program['nodes']}==expected_types and all(n['children']==[] and n['subprogram'] is None for n in program['nodes']),'Exact inert offered syntax, no hidden provider/parser/guest program')
+    need(command==reopened['recovered']['command'] and command['jobId']==reply['jobId']=='lcnc/run/'+reply['runId'] and command['owner']=='lcnc-runner','Actual retained board command/run identity')
+    saved=command['lcncRun'];need(saved['runId']==reply['runId'] and saved['programCid']==reply['programCid'] and saved['outputs']==complete['outputs'] and saved['status']=='completed' and saved['ok'] is True,'Full saved outputs and program retained in actual final command')
+    summary=envelope(complete['outputs']['evaluate'],*cases['S12'][:2]);selection=complete['outputs']['passage'];need(selection['found'] is True and selection['path']=='0' and selection['geometry']=='kotlin' and selection['value']==complete['outputs']['evaluate']['passages'][0],'Actual Kotlin selector returns first exact occurrence')
+    evaluated=[e for e in invocations['entries'] if e['type']=='document.english.nal'];need(len(evaluated)==1 and evaluated[0]['status']=='completed' and evaluated[0]['inputs']=={'receiptCid':ORIGINALS['S12'],'mode':'current'} and all(e['documentCid']==reply['programCid'] for e in invocations['entries']),'Actual same-program invocation and current owner input')
+    guard=o['guard'];candidate=guard['candidate']['response'];need(C['decode_cbor'](block(attempt,candidate['receiptCid']))=={k:v for k,v in candidate.items() if k!='receiptCid'},'Actual canonical candidate block')
+    guard_summary=g07_query(guard,cases['G07'][0])
+    for label,(body,text,row) in cases.items():
+        need(block(attempt,body['receiptCid'])==(proof/'inputs'/label/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor')).read_bytes() and block(attempt,body['extractedTextCid'])==text.encode('utf8'),'After-close original receipt/source readbacks')
+        need(start['baseline']['rows'][label]==reopened['currentUnchangedRows'][label]==row,'Physical original revision/sequence unchanged')
+    before=load(attempt/'holder-before-contend.json');after=load(attempt/'holder-after-contend.json');probe=load(attempt/'contender.json');controller=load(attempt/'contender-controller-state.json');directory=live_ownership(before,after,probe,controller,main)
+    need(probe['pid']!=reopened['readerPid'] and probe['parentPid']==controller['controllerPid'],'Distinct real contender and fresh reader under controller')
+    probe_command=load(attempt/'contender-command.json');need(probe_command[-3]==directory,'Actual contender argv targets same active module WAL')
+    wal=(attempt/'after-close-readbacks/board.wal').read_bytes();frames=recovery(reopened,cleanup,before,reply,command,wal)
+    job=reply['jobId'];baseline_bb=run['before']['blackboard'];after_bb=run['after']['blackboard'];added={job}|{'kanban/committed/'+job+'/'+str(f['sequence']) for f in frames}
+    need(set(after_bb)-set(baseline_bb)==added and all(after_bb[k]==v for k,v in baseline_bb.items()) and after_bb[job]==reply,'Only expected run and committed workflow records added to blackboard')
+    for frame,operation in zip(frames,['submit','start','complete']):
+        committed=after_bb['kanban/committed/'+job+'/'+str(frame['sequence'])]
+        need(committed['op']==operation and committed['cid']==frame['payloadUtf8'].rsplit('\t',1)[1] and committed['owner']=='lcnc-runner','WAL pointers bind actual submit/start/complete workflow records')
+    need(len(frames)==3 and run['after']['englishCurrentnessReads']-run['before']['englishCurrentnessReads']==2,'Exactly three actual workflow commits and before/after English owner checks')
+    for state in [start['baseline']]+[r['state'] for r in o['states']]+[before,after]:
+        need(state['guestInstalled']==state['guestMounted']==[] and state['configuredModelCount']==0 and state['modelEndpointsPresent'] is False and all(v is False for v in state['intakeHooks'].values()) and all(state[k] is False for k in ['beliefBagPresent','kifBankPresent','narsRetePresent']),'Actual empty-SDK/no fresh parser/provider/admission host')
+        need(state['rows']==start['baseline']['rows'] and state['sourceFiles']==start['baseline']['sourceFiles'],'No source amendment in focused lease proof')
+        need(all(f['partition']=='board' and f['fields']['kind'] in ['now','card'] for f in state['reteFacts']),'Actual expected board clock/card facts, no English observation admission')
+    need(before['blackboard']==after['blackboard']==run['after']['blackboard'] and len(before['reteFacts'])==2 and any(f['id']==reply['jobId'] and f['fields']['kind']=='card' and f['versionCid']==reply['receiptCid'] for f in before['reteFacts']),'Actual completed board workflow facts retained through contender')
+    index=load(attempt/'readback-index.json');need(index==o['reads'] and len(index)==len(reopened['readbacks'])==8,'Exactly supplied eight actual CAS readbacks')
+    for record,closed in zip(index,reopened['readbacks']):
+        raw=block(attempt,record['cid']);need(record['sha256']==record['cid']==closed['cid'] and closed['sha256']==sha(raw) and record['bytes']==closed['bytes']==len(raw) and record['role']==closed['role'],'Exact fetched content/role after-close binding')
+    posts=[r for r in browser['requests'] if r['method']=='POST'];need(sum(r['path']=='/api/lcnc/run' for r in posts)==1 and not any(r['path']=='/api/documents/english' for r in posts),'One explicit run and zero fresh parser POSTs')
+    need(sum(r['path']=='/api/documents/english/legal-patterns/query' for r in posts)==1,'One explicit retained guard query')
+    network=load(attempt/'network.json');outside=load(attempt/'controller-before-netns.json');need(network['networkNamespace']==before['networkNamespace'] and network['networkNamespace']!=outside['networkNamespace'] and {r['ifname'] for r in json.loads(network['interfaces'])}=={'lo'} and json.loads(network['routes'])==[] and network['externalTcp']['errno']==101,'Actual loopback namespace, no full rootfs/hardware seal claim')
+    if not args.recorded_only:
+        need(stamp((attempt/'runtime/cas/pack').read_bytes())==cleanup['closedPack'] and (Path(directory)/'board.wal').read_bytes()==wal,'Actual local closed CAS/WAL bytes')
+    controls=[]
+    def reject(label,fn):
+        try:fn()
+        except (AuditError,ValueError,KeyError,TypeError,StopIteration):controls.append({'mutation':label,'result':'REJECTED'})
+        else:raise AuditError('Mutated copy accepted: '+label)
+    bad=copy.deepcopy(probe);bad['directory']+='/other';reject('wrong-active-journal-directory',lambda:live_ownership(before,after,bad,controller,main))
+    bad=copy.deepcopy(probe);bad['pid']=before['pid'];reject('contender-reuses-writer-PID',lambda:live_ownership(before,after,bad,controller,main))
+    bad=copy.deepcopy(after);bad['journal']['wal']['sha256']='0'*64;reject('contender-changes-committed-WAL',lambda:live_ownership(before,bad,probe,controller,main))
+    bad=bytearray(wal);bad[20]^=1;reject('corrupt-WAL-frame-checksum',lambda:wal_frames(bytes(bad)))
+    bad=copy.deepcopy(reopened);bad['recovered']['card']['commandCid']=reply['programCid'];reject('recovery-substitutes-program-for-command',lambda:recovery(bad,cleanup,before,reply,command,wal))
+    names=['GO.json','startup.json','browser-result.json','holder-before-contend.json','holder-after-contend.json','contender.json','contender-controller-state.json','cleanup.json','reopened.json','classpath.json','network.json','writer-command.json','reader-command.json','contender-command.json','readback-index.json']
+    return {'result':'PASS_RECORDED_MODULE_WAL_OWNERSHIP_CONSISTENCY','sourceHead':args.source_head,'mainSha256':args.main_sha,'documentsSha256':args.documents_sha,'panelsSha256':args.panels_sha,'writerPid':before['pid'],'contenderPid':probe['pid'],'readerPid':reopened['readerPid'],'directory':directory,'wal':stamp(wal),'walFrames':frames,'recoveredCard':reopened['recovered']['card'],'runId':reply['runId'],'receiptCid':reply['receiptCid'],'programCid':reply['programCid'],'invocationsCid':reply['invocationsCid'],'nal':summary,'guard':guard_summary,'readbacks':len(index),'mutatedCopyControls':controls,'recordSha256':{n:sha((attempt/n).read_bytes()) for n in names},'observerSourceSha256':{p.name:sha(p.read_bytes()) for p in sorted((attempt/'observer-inputs').iterdir()) if p.is_file()},'imageSha256':{p.name:sha(p.read_bytes()) for p in sorted(attempt.glob('*.png'))},'artifactVerification':'recorded metadata only; external JAR/full-pack availability not checked' if args.recorded_only else 'actual frozen120-JAR/browser and closed local CAS/WAL bytes additionally rehashed','scope':'Recorded cooperating local JVM single-owner refusal and graceful lease handover/recovery; unchanged historical S12 hypotheses and G07 source observations only. No new parser/model execution, semantic/legal accuracy, independent source authentication, live observation admission, hostile-writer/lock replacement protection, power-loss/crash/physical-disk guarantees or full R4 rootfs seal. Prior v80 SDK/model proof remains at its original artifact pins. Public selected blocks/WAL are not a portable complete CAS/runtime.'}
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('proof',type=Path);parser.add_argument('attempt',type=Path);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--recorded-only',action='store_true')
+    for key in ['source-head','main-sha','documents-sha','panels-sha']:parser.add_argument('--'+key,required=True)
+    args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    try:result=audit(args.proof,args.attempt,args)
+    except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:result={'result':'FAIL','error':str(error)}
+    result['auditScriptSha256']=sha(Path(__file__).read_bytes());result['receiptCoreSha256']=sha(CORE.read_bytes())
+    (args.out/'result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
+    lines=[result['result'],result.get('scope',result.get('error',''))]
+    if result['result'].startswith('PASS'):
+        lines+=['Pins: '+result['sourceHead']+' / main '+result['mainSha256'],
+          'Actual writer '+str(result['writerPid'])+', separate live contender '+str(result['contenderPid'])+' exit42, then fresh reader '+str(result['readerPid'])+'. Same canonical production module directory and stable sidecar inode; holder stats sidecar only.',
+          'Independent WAL1 big-endian/version/sequence/CRC32C parse: '+str(result['wal']['bytes'])+' bytes, '+str(len(result['walFrames']))+' exact submit/start/complete pointers. Final pointer equals recovered DONE card and full retained command CID.',
+          'Actual final command/program/invocation bytes and eight selected CAS readbacks agree after close. Full ordinary output is inline and retained in the command; frameCid is not a fetched CAS report.',
+          'Unchanged v77 checker verifies genuine S12: five dependent occurrences, four premises, twelve pairs, one deduction hypothesis289/0 and two weak-induction hypotheses224/0; no semantic authority or independent evidence upgrade.',
+          'Current outer envelope and all five exact quotations verified; actual owner checked currentness before/after. G07 preserves two typed raw-role rows and its unmarked Trustee branch; two source focuses preserve URL.',
+          'Expected workflow blackboard additions and board clock/card facts recorded. No fresh parser POST, installed/mounted SDK, provider endpoint, live bag/KIF/NARS or intake hook in this host.',
+          'Recorded live-contender state and after-close CAS/WAL/source-head invariants agree. Five mutated copies rejected. '+result['artifactVerification']+'.']
+    (args.out/'report.txt').write_text('\n'.join(lines)+'\n')
+    print(json.dumps({'result':result['result'],'out':str(args.out),'error':result.get('error')}));raise SystemExit(0 if result['result'].startswith('PASS') else 1)

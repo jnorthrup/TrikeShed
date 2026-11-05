@@ -49,9 +49,28 @@ object NalNodes {
      * `nal.recall` — expose [BeliefBagElement]'s read methods as an LCNC node.
      * Mode param selects: `top` (priority-sorted), `sample` (stochastic),
      * `near` (angular neighborhood — requires `centroid` and `maxDistance` params).
+     * `exact-role` exposes typed angular/propositionCid targets ONLY for one documentary
+     * match which is an exact current resident. Residency never disambiguates multiple matches.
+     * Selection is read-only; the caller must wire a separate attention action.
      */
-    fun recallRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, _ ->
+    fun recallRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
         val mode = node.params["mode"] ?: "top"
+        if (mode == "exact-role") {
+            require(!("request" in inputs && "request?" in inputs)) { "Exact role request supplied twice" }
+            val request = when {
+                "request" in inputs -> inputs["request"]
+                "request?" in inputs -> inputs["request?"]
+                else -> node.params["request"]
+            }
+            val selection = bag.recallRoles(request)
+            val matches = selection["matches"] as List<*>
+            val output = _m["selection" j selection,
+                "beliefs" j matches.filter { (it as Map<*, *>)["residentStatus"] == "MATCH_RESIDENT" }]
+            val target = if (selection["complete"] == true) matches.singleOrNull() as? Map<*, *> else null
+            val eligible = target?.takeIf { it["residentStatus"] == "MATCH_RESIDENT" }
+            // Explicit null crosses a wire as unavailable; it must not reactivate stale authored IDs.
+            return@boundLcnc output + _m["angular" j eligible?.get("angular"), "propositionCid" j eligible?.get("propositionCid")]
+        }
         val k = node.params["k"]?.toIntOrNull() ?: 16
         val beliefs = when (mode) {
             "sample" -> {

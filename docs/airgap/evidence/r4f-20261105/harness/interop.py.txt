@@ -1,0 +1,83 @@
+from pathlib import Path
+import subprocess,json,hashlib,shutil,os,sys,time,select,struct,signal
+h=Path('/workspace/airgap-r4f-proof');a=h/sys.argv[1];a.mkdir();state=a/'state';state.mkdir();root=Path(os.environ.get('TRIKESHED_PROOF_ROOT',str(h/'rootfs')));results=[];active=[]
+def sha(p):return hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+def inventory(p):return {x.relative_to(p).as_posix():sha(x) for x in sorted(p.rglob('*')) if x.is_file() and not x.is_symlink()}
+network={'namespace':os.readlink('/proc/self/ns/net'),'routes':json.loads(subprocess.check_output(['ip','-j','route']))};assert not network['routes'];(a/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+def command(runtime,mode,directory,*extra):
+ cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--hostname','airgap-'+runtime,'--die-with-parent','--ro-bind',str(root),'/','--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv','--setenv','LANG','C.UTF-8','--chdir','/state','--cap-drop','ALL','--tmpfs','/opt/trikeshed/assets','--remount-ro','/opt/trikeshed/assets','--tmpfs','/opt/trikeshed/modules','--remount-ro','/opt/trikeshed/modules']
+ if runtime=='native':cmd+=['--tmpfs','/opt/trikeshed/jdk','--remount-ro','/opt/trikeshed/jdk','--ro-bind',str(h/'wal-native.kexe'),'/tmp/wal-native','/tmp/wal-native']
+ else:cmd+=['--ro-bind',str(h/'jvm-probe'),'/tmp/jvm-probe','/opt/trikeshed/jdk/bin/java','--enable-native-access=ALL-UNNAMED','-Xmx128m','-XX:ActiveProcessorCount=2','-Dpolyglot.engine.WarnInterpreterOnly=false','-cp','/tmp/jvm-probe:/opt/trikeshed/lib/*','WalOwner']
+ return cmd+[mode,directory,*extra]
+def decode(data):
+ rows=[];i=0
+ while i<len(data):
+  assert len(data)-i>=22;magic,version,seq,n=struct.unpack_from('>4sHQI',data,i);assert magic==b'WAL1' and version==1 and seq==len(rows)+1;end=i+18+n;assert end+4<=len(data);crc=0xffffffff
+  for b in data[i:end]:
+   crc^=b
+   for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+  assert crc^0xffffffff==struct.unpack_from('>I',data,end)[0];rows.append({'sequence':seq,'payload':data[i+18:end].decode()});i=end+4
+ return rows
+def run(runtime,mode,directory,label,*extra,expected=0):
+ cmd=command(runtime,mode,directory,*extra);p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=40);(a/(label+'-stdout.txt')).write_text(p.stdout);(a/(label+'-stderr.txt')).write_text(p.stderr);row={'label':label,'runtime':runtime,'mode':mode,'command':cmd,'exit':p.returncode,'stdout':p.stdout,'stderr':p.stderr};results.append(row);save();assert p.returncode==expected,(label,p.returncode,p.stdout,p.stderr);return [json.loads(x) for x in p.stdout.splitlines() if x.startswith('{')]
+def save(): (a/'processes.json').write_text(json.dumps(results,indent=2)+'\n')
+def owner(runtime,directory,label):
+ cmd=command(runtime,'hold',directory);err=(a/(label+'-stderr.txt')).open('w');p=subprocess.Popen(cmd,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=err,bufsize=0);active.append(p);row={'label':label,'runtime':runtime,'mode':'hold','command':cmd,'hostPid':p.pid,'stdout':''};results.append(row);save();end=time.monotonic()+40
+ def line():
+  assert select.select([p.stdout],[],[],max(0,end-time.monotonic()))[0],('no owner ready',label)
+  b=p.stdout.readline();assert b,(label,'EOF',p.poll());s=b.decode();row['stdout']+=s;save();return json.loads(s)
+ assert line()['phase']=='opened'
+ if runtime=='native':assert line()['phase']=='self-contender-refused'
+ children={};names={}
+ for entry in Path('/proc').glob('[0-9]*'):
+  try:
+   tail=(entry/'stat').read_text().rsplit(') ',1)[1].split();pid=int(entry.name);children.setdefault(int(tail[1]),[]).append(pid);names[pid]=(entry/'comm').read_text().strip()
+  except (OSError,ValueError,IndexError):pass
+ pending=[p.pid];descendants=[]
+ while pending:
+  pid=pending.pop();descendants.append(pid);pending.extend(children.get(pid,[]))
+ candidates=[pid for pid in descendants if names.get(pid)==('wal-native' if runtime=='native' else 'java')]
+ assert len(candidates)==1,(label,candidates);row['ownerPid']=candidates[0]
+ actual=Path('/proc',str(candidates[0]),'cmdline').read_bytes().split(b'\0')
+ assert actual[0]==(b'/tmp/wal-native' if runtime=='native' else b'/opt/trikeshed/jdk/bin/java')
+ if runtime=='jvm':assert b'WalOwner' in actual
+ row['observedArgv']=[x.decode() for x in actual if x];row['procReadErrors']={}
+ for name in ['status','maps','mountinfo']:
+  try:(a/(label+'-'+name+'.txt')).write_text(Path('/proc',str(candidates[0]),name).read_text())
+  except PermissionError as failure:row['procReadErrors'][name]=str(failure)
+ if runtime=='native' and (a/(label+'-maps.txt')).exists():assert 'libjvm' not in (a/(label+'-maps.txt')).read_text()
+ save();return p,row,err
+try:
+ seed=state/'seed-α';payloads=['JVM α first\nline two','native β second','JVM third']
+ for i,runtime in enumerate(['jvm','native','jvm']):
+  rows=run(runtime,'append','/state/seed-α','seed-'+str(i),payloads[i]);assert next(x for x in rows if x['phase']=='flushed')['sequence']==i+1
+ original=(seed/'board.wal').read_bytes();expected=[{'sequence':i+1,'payload':p} for i,p in enumerate(payloads)];assert decode(original)==expected
+ rows=run('native','inspect','/state/seed-α','seed-native-inspect');assert rows[0]['records']==expected
+ cases=[]
+ for runtime in ['jvm','native']:
+  other='native' if runtime=='jvm' else 'jvm'
+  for ending in ['close','kill']:
+   label=runtime+'-'+ending;directory=state/label;shutil.copytree(seed,directory);(state/(label+'-alias')).symlink_to(label,target_is_directory=True);wal=directory/'board.wal';p,row,err=owner(runtime,'/state/'+label,label+'-owner')
+   wal.write_bytes(original+b'short-tail');before=sha(wal);(a/(label+'-wal-held.bin')).write_bytes(wal.read_bytes())
+   for path,suffix in [('/state/'+label,'direct'),('/state/'+label+'-alias','alias')]:
+    refusal=run(other,'inspect',path,label+'-'+suffix,expected=42);assert refusal==[{'phase':'lease-refused'}] if other=='jvm' else refusal[0]['phase']=='lease-refused';assert sha(wal)==before
+   if ending=='kill':os.kill(row['ownerPid'],signal.SIGKILL)
+   else:p.stdin.write(b'close\n');p.stdin.flush()
+   p.wait(timeout=20);row['exit']=p.returncode;row['stdout']+=p.stdout.read().decode();row['ownerReaped']=not Path('/proc',str(row['ownerPid'])).exists();err.close();(a/(label+'-owner-stdout.txt')).write_text(row['stdout']);save();assert row['exit']==(137 if ending=='kill' else 0) and row['ownerReaped'];assert ('"phase":"closed"' in row['stdout'])==(ending=='close')
+   reopened=run(other,'inspect','/state/'+label,label+'-reopened');assert wal.read_bytes()==original
+   if other=='native':assert reopened[0]['records']==expected
+   appended=run(other,'append','/state/'+label,label+'-append','after-'+label);assert next(x for x in appended if x['phase']=='flushed')['sequence']==4
+   final=decode(wal.read_bytes());assert final==expected+[{'sequence':4,'payload':'after-'+label}]
+   (a/(label+'-wal-final.bin')).write_bytes(wal.read_bytes());cases.append({'case':label,'contender':other,'refusals':2,'ownerExit':row['exit'],'ownerReaped':True,'samePrefixRecovered':True,'nextSequence':4,'result':'PASS'});print(label,'PASS',flush=True)
+ retained=state/'retained';shutil.copytree('/workspace/airgap-r4e-proof/storage-kill-archive02/state/runtime',retained);before=inventory(retained)
+ replay=run('native','inspect-store','/state/retained/.kanban','retained-native-replay','/state/retained/cas');store=next(x for x in replay if x['phase']=='store-replayed');assert store['sequence']==3 and len(store['cards'])==1
+ expected_run=json.loads(Path('/workspace/airgap-r4e-proof/storage-kill-archive02/browser.json').read_text())['recovered'];card=store['cards'][0]
+ for key in ['receiptCid','runId','programCid','status']:assert card[key]==expected_run[key],key
+ assert card['status']=='completed' and card['begin']==18477 and card['end']==18654;assert inventory(retained)==before
+ (a/'retained-before.json').write_text(json.dumps(before,indent=2)+'\n');(a/'retained-replay.json').write_text(json.dumps(store,indent=2)+'\n')
+ summary={'cases':cases,'seedRecords':expected,'retainedStore':store,'retainedRuntimeBytesUnchanged':True,'nativeSourceSha256':sha(h/'WalOwner.kt'),'nativeBinarySha256':sha(h/'wal-native.kexe'),'jvmProbeSha256':sha(h/'jvm-probe/WalOwner.class'),'runtimeBaseSourceCommit':'2c6e55e25dbe8b38355f045a46cc6a91c378787b','scope':'Actual BoardFileWal owners and native BoardStoreElement replay; constructed short tails, no power-loss claim. Native process runs with the JDK hidden.'}
+ (a/'verification.json').write_text(json.dumps(summary,indent=2)+'\n');print('retained native BoardStore replay PASS',flush=True)
+finally:
+ for p in active:
+  if p.poll() is None:p.terminate();p.wait(timeout=15)
+ save()

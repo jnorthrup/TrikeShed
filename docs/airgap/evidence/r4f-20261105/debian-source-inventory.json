@@ -1,0 +1,31 @@
+[
+  {
+    "source": "libxcrypt",
+    "version": "1:4.4.38-1",
+    "files": [
+      {
+        "file": "libxcrypt/libxcrypt_4.4.38-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libxcrypt_4.4.38-1.dsc",
+        "sha256": "feba1874a84616791c1c17f9a290c9e97562b2904b3b0200edc82a2db54f3f07",
+        "bytes": 1573,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxcrypt/libxcrypt_4.4.38.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libxcrypt_4.4.38.orig.tar.xz",
+        "sha256": "6a275a356622c64ba9f693892215dbb399c003a7a4afeed9c4c74070eaab20f4",
+        "bytes": 394216,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxcrypt/libxcrypt_4.4.38-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libxcrypt_4.4.38-1.debian.tar.xz",
+        "sha256": "6b87bcb5325e417ab3f4c01c364233444b4c9008a69ec1d6fababb3f6e693a5e",
+        "bytes": 8512,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  }
+]

@@ -1,0 +1,6 @@
+exit 0
+{"phase":"opened", "records":[]}
+{"phase":"flushed", "sequence":1}
+{"phase":"closed"}
+
+

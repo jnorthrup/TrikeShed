@@ -20,9 +20,14 @@ import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
 import java.io.File
 import java.lang.System
+import java.nio.charset.Charset
 
 /** Packaged demonstrator composition. The miner, store, execution and HTTP owners are production code. */
 fun main(args: Array<String>) {
+    // The JDK decodes OS arguments before main; file.encoding does not govern that boundary.
+    require(Charset.forName(System.getProperty("native.encoding")) == Charsets.UTF_8) {
+        "UTF-8 native encoding required; package the C.utf8 locale and set LANG=C.UTF-8"
+    }
     require(args.size == 4) { "Usage: AirgapDocumentMainKt STATE INSTALL PORT run|inspect|recover" }
     val root = File(args[0]).absoluteFile
     val install = File(args[1]).absoluteFile
@@ -140,6 +145,7 @@ fun main(args: Array<String>) {
                 "reopened" j (mode != "run"), "minerInstalled" j (miner != null), "llvmInstalled" j (LlvmConfixContract.TYPE in ctx.lcncRunners),
                 "runs" j ctx.blackboard.snapshot().values.filterKeys { it.startsWith("lcnc/run/") },
                 "javaHome" j System.getProperty("java.home"), "classpath" j System.getProperty("java.class.path"),
+                "nativeEncoding" j System.getProperty("native.encoding"),
                 "workspaceVisible" j File("/workspace").exists(), "gradleCacheVisible" j File("/home/agent/.gradle").exists(),
                 "modulesVisible" j File(install, "modules/confix.bc").exists(),
                 "assetsVisible" j File(install, "assets/$id").exists(),

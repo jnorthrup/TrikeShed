@@ -1,0 +1,34 @@
+import borg.trikeshed.kanban.BoardFileWal;
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.Locale;
+public class WalOwner {
+    public static void main(String[] args) throws Exception {
+        BoardFileWal wal;
+        try { wal = new BoardFileWal(new JvmFileOperations(), args[1]); }
+        catch (IllegalStateException failure) {
+            if (!String.valueOf(failure.getMessage()).toLowerCase(Locale.ROOT).contains("lease")) throw failure;
+            System.out.println("{\"phase\":\"lease-refused\"}");
+            System.err.println(failure.getMessage());
+            System.exit(42); return;
+        }
+        try {
+            System.out.println("{\"phase\":\"opened\"}");
+            switch (args[0]) {
+                case "hold":
+                    if (!"close".equals(new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8)).readLine())) throw new IllegalStateException("Expected close command");
+                    break;
+                case "append":
+                    long sequence = wal.append(args[2].getBytes(StandardCharsets.UTF_8));
+                    wal.flush();
+                    System.out.println("{\"phase\":\"flushed\",\"sequence\":" + sequence + "}");
+                    break;
+                case "inspect": break;
+                default: throw new IllegalArgumentException("Unknown probe operation");
+            }
+        } finally { wal.close(); }
+        System.out.println("{\"phase\":\"closed\"}");
+    }
+}

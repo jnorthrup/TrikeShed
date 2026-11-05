@@ -268,6 +268,9 @@ class BeliefBagElement(
     /** Bounded per-response source verification, shared by HTTP and LCNC resonance. */
     fun sourceContexts(): (SemanticSignal?) -> Map<String, Any?> = KgRetention.sourceContexts(cas)
 
+    /** Documentary role selection observes residency only; explicit attention rechecks inside the writer. */
+    fun recallRoles(request: Any?): Map<String, Any?> = KgRetention.selectRoles(cas, KgRetention.roleRequest(request), ::signalOf)
+
     /** The same channel owns CAS writes, acknowledgements, refusals, and drain as the belief work. */
     suspend fun retainKg(artifacts: KgRetention.Batch): borg.trikeshed.userspace.nio.file.spi.StorageDurability {
         check(worker != null) { "Belief bag is not open" }

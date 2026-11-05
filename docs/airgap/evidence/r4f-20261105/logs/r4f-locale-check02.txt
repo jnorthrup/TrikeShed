@@ -1,0 +1,7 @@
+{
+  "beforeNativeEncoding": "ANSI_X3.4-1968",
+  "afterNativeEncoding": "UTF-8",
+  "localeBytes": 373393,
+  "packageOwner": "libc-bin: /usr/lib/locale/C.utf8/LC_CTYPE",
+  "scope": "JVM OS argument/path encoding under LANG=C.UTF-8; file.encoding alone already reported UTF-8 and did not prevent argv replacement."
+}

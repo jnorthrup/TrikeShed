@@ -1,0 +1,8 @@
+{
+  "interop-attempt01": "Real JVM argv replacement defect without glibc C.utf8; exact corrupted WAL retained.",
+  "interop-attempt02": "No runtime process started: locale.py shadowed Python stdlib locale; logs and original source retained.",
+  "interop-attempt03": "Unicode seeds passed; /proc/exe descendant identification yielded none in the namespace. Corrected to the existing stat/comm plus exact argv ownership check; maps/status/mountinfo then read successfully.",
+  "unicode-mkdir-audit": "Initial parser expected literal UTF-8 paths; strace rendered them with octal C escapes. Decode path escapes before exact path matching; 93/93 required barriers pass.",
+  "unicode-quote-audit": "Initial Python audit sliced with integral JSON float values. Require exact integer equality, convert for slicing, and retain original source/error.",
+  "native-smoke01": "Original JVM-only root lacked libutil; exit127 retained. Added libutil/libcrypt closure supports actual native probe."
+}

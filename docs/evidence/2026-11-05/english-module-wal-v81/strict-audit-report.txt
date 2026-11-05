@@ -1,0 +1,10 @@
+PASS_RECORDED_MODULE_WAL_OWNERSHIP_CONSISTENCY
+Recorded cooperating local JVM single-owner refusal and graceful lease handover/recovery; unchanged historical S12 hypotheses and G07 source observations only. No new parser/model execution, semantic/legal accuracy, independent source authentication, live observation admission, hostile-writer/lock replacement protection, power-loss/crash/physical-disk guarantees or full R4 rootfs seal. Prior v80 SDK/model proof remains at its original artifact pins. Public selected blocks/WAL are not a portable complete CAS/runtime.
+Pins: 7fb91a0b56cd860a13ce0af8eeef10205e586314 / main 5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c
+Actual writer 143740, separate live contender 143939 exit42, then fresh reader 143962. Same canonical production module directory and stable sidecar inode; holder stats sidecar only.
+Independent WAL1 big-endian/version/sequence/CRC32C parse: 417 bytes, 3 exact submit/start/complete pointers. Final pointer equals recovered DONE card and full retained command CID.
+Actual final command/program/invocation bytes and eight selected CAS readbacks agree after close. Full ordinary output is inline and retained in the command; frameCid is not a fetched CAS report.
+Unchanged v77 checker verifies genuine S12: five dependent occurrences, four premises, twelve pairs, one deduction hypothesis289/0 and two weak-induction hypotheses224/0; no semantic authority or independent evidence upgrade.
+Current outer envelope and all five exact quotations verified; actual owner checked currentness before/after. G07 preserves two typed raw-role rows and its unmarked Trustee branch; two source focuses preserve URL.
+Expected workflow blackboard additions and board clock/card facts recorded. No fresh parser POST, installed/mounted SDK, provider endpoint, live bag/KIF/NARS or intake hook in this host.
+Recorded live-contender state and after-close CAS/WAL/source-head invariants agree. Five mutated copies rejected. actual frozen120-JAR/browser and closed local CAS/WAL bytes additionally rehashed.

@@ -1,0 +1,9 @@
+from pathlib import Path
+import subprocess,shutil,json,hashlib
+h=Path('/workspace/airgap-r4f-proof');root=h/'rootfs';report=h/'locale';report.mkdir();cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-net','--die-with-parent','--ro-bind',str(root),'/','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv','--setenv','LANG','C.UTF-8','/opt/trikeshed/jdk/bin/java','-XshowSettings:properties','-version']
+def run(name):
+ p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=20);(report/(name+'.txt')).write_text(p.stdout);assert p.returncode==0;return p.stdout
+before=run('before');assert 'native.encoding = ANSI_X3.4-1968' in before
+source=Path('/usr/lib/locale/C.utf8');destination=root/'usr/lib/locale/C.utf8';assert not destination.exists();shutil.copytree(source,destination)
+after=run('after');assert 'native.encoding = UTF-8' in after and 'sun.jnu.encoding = UTF-8' in after
+files={p.relative_to(root).as_posix():hashlib.file_digest(p.open('rb'),'sha256').hexdigest() for p in destination.rglob('*') if p.is_file()};owner=subprocess.check_output(['dpkg-query','-S','/usr/lib/locale/C.utf8/LC_CTYPE'],text=True).strip();record={'command':cmd,'beforeNativeEncoding':'ANSI_X3.4-1968','afterNativeEncoding':'UTF-8','localeFiles':files,'localeBytes':sum(p.stat().st_size for p in destination.rglob('*') if p.is_file()),'packageOwner':owner,'scope':'JVM OS argument/path encoding under LANG=C.UTF-8; file.encoding alone already reported UTF-8 and did not prevent argv replacement.'};(report/'result.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps({k:v for k,v in record.items() if k not in ['command','localeFiles']},indent=2))

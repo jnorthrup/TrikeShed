@@ -1,0 +1,13 @@
+{
+  "compiler": "Kotlin/Native 2.4.21 linux_x64",
+  "projectLibrarySourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+  "runtimeTestedSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "nativeBinarySha256": "f289376cf6951279b5d2e95511e1588593146c08a628c136fb7924ca21b81d41",
+  "nativeSourceSha256": "7ffef5edf11d230c5b1928f6d25f715247934e7df1d1b2a0404477a52918fc48",
+  "scope": "External verification caller linked to the existing full project klib. It is not the native LCNC HTTP service or the JVM Sulong engine. Build/link commands and every klib input digest are retained; the supplied compiler source zip is not claimed to be the complete compiler source closure.",
+  "archive": {
+    "file": "/workspace/library-files/airgap-r4f-native-verification-2026-11-05.tar.gz",
+    "bytes": 5261081,
+    "sha256": "0a556481cd93ec4b367f10c89c3169039ffce5a17c1fe232b84b70ef91519098"
+  }
+}

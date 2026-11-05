@@ -1,0 +1,11 @@
+{
+  "cutBytes": 137,
+  "error": null,
+  "limited": true,
+  "killed": true,
+  "restarted": true,
+  "exits": [
+    137,
+    0
+  ]
+}

@@ -1,0 +1,2 @@
+{"phase":"opened", "records":[{"sequence":1, "payload":"JVM α first\nline two"}, {"sequence":2, "payload":"native β second"}, {"sequence":3, "payload":"JVM third"}]}
+{"phase":"self-contender-refused"}

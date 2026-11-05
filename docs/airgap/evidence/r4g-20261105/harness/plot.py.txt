@@ -1,0 +1,29 @@
+from pathlib import Path
+import matplotlib
+import json
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+h=Path('/workspace/airgap-r4g-proof')
+fig,ax=plt.subplots(figsize=(11,5.6));fig.patch.set_facecolor('#ffffff');ax.set_facecolor('#ffffff')
+for x,w,c,label in [(0,18,'#315a88','Header · 18'),(18,117,'#2b7a78','CAS pointer · 117'),(135,4,'#74529a','CRC · 4')]:
+ ax.add_patch(Rectangle((x,-.85),w,.36,facecolor=c));ax.text(x+w/2,-.67,label,ha='center',va='center',fontsize=9 if w>4 else 8,color='white' if w>4 else '#333',rotation=0 if w>4 else 90)
+cases=[('Header cut','partial-header-attempt03'),('Payload cut','partial-payload-attempt02'),('CRC cut','partial-crc-attempt02'),('Complete frame','complete-frame-attempt02'),('Short write continued','partial-retry-attempt02')]
+rows=[]
+for label,name in cases:
+ audit=json.loads((h/name/'independent-audit.json').read_text());assert audit['walPrefixBytes']==278 and audit['finalFrameBytes']==139
+ outcome='Interrupted' if audit['recoveredStatus']=='interrupted' else ('Completed; HTTP 200' if audit['writerExit']==0 else 'Completed; response lost')
+ rows.append((label,audit['cutBytes'],outcome))
+for y,(label,n,outcome) in enumerate(rows):
+ ax.barh(y,139,height=.48,color='#e9edf1',edgecolor='#c3cbd4')
+ if y==4:
+  ax.barh(y,130,left=9,height=.48,color='#c8e6db',edgecolor='none');ax.annotate('',xy=(137,y),xytext=(12,y),arrowprops={'arrowstyle':'->','color':'#246c50','lw':1.8})
+ ax.barh(y,n,height=.48,color='#be7423' if y<3 else '#276c50',edgecolor='none')
+ ax.text(n+.9,y,f'{n}',va='center',fontsize=10,color='#20252b')
+ ax.text(151,y,outcome,va='center',fontsize=11,color='#20252b')
+ax.set_yticks(range(5),[x[0] for x in rows]);ax.set_xlim(0,223);ax.set_ylim(4.8,-1.05);ax.set_xticks([0,9,18,48,100,139]);ax.tick_params(axis='y',length=0,pad=10);ax.tick_params(axis='x',labelsize=9)
+ax.spines[['top','right','left']].set_visible(False);ax.spines['bottom'].set_bounds(0,139);ax.set_xlabel('Bytes of the 139-byte final frame (two earlier frames: 278 bytes unchanged)',loc='left',labelpad=12)
+ax.text(151,-.67,'After reopening',weight='bold',fontsize=11,va='center');fig.suptitle('Measured WAL write boundaries and recovered outcomes',fontsize=16,weight='bold',x=.03,ha='left')
+fig.text(.03,.035,'Kernel writes under RLIMIT_FSIZE. Four process kills; one limit restoration.\nThe host kernel survives. These measurements do not establish power-loss safety.',fontsize=10,color='#424b55')
+fig.subplots_adjust(left=.20,right=.98,top=.86,bottom=.23)
+for ext in ['svg','pdf','png']:fig.savefig(h/('partial-writes.'+ext),dpi=160,bbox_inches='tight')

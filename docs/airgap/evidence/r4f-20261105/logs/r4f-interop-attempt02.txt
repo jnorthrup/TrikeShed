@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4f-proof/interop.py", line 2, in <module>
+    import subprocess,json,hashlib,shutil,os,sys,time,select,struct,signal
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 46, in <module>
+    import locale
+  File "/workspace/airgap-r4f-proof/locale.py", line 3, in <module>
+    h=Path('/workspace/airgap-r4f-proof');root=h/'rootfs';report=h/'locale';report.mkdir();cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-net','--die-with-parent','--ro-bind',str(root),'/','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv','--setenv','LANG','C.UTF-8','/opt/trikeshed/jdk/bin/java','-XshowSettings:properties','-version']
+                                                                            ^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py", line 1311, in mkdir
+    os.mkdir(self, mode)
+FileExistsError: [Errno 17] File exists: '/workspace/airgap-r4f-proof/locale'

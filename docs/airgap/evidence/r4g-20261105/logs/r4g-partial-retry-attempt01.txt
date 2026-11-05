@@ -1,0 +1,12 @@
+{
+  "cutBytes": 9,
+  "error": null,
+  "limited": true,
+  "restored": true,
+  "killed": false,
+  "restarted": true,
+  "exits": [
+    0,
+    0
+  ]
+}
