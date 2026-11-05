@@ -1,0 +1,32 @@
+{
+  "kind": "external-verifier-reference/1",
+  "path": "/workspace/library-files/required-anchor-coverage-v73-proof/verify.py",
+  "sha256": "6cc9fc74c915fb33fe4d601f73eca907adb07c1b33d8fe142f921898edd89e07",
+  "scope": "Exact already-executed verifier bytes archived as a non-executable documentation artifact. Original external executable path, actual invocation and complete raw attempt provenance remain unchanged. No predictor or build.",
+  "invocation": [
+    "python3",
+    "/workspace/library-files/required-anchor-coverage-v73-proof/verify.py",
+    "--snapshot",
+    "/workspace/library-files/english-inference-coverage-v73-proof/snapshot",
+    "--repo",
+    "/workspace/TrikeShed",
+    "--root-go",
+    "08dd94f6cf88e1fb002291bcc3b2195a9f426608-GREEN-v73-72f74004dc435f869787d6d77e04eddbd31927065894bbe4e4f908245636a87a"
+  ],
+  "rawAttempt": "/workspace/library-files/required-anchor-coverage-v73-proof/attempt-20261105T003944.144996Z",
+  "rawSummarySha256": "a05dd25a6367df089c4d43f85197ee9ebcb05ef069dcb1aa74f5c9f1b505d4c0",
+  "encoding": "JSONL stdoutUtf8/stderrUtf8 and mutation utf8 strings reconstruct original UTF-8 bytes; compare recorded SHA-256. Commands reconstruct java -cp colon-joined artifact-origins.classpathOrder plus argumentsAfterClasspath.",
+  "archivedDocumentation": "verify.py.txt",
+  "archivedDocumentationSha256": "6cc9fc74c915fb33fe4d601f73eca907adb07c1b33d8fe142f921898edd89e07",
+  "archiveReplay": [
+    "python3",
+    "/workspace/library-files/required-anchor-coverage-v73-replay/verify.py",
+    "--snapshot",
+    "/workspace/library-files/english-inference-coverage-v73-proof/snapshot",
+    "--repo",
+    "/workspace/TrikeShed",
+    "--root-go",
+    "<new authorized replay identifier>"
+  ],
+  "archiveReplayPreparation": "Copy verify.py.txt byte-for-byte to /workspace/library-files/required-anchor-coverage-v73-replay/verify.py outside Git before replay; its parent directory receives new attempt directories."
+}
