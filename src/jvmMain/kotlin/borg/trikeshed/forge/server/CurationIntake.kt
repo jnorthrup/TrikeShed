@@ -439,6 +439,9 @@ class CurationIntake(
                 grabCapacity.acquire()
                 permit = grabCapacity
             }
+            // A cancelled grab can release capacity before cancellation reaches this consumer.
+            // The owning scope must still admit work; finally already owns any acquired permit.
+            scope.coroutineContext.ensureActive()
             val root = constellations()
             // A removal observed before a later stage stops that stage.
             fun discarded(orphan: Boolean = false): Boolean = synchronized(admission) {
@@ -583,7 +586,7 @@ class CurationIntake(
                 permit = null
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
-            val ownerCancelled = !kotlinx.coroutines.currentCoroutineContext().isActive
+            val ownerCancelled = !kotlinx.coroutines.currentCoroutineContext().isActive || !scope.coroutineContext.isActive
             synchronized(admission) {
                 if (e is JoinCancellation && d in removed) {
                     t.failed.incrementAndGet()
