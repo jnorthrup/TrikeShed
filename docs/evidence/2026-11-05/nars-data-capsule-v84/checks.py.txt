@@ -1,0 +1,127 @@
+"""Prepared recorded-byte/identity checks; no parser, SPARQL engine or NARS execution."""
+import base64,hashlib,json,re,runpy,struct
+from pathlib import Path
+CORE=Path(__file__).with_name('receipt-core.py.txt')
+assert hashlib.sha256(CORE.read_bytes()).hexdigest()=='8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763'
+C=runpy.run_path(str(CORE));need=C['need'];cid=C['cid'];load=C['load'];AuditError=C['AuditError'];f32=C['f32']
+C2=b'(pays Tenant Landlord)\n(owes Tenant Landlord)\n'
+C2_CID='sha256:856e48302ec7ce9e8db378cad6244b49c8510d80376b914c95c37a811420ba05'
+VOCAB='urn:trikeshed:kg-role-selection:1:'
+SCALE=(1<<20)-1
+def definition(raw,context,predicate,subject,obj):
+    body=C['decode_cbor'](raw)
+    expected={'kind':'kg-source-proposition/1','sourceContext':context,'predicate':predicate,'subject':subject,'object':obj,'subjectCid':None,'objectCid':None,'copula':'PRODUCT','relation':'MATCH','temporal':None}
+    need(body==expected and C['canonical'](body)==raw,'Exact canonical source-scoped ordered lexical proposition preimage; role IDs remain null')
+    return cid(raw)
+def signal_fields(raw):
+    # SignalCodec lengths count Kotlin UTF-16 code units, not Python characters.
+    units=raw.decode('utf8',errors='strict').encode('utf-16-le');at=0;values=[]
+    while at<len(units):
+        colon=units.find(b':\x00',at);need(colon>=at and (colon-at)%2==0,'SignalCodec field length delimiter')
+        length_text=units[at:colon].decode('utf-16-le');need(re.fullmatch(r'0|[1-9][0-9]*',length_text),'Exact canonical SignalCodec decimal field length')
+        begin=colon+2;end=begin+int(length_text)*2;need(end+2<=len(units) and units[end:end+2]==b';\x00','Complete SignalCodec field and delimiter')
+        values.append(units[begin:end].decode('utf-16-le'));at=end+2
+    need(len(values)==12,'Actual modern SignalCodec full proposition identity field')
+    rebuilt=''.join(str(len(v.encode('utf-16-le'))//2)+':'+v+';' for v in values).encode('utf8')
+    need(rebuilt==raw,'SignalCodec exact original UTF8 preimage')
+    return values
+def budget(record):
+    packed=int(record['packed']);need(0<=packed<1<<60,'Budget is exactly three unsigned20-bit fields')
+    parts={key:(packed>>shift)&SCALE for key,shift in [('p',40),('d',20),('q',0)]}
+    for key,value in parts.items():need(f32(record[key])==f32(f32(value)/f32(SCALE)),'Actual quantized P20 budget float '+key)
+    return parts
+def row_signal(row,source,pays_pid):
+    raw=base64.b64decode(row['signalBase64'],validate=True);need(cid(raw)[7:]==row['signalSha256'] and raw.decode('utf8')==row['signalUtf8'],'Actual signal bytes/hash/text')
+    fields=signal_fields(raw);angular,evidence=int(fields[0]),int(fields[1]);need(str(angular)==row['angular'] and fields[2]=='MATCH' and fields[3]==source and fields[4:9]==['']*5,'Actual structural fields/source-routing fallback separate from null documentary role IDs')
+    need(fields[9]==(row['provenanceCid'] or '') and int(fields[10])==int(row['basisBloom']) and fields[11]==row['propositionCid']==pays_pid and row['subjectCid']==source,'Exact provenance/basis/PID signal identity')
+    need((evidence>>32)&0xffffffff==row['evidence']['positive'] and evidence&0xffffffff==row['evidence']['negative'],'Exact existing packed evidence coordinates')
+    budget(row['budget']);return raw
+def unchanged(before,after,allow_priority=False):
+    need(len(before['bagRows'])==len(after['bagRows'])==1 and before.get('bagSize',1)==after.get('bagSize',1)==1,'Actual single resident before/after method boundary')
+    a,b=before['bagRows'][0],after['bagRows'][0]
+    for key in ['angular','signalBase64','signalUtf8','signalSha256','propositionCid','subjectCid','provenanceCid','basisBloom','evidence']:need(a[key]==b[key],'Selection/attention preserves actual signal '+key)
+    ap,bp=budget(a['budget']),budget(b['budget'])
+    need((ap['d'],ap['q'])==(bp['d'],bp['q']),'Explicit priority command never changes D/Q')
+    if not allow_priority:need(a['budget']==b['budget'],'Read-only selection or duplicate attention changes no packed budget')
+    return ap,bp
+def explicit_priority(before,after,value):
+    ap,bp=unchanged(before,after,True);expected=int(f32(f32(value)*f32(SCALE)))
+    need(bp['p']==expected,'Actual explicit priority quantizes using existing Float32P20 packing')
+    return {'before':ap,'after':bp}
+def selection(run):return run['complete']['outputs']['recall']['selection']
+def selected(output,context,predicate,subject,obj,definitions,resident_status,angular,pid):
+    need(output['kind']=='kg-exact-role-selection/1' and output['profile']=='retained-ground-binary-kif/1' and output['status']=='MATCHES_IN_COMPLETE_SOURCE' and output['complete'] is True,'Whole accepted source produces documentary match')
+    need(output['sourceContext']==context and output['persistence']=='request-local' and output['currentness']=='not-checked' and output['sourceAuthentication']==output['reviewAuthority']=='not-established' and output['attention']==output['admission']=='not-performed','Request-local lexical observations have no authority/admission/attention upgrade')
+    need(output['definitions']==definitions and output['quads']==4*definitions and output['graph']==VOCAB+'graph:'+context[7:],'Complete verified definitions create only local documentary graph')
+    if context==C2_CID:need(output['source']=={'sourceContext':context,'begin':0,'end':46,'quote':C2.decode(),'offsetUnit':'utf16-code-units','endExclusive':True,'meaning':'whole accepted manual KG source'},'Exact whole manual C2 source quotation/range, not a selected-claim subset')
+    match={'propositionCid':pid,'angular':angular,'sourceContext':context,'predicate':predicate,'subject':subject,'object':obj,'subjectCid':None,'objectCid':None,'residentStatus':resident_status}
+    need(output['matches']==[match],'Exact ordered source lexical roles and separately checked resident identity')
+    need(output['results']=={'head':{'vars':['proposition','object']},'results':{'bindings':[{'proposition':{'type':'uri','value':'urn:sha256:'+pid[7:]},'object':{'type':'literal','value':obj}}]}},'Actual RDF URI proposition and exact plain lexical object literal')
+    request=output['request'];need(request['sourceContext']==context and request['predicate']==predicate and request['subject']==subject and set(request)<= {'sourceContext','predicate','subject','object'},'Actual exact declared lexical request fields')
+    if 'object' in request:need(request['object']==obj,'Optional exact object term is lexical data')
+    def literal(value):return json.dumps(value,ensure_ascii=False,separators=(',',':'))
+    extra=' ?proposition <'+VOCAB+'objectToken> '+literal(obj)+' .' if 'object' in request else ''
+    expected='SELECT ?proposition ?object WHERE { GRAPH <'+VOCAB+'graph:'+context[7:]+'> { ?proposition <'+VOCAB+'sourceContext> <urn:sha256:'+context[7:]+'> . ?proposition <'+VOCAB+'predicateToken> '+literal(predicate)+' . ?proposition <'+VOCAB+'subjectToken> '+literal(subject)+' . ?proposition <'+VOCAB+'objectToken> ?object .'+extra+' } }'
+    need(output['query']==expected,'Actual fixed4/5BGP query keeps lexical strings literal and context as URI')
+    return match
+def incomplete(output,status):
+    need(output['status']==status and output['complete'] is False and output['matches']==[] and 'results' not in output,'Whole unsupported/unverified/bounded source gives no partial rows or false complete no-match')
+def typed_target(output):
+    selected=output['selection'];matches=selected['matches']
+    eligible=matches[0] if selected['complete'] is True and len(matches)==1 and matches[0]['residentStatus']=='MATCH_RESIDENT' else None
+    need('angular' in output and 'propositionCid' in output,'Typed identity output keys remain present including null')
+    need(output['angular']==(eligible['angular'] if eligible else None) and output['propositionCid']==(eligible['propositionCid'] if eligible else None),'Typed target only for ONE documentary match with exact current residency; no resident-based ambiguity resolution')
+    need(output['beliefs']==[m for m in matches if m['residentStatus']=='MATCH_RESIDENT'],'Belief projection filters documentary rows by exact resident identity')
+    return eligible
+def null_identity_refusal(boundary):
+    inputs=boundary['inputs'];names=[name for name in ['angular','propositionCid'] if (name in inputs and inputs[name] is None) or (name+'?' in inputs and inputs[name+'?'] is None)]
+    need(names,'Actual present-null identity wire, not an absent input')
+    need(boundary['output']=={'attended':{'error':names[0]+' required'}},'Wired null refuses before stale authored identity fallback')
+    unchanged(boundary['before'],boundary['after'])
+    need(boundary['before']['beliefWal']==boundary['after']['beliefWal'] and boundary['before']['pack']==boundary['after']['pack'],'Null identity refusal submits no attention writer/CAS effect')
+def c2_angular():
+    # Existing coordinate layout for these declared ASCII tokens only; not proposition identity.
+    def fnv(token):
+        value=0x811c9dc5
+        for ch in token:value=((value^ord(ch))*0x01000193)&0xffffffff
+        return value&0x7fffffff
+    def simhash(token):
+        text=token.lower();grams=[text] if len(text)<3 else [text[i:i+3] for i in range(len(text)-2)]
+        hashes=[fnv(g) for g in grams]
+        return sum(1<<bit for bit in range(16) if sum(1 if h&(1<<bit) else -1 for h in hashes)>0)
+    taxonomy=((fnv('kg')&15)<<12)|((fnv('product')&15)<<8)
+    # RelationKind.MATCH ordinal2; TemporalGrade.NONE ordinal7 in the actual enum.
+    return str((2<<61)|(taxonomy<<37)|(simhash('Tenant')<<21)|(simhash('Landlord')<<5)|7)
+def crc32c(raw):
+    value=0xffffffff
+    for byte in raw:
+        value^=byte
+        for _ in range(8):value=(value>>1)^(0x82f63b78 if value&1 else 0)
+    return value^0xffffffff
+def frames(raw,document=False):
+    if document:need(raw[:8]==b'DOC-LOG1','Actual configured DocumentAppendLog header')
+    at=8 if document else 0;previous=0;out=[]
+    while at<len(raw):
+        need(len(raw)-at>=22,'Complete supplied WAL frame')
+        magic,version,sequence,length=struct.unpack_from('>4sHqi',raw,at)
+        need(magic==b'WAL1' and version==1 and sequence>previous and 0<=length<=64*1024*1024,'WAL1 version/sequence/bounded length')
+        end=at+18+length;need(end+4<=len(raw) and crc32c(raw[at:end])==struct.unpack_from('>I',raw,end)[0],'Independent actual WAL1 CRC32C')
+        payload=raw[at+18:end];out.append({'sequence':sequence,'payloadUtf8':payload.decode('utf8',errors='strict'),'payloadSha256':cid(payload)[7:]});at=end+4;previous=sequence
+    return out
+def belief_projection(records,initial_signal,angular):
+    resident={};receipts=set();spill={};events=[]
+    for frame in records:
+        text=frame['payloadUtf8'];kind=text.split(':',1)[0];events.append(kind)
+        if kind=='B':
+            _,packed,encoded=text.split(':',2);fields=signal_fields(encoded.encode('utf8'));key=fields[0]
+            need(encoded.encode('utf8')==initial_signal and key==angular,'Actual mint/replay signal remains exact admitted pays, no evidence rewrite')
+            resident[key]={'signalBase64':base64.b64encode(initial_signal).decode(),'budgetPacked':packed,'propositionCid':fields[11]}
+        elif kind=='A':
+            _,key,packed=text.split(':');need(key in resident,'Actual attention updates current resident only');resident[key]['budgetPacked']=packed
+        elif kind=='E':
+            _,key,identity=text.split(':',2);resident.pop(key,None);spill[key]='sha256:'+identity
+        elif kind=='R':receipts.add(text[2:])
+        else:need(kind=='D','Only actual existing bag WAL record kinds')
+    need(events.count('B')==1 and events.count('A')==2 and events.count('E')==1 and events.count('R')==1 and events.count('D')==1,'One admitted source observation, two explicit changed budgets, one actual tick/spill; duplicate/read selection adds no frames')
+    need(spill=={angular:cid(initial_signal)} and resident=={},'Actual writer WAL removes exact signal to hash-verified spill; empty projection follows E record')
+    return {'events':events,'receiptRecords':len(receipts),'resident':resident,'spill':spill}
