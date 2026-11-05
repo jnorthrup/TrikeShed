@@ -388,9 +388,9 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
             witness(card, requireNotNull(origins[source["selectionId"]]))
             val origin = origins.getValue(source["selectionId"])
             val english = origin["englishQuotation"] as Map<*, *>
-            text(card, "p", "English source ${english["originalCid"]} · UTF-16 characters ${english["begin"]}–${english["end"]} · inspection ${origin["inspectionCid"]}").className = "ds-cid"
+            text(card, "p", "English original ${english["originalCid"]} · extracted text ${english["extractedTextCid"]} · extracted text UTF-16 [${english["begin"]}, ${english["end"]}) · inspection ${origin["inspectionCid"]}").className = "ds-cid"
             val q = source["quotation"] as Map<*, *>
-            text(card, "p", "KIF source ${source["sourceCid"]} · UTF-16 characters ${q["begin"]}–${q["end"]} · selection ${source["selectionId"]} · source node ${source["nodeId"]}").className = "ds-cid"
+            text(card, "p", "KIF source ${source["sourceCid"]} · UTF-16 [${q["begin"]}, ${q["end"]}) · selection ${source["selectionId"]} · source node ${source["nodeId"]}").className = "ds-cid"
         }
     }
 
