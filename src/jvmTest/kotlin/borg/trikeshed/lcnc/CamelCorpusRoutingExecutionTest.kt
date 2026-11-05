@@ -14,6 +14,9 @@ import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
 import java.nio.file.Path
+import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.test.*
 
 /** Real installed Camel in an owned child; the parser and class-directory deployment are explicit test fixtures. */
@@ -109,6 +112,22 @@ class CamelCorpusRoutingExecutionTest {
     }
 
     @Test fun staleUnsupportedForgedAndNullRequestsRefuseBeforeChildButSnapshotRemainsExplicit(): Unit = runBlocking {
+        fun jar(manifest: ByteArray): ByteArray = ByteArrayOutputStream().also { bytes ->
+            ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(ZipEntry("META-INF/MANIFEST.MF")); zip.write(manifest); zip.closeEntry()
+            }
+        }.toByteArray()
+        val large = buildString {
+            append("Manifest-Version: 1.0\r\n")
+            repeat(18_000) { append("X-Digest-$it: ${"a".repeat(50)}\r\n") }
+        }
+        assertTrue(large.encodeToByteArray().size > 1024 * 1024)
+        CamelCorpusProcess.checkJarManifest(jar((large + "\r\n").encodeToByteArray()))
+        assertFailsWith<IllegalArgumentException> {
+            CamelCorpusProcess.checkJarManifest(jar((large + "Class-Path: unpinned.jar\r\n\r\n").encodeToByteArray()))
+        }
+        assertFails { CamelCorpusProcess.checkJarManifest(jar(large.encodeToByteArray() + _a[255.toByte()])) }
+        assertFailsWith<IllegalArgumentException> { CamelCorpusProcess.checkJarManifest(jar(ByteArray(CamelCorpusProcess.MANIFEST_LIMIT + 1) { 32 })) }
         val f = fixture("refusals")
         try {
             assertFailsWith<IllegalArgumentException> { CamelCorpusProcess.packaged(JvmFileOperations()) }
