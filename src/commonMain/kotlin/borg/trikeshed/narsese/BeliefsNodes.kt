@@ -202,8 +202,12 @@ object BeliefsNodes {
      * new budget, evidence untouched. The writer resolves missing components
      * and acknowledges processing. A supplied propositionCid requires that
      * exact current resident; angular-only legacy calls retain their absent no-op.
+     * An explicitly null wired identity refuses before authored fallback or writer admission.
      */
     fun attendRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
+        for (name in s_["angular", "propositionCid"].view)
+            if ((name in inputs && inputs[name] == null) || ("$name?" in inputs && inputs["$name?"] == null))
+                return@boundLcnc _m["attended" j _m["error" j "$name required"]]
         val request = mutableMapOf<String, Any?>()
         for (name in s_["angular", "propositionCid", "p", "d", "q"].view)
             (port(inputs, name) ?: node.params[name]?.takeIf { it.isNotBlank() })?.let { request[name] = it }
