@@ -501,6 +501,17 @@ internal object DocumentsEnglish {
             val answer = guardQueryAnswer ?: return
             text(section, "p", "${answer.rows.size} typed attachment rows, displayed in source sentence/attachment order. The query has no ORDER BY. Empty rows mean no matching projected attachment, not absence of guards or legal effects.", "ds-curate-label")
             val table = table(section, EnglishGuardQueryView.variables.toSeries())
+            val queryTable = table.parentElement as HTMLElement
+            queryTable.style.minWidth = "1520px"; queryTable.style.tableLayout = "fixed"
+            val headings = queryTable.querySelectorAll("th")
+            for ((index, name) in EnglishGuardQueryView.variables.withIndex()) {
+                (headings.item(index) as HTMLElement).style.width = when (name) {
+                    "governorWord", "subordinateWord" -> "130px"
+                    "relation" -> "140px"
+                    "normIssue" -> "160px"
+                    else -> "240px"
+                }
+            }
             for (row in answer.rows) {
                 val tr = text(table, "tr", ""); tr.setAttribute("data-english-guard-query-row", "${row.sentenceIndex}:${row.ordinal}")
                 for (name in EnglishGuardQueryView.variables) {
