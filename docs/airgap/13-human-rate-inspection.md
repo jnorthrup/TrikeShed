@@ -231,9 +231,11 @@ identities remain retained. Only verified archive-backed scratch patch copies
 and superseded scratch runtime roots were reclaimed for disk space.
 
 D3M initially freezes 545 refs. Publication detects concurrent work and
-rechecks 546, then 547 refs: 537 remote heads, nine local branches and
-`origin/HEAD`. Three chronological merges retain exact-role NARS work,
-native Horn binding receipts and subsequent replay evidence. No conflicts
+rechecks 546, 547 and finally 548 refs: 538 remote heads, nine local branches and
+`origin/HEAD`. Four chronological merges retain exact-role NARS work,
+native Horn binding receipts, subsequent replay evidence and the concurrent
+remote master integration of the same Horn branch. This last merge changes
+no tested source or build inputs. No conflicts
 occur, no branch is preferred or deleted, and all frozen tips are ancestors
 of the result. Jim's Mac remains unchanged; this is the cloud Linux checkout
 and an ordinary master publication.

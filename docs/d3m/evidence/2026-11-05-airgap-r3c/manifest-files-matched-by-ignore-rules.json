@@ -1,30 +1,5 @@
 {
-  "exactManifestPathsAddedDespiteIgnoreRules": [
-    "docs/airgap/evidence/r3c-20261105/accepted/final-document/paused-display-completed-engine.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-document/pinned-observation.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-document/reopened-transfers.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-document/state/runtime/files/coinbase-suski/coinbase-suski.pdf",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-document/state/runtime/host/.causal.wal",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-document/transfer-table.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-fanout/fanout-observation-coverage.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-fanout/state/runtime/files/coinbase-suski/coinbase-suski.pdf",
-    "docs/airgap/evidence/r3c-20261105/accepted/final-fanout/state/runtime/host/.causal.wal",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-document/paused-display-completed-engine.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-document/pinned-observation.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-document/reopened-transfers.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-document/state/runtime/files/coinbase-suski/coinbase-suski.pdf",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-document/state/runtime/host/.causal.wal",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-document/transfer-table.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-fanout/fanout-observation-coverage.png",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-fanout/state/runtime/files/coinbase-suski/coinbase-suski.pdf",
-    "docs/airgap/evidence/r3c-20261105/accepted/integrated-fanout/state/runtime/host/.causal.wal",
-    "docs/airgap/evidence/r3c-20261105/observation-coverage-final.pdf",
-    "docs/airgap/evidence/r3c-20261105/observation-coverage-final.png",
-    "docs/airgap/evidence/r3c-20261105/observation-coverage-final.svg",
-    "docs/airgap/evidence/r3c-20261105/observation-coverage-integrated.pdf",
-    "docs/airgap/evidence/r3c-20261105/observation-coverage-integrated.png",
-    "docs/airgap/evidence/r3c-20261105/observation-coverage-integrated.svg"
-  ],
-  "count": 24,
+  "exactManifestPathsAddedDespiteIgnoreRules": [],
+  "count": 0,
   "method": "Add only immutable evidence files listed in SHA256.json; preserve repository ignore rules"
 }

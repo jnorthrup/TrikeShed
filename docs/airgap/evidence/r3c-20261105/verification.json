@@ -221,10 +221,11 @@
     "initialRefs": 545,
     "firstPublicationRefs": 545,
     "recheckRefs": 546,
-    "finalRefs": 547,
-    "merges": 3,
+    "finalRefs": 548,
+    "merges": 4,
     "conflicts": 0,
-    "noBranchesDeleted": true
+    "noBranchesDeleted": true,
+    "preSealedRefs": 547
   },
   "limits": [
     "Linux host and external Chromium; no machine power-loss proof",
@@ -243,9 +244,12 @@
     "nativeHornMergeCommit": "56af0795fe948c41e12a6eb1519e792d1f401177",
     "finalMergeCommit": "792a14c3b982956df3a139661797e171cba9b963",
     "incomingMaster": "c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2",
-    "frozenRefs": 547,
-    "merges": 3,
+    "frozenRefs": 548,
+    "merges": 4,
     "conflicts": 0,
-    "intent": "Retain read-only exact source-local KG role recall, typed unique resident attention targets and refusal of null wired identities before authored fallback. Retain native Horn certificate projections with rule-scoped bindings and source references; explicit host assumptions do not confer review authority or world applicability. Incoming English WAL and exact-role replay evidence retains its original source identities."
+    "intent": "Retain read-only exact source-local KG role recall, typed unique resident attention targets and refusal of null wired identities before authored fallback. Retain native Horn certificate projections with rule-scoped bindings and source references; explicit host assumptions do not confer review authority or world applicability. Incoming English WAL and exact-role replay evidence retains its original source identities.",
+    "sealedMergeCommit": "08e8830a4e89b5bc025c150f492c90192ffc0dda",
+    "sealedIncomingMaster": "bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70",
+    "sealedSourceBuildInputsUnchanged": true
   }
 }
