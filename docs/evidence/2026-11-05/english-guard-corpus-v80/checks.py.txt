@@ -1,0 +1,164 @@
+"""Structural recorded-observation checks; no legal helper, parser or query engine."""
+from pathlib import Path
+import hashlib,json,re,runpy
+from urllib.parse import urlsplit,parse_qsl
+CORE=Path(__file__).with_name('receipt-core.py.txt')
+assert hashlib.sha256(CORE.read_bytes()).hexdigest()=='8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763'
+C=runpy.run_path(str(CORE));need=C['need'];cid=C['cid'];canonical=C['canonical'];load=C['load'];decode=C['decode_cbor'];utf16=C['utf16'];AuditError=C['AuditError']
+VARS=['attachment','governor','governorWord','subordinate','subordinateWord','relation','normIssue','sentence']
+VOCAB='urn:trikeshed:english:legal:'
+def edge(e):return (e['governorNode'],e['relation'],e['dependentNode'])
+def small(e):return {k:e[k] for k in ['governorNode','dependentNode','relation']}
+def raw_block(attempt,identity):
+    raw=(attempt/'cas-readbacks'/(identity[7:]+'.bin')).read_bytes();need(cid(raw)==identity,'Actual materialized CAS block CID');return raw
+
+def receipt(body,raw,source):
+    need(cid(raw)==body['receiptCid'] and decode(raw)=={k:v for k,v in body.items() if k!='receiptCid'},'Exact canonical inspection CBOR and response')
+    need(body['originalCid']==body['extractedTextCid']==cid(source.encode('utf8')),'Exact selected original/extracted source identity')
+    bounds=body['range'];begin,end=bounds['begin'],bounds['end'];total=len(source.encode('utf-16-le'))//2
+    need(0<=begin<end<=total and bounds['totalLength']==total and bounds['complete']==(begin==0 and end==total),'Whole inspection range metadata')
+    for s in body['sentences']:
+        need(begin<=s['begin']<s['end']<=end and s['quote']==utf16(source,s['begin'],s['end']),'Exact sentence quotation within selected inspection range')
+        nodes={n['id']:n for n in s['nodes']};need(len(nodes)==len(s['nodes']),'Unique full dependency-node identities')
+        for n in nodes.values():need(n['id']==str(n['index'])+':'+str(n['copy']) and n['word']==utf16(source,n['begin'],n['end']),'Actual full node identity/source span')
+        for e in s['dependencies']:need(e['governorNode'] in nodes or e['governorNode']=='0:0','Observed edge governor');need(e['dependentNode'] in nodes,'Observed edge dependent')
+        for m in s['markers']:need(m['quote']==utf16(source,m['begin'],m['end']),'Actual lexical marker quotation')
+
+def guard_candidate(candidate,base,source,diagnostics):
+    need(candidate['schema']=='trikeshed.english-legal-patterns.v1' and candidate['inspectionCid']==base['receiptCid'] and candidate['originalCid']==base['originalCid'] and candidate['extractedTextCid']==base['extractedTextCid'] and candidate['range']==base['range'],'Candidate exact parent/source/range')
+    need(candidate['parser']==base['parser'] and candidate['parserExecution']=='not-reverified' and candidate['producerAuthority']=='not-established' and candidate['countsAreEvidenceConfidence'] is False and candidate['reviewStatus']=='unreviewed' and candidate['authority']=='parser-role-and-quantity-candidates-only','Retained candidate has no producer/force/confidence upgrade')
+    physical=candidate['source'];need(physical['receiptCid']==base['receiptCid'] and physical['originalCid']==base['originalCid'] and physical['extractedTextCid']==base['extractedTextCid'] and physical['mode']=='current' and physical['currentness']=='checked-before-and-after-inspection','Candidate host checks original physical source revision')
+    section=candidate['guardAttachments'];need(section['kind']=='english-guard-attachment-observations/1' and section['profile']=='observed-advcl-mark-bindings/1' and section['meaning']=='parser-attachment-candidates-only','Versioned observed attachment section')
+    need(len(candidate['sentences'])==len(base['sentences'])==len(section['sentences']),'All raw observed sentences covered')
+    expected={};marker_count=0;binding_count=0
+    diagnostic_by_index={d['sentence']:d['conditionIssue'] for d in diagnostics}
+    for original,row,g in zip(base['sentences'],candidate['sentences'],section['sentences']):
+        for k in ['index','begin','end','quote','quotation','markers','nodes','dependencies']:need(row[k]==original[k],'Candidate preserves exact original '+k)
+        nodes={n['id']:n for n in original['nodes']};edges=original['dependencies'];edgeset={edge(e) for e in edges};markers=original['markers']
+        need(g['index']==row['index'] and g['normDiagnosticProducer']=='NormClauses.conditionIssue' and g['normConditionIssue']==diagnostic_by_index[row['index']],'Existing diagnostic is separately recorded, not recomputed as legal gold')
+        quote_ids=[n['id'] for n in original['nodes'] if any(c in n['word'] for c in '\"“”‘’')]
+        need(g['quotationIndicatorNodeIds']==quote_ids,'All original quotation-indicator nodes retained; no quote-scope inference')
+        must_unknown={'legal-force-not-established','guard-and-negation-scope-not-established'}
+        need(must_unknown<=set(g['unresolved']),'No established guard or legal force')
+        modal_edges=[e for e in edges if e['relation']=='aux' and nodes[e['dependentNode']]['pos']=='MD']
+        need([small(a['dependency']) for a in row['modalActions']]==[small(e) for e in modal_edges],'All selected original modal-auxiliary edges represented; no inherited owner')
+        allowed_markers={i:m for i,m in enumerate(markers) if m['kind'] in ['condition','exception']}
+        need([m['markerOrdinal'] for m in g['markerBindings']]==list(allowed_markers),'All condition/exception occurrence ordinals, including overlap')
+        direct={}
+        for record in g['markerBindings']:
+            ordinal=record['markerOrdinal'];m=allowed_markers[ordinal];aligned=[n['id'] for n in original['nodes'] if n['begin']>=m['begin'] and n['end']<=m['end']]
+            incoming=[e for e in edges if e['dependentNode'] in aligned and e['relation'].lower() in ['mark','advmod']]
+            need(record['marker']==m and record['nodeIds']==aligned and record['dependencies']==[small(e) for e in incoming],'Exact direct marker/node/dependency alignment')
+            direct[ordinal]=incoming;marker_count+=1;binding_count+=len(incoming)
+        negative=[]
+        for ordinal,m in enumerate(markers):
+            if m['kind']!='negation':continue
+            for n in original['nodes']:
+                if n['begin']<m['begin'] or n['end']>m['end']:continue
+                for e in edges:
+                    if e['dependentNode']==n['id']:negative.append((ordinal,n['id'],e['governorNode'],small(e)))
+        links=[e for e in edges if e['relation'].lower()=='advcl' or e['relation'].lower().startswith('advcl:')]
+        need(len(g['attachments'])==len(links),'Every original advcl target preserved, including unmarked/nested targets')
+        for ordinal,(link,a) in enumerate(zip(links,g['attachments'])):
+            gov,_,sub=edge(link);marks=[i for i,es in direct.items() if any(e['governorNode']==sub for e in es)]
+            need(a['ordinal']==ordinal and a['dependency']==small(link) and a['governorNodeId']==gov and a['subordinateNodeId']==sub,'Observed governor/subordinate direction and original edge order')
+            need(a['status']=='parser-attachment-candidate' and a['markerBindingOrdinals']==marks,'No inherited or substituted guard marker binding')
+            actions=[i for i,action in enumerate(row['modalActions']) if action['action']['id']==gov]
+            need(a['modalActionOrdinals']==actions,'Only directly reported modal-action owner references')
+            for action in row['modalActions']:
+                need(edge(action['dependency']) in edgeset and action['action']==nodes[action['dependency']['governorNode']] and action['modal']==nodes[action['dependency']['dependentNode']],'Modal/action source role binds an original dependency')
+            observed_cues=[]
+            for cue in a['directNegationCueBindings']:
+                expected_location='governor-head' if cue['governorNodeId']==gov else 'subordinate-head' if cue['governorNodeId']==sub else 'other-observed-head'
+                need(cue['location']==expected_location,'Direct negation cue location is relative raw node identity')
+                observed_cues.append((cue['markerOrdinal'],cue['cueNodeId'],cue['governorNodeId'],cue['dependency']))
+            need(observed_cues==negative,'Exactly direct recorded lexical negation cues; diagnostic cannot invent a cue')
+            coord=[small(e) for e in edges if e['relation'].lower()=='cc' or e['relation'].lower().startswith('conj')]
+            need(a['coordinationDependencies']==coord and must_unknown<=set(a['unresolved']),'Coordination is reported context, not interpreted scope')
+            if not marks:need('no-direct-guard-marker-binding' in a['unresolved'],'Unmarked target stays unresolved')
+            binding_count+=1+len(negative)+len(coord)
+            expected[(row['index'],ordinal)]={'governor':gov,'subordinate':sub,'relation':link['relation'],'diagnostic':g['normConditionIssue'] or 'none-reported','quoteIndicators':quote_ids,'markerOrdinals':marks,'directCues':observed_cues,'quote':row['quote']}
+    need(section['counts']['attachments']==len(expected) and section['counts']['markerOccurrences']==marker_count and section['counts']['dependencyBindings']==binding_count,'Guard inventory counts are serialization counts only')
+    return expected
+
+def typed_guard(record,candidate,expected):
+    wire=record['queried'];response=wire['response'];request=wire['request'];graph=VOCAB+candidate['receiptCid'][7:]
+    need(wire['status']==200 and request['inspectionCid']==candidate['inspectionCid'] and request['mode']=='current' and request['program']['controls']['inspectionOnly'] is True,'Actual receipt-local inspection-only query request')
+    patterns=[n for n in request['program']['nodes'] if n['type']=='sparql.pattern']
+    program=request['program'];need(len(patterns)==8 and len(program['nodes'])==17 and all(n['type'] in ['sparql.select','sparql.variable','sparql.pattern'] and not n.get('children') and n.get('subprogram') is None for n in program['nodes']),'Exact bounded visual syntax, no procedure/guest dispatch')
+    triples=[('?attachment','kind','"adverbial-attachment-observation"'),('?attachment','governorNode','?governor'),('?governor','word','?governorWord'),('?attachment','subordinateNode','?subordinate'),('?subordinate','word','?subordinateWord'),('?attachment','attachmentRelation','?relation'),('?attachment','normConditionIssue','?normIssue'),('?attachment','sentence','?sentence')]
+    need([n['params'] for n in patterns]==[{'subject':a,'predicate':'<'+VOCAB+b+'>','object':c,'graph':'<'+graph+'>'} for a,b,c in triples],'Exact eight candidate-local graph patterns')
+    expected_query='SELECT '+' '.join('?'+v for v in VARS)+' WHERE { '+' '.join('GRAPH <'+graph+'> { '+a+' <'+VOCAB+b+'> '+c+' . }' for a,b,c in triples)+' }'
+    need(response['query']==expected_query,'Actual lowered query matches bounded recorded starter; no separate query engine')
+    need(response['dataset']=='english-legal-candidate-observations','Query dataset is candidate observations')
+    source=response['source'];need(source['candidateCid']==source['receiptCid']==candidate['receiptCid'] and source['inspectionCid']==candidate['inspectionCid'] and source['namedGraph']==graph and source['mode']=='current' and source['currentness']=='checked-before-and-after-query' and source['semanticAuthority']==source['producerAuthority']=='not-established','Actual candidate/inspection/physical-source current provenance')
+    need(source['originalCid']==candidate['originalCid'] and source['extractedTextCid']==candidate['extractedTextCid'] and source['parserExecution']=='not-reverified' and source['reviewStatus']=='unreviewed' and source['sameSentenceJoin']=='cooccurrence-only-not-applicability','Query physical source and authority qualifications')
+    result=response['results'];need(result['head']['vars']==VARS,'Typed query variable order')
+    bindings=result['results']['bindings'];need(len(bindings)==len(expected),'All source attachments represented by typed rows')
+    by_attachment={}
+    raw_sentences={s['index']:s for s in candidate['sentences']}
+    for raw in bindings:
+        need(set(raw)==set(VARS),'Exactly declared typed variables')
+        attachment=raw['attachment'];need(set(attachment)=={'type','value'} and attachment['type']=='uri','Attachment is full URI')
+        iri=attachment['value'];matches=[key for key in expected if iri==graph+'/sentence/'+str(key[0])+'/guard-attachment/'+str(key[1])]
+        need(len(matches)==1 and iri not in by_attachment,'Unique candidate-scoped attachment URI')
+        key=matches[0];e=expected[key];sentence=graph+'/sentence/'+str(key[0]);nodes={n['id']:n for n in raw_sentences[key[0]]['nodes']}
+        values={'attachment':('uri',iri),'governor':('uri',sentence+'/node/'+e['governor']),'subordinate':('uri',sentence+'/node/'+e['subordinate']),
+          'governorWord':('literal',nodes[e['governor']]['word']),'subordinateWord':('literal',nodes[e['subordinate']]['word']),
+          'relation':('literal',e['relation']),'normIssue':('literal',e['diagnostic']),'sentence':('uri',sentence)}
+        for name,(kind,value) in values.items():need(raw[name]=={'type':kind,'value':value},'Exact typed raw role/source/diagnostic binding '+name)
+        by_attachment[iri]=(key,raw)
+    need([r['key'] for r in record['rows']]==[str(i)+':'+str(j) for i,j in sorted(expected)],'DOM rows sort actual source sentence/attachment ordinals')
+    for row in record['rows']:
+        key=tuple(map(int,row['key'].split(':')));iri=graph+'/sentence/'+str(key[0])+'/guard-attachment/'+str(key[1]);raw=by_attachment[iri][1]
+        need([c['variable'] for c in row['cells']]==VARS and all(c['text'].startswith(raw[c['variable']]['value']+'\nRDF '+raw[c['variable']]['type']) for c in row['cells']),'Actual DOM displays each typed binding without substitution')
+        target='english-guard-'+candidate['receiptCid'][7:]+'-'+str(key[0])+'-'+str(key[1]);need(row['target']==row['activeElementId']==target and row['beforeUrl']==row['afterUrl'] and row['sourceCardAttributes']['data-english-guard-attachment']==row['key'],'Native source focus binds exact attachment and preserves URL')
+        context=row['sourceContext'];e=expected[key]
+        need(context['sentenceAttribute']==context['guardSentence']==str(key[0]) and context['sentenceQuote']==e['quote'],'Focused attachment belongs to exact quoted source sentence')
+        need(context['normDiagnostic']==e['diagnostic'] and context['quotationIndicators']==str(len(e['quoteIndicators'])) and context['directMarkerCounts']==[str(len(e['markerOrdinals']))] and [c['location'] for c in context['directCueLocations']]==[('governor-head' if c[2]==e['governor'] else 'subordinate-head' if c[2]==e['subordinate'] else 'other-observed-head') for c in e['directCues']],'Actual direct marker/cue/quote/diagnostic DOM fields stay separate')
+    return {'rows':len(bindings),'candidateCid':candidate['receiptCid'],'inspectionCid':candidate['inspectionCid']}
+
+def parser_range(body,request,source):
+    need(body['range']['begin']==request['begin'] and body['range']['end']==request['end'] and body['selection']=={k:request[k] for k in ['project','id','cid','rev','seq']},'Fresh actual requested range/selection')
+    subset=utf16(source,request['begin'],request['end']).encode('utf8');runtime=body['parser']['runtime']
+    need(runtime['module']=='corenlp' and runtime['profile']=='syntax-v1' and runtime['packageVersion']=='4.6.0' and runtime['manifestCid']=='sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd','Actual reported CoreNLP profile/closure metadata')
+    need(runtime['sourceTextCid']==runtime['parserInputCid']==cid(subset) and cid(subset)!=body['extractedTextCid'],'Parser input is exact selected substring, not whole source CID')
+    return subset
+
+def handoff(href,sentence,document):
+    matches=[r for r in document['ranges'] if r['receiptCid']==sentence['receiptCid']];need(len(matches)==1,'Concordance selects exactly matching inspection range')
+    chosen=matches[0];selection=chosen['selection'];need(selection==sentence['selection'],'Sentence source selection matches whole inspection range')
+    fields=parse_qsl(urlsplit(href).query,keep_blank_values=True,encoding='utf8',errors='strict');need(len(fields)==len(dict(fields)),'No duplicate navigation fields')
+    expected={'load':'preset-english-copular-query','englishReceipt':chosen['receiptCid'],'englishProject':selection['project'],'englishDocument':selection['id'],'englishCid':document['originalCid'],'englishRev':selection['rev'],'englishSeq':str(selection['seq']),'englishBegin':str(chosen['begin']),'englishEnd':str(chosen['end'])}
+    need(dict(fields)==expected and urlsplit(href).path=='/panels','Exactly fixed offered preset plus eight typed whole-inspection fields; no term/program/credential/autofilter')
+    return chosen
+
+def corpus(response,fresh,source):
+    ids={b['receiptCid']:b for b in fresh};need(set(response['receiptCids'])==set(ids) and len(response['receiptCids'])==2,'Only two actual fresh range inspections selected')
+    need(response['schema']=='trikeshed.english-corpus.v1' and response['authority']=='statistics-of-reported-parser-observations' and response['legalMeaning']=='not-established' and response['countsAreEvidenceConfidence'] is False and response['topics'] is None and response['topicCid'] is None,'Descriptive corpus only, no LDA or evidence upgrade')
+    matrix=response['matrix'];need(cid(canonical(matrix))==response['matrixCid'],'Exact canonical matrix identity')
+    core_keys=['schema','reviewStatus','authority','legalMeaning','countsAreEvidenceConfidence','coverage','matrixCid','matrix','rawTokenCount','retrieval','terms','sentences','occurrences']
+    need(cid(canonical({k:response[k] for k in core_keys}))==response['corpusCid'],'Exact core corpus identity distinct from host receipt')
+    need(len(matrix['documents'])==1,'One distinct original/extracted source content, not two documents')
+    document=matrix['documents'][0];need(document['originalCid']==document['extractedTextCid']==cid(source.encode('utf8')) and document['totalLength']==105,'Actual whole source identity and length')
+    need(len(document['ranges'])==2 and [(r['begin'],r['end']) for r in document['ranges']]==[(0,40),(40,105)] and {r['receiptCid'] for r in document['ranges']}==set(ids),'Exact disjoint inspection ranges, not sentence bounds')
+    for r in document['ranges']:need(r['selection']==ids[r['receiptCid']]['selection'] and r['begin']==ids[r['receiptCid']]['range']['begin'] and r['end']==ids[r['receiptCid']]['range']['end'],'Whole inspection matrix range/selection cross-join')
+    sentences={}
+    for row in response['sentences']:
+        need(row['receiptCid'] in ids,'Corpus sentence comes from an actual selected fresh receipt')
+        body=ids[row['receiptCid']];original=next(s for s in body['sentences'] if s['index']==row['index'])
+        need(row['begin']==original['begin'] and row['end']==original['end'] and row['quote']==original['quote']==utf16(source,row['begin'],row['end']) and row['selection']==body['selection'],'Exact actual fresh sentence source quote/selection')
+        preimage={'receiptCid':row['receiptCid'],'sentence':row['index'],'begin':row['begin'],'end':row['end']}
+        need(cid(canonical(preimage))==row['id'] and row['id'] not in sentences,'Full receipt-scoped sentence identity')
+        sentences[row['id']]=row
+    need(len(sentences)==sum(len(b['sentences']) for b in fresh),'No omitted or extra selected fresh sentences')
+    term_counts={}
+    for token in response['occurrences']:
+        sentence=sentences[token['sentenceId']];body=ids[token['receiptCid']];original=next(s for s in body['sentences'] if s['index']==sentence['index']);t=next(t for t in original['tokens'] if t['index']==token['index'])
+        need(token['receiptCid']==sentence['receiptCid'] and all(token[k]==t[k] for k in ['begin','end','word','lemma','pos']),'Occurrence uses actual source token, never copied node or guessed lexical text')
+        need(token['word']==utf16(source,token['begin'],token['end']),'Exact token source quotation')
+        if token['included']:term_counts[token['term']]=term_counts.get(token['term'],0)+1
+    need(len(response['occurrences'])==sum(len(s['tokens']) for b in fresh for s in b['sentences'])==response['rawTokenCount'],'All original lexical occurrences retained')
+    need(matrix['vocabulary']==[t['lemma'] for t in response['terms']] and document['counts']==[term_counts.get(t,0) for t in matrix['vocabulary']] and matrix['tokenCount']==sum(term_counts.values()),'Actual included token counts and matrix coordinates')
+    need({t['lemma']:t['frequency'] for t in response['terms']}==term_counts,'Descriptive frequencies agree with actual included occurrences')
+    return document,sentences

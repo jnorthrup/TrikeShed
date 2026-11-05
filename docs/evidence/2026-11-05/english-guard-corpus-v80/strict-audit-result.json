@@ -1,0 +1,254 @@
+{
+  "selectedInputSha256": {
+    "inputs/S12/source.txt": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+    "inputs/S12/request.json": "837df697ec22332dbebba84470e7f82b1744c565f004b858e09f6f38468d6813",
+    "inputs/S12/response.json": "0853437007c98cab17ec3daeb036de25865d928cf32a5580ad6105760c16544e",
+    "inputs/S12/source-row.json": "63066d2e1017b27ad459e22b7b2d847bad2f1fcf7065ae9f29ca5f1e597b1c56",
+    "inputs/S12/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/S12/cas-readbacks/b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0.cbor": "b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+    "inputs/S12/cas-readbacks/2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac.txt": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+    "inputs/G03/source.txt": "c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+    "inputs/G03/request.json": "53678b73abc489d400ca304db4291d7092812393623840cf861641f437548a29",
+    "inputs/G03/response.json": "428148d3b42291a10211d93be569aaa031ebf07d0585646753795c92551e69e6",
+    "inputs/G03/source-row.json": "9bb59996e14e2b9e5bc1737276abc38fdd0eb29be19dd38621cabba6823635ff",
+    "inputs/G03/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/G03/cas-readbacks/da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85.cbor": "da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+    "inputs/G03/cas-readbacks/c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b.txt": "c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+    "inputs/G03/condition-diagnostics.json": "d94a765aeb363487d79bc17964db64b1e6108c6a12ad47103d3d305435743577",
+    "inputs/G04/source.txt": "873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+    "inputs/G04/request.json": "d71453601615b585ece646c5b8bef30b392d43f2a9213204a9e7ea3f89b76b81",
+    "inputs/G04/response.json": "9ba3711a023d8ea6bec3383f96c0c5863212314cf6dd3e9887fcba93aeb8e14b",
+    "inputs/G04/source-row.json": "2ce557f88c3e029e502dbf63406d39b5f8dffe9764654ae320a02b1c7c5290d3",
+    "inputs/G04/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/G04/cas-readbacks/f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec.cbor": "f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+    "inputs/G04/cas-readbacks/873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1.txt": "873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+    "inputs/G04/condition-diagnostics.json": "7388961ad0a27cee4626d4b9b9d83461f4e073a1a90aa9f8e1f21db0cb12d215",
+    "inputs/G07/source.txt": "a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896",
+    "inputs/G07/request.json": "48ddaa217a3e9f87348707971c9b939d1f1cc155d3c6ee13dc259036e5939435",
+    "inputs/G07/response.json": "01e5b674fa7278886db5c888f0ad35eb0e63bdc42ff7e77647a3926fe28c78c7",
+    "inputs/G07/source-row.json": "6a8552cae9a7ed375892cca2306b0952c2ffe81e63090c28382a46766621743b",
+    "inputs/G07/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/G07/cas-readbacks/1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608.cbor": "1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+    "inputs/G07/cas-readbacks/a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896.txt": "a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896",
+    "inputs/G07/condition-diagnostics.json": "f479b277e73542710abadf1d009a1d693cdface7e657c67b948192de3dfb2caf",
+    "inputs/G13/source.txt": "72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4",
+    "inputs/G13/request.json": "a4cc2c2f264be8b8938cb3fe8535a94748c5cb57c274c0a6bc79782ed842bf12",
+    "inputs/G13/response.json": "29f80bade5bc7e18ba6c480b6d5624d20c47ae35705931a21b93c550803e57a5",
+    "inputs/G13/source-row.json": "61fcfcebcdd920802e0c5184e211e0c8c1569e4bccec32a59d068e3a0d066e4d",
+    "inputs/G13/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/G13/cas-readbacks/bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39.cbor": "bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+    "inputs/G13/cas-readbacks/72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4.txt": "72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4",
+    "inputs/G13/condition-diagnostics.json": "7388961ad0a27cee4626d4b9b9d83461f4e073a1a90aa9f8e1f21db0cb12d215",
+    "inputs/static-closure.json": "9424b0a673e7f9a0189d216304a7e38ebcbb76bf572e13188c11e51aad4574ab"
+  },
+  "imageSha256": {
+    "native-G03-typed-attachment-query-left.png": "7a8063ef137e981c3240154d11df044e42c1b2b4af403a1366363bfb583965bd",
+    "native-G03-typed-attachment-query-right.png": "06641918b40a6937c4e2d966ba4b56b47af0760035a2750aa87c6d0cd67cb4b8",
+    "native-G04-typed-attachment-query-left.png": "13cf391664b02ba34ea16dd4e2b4f5f7be8a1fb77fa024ca58ba6de8361f16c3",
+    "native-G04-typed-attachment-query-right.png": "405855c8246b66815cea9f181202f604de35160e64672e73a8e951c5fd5ea721",
+    "native-G07-focused-attachment-source-card.png": "13d9f0c08f38da9949bd24555797b0a8534f75f702b37c6b2f038a759a7f6892",
+    "native-G07-full-english-source-quotation.png": "3546b7d25351a9077de59b861ab72b14af9fc01e2f51e326db510ed5ce318c38",
+    "native-G07-typed-attachment-query-left.png": "1dd0f8f34d6d105acaad84d406587388e6dd3626f14daf671728b97cb2983b3b",
+    "native-G07-typed-attachment-query-right.png": "58b6a5dd67a45683454d7347fba7cacce330f69ae5b06335062f5f9cd347ba4c",
+    "native-G13-focused-attachment-source-card.png": "1541e5425fd450a8112527c80aad7219ee387717e40448781307d7c0547aab26",
+    "native-G13-full-english-source-quotation.png": "250fe0f0ec1412f61149e7b7cb21e05bb1724af70d2cdeff544c606d0a1d07f4",
+    "native-G13-typed-attachment-query-left.png": "c7eea30b29fb35b0a9bb344e7486863d50a461eba00ba1cfeb6b250394505106",
+    "native-G13-typed-attachment-query-right.png": "21d36ef1ef1317c8f88ceddf2e25f1b3292c9216ad6611c0d24f330d85fae4d1",
+    "native-current-corpus-wordcloud-imply.png": "3b3a52877668647b03a0bc7d1a01816a672bfd1a0ca8eb25c84e59cc113b3220",
+    "native-guard-currentness-refusal.png": "29aef3fc48b5b459f7c18af9747fc34f0f13872be6d8bd728e7a9bc4b0bf0e80",
+    "native-imply-concordance-card-0-inspection-0-40.png": "4b9df11fae4679138aea0d6c87d04a72af828b30c6652ee3e3188912c91afc3c",
+    "native-imply-concordance-card-1-inspection-0-40.png": "19cc15dc96556c27c3a95204841f0cf8ae6ea8f5971018e6e38acfc0d0cdacf7",
+    "native-imply-concordance-card-2-inspection-40-105.png": "bc9923d074156f87d0c3750419ddeb8ae45b474ba36e8dfe3cc3f66536ba0d61",
+    "native-imply-concordance-card-3-inspection-40-105.png": "93baf932ee3b72de5ae944e877e4941464dfde4a83a3ed09a28d6fada820c225",
+    "native-imply-concordance-card-4-inspection-40-105.png": "d16bb29e2c02a3828078bf061648b6677f8bc3c466df495df3f51c29a1aa8e5f",
+    "native-inert-query-popup-range-0.png": "cad96b676e90734eae560d8d14f2cf9b1a2c620698eb2f994a75e15fb1e159c6",
+    "native-inert-query-popup-range-40.png": "e46dfc126e040ead919f77d98f65a7796640f00b0fbff734b1c9084b75c5fc99",
+    "native-old-concordance-current-source-refusal.png": "04bb2e1691add8fdceca94604bd8c49206246996c1c749e8d81ac4bb603f5eb5",
+    "native-palette-aware-fit-left-controls.png": "ea5c1ff14a7d11cb47b3176420f10799a455a883d854d2b4e1f80e539f19b4a0"
+  },
+  "recordSha256": {
+    "GO.json": "a67ea3aa710f21a43429b197700c98249a1d5a853f06afb4ec380918a9705872",
+    "startup.json": "a735206d338abe5a1f1378f1f38dabc011d05c94370b3c56c2dc6e96f64ee73c",
+    "browser-result.json": "cd36fb2d268e48f863895a9a8b7d69abc69a217e622fc8962214f1a9b5d378e5",
+    "cleanup.json": "512f9a387367a2523241eb9f89e17b8aa0086782844d06b31f869b173188625b",
+    "reopened.json": "fa57778903ffa309a7db2ed96019e605ce3d74ae04eab89e62da06b9572cb7a5",
+    "classpath.json": "af7c2309eef527dd039bc3e2be61a8ff6cfd5d50f9a7622939209b91398daf92",
+    "network.json": "a4093b3beaba65fe642ccf68db3bc8560083bbcae6e5b3c3d57a819bc4070911",
+    "readback-index.json": "912fd596edd436fc2c15f8357e62d34175122a3a0b402666608430fd7f91ce63",
+    "writer-command.json": "253d49c02ea0afcf69aedc150e1efa6256aacdecfd58e3fb19ed6cc8071592ca",
+    "reader-command.json": "ca4193fc1e185429380135830ccf4bfdac0c3f0845e076efe4d549a58097e34b"
+  },
+  "observerSourceSha256": {
+    "compile.sh": "2ab75db5bcda512105770c6c483cb97cb7ebbe226d141da3d600a5328dbbab6c",
+    "protocol.txt": "e7a3150b7ac84c5de524ba7ea1cd74e8ff8380bcb75fc86247e1a729337e22e9",
+    "Reopen.kt": "84e8de46b1ceed5eb9368d014de8673e3099aff36c237315dc27b26c4fe42f9d",
+    "run-proof.py": "d47599dd6c749dc519cf468f33450e95901037a9007fb014fd0530b0114fba34",
+    "preparation.json": "e8b8e12706b5cdc2d0d093891b71e638d36af1509ce5035bacb74d81d95b7cb7",
+    "driver.cjs": "f3226ee3983cd61c261dec0d3911982fec78ee8198d1171b621452aac7a31b04",
+    "Fixture.kt": "95ec1eadee8bff3bf6ffad2ebf71f691a528280639247932f3c1b61132e47c17"
+  },
+  "mutatedCopyControls": [
+    {
+      "mutation": "wrong-governor-role-URI",
+      "result": "REJECTED",
+      "reason": "Exact typed raw role/source/diagnostic binding governor"
+    },
+    {
+      "mutation": "inherited-marker-on-unmarked-G07-target",
+      "result": "REJECTED",
+      "reason": "No inherited or substituted guard marker binding"
+    },
+    {
+      "mutation": "dropped-original-G07-target",
+      "result": "REJECTED",
+      "reason": "Every original advcl target preserved, including unmarked/nested targets"
+    },
+    {
+      "mutation": "wrong-original-source-CID",
+      "result": "REJECTED",
+      "reason": "Candidate exact parent/source/range"
+    },
+    {
+      "mutation": "sentence-bounds-as-inspection-range",
+      "result": "REJECTED",
+      "reason": "Exactly fixed offered preset plus eight typed whole-inspection fields; no term/program/credential/autofilter"
+    },
+    {
+      "mutation": "full-source-hash-as-substring-parser-input",
+      "result": "REJECTED",
+      "reason": "Parser input is exact selected substring, not whole source CID"
+    },
+    {
+      "mutation": "fresh-stale-refusal-reuses-old-rows",
+      "result": "REJECTED",
+      "reason": "Fresh amended-source refusal clears candidate/rows"
+    },
+    {
+      "mutation": "automatic-run-from-concordance-popup",
+      "result": "REJECTED",
+      "reason": "Native retained popup stays inert after two fresh parses"
+    }
+  ],
+  "tableViews": {
+    "measured": true,
+    "tables": 4,
+    "wrapperWidth": 1028,
+    "tableWidth": 1648,
+    "scrollDelta": 620,
+    "scope": "Measured overflow wrapper and cells; all columns accessible by actual horizontal wheel; not all fit in one viewport"
+  },
+  "result": "PASS_RECORDED_GUARD_CORPUS_LOGIC_CONSISTENCY",
+  "sourceHead": "fdfa355623f03958536089c81e87162e6c8313ff",
+  "mainSha256": "e2352d79aa5b8a6180ed7152897a80bd98d86a48cd3282e4656268ec1ee7bf0d",
+  "documentsSha256": "6e99a60f9942c1242ae20a016e1e7993294175f72d7a1b3638b3bcc760ab48cb",
+  "panelsSha256": "d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b",
+  "writerPid": 137358,
+  "readerPid": 137676,
+  "guardRows": [
+    {
+      "rows": 1,
+      "candidateCid": "sha256:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b",
+      "inspectionCid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85"
+    },
+    {
+      "rows": 1,
+      "candidateCid": "sha256:1d6110b5605f06f29c84956fa7476e2d569f755ce059527c61aa46f12f4d7232",
+      "inspectionCid": "sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec"
+    },
+    {
+      "rows": 2,
+      "candidateCid": "sha256:150a666f58928235d2964803e34f78734025855d6a8336f087fb46e4d0ba27a3",
+      "inspectionCid": "sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608"
+    },
+    {
+      "rows": 2,
+      "candidateCid": "sha256:fc61bb07d007112a5bd2b1ac6195a7c62885add6c46593e477c6dd603be60fed",
+      "inspectionCid": "sha256:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39"
+    }
+  ],
+  "freshInspections": [
+    {
+      "receiptCid": "sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824",
+      "range": {
+        "begin": 0,
+        "end": 40,
+        "totalLength": 105,
+        "complete": false
+      },
+      "parserInputCid": "sha256:7ceb04bb92eadb2c16cd6ac40e4366b393da5b064161dccd68b1816066680570"
+    },
+    {
+      "receiptCid": "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a",
+      "range": {
+        "begin": 40,
+        "end": 105,
+        "totalLength": 105,
+        "complete": false
+      },
+      "parserInputCid": "sha256:b3f5899fa3e3ecc09a506666ac31d54c2ef6e49727df11fea142c68595af1680"
+    }
+  ],
+  "casReadbacks": 19,
+  "corpusCoreBlockMaterialized": true,
+  "paletteFit": {
+    "url": "http://127.0.0.1:18778/panels?load=preset-english-nal-report",
+    "palette": {
+      "x": 0,
+      "y": 84,
+      "width": 216,
+      "height": 960
+    },
+    "nodeRects": {
+      "instructions": {
+        "x": 264,
+        "y": 196.56533813476562,
+        "width": 256.89288330078125,
+        "height": 145.40234375
+      },
+      "receipt": {
+        "x": 264,
+        "y": 375.61187744140625,
+        "width": 228.22354125976562,
+        "height": 195.61322021484375
+      },
+      "mode": {
+        "x": 523.228271484375,
+        "y": 531.3045654296875,
+        "width": 147.90802001953125,
+        "height": 122.43768310546875
+      }
+    },
+    "runPosts": 0
+  },
+  "artifactVerification": "actual frozen120JAR/browser/static29SDK bytes additionally rehashed",
+  "sdkProcessorOrigins": [
+    {
+      "status": "already-mounted-by-default-reader",
+      "processorCodeSource": "file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0.jar",
+      "processorPackageVersion": "4.6.0",
+      "resolvedResourceUrls": {
+        "edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger",
+        "edu/stanford/nlp/models/parser/nndep/english_UD.gz": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/parser/nndep/english_UD.gz",
+        "edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz"
+      },
+      "resourceScope": "Resource URLs resolved through the already-mounted production loader after actual parse; availability is not a separate model-use trace"
+    },
+    {
+      "status": "already-mounted-by-default-reader",
+      "processorCodeSource": "file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0.jar",
+      "processorPackageVersion": "4.6.0",
+      "resolvedResourceUrls": {
+        "edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger",
+        "edu/stanford/nlp/models/parser/nndep/english_UD.gz": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/parser/nndep/english_UD.gz",
+        "edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz"
+      },
+      "resourceScope": "Resource URLs resolved through the already-mounted production loader after actual parse; availability is not a separate model-use trace"
+    }
+  ],
+  "scope": "Raw retained dependency/marker/quote/diagnostic and actual request/result/source/CID consistency only. Fresh parser provenance is captured default-owner/SDK execution, not independent output accuracy or producer authentication. Corpus counts/navigation are descriptive; no legal force, benchmark completeness, semantic entailment, independent evidence, review/admission, or full R4 rootfs claim. Omitted full pack/prefix/SDK bytes are not a portable CAS/model bundle. Measured final horizontal table/cell records are reported separately; historical v79 c929 records retain their query-table layout limitation.",
+  "auditScriptSha256": "19189b8d5fc1ff32e3053a6aef5f8746274d47112870e698ea39a23966b93a51",
+  "supportScriptSha256": {
+    "checks.py": "274ba01ae57e693b4c83332dafbf4793fc09df9e20d08ffb108eebdaa6e431c9",
+    "receipt-core.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+  }
+}

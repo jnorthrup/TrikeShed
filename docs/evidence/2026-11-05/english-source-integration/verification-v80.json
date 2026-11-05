@@ -1,0 +1,3130 @@
+{
+  "source": "fdfa355623f03958536089c81e87162e6c8313ff",
+  "started": "2026-11-05T05:28:17.107146+00:00",
+  "result": "PASS",
+  "expectedSelectedTests": 503,
+  "sourceFreezeDirectory": ".git/airgap-english-integration-20261105/combined-v80-source",
+  "frozenInputCount": 694,
+  "frozenUniqueTips": 537,
+  "allFrozenTipsContained": true,
+  "merges": [
+    {
+      "ref": "refs/heads/codex/retained-nal-lcnc-v78-evidence-20261105",
+      "oid": "1da36da7da14463347e93e1d61e34833c2d6f31a",
+      "committerTimestamp": 1793855218,
+      "before": "c9298dc6846281de16475878c92ff8ca3b56b5c8",
+      "code": 0,
+      "stdout": "Merge made by the 'ort' strategy.\n",
+      "stderr": "",
+      "after": "c3a1e9b7e0a0340c4bc1f063d32e938d3ba498cb"
+    },
+    {
+      "ref": "refs/heads/feat/english-guard-observation-ui-20261105",
+      "oid": "131c768231354318b8fd38fa189489231939662e",
+      "committerTimestamp": 1793856280,
+      "before": "c3a1e9b7e0a0340c4bc1f063d32e938d3ba498cb",
+      "code": 0,
+      "stdout": "Merge made by the 'ort' strategy.\n",
+      "stderr": "",
+      "after": "fdfa355623f03958536089c81e87162e6c8313ff"
+    }
+  ],
+  "productionEditsFrozen": true,
+  "command": "./gradlew jsBrowserDocumentsDevelopmentWebpack jsBrowserSpacegraphDevelopmentWebpack jsBrowserPagesDevelopmentWebpack jvmTest -I /workspace/.trikeshed-cloud/resolve-jvm.init.gradle -PkotlinJsApps=documents,pages,spacegraph --daemon --configuration-cache --max-workers=4 -Ptrikeshed.native.mlnix=/workspace/library-files/mlnix-native-validation/build/bin/mlnix -Ptrikeshed.native.mlnix.sha256=97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5 -Ptrikeshed.native.adapter=/workspace/TrikeShed/utils/sumo-nix/run.nix -Ptrikeshed.native.datalog=/workspace/library-files/sumo-nix-proof/source --tests borg.trikeshed.nlp.EnglishInspectionTest --tests borg.trikeshed.graal.subvm.CoreNlpSourceTest --tests borg.trikeshed.narsese.NormClauseConditionsTest --tests borg.trikeshed.forge.server.DocumentEnglishWireTest --tests borg.trikeshed.narsese.ApplicabilityFactsTest --tests borg.trikeshed.narsese.ConstellationPremiseTest --tests borg.trikeshed.docs.DocumentSurfaceTest --tests borg.trikeshed.forge.server.PrimaryProjectCorpusTest --tests borg.trikeshed.forge.server.DocumentPdfLinksWireTest --tests borg.trikeshed.lcnc.CamelDispatchOwnershipTest --tests borg.trikeshed.graal.subvm.NlpNodeIdentityTest --tests borg.trikeshed.narsese.DependencyCopyInferenceTest --tests borg.trikeshed.nlp.EnglishLegalPatternsTest --tests borg.trikeshed.forge.server.EnglishLegalPatternsWireTest --tests borg.trikeshed.nlp.EnglishCorpusTest --tests borg.trikeshed.nlp.EnglishLdaTest --tests borg.trikeshed.forge.server.EnglishObservationWireTest --tests borg.trikeshed.forge.server.EnglishCorpusWireTest --tests borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest --tests borg.trikeshed.lcnc.PresetAssemblyTest --tests borg.trikeshed.forge.server.SparqlVisualBoundsTest --tests borg.trikeshed.forge.server.SparqlSourceWireTest --tests borg.trikeshed.narsese.KgRdfFidelityTest --tests borg.trikeshed.narsese.KgPropositionIdentityTest --tests borg.trikeshed.narsese.PropositionReadbackTest --tests borg.trikeshed.kif.KifSemanticTest --tests borg.trikeshed.narsese.BeliefAdmissionTest --tests borg.trikeshed.memory.HermesMemoryFeedbackTest --tests borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest --tests borg.trikeshed.hermes.HermesPenDelegatesTest.modelRefusalCarriesNegativeToolEvidence --tests borg.trikeshed.hermes.HermesPenDelegatesTest.negativeClaimIsNotARefusedOperation --tests borg.trikeshed.hermes.HermesPenDelegatesTest.everyCrossingLandsTwice --tests borg.trikeshed.hermes.HermesPenDelegatesTest.rejectedAssertionAdmissionIsNotSuccess --tests borg.trikeshed.narsese.KgRetentionTest --tests borg.trikeshed.litebike.KgHttpUtf8Test --tests borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest --tests borg.trikeshed.memory.ace.AceContextNodesTest --tests borg.trikeshed.memory.ace.BreadcrumbContextNodesTest --tests borg.trikeshed.docs.DocumentNavigationTest --tests borg.trikeshed.terminal.XtermTerminalEraseSavedTest --tests borg.trikeshed.terminal.XtermTerminalRowIdentityTest --tests borg.trikeshed.forge.server.CurationInstalledLinkTest --tests borg.trikeshed.forge.server.CurationIntakeTest --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest --tests borg.trikeshed.forge.server.LinkGrabRetryTest --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest --tests borg.trikeshed.forge.server.ProjectDbBindingTest --tests borg.trikeshed.job.PackCasVerifierTest --tests borg.trikeshed.narsese.BertPythonSleeveTest --tests borg.trikeshed.narsese.JevaWorkerProtocolTest --tests borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest --tests borg.trikeshed.narsese.KgPredicateNamespaceTest --tests borg.trikeshed.kif.KifTaxonomySnapshotTest --tests borg.trikeshed.nlp.EnglishCorpusViewTest --tests borg.trikeshed.narsese.KgRouteErrorTest --tests borg.trikeshed.lcnc.EnglishCopularPresetTest --tests borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest --tests borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest --tests borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest --tests borg.trikeshed.forge.server.EnglishTaxonomyWireTest --tests borg.trikeshed.lcnc.CurationReviewedReadTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyWireTest --tests borg.trikeshed.forge.server.ReviewedKifWireTest --tests borg.trikeshed.lcnc.ReviewedKifCancellationTest --tests borg.trikeshed.lcnc.LlvmScalarTest --tests borg.trikeshed.kanban.module.LlvmScalarRunTest --tests borg.trikeshed.lcnc.NativeHornProfileTest --tests borg.trikeshed.lcnc.LlvmConfixTest --tests borg.trikeshed.kanban.module.LlvmConfixRunTest --tests borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest --tests borg.trikeshed.narsese.PropositionAttentionTest --tests borg.trikeshed.lcnc.LcncConsumptionTest --tests borg.trikeshed.narsese.KgKifCommentTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest --tests borg.trikeshed.kif.KifActivationPlanTest --tests borg.trikeshed.kif.SumoNixBridgeTest --tests borg.trikeshed.lcnc.KifNodesTest --tests borg.trikeshed.forge.server.CurationIntakeEligibilityTest --tests borg.trikeshed.kanban.module.KanbanPinnedDispatchTest --tests borg.trikeshed.lcnc.DocumentSpansTest --tests borg.trikeshed.lcnc.FinanceKifPresetExecutionTest --tests borg.trikeshed.lcnc.LcncConfixSelectionTest --tests borg.trikeshed.lcnc.LcncPinnedBindingTest --tests borg.trikeshed.lcnc.WorkModelRouteTest --tests borg.trikeshed.lcnc.WorkSelectNodeTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsReadTest --tests borg.trikeshed.lcnc.LcncConfixPickPathContractTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyQueryViewTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest --tests borg.trikeshed.narsese.RetainedNalImplicationTest --tests borg.trikeshed.narsese.SyntheticNalExperimentCliTest --tests borg.trikeshed.lcnc.EnglishNalPresetTest --tests borg.trikeshed.forge.server.EnglishNalPresetExecutionTest --tests borg.trikeshed.nlp.EnglishGuardAttachmentsTest --tests borg.trikeshed.lcnc.EnglishGuardQueryViewTest --tests borg.trikeshed.userspace.nio.file.spi.FilePublicationTest",
+  "changeSince503Freeze": "ONLY11DocumentsEnglish query-table layout lines plus21publicv78evidencefiles; JVM production/common/JVM test source diff EMPTY versus c929503GREEN.",
+  "jvmVerificationMode": "JVM production/test compilation UP-TO-DATE with empty source diff; all503 focused tests actually re-executed and passed in58s build.",
+  "newNativeProof": "PENDING new final Docs artifact/newfreshmonotonic native profile; repeat same native scope to verify readable query columns and full corpus-core/matrix/receipt retention.",
+  "scope": "No query/provenance/inference/source/currentness logic change. Existing horizontal wrapper plus fixed readable column widths. v79functional native PASS retained with initial table readability limitation.",
+  "totals": {
+    "tests": 503,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "file": "TEST-borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest.xml",
+      "name": "BreadcrumbForegroundTest[jvm]",
+      "timestamp": "2026-11-05T05:28:22.978Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.docs.DocumentNavigationTest.xml",
+      "name": "DocumentNavigationTest[jvm]",
+      "timestamp": "2026-11-05T05:28:23.370Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.docs.DocumentSurfaceTest.xml",
+      "name": "DocumentSurfaceTest[jvm]",
+      "timestamp": "2026-11-05T05:28:23.395Z",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationInstalledLinkTest.xml",
+      "name": "CurationInstalledLinkTest[jvm]",
+      "timestamp": "2026-11-05T05:28:23.452Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationIntakeEligibilityTest.xml",
+      "name": "CurationIntakeEligibilityTest[jvm]",
+      "timestamp": "2026-11-05T05:28:24.351Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationIntakeTest.xml",
+      "name": "CurationIntakeTest[jvm]",
+      "timestamp": "2026-11-05T05:28:24.372Z",
+      "tests": "37",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationRemovalOwnershipTest.xml",
+      "name": "CurationRemovalOwnershipTest[jvm]",
+      "timestamp": "2026-11-05T05:28:27.468Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest.xml",
+      "name": "DocumentEnglishRetainedWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:27.491Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.DocumentEnglishWireTest.xml",
+      "name": "DocumentEnglishWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:27.912Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.DocumentPdfLinksWireTest.xml",
+      "name": "DocumentPdfLinksWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:27.963Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishCorpusWireTest.xml",
+      "name": "EnglishCorpusWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:28.392Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishLegalPatternsWireTest.xml",
+      "name": "EnglishLegalPatternsWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:34.785Z",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishNalPresetExecutionTest.xml",
+      "name": "EnglishNalPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T05:28:36.908Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishObservationWireTest.xml",
+      "name": "EnglishObservationWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:37.270Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishTaxonomyWireTest.xml",
+      "name": "EnglishTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:37.855Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.LinkGrabRetryTest.xml",
+      "name": "LinkGrabRetryTest[jvm]",
+      "timestamp": "2026-11-05T05:28:39.815Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.PrimaryProjectCorpusTest.xml",
+      "name": "PrimaryProjectCorpusTest[jvm]",
+      "timestamp": "2026-11-05T05:28:40.053Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ProjectCorpusVisitTest.xml",
+      "name": "ProjectCorpusVisitTest[jvm]",
+      "timestamp": "2026-11-05T05:28:40.476Z",
+      "tests": "27",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ProjectDbBindingTest.xml",
+      "name": "ProjectDbBindingTest[jvm]",
+      "timestamp": "2026-11-05T05:28:40.737Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ReviewedKifWireTest.xml",
+      "name": "ReviewedKifWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:40.748Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest.xml",
+      "name": "ReviewedTaxonomyQuadQueryWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:45.958Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ReviewedTaxonomyWireTest.xml",
+      "name": "ReviewedTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:46.267Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.SparqlSourceWireTest.xml",
+      "name": "SparqlSourceWireTest[jvm]",
+      "timestamp": "2026-11-05T05:28:46.761Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.SparqlVisualBoundsTest.xml",
+      "name": "SparqlVisualBoundsTest[jvm]",
+      "timestamp": "2026-11-05T05:28:47.116Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.graal.subvm.CoreNlpSourceTest.xml",
+      "name": "CoreNlpSourceTest[jvm]",
+      "timestamp": "2026-11-05T05:28:47.172Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.graal.subvm.NlpNodeIdentityTest.xml",
+      "name": "NlpNodeIdentityTest[jvm]",
+      "timestamp": "2026-11-05T05:28:47.185Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.hermes.HermesPenDelegatesTest.xml",
+      "name": "HermesPenDelegatesTest[jvm]",
+      "timestamp": "2026-11-05T05:28:47.200Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.job.PackCasVerifierTest.xml",
+      "name": "PackCasVerifierTest[jvm]",
+      "timestamp": "2026-11-05T05:28:54.351Z",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kanban.module.KanbanPinnedDispatchTest.xml",
+      "name": "KanbanPinnedDispatchTest[jvm]",
+      "timestamp": "2026-11-05T05:28:54.577Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kanban.module.LlvmConfixRunTest.xml",
+      "name": "LlvmConfixRunTest[jvm]",
+      "timestamp": "2026-11-05T05:28:56.471Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kanban.module.LlvmScalarRunTest.xml",
+      "name": "LlvmScalarRunTest[jvm]",
+      "timestamp": "2026-11-05T05:29:00.050Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.KifActivationPlanTest.xml",
+      "name": "KifActivationPlanTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.178Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.KifSemanticTest.xml",
+      "name": "KifSemanticTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.187Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.KifTaxonomySnapshotTest.xml",
+      "name": "KifTaxonomySnapshotTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.215Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.SumoNixBridgeTest.xml",
+      "name": "SumoNixBridgeTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.220Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.CamelDispatchOwnershipTest.xml",
+      "name": "CamelDispatchOwnershipTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.224Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.CurationReviewedReadTest.xml",
+      "name": "CurationReviewedReadTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.247Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.DocumentSpansTest.xml",
+      "name": "DocumentSpansTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.297Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest.xml",
+      "name": "EnglishCamelPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.309Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest.xml",
+      "name": "EnglishCopularPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:01.874Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishCopularPresetTest.xml",
+      "name": "EnglishCopularPresetTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.048Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishGuardQueryViewTest.xml",
+      "name": "EnglishGuardQueryViewTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.081Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishNalPresetTest.xml",
+      "name": "EnglishNalPresetTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.111Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest.xml",
+      "name": "EnglishTaxonomyCarrierTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.132Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest.xml",
+      "name": "EnglishTaxonomyExportGuardTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.247Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.FinanceKifPresetExecutionTest.xml",
+      "name": "FinanceKifPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.308Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.KifNodesTest.xml",
+      "name": "KifNodesTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.386Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncConfixPickPathContractTest.xml",
+      "name": "LcncConfixPickPathContractTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.394Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncConfixSelectionTest.xml",
+      "name": "LcncConfixSelectionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.480Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncConsumptionTest.xml",
+      "name": "LcncConsumptionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.522Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncPinnedBindingTest.xml",
+      "name": "LcncPinnedBindingTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.612Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LlvmConfixTest.xml",
+      "name": "LlvmConfixTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.620Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LlvmScalarTest.xml",
+      "name": "LlvmScalarTest[jvm]",
+      "timestamp": "2026-11-05T05:29:02.995Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.NativeHornProfileTest.xml",
+      "name": "NativeHornProfileTest[jvm]",
+      "timestamp": "2026-11-05T05:29:03.157Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.PresetAssemblyTest.xml",
+      "name": "PresetAssemblyTest[jvm]",
+      "timestamp": "2026-11-05T05:29:03.167Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedKifCancellationTest.xml",
+      "name": "ReviewedKifCancellationTest[jvm]",
+      "timestamp": "2026-11-05T05:29:03.922Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest.xml",
+      "name": "ReviewedTaxonomyPlanPageTest[jvm]",
+      "timestamp": "2026-11-05T05:29:05.156Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest.xml",
+      "name": "ReviewedTaxonomyProofGraphTest[jvm]",
+      "timestamp": "2026-11-05T05:29:05.542Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsReadTest.xml",
+      "name": "ReviewedTaxonomyProofPathsReadTest[jvm]",
+      "timestamp": "2026-11-05T05:29:05.965Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsTest.xml",
+      "name": "ReviewedTaxonomyProofPathsTest[jvm]",
+      "timestamp": "2026-11-05T05:29:05.980Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyQueryViewTest.xml",
+      "name": "ReviewedTaxonomyQueryViewTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.296Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.WorkModelRouteTest.xml",
+      "name": "WorkModelRouteTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.336Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.WorkSelectNodeTest.xml",
+      "name": "WorkSelectNodeTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.377Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.litebike.KgHttpUtf8Test.xml",
+      "name": "KgHttpUtf8Test[jvm]",
+      "timestamp": "2026-11-05T05:29:06.400Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.memory.HermesMemoryFeedbackTest.xml",
+      "name": "HermesMemoryFeedbackTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.421Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.memory.ace.AceContextNodesTest.xml",
+      "name": "AceContextNodesTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.439Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.memory.ace.BreadcrumbContextNodesTest.xml",
+      "name": "BreadcrumbContextNodesTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.461Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.ApplicabilityFactsTest.xml",
+      "name": "ApplicabilityFactsTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.545Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.BeliefAdmissionTest.xml",
+      "name": "BeliefAdmissionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.548Z",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.BertPythonSleeveTest.xml",
+      "name": "BertPythonSleeveTest[jvm]",
+      "timestamp": "2026-11-05T05:29:06.620Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.ConstellationPremiseTest.xml",
+      "name": "ConstellationPremiseTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.327Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.DependencyCopyInferenceTest.xml",
+      "name": "DependencyCopyInferenceTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.337Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest.xml",
+      "name": "DocumentCuratorNlpRetentionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.362Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.JevaWorkerProtocolTest.xml",
+      "name": "JevaWorkerProtocolTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.377Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgKifCommentTest.xml",
+      "name": "KgKifCommentTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.410Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgPredicateNamespaceTest.xml",
+      "name": "KgPredicateNamespaceTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.455Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgPropositionIdentityTest.xml",
+      "name": "KgPropositionIdentityTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.463Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgRdfFidelityTest.xml",
+      "name": "KgRdfFidelityTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.494Z",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgRetentionTest.xml",
+      "name": "KgRetentionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.524Z",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgRouteErrorTest.xml",
+      "name": "KgRouteErrorTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.588Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest.xml",
+      "name": "LegalRequiredAnchorCoverageCliTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.614Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest.xml",
+      "name": "LegalRequiredAnchorCoverageTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.642Z",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.NormClauseConditionsTest.xml",
+      "name": "NormClauseConditionsTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.648Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.PropositionAttentionTest.xml",
+      "name": "PropositionAttentionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.657Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.PropositionReadbackTest.xml",
+      "name": "PropositionReadbackTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.827Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.RetainedNalImplicationTest.xml",
+      "name": "RetainedNalImplicationTest[jvm]",
+      "timestamp": "2026-11-05T05:29:14.838Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.SyntheticNalExperimentCliTest.xml",
+      "name": "SyntheticNalExperimentCliTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.050Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishCorpusTest.xml",
+      "name": "EnglishCorpusTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.078Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishCorpusViewTest.xml",
+      "name": "EnglishCorpusViewTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.179Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishGuardAttachmentsTest.xml",
+      "name": "EnglishGuardAttachmentsTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.191Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishInspectionTest.xml",
+      "name": "EnglishInspectionTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.277Z",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishLdaTest.xml",
+      "name": "EnglishLdaTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.287Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishLegalPatternsTest.xml",
+      "name": "EnglishLegalPatternsTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.450Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.terminal.XtermTerminalEraseSavedTest.xml",
+      "name": "XtermTerminalEraseSavedTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.629Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.terminal.XtermTerminalRowIdentityTest.xml",
+      "name": "XtermTerminalRowIdentityTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.644Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest.xml",
+      "name": "FileChannelDuplicateTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.648Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.userspace.nio.file.spi.FilePublicationTest.xml",
+      "name": "FilePublicationTest[jvm]",
+      "timestamp": "2026-11-05T05:29:15.662Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "allJvmTestSourcesCompiled": true,
+  "allThreeBrowserBuilds": "PASS",
+  "frozenSnapshot": "/workspace/library-files/english-guard-corpus-v80-proof/snapshot",
+  "artifacts": {
+    "main.jar": "e2352d79aa5b8a6180ed7152897a80bd98d86a48cd3282e4656268ec1ee7bf0d",
+    "documents.js": "6e99a60f9942c1242ae20a016e1e7993294175f72d7a1b3638b3bcc760ab48cb",
+    "spacegraph.js": "d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "dependencyJars": 119,
+  "totalClasspathJars": 120,
+  "buildLogSha256": "fc40ae4928ad80dbc6165e31247d1a5984b84e47e8a8fcb761bee4b0886ccfea",
+  "buildFinished": "2026-11-05T05:31:11.170252+00:00",
+  "actualFrozenNativeProof": "PASS actual final JS/native/after-close workflow; independent strict and recorded-data audits PASS; root portable replay exact",
+  "byteIdenticalTo503Freeze": {
+    "main.jar": true,
+    "documents.js": false,
+    "spacegraph.js": true,
+    "pages.js": true
+  },
+  "sourcePublication": {
+    "remote": "origin/master",
+    "head": "fdfa355623f03958536089c81e87162e6c8313ff",
+    "exactLsRemoteVerified": true,
+    "ordinaryFastForwardPush": true,
+    "all694FrozenTipsContained": true,
+    "cloudLocalMasterFastForward": {
+      "before": "21e70d7d65d29f633c0132e2e03e8716f93c42ae",
+      "after": "fdfa355623f03958536089c81e87162e6c8313ff"
+    },
+    "published": "2026-11-05T05:40:32.461819+00:00",
+    "nativeEvidencePublication": "PENDING independent audit and docs-only follow-up"
+  },
+  "nativeSummary": {
+    "result": "NATIVE_AND_CLOSED_READER_PASS_PENDING_INDEPENDENT_AUDIT",
+    "selectedAttempt": "/workspace/library-files/guard-corpus-v80-native-proof/native-attempt1",
+    "go": {
+      "rootGreen": true,
+      "sourceHead": "fdfa355623f03958536089c81e87162e6c8313ff",
+      "snapshot": "/workspace/library-files/english-guard-corpus-v80-proof/snapshot",
+      "mainSha256": "e2352d79aa5b8a6180ed7152897a80bd98d86a48cd3282e4656268ec1ee7bf0d",
+      "spacegraphSha256": "d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b",
+      "documentsSha256": "6e99a60f9942c1242ae20a016e1e7993294175f72d7a1b3638b3bcc760ab48cb",
+      "pagesSha256": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5",
+      "totals": {
+        "tests": 503,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "dependencyJars": 119,
+      "totalClasspathJars": 120,
+      "issued": "2026-11-05T05:32:05.645410+00:00",
+      "sdkRoot": "/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm",
+      "sdkStaticClosureSha256": "9424b0a673e7f9a0189d216304a7e38ebcbb76bf572e13188c11e51aad4574ab",
+      "scope": "Same full real native guard/corpus workflow with query-table presentation fixed; direct receipt/core/matrix CAS readbacks; two genuine CoreNLP-only ranges; actual amendments/current refusals; strict loopback network namespace; no generative model/provider/admission."
+    },
+    "compileAttempt": 1,
+    "runtimeAttempt": 1,
+    "guardCases": [
+      {
+        "case": "G03",
+        "retainedInspectionCid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+        "candidateCid": "sha256:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b",
+        "queryStatus": 200,
+        "typedRows": 1,
+        "sourceFocusCount": 1,
+        "sourceQueries": "Actual inspectionOnly8-BGP source-checked program, no order/legal-gold claim"
+      },
+      {
+        "case": "G04",
+        "retainedInspectionCid": "sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+        "candidateCid": "sha256:1d6110b5605f06f29c84956fa7476e2d569f755ce059527c61aa46f12f4d7232",
+        "queryStatus": 200,
+        "typedRows": 1,
+        "sourceFocusCount": 1,
+        "sourceQueries": "Actual inspectionOnly8-BGP source-checked program, no order/legal-gold claim"
+      },
+      {
+        "case": "G07",
+        "retainedInspectionCid": "sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+        "candidateCid": "sha256:150a666f58928235d2964803e34f78734025855d6a8336f087fb46e4d0ba27a3",
+        "queryStatus": 200,
+        "typedRows": 2,
+        "sourceFocusCount": 2,
+        "sourceQueries": "Actual inspectionOnly8-BGP source-checked program, no order/legal-gold claim"
+      },
+      {
+        "case": "G13",
+        "retainedInspectionCid": "sha256:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+        "candidateCid": "sha256:fc61bb07d007112a5bd2b1ac6195a7c62885add6c46593e477c6dd603be60fed",
+        "queryStatus": 200,
+        "typedRows": 2,
+        "sourceFocusCount": 2,
+        "sourceQueries": "Actual inspectionOnly8-BGP source-checked program, no order/legal-gold claim"
+      }
+    ],
+    "freshInspections": [
+      {
+        "request": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+          "seq": 16,
+          "begin": 0,
+          "end": 40
+        },
+        "status": 200,
+        "receiptCid": "sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824",
+        "parser": {
+          "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+          "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+          "runtime": {
+            "module": "corenlp",
+            "profile": "syntax-v1",
+            "dependencyGraph": "enhanced-plus-plus",
+            "dependencyNodeIdentity": "token-index+copy-count/1",
+            "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+            "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+            "jar": "stanford-corenlp-4.6.0.jar",
+            "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+            "packageVersion": "4.6.0",
+            "parserNormalization": "identity/1",
+            "sourceTextCid": "sha256:7ceb04bb92eadb2c16cd6ac40e4366b393da5b064161dccd68b1816066680570",
+            "parserInputCid": "sha256:7ceb04bb92eadb2c16cd6ac40e4366b393da5b064161dccd68b1816066680570",
+            "relationGlossSource": "parser-input"
+          },
+          "configuration": {
+            "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+            "threads": "1"
+          }
+        },
+        "elapsedMillis": 12462,
+        "sourceBefore": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+          "seq": 16,
+          "length": 105,
+          "contentType": "text/plain"
+        },
+        "sourceAfter": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+          "seq": 16,
+          "length": 105,
+          "contentType": "text/plain"
+        }
+      },
+      {
+        "request": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+          "seq": 16,
+          "begin": 40,
+          "end": 105
+        },
+        "status": 200,
+        "receiptCid": "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a",
+        "parser": {
+          "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+          "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+          "runtime": {
+            "module": "corenlp",
+            "profile": "syntax-v1",
+            "dependencyGraph": "enhanced-plus-plus",
+            "dependencyNodeIdentity": "token-index+copy-count/1",
+            "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+            "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+            "jar": "stanford-corenlp-4.6.0.jar",
+            "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+            "packageVersion": "4.6.0",
+            "parserNormalization": "identity/1",
+            "sourceTextCid": "sha256:b3f5899fa3e3ecc09a506666ac31d54c2ef6e49727df11fea142c68595af1680",
+            "parserInputCid": "sha256:b3f5899fa3e3ecc09a506666ac31d54c2ef6e49727df11fea142c68595af1680",
+            "relationGlossSource": "parser-input"
+          },
+          "configuration": {
+            "annotators": "tokenize,ssplit,pos,lemma,depparse,ner",
+            "threads": "1"
+          }
+        },
+        "elapsedMillis": 311,
+        "sourceBefore": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+          "seq": 16,
+          "length": 105,
+          "contentType": "text/plain"
+        },
+        "sourceAfter": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+          "seq": 16,
+          "length": 105,
+          "contentType": "text/plain"
+        }
+      }
+    ],
+    "corpus": {
+      "receiptCid": "sha256:0e4682987e9d093233fd26f50c8435b3287a6e3ff0b7eec6a7d4dbb1e6d5f38c",
+      "corpusCid": "sha256:b83b2616d8b433e50e184a208c73822fa09fc10f67ab9f466ffde998bb90867e",
+      "matrixCid": "sha256:20b16662f8ce8c402d1a79114d35141de0bbc2fe19a52226f8b6321c5d52faa2"
+    },
+    "concordanceCards": 5,
+    "handoffs": [
+      {
+        "url": "http://127.0.0.1:18778/panels?load=preset-english-copular-query&englishReceipt=sha256%3A06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824&englishProject=synthetic-guard-observations-v76&englishDocument=S12.txt&englishCid=sha256%3A2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac&englishRev=1-sha256%3A959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022&englishSeq=16&englishBegin=0&englishEnd=40",
+        "receiptControl": "sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824",
+        "modeControl": "current",
+        "inspectionRange": {
+          "begin": 0,
+          "end": 40
+        },
+        "parserPosts": 2,
+        "runPosts": 0,
+        "queryPosts": 0,
+        "scratchUnchanged": true
+      },
+      {
+        "url": "http://127.0.0.1:18778/panels?load=preset-english-copular-query&englishReceipt=sha256%3Ad975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a&englishProject=synthetic-guard-observations-v76&englishDocument=S12.txt&englishCid=sha256%3A2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac&englishRev=1-sha256%3A959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022&englishSeq=16&englishBegin=40&englishEnd=105",
+        "receiptControl": "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a",
+        "modeControl": "current",
+        "inspectionRange": {
+          "begin": 40,
+          "end": 105
+        },
+        "parserPosts": 2,
+        "runPosts": 0,
+        "queryPosts": 0,
+        "scratchUnchanged": true
+      }
+    ],
+    "guardRefusal": {
+      "status": 409,
+      "candidateCount": 0,
+      "rows": 0,
+      "request": {
+        "inspectionCid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+        "mode": "current",
+        "program": {
+          "nodes": [
+            {
+              "id": "select",
+              "type": "sparql.select",
+              "params": {},
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v0",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?attachment",
+                "ord": "0"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v1",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?governor",
+                "ord": "1"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v2",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?governorWord",
+                "ord": "2"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v3",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?subordinate",
+                "ord": "3"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v4",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?subordinateWord",
+                "ord": "4"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v5",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?relation",
+                "ord": "5"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v6",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?normIssue",
+                "ord": "6"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v7",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?sentence",
+                "ord": "7"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p0",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?attachment",
+                "predicate": "<urn:trikeshed:english:legal:kind>",
+                "object": "\"adverbial-attachment-observation\"",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p1",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?attachment",
+                "predicate": "<urn:trikeshed:english:legal:governorNode>",
+                "object": "?governor",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p2",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?governor",
+                "predicate": "<urn:trikeshed:english:legal:word>",
+                "object": "?governorWord",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p3",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?attachment",
+                "predicate": "<urn:trikeshed:english:legal:subordinateNode>",
+                "object": "?subordinate",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p4",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?subordinate",
+                "predicate": "<urn:trikeshed:english:legal:word>",
+                "object": "?subordinateWord",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p5",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?attachment",
+                "predicate": "<urn:trikeshed:english:legal:attachmentRelation>",
+                "object": "?relation",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p6",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?attachment",
+                "predicate": "<urn:trikeshed:english:legal:normConditionIssue>",
+                "object": "?normIssue",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p7",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?attachment",
+                "predicate": "<urn:trikeshed:english:legal:sentence>",
+                "object": "?sentence",
+                "graph": "<urn:trikeshed:english:legal:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            }
+          ],
+          "wires": [
+            {
+              "from": [
+                "v0",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v1",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v2",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v3",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v4",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v5",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v6",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v7",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "p0",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p1",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p2",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p3",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p4",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p5",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p6",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p7",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            }
+          ],
+          "controls": {
+            "humanOversight": true,
+            "matingPoints": [],
+            "inspectionOnly": true
+          },
+          "kanban": null,
+          "view": null,
+          "seq": 1
+        }
+      },
+      "response": {
+        "error": "English observation source snapshot is stale or unavailable"
+      }
+    },
+    "concordanceRefusal": [
+      {
+        "url": "http://127.0.0.1:18778/panels?load=preset-english-copular-query&englishReceipt=sha256%3Ad975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a&englishProject=synthetic-guard-observations-v76&englishDocument=S12.txt&englishCid=sha256%3A2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac&englishRev=1-sha256%3A959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022&englishSeq=16&englishBegin=40&englishEnd=105",
+        "status": 409,
+        "request": {
+          "receiptCid": "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a",
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+          "seq": 16,
+          "begin": 40,
+          "end": 105
+        },
+        "response": {
+          "error": "Selected source revision changed or is unavailable"
+        },
+        "visibleText": "Panel not loaded: English inspection handoff unavailable: Selected source revision changed or is unavailable. Current canvas and saved scratch are unchanged.\n\nRetry contractsDismiss",
+        "originCount": 0,
+        "nodeCount": 0
+      }
+    ],
+    "tableViews": [
+      {
+        "id": "G03",
+        "left": {
+          "scrollLeft": 0,
+          "scrollWidth": 1648,
+          "clientWidth": 1028,
+          "rect": {
+            "x": 466,
+            "y": 507.5625,
+            "width": 1028,
+            "height": 175.578125
+          }
+        },
+        "right": {
+          "scrollLeft": 620,
+          "scrollWidth": 1648,
+          "clientWidth": 1028
+        },
+        "action": "Actual mouse horizontal wheel over existing overflow wrapper; no DOM scrollLeft/style assignment"
+      },
+      {
+        "id": "G04",
+        "left": {
+          "scrollLeft": 0,
+          "scrollWidth": 1648,
+          "clientWidth": 1028,
+          "rect": {
+            "x": 466,
+            "y": 507.5625,
+            "width": 1028,
+            "height": 175.578125
+          }
+        },
+        "right": {
+          "scrollLeft": 620,
+          "scrollWidth": 1648,
+          "clientWidth": 1028
+        },
+        "action": "Actual mouse horizontal wheel over existing overflow wrapper; no DOM scrollLeft/style assignment"
+      },
+      {
+        "id": "G07",
+        "left": {
+          "scrollLeft": 0,
+          "scrollWidth": 1648,
+          "clientWidth": 1028,
+          "rect": {
+            "x": 466,
+            "y": 437.5625,
+            "width": 1028,
+            "height": 315.359375
+          }
+        },
+        "right": {
+          "scrollLeft": 620,
+          "scrollWidth": 1648,
+          "clientWidth": 1028
+        },
+        "action": "Actual mouse horizontal wheel over existing overflow wrapper; no DOM scrollLeft/style assignment"
+      },
+      {
+        "id": "G13",
+        "left": {
+          "scrollLeft": 0,
+          "scrollWidth": 1648,
+          "clientWidth": 1028,
+          "rect": {
+            "x": 466,
+            "y": 437.5625,
+            "width": 1028,
+            "height": 315.359375
+          }
+        },
+        "right": {
+          "scrollLeft": 620,
+          "scrollWidth": 1648,
+          "clientWidth": 1028
+        },
+        "action": "Actual mouse horizontal wheel over existing overflow wrapper; no DOM scrollLeft/style assignment"
+      }
+    ],
+    "paletteFit": {
+      "url": "http://127.0.0.1:18778/panels?load=preset-english-nal-report",
+      "palette": {
+        "x": 0,
+        "y": 84,
+        "width": 216,
+        "height": 960
+      },
+      "nodeRects": {
+        "instructions": {
+          "x": 264,
+          "y": 196.56533813476562,
+          "width": 256.89288330078125,
+          "height": 145.40234375
+        },
+        "receipt": {
+          "x": 264,
+          "y": 375.61187744140625,
+          "width": 228.22354125976562,
+          "height": 195.61322021484375
+        },
+        "mode": {
+          "x": 523.228271484375,
+          "y": 531.3045654296875,
+          "width": 147.90802001953125,
+          "height": 122.43768310546875
+        }
+      },
+      "runPosts": 0
+    },
+    "writerCleanup": {
+      "pid": 137358,
+      "listenerJoined": true,
+      "moduleDrained": true,
+      "englishDrained": true,
+      "scopesDrained": true,
+      "ownerCompleted": true,
+      "remainingChildren": 0,
+      "casClosed": true,
+      "guestModulesClosed": true,
+      "guestModulesMountedAfterClose": [],
+      "closedPack": {
+        "bytes": 200761,
+        "sha256": "50de32f457d1206ea949942a2b50eac90b696dce9f8fd92b9be2e681152720c6"
+      }
+    },
+    "reader": {
+      "result": "PASS",
+      "writerPid": 137358.0,
+      "readerPid": 137676,
+      "writerCleanup": {
+        "pid": 137358.0,
+        "listenerJoined": true,
+        "moduleDrained": true,
+        "englishDrained": true,
+        "scopesDrained": true,
+        "ownerCompleted": true,
+        "remainingChildren": 0.0,
+        "casClosed": true,
+        "guestModulesClosed": true,
+        "guestModulesMountedAfterClose": [],
+        "closedPack": {
+          "bytes": 200761.0,
+          "sha256": "50de32f457d1206ea949942a2b50eac90b696dce9f8fd92b9be2e681152720c6"
+        }
+      },
+      "readbacks": [
+        {
+          "cid": "sha256:91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b",
+          "role": "retained-G03-legal-candidate",
+          "bytes": 7939,
+          "sha256": "91d43914bd746319d8532faa8054ee7792b94cb0247ee6fce2935c03f803286b"
+        },
+        {
+          "cid": "sha256:1d6110b5605f06f29c84956fa7476e2d569f755ce059527c61aa46f12f4d7232",
+          "role": "retained-G04-legal-candidate",
+          "bytes": 8080,
+          "sha256": "1d6110b5605f06f29c84956fa7476e2d569f755ce059527c61aa46f12f4d7232"
+        },
+        {
+          "cid": "sha256:150a666f58928235d2964803e34f78734025855d6a8336f087fb46e4d0ba27a3",
+          "role": "retained-G07-legal-candidate",
+          "bytes": 8926,
+          "sha256": "150a666f58928235d2964803e34f78734025855d6a8336f087fb46e4d0ba27a3"
+        },
+        {
+          "cid": "sha256:fc61bb07d007112a5bd2b1ac6195a7c62885add6c46593e477c6dd603be60fed",
+          "role": "retained-G13-legal-candidate",
+          "bytes": 8797,
+          "sha256": "fc61bb07d007112a5bd2b1ac6195a7c62885add6c46593e477c6dd603be60fed"
+        },
+        {
+          "cid": "sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824",
+          "role": "new-genuine-S12-range",
+          "bytes": 5970,
+          "sha256": "06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824"
+        },
+        {
+          "cid": "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a",
+          "role": "new-genuine-S12-range",
+          "bytes": 7568,
+          "sha256": "d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a"
+        },
+        {
+          "cid": "sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+          "role": "original-S12-inspection",
+          "bytes": 10469,
+          "sha256": "b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0"
+        },
+        {
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "role": "original-S12-source",
+          "bytes": 105,
+          "sha256": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+        },
+        {
+          "cid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+          "role": "original-G03-inspection",
+          "bytes": 6003,
+          "sha256": "da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85"
+        },
+        {
+          "cid": "sha256:c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+          "role": "original-G03-source",
+          "bytes": 43,
+          "sha256": "c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b"
+        },
+        {
+          "cid": "sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+          "role": "original-G04-inspection",
+          "bytes": 6240,
+          "sha256": "f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec"
+        },
+        {
+          "cid": "sha256:873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+          "role": "original-G04-source",
+          "bytes": 47,
+          "sha256": "873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1"
+        },
+        {
+          "cid": "sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+          "role": "original-G07-inspection",
+          "bytes": 6555,
+          "sha256": "1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608"
+        },
+        {
+          "cid": "sha256:a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896",
+          "role": "original-G07-source",
+          "bytes": 59,
+          "sha256": "a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896"
+        },
+        {
+          "cid": "sha256:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+          "role": "original-G13-inspection",
+          "bytes": 6908,
+          "sha256": "bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39"
+        },
+        {
+          "cid": "sha256:72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4",
+          "role": "original-G13-source",
+          "bytes": 60,
+          "sha256": "72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4"
+        },
+        {
+          "cid": "sha256:0e4682987e9d093233fd26f50c8435b3287a6e3ff0b7eec6a7d4dbb1e6d5f38c",
+          "role": "current-two-range-corpus-receiptCid",
+          "bytes": 11266,
+          "sha256": "0e4682987e9d093233fd26f50c8435b3287a6e3ff0b7eec6a7d4dbb1e6d5f38c"
+        },
+        {
+          "cid": "sha256:b83b2616d8b433e50e184a208c73822fa09fc10f67ab9f466ffde998bb90867e",
+          "role": "current-two-range-corpus-corpusCid",
+          "bytes": 9227,
+          "sha256": "b83b2616d8b433e50e184a208c73822fa09fc10f67ab9f466ffde998bb90867e"
+        },
+        {
+          "cid": "sha256:20b16662f8ce8c402d1a79114d35141de0bbc2fe19a52226f8b6321c5d52faa2",
+          "role": "current-two-range-corpus-matrixCid",
+          "bytes": 1219,
+          "sha256": "20b16662f8ce8c402d1a79114d35141de0bbc2fe19a52226f8b6321c5d52faa2"
+        }
+      ],
+      "newInspections": [
+        {
+          "receiptCid": "sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824",
+          "selection": {
+            "project": "synthetic-guard-observations-v76",
+            "id": "S12.txt",
+            "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+            "seq": 16
+          },
+          "sourceTextSha256": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "inventory": {
+            "schema": "trikeshed.english-inspection.v1",
+            "reviewStatus": "unreviewed",
+            "authority": "lexical-and-parser-observations-only",
+            "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "extractedTextCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "range": {
+              "begin": 0,
+              "end": 40,
+              "totalLength": 105,
+              "complete": false
+            },
+            "parser": {
+              "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+              "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+              "runtime": {
+                "jar": "stanford-corenlp-4.6.0.jar",
+                "module": "corenlp",
+                "profile": "syntax-v1",
+                "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+                "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+                "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+                "sourceTextCid": "sha256:7ceb04bb92eadb2c16cd6ac40e4366b393da5b064161dccd68b1816066680570",
+                "packageVersion": "4.6.0",
+                "parserInputCid": "sha256:7ceb04bb92eadb2c16cd6ac40e4366b393da5b064161dccd68b1816066680570",
+                "dependencyGraph": "enhanced-plus-plus",
+                "parserNormalization": "identity/1",
+                "relationGlossSource": "parser-input",
+                "dependencyNodeIdentity": "token-index+copy-count/1"
+              },
+              "configuration": {
+                "threads": "1",
+                "annotators": "tokenize,ssplit,pos,lemma,depparse,ner"
+              }
+            },
+            "coverage": {
+              "kind": "bounded-text-range",
+              "semantics": "not-established",
+              "markerMethod": "literal-word-and-phrase-candidates",
+              "dependencyNodeIdentity": "token-index+copy-count/1",
+              "parserDependencyNodeIdentity": "token-index+copy-count/1",
+              "parserNodeIdentityReported": true,
+              "scope": "sentence-token-dependency-observations",
+              "omitted": [
+                "constituency",
+                "coreference",
+                "openie",
+                "kbp",
+                "legal-interpretation"
+              ]
+            },
+            "sentences": [
+              {
+                "index": 0,
+                "begin": 0,
+                "end": 19,
+                "quote": "ALPHA implies BETA.",
+                "quotation": {
+                  "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "extractedTextCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "begin": 0,
+                  "end": 19,
+                  "quote": "ALPHA implies BETA.",
+                  "anchors": [],
+                  "unresolved": [
+                    "page",
+                    "folio",
+                    "section",
+                    "table",
+                    "diagram",
+                    "coordinates"
+                  ],
+                  "category": "document",
+                  "provenance": {
+                    "reviewStatus": "unreviewed",
+                    "extractionKind": "identity-utf8"
+                  },
+                  "authentication": "unverified",
+                  "quotationSource": "extracted-text"
+                },
+                "tokens": [
+                  {
+                    "index": 1,
+                    "begin": 0,
+                    "end": 5,
+                    "word": "ALPHA",
+                    "lemma": "alpha",
+                    "pos": "NN",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 6,
+                    "end": 13,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 14,
+                    "end": 18,
+                    "word": "BETA",
+                    "lemma": "beta",
+                    "pos": "NN",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 18,
+                    "end": 19,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O"
+                  }
+                ],
+                "nodes": [
+                  {
+                    "index": 1,
+                    "begin": 0,
+                    "end": 5,
+                    "word": "ALPHA",
+                    "lemma": "alpha",
+                    "pos": "NN",
+                    "ner": "O",
+                    "id": "1:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 6,
+                    "end": 13,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O",
+                    "id": "2:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 14,
+                    "end": 18,
+                    "word": "BETA",
+                    "lemma": "beta",
+                    "pos": "NN",
+                    "ner": "O",
+                    "id": "3:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 18,
+                    "end": 19,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O",
+                    "id": "4:0",
+                    "copy": 0,
+                    "kind": "token"
+                  }
+                ],
+                "dependencies": [
+                  {
+                    "governor": 0,
+                    "dependent": 2,
+                    "relation": "root",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "0:0",
+                    "dependentNode": "2:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 1,
+                    "relation": "nsubj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "1:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 3,
+                    "relation": "obj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "3:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 4,
+                    "relation": "punct",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "4:0"
+                  }
+                ],
+                "markers": []
+              },
+              {
+                "index": 1,
+                "begin": 20,
+                "end": 39,
+                "quote": "BETA implies GAMMA.",
+                "quotation": {
+                  "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "extractedTextCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "begin": 20,
+                  "end": 39,
+                  "quote": "BETA implies GAMMA.",
+                  "anchors": [],
+                  "unresolved": [
+                    "page",
+                    "folio",
+                    "section",
+                    "table",
+                    "diagram",
+                    "coordinates"
+                  ],
+                  "category": "document",
+                  "provenance": {
+                    "reviewStatus": "unreviewed",
+                    "extractionKind": "identity-utf8"
+                  },
+                  "authentication": "unverified",
+                  "quotationSource": "extracted-text"
+                },
+                "tokens": [
+                  {
+                    "index": 1,
+                    "begin": 20,
+                    "end": 24,
+                    "word": "BETA",
+                    "lemma": "beta",
+                    "pos": "NN",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 25,
+                    "end": 32,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 33,
+                    "end": 38,
+                    "word": "GAMMA",
+                    "lemma": "gamma",
+                    "pos": "NN",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 38,
+                    "end": 39,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O"
+                  }
+                ],
+                "nodes": [
+                  {
+                    "index": 1,
+                    "begin": 20,
+                    "end": 24,
+                    "word": "BETA",
+                    "lemma": "beta",
+                    "pos": "NN",
+                    "ner": "O",
+                    "id": "1:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 25,
+                    "end": 32,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O",
+                    "id": "2:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 33,
+                    "end": 38,
+                    "word": "GAMMA",
+                    "lemma": "gamma",
+                    "pos": "NN",
+                    "ner": "O",
+                    "id": "3:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 38,
+                    "end": 39,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O",
+                    "id": "4:0",
+                    "copy": 0,
+                    "kind": "token"
+                  }
+                ],
+                "dependencies": [
+                  {
+                    "governor": 0,
+                    "dependent": 2,
+                    "relation": "root",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "0:0",
+                    "dependentNode": "2:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 1,
+                    "relation": "nsubj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "1:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 3,
+                    "relation": "obj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "3:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 4,
+                    "relation": "punct",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "4:0"
+                  }
+                ],
+                "markers": []
+              }
+            ],
+            "counts": {
+              "sentences": 2,
+              "tokens": 8,
+              "nodes": 8,
+              "dependencies": 8,
+              "markers": 0
+            }
+          }
+        },
+        {
+          "receiptCid": "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a",
+          "selection": {
+            "project": "synthetic-guard-observations-v76",
+            "id": "S12.txt",
+            "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "rev": "1-sha256:959048af33930aa3cd19af3c06684c4c248e052d4199f3189d70e69bcf909022",
+            "seq": 16
+          },
+          "sourceTextSha256": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "inventory": {
+            "schema": "trikeshed.english-inspection.v1",
+            "reviewStatus": "unreviewed",
+            "authority": "lexical-and-parser-observations-only",
+            "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "extractedTextCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+            "range": {
+              "begin": 40,
+              "end": 105,
+              "totalLength": 105,
+              "complete": false
+            },
+            "parser": {
+              "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+              "implementation": "borg.trikeshed.graal.subvm.CoreNlpRuntime",
+              "runtime": {
+                "jar": "stanford-corenlp-4.6.0.jar",
+                "module": "corenlp",
+                "profile": "syntax-v1",
+                "declared": "edu.stanford.nlp:stanford-corenlp:4.6.0,edu.stanford.nlp:stanford-corenlp:4.6.0:models",
+                "jarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431",
+                "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+                "sourceTextCid": "sha256:b3f5899fa3e3ecc09a506666ac31d54c2ef6e49727df11fea142c68595af1680",
+                "packageVersion": "4.6.0",
+                "parserInputCid": "sha256:b3f5899fa3e3ecc09a506666ac31d54c2ef6e49727df11fea142c68595af1680",
+                "dependencyGraph": "enhanced-plus-plus",
+                "parserNormalization": "identity/1",
+                "relationGlossSource": "parser-input",
+                "dependencyNodeIdentity": "token-index+copy-count/1"
+              },
+              "configuration": {
+                "threads": "1",
+                "annotators": "tokenize,ssplit,pos,lemma,depparse,ner"
+              }
+            },
+            "coverage": {
+              "kind": "bounded-text-range",
+              "semantics": "not-established",
+              "markerMethod": "literal-word-and-phrase-candidates",
+              "dependencyNodeIdentity": "token-index+copy-count/1",
+              "parserDependencyNodeIdentity": "token-index+copy-count/1",
+              "parserNodeIdentityReported": true,
+              "scope": "sentence-token-dependency-observations",
+              "omitted": [
+                "constituency",
+                "coreference",
+                "openie",
+                "kbp",
+                "legal-interpretation"
+              ]
+            },
+            "sentences": [
+              {
+                "index": 0,
+                "begin": 40,
+                "end": 62,
+                "quote": "EPSILON implies GAMMA.",
+                "quotation": {
+                  "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "extractedTextCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "begin": 40,
+                  "end": 62,
+                  "quote": "EPSILON implies GAMMA.",
+                  "anchors": [],
+                  "unresolved": [
+                    "page",
+                    "folio",
+                    "section",
+                    "table",
+                    "diagram",
+                    "coordinates"
+                  ],
+                  "category": "document",
+                  "provenance": {
+                    "reviewStatus": "unreviewed",
+                    "extractionKind": "identity-utf8"
+                  },
+                  "authentication": "unverified",
+                  "quotationSource": "extracted-text"
+                },
+                "tokens": [
+                  {
+                    "index": 1,
+                    "begin": 40,
+                    "end": 47,
+                    "word": "EPSILON",
+                    "lemma": "EPSILON",
+                    "pos": "NNP",
+                    "ner": "ORGANIZATION"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 48,
+                    "end": 55,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 56,
+                    "end": 61,
+                    "word": "GAMMA",
+                    "lemma": "GAMMA",
+                    "pos": "NNP",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 61,
+                    "end": 62,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O"
+                  }
+                ],
+                "nodes": [
+                  {
+                    "index": 1,
+                    "begin": 40,
+                    "end": 47,
+                    "word": "EPSILON",
+                    "lemma": "EPSILON",
+                    "pos": "NNP",
+                    "ner": "ORGANIZATION",
+                    "id": "1:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 48,
+                    "end": 55,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O",
+                    "id": "2:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 56,
+                    "end": 61,
+                    "word": "GAMMA",
+                    "lemma": "GAMMA",
+                    "pos": "NNP",
+                    "ner": "O",
+                    "id": "3:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 61,
+                    "end": 62,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O",
+                    "id": "4:0",
+                    "copy": 0,
+                    "kind": "token"
+                  }
+                ],
+                "dependencies": [
+                  {
+                    "governor": 0,
+                    "dependent": 2,
+                    "relation": "root",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "0:0",
+                    "dependentNode": "2:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 1,
+                    "relation": "nsubj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "1:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 3,
+                    "relation": "obj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "3:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 4,
+                    "relation": "punct",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "4:0"
+                  }
+                ],
+                "markers": []
+              },
+              {
+                "index": 1,
+                "begin": 63,
+                "end": 85,
+                "quote": "EPSILON implies DELTA.",
+                "quotation": {
+                  "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "extractedTextCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "begin": 63,
+                  "end": 85,
+                  "quote": "EPSILON implies DELTA.",
+                  "anchors": [],
+                  "unresolved": [
+                    "page",
+                    "folio",
+                    "section",
+                    "table",
+                    "diagram",
+                    "coordinates"
+                  ],
+                  "category": "document",
+                  "provenance": {
+                    "reviewStatus": "unreviewed",
+                    "extractionKind": "identity-utf8"
+                  },
+                  "authentication": "unverified",
+                  "quotationSource": "extracted-text"
+                },
+                "tokens": [
+                  {
+                    "index": 1,
+                    "begin": 63,
+                    "end": 70,
+                    "word": "EPSILON",
+                    "lemma": "EPSILON",
+                    "pos": "NNP",
+                    "ner": "ORGANIZATION"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 71,
+                    "end": 78,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 79,
+                    "end": 84,
+                    "word": "DELTA",
+                    "lemma": "DELTA",
+                    "pos": "NNP",
+                    "ner": "ORGANIZATION"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 84,
+                    "end": 85,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O"
+                  }
+                ],
+                "nodes": [
+                  {
+                    "index": 1,
+                    "begin": 63,
+                    "end": 70,
+                    "word": "EPSILON",
+                    "lemma": "EPSILON",
+                    "pos": "NNP",
+                    "ner": "ORGANIZATION",
+                    "id": "1:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 71,
+                    "end": 78,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O",
+                    "id": "2:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 79,
+                    "end": 84,
+                    "word": "DELTA",
+                    "lemma": "DELTA",
+                    "pos": "NNP",
+                    "ner": "ORGANIZATION",
+                    "id": "3:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 84,
+                    "end": 85,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O",
+                    "id": "4:0",
+                    "copy": 0,
+                    "kind": "token"
+                  }
+                ],
+                "dependencies": [
+                  {
+                    "governor": 0,
+                    "dependent": 2,
+                    "relation": "root",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "0:0",
+                    "dependentNode": "2:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 1,
+                    "relation": "nsubj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "1:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 3,
+                    "relation": "obj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "3:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 4,
+                    "relation": "punct",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "4:0"
+                  }
+                ],
+                "markers": []
+              },
+              {
+                "index": 2,
+                "begin": 86,
+                "end": 105,
+                "quote": "ALPHA implies BETA.",
+                "quotation": {
+                  "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "extractedTextCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+                  "begin": 86,
+                  "end": 105,
+                  "quote": "ALPHA implies BETA.",
+                  "anchors": [],
+                  "unresolved": [
+                    "page",
+                    "folio",
+                    "section",
+                    "table",
+                    "diagram",
+                    "coordinates"
+                  ],
+                  "category": "document",
+                  "provenance": {
+                    "reviewStatus": "unreviewed",
+                    "extractionKind": "identity-utf8"
+                  },
+                  "authentication": "unverified",
+                  "quotationSource": "extracted-text"
+                },
+                "tokens": [
+                  {
+                    "index": 1,
+                    "begin": 86,
+                    "end": 91,
+                    "word": "ALPHA",
+                    "lemma": "alpha",
+                    "pos": "NN",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 92,
+                    "end": 99,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 100,
+                    "end": 104,
+                    "word": "BETA",
+                    "lemma": "beta",
+                    "pos": "NN",
+                    "ner": "O"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 104,
+                    "end": 105,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O"
+                  }
+                ],
+                "nodes": [
+                  {
+                    "index": 1,
+                    "begin": 86,
+                    "end": 91,
+                    "word": "ALPHA",
+                    "lemma": "alpha",
+                    "pos": "NN",
+                    "ner": "O",
+                    "id": "1:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 2,
+                    "begin": 92,
+                    "end": 99,
+                    "word": "implies",
+                    "lemma": "imply",
+                    "pos": "VBZ",
+                    "ner": "O",
+                    "id": "2:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 3,
+                    "begin": 100,
+                    "end": 104,
+                    "word": "BETA",
+                    "lemma": "beta",
+                    "pos": "NN",
+                    "ner": "O",
+                    "id": "3:0",
+                    "copy": 0,
+                    "kind": "token"
+                  },
+                  {
+                    "index": 4,
+                    "begin": 104,
+                    "end": 105,
+                    "word": ".",
+                    "lemma": ".",
+                    "pos": ".",
+                    "ner": "O",
+                    "id": "4:0",
+                    "copy": 0,
+                    "kind": "token"
+                  }
+                ],
+                "dependencies": [
+                  {
+                    "governor": 0,
+                    "dependent": 2,
+                    "relation": "root",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "0:0",
+                    "dependentNode": "2:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 1,
+                    "relation": "nsubj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "1:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 3,
+                    "relation": "obj",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "3:0"
+                  },
+                  {
+                    "governor": 2,
+                    "dependent": 4,
+                    "relation": "punct",
+                    "governorCopy": 0,
+                    "dependentCopy": 0,
+                    "governorNode": "2:0",
+                    "dependentNode": "4:0"
+                  }
+                ],
+                "markers": []
+              }
+            ],
+            "counts": {
+              "sentences": 3,
+              "tokens": 12,
+              "nodes": 12,
+              "dependencies": 12,
+              "markers": 0
+            }
+          }
+        }
+      ],
+      "currentRows": {
+        "S12": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "S12.txt",
+          "cid": "sha256:f4ed16216f52737c132603a8451851c6e159f749944b375a98255d821d782e62",
+          "rev": "2-sha256:96ac55108b10f42511c3cb6d26062ae539fcd0a620f5d9435babb01345b85bbe",
+          "seq": 18,
+          "length": 106,
+          "contentType": "text/plain"
+        },
+        "G03": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "G03.txt",
+          "cid": "sha256:46272af717d161454bca2c767e53d86a1e0351bd07f1d8a8253877ec0f594802",
+          "rev": "2-sha256:8f8a2f84d5b604758cbd25465d8c87a733148ceed531511ea53fb188e151a62a",
+          "seq": 17,
+          "length": 44,
+          "contentType": "text/plain"
+        },
+        "G04": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "G04.txt",
+          "cid": "sha256:873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+          "rev": "1-sha256:553915a51d8588f154ee13b385dfd035e798b858574fab1698f9594c1965d386",
+          "seq": 2,
+          "length": 47,
+          "contentType": "text/plain"
+        },
+        "G07": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "G07.txt",
+          "cid": "sha256:a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896",
+          "rev": "1-sha256:1ba1a393d8f43606dc6ba4b96082c06b0b67110e6d059b48b640e09fd46ab716",
+          "seq": 5,
+          "length": 59,
+          "contentType": "text/plain"
+        },
+        "G13": {
+          "project": "synthetic-guard-observations-v76",
+          "id": "G13.txt",
+          "cid": "sha256:72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4",
+          "rev": "1-sha256:39b9743eddbb2547755a491134a0df23976d1968bfa78467e0c5021e79f0fbb1",
+          "seq": 11,
+          "length": 60,
+          "contentType": "text/plain"
+        }
+      },
+      "packBeforeOpen": {
+        "bytes": 200761,
+        "sha256": "50de32f457d1206ea949942a2b50eac90b696dce9f8fd92b9be2e681152720c6"
+      },
+      "packAfterClose": {
+        "bytes": 200761,
+        "sha256": "50de32f457d1206ea949942a2b50eac90b696dce9f8fd92b9be2e681152720c6"
+      },
+      "ownerFilesBeforeOpen": {
+        "host/.kanban/board.wal": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "host/.causal.wal": {
+          "bytes": 8,
+          "sha256": "2885a238aeb9e1a5cb5bf87e26995ed7530071c0451bd38eefe3a2d7f6a60592"
+        }
+      },
+      "ownerFilesAfterClose": {
+        "host/.kanban/board.wal": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "host/.causal.wal": {
+          "bytes": 8,
+          "sha256": "2885a238aeb9e1a5cb5bf87e26995ed7530071c0451bd38eefe3a2d7f6a60592"
+        }
+      },
+      "codeSources": {
+        "PackCasStore": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+        "EnglishObservationGraph": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+        "JvmProjectCorpus": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar"
+      },
+      "guestModulesInstalled": [
+        "corenlp"
+      ],
+      "guestModulesMountedAfterClose": [],
+      "guestModulesClosed": true,
+      "closed": true,
+      "scope": "Separate production bounded-reader readback only; original/fresh receipts and historical source availability do not confer current authority after actual amendments"
+    },
+    "origins": {
+      "PackCasStore": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishObservationGraph": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishObservationWire": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "DocumentEnglishWire": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "JvmKanbanServer": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "KanbanModule": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "CouchWire": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "CouchWireRouter": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishNalPreset": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "LcncOutputReceipt": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "CoreNlpRuntime": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishGuardAttachments": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishGuardQueryView": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishLegalGraph": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishCorpusWire": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "EnglishLegalQueryWire": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "SparqlWire": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "SparqlSurface": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "QuadStore": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar",
+      "LcncRunService": "file:/workspace/library-files/english-guard-corpus-v80-proof/snapshot/main.jar"
+    },
+    "actualRuntimeSdk": {
+      "status": "already-mounted-by-default-reader",
+      "processorCodeSource": "file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0.jar",
+      "processorPackageVersion": "4.6.0",
+      "resolvedResourceUrls": {
+        "edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/pos-tagger/english-left3words-distsim.tagger",
+        "edu/stanford/nlp/models/parser/nndep/english_UD.gz": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/parser/nndep/english_UD.gz",
+        "edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz": "jar:file:/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm/corenlp/lib/stanford-corenlp-4.6.0-models.jar!/edu/stanford/nlp/models/ner/english.all.3class.distsim.crf.ser.gz"
+      },
+      "resourceScope": "Resource URLs resolved through the already-mounted production loader after actual parse; availability is not a separate model-use trace"
+    },
+    "sdkClosureAfterRunHashesUnchanged": true,
+    "originalProducerPackAndSelectedSourceBytesUnchanged": true,
+    "originalCopiedPackPrefixUnchanged": true,
+    "finalFactKinds": {
+      "now": 1
+    },
+    "finalPlanes": {
+      "beliefBagPresent": false,
+      "kifBankPresent": false,
+      "narsRetePresent": false,
+      "configuredModelCount": 0,
+      "modelEndpointsPresent": false,
+      "guestInstalled": [
+        "corenlp"
+      ],
+      "guestMounted": [
+        "corenlp"
+      ]
+    },
+    "requests": {
+      "browserContextRequests": 95,
+      "freshParserPosts": 2,
+      "wholeProgramRunPosts": 0,
+      "copularQueryPosts": 0,
+      "externalBrowserRequests": [],
+      "browserErrors": []
+    },
+    "screenshots": {
+      "native-G03-typed-attachment-query-left.png": {
+        "bytes": 22305,
+        "sha256": "7a8063ef137e981c3240154d11df044e42c1b2b4af403a1366363bfb583965bd"
+      },
+      "native-G03-typed-attachment-query-right.png": {
+        "bytes": 18311,
+        "sha256": "06641918b40a6937c4e2d966ba4b56b47af0760035a2750aa87c6d0cd67cb4b8"
+      },
+      "native-G04-typed-attachment-query-left.png": {
+        "bytes": 21831,
+        "sha256": "13cf391664b02ba34ea16dd4e2b4f5f7be8a1fb77fa024ca58ba6de8361f16c3"
+      },
+      "native-G04-typed-attachment-query-right.png": {
+        "bytes": 18142,
+        "sha256": "405855c8246b66815cea9f181202f604de35160e64672e73a8e951c5fd5ea721"
+      },
+      "native-G07-focused-attachment-source-card.png": {
+        "bytes": 57426,
+        "sha256": "13d9f0c08f38da9949bd24555797b0a8534f75f702b37c6b2f038a759a7f6892"
+      },
+      "native-G07-full-english-source-quotation.png": {
+        "bytes": 5502,
+        "sha256": "3546b7d25351a9077de59b861ab72b14af9fc01e2f51e326db510ed5ce318c38"
+      },
+      "native-G07-typed-attachment-query-left.png": {
+        "bytes": 40299,
+        "sha256": "1dd0f8f34d6d105acaad84d406587388e6dd3626f14daf671728b97cb2983b3b"
+      },
+      "native-G07-typed-attachment-query-right.png": {
+        "bytes": 33954,
+        "sha256": "58b6a5dd67a45683454d7347fba7cacce330f69ae5b06335062f5f9cd347ba4c"
+      },
+      "native-G13-focused-attachment-source-card.png": {
+        "bytes": 45305,
+        "sha256": "1541e5425fd450a8112527c80aad7219ee387717e40448781307d7c0547aab26"
+      },
+      "native-G13-full-english-source-quotation.png": {
+        "bytes": 5418,
+        "sha256": "250fe0f0ec1412f61149e7b7cb21e05bb1724af70d2cdeff544c606d0a1d07f4"
+      },
+      "native-G13-typed-attachment-query-left.png": {
+        "bytes": 40037,
+        "sha256": "c7eea30b29fb35b0a9bb344e7486863d50a461eba00ba1cfeb6b250394505106"
+      },
+      "native-G13-typed-attachment-query-right.png": {
+        "bytes": 32564,
+        "sha256": "21d36ef1ef1317c8f88ceddf2e25f1b3292c9216ad6611c0d24f330d85fae4d1"
+      },
+      "native-current-corpus-wordcloud-imply.png": {
+        "bytes": 15466,
+        "sha256": "3b3a52877668647b03a0bc7d1a01816a672bfd1a0ca8eb25c84e59cc113b3220"
+      },
+      "native-guard-currentness-refusal.png": {
+        "bytes": 128190,
+        "sha256": "29aef3fc48b5b459f7c18af9747fc34f0f13872be6d8bd728e7a9bc4b0bf0e80"
+      },
+      "native-imply-concordance-card-0-inspection-0-40.png": {
+        "bytes": 40947,
+        "sha256": "4b9df11fae4679138aea0d6c87d04a72af828b30c6652ee3e3188912c91afc3c"
+      },
+      "native-imply-concordance-card-1-inspection-0-40.png": {
+        "bytes": 41902,
+        "sha256": "19cc15dc96556c27c3a95204841f0cf8ae6ea8f5971018e6e38acfc0d0cdacf7"
+      },
+      "native-imply-concordance-card-2-inspection-40-105.png": {
+        "bytes": 41846,
+        "sha256": "bc9923d074156f87d0c3750419ddeb8ae45b474ba36e8dfe3cc3f66536ba0d61"
+      },
+      "native-imply-concordance-card-3-inspection-40-105.png": {
+        "bytes": 41417,
+        "sha256": "93baf932ee3b72de5ae944e877e4941464dfde4a83a3ed09a28d6fada820c225"
+      },
+      "native-imply-concordance-card-4-inspection-40-105.png": {
+        "bytes": 41302,
+        "sha256": "d16bb29e2c02a3828078bf061648b6677f8bc3c466df495df3f51c29a1aa8e5f"
+      },
+      "native-inert-query-popup-range-0.png": {
+        "bytes": 205265,
+        "sha256": "cad96b676e90734eae560d8d14f2cf9b1a2c620698eb2f994a75e15fb1e159c6"
+      },
+      "native-inert-query-popup-range-40.png": {
+        "bytes": 205429,
+        "sha256": "e46dfc126e040ead919f77d98f65a7796640f00b0fbff734b1c9084b75c5fc99"
+      },
+      "native-old-concordance-current-source-refusal.png": {
+        "bytes": 59716,
+        "sha256": "04bb2e1691add8fdceca94604bd8c49206246996c1c749e8d81ac4bb603f5eb5"
+      },
+      "native-palette-aware-fit-left-controls.png": {
+        "bytes": 240546,
+        "sha256": "ea5c1ff14a7d11cb47b3176420f10799a455a883d854d2b4e1f80e539f19b4a0"
+      }
+    },
+    "scope": "Actual source-linked parser observations, default CoreNLP4.6 syntax range inspections, descriptive corpus/TF and inert whole-inspection navigation. Not legal-gold interpretation, review or world admission, source authenticity/independent entailment, generative provider execution, calibrated confidence, independent model-use tracing, full sealed R4 filesystem or crash recovery.",
+    "priorAttempts": {
+      "v79": "/workspace/library-files/guard-corpus-v79-native-proof/native-attempt2",
+      "meaning": "Originalc929/DocsE1b088 v79 functionaldataPASS retained with unreadable guard table and clipped parent screenshot. Compile1external delimiter failure retained there. None relabelled as fdfa/Docs6e99; v80 is fresh complete first successful compile/native/reader with source-preserving runtime."
+    }
+  },
+  "independentAuditManifest": {
+    "kind": "guard-corpus-independent-audit-files/1",
+    "selectedNativeAttempt": "guard-corpus-v80-native-proof/native-attempt1",
+    "sourceHead": "fdfa355623f03958536089c81e87162e6c8313ff",
+    "files": {
+      "audit.py": {
+        "bytes": 30243,
+        "sha256": "19189b8d5fc1ff32e3053a6aef5f8746274d47112870e698ea39a23966b93a51"
+      },
+      "checks.py": {
+        "bytes": 20905,
+        "sha256": "274ba01ae57e693b4c83332dafbf4793fc09df9e20d08ffb108eebdaa6e431c9"
+      },
+      "receipt-core.py.txt": {
+        "bytes": 33996,
+        "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+      },
+      "README.txt": {
+        "bytes": 4843,
+        "sha256": "663ba18cf05ae51fe833acb3095efbc5d30a2e4c9c3fc57644fc10fc8333f6ce"
+      },
+      "final-v80-strict/result.json": {
+        "bytes": 17196,
+        "sha256": "4fada18998d4e93ff8baf5f223f7d23845bfd2ccf81593ab7b20276468b30078"
+      },
+      "final-v80-strict/report.txt": {
+        "bytes": 2480,
+        "sha256": "429796ae69870c639687f97ef31de2362d24353205a97d31b7e67d9272f017bb"
+      },
+      "final-v80-recorded/result.json": {
+        "bytes": 17204,
+        "sha256": "0027f49108df5f401e10dfb16d553b3b18f74c2c4b3cab473ea7c4172af4d2b8"
+      },
+      "final-v80-recorded/report.txt": {
+        "bytes": 2488,
+        "sha256": "11970153b79ec78c837a3e19a96665e2102dbb8a496eef2abadb3114c5183639"
+      }
+    }
+  },
+  "rootPublicReplay": {
+    "result": "PASS_EXACT_RECORDED_DATA_REPLAY",
+    "files": 281,
+    "rawBytes": 31410956,
+    "archiveSha256": "3052e1497dc56dfdd35c7b078a29ef09e4a4580322c09642a5017904f6eaff50",
+    "resultSha256": "0027f49108df5f401e10dfb16d553b3b18f74c2c4b3cab473ea7c4172af4d2b8"
+  },
+  "publicEvidenceCommit": "2be644ade31886ecc9d9fdfbee3e70f77f9a516c",
+  "screenshotsRootViewed": [
+    "G07 right-scroll readable typed table",
+    "G13 nested source article and full sentence quotation",
+    "wordcloud imply five occurrences",
+    "concordance sentence40-62 originalinspection40-105",
+    "palette-aware Fit left controls unobscured"
+  ]
+}
