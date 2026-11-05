@@ -167,7 +167,7 @@ object EnglishRelationFrames {
                     "bindings" j binding, "predicateNode" j head, "subjectNode" j subject, "objectNode" j obj,
                     "dependencies" j sentence["dependencies"], "markers" j sentence["markers"], "guardObservations" j guard,
                     "unresolved" j _l["role-observations-only", "entity-identity-not-established", "polarity-and-guard-scope-not-established", "legal-force-not-established"],
-                    "basis" j _l[snapshot.source.originalCid.value, snapshot.source.extractedTextCid.value].distinct().sorted()))
+                    "basis" j _l[snapshot.source.originalCid.value, snapshot.source.extractedTextCid.value].distinct().sorted()])
             }
             if (candidates.isEmpty()) excluded.add(_m["sentenceIndex" j index, "reasons" j reasons.distinct(),
                 "dependencies" j sentence["dependencies"], "markers" j sentence["markers"], "guardObservations" j guard])
@@ -178,7 +178,7 @@ object EnglishRelationFrames {
             "status" j if (frames.isEmpty()) "NO_SUPPORTED_OBSERVATIONS" else "OBSERVED",
             "guardProjection" j "existing-EnglishLegalPatterns-over-recorded-inspection-not-parser-execution",
             "sourceBasis" j _l[snapshot.source.originalCid.value, snapshot.source.extractedTextCid.value].distinct().sorted(),
-            "authority" j "recorded-parser-roles-only", "admission" j "not-performed", "countsAreEvidence" j false)
+            "authority" j "recorded-parser-roles-only", "admission" j "not-performed", "countsAreEvidence" j false]
         require(CanonicalCbor.encodeMap(value).size <= MAX_BYTES) { "Relation report limit" }
         return Report(snapshot, value, frames, query, results)
     }
@@ -196,6 +196,6 @@ object EnglishRelationFrames {
         quote + _m["inspectionCid" j report.snapshot.receiptCid.value, "frameCid" j report.cid.value,
             "occurrenceCid" j frame["occurrenceCid"], "subjectNodeIri" j frame["subjectNodeIri"],
             "predicateNodeIri" j frame["predicateNodeIri"], "objectNodeIri" j frame["objectNodeIri"],
-            "basis" j frame["basis"], "meaning" j "one recorded role occurrence, not an independent evidence vote")
+            "basis" j frame["basis"], "meaning" j "one recorded role occurrence, not an independent evidence vote"]
     }
 }
