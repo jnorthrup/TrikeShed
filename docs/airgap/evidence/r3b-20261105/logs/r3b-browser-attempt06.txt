@@ -1,0 +1,84 @@
+driver 1 fixture 0
+apiRequestContext.get: socket hang up
+Call log:
+[2m  - → GET http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3Ae9f8ec6a3b76b6f7919592721ef4af3705b43488aa83fe8be7d418846b372289[22m
+[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36[22m
+[2m    - accept: */*[22m
+[2m    - accept-encoding: gzip,deflate,br[22m
+
+    at /workspace/airgap-r3b-proof/driver.cjs:71:44 {
+  log: [
+    '  - → GET http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3Ae9f8ec6a3b76b6f7919592721ef4af3705b43488aa83fe8be7d418846b372289',
+    '    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36',
+    '    - accept: */*',
+    '    - accept-encoding: gzip,deflate,br'
+  ],
+  name: 'Error'
+}
+
+accepted conn=16
+[BIND] conn=16 frame complete proto=Http bytes=555 seq-alloc
+[BIND] conn=16 accept ok=true
+[BIND] accepted conn=17
+[BIND] conn=17 frame complete proto=Http bytes=555 seq-alloc
+[BIND] conn=17 accept ok=true
+[BIND] accepted conn=18
+[BIND] conn=18 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=18 accept ok=true
+[BIND] accepted conn=19
+[BIND] conn=19 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=19 accept ok=true
+[BIND] accepted conn=20
+[BIND] conn=20 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=20 accept ok=true
+[BIND] accepted conn=21
+[BIND] conn=21 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=21 accept ok=true
+[BIND] accepted conn=22
+[BIND] conn=22 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=22 accept ok=true
+[BIND] accepted conn=23
+[BIND] conn=23 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=23 accept ok=true
+[BIND] accepted conn=24
+[BIND] conn=24 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=24 accept ok=true
+[BIND] accepted conn=25
+[BIND] conn=25 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=25 accept ok=true
+[BIND] accepted conn=26
+[BIND] conn=26 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=26 accept ok=true
+[BIND] accepted conn=27
+[BIND] conn=27 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=27 accept ok=true
+[BIND] accepted conn=28
+[BIND] conn=28 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=28 accept ok=true
+[BIND] accepted conn=29
+[BIND] conn=29 frame complete proto=Http bytes=809 seq-alloc
+[BIND] conn=29 accept ok=true
+[BIND] accepted conn=30
+[BIND] conn=30 frame complete proto=Http bytes=672 seq-alloc
+[BIND] conn=30 accept ok=true
+[BIND] accepted conn=31
+[BIND] conn=31 frame complete proto=Http bytes=329 seq-alloc
+[BIND] conn=31 accept ok=true
+[BIND] accepted conn=32
+[BIND] conn=32 frame complete proto=Http bytes=329 seq-alloc
+[BIND] conn=32 accept ok=true
+[BIND] conn=32 frame complete proto=Http bytes=329 seq-alloc
+[BIND] conn=32 accept ok=true
+[BIND] accepted conn=33
+[BIND] conn=33 frame complete proto=Http bytes=596 seq-alloc
+[BIND] conn=33 accept ok=true
+[BIND] accepted conn=34
+[BIND] conn=34 frame complete proto=Http bytes=2861 seq-alloc
+[BIND] conn=34 accept ok=true
+[BIND] accepted conn=35
+[BIND] conn=35 frame complete proto=Http bytes=672 seq-alloc
+[BIND] conn=35 accept ok=true
+[BIND] accepted conn=36
+[BIND] conn=36 frame complete proto=Http bytes=202 seq-alloc
+[BIND] conn=36 accept ok=true
+

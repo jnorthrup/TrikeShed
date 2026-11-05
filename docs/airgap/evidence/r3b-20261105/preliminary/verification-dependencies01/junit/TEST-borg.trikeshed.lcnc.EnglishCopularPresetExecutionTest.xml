@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishCopularPresetExecutionTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T00:02:10.472Z" hostname="0d6dfba25614" time="0.499">
+  <properties/>
+  <testcase name="actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm]" classname="borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest" time="0.211"/>
+  <testcase name="currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm]" classname="borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest" time="0.208"/>
+  <testcase name="forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm]" classname="borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest" time="0.079"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

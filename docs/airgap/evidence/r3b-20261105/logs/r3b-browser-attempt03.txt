@@ -1,0 +1,36 @@
+driver 1 fixture 1
+page.waitForResponse: Timeout 120000ms exceeded while waiting for event "response"
+    at /workspace/airgap-r3b-proof/driver.cjs:44:24 {
+  log: [],
+  name: 'TimeoutError'
+}
+
+linx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(Unknown Source)
+	at proof.airgap.FixtureKt.main(Fixture.kt:23)
+Caused by: java.lang.IllegalStateException: Board actions failed
+	at borg.trikeshed.kanban.BoardActionElement$drain$2.invokeSuspend(BoardActionElement.kt:207)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	... 10 more
+Caused by: java.lang.IllegalAccessError: class borg.trikeshed.lcnc.LcncConfixSelection$select$value$$inlined$α$1 tried to access private method 'java.lang.Object borg.trikeshed.lcnc.LcncConfixSelection.select$value(borg.trikeshed.lib.Join)' (borg.trikeshed.lcnc.LcncConfixSelection$select$value$$inlined$α$1 and borg.trikeshed.lcnc.LcncConfixSelection are in unnamed module of loader 'app')
+	at borg.trikeshed.lcnc.LcncConfixSelection$select$value$$inlined$α$1.invoke(Join.kt:200)
+	at borg.trikeshed.lib.SeriesKt$toList$1.get(Series.kt:42)
+	at kotlin.collections.AbstractList$IteratorImpl.next(AbstractList.kt:89)
+	at borg.trikeshed.parse.ValueBudget.violation$visit(ValueBudget.kt:28)
+	at borg.trikeshed.parse.ValueBudget.violation$visit(ValueBudget.kt:26)
+	at borg.trikeshed.parse.ValueBudget.violation$visit(ValueBudget.kt:26)
+	at borg.trikeshed.parse.ValueBudget.violation(ValueBudget.kt:34)
+	at borg.trikeshed.lcnc.LcncInvocationLedger$Invocation.capture(LcncInvocationLedger.kt:20)
+	at borg.trikeshed.lcnc.LcncInvocationLedger$Invocation.finish(LcncInvocationLedger.kt:36)
+	at borg.trikeshed.lcnc.LcncRunner.runRing(LcncRunner.kt:960)
+	at borg.trikeshed.lcnc.LcncRunner.access$runRing(LcncRunner.kt:124)
+	at borg.trikeshed.lcnc.LcncRunner$runRing$1.invokeSuspend(LcncRunner.kt)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:807)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+	Suppressed: kotlinx.coroutines.internal.DiagnosticCoroutineContextException: [StandaloneCoroutine{Cancelled}@7133537, Dispatchers.Default]
+

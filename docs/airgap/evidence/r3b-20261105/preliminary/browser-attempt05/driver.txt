@@ -1,0 +1,10 @@
+AssertionError [ERR_ASSERTION]: Quotation must be visible in the recorded viewport
+    at inspectText (/workspace/airgap-r3b-proof/driver.cjs:42:3)
+    at async /workspace/airgap-r3b-proof/driver.cjs:74:20 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}

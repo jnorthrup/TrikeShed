@@ -4,8 +4,10 @@ R3b connects a substantial retained legal document to the existing LCNC walk,
 real LLVM Confix scanning, deterministic passage selection and browser source
 inspection. This is a document traversal increment. It does not decide the
 legal dispute, evaluate a Nix expression or replace the curator's managed NLP
-and review owners. Verification and publication are pending while this
-checkpoint is under test.
+and review owners. The bounded Linux x86-64 increment is verified; its
+[exact evidence](evidence/r3b-20261105/verification.json) and
+[D3M record](../d3m/2026-11-05-airgap-r3b.md) distinguish accepted runs,
+failed attempts and remaining gates.
 
 ## Source and interpretation boundary
 
@@ -213,3 +215,53 @@ deadline. Using the pinned known fixture does not establish a bounded hostile
 PDF ingestion service. The network-isolated proof uses staged toolchains and
 caches. Portable runtime/dependency closure and clean-machine installation
 remain the separate R4 gate.
+
+## Verified checkpoint — 2026-11-05
+
+The actual production extraction is 23,021 UTF-8 bytes, 22,686 UTF-16 units,
+with 431 line anchors across all 12 physical pages. Its SHA-256 is
+`593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801`.
+The selected half-open range `[18477, 18654)` contains 177 UTF-16 units on
+physical page 10. It is this exact derivative passage, including its retained
+line break and hyphenation:
+
+```text
+took this case to decide whether, under the FAA, a court or
+an arbitrator decides which of the two contractual provi-
+sions controls. We decline to consider auxiliary questions
+```
+
+The native invocation scanned a 2,028-byte JSON batch into 151 rows. The
+selection used those copied rows after bridge buffers had been released.
+The receipt retained all eight actual consumed-wire observations with zero
+owner omissions, plus both consumed project revisions. Source loading and
+quotation verification caused no additional execution.
+
+All **149 selected JVM regressions** passed, with zero failures, errors or
+skips. All JVM main and test sources compile. JS main, Documents and Spacegraph
+production bundles, Wasm-JS, Wasm-WASI and Linux x64 compiled using pre-staged
+caches in OS network namespaces with loopback only. These are selected
+regressions and target compilation, not the full repository test suite.
+
+The final production browser passed **nine document cases** and **11 earlier
+animation/replay cases** on the recorded JVM/browser artifacts. Document cases
+cover actual moving consumed wire and node-boundary pause, native quotation,
+durable transfer identities, complete extracted-text display, native evidence,
+replay without another run, refusal after a semantic edit, a delayed output
+read superseded by replay, and reopening without native runners. The final
+source and quotation panes avoid the generic result-height cap; raw output
+fields remain available in a collapsed disclosure. Browser geometry assertions
+and screenshot inspection establish that the quotation is visible.
+
+The reopened proof uses a fresh module context against the same disk-backed
+store inside the same JVM. Native owners are drained before reopening. The
+immutable invocation ledger remains byte-identical; source hashing and exact
+quotation verification still succeed. A fresh process/root filesystem remains
+part of R4, not an implied property of this check.
+
+Failed probes remain retained: an invalid ProjectDoc wire declaration, an
+omitted fixture registry, exact integer transport comparison, optional-port
+aliases, and a JVM access error in deferred recursive array projection. A
+successful but clipped screenshot precedes the final readable browser build.
+The verification manifest qualifies each artifact; no earlier failure is
+relabelled as acceptance.

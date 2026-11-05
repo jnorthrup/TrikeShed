@@ -1,0 +1,4 @@
+From https://github.com/jnorthrup/TrikeShed
+   c8b7f5e8a..d55dff57d  codex/english-query-handoff-integration-20261104 -> origin/codex/english-query-handoff-integration-20261104
+ * [new branch]          codex/english-query-handoff-v72-evidence-20261105 -> origin/codex/english-query-handoff-v72-evidence-20261105
+   5b7af601b..d55dff57d  master     -> origin/master

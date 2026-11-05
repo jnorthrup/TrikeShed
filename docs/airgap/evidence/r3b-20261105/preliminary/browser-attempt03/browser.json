@@ -1,0 +1,54 @@
+{
+  "scope": "Production project miner, retained document source, bounded passages, LLVM scanner and native geometry selection; local transport fixture",
+  "cases": {
+    "nativeBoundaryPause": {
+      "result": "PASS",
+      "before": "selection",
+      "wire": 2,
+      "positions": [
+        [
+          "866.40625",
+          "155.1382598876953"
+        ],
+        [
+          "876.9783935546875",
+          "152.6369171142578"
+        ]
+      ],
+      "caption": "OBSERVED TRANSFERS\nObserved execution · delayed display · 5074044e-12bb-4c42-a620-26a3e2825a0b 3 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:c50b41725f9bb5a8be81fd266e04a2784e84394f3edea0a38fcc89e29a54171b\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:7dfe0db169dc98817b64d92514c65145ebc50c0669e22d5f5425ce6bbc2bb11d\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:8ad73a1f79b7c9e4c01fd27b3167c1d1c515a81c4f326201f5ad6183c89b370b\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":0.8}},\"inputs\":{},\"debugToken\":\"19b944b5-d771-4f83-bd64-68fd1e82bd4a\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"19b944b5-d771-4f83-bd64-68fd1e82bd4a\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"5074044e-12bb-4c42-a620-26a3e2825a0b\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"19b944b5-d771-4f83-bd64-68fd1e82bd4a\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"5074044e-12bb-4c42-a620-26a3e2825a0b\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"19b944b5-d771-4f83-bd64-68fd1e82bd4a\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"5074044e-12bb-4c42-a620-26a3e2825a0b\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"19b944b5-d771-4f83-bd64-68fd1e82bd4a\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"5074044e-12bb-4c42-a620-26a3e2825a0b\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"19b944b5-d771-4f83-bd64-68fd1e82bd4a\",\"ordinal\":5,\"action\":\"continue\",\"runId\":\"5074044e-12bb-4c42-a620-26a3e2825a0b\"}"
+    }
+  ],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "11c15bd58fd2f53eb2fb0ecae14c94d45a6d8a73b2826f80408ed848a1201fa9",
+    "bytes": 1805302
+  },
+  "failure": "page.waitForResponse: Timeout 120000ms exceeded while waiting for event \"response\"\n    at /workspace/airgap-r3b-proof/driver.cjs:44:24"
+}

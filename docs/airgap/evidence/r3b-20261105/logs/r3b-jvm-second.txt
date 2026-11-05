@@ -1,0 +1,819 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as configuration cache cannot be reused because environment variable 'CODEX_TOOL_CALL_ID' has changed.
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildJvmKernels UP-TO-DATE
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateComposeResClass SKIPPED
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :fetchSumoCorpus UP-TO-DATE
+> Task :generateForgeAssets UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+> Task :compileKotlinJvm
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/CouchKeyStore.kt:127:34 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HarnessSource.kt:392:42 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:150:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:150:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:190:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:190:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:199:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:199:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:289:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:289:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:321:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:321:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:371:33 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:486:69 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/HermesCredentialSource.kt:486:87 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/KeyMux.kt:348:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/KeyMux.kt:348:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/KeyMux.kt:654:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/keymux/KeyMux.kt:654:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbContext.kt:142:31 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbContext.kt:142:50 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbContext.kt:483:58 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbContext.kt:483:77 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbElement.kt:76:26 Unnecessary safe call on a non-null receiver of type 'BreadcrumbStore'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbFileStore.kt:37:54 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:63:21 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:63:40 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:117:70 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:117:89 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:142:66 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:142:85 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:214:31 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReel.kt:214:50 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReelStore.kt:25:31 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbReelStore.kt:25:50 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:302:39 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:302:58 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:393:42 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:393:61 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:431:54 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:431:73 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:491:35 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:491:54 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:532:93 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:532:112 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:586:72 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:586:91 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:597:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:597:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:607:54 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:607:73 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:619:46 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:619:65 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:638:92 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:638:111 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:650:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:650:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:794:35 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:794:54 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:805:46 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:805:65 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:831:40 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:831:59 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:880:81 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:880:100 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:892:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/ModelMux.kt:892:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/MuxActivity.kt:64:13 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/MuxActivity.kt:64:32 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/MuxActivity.kt:71:23 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/MuxActivity.kt:71:42 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/QuotaHttp.kt:48:27 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/QuotaHttp.kt:48:46 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/QuotaHttp.kt:75:41 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/QuotaHttp.kt:76:26 'fun Instant.toLocalDateTime(timeZone: TimeZone): LocalDateTime' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/QuotaHttp.kt:77:28 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/QuotaLegion.kt:262:30 Unnecessary safe call on a non-null receiver of type 'QuotaLegion.Meter'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/agent/modelmux/QuotaLegion.kt:262:53 Unnecessary safe call on a non-null receiver of type 'QuotaLegion.Meter'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsRaidImage.kt:196:67 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/btrfs/DurableTodoQueue.kt:146:26 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/btrfs/DurableTodoQueue.kt:146:45 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cas/CasReplicationElement.kt:59:51 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cas/CursorTrie.kt:241:50 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cas/CursorTrie.kt:489:50 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cas/LineCas.kt:437:23 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ccek/ArticulatedNode.kt:97:24 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/charstr/CharStr.kt:79:93 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/charstr/CharStrCached.kt:215:53 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/SlabKernel.kt:22:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/btrfs/TinyBtrfsContract.kt:39:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/btrfs/TinyBtrfsContract.kt:43:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/btrfs/TinyBtrfsContract.kt:124:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/duckdb/MiniDuckContract.kt:14:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/duckdb/MiniDuckContract.kt:15:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/duckdb/MiniDuckContract.kt:16:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/duckdb/MiniDuckContract.kt:17:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/duckdb/MiniDuckContract.kt:61:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/duckdb/MiniDuckContract.kt:62:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/facet/FacetedCursorContract.kt:33:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/facet/FacetedCursorContract.kt:51:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/facet/FacetedCursorContract.kt:78:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/classfile/slab/facet/FacetedCursorContract.kt:175:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/CircularQueue.kt:38:30 Unnecessary safe call on a non-null receiver of type '(T (of class CirQlar<T>)) -> Unit'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:38:62 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:38:81 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:43:67 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:43:86 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:48:63 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:48:82 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:54:65 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:54:84 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:65:18 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:65:37 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/StrictFibonacciHeap.kt:142:51 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/_m.kt:19:107 Unchecked cast of 'Pair<K (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get), V (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get)>' to 'T (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/Cbor.kt:170:25 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:100:37 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:101:44 Unchecked cast of 'Any?' to 'V? (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:120:54 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:120:88 Unchecked cast of 'Any?' to 'V? (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:138:54 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:139:44 Unchecked cast of 'Any?' to 'V? (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:162:45 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:162:66 Unchecked cast of 'Any?' to 'V (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/multiindex/MultiIndexContainer.kt:114:85 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/lcnc/LcncFanoutElement.kt:55:38 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/lcnc/LcncFanoutElement.kt:57:48 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/lcnc/LcncFanoutElement.kt:57:67 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/nuid/SignalJobBridgeElement.kt:217:27 'fun CoroutineScope.launch(context: Job, start: CoroutineStart = ..., block: suspend CoroutineScope.() -> Unit): Job' is deprecated. Passing a Job to coroutine builders breaks structured concurrency, leading to hard-to-diagnose errors. This pattern should be avoided. This overload will be deprecated with an error in the future.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:33:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:35:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:36:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:37:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:38:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:39:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:40:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:98:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:99:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:100:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:103:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:104:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:105:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:106:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:107:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:108:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:109:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:110:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:111:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:112:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:113:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:114:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:115:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:116:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:117:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:118:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:120:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpPacket.kt:121:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpTcb.kt:227:5 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpTcb.kt:467:27 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SctpTcb'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpTcb.kt:467:65 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SctpTcb'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpTcb.kt:467:79 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SctpTcb'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpTcb.kt:467:129 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SctpTcb'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/sctp/SctpUdpPort.kt:385:22 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ConfixDocStore.kt:23:27 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ConfixDocStore.kt:63:79 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ConfixDocStore.kt:107:35 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/CouchChangesFactElement.kt:69:36 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/CouchHeadProjection.kt:194:79 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IntArray'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/CouchReportReactorElement.kt:102:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/CouchReportReactorElement.kt:102:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/IncrementalViewElement.kt:70:48 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ViewServer.kt:41:23 Unchecked cast of 'Comparable<*>' to 'Comparable<Any>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/persistence/DurableCouchPersistence.kt:79:29 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/persistence/DurableCouchPersistence.kt:81:30 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/CursorOps.kt:21:10 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/CursorTensor.kt:281:92 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/ReifiedSplitSeries2.kt:29:62 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/ReifiedSplitSeries2.kt:38:117 Unchecked cast of 'Join<Int, (Int) -> Any?>?' to 'Join<Int, (Int) -> () -> ColumnMeta>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:34:41 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:63:41 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:113:38 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:127:65 Unchecked cast of 'Join<*, *>' to 'Join<Int, *>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/dht/routing/RoutingEvent.kt:44:35 Unchecked cast of 'RoutingEventElement<*>?' to 'RoutingEventElement<TNum (of fun <TNum : Comparable<TNum>> publishRoutingEvent)>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:232:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:232:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeDoc.kt:540:58 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeWorkspace.kt:76:28 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeWorkspace.kt:76:47 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ForgeSurfaceProjection.kt:235:17 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ForgeSurfaceProjection.kt:235:36 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ModelMuxSurfaceProjection.kt:78:17 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ModelMuxSurfaceProjection.kt:78:36 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ReteFireSurfaceProjection.kt:177:21 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ReteFireSurfaceProjection.kt:177:40 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:62:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:62:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:91:17 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:91:36 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:130:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:130:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:314:25 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:314:44 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:329:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:329:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:341:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/SessionBlackboardAdapter.kt:341:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/board/ForgeCommands.kt:89:54 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/board/ForgeCommands.kt:89:73 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/board/ForgeCommands.kt:114:59 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/board/ForgeCommands.kt:114:78 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:28:40 Unchecked cast of 'Any?' to 'List<Any>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:29:46 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:74:44 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:79:71 Unchecked cast of 'Any?' to 'List<String>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:96:34 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:96:53 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:165:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:165:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/window/ForgeWindowManager.kt:39:86 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/window/ForgeWindowManager.kt:39:105 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/BlackboardNeighbors.kt:80:35 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Any'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:162:47 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:162:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:176:47 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:176:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:196:47 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:196:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/console/Projection.kt:171:65 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Char'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/console/Projection.kt:173:38 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Char'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/subvm/PythonSocketElement.kt:29:13 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/subvm/PythonSocketElement.kt:139:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/subvm/PythonSocketElement.kt:279:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/subvm/PythonSocketElement.kt:285:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graph/query/CausalGraphAdapter.kt:44:41 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/htx/HtxReactorElement.kt:63:41 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/htx/HtxReactorElement.kt:97:43 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/htx/TrikeHtxHttpClient.kt:32:11 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsNode.kt:33:64 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsNode.kt:46:43 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsNode.kt:92:65 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsPublisher.kt:72:43 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsPublisher.kt:79:21 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsPublisher.kt:138:23 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsRecord'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/IsamWireProtoDsl.kt:103:64 Unchecked cast of 'Array<Any?>' to 'Array<Synapse? (of fun <Synapse> create)>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/IsamWireProtoDsl.kt:214:35 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/IsamWireProtoDsl.kt:214:54 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:84:32 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:84:42 'fun Instant.toLocalDateTime(timeZone: TimeZone): LocalDateTime' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:85:42 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:98:11 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:100:35 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:101:40 'val epochSeconds: Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:102:42 'val nanosecondsOfSecond: Int' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:109:13 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:170:37 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:182:32 Unchecked cast of 'Join<Int, (Int) -> ColumnMeta>' to 'Join<Int, (Int) -> RecordMeta>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileReader.kt:304:32 Unchecked cast of 'Join<Int, (Int) -> ColumnMeta>' to 'Join<Int, (Int) -> RecordMeta>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:49:50 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:56:50 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:137:16 This extension is shadowed by a member: 'val operationName: String' defined in 'borg.trikeshed.job.JobCommand'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobRepository.kt:91:46 Unnecessary non-null assertion (!!) on a non-null receiver of type 'JobCheckpoint'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:79:57 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:80:60 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:81:52 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:82:64 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/PackCasStore.kt:49:50 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/BoardActionElement.kt:105:15 'fun CoroutineScope.launch(context: Job, start: CoroutineStart = ..., block: suspend CoroutineScope.() -> Unit): Job' is deprecated. Passing a Job to coroutine builders breaks structured concurrency, leading to hard-to-diagnose errors. This pattern should be avoided. This overload will be deprecated with an error in the future.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/BoardClaimWorker.kt:480:87 Unnecessary safe call on a non-null receiver of type 'Map<*, *>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt:389:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'JobSnapshot'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt:405:88 Unnecessary safe call on a non-null receiver of type 'CardRow'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt:754:50 Unnecessary safe call on a non-null receiver of type 'CardRow'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeBoardFSM.kt:250:33 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeBoardFSM.kt:250:52 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanDaemon.kt:221:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanDaemon.kt:221:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:105:86 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanGraphConfix.kt:38:80 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanGraphConfix.kt:39:162 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:313:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:313:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/SessionCard.kt:29:28 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/SessionCard.kt:29:47 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/SessionCard.kt:311:65 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/SessionCard.kt:311:84 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kernel/KernelElement.kt:65:93 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:186:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:186:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:297:52 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:297:71 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:328:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:328:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:413:54 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:413:73 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:415:52 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:415:71 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/CcekConstruction.kt:25:33 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/CouncilCaseRegistry.kt:343:91 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/CouncilNodes.kt:448:56 Unnecessary safe call on a non-null receiver of type 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/DocumentCurationTasks.kt:199:35 Unnecessary safe call on a non-null receiver of type 'Map<*, *>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt:57:47 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt:149:29 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt:202:26 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt:243:29 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt:401:78 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt:444:23 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:35:35 Unchecked cast of 'Any?' to 'List<List<Any?>>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:39:27 Unchecked cast of 'Map<*, *>' to 'Map<String, String>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:58:35 Unchecked cast of 'Any?' to 'List<List<Any?>>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:59:41 Unchecked cast of 'Any?' to 'List<Map<String, String>>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:63:57 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:93:41 Unchecked cast of 'Any?' to 'List<Map<String, String>>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:104:35 Unchecked cast of 'Any?' to 'List<List<Any?>>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTreeShake.kt:21:87 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTreeShake.kt:195:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<LcncTreeShake.CandidatePair>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTypeCheck.kt:332:59 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTypeCheck.kt:342:37 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:78:30 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:78:49 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:83:45 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:83:64 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:93:49 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:93:68 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:131:48 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:131:67 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/TribunalNodes.kt:148:49 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/TribunalNodes.kt:149:59 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/ccek/LcncWorkgroupElement.kt:301:55 Unnecessary safe call on a non-null receiver of type 'Map<*, *>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/rollup/RollupReducer.kt:25:17 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Densification.kt:16:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FacetedRow.kt:14:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FibonacciReporter.kt:56:21 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FibonacciReporter.kt:56:40 'fun plus(duration: Duration): Instant' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FibonacciReporter.kt:56:56 'fun Instant.toLocalDateTime(timeZone: TimeZone): LocalDateTime' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/IntAccumulator.kt:7:67 'expect class IntAccumulator : CoroutineContext.Element' is deprecated. Resolve via IntAccumulator.Key in coroutine context.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/System.kt:15:12 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/System.kt:16:12 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/System.kt:16:73 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twin.kt:15:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twin.kt:28:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:7:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:10:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:13:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:16:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:19:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/longp/LineScan.kt:24:22 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/longp/LineScan.kt:60:22 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:135:48 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:165:46 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:180:46 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:186:46 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:235:48 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:248:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:248:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:275:45 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:297:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:297:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:343:48 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:28:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:55:60 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:59:20 'constructor(packed: Long): BudgetCoord' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:63:35 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:63:49 'constructor(packed: Long): BudgetCoord' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:66:21 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:66:35 'constructor(packed: Long): BudgetCoord' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:82:17 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:95:18 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:105:18 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:115:44 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/mcp/McpLineServer.kt:141:71 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/mcp/McpToolServer.kt:131:36 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/memory/ontology/MemoryPhaseElements.kt:79:30 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/memory/ontology/MemoryPhaseElements.kt:141:30 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:175:56 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:176:62 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/modelmux/BrainClient.kt:313:54 Unnecessary non-null assertion (!!) on a non-null receiver of type 'KeyMux'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/modelmux/BrainClient.kt:595:20 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/modelmux/BrainClient.kt:595:39 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/modelmux/ModelResponse.kt:104:43 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/modelmux/ModelResponse.kt:104:62 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/CuratorLedger.kt:46:32 Elvis operator (?:) always returns the left operand of non-nullable type 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/DocumentCuratorGrounding.kt:197:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Int'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/DocumentToolReceipt.kt:43:53 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/DocumentToolReceipt.kt:43:72 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/HijackBeliefBag.kt:67:13 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/HijackBeliefBag.kt:68:13 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/HijackBeliefBag.kt:69:13 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/JevaElement.kt:237:48 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/JevaHead.kt:153:67 Wrapping the left-hand side of assignments in parentheses, labels or annotations is not allowed. This will become an error in a future release. See https://youtrack.jetbrains.com/issue/KT-70507.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/SourceScopedQuery.kt:127:39 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/panama/PanamaInduction.kt:25:21 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/panama/PanamaInduction.kt:25:40 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:304:16 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:406:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Join<Int, (Int) -> Char>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:406:74 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Join<Int, (Int) -> Char>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:104:27 This declaration needs opt-in. Its usage should be marked with '@kotlinx.serialization.ExperimentalSerializationApi' or '@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)'
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:182:51 This declaration needs opt-in. Its usage should be marked with '@kotlinx.serialization.ExperimentalSerializationApi' or '@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)'
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:226:18 Base declaration of supertype 'CompositeDecoder' needs opt-in. The declaration override should be annotated with '@kotlinx.serialization.ExperimentalSerializationApi' or '@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)'
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/RowVecBuilder.kt:236:13 Check for instance is always 'true'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/TypeDefOracle.kt:147:17 Condition is always 'false'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/csv/CSVUtil.kt:21:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/csv/CsvBitmap.kt:130:51 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:671:28 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlEval.kt:200:29 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlRuntime.kt:22:63 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> Join<Any?, ColumnMeta↻>>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/rdf/CypherQuery.kt:280:112 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/rdf/SparqlQuery.kt:462:112 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/Tls13CodecBackend.kt:33:39 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/Tls13CodecBackend.kt:33:58 'val epochSeconds: Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/openapi/OpenApiRawParser.kt:9:46 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/openapi/OpenApiReactorResolver.kt:3:59 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/ConfixReducers.kt:75:70 Unnecessary safe call on a non-null receiver of type 'SpanEvent.Span'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/ConfixReducers.kt:177:39 Unchecked cast of 'Any' to 'ReductionCarrier<Join<ConfixStructuralKey, List<ConfixReducers.ScanToken>>>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncKeyAlg.kt:68:24 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncKeyAlg.kt:73:29 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:29:33 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncValueAlg.kt:147:31 Unchecked cast of 'V? (of fun <K, V> mergeMaps)' to 'V (of fun <K, V> mergeMaps)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncValueAlg.kt:147:45 Unchecked cast of 'V? (of fun <K, V> mergeMaps)' to 'V (of fun <K, V> mergeMaps)'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/ReducerRegistry.kt:6:44 This extension is shadowed by a member: 'val category: String' defined in 'borg.trikeshed.context.nuid.Capability'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/TrajectoryReduction.kt:160:64 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/relaxfactory/RequestFactoryReactorElement.kt:47:43 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/relaxfactory/RequestFactoryReactorElement.kt:93:40 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/relaxfactory/ViewRoute.kt:196:37 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/PeerWireHandler.kt:123:43 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentHttpRouter.kt:38:61 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentSession.kt:133:25 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentSession.kt:161:21 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentSession.kt:198:33 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentSession.kt:341:21 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentSession.kt:355:22 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentSession.kt:446:87 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/TorrentSession.kt:458:109 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/UtpManager.kt:67:19 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UtpStream'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/UtpManager.kt:71:34 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UtpStream'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/UtpManager.kt:83:62 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/UtpManager.kt:86:62 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/UtpManager.kt:136:29 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/UtpManager.kt:158:13 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/UtpManager.kt:252:64 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UtpStream.Command.Write'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:231:57 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:232:63 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:278:57 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:279:63 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/EmulatedRing.kt:443:87 Unnecessary safe call on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt:293:22 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt:367:26 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt:382:35 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt:447:26 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt:464:31 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt:471:22 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt:695:30 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/Channel.kt:40:40 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/containment/CrossInstanceCollusionDetector.kt:111:41 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/containment/CrossInstanceCollusionDetector.kt:111:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/channels/ChannelRunner.kt:238:21 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/channels/UringFileChannel.kt:66:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/charset/Charset.kt:39:35 The corresponding parameter in the supertype 'Comparable' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/charset/Charset.kt:43:32 The corresponding parameter in the supertype 'Any' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/ebpf/engine/X86_64Jit.kt:39:32 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/SecureDirectoryStream.kt:9:39 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/AclEntry.kt:18:25 The corresponding parameter in the supertype 'Any' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:18:9 'when' is exhaustive so 'else' is redundant here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:23:22 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:23:32 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:32:51 'fun toString(): String' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:43:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:48:27 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:48:65 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:16:85 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:17:97 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:18:85 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/KernelSeat.kt:83:17 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/ProcessCaptureChannel.kt:122:99 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/process/ProcessCaptureChannel.kt:150:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ForgeReactorExample.kt:165:22 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ForgeReactorExample.kt:165:41 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:42:28 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:42:47 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:58:42 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:58:61 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:67:42 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:67:61 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:90:39 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:90:58 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/MuxReactorElement.kt:706:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/MuxReactorElement.kt:706:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosGateway.kt:12:71 Unchecked cast of 'Any?' to 'Join<OroborosNetworkK<*>, (OroborosNetworkK<*>) -> Any?>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:62:13 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/vast/VastCatalog.kt:53:26 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/vast/VastCatalog.kt:53:45 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/vm/VmLanguage.kt:140:56 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/wiki/WikiNodes.kt:94:33 Unnecessary safe call on a non-null receiver of type 'List<Path>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/wiki/WikiNodes.kt:405:36 Unnecessary safe call on a non-null receiver of type 'List<Path>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/wiki/WikiNodes.kt:604:54 Unnecessary safe call on a non-null receiver of type 'List<Path>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/wiki/WikiNodes.kt:615:54 Unnecessary safe call on a non-null receiver of type 'List<Path>'.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/wiki/WikiNodes.kt:798:85 Cast is redundant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ws/Rfc6455Handshake.kt:41:51 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ws/Rfc6455Handshake.kt:41:70 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/commonMain/kotlin/narchy/spacegraph/graphics/spi/FrameTriangles.kt:19:17 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/bench/UxMetricsBenchmark.kt:38:33 Cast is redundant.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/bench/UxMetricsBenchmark.kt:51:26 Cast is redundant.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/btrfs/BtrfsStoreHarness.kt:317:68 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/btrfs/BtrfsStoreHarness.kt:317:121 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/IncrementalViewRegistry.kt:137:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:23:52 Unchecked cast of '(Int) -> Join<Any?, ColumnMeta↻>' to '() -> ColumnMeta'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:44:40 This cast can never succeed.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:72:40 This cast can never succeed.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:84:41 This cast can never succeed.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:131:33 Unchecked cast of '(Int) -> Join<Any?, ColumnMeta↻>' to '() -> ColumnMeta'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:163:17 Unchecked cast of 'Join<Join<Int, (Int) -> Any?>, () -> ColumnMeta>' to 'Join<Int, (Int) -> Join<Any?, ColumnMeta↻>>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:210:13 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:271:62 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:272:57 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:273:65 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:274:66 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:275:66 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:276:55 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:277:63 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:278:64 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:279:64 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/dag/demo/BlackboardDagDemo.kt:23:47 'val id: Long' is deprecated. Deprecated in Java.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/BreadcrumbReelService.kt:170:87 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWebhookBindings.kt:85:68 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWebhookBindings.kt:86:65 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWebhookBindings.kt:87:65 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWire.kt:163:13 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CurationIntake.kt:203:21 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentPdfLinksWire.kt:131:94 Cast is redundant.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:328:60 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:844:28 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> *>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:853:31 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> *>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:858:37 Unchecked cast of 'Any?' to 'Join<ContentId, OverlapCounts>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/LinkGrab.kt:260:74 Cast is redundant.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:48:28 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:107:25 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:129:27 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:140:49 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:171:31 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:185:112 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:195:31 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:207:98 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:242:28 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:268:23 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:291:120 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:321:61 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:341:80 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:362:45 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:389:77 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:414:96 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/MuxSessionService.kt:419:74 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/PatchWire.kt:799:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/PatchWire.kt:799:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/PiWire.kt:29:114 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/ProjectMiner.kt:228:25 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/InProcessIsolate.kt:129:43 'static fun allowInternalResourceAccess(fileSystem: FileSystem!): FileSystem!' is deprecated. Deprecated in Java.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/InProcessIsolate.kt:397:97 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/ProcessIsolate.kt:152:56 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:72:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:85:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:122:53 Projection is redundant: the corresponding type parameter of 'Set<out AccessMode>' has the same variance.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:135:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:150:22 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:290:9 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/harness/DocumentFeedHarness.kt:160:89 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/vitals/AllocationSites.kt:29:47 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/hermes/HermesPythonPort.kt:793:17 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/hermes/HermesVmConsole.kt:812:23 Unnecessary safe call on a non-null receiver of type 'Map<String, Teleported>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/hermes/tool/Og1RingTool.kt:180:32 Unchecked cast of 'Any?' to 'List<Map<String, Any?>>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:40:24 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsJournal'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:53:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UringLibp2pDialer'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:76:30 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:78:88 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:78:147 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:85:71 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:95:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:95:78 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:96:63 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:98:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:99:59 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:111:55 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/JvmLibp2pTls.kt:72:71 Unnecessary safe call on a non-null receiver of type 'SSLEngine'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/job/BtrfsCasStore.kt:138:57 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/kanban/module/KanbanModule.kt:120:25 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Result<Unit>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/kanban/module/KanbanModule.kt:226:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'TurnReviewElement'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/kanban/module/LcncRunService.kt:911:52 Unnecessary safe call on a non-null receiver of type 'LcncRunService.RunPermit'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/kanban/module/LcncRunService.kt:911:134 Unnecessary safe call on a non-null receiver of type 'LcncRunService.RunPermit'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/lcnc/OroborosLcncWiring.kt:38:103 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/mux/MuxCli.kt:264:80 Unnecessary safe call on a non-null receiver of type 'Join<String?, String>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/narsese/ConstellationNodes.kt:1190:36 Unnecessary safe call on a non-null receiver of type 'NlpMetadata'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/narsese/ConstellationNodes.kt:1620:23 Unnecessary safe call on a non-null receiver of type 'Map<*, *>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/narsese/ConstellationNodes.kt:1628:73 Unnecessary safe call on a non-null receiver of type 'Map<*, *>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/narsese/ConstellationNodes.kt:1628:111 Unnecessary safe call on a non-null receiver of type 'Map<*, *>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/narsese/LegalNodes.kt:304:9 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/narsese/LegalNodes.kt:305:30 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/GraalPiMain.kt:74:38 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/GraalPiMain.kt:76:26 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/GraalPiMain.kt:81:24 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/GraalPiMain.kt:82:28 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/GraalPiMain.kt:88:30 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/GraalPiMain.kt:92:22 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/PiWorkspace.kt:25:24 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/pi/PiWorkspace.kt:26:25 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:195:62 This class is not recommended for use in Kotlin. Use 'kotlin.Int' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:196:56 This class is not recommended for use in Kotlin. Use 'kotlin.Long' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:197:58 This class is not recommended for use in Kotlin. Use 'kotlin.Short' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:198:56 This class is not recommended for use in Kotlin. Use 'kotlin.Byte' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:199:60 This class is not recommended for use in Kotlin. Use 'kotlin.Double' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:201:58 This class is not recommended for use in Kotlin. Use 'kotlin.Float' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:208:62 This class is not recommended for use in Kotlin. Use 'kotlin.Boolean' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt:210:66 This class is not recommended for use in Kotlin. Use 'kotlin.Char' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/RequestFactorySchema.kt:128:155 This class is not recommended for use in Kotlin. Use 'kotlin.Boolean' instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/userspace/PanamauRing.kt:578:16 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/userspace/UserspaceIO.jvm.kt:319:131 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/userspace/UserspaceIO.jvm.kt:460:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Int'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/ingress/QueueGraphWork.kt:63:31 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/ingress/QueueGraphWork.kt:63:50 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/org/trikeshed/oroboros/OroborosDaemon.kt:956:80 Redundant call of conversion method.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/org/trikeshed/oroboros/OroborosDaemon.kt:1793:50 Unnecessary safe call on a non-null receiver of type 'Pair<ModelMux, String>'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/org/trikeshed/oroboros/OroborosDaemon.kt:2993:17 Elvis operator (?:) always returns the left operand of non-nullable type 'String'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/org/trikeshed/oroboros/OroborosDaemon.kt:3148:73 Elvis operator (?:) always returns the left operand of non-nullable type 'String'.
+w: file:///workspace/TrikeShed/src/jvmMain/kotlin/org/trikeshed/oroboros/OroborosDaemon.kt:3149:33 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+
+> Task :hotswapAgentJar UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses
+> Task :jvmJar
+> Task :muxClasspath UP-TO-DATE
+
+> Task :compileTestKotlinJvm
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/DocumentSpansTest.kt:57:42 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+
+> Task :compileJvmTestJava NO-SOURCE
+> Task :jvmTestClasses
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/home/agent/.gradle/caches/modules-2/files-2.1/org.graalvm.truffle/truffle-runtime/25.3.4.1/5f9818cd0413f63bdf1fe52ba4f2fc2786f4cbb7/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+
+> Task :jvmTest
+WARNING: package jdk.internal.classfile.instruction not in java.base
+WARNING: package jdk.internal.classfile.constantpool not in java.base
+WARNING: package jdk.internal.classfile not in java.base
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] STARTED
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] STARTED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] PASSED
+
+DocumentSpansTest[jvm] > compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm] STARTED
+
+DocumentSpansTest[jvm] > compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm] PASSED
+
+DocumentSpansTest[jvm] > oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm] STARTED
+
+DocumentSpansTest[jvm] > oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm] PASSED
+
+DocumentSpansTest[jvm] > continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm] STARTED
+
+DocumentSpansTest[jvm] > continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm] PASSED
+
+DocumentSpansTest[jvm] > pausedReferenceCannotConsumeARevisedProjectDocument()[jvm] STARTED
+
+DocumentSpansTest[jvm] > pausedReferenceCannotConsumeARevisedProjectDocument()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > realNativeRowsSelectAfterGuestClosure()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > realNativeRowsSelectAfterGuestClosure()[jvm] FAILED
+    org.opentest4j.AssertionFailedError: expected: <35> but was: <35.0>
+        at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+        at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+        at app//org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+        at app//org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+        at app//org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1156)
+        at app//kotlin.test.junit5.JUnit5Asserter.assertEquals(JUnitSupport.kt:32)
+        at app//kotlin.test.AssertionsKt__AssertionsKt.assertEquals(Assertions.kt:83)
+        at app//kotlin.test.AssertionsKt.assertEquals(Unknown Source)
+        at app//kotlin.test.AssertionsKt__AssertionsKt.assertEquals$default(Assertions.kt:82)
+        at app//kotlin.test.AssertionsKt.assertEquals$default(Unknown Source)
+        at app//borg.trikeshed.lcnc.LcncConfixSelectionTest$realNativeRowsSelectAfterGuestClosure$1.invokeSuspend(LcncConfixSelectionTest.kt:24)
+        at app//kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+        at app//kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:278)
+        at app//kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+        at app//kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:47)
+        at app//kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:278)
+        at app//kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+        at app//kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:47)
+        at app//kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+        at app//kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+        at app//kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+        at app//kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+        at app//kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+        at app//kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+        at app//kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+        at app//kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+        at app//kotlinx.coroutines.BuildersKt.runBlockingK$default(Unknown Source)
+        at app//borg.trikeshed.lcnc.LcncConfixSelectionTest.realNativeRowsSelectAfterGuestClosure(LcncConfixSelectionTest.kt:16)
+
+LcncConfixSelectionTest[jvm] > selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm] PASSED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] STARTED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] PASSED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] STARTED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] STARTED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] PASSED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] STARTED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] PASSED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] PASSED
+
+17 tests completed, 1 failed
+
+> Task :jvmTest FAILED
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':jvmTest'.
+> There were failing tests. See the report at: file:///workspace/TrikeShed/build/reports/tests/jvmTest/index.html
+
+* Try:
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 5m 34s
+16 actionable tasks: 6 executed, 10 up-to-date
+Configuration cache entry stored.

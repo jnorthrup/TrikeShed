@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="FinanceKifPresetExecutionTest[jvm]" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-05T00:02:11.204Z" hostname="0d6dfba25614" time="0.216">
+  <properties/>
+  <testcase name="formulaPresetRunsTheSharedInspectionRunnerWithoutAnAssertionService()[jvm]" classname="borg.trikeshed.lcnc.FinanceKifPresetExecutionTest" time="0.144"/>
+  <testcase name="financePresetReadsCurrentDocumentsAndConservesExactReviewTotals()[jvm]" classname="borg.trikeshed.lcnc.FinanceKifPresetExecutionTest" time="0.071"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
