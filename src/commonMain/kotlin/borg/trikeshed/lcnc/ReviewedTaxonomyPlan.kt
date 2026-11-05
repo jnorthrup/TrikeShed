@@ -7,9 +7,9 @@ import borg.trikeshed.narsese.DocumentQuotationCheck
 import kotlinx.coroutines.currentCoroutineContext
 
 /**
- * Authenticated current-book inspector. Existing book modalities are norms/presumptions,
- * never asserted taxonomy facts. A genuinely asserted taxonomy receipt is not implemented.
- * Consequently this first endpoint exports an empty positive-support plan and ALL exclusions.
+ * Authenticated current reviewed-source inspector. Separately approved ground KIF assertions
+ * have source-backed positive taxonomy proofs. Book modalities remain norms/presumptions,
+ * never asserted taxonomy facts, and produce an empty support plan with explicit exclusions.
  * No permit is consumed and no global fact, attention budget or evidence is changed.
  */
 object ReviewedTaxonomyPlan {
@@ -138,6 +138,7 @@ object ReviewedTaxonomyPlan {
                     "begin" j q.begin, "end" j q.end, "quote" j q.quote]]
         }
         val englishOrigin = EnglishTaxonomyCarrier.evidence(cas, read.candidate)
+        val paths = ReviewedTaxonomyProofPaths.project(plan, selections)
         val frame = ContentId.of(CanonicalCbor.encodeMap(_m["kind" j "reviewed-kif-read-frame/1",
             "readCid" j read.readCid.value, "page" j page, "fragmentExportCid" j ContentId.of(export).value] +
             if (englishOrigin == null) emptyMap() else _m["englishOrigin" j englishOrigin]))
@@ -155,9 +156,7 @@ object ReviewedTaxonomyPlan {
             "curationReceiptCid" j read.candidate.curationReceiptCid.value, "ontologyCid" j read.candidate.ontologyCid.value,
             "sourceRevision" j read.candidate.sourceRevision, "assessmentCid" j null, "assessments" j emptyList<Any>(),
             "selected" j selected, "goal" j _m["predicate" j predicate, "subject" j subject, "object" j obj],
-            "plan" j _m["queryId" j plan.queryId.value, "frameId" j plan.frameId.value,
-                "exportCid" j ContentId.of(export).value, "export" j export.decodeToString(),
-                "status" j plan.status.name, "truncated" j plan.truncated],
+            "plan" j paths,
             "counters" j _m["selected" j selected.size, "eligible" j selected.size, "excluded" j 0,
                 "textBytesRead" j bytesRead, "steps" j plan.steps, "proofs" j plan.proofs.size]]
         return if (englishOrigin == null) report else report + _m[
