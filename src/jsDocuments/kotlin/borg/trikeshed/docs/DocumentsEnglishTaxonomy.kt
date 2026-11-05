@@ -1,6 +1,7 @@
 package borg.trikeshed.docs
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lcnc.ReviewedTaxonomyProofPaths
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import kotlinx.browser.document
@@ -298,8 +299,98 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
                 val selectedValue = selection["value"] as? Map<*, *> ?: error("Missing reviewed selection")
                 verifyOrigin(selectedValue["englishOrigin"])
             }
+            val plan = value["plan"] as? Map<*, *> ?: error("Missing reviewed proof paths")
+            ReviewedTaxonomyProofPaths.validate(plan, rows((frozen["snapshot"] as Map<*, *>)["selections"]))
+            require(plan["revision"] == value["revision"] && plan["status"] == value["status"] &&
+                plan["semantics"] == value["semantics"] &&
+                s_["predicate", "subject", "object"].view.all { plan[it] == goal[it] })
+            // Resolve EVERY source against the complete frozen selection, including off-page premises.
+            val frozenSelections = rows((frozen["snapshot"] as Map<*, *>)["selections"]).associateBy { it["id"] }
+            val sources = rows(plan["sources"])
+            require(sources.map { it["selectionId"] }.toSet() == frozenIds && sources.size == frozenIds.size)
+            for (source in sources) {
+                val selection = requireNotNull(frozenSelections[source["selectionId"]])
+                val quotation = selection["quotation"] as? Map<*, *> ?: error("Missing frozen source quotation")
+                val actual = source["quotation"] as? Map<*, *> ?: error("Missing proof source quotation")
+                require(s_["originalCid", "extractedTextCid", "begin", "end", "quote"].view.all { actual[it] == quotation[it] } &&
+                    source["sourceRevision"] == value["sourceRevision"] && source["text"] == quotation["quote"] &&
+                    source["sourceCid"] == translation["derivedKifCid"])
+                val offered = requireNotNull(expected[source["selectionId"]])
+                require(s_["originalCid", "extractedTextCid", "begin", "end", "quote"].view.all {
+                    actual[it] == (offered["kifQuotation"] as Map<*, *>)[it]
+                })
+                verifyOrigin((selection["value"] as Map<*, *>)["englishOrigin"])
+            }
         }
         report = value
+        }
+    }
+
+    private fun proofPaths(parent: HTMLElement, value: Map<*, *>) {
+        val plan = value["plan"] as Map<*, *>
+        val sources = rows(plan["sources"])
+        val byNode = sources.associateBy { it["nodeId"] }
+        val origins = rows(value["englishWitnesses"]).associateBy { it["selectionId"] }
+        val proofs = rows(plan["proofs"], 128)
+        val used = proofs.flatMap { it["premises"] as List<*> }.toSet()
+        if (plan["truncated"] == true) text(parent, "p",
+            "${value["status"]} · Search bounds were reached. Returned paths are incomplete; other support may exist.",
+            "data-taxonomy-proof-incomplete").className = "ds-curate-warn"
+        if (proofs.isEmpty()) text(parent, "p", "No positive proof path was returned for this goal.").className = "ds-curate-status"
+        fun anchor(source: Map<*, *>) = "taxonomy-source-" + (source["nodeId"] as String).removePrefix("sha256:")
+        fun rule(raw: Any?) = when (raw) {
+            "kif-taxonomy/v1/instance-assertion" -> "Instance assertion"
+            "kif-taxonomy/v1/subclass-assertion" -> "Subclass assertion"
+            "kif-taxonomy/v1/instance-subclass" -> "Instance inherits through subclass"
+            "kif-taxonomy/v1/subclass-transitivity" -> "Subclass transitivity"
+            "kif-taxonomy/v1/class-reflexivity" -> "Class reflexivity with declaration witness"
+            else -> error("Unknown taxonomy proof rule")
+        }
+        for ((index, proof) in proofs.withIndex()) {
+            val path = text(parent, "section", "", "data-taxonomy-proof-path")
+            path.setAttribute("data-proof-node", proof["nodeId"] as String)
+            text(path, "h5", "Support path ${index + 1}").className = "ds-curate-h3"
+            val ordered = text(path, "ol", "")
+            val premises = proof["premises"] as List<*>
+            val rules = proof["rules"] as List<*>
+            for ((step, node) in premises.withIndex()) {
+                val source = requireNotNull(byNode[node])
+                val origin = requireNotNull(origins[source["selectionId"]])
+                val item = text(ordered, "li", "", "data-taxonomy-proof-premise")
+                item.setAttribute("data-source-node", node as String)
+                item.setAttribute("data-selection-id", source["selectionId"] as String)
+                text(item, "p", rule(rules[step]), "data-taxonomy-proof-rule").className = "ds-curate-label"
+                text(item, "blockquote", (origin["englishQuotation"] as Map<*, *>)["quote"] as String).also {
+                    it.className = "ds-curate-quote"; it.style.whiteSpace = "pre-wrap"
+                }
+                code(item, source["text"] as String)
+                button(item, "Inspect this source witness") {
+                    (document.getElementById(anchor(source)) as? HTMLElement)?.let { card ->
+                        card.scrollIntoView(); card.focus()
+                    }
+                }.also { control ->
+                    // This local scroll action must never replace the Documents route hash.
+                    control.setAttribute("data-taxonomy-source-target", anchor(source))
+                    control.setAttribute("aria-controls", anchor(source))
+                }
+            }
+        }
+        text(parent, "h5", "Reviewed source witnesses").className = "ds-curate-h3"
+        for (source in sources) {
+            val card = text(parent, "section", "", "data-taxonomy-proof-source")
+            card.id = anchor(source)
+            card.setAttribute("tabindex", "-1")
+            card.setAttribute("data-source-node", source["nodeId"] as String)
+            card.setAttribute("data-selection-id", source["selectionId"] as String)
+            if (source["nodeId"] !in used) text(card, "p", "Selected evidence not used in returned paths",
+                "data-taxonomy-unused-evidence").className = "ds-curate-status"
+            else text(card, "p", "Source witness used in returned paths").className = "ds-curate-label"
+            witness(card, requireNotNull(origins[source["selectionId"]]))
+            val origin = origins.getValue(source["selectionId"])
+            val english = origin["englishQuotation"] as Map<*, *>
+            text(card, "p", "English original ${english["originalCid"]} · extracted text ${english["extractedTextCid"]} · extracted text UTF-16 [${english["begin"]}, ${english["end"]}) · inspection ${origin["inspectionCid"]}").className = "ds-cid"
+            val q = source["quotation"] as Map<*, *>
+            text(card, "p", "KIF source ${source["sourceCid"]} · UTF-16 [${q["begin"]}, ${q["end"]}) · selection ${source["selectionId"]} · source node ${source["nodeId"]}").className = "ds-cid"
         }
     }
 
@@ -388,7 +479,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
         val frozen = review ?: return
         text(parent, "h4", "Analyst review · ${frozen["state"]}").className = "ds-curate-h3"
         if (reviewUncertain) text(parent, "p", "Review or source status was not confirmed. Refresh before any further decision or query.").className = "ds-curate-warn"
-        text(parent, "p", "Snapshot: ${frozen["snapshotCid"]} · revision ${frozen["revision"]} · source current: ${frozen["sourceCurrent"]}").className = "ds-cid"
+        text(parent, "p", "Snapshot: ${frozen["snapshotCid"]} · revision ${frozen["revision"]} · source current: ${if (reviewUncertain) "unconfirmed" else frozen["sourceCurrent"]}", "data-taxonomy-source-current").className = "ds-cid"
         evidence(parent, "Frozen source, declarations and evidence", frozen["snapshot"])
         val noteLabel = text(parent, "label", "Review decision note"); noteLabel.className = "ds-curate-label"
         noteLabel.style.cssText = "display:flex;flex-direction:column;gap:6px;margin:14px 0"
@@ -419,7 +510,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
             text(result, "p", "Applies to the selected approved translation assumptions in this context. UNKNOWN is not a refutation; bounded or unavailable results do not establish absence. No approval is consumed.").className = "ds-curate-dest"
             if (value["status"] != "UNAVAILABLE") {
                 text(result, "p", "Context: $contextIri · approval ${value["approvalCid"]}").className = "ds-cid"
-                for (origin in rows(value["englishWitnesses"])) witness(result, origin)
+                proofPaths(result, value)
             }
             evidence(result, "Approval, context, English/KIF witnesses and proof", value)
         }

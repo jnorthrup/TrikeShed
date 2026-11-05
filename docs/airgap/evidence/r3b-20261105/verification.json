@@ -1,0 +1,933 @@
+{
+  "kind": "airgap-document-traversal-release/1",
+  "release": "R3b",
+  "testedSourceCommit": "7ce746462529d1fdd13ec0ab41d1f9528b040f9f",
+  "jvmTestSourceCommit": "b2f76e40c1d6c6777bd947464cb64f91e5d329ca",
+  "browserBuildCommit": "7ce746462529d1fdd13ec0ab41d1f9528b040f9f",
+  "checks": [
+    {
+      "sourceCommit": "b2f76e40c1d6c6777bd947464cb64f91e5d329ca",
+      "startedAt": "2026-11-05T00:23:11.234671+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-current-user",
+        "--net",
+        "--keep-caps",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-check",
+        "./gradlew",
+        "--offline",
+        "--no-daemon",
+        "--max-workers=2",
+        "jvmTest",
+        "--tests",
+        "*.DocumentSpansTest",
+        "--tests",
+        "*.LcncConfixSelectionTest",
+        "--tests",
+        "*.LcncConsumptionTest",
+        "--tests",
+        "*.LlvmScalarTest",
+        "--tests",
+        "*.LlvmConfixTest",
+        "--tests",
+        "*.LlvmScalarRunTest",
+        "--tests",
+        "*.LlvmConfixRunTest",
+        "--tests",
+        "*.WorkSelectNodeTest",
+        "--tests",
+        "*.FinanceKifPresetExecutionTest",
+        "--tests",
+        "*.AceContextNodesTest",
+        "--tests",
+        "*.BreadcrumbContextNodesTest",
+        "--tests",
+        "*.EnglishCopularPresetExecutionTest",
+        "--tests",
+        "*.LcncPinnedBindingTest",
+        "--tests",
+        "*.KanbanPinnedDispatchTest",
+        "--tests",
+        "*.WorkModelRouteTest",
+        "--tests",
+        "*.PropositionAttentionTest",
+        "--tests",
+        "*.DocumentEnglishRetainedWireTest",
+        "--tests",
+        "*.EnglishTaxonomyCarrierTest",
+        "--tests",
+        "*.EnglishTaxonomyExportGuardTest",
+        "--tests",
+        "*.ProjectCorpusVisitTest",
+        "--tests",
+        "*.CurationReviewedReadTest",
+        "--tests",
+        "*.CurationIntakeTest",
+        "--tests",
+        "*.CurationIntakeEligibilityTest",
+        "muxClasspath"
+      ],
+      "cwd": "/workspace/TrikeShed",
+      "exit": 0,
+      "finishedAt": "2026-11-05T00:28:59.596089+00:00"
+    },
+    {
+      "sourceCommit": "b2f76e40c1d6c6777bd947464cb64f91e5d329ca",
+      "startedAt": "2026-11-05T00:23:11.239667+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-current-user",
+        "--net",
+        "--keep-caps",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-check",
+        "./gradlew",
+        "--offline",
+        "--no-daemon",
+        "--max-workers=2",
+        "-PkotlinJsApps=documents,spacegraph",
+        "stageKotlinJs",
+        "compileKotlinJs",
+        "compileKotlinWasmJs",
+        "compileKotlinWasmWasi",
+        "compileKotlinLinuxX64"
+      ],
+      "cwd": "/workspace/TrikeShed-target-checks",
+      "exit": 0,
+      "finishedAt": "2026-11-05T00:30:26.224978+00:00"
+    },
+    {
+      "sourceCommit": "7ce746462529d1fdd13ec0ab41d1f9528b040f9f",
+      "startedAt": "2026-11-05T00:30:56.307706+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-current-user",
+        "--net",
+        "--keep-caps",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-check",
+        "./gradlew",
+        "--offline",
+        "--no-daemon",
+        "--max-workers=2",
+        "-PkotlinJsApps=spacegraph",
+        "stageKotlinJs"
+      ],
+      "cwd": "/workspace/TrikeShed-target-checks",
+      "exit": 0,
+      "finishedAt": "2026-11-05T00:32:11.644772+00:00"
+    }
+  ],
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "jdk": "GraalVM CE 25.3.4.1+1.1",
+  "kotlin": "2.4.21",
+  "gradle": "9.8.2",
+  "llvm": "22.1.8",
+  "testTotals": {
+    "tests": 149,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "testSuites": [
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "CurationIntakeEligibilityTest[jvm]",
+      "timestamp": "2026-11-05T00:28:43.325Z",
+      "cases": [
+        "eligibilityIsRecheckedBeforeQueuedWorkStarts()[jvm]",
+        "resumeAndExplicitOffersDoNotAdmitIneligibleProjects()[jvm]",
+        "defaultEligibilityStillAdmitsDocuments()[jvm]"
+      ]
+    },
+    {
+      "tests": 37,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "CurationIntakeTest[jvm]",
+      "timestamp": "2026-11-05T00:28:43.485Z",
+      "cases": [
+        "replacementUploadWaitsUntilTheRemovalHookHasFinished()[jvm]",
+        "ownerCancellationCancelsAnAdmittedLinkGrab()[jvm]",
+        "resumeVisitsDocumentsWithoutMaterializingTheCorpus()[jvm]",
+        "drainWaitsForAdmittedDocumentLinkGrab()[jvm]",
+        "blockedPolicyFailsClosedWithoutParsingJoiningOrScoring()[jvm]",
+        "blockedCurationBoundsExtractedDocumentsAndDrainFinishesEachAdmission()[jvm]",
+        "removalDuringJoinReportsUncertainMembershipAndKeepsTheReplacement()[jvm]",
+        "drainingRejectsExternalOffersAndFinishesRecursivelyLandedDocuments()[jvm]",
+        "internallyCancelledJoinSettlesFailureAndKeepsTheConsumerAvailable()[jvm]",
+        "concurrentLinkIndexReadersShareAndRetryCancelledInitialization()[jvm]",
+        "reviewIntakeDoesNotOverwriteABookAlreadyInAConstellation()[jvm]",
+        "selectedProviderIsFrozenPerAdmissionAndDrainWaitsForScoring()[jvm]",
+        "grabsApplyBackpressureAtTheDocumentLimit()[jvm]",
+        "followupUsesLatestModeAndProviderAfterSuspendedReview()[jvm]",
+        "forgettingDuringReviewCurationDoesNotPublishAStaleReceipt()[jvm]",
+        "concurrentDrainsWaitForCancelledWorkToReleaseInference()[jvm]",
+        "ownerCancellationDuringRemovedJoinReportsUncertaintyAndPropagates()[jvm]",
+        "resumeContinuesAfterAProjectBecomesUnavailable()[jvm]",
+        "reviewIntakeFailsWithoutRetainedSourceRatherThanExtractingOrPublishing()[jvm]",
+        "forgottenQueuedDocumentIsReleasedWithoutExtraction()[jvm]",
+        "resumedDocumentsUseRetainedProviderAndLegacyDocumentsDoNotScore()[jvm]",
+        "cancelledOwnedResumeStopsEnumeratingDocuments()[jvm]",
+        "drainingRejectsFollowUpsForAnInFlightDocument()[jvm]",
+        "ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount()[jvm]",
+        "reofferedRevisionIsProcessedAfterRunningCurationWhetherOrNotItWasForgotten()[jvm]",
+        "reviewIntakeSharesReducedProfileBookIdentityWithHostNodes()[jvm]",
+        "reviewIntakeRetainsSourceAndReceiptWithoutPublishing()[jvm]",
+        "replacedSelectedTextCannotBeCuratedAsTheSelectedRevision()[jvm]",
+        "forgettingDuringLegacyCurationDoesNotJoinADeletedDocument()[jvm]",
+        "repeatedReviewReplacesObservationAndBookIdentityTracksItsInputs()[jvm]",
+        "repeatedFollowUpsRetainOneLatestAdmission()[jvm]",
+        "startedLegacyReofferJoinsLatestSourceWhileQueuedDuplicatesCoalesce()[jvm]",
+        "ownerCancellationSettlesActiveQueuedAndFollowUpAdmissions()[jvm]",
+        "drainWaitsForOwnedResumeAndCuratesItsDiscoveredDocuments()[jvm]",
+        "reviewIntakeRejectsAResultWithoutAnUnreviewedReceipt()[jvm]",
+        "selectedProjectTextIsSourceBoundAndAwaitingReviewWithoutAutomaticAdmission()[jvm]",
+        "newAdmissionWaitsUntilIdleSettlementFinishes()[jvm]"
+      ]
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "DocumentEnglishRetainedWireTest[jvm]",
+      "timestamp": "2026-11-05T00:28:46.512Z",
+      "cases": [
+        "staleSourcesAndALateMutationBeforePublicationReturnNoInspection()[jvm]",
+        "retainedOpeningReturnsTheActualPayloadAndExactOriginalCborWithoutAReaderOrNewReceipt()[jvm]",
+        "validLegacyPayloadKeepsItsOriginalIdentitySpellingWithoutInventingNodes()[jvm]",
+        "drainWithdrawsBothRoutesAndWaitsForAcceptedInspectionAndRetainedOpening()[jvm]",
+        "retainedOpeningRequiresExactEightFieldsSourceIdentityAndRangeEvenForIdenticalOtherDocuments()[jvm]",
+        "missingMalformedTamperedOversizedAndCorruptRetainedBlocksRefuseBoundedlyWithoutInitializingAReader()[jvm]"
+      ]
+    },
+    {
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "ProjectCorpusVisitTest[jvm]",
+      "timestamp": "2026-11-05T00:28:46.801Z",
+      "cases": [
+        "visitorCanStopBeforeASecondDocumentIsRead()[jvm]",
+        "extractionDoesNotMineAfterEvidenceReadFailure()[jvm]",
+        "casCapturePreservesCompoundTypesAndAliases()[jvm]",
+        "visitorDoesNotSwallowCancellationCaughtByItsLastCallback()[jvm]",
+        "duplicateAttachmentFieldsAreRejectedBeforeRevisionPublication()[jvm]",
+        "visitorEmitsOnCallerContextAndStopsWhenItsJobIsCancelled()[jvm]",
+        "visitorRetainsCommittedIdentityWhenFieldListsAreMutated()[jvm]",
+        "casCaptureRetainsDistinctMapKeysWithTheSameCanonicalText()[jvm]",
+        "missingOriginDoesNotHideCorruptCompletionOrTriggerMining()[jvm]",
+        "extractionDoesNotCombineOldAnchorsWithAReplacementCompletion()[jvm]",
+        "casBodyBytesRemainStableWhenHeadAliasesChangeDuringPublication()[jvm]",
+        "casBodyBytesOwnEncodedCompoundContentsWhileHeadPreservesTypes()[jvm]",
+        "missingProjectIsAnIncompleteVisit()[jvm]",
+        "visitorFailsIfTheProjectIsRemountedMidScan()[jvm]",
+        "extractionPropagatesCancellationRaisedDuringSynchronousEvidenceRead()[jvm]",
+        "extractionRequiresVerifiedPdfFootnotes()[jvm]",
+        "visitorObservesCurrentRevisionsAndSkipsDeletedOrNewSlots()[jvm]",
+        "casCaptureRetainsOpaqueValuesWhileHashingTheirCanonicalString()[jvm]",
+        "casCaptureRejectsCyclesAndExcessiveDepthBeforePublication()[jvm]",
+        "casStoreCapturesAttachmentFieldsBeforeHashingAndPublication()[jvm]",
+        "mountedReadsVerifyBytesEvenWhenTheCidIsUnchanged()[jvm]",
+        "mountedReadsFailClosedWhenTheExposedHeadBodyIsMutated()[jvm]",
+        "conflictsAndIdempotentReplicationShortCircuitBeforeBodyCapture()[jvm]",
+        "directTextExtractionDoesNotMixSourceRevisions()[jvm]",
+        "mountedVisitorMatchesGatewayDeletionAndMissingCidRules()[jvm]",
+        "concurrentVisitsOnlyEmitCommittedRevisionTuples()[jvm]",
+        "mountedReadsRejectMissingOrInvalidDeclaredLengths()[jvm]"
+      ]
+    },
+    {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "KanbanPinnedDispatchTest[jvm]",
+      "timestamp": "2026-11-05T00:28:46.964Z",
+      "cases": [
+        "queuedRunUsesItsPinnedWorkgroupDespiteNearerWildcard()[jvm]"
+      ]
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "LlvmConfixRunTest[jvm]",
+      "timestamp": "2026-11-05T00:28:48.755Z",
+      "cases": [
+        "failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm]",
+        "sourceGeometryAndScalarSummarySurviveReopening()[jvm]",
+        "nativeSelectionConsumesOptionalPortSpellingsThroughTheActualRoute()[jvm]"
+      ]
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "LlvmScalarRunTest[jvm]",
+      "timestamp": "2026-11-05T00:28:52.942Z",
+      "cases": [
+        "mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm]",
+        "failedConfiguredBootstrapReleasesItsRootOwner()[jvm]"
+      ]
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "CurationReviewedReadTest[jvm]",
+      "timestamp": "2026-11-05T00:28:55.043Z",
+      "cases": [
+        "realRetainedBookReadDoesNotAppendOrSpendRelease()[jvm]",
+        "authenticationRevisionAndCurrentnessCannotBeSuppliedByCaller()[jvm]"
+      ]
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "DocumentSpansTest[jvm]",
+      "timestamp": "2026-11-05T00:28:55.251Z",
+      "cases": [
+        "compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm]",
+        "oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm]",
+        "continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm]",
+        "pausedReferenceCannotConsumeARevisedProjectDocument()[jvm]"
+      ]
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "EnglishCopularPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T00:28:55.286Z",
+      "cases": [
+        "actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm]",
+        "currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm]",
+        "forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm]"
+      ]
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "EnglishTaxonomyCarrierTest[jvm]",
+      "timestamp": "2026-11-05T00:28:56.049Z",
+      "cases": [
+        "deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm]",
+        "sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm]",
+        "exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm]",
+        "familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm]",
+        "sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm]",
+        "declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm]"
+      ]
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "EnglishTaxonomyExportGuardTest[jvm]",
+      "timestamp": "2026-11-05T00:28:56.327Z",
+      "cases": [
+        "manualKifRetainsSingleAndMultipleSnapshotExports()[jvm]",
+        "anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm]",
+        "persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm]",
+        "eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm]"
+      ]
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "FinanceKifPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T00:28:56.437Z",
+      "cases": [
+        "formulaPresetRunsTheSharedInspectionRunnerWithoutAnAssertionService()[jvm]",
+        "financePresetReadsCurrentDocumentsAndConservesExactReviewTotals()[jvm]"
+      ]
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "LcncConfixSelectionTest[jvm]",
+      "timestamp": "2026-11-05T00:28:56.838Z",
+      "cases": [
+        "geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm]",
+        "realNativeRowsSelectAfterGuestClosure()[jvm]",
+        "selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm]",
+        "scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm]"
+      ]
+    },
+    {
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "LcncConsumptionTest[jvm]",
+      "timestamp": "2026-11-05T00:28:56.931Z",
+      "cases": [
+        "inlineConsumptionReferencesTheEnclosingOutputOwner()[jvm]",
+        "interventionReplacesWireAttributionAndSharesTheAcknowledgedControlSequence()[jvm]",
+        "cancelledPausedConsumerDoesNotClaimWireDelivery()[jvm]",
+        "intervenedBindingIsLinkedThroughItsActualScopeInputProducer()[jvm]",
+        "finalEvidenceTrimmingRecountsTheStreamInsteadOfPreservingAStaleSummary()[jvm]",
+        "manyPortsRetainAuthoredPositionsAndTheirExistingSingleValueShape()[jvm]",
+        "singlePortRecordsOnlyTheLastFedWireIncludingDuplicateEndpoints()[jvm]",
+        "omittedSelectionsAndWindowEvictionKeepExactCountsAndPositions()[jvm]",
+        "missingRequiredInputAndGuardedScopesDoNotEmitConsumedSuccess()[jvm]",
+        "pulseConsumesTheActualWarmFrameWithoutInventingAProducerInvocation()[jvm]",
+        "repeatedNamedFramesUseTheirActualProducerAndDocumentIdentity()[jvm]"
+      ]
+    },
+    {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "LcncPinnedBindingTest[jvm]",
+      "timestamp": "2026-11-05T00:28:57.062Z",
+      "cases": [
+        "failedBindingPreparationLeavesNoRegistrationAndCanRetry()[jvm]"
+      ]
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "LlvmConfixTest[jvm]",
+      "timestamp": "2026-11-05T00:28:57.067Z",
+      "cases": [
+        "upstreamScannersMatchRetainedKotlinGeometry()[jvm]",
+        "yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm]",
+        "admittedCancellationSettlesBeforeEvidenceAndClose()[jvm]",
+        "faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm]",
+        "strictProfilesAndFailedOpeningLeaveNoSeat()[jvm]",
+        "copiedGeometryRemainsReadableAfterContextClose()[jvm]",
+        "admissionBoundsAndOperatorAuthorityAreEnforced()[jvm]"
+      ]
+    },
+    {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "LlvmScalarTest[jvm]",
+      "timestamp": "2026-11-05T00:28:57.892Z",
+      "cases": [
+        "nativeDeniedControlStillRefusesLlvm()[jvm]",
+        "cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm]",
+        "drainSettlesAcceptedQueueBeforeClosingContext()[jvm]",
+        "runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm]",
+        "invalidModuleOpenReleasesSeatForRetry()[jvm]",
+        "profileIsStrictOperatorConfiguration()[jvm]",
+        "verifiedBinaryExecutesAndCopiesHostScalars()[jvm]"
+      ]
+    },
+    {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "WorkModelRouteTest[jvm]",
+      "timestamp": "2026-11-05T00:28:58.158Z",
+      "cases": [
+        "selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm]",
+        "selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm]"
+      ]
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "WorkSelectNodeTest[jvm]",
+      "timestamp": "2026-11-05T00:28:58.254Z",
+      "cases": [
+        "guardedRingsRunOnlyTheSelectedBranch()[jvm]",
+        "refusesAmbiguousIdsAndInexactLimits()[jvm]",
+        "excludesUnknownExpiredUnavailableAndOverBudgetQuotes()[jvm]",
+        "selectsLowestDeclaredPriceAcrossModelAndService()[jvm]"
+      ]
+    },
+    {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "AceContextNodesTest[jvm]",
+      "timestamp": "2026-11-05T00:28:58.285Z",
+      "cases": [
+        "normalizedFrameNameTakesPrecedenceOverOptionalAlias()[jvm]",
+        "optionalFrameWiresRetainPayloadIdentity()[jvm]",
+        "frameParametersRemainDefaultsAndNullWiresMaskThem()[jvm]"
+      ]
+    },
+    {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "BreadcrumbContextNodesTest[jvm]",
+      "timestamp": "2026-11-05T00:28:58.330Z",
+      "cases": [
+        "boundedRecallReportsOmissionAndKeepsDisjointRangesDistinct()[jvm]",
+        "sourceRecallSelectsTheChildAndPreservesExactRawEvidence()[jvm]",
+        "offeredPresetProjectsAndExpandsLocalEvidenceWithoutAModel()[jvm]",
+        "invalidBudgetsAndUnknownContextsRefuseWithoutCreatingMemory()[jvm]"
+      ]
+    },
+    {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "name": "PropositionAttentionTest[jvm]",
+      "timestamp": "2026-11-05T00:28:58.430Z",
+      "cases": [
+        "mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers()[jvm]",
+        "lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity()[jvm]",
+        "httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409()[jvm]",
+        "exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes()[jvm]",
+        "sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer()[jvm]",
+        "productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence()[jvm]"
+      ]
+    }
+  ],
+  "testScope": "149 selected JVM regressions; all JVM main/test sources compiled. Not the full repository test suite.",
+  "verifiedTargets": [
+    "JVM main and all test sources",
+    "JS main",
+    "Documents and Spacegraph production bundles",
+    "Wasm-JS",
+    "Wasm-WASI",
+    "Linux x64"
+  ],
+  "browser": {
+    "caseNames": [
+      "nativeBoundaryPause",
+      "retainedQuotation",
+      "durableTransfers",
+      "documentInspection",
+      "nativeInspection",
+      "playback",
+      "editedDefinition",
+      "supersededOutputRead",
+      "reopenedInspection"
+    ],
+    "browserVersion": "154.0.8037.57",
+    "bundle": {
+      "sha256": "e67538206ad8b3a54bf7670a85c1424bc9168d7c41a882057868c6097334b1da",
+      "bytes": 1805728
+    },
+    "source": "accepted/browser.json",
+    "identity": "accepted/identity.json",
+    "liveVideo": "accepted/videos/page@4a36b2d8fa68ed35f8f6acfd27c478e9.webm",
+    "reopenedVideo": "accepted/videos/page@d206adedc216ce40463b07adf5ba6fc9.webm",
+    "screenshots": [
+      "native-boundary-pause.png",
+      "reopened-document-without-llvm.png",
+      "retained-native-evidence.png",
+      "verified-document-and-passage.png"
+    ]
+  },
+  "animationRegression": {
+    "caseNames": [
+      "liveTransfer",
+      "durableTransfers",
+      "nativeInspection",
+      "replay",
+      "reducedMotion",
+      "camera",
+      "nativeFlyover",
+      "editedDefinition",
+      "reopen",
+      "reopenedBrowser",
+      "legacyReceipt"
+    ],
+    "source": "animation-regression/browser.json",
+    "identity": "animation-regression/identity.json",
+    "bundle": {
+      "sha256": "e67538206ad8b3a54bf7670a85c1424bc9168d7c41a882057868c6097334b1da",
+      "bytes": 1805728
+    }
+  },
+  "execution": {
+    "runId": "94deac52-10ec-4807-8a90-3125542772a6",
+    "programCid": "sha256:838557c42014b1d18a7c5263dc37753d4f202186a44066d1126f5829406605b8",
+    "receiptCid": "sha256:3773f5f4e35bcba147649baf38cbda2a22ccfdbb11f190a1c697a7a344ea2177",
+    "invocationsCid": "sha256:c1505cc09b6c69b3c4636066d9b77753d7b9ee8840ac269f132fc1bafa0d7874",
+    "batchCid": "sha256:35763a2e04fcae8cada44f2b9d68e1c56dbb7e511d4b524a0471621605a3d432",
+    "batchBytes": 2028,
+    "rowCount": 151,
+    "wireSelections": 8,
+    "consumedProjects": 2,
+    "quotation": {
+      "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+      "begin": 18477,
+      "end": 18654,
+      "quote": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+      "anchors": [
+        {
+          "begin": 18477,
+          "end": 18536,
+          "page": 10,
+          "folio": null,
+          "section": null,
+          "table": null,
+          "diagram": null,
+          "coordinates": [
+            651,
+            871,
+            1248,
+            55
+          ],
+          "coordinateSystem": "pixels-300dpi",
+          "unresolved": [
+            "table",
+            "diagram",
+            "folio",
+            "section"
+          ]
+        },
+        {
+          "begin": 18537,
+          "end": 18594,
+          "page": 10,
+          "folio": null,
+          "section": null,
+          "table": null,
+          "diagram": null,
+          "coordinates": [
+            651,
+            926,
+            1248,
+            55
+          ],
+          "coordinateSystem": "pixels-300dpi",
+          "unresolved": [
+            "table",
+            "diagram",
+            "folio",
+            "section"
+          ]
+        },
+        {
+          "begin": 18595,
+          "end": 18653,
+          "page": 10,
+          "folio": null,
+          "section": null,
+          "table": null,
+          "diagram": null,
+          "coordinates": [
+            651,
+            982,
+            1248,
+            55
+          ],
+          "coordinateSystem": "pixels-300dpi",
+          "unresolved": [
+            "table",
+            "diagram",
+            "folio",
+            "section"
+          ]
+        }
+      ],
+      "unresolved": [
+        "table",
+        "diagram"
+      ],
+      "category": "document",
+      "provenance": {
+        "finalUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf",
+        "notesCid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+        "retrieved": "2026-11-04T23:32:18Z",
+        "requestedUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+      },
+      "authentication": "unverified",
+      "quotationSource": "extracted-text"
+    },
+    "cleanup": {
+      "moduleOwnersCompleted": true,
+      "nativeRootDrained": true,
+      "listenerJoined": true,
+      "reopened": true
+    },
+    "scope": "Production ProjectMiner, retained source/project owners, KanbanModule, userspace HTTP, CAS/Couch, vmLegos, actual production JVM and browser artifacts. Fixture setup/control routes only; no production class overlays."
+  },
+  "sourceFiles": {
+    "coinbase-suski.pdf": {
+      "sha256": "591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "bytes": 111243
+    },
+    "coinbase-suski.pdf.extract.json": {
+      "sha256": "e22b7b6a38f1b1c83ef2d6f6c644725e3fdc59b7addfa28d1bfe935f20815a96",
+      "bytes": 97806
+    },
+    "coinbase-suski.pdf.extract.md": {
+      "sha256": "593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+      "bytes": 23021
+    },
+    "coinbase-suski.pdf.notes.md": {
+      "sha256": "397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+      "bytes": 95
+    },
+    "coinbase-suski.pdf.footnotes.tsv": {
+      "sha256": "ff7919835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101",
+      "bytes": 1082
+    },
+    "coinbase-suski.pdf.extract-origin.tsv": {
+      "sha256": "a5c0c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52",
+      "bytes": 143
+    }
+  },
+  "ingestion": {
+    "ingestion": {
+      "verdict": "ingested",
+      "id": "coinbase-suski.pdf",
+      "chars": 22686,
+      "route": "pdf pages (layer)",
+      "ms": 322
+    },
+    "document": {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf",
+      "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "rev": "1-sha256:f465687a26fc037cf0d799973361be5184ecae69127ca161b4d21b3178a3fb1c",
+      "seq": 0,
+      "length": 111243,
+      "contentType": "application/pdf"
+    },
+    "documents": [
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "rev": "1-sha256:f465687a26fc037cf0d799973361be5184ecae69127ca161b4d21b3178a3fb1c",
+        "seq": 0,
+        "length": 111243,
+        "contentType": "application/pdf"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "rev": "1-sha256:16db5ba56c6ea4d76f8f7717ac891f772da281d0c23f333779838a85e4eab4c6",
+        "seq": 3,
+        "length": 23021,
+        "contentType": "text/markdown"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.json",
+        "cid": "sha256:e22b7b6a38f1b1c83ef2d6f6c644725e3fdc59b7addfa28d1bfe935f20815a96",
+        "rev": "1-sha256:2fa042206089fb20f2115ba83c8ddccd189603202f3fc905f453225c53911fbd",
+        "seq": 5,
+        "length": 97806,
+        "contentType": "application/json"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract-origin.tsv",
+        "cid": "sha256:a5c0c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52",
+        "rev": "1-sha256:37f623e3200d8d39710b3286aa15ba7362415ba7818872a8f5ebffb2d2f06b60",
+        "seq": 4,
+        "length": 143,
+        "contentType": "application/octet-stream"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.notes.md",
+        "cid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+        "rev": "1-sha256:52900b97bac60dd4025a840a348da39f8eb9e4a1b815e9c737e3c02c3aa6d753",
+        "seq": 1,
+        "length": 95,
+        "contentType": "text/markdown"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.footnotes.tsv",
+        "cid": "sha256:ff7919835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101",
+        "rev": "1-sha256:041e91e9c3f462d1c6c910a275514883191f06ade601e0bd79e2ba01a1cea0dc",
+        "seq": 2,
+        "length": 1082,
+        "contentType": "application/octet-stream"
+      }
+    ],
+    "extractedChars": 22686,
+    "anchors": 431,
+    "physicalPages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "passageOffset": 18477,
+    "passageAnchor": {
+      "begin": 18477,
+      "end": 18536,
+      "page": 10,
+      "folio": null,
+      "section": null,
+      "table": null,
+      "diagram": null,
+      "coordinates": [
+        651,
+        871,
+        1248,
+        55
+      ],
+      "coordinateSystem": "pixels-300dpi",
+      "unresolved": [
+        "table",
+        "diagram",
+        "folio",
+        "section"
+      ]
+    }
+  },
+  "cas": {
+    "sha256:3773f5f4e35bcba147649baf38cbda2a22ccfdbb11f190a1c697a7a344ea2177": {
+      "path": "accepted/cas/3773f5f4e35bcba147649baf38cbda2a22ccfdbb11f190a1c697a7a344ea2177.json",
+      "bytes": 27621
+    },
+    "sha256:dee15aaadc5e577c0ab0e254f5b287b24ac75651763a561940fb096d0bf2e4f3": {
+      "path": "accepted/cas/dee15aaadc5e577c0ab0e254f5b287b24ac75651763a561940fb096d0bf2e4f3.json",
+      "bytes": 28956
+    },
+    "sha256:b997defb13ae1ae1340b4b9c03e5c0625dfe08f08a7520af29e47ba29e23ca6b": {
+      "path": "accepted/cas/b997defb13ae1ae1340b4b9c03e5c0625dfe08f08a7520af29e47ba29e23ca6b.cbor",
+      "bytes": 65627
+    },
+    "sha256:35763a2e04fcae8cada44f2b9d68e1c56dbb7e511d4b524a0471621605a3d432": {
+      "path": "accepted/cas/35763a2e04fcae8cada44f2b9d68e1c56dbb7e511d4b524a0471621605a3d432.source",
+      "bytes": 2028
+    },
+    "sha256:838557c42014b1d18a7c5263dc37753d4f202186a44066d1126f5829406605b8": {
+      "path": "accepted/cas/838557c42014b1d18a7c5263dc37753d4f202186a44066d1126f5829406605b8.json",
+      "bytes": 2464
+    },
+    "sha256:171a3f12a2c5cf9cd45f9fa92843281dc1fb2e7ffcf392d27d36fda9c270ab0a": {
+      "path": "accepted/cas/171a3f12a2c5cf9cd45f9fa92843281dc1fb2e7ffcf392d27d36fda9c270ab0a.cbor",
+      "bytes": 18909
+    },
+    "sha256:c1505cc09b6c69b3c4636066d9b77753d7b9ee8840ac269f132fc1bafa0d7874": {
+      "path": "accepted/cas/c1505cc09b6c69b3c4636066d9b77753d7b9ee8840ac269f132fc1bafa0d7874.json",
+      "bytes": 19187
+    }
+  },
+  "offline": {
+    "boundary": "Linux user/network namespaces with loopback only; no external routes; external TCP returns ENETUNREACH",
+    "record": "accepted/network.json",
+    "checks": "JVM tests and target builds use --offline in equivalent OS-isolated namespaces",
+    "dependencyState": "Pre-staged toolchains, dependency caches, Chromium and recording helper. This is not sealed runtime closure."
+  },
+  "sourceSha256": {
+    "src/commonMain/kotlin/borg/trikeshed/forge/sheet/CursorSheet.kt": "f402b9abb0f2040b06ee7d59cdc6e3003d1140a38025edd6c8a68fbe0a425775",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncConfixSelection.kt": "2f94f3c1f4b0857d1dd85796b358cc1559bfd2083925e7dc6a75b89cbe4875c8",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "dc7906e2b4c98daa78c882658f7dda8afd4bbbd9068cf818654e3b1202a60019",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt": "994b0f03ad0767448d93d1ef1ec8feb575506f6d091d727a739c4ac65969a992",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncNodeKey.kt": "626b1bd6be2ff68361610b26e6cca5a68271271387d4ded1150835bd7ebd5609",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LlvmConfixContract.kt": "c305ce7311eaf209d68757fdd8889053572b43fb64d9fbee4049fe584fe70652",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt": "6b9192e2cbfa91bfc6176f9fc607de4c3dbc7f5bd2245928c008b91bbd6ab557",
+    "src/jsMain/kotlin/borg/trikeshed/web/AppNav.kt": "f7a47541a643e1e79ccfc277257bb91961cf763a4ad011b3580234a6473bf9fb",
+    "src/jsMain/kotlin/borg/trikeshed/web/EnglishQueryNavigation.kt": "81d750908c659fdfa16568761bba0f914673d63b08f00e3dc4e949e06e148eb3",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Main.kt": "cea87073758571ee60965ceec77e0a435bd5b2e7c9b25f5be1b6df3b4d30bb4e",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "2488553641ed399c6636d8105a50f08104f9f8fb312652d565ea7a9926158c93",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDocumentSource.kt": "fa3c2ddd26f90af677e95b0b94672d155b76b9f3af26913147b3209b268fd20f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsEnglishQuery.kt": "7dc55d18532e3769105d521799832e486fba1c010450379033c766b41d9a6a58",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt": "050b187b5f8a4ffbc91c5f2ea552eda4586abc90db83777f990290bc713a66db",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "276b0885056604d11b51c123af293218b60b0b008575834d6f30dc7d305a1541",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "45c7b448190b213286638fb77db38ec3c8a378baabedc0d1a342a128e4a5161e",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt": "6bf7b00a7da92f0f3bb36a4872f68fcfb97d1c391fa39ef74f0b2e72a5b8ae58",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/DocumentCurationLegos.kt": "af48c12d4725d554e39ceee15644f251b6619fb43eab3229b441b0358f9e00e6",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/DocumentSpans.kt": "54e248b5bf5641c9649b9c2e9484ed3225bd2f47fcf5489cf2879db8bfe277c0",
+    "src/jvmTest/kotlin/borg/trikeshed/kanban/module/LlvmConfixRunTest.kt": "98e85ae872d3332719cc9142fb147fd8c553567a7514b7bc0f221d9b29c85e94",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/DocumentSpansTest.kt": "e91a31de345117c16225cdddcef4164e76790a6ad943536fb0d62d9be324ea61",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/LcncConfixSelectionTest.kt": "6bc8e3ceb189f53c1ce9092387405fe21f9a83cacb2e83b27bc239066855f49c"
+  },
+  "sourceEquivalence": "Only PanelsDocumentSource.kt changed after the final JVM/common-target build: readable document panes. The production Spacegraph bundle was rebuilt and both browser proofs repeated. Later publication commits contain documentation/evidence only.",
+  "preliminaryAttempts": [
+    {
+      "path": "preliminary/core-attempt01",
+      "result": "Production validation refused untyped JSON map on ProjectDoc doc? port. Preparation now admits the actual ProjectDoc and graph uses a retained source reference."
+    },
+    {
+      "path": "preliminary/core-attempt02",
+      "result": "Fixture had omitted PureNodes registry. Restored existing registry; no alternative executor."
+    },
+    {
+      "path": "preliminary/browser-attempt01",
+      "result": "Reference JSON transported integer sequence as Double; exact manifest comparison rejected it. Exact safe integers now normalize for comparison; fractional/changed metadata still refuse.",
+      "identityLimit": "Its manifest mislabeled JVM source as 2260c8a14; actual jar a9d3ca1084229f4409573b9e4cb2ef3c65b9a22357480f887bb107ca28d4c423 was built at 78ecb9d71. This failed attempt is not acceptance."
+    },
+    {
+      "path": "preliminary/browser-attempt02",
+      "result": "Real scanner completed but native selector did not read optional port aliases. Fixed actual route and retained route regression."
+    },
+    {
+      "path": "preliminary/browser-attempt03",
+      "result": "Nested selected arrays triggered IllegalAccessError from Kotlin-generated lazy projection calling a private local recursive function. Moved projection to an internal member and extended native/route serialization checks; failed run did not produce a successful receipt."
+    }
+  ],
+  "transportAttempt": {
+    "path": "preliminary/browser-attempt06",
+    "result": "Read-only invocation GET ended with socket hang up after successful native run and quotation checks. Fixture drained normally. No native/runtime error was logged; cause is unconfirmed. Retained as an incomplete transport attempt, not acceptance."
+  },
+  "additionalPreliminaryAttempt": {
+    "path": "preliminary/browser-attempt05",
+    "result": "Readable pane expanded correctly; fixed camera framing clipped the right edge after normal overlap layout. Harness now invokes the existing Fit graph action before viewport assertions; no production change."
+  },
+  "screenshotReview": {
+    "priorSuccessfulRun": "preliminary/browser-attempt04",
+    "result": "All nine cases passed; screenshot review found generic 150-pixel result clipping. Final browser gives document panes readable space and collapses raw fields; geometry assertions check quotation visibility."
+  },
+  "limits": [
+    "One exact passage from a real 12-page judicial opinion; not the Coinbase user agreement or a legal conclusion",
+    "Extraction derivative preserves supplied physical-page geometry; printed folios and source authentication remain unresolved",
+    "No autonomous all-page processing or general Nix evaluation",
+    "Native memory is explicitly owned; no unified-GC, zero-copy, speedup or native sandbox claim",
+    "Reopening replaces module owners inside one JVM; no separate-process or clean-machine recovery claim",
+    "LLVM instruction progress remains unobserved; pause is between node invocations",
+    "No dense recursive RTS/FPS acceptance or hostile PDF ingestion deadline",
+    "R4 portable dependency/runtime closure and Apple Silicon acceptance remain open"
+  ],
+  "d3m": "../../../d3m/2026-11-05-airgap-r3b.md"
+}

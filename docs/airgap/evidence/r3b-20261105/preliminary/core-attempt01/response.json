@@ -1,0 +1,44 @@
+{
+  "runId": "96b48e29-34e0-4a56-8791-5a2a4ddfd899",
+  "program": "airgap-coinbase-suski-core",
+  "programKey": null,
+  "programCid": "sha256:09744ef35dec8162e5b332a10cadd8e1802d97316da207f350acd9efa6edfaa0",
+  "inputs": {},
+  "status": "refused",
+  "queuedAtMs": 1793836738651.0,
+  "queueNamed": false,
+  "queueDeclaredSubnet": null,
+  "queueRequest": {
+    "timeoutMs": 120000.0,
+    "maxNodes": 10000.0,
+    "subnet": "local"
+  },
+  "queueDurability": "DURABLE",
+  "executionFamily": "lcnc/run/96b48e29-34e0-4a56-8791-5a2a4ddfd899",
+  "parentRunId": null,
+  "versionPolicy": "root-at-queue,subprogram-at-first-use",
+  "budgets": {
+    "timeoutMs": 120000.0,
+    "maxNodes": 10000.0,
+    "maxPayloadChars": 131072.0
+  },
+  "jobId": "lcnc/run/96b48e29-34e0-4a56-8791-5a2a4ddfd899",
+  "sequence": 2,
+  "timelineRevision": 2,
+  "receiptCid": "sha256:91b9d1987475de9521174502388fc8387bf721263a88fac1d5c22338c0583a42",
+  "violations": [
+    {
+      "rule": "kind-mismatch",
+      "fromNode": "document",
+      "fromPort": "value",
+      "toNode": "source",
+      "toPort": "doc?",
+      "detail": "json.value.value emits json, document.source.doc wants ProjectDoc"
+    }
+  ],
+  "ok": false,
+  "phase": "validation",
+  "error": "type_check_failed",
+  "finishedAtMs": 1793836738829,
+  "previousReceiptCid": "sha256:fc6ee9aa1f95be7202fa1f5bbed6d312d44d3b308e91b712a0a8835c04c61a0e"
+}

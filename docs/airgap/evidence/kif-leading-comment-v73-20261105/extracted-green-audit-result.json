@@ -1,0 +1,264 @@
+{
+  "result": "PASS",
+  "mode": "green",
+  "attemptDirectory": "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2",
+  "snapshotDirectory": "/workspace/library-files/english-inference-coverage-v73-proof/snapshot",
+  "sourceHead": "08dd94f6cf88e1fb002291bcc3b2195a9f426608",
+  "mainSha256": "72f74004dc435f869787d6d77e04eddbd31927065894bbe4e4f908245636a87a",
+  "recordedProductionJar": "/workspace/library-files/english-inference-coverage-v73-proof/snapshot/main.jar",
+  "commentedSourceCid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+  "acceptedSourceCid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+  "definitionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+  "writerPid": "87837",
+  "readerPid": "87933",
+  "httpRequests": 12,
+  "afterAttendBudgetPacked": "1037628254634744217",
+  "finalBudgetPacked": "691752682861992345",
+  "negativeBudgetTransitions": [
+    {
+      "case": "comment-only",
+      "beforeRefusal": "1037628254634744217",
+      "afterRefusal": "1037628254634744217",
+      "afterExplicitHealthyReplay": "691752682861992345"
+    },
+    {
+      "case": "unsupported-multiform",
+      "beforeRefusal": "691752682861992345",
+      "afterRefusal": "691752682861992345",
+      "afterExplicitHealthyReplay": "691752682861992345"
+    },
+    {
+      "case": "malformed-multiform",
+      "beforeRefusal": "691752682861992345",
+      "afterRefusal": "691752682861992345",
+      "afterExplicitHealthyReplay": "691752682861992345"
+    },
+    {
+      "case": "mixed-formats",
+      "beforeRefusal": "691752682861992345",
+      "afterRefusal": "691752682861992345",
+      "afterExplicitHealthyReplay": "691752682861992345"
+    },
+    {
+      "case": "hash-is-not-kif-comment",
+      "beforeRefusal": "691752682861992345",
+      "afterRefusal": "691752682861992345",
+      "afterExplicitHealthyReplay": "691752682861992345"
+    }
+  ],
+  "casBlobs": 2,
+  "walFrames": [
+    {
+      "sequence": 1,
+      "kind": "R",
+      "bytes": 86,
+      "angular": "4616048923953057863",
+      "sourceCid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802"
+    },
+    {
+      "sequence": 2,
+      "kind": "B",
+      "bytes": 241,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    },
+    {
+      "sequence": 3,
+      "kind": "A",
+      "bytes": 41,
+      "angular": "4616048923953057863",
+      "budgetPacked": "1037628254634744217"
+    },
+    {
+      "sequence": 4,
+      "kind": "B",
+      "bytes": 241,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    },
+    {
+      "sequence": 5,
+      "kind": "B",
+      "bytes": 241,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    },
+    {
+      "sequence": 6,
+      "kind": "B",
+      "bytes": 241,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    },
+    {
+      "sequence": 7,
+      "kind": "B",
+      "bytes": 241,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    },
+    {
+      "sequence": 8,
+      "kind": "B",
+      "bytes": 241,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    }
+  ],
+  "checks": [
+    "Frozen JAR/source head and all twelve production owner/codec class origins in two distinct processes",
+    "Seven pinned fixtures and complete source bytes, canonical proposition CBOR and scalar constant/literal roles",
+    "Actual HTTP request byte identities/statuses, exact source-scoped import/replay/attention and closed owners",
+    "Entire actual closed CAS pack decoded and content-hashed: exact accepted source/definition only",
+    "Independent full WAL frame CRC32C/sequence validation and exact source receipt/signal/evidence/budget replay",
+    "Five refusals preserve full bag and CAS bytes; explicit healthy replay preserves signal/evidence while renewing attention; actual after-close readbacks/WAL match",
+    "8 mutated copies rejected by the same verifier"
+  ],
+  "mutatedCopyControls": [
+    {
+      "mutation": "wrong-source-context-CID",
+      "result": "REJECTED",
+      "reason": "writer source/definition/comment fixture CID"
+    },
+    {
+      "mutation": "wrong-HTTP-request-byte-hash",
+      "result": "REJECTED",
+      "reason": "HTTP request byte/CID mismatch"
+    },
+    {
+      "mutation": "negative-returned-200",
+      "result": "REJECTED",
+      "reason": "HTTP status mismatch: comment-only"
+    },
+    {
+      "mutation": "same-PID-reader",
+      "result": "REJECTED",
+      "reason": "separate reader PID/source/definition binding"
+    },
+    {
+      "mutation": "wrong-readback-proposition",
+      "result": "REJECTED",
+      "reason": "separate reader PID/source/definition binding"
+    },
+    {
+      "mutation": "unclosed-bag-owner",
+      "result": "REJECTED",
+      "reason": "writer owner/transport/storage cleanup"
+    },
+    {
+      "mutation": "negative-changed-full-bag-budget",
+      "result": "REJECTED",
+      "reason": "negative full bag evidence/signal/budget changed"
+    },
+    {
+      "mutation": "after-close-source-readback-hash",
+      "result": "REJECTED",
+      "reason": "after-close source readback byte hash/size"
+    }
+  ],
+  "limits": [
+    "Loopback HttpServer delegates to production BeliefWire; body UTF-8 decoding is done by the observer facade.",
+    "No malformed-raw-UTF8 transport or OS airgap claim.",
+    "Manual declared KG; no source authentication, semantic entailment, reasoner result or complete KIF conformance.",
+    "Clean separate-process close/reopen; no crash or power-loss recovery claim."
+  ],
+  "artifactHashes": {
+    "/workspace/library-files/english-inference-coverage-v73-proof/snapshot/main.jar": {
+      "bytes": 36011922,
+      "sha256": "72f74004dc435f869787d6d77e04eddbd31927065894bbe4e4f908245636a87a"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/inputs/commented.kif": {
+      "bytes": 77,
+      "sha256": "fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/inputs/plain.kif": {
+      "bytes": 40,
+      "sha256": "6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/inputs/comment-only.kif": {
+      "bytes": 31,
+      "sha256": "02d5281bbc34b637189f1e8b9cdc38f33116c6b7439f9a6a27c8d48e2f9715a1"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/inputs/unsupported-multiform.kif": {
+      "bytes": 61,
+      "sha256": "05919573a1176bfbb241f82f690776a46ca232c94f569aadb774203697382600"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/inputs/malformed-multiform.kif": {
+      "bytes": 62,
+      "sha256": "37a9dc3fb665a6a60746b047785fa804a84f6697735551aae0b9bf26437d853b"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/inputs/mixed-formats.kif": {
+      "bytes": 59,
+      "sha256": "c4f732d3eb1c8c0b002af17572996d4da962bea1c176e23243e28201c311e2cd"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/inputs/hash-is-not-kif-comment.kif": {
+      "bytes": 42,
+      "sha256": "8877c0c70c9b1a895ff76a502cc4714cef481504160e57dd0c7c84488bd920e5"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/accepted-source.kif": {
+      "bytes": 77,
+      "sha256": "fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/commented.kif": {
+      "bytes": 77,
+      "sha256": "fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/plain.kif": {
+      "bytes": 40,
+      "sha256": "6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/definition.cbor": {
+      "bytes": 242,
+      "sha256": "a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/runtime/cas/pack": {
+      "bytes": 393,
+      "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/runtime/beliefs.wal": {
+      "bytes": 1757,
+      "sha256": "d0f22242b9fa91195b7108d50c92e15ef3b6d7f7481f5c95f40073e0f2241d62"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/writer-result.json": {
+      "bytes": 14839,
+      "sha256": "f7a94c72a97a00ccbb13d85e9345040546ab0ac994d9314f0444f623d99cff37"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/reopen-result.json": {
+      "bytes": 1935,
+      "sha256": "18b29505775167fb7bdf50688d7ede0240931fbcecca7666ca036fe765622719"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/http-records.json": {
+      "bytes": 7477,
+      "sha256": "c8aa1e1bf343cd6224f0e2173d933781eaf1b0aefb66d9b47de18d1574672b92"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/cleanup.json": {
+      "bytes": 220,
+      "sha256": "d68b66755d48a34035126133949dbbf8cde89a01f162bacb9fade5f2975c5eba"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/writer-identity.json": {
+      "bytes": 1854,
+      "sha256": "e30e7c9fc69de3441c062599cca9620d5780fc864007220086812432c83fe20b"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/reopen-identity.json": {
+      "bytes": 1854,
+      "sha256": "35d9831242c810bcfb3891875f5dedd32b64c2901db9d89a12c6dcd71e7742ab"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/Proof.kt": {
+      "bytes": 16017,
+      "sha256": "4e72b8caf8a6f8964c21d3cae877322543f816e9715136ebba42987c2475faf2"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/compile.sh": {
+      "bytes": 681,
+      "sha256": "2a846c3f07efe814bcdc177cefd70c9ae269239b134d087f284c08d15c47ae71"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/run.sh": {
+      "bytes": 716,
+      "sha256": "5aa91ad29ae6cb80c336225dd5dac866628699146033f6921f181bd9e11cfb7b"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/green-v73-attempt2/observer-inputs/input-manifest.json": {
+      "bytes": 1477,
+      "sha256": "0a215fb6cf7057b16d8caf4fbb44fa4247adefd05456f405aa728cdc35e5784f"
+    }
+  },
+  "auditScriptSha256": "79565d78eb42d37d85b46eb768d382195961b883bd6be74d67eddde29dc48a11"
+}

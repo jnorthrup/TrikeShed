@@ -1,0 +1,52 @@
+{
+  "scope": "Documentation-only v73 KIF HTTP evidence; each sibling artifact except this manifest itself is SHA256-bound",
+  "sourceHead": "08dd94f6cf88e1fb002291bcc3b2195a9f426608",
+  "selectedGreenAttempt": "green-v73-attempt2",
+  "selectedRedAttempt": "red-v72-attempt2",
+  "files": {
+    "README.md": {
+      "bytes": 4869,
+      "sha256": "e183488c52529722afe4cfef869572ca959835ef4d0615c0c34590ca847de5f0"
+    },
+    "audit-usage.txt": {
+      "bytes": 2760,
+      "sha256": "146f6e42152c3167c9b86ca8256ca448bb7bade69f45e22ae2ebcfef6b5ecf67"
+    },
+    "audit.py.txt": {
+      "bytes": 27367,
+      "sha256": "79565d78eb42d37d85b46eb768d382195961b883bd6be74d67eddde29dc48a11"
+    },
+    "extracted-green-audit-result.json": {
+      "bytes": 13369,
+      "sha256": "998de061bd31e7770c7aa79c2a0a284d31d2890f6f81ec73a9933f1d85517a36"
+    },
+    "extracted-red-audit-result.json": {
+      "bytes": 9650,
+      "sha256": "3ee4ff3d9b95769e44a5cce69b12529eae2257d646351f4ea9868d782e47fb08"
+    },
+    "green-audit-report.txt": {
+      "bytes": 968,
+      "sha256": "4a3d63bd11d331ac102a1a8de4f4f6e910851f1fa1982a3b44f9531fc16cd977"
+    },
+    "green-audit-result.json": {
+      "bytes": 12793,
+      "sha256": "475e6f97cc79c2ee0042380eebf462830a4207d1669fb8678e2c497a769639c2"
+    },
+    "records.tar.gz": {
+      "bytes": 122560,
+      "sha256": "2f5531444d02209b60b5681972651c6aa355d151b91d0dd266f9d111cc45cf33"
+    },
+    "red-audit-report.txt": {
+      "bytes": 811,
+      "sha256": "9c9aca5f492f686a0439a30ee3ceb2ccda6f6395a1aede2bbdb1f558f202671d"
+    },
+    "red-audit-result.json": {
+      "bytes": 9074,
+      "sha256": "c8fbe7af349d33fe20f07b361d1ed26267bcd87a66239ba9fab42211f7274b5b"
+    },
+    "summary.json": {
+      "bytes": 20042,
+      "sha256": "1cdf84aae0e125a8874ea6f57331d7476e8ae1f2aacb9b89b9972e3c4f764c8c"
+    }
+  }
+}

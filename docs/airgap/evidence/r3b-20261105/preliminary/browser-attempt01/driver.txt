@@ -1,0 +1,6 @@
+page.waitForFunction: Timeout 60000ms exceeded.
+    at pause (/workspace/airgap-r3b-proof/driver.cjs:27:29)
+    at /workspace/airgap-r3b-proof/driver.cjs:46:80 {
+  log: [],
+  name: 'TimeoutError'
+}

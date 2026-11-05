@@ -1,0 +1,16 @@
+apiRequestContext.get: socket hang up
+Call log:
+[2m  - → GET http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3Ae9f8ec6a3b76b6f7919592721ef4af3705b43488aa83fe8be7d418846b372289[22m
+[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36[22m
+[2m    - accept: */*[22m
+[2m    - accept-encoding: gzip,deflate,br[22m
+
+    at /workspace/airgap-r3b-proof/driver.cjs:71:44 {
+  log: [
+    '  - → GET http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3Ae9f8ec6a3b76b6f7919592721ef4af3705b43488aa83fe8be7d418846b372289',
+    '    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36',
+    '    - accept: */*',
+    '    - accept-encoding: gzip,deflate,br'
+  ],
+  name: 'Error'
+}

@@ -1,0 +1,321 @@
+{
+  "kind": "english-combined-checkpoint/74",
+  "at": "2026-11-05T01:52:09.739397+00:00",
+  "testedSource": "ddce0153ef4cb625b30b2cc5ca47cec98dddfa3e",
+  "sourceRefFreezes": [
+    {
+      "refs": 651,
+      "ordinaryThreeWayMerges": 2,
+      "allContained": true
+    },
+    {
+      "refs": 656,
+      "ordinaryThreeWayMerges": 2,
+      "allContained": true
+    }
+  ],
+  "publicationRefFreeze": {
+    "refs": 658,
+    "uniqueTips": 516,
+    "ordinaryThreeWayMerges": 1,
+    "allContained": true,
+    "inventorySha256": "f4fe9e00c37e157c0073f8699cf55dc8882d3e862091495c6236f4ae0396055a",
+    "tieOrder": "committertimestamp,commitOID,refname"
+  },
+  "behavior": {
+    "reviewedProofPaths": "Existing protected current-approved plan projects complete sources and actual ordered proof alternatives; Documents binds all quotations/identities and shows exact English/KIF premises, source focus and truncation.",
+    "defaultConfix": "All advertised Kotlin pickPath outputs now present, JSON null distinguished from absent; source CID and inclusive UTF8 byteSpan name original JSON, legacy display sheets stay separate.",
+    "intakeCancellation": "Owning scope admission checked after capacity handoff; ancestor cancellation propagates before waiting sibling can begin; counters and existing regression assertions unchanged.",
+    "airgapFixtures": "Actual process prohibition remains enabled. Route fixtures assert exact rejection and zero fake HTTP calls when prohibited; permitted transport branch and invalid-selection tests retained.",
+    "staleLabel": "Unconfirmed review/source status no longer displays the previous cached sourceCurrent=true as current."
+  },
+  "build": {
+    "selectedJvmTests": 457,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "allJvmTestSourcesCompiled": true,
+    "allThreeBrowserBuilds": "PASS",
+    "actualFinalJvmExecutionSource": "ddce0153ef4cb625b30b2cc5ca47cec98dddfa3e",
+    "configuredPinnedNativeSolverChecks": "PASS",
+    "confixPinnedRetainedBitcodeRuntimeMethods": 9,
+    "freshConfixAdapterRebuild": "Not attempted; exactClang22.1.8 executable/package unavailable; unchanged retained published adapter/IR.",
+    "targetedPriorFailureReplay": {
+      "command": "./gradlew jvmTest -I /workspace/.trikeshed-cloud/resolve-jvm.init.gradle -PkotlinJsApps=documents,pages,spacegraph --daemon --configuration-cache --max-workers=4 -Ptrikeshed.native.mlnix=/workspace/library-files/mlnix-native-validation/build/bin/mlnix -Ptrikeshed.native.mlnix.sha256=97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5 -Ptrikeshed.native.adapter=/workspace/TrikeShed/utils/sumo-nix/run.nix -Ptrikeshed.native.datalog=/workspace/library-files/sumo-nix-proof/source --tests borg.trikeshed.forge.server.CurationIntakeTest.ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount --tests borg.trikeshed.lcnc.WorkModelRouteTest",
+      "expectedTests": 3,
+      "result": "PASS",
+      "totals": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "logSha256": "1e98af4a6e1614327263002f3b406006dc8aec16bc51ad49af924a7c540046ab",
+      "mode": "actualprocessAirgap1; exactrejection+0fakeHTXtransportcalls"
+    },
+    "failedBuildAttempts": [
+      {
+        "attempt": 1,
+        "source": "83cddf9586a81743320356ec3e58475f8ed5ae09",
+        "result": "TEST_SOURCE_COMPILE_FAILURE",
+        "location": "LcncConfixPickPathContractTest.kt:12",
+        "reason": "Test called protected CasStore constructor directly; corrected test-only anonymous subclass",
+        "mainAndThreeJs": "PASS; tests not executed",
+        "log": "build-v74-attempt1.log"
+      },
+      {
+        "attempt": 2,
+        "source": "5be3bba84529226c697f1b62409aa80dcaa440af",
+        "result": "THREE_TEST_FAILURES",
+        "totals": {
+          "tests": 457,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0
+        },
+        "failures": [
+          {
+            "class": "borg.trikeshed.lcnc.WorkModelRouteTest",
+            "method": "selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm]",
+            "message": "org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+          },
+          {
+            "class": "borg.trikeshed.lcnc.WorkModelRouteTest",
+            "method": "selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm]",
+            "message": "borg.trikeshed.agent.modelmux.Airgap$Rejection: airgap: remote model calls are disabled"
+          },
+          {
+            "class": "borg.trikeshed.forge.server.CurationIntakeTest",
+            "method": "ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount()[jvm]",
+            "message": "org.opentest4j.AssertionFailedError: expected: <3> but was: <4>"
+          }
+        ],
+        "log": "build-v74-attempt2.log",
+        "xml": "/workspace/library-files/curation-next/build-v74-attempt2-test-results",
+        "diagnosis": "Curation owner/permit cancellation handoff race; two fake-HTTP route fixtures omitted process airgap policy expectations. No production guard relaxation."
+      }
+    ],
+    "processAirgapProfile": "TRIKESHED_AIRGAP=1 remains active from activation; model-route tests assert exact refusal+zero fake HTX, permitted transport assertions not exercised in this profile",
+    "finalLabelBuild": "1m;457 tests re-executed with0 failures/errors/skips"
+  },
+  "artifacts": {
+    "main.jar": "b8cfd4ac9b641df161c5aa8edc6f15c9dfde63f0dec12bdda6b4f5595fb64233",
+    "documents.js": "2ce1d1463fb7aedfe62e744f336e2ce0307c237463469c6b263459b60857c62f",
+    "spacegraph.js": "e70cf39ce3fbbd353774fea476a61c5ad512c684d8ad1b341c11f275e39825e6",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "dependencyJars": 119,
+  "totalClasspathJars": 120,
+  "liveDocumentsWorkflow": {
+    "selectedAttempt": "native-v74-attempt2",
+    "positiveInspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+    "originalSourceCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "sourceUtf8Bytes": 41,
+    "originalArchiveFiles": 7,
+    "guestModules": {
+      "installed": [],
+      "mounted": []
+    },
+    "freshInspectPosts": 0,
+    "modelCalls": 0,
+    "configuredModels": 0,
+    "automaticIntake": 0,
+    "analysisReteFacts": 0,
+    "blackboardUnchangedFromReadinessBaseline": true,
+    "syntheticReviewer": true,
+    "actualHttp": [
+      {
+        "method": "POST",
+        "path": "/api/documents/english/retained",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/api/documents/review/session",
+        "status": 401
+      },
+      {
+        "method": "GET",
+        "path": "/api/documents/review/session",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/english-taxonomy-candidates",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/english-taxonomy",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/snapshot",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 409
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/decision",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/documents/review/taxonomy-plan",
+        "status": 409
+      }
+    ],
+    "queryCases": [
+      {
+        "status": "SUPPORTED",
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "planSources": 2,
+        "displayedSources": 2,
+        "premiseCounts": [
+          2
+        ]
+      },
+      {
+        "status": "UNKNOWN",
+        "goal": {
+          "predicate": "subclass",
+          "subject": "urn:legal:Agent",
+          "object": "urn:legal:Person"
+        },
+        "planSources": 2,
+        "displayedSources": 2,
+        "premiseCounts": []
+      },
+      {
+        "status": "SUPPORTED",
+        "goal": {
+          "predicate": "subclass",
+          "subject": "urn:legal:Person",
+          "object": "urn:legal:Person"
+        },
+        "planSources": 2,
+        "displayedSources": 2,
+        "premiseCounts": [
+          1,
+          1
+        ]
+      }
+    ],
+    "sourceFocusActions": 4,
+    "sourceFocusScope": "Local verified evidence cards; document URL/hash/focus context preserved, not original PDF/page navigation.",
+    "reviewWalCaptures": 7,
+    "reviewWal": {
+      "bytes": 194,
+      "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766"
+    },
+    "reviewFrames": 2,
+    "reviewWrites": "Explicit freeze and approve only; read-only queries and stale refusal append no review decisions.",
+    "staleCurrentnessLabel": "source current: unconfirmed",
+    "currentSourceBefore": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+      "seq": 0,
+      "length": 41,
+      "contentType": "text/plain"
+    },
+    "currentSourceAfter": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db",
+      "rev": "2-sha256:18c06fb3a81e4cec66d952d4f42f34ced73bc948090a279d25c0795241ad657e",
+      "seq": 1,
+      "length": 80,
+      "contentType": "text/plain"
+    },
+    "historicalInspectionCurrentAfterAmendment": false,
+    "sourceProfileLimits": {
+      "maxAssertions": 256,
+      "maxTotalChars": 1048576,
+      "maxSteps": 10000,
+      "maxProofs": 128
+    },
+    "displayExportByteLimit": 16777216,
+    "writerPid": "99002",
+    "readerPid": "99285",
+    "afterCloseCasReadbacks": 8,
+    "casPack": {
+      "bytes": 20860,
+      "sha256": "b8ca2ad77651a2c2a207a5100f3bebb7a65c901f7556c6cfb81761c13955a084"
+    },
+    "allOwnedResourcesDrained": true
+  },
+  "rootPublicAudit": {
+    "result": "PASS",
+    "finalMutatedCopyRefusals": 14,
+    "beforeLabelCorrectionMutatedCopyRefusals": 13,
+    "safelyExtractedRegularMembers": 120,
+    "samePublicArchiveBytes": true,
+    "scriptSha256": "5f8af53a0eca28f542bc63136b14e803bc6b17a8c0482dafd860ea71a1c38575",
+    "workingScreenshotsVisuallyInspected": [
+      "native-supported-two-ordered-premises-visible-proof.png",
+      "native-source-current-unconfirmed.png"
+    ],
+    "scope": "Recorded source/identity/provenance/display consistency; not independent English/legal entailment or proof validity."
+  },
+  "preservedEarlierRuntime": {
+    "attempt": "native-v74-attempt1",
+    "source": "dc4686a399f606397fc8aa6221055f40f5272d41",
+    "documentsSha256": "db21e0de1aadd88cee1a226772cfc05c864e6e99aecb170156d7668158af4b00",
+    "result": "Functional read/refusal/retention PASS; cached source-current label corrected afterwards.",
+    "amendedRuntimeRewound": false,
+    "newRuntimeInput": "Fresh copy of exact original seven-file archive; earlier actual amended source remains intact."
+  },
+  "publicEvidence": {
+    "directory": "docs/airgap/evidence/reviewed-taxonomy-path-v74-20261105",
+    "manifestSha256": "1dfcfd7d5af36c0a09097ec88cbdc903da4501c54dc4da3a2948a2765dd51175",
+    "verifiedFiles": 19,
+    "archive": {
+      "bytes": 1483474,
+      "sha256": "9b4745269c341017f1ceb28a4728714ee93ab5150eb60f2235f7dd159ea7b5ba"
+    },
+    "selectedAuditResultSha256": "3179eda58f54559ae39e70051970f3fd951e34f51d392c8f4f54e626d7147866"
+  },
+  "productionChangesAfterFinalTestedSource": [],
+  "limits": [
+    "The returned paths are positive ground taxonomy derivations over manually declared reviewed translation assumptions. They are not independently established English or legal entailment.",
+    "The reviewer is explicitly synthetic; no expert human legal approval or source authentication is established.",
+    "The actual retained CoreNLP receipt is reused with empty SDK; no fresh parser execution or producer reauthentication is claimed.",
+    "The structured projection validator checks receipt identities, source joins and serialization consistency; it does not independently verify inference rules.",
+    "Source IDs, English original/extracted CIDs, derived KIF CID and logical terms remain distinct. Repeated witnesses/alternative proofs are not independent NARS evidence.",
+    "After actual source amendment the old carrier remains historical; retention does not make its source or approval current.",
+    "Clean-close reopening is not crash/power-loss durability, and fixture egress denial is not sealed distribution or universal OS/native containment.",
+    "No NARS role-variable query, predicate coexistence at one natural angle, source retraction or training capability is added.",
+    "Source-profile bounds are preserved; display export is separately bounded16MiB. No full SPARQL, full SUMO/Horn or legal applicability completeness is claimed."
+  ],
+  "activeNextSlices": [
+    "Optional LCNC visual query program on the existing protected taxonomy-plan POST, mapped to request-local proof/evidence quads with post-query approval/currentness recheck.",
+    "Preserve absent-program behavior and clearly separate computed frame IDs from CAS availability, query-local provenance from reviewed authority, and literal KIF tokens from evidence resources.",
+    "Continue unified project/wiki/blackboard navigation, generic visual SPARQL, difficult-page OCR, contained Hermes/Pi recall and meaningful typed NARS corpus/role reasoning as measured separate work."
+  ]
+}

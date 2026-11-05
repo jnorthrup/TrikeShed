@@ -12,6 +12,37 @@ import kotlin.test.*
 class LlvmConfixRunTest {
     @org.junit.jupiter.api.io.TempDir lateinit var directory: Path
 
+    @Test fun nativeSelectionConsumesOptionalPortSpellingsThroughTheActualRoute(): Unit = runBlocking {
+        val session = LlvmScalarRunTest.Session(directory, coroutineContext)
+        try {
+            session.open(LlvmScalarTest.bytes())
+            session.ctx.lcncRunners.putAll(PureNodes.registry { 0L })
+            val scanner = LlvmConfix.open(checkNotNull(session.kernel), KernelId("scan"),
+                LlvmConfixTest.profile(), LlvmScalarTest.files(LlvmConfixTest.bytes()))
+            session.ctx.lcncRunners[LlvmConfixContract.TYPE] = scanner.runner(session.cas)
+            val json = "{\"quote\":\"é水🙂\",\"page\":12,\"anchors\":[{\"page\":12,\"box\":[1,2,3,4]}]}"
+            val program = LcncProgram("native-selection-optional-ports", s_[
+                LcncNode("text", "text.value", _m["value" j json]),
+                LcncNode("scan", LlvmConfixContract.TYPE, _m["format" j "JSON"]),
+                LcncNode("selection", "confix.pickPath", _m["geometry" j "native", "path" j "/"])],
+                s_[LcncWire("text", "value", "scan", "data?"), LcncWire("text", "value", "selection", "data?"),
+                    LcncWire("scan", "rows", "selection", "rows?"), LcncWire("scan", "ok", "selection", "ok?"),
+                    LcncWire("scan", "format", "selection", "format?"), LcncWire("scan", "sourceCid", "selection", "sourceCid?")])
+            val receipt = session.request("POST", "/api/lcnc/run", jsonOf(_m["name" j program.name,
+                "document" j reify(LcncProgramConfix.toJson(program))]))
+            assertEquals("completed", receipt["status"], jsonOf(receipt))
+            val selection = ((receipt["outputs"] as Map<*, *>)["selection"] as Map<*, *>)
+            assertEquals("native", selection["geometry"])
+            assertEquals(ContentId.of(json.encodeToByteArray()).value, selection["sourceCid"])
+            val value = selection["value"] as Map<*, *>
+            assertEquals("é水🙂", value["quote"])
+            assertEquals(12.0, (value["page"] as Number).toDouble())
+            val anchor = (value["anchors"] as List<*>).single() as Map<*, *>
+            assertEquals(12.0, (anchor["page"] as Number).toDouble())
+            assertEquals(_l[1.0, 2.0, 3.0, 4.0], (anchor["box"] as List<*>).map { (it as Number).toDouble() })
+        } finally { session.close() }
+    }
+
     @Test fun sourceGeometryAndScalarSummarySurviveReopening(): Unit = runBlocking {
         val first = LlvmScalarRunTest.Session(directory, coroutineContext)
         val source = "{\"agreement\":\"Coinbase\",\"revision\":42,\"active\":true}"

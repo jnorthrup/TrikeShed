@@ -1,0 +1,52 @@
+{
+  "runId": "c3c4c8d3-e11e-4faf-81ea-75b813fdc57b",
+  "program": "airgap-coinbase-suski-core",
+  "programKey": null,
+  "programCid": "sha256:b1dd3a456466970da46e53951623ff9ff3f978b38991b3e3750cbcd359aaa9e3",
+  "inputs": {},
+  "status": "failed",
+  "queuedAtMs": 1793836899799.0,
+  "queueNamed": false,
+  "queueDeclaredSubnet": null,
+  "queueRequest": {
+    "timeoutMs": 120000.0,
+    "maxNodes": 10000.0,
+    "subnet": "local"
+  },
+  "queueDurability": "DURABLE",
+  "executionFamily": "lcnc/run/c3c4c8d3-e11e-4faf-81ea-75b813fdc57b",
+  "parentRunId": null,
+  "versionPolicy": "root-at-queue,subprogram-at-first-use",
+  "budgets": {
+    "timeoutMs": 120000.0,
+    "maxNodes": 10000.0,
+    "maxPayloadChars": 131072.0
+  },
+  "jobId": "lcnc/run/c3c4c8d3-e11e-4faf-81ea-75b813fdc57b",
+  "sequence": 3,
+  "timelineRevision": 3,
+  "receiptCid": "sha256:cd2a8f5ca6f4de151f039e02da95dc19b591076ccf6b8704504183201351c13f",
+  "workgroup": "lcnc/program/airgap-coinbase-suski-core@sha256:b1dd3a456466970da46e53951623ff9ff3f978b38991b3e3750cbcd359aaa9e3",
+  "claimId": 1,
+  "subnet": "local",
+  "claimedAtSubnet": "local",
+  "claimLineage": [
+    {
+      "workgroup": "lcnc/program/airgap-coinbase-suski-core@sha256:b1dd3a456466970da46e53951623ff9ff3f978b38991b3e3750cbcd359aaa9e3",
+      "claimId": 1
+    }
+  ],
+  "parentWorkgroup": null,
+  "parentClaimId": null,
+  "startedAtMs": 1793836900069,
+  "programVersions": {},
+  "previousReceiptCid": "sha256:6fcc42a5133be1ee89977b6a070bfae8e9458165cce8a961153f569a6fb1938b",
+  "ok": false,
+  "phase": "execution",
+  "error": "no runner registered for node type 'json.value'",
+  "finishedAtMs": 1793836900114,
+  "invocationsCid": "sha256:52064bc2c91353b0dbbe9c83c3f467f408e9e2d97b838f13feb145f7cf43aed0",
+  "oroborosCid": "sha256:cfc5f2bb27743f071118a7e6023076e692f7f70cd3d85cf2ab84030f4c2c7d88",
+  "invocationsAttempted": 1,
+  "invocationsDropped": 0
+}

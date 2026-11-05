@@ -1,0 +1,13 @@
+from pathlib import Path
+import subprocess
+root=Path('/workspace/airgap-r3b-proof')
+cache=Path('/workspace/gradle-offline-cache/caches/modules-2/files-2.1')
+compiler=[]
+for org,name in [('org.jetbrains.kotlin','kotlin-compiler-embeddable'),('org.jetbrains.kotlin','kotlin-stdlib'),('org.jetbrains.kotlin','kotlin-script-runtime'),('org.jetbrains.kotlin','kotlin-reflect'),('org.jetbrains.kotlin','kotlin-daemon-embeddable'),('org.jetbrains.intellij.deps','trove4j'),('org.jetbrains','annotations'),('org.jetbrains.kotlinx','kotlinx-coroutines-core-jvm')]:
+    compiler += [str(p) for p in sorted((cache/org/name).rglob('*.jar'))]
+cp=':'.join(p for p in Path('/workspace/TrikeShed/build/mux/classpath.txt').read_text().strip().split(':') if not p.endswith('.pom'))
+(root/'runtime-classpath.txt').write_text(cp+'\n')
+(root/'classes').mkdir(exist_ok=True)
+cmd=['/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/java','-Xmx1g','-cp',':'.join(compiler),'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-jvm-target','25','-classpath',cp,'-d',str(root/'classes'),str(root/'Fixture.kt')]
+with (root/'compile.txt').open('w') as log:p=subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT)
+print('exit',p.returncode);print((root/'compile.txt').read_text()[-5000:]);raise SystemExit(p.returncode)

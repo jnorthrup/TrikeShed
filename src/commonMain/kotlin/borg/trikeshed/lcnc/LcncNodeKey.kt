@@ -130,6 +130,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     READ_CONSTRUCT("read.construct"),
     DOCUMENT_CURATE("document.curate"),
     DOCUMENT_SOURCE("document.source"),
+    DOCUMENT_SPANS("document.spans"),
     DOCUMENT_REVIEW_SNAPSHOT("document.reviewSnapshot"),
     DOCUMENT_REVIEW_DECISION("document.reviewDecision"),
     DOCUMENT_REVIEW_RELEASE("document.reviewRelease"),

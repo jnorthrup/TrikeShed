@@ -10,7 +10,7 @@ and D3M integration record. A planned gate is not a completed release.
 | R1: owned scalar execution | Standard MLIR arithmetic through a pinned Sulong module, two wired LCNC nodes, durable receipt reopening | [Verified runbook](../sulong-bitcode/README.md); published master `26d5bf3db` |
 | R2: owned Confix scanning | Execute the real pinned upstream JSON/CBOR/YAML scanner, copy bounded rows, release native buffers, compare Kotlin results, retain a whole-program LCNC receipt | [Verified runbook](02-confix.md), [exact evidence](evidence/r2-20261104/verification.json), [D3M record](../d3m/2026-11-04-airgap-r2.md) |
 | R3a: observed transfers | Actual selected-wire sparks, recorded LLVM flyovers, reduced motion and immutable receipt playback | [Implemented contract and evidence](04-observed-transfers.md); bounded precursor to full R3 |
-| R3: visible document traversal | Source intake to scanner/evidence nodes with measured wire activity, pause at supported boundaries and evidence flyovers | Planned; [implementation handoff](03-visible-traversal.md) and [visual acceptance](../lcnc/airgap-demonstrator/07-visualization.md) |
+| R3b: retained document traversal | Real 12-page PDF, production extraction, bounded passage, LLVM geometry selection, verified source/quotation and reopening without LLVM | [Verified increment](05-document-traversal.md), [final combined evidence](evidence/r3b-cutoff-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r3b.md); dense recursive visualization remains open |
 | R4: offline release closure | Reproducible packaged runtime, verified dependency closure and clean-machine startup without external networking | Planned; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
@@ -19,6 +19,20 @@ three exact-program syntax queries, and selected B trace/Evidence ownership when
 older A invocation reads return. It retains its final-JAR identity, original
 inspection, failed attempts, after-close CAS proof and independent audit; it
 does not close the planned R3/R4 gates.
+
+The [v73 KIF comment follow-up](evidence/kif-leading-comment-v73-20261105/README.md)
+retains an actual v72 RED and v73 GREEN HTTP comparison for the same commented
+CRLF/Unicode source, whole-input refusals without bag/CAS changes, healthy
+replay attention renewal, and independent after-close CAS/WAL verification.
+Its manual declared-KG scope does not establish source entailment or complete
+KIF conformance.
+
+The [v74 native reviewed-proof paths](evidence/reviewed-taxonomy-path-v74-20261105/README.md)
+show actual ordered premises, English/KIF evidence-card focus without route
+changes, valid UNKNOWN and source-backed reflexivity, then real source-stale409
+with cleared proof and unconfirmed currentness. The retained parser, explicit
+synthetic review and independent provenance audit stay scoped to the manual
+translation assumptions; this is not independent English entailment.
 
 ## R2 acceptance and verification
 
@@ -66,5 +80,23 @@ sanitizer audit passed 150,026 bounded cases; it is not an exhaustive proof.
 All 494 enumerated remote branches and six local branches were contained by
 the final D3M audit (501 refs including origin/HEAD). No conflicts occurred and
 no branches were deleted in that R2 publication. [R3a](04-observed-transfers.md)
-adds measured wire activity and native inspection. R3's full document path
-and R4's sealed runtime/clean-machine closure remain open.
+adds measured wire activity and native inspection. [R3b](05-document-traversal.md)
+now verifies a bounded passage from a real retained PDF through that path.
+Dense recursive visualization and R4's sealed runtime/clean-machine closure
+remain open.
+
+
+## R3b acceptance
+
+The retained *Coinbase, Inc. v. Suski* opinion traverses production source
+admission, a 2,028-byte passage envelope, real LLVM scanning (151 rows), native
+indexed selection and browser source verification. The exact 177-unit quote
+retains physical-page anchors and separate original/extraction identities.
+Eight consumed wires are observed; both project revisions are recorded.
+
+The final combined code passed 201 selected JVM regressions, the listed platform
+compiles, nine document browser cases and 11 animation/replay regressions.
+The frozen D3M inventory contains 511 remote branches and nine local branches
+plus origin/HEAD; no conflict or branch deletion occurred. Reopening without
+LLVM happens within one JVM. The evidence does not claim clean-machine closure,
+general Nix evaluation, legal adjudication or exhaustive all-page processing.

@@ -1,0 +1,500 @@
+{
+  "kind": "english-combined-checkpoint/73",
+  "at": "2026-11-05T00:50:45.709336+00:00",
+  "testedSource": "08dd94f6cf88e1fb002291bcc3b2195a9f426608",
+  "productionSourceBeforeTestOnlyCompileFix": "3c9b5e0f551f29bd63acfe4216670fa961a2b239",
+  "sourceRefFreeze": {
+    "refs": 641,
+    "ordinaryThreeWayMerges": 2,
+    "allContained": true,
+    "tieOrder": "committertimestamp,commitOID,refname"
+  },
+  "publicationRefFreeze": {
+    "refs": 646,
+    "ordinaryThreeWayMerges": 3,
+    "allContained": true,
+    "inventorySha256": "5109cf42d822eebdeeff96a139faf8696cb080bd19f8ebdec9e79cac80616d90"
+  },
+  "build": {
+    "selectedJvmTests": 426,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "allJvmTestSourcesCompiled": true,
+    "allThreeBrowserBuilds": "PASS",
+    "configuredPinnedNativeSolverChecks": "PASS",
+    "confixPinnedRetainedBitcodeRuntimeMethods": 9,
+    "freshConfixAdapterRebuild": "Not attempted; exactClang22.1.8 executable/package unavailable. Unchanged retained Confix adapter/IR from published checkpoint.",
+    "failedBuildAttempts": [
+      {
+        "attempt": 1,
+        "source": "3c9b5e0f551f29bd63acfe4216670fa961a2b239",
+        "result": "TEST_SOURCE_COMPILE_FAILURE",
+        "location": "LegalRequiredAnchorCoverageCliTest.kt:35",
+        "reason": "emptyList() element type not inferred against untyped JSON value",
+        "mainAndThreeJs": "PASS; no tests executed",
+        "log": "build-v73-attempt1.log"
+      }
+    ],
+    "successfulRetryDuration": "1m35s; main/JS compiled during attempt1 and reused unchanged"
+  },
+  "artifacts": {
+    "main.jar": "72f74004dc435f869787d6d77e04eddbd31927065894bbe4e4f908245636a87a",
+    "documents.js": "7b79575f096943a87cacacd21034aaae33a1bd1495adcdf9b30aaa56db1b65e6",
+    "spacegraph.js": "23d73097b2303da6990ee5bf0c0b8720d5931d140c6e4fb52911298179fc564a",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "dependencyJars": 119,
+  "totalClasspathJars": 120,
+  "kifHttpProof": {
+    "selectedGreenAttempt": "green-v73-attempt2",
+    "selectedRedAttempt": "red-v72-attempt2",
+    "sourceCid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+    "sourceBytes": 77,
+    "definitionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+    "definitionBytes": 242,
+    "sameSourceBeforeAfterStatus": [
+      400,
+      200
+    ],
+    "selectedActualHttpRequests": 12,
+    "wholeInputRefusals": [
+      {
+        "case": "comment-only",
+        "status": 400,
+        "healthyNextStatus": 200,
+        "bagEvidenceAndBudgetUnchanged": true,
+        "casPackUnchangedOnRefusal": true,
+        "refusedSourceNotRetained": true,
+        "sourceCid": "sha256:02d5281bbc34b637189f1e8b9cdc38f33116c6b7439f9a6a27c8d48e2f9715a1",
+        "bagBefore": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "1037628254634744217",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfter": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "1037628254634744217",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfterHealthy": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "casPackBefore": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "casPackAfter": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "healthyEvidenceUnchanged": true,
+        "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+      },
+      {
+        "case": "unsupported-multiform",
+        "status": 400,
+        "healthyNextStatus": 200,
+        "bagEvidenceAndBudgetUnchanged": true,
+        "casPackUnchangedOnRefusal": true,
+        "refusedSourceNotRetained": true,
+        "sourceCid": "sha256:05919573a1176bfbb241f82f690776a46ca232c94f569aadb774203697382600",
+        "bagBefore": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfter": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfterHealthy": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "casPackBefore": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "casPackAfter": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "healthyEvidenceUnchanged": true,
+        "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+      },
+      {
+        "case": "malformed-multiform",
+        "status": 400,
+        "healthyNextStatus": 200,
+        "bagEvidenceAndBudgetUnchanged": true,
+        "casPackUnchangedOnRefusal": true,
+        "refusedSourceNotRetained": true,
+        "sourceCid": "sha256:37a9dc3fb665a6a60746b047785fa804a84f6697735551aae0b9bf26437d853b",
+        "bagBefore": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfter": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfterHealthy": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "casPackBefore": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "casPackAfter": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "healthyEvidenceUnchanged": true,
+        "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+      },
+      {
+        "case": "mixed-formats",
+        "status": 400,
+        "healthyNextStatus": 200,
+        "bagEvidenceAndBudgetUnchanged": true,
+        "casPackUnchangedOnRefusal": true,
+        "refusedSourceNotRetained": true,
+        "sourceCid": "sha256:c4f732d3eb1c8c0b002af17572996d4da962bea1c176e23243e28201c311e2cd",
+        "bagBefore": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfter": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfterHealthy": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "casPackBefore": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "casPackAfter": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "healthyEvidenceUnchanged": true,
+        "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+      },
+      {
+        "case": "hash-is-not-kif-comment",
+        "status": 400,
+        "healthyNextStatus": 200,
+        "bagEvidenceAndBudgetUnchanged": true,
+        "casPackUnchangedOnRefusal": true,
+        "refusedSourceNotRetained": true,
+        "sourceCid": "sha256:8877c0c70c9b1a895ff76a502cc4714cef481504160e57dd0c7c84488bd920e5",
+        "bagBefore": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfter": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "bagAfterHealthy": [
+          {
+            "angular": "4616048923953057863",
+            "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+            "evidencePacked": "3865470566400",
+            "positive": 900,
+            "negative": 0,
+            "budgetPacked": "691752682861992345",
+            "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+          }
+        ],
+        "casPackBefore": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "casPackAfter": {
+          "bytes": 393,
+          "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+        },
+        "healthyEvidenceUnchanged": true,
+        "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+      }
+    ],
+    "refusalStateInvariant": "full bag signal/evidence/budget and exact CAS pack unchanged",
+    "explicitHealthyReplay": "may renew attention budget; exact signal/evidence/PID/source preserved; no independent evidence",
+    "casBlobs": 2,
+    "closedCasPack": {
+      "bytes": 393,
+      "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+    },
+    "closedWal": {
+      "bytes": 1757,
+      "sha256": "d0f22242b9fa91195b7108d50c92e15ef3b6d7f7481f5c95f40073e0f2241d62"
+    },
+    "independentlyCrcVerifiedWalFrames": 8,
+    "writerPid": "87837",
+    "readerPid": "87933",
+    "afterClose": "PASS; full source/definition readbacks and replayed bag budget/signal/evidence; WAL unchanged",
+    "preservedIncompleteAttempts": [
+      {
+        "name": "red-v72-attempt1",
+        "scope": "Observer identity failed before HTTP/storage: wildcard System shadowed java.lang.System; explicit import fixed harness"
+      },
+      {
+        "name": "green-v73-attempt1",
+        "scope": "Primary200, attention200, firstnegative400, healthy200 all correct. Harness wrongly expected explicit healthy KG replay not to renew attention from .9 to incoming .6; stopped. Product unchanged."
+      }
+    ],
+    "publicEvidence": "docs/airgap/evidence/kif-leading-comment-v73-20261105",
+    "archive": {
+      "bytes": 122560,
+      "sha256": "2f5531444d02209b60b5681972651c6aa355d151b91d0dd266f9d111cc45cf33"
+    }
+  },
+  "anchorCliProof": {
+    "actualFinalJarCliRuns": 20,
+    "exitZero": 16,
+    "expectedInputRefusals": 4,
+    "sourceCases": 16,
+    "exactUtf16AnchorSpans": 30,
+    "explicitRequirementCases": 6,
+    "partialControl": {
+      "S2LegacyGroundedAgreement": true,
+      "required": 2,
+      "matched": 1,
+      "complete": false,
+      "missingQuote": "An Agent is an Entity."
+    },
+    "fullControl": {
+      "S2LegacyGroundedAgreement": true,
+      "required": 2,
+      "matched": 2,
+      "complete": true
+    },
+    "controlDenominator": "Only one of six declared cases comparable; other five have no supplied prediction. 0/1 or1/1 is not six-case accuracy.",
+    "emptySeat": {
+      "missing": 16,
+      "scored": 0,
+      "explicitUnknown": 0,
+      "comparable": 0,
+      "rate": null
+    },
+    "legacyIdentityAndBlindRequests": "PRESERVED",
+    "labelAgreementIndependentOfCoverage": true,
+    "invalidQuotesCannotEarnCoverage": true,
+    "scope": "Manually supplied annotation controls, no predictor, training, actual NARS semantic answer or proof-validity result",
+    "publicEvidence": "docs/evidence/2026-11-05/required-anchor-coverage-v73",
+    "verifierSha256": "6cc9fc74c915fb33fe4d601f73eca907adb07c1b33d8fe142f921898edd89e07"
+  },
+  "rootPublicRecordedDataAudits": {
+    "kifGreen": {
+      "result": "PASS",
+      "checks": 7,
+      "mutatedCopyRefusals": 8,
+      "fromSafelyExtractedPublicArchive": true
+    },
+    "kifRed": {
+      "result": "RED_CONFIRMED",
+      "checks": 6,
+      "mutatedCopyRefusals": 6,
+      "fromSafelyExtractedPublicArchive": true
+    },
+    "anchorPublic": {
+      "result": "PASS",
+      "scope": "Independent root recorded-public-data/hash/quote/denominator audit; no new CLI or predictor/reasoner execution",
+      "at": "2026-11-05T00:45:45.802792+00:00",
+      "publicFilesVerified": 9,
+      "actualRecordedCliCommands": 20,
+      "exitZero": 16,
+      "expectedRefusals": 4,
+      "mutatedInputBytesVerified": 11,
+      "frozenJarsVerified": 120,
+      "sourceCases": 16,
+      "exactUtf16Spans": 30,
+      "emptySeat": {
+        "missing": 16,
+        "scored": 0,
+        "explicitUnknown": 0,
+        "requiredAnchorCases": 6,
+        "comparable": 0,
+        "rate": null
+      },
+      "controls": {
+        "extended-partial": {
+          "S2Grounded": true,
+          "required": 2,
+          "matched": 1,
+          "complete": false,
+          "missingAnchors": [
+            {
+              "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+              "begin": 21,
+              "end": 43,
+              "quote": "An Agent is an Entity.",
+              "role": "SUPPORTS"
+            }
+          ]
+        },
+        "extended-full": {
+          "S2Grounded": true,
+          "required": 2,
+          "matched": 2,
+          "complete": true,
+          "missingAnchors": []
+        }
+      },
+      "manifestSha256": "9a8445d0efba7beeab64e7b28cafe360ca2c1ab107be3ed38fb4f79be0a7c567"
+    },
+    "independentRawCliAudit": {
+      "result": "PASS",
+      "mutatedCopyControls": 5,
+      "recordedDataOnly": true
+    }
+  },
+  "verifiedPublicManifests": [
+    {
+      "path": "docs/airgap/evidence/kif-leading-comment-v73-20261105/manifest.json",
+      "sha256": "3793d2cdadac4d53cd40ab14740a1d312655ae09f26b9fce89ac32c2eec71477",
+      "files": 11
+    },
+    {
+      "path": "docs/evidence/2026-11-05/required-anchor-coverage-v73/evidence-sha256.json",
+      "sha256": "9a8445d0efba7beeab64e7b28cafe360ca2c1ab107be3ed38fb4f79be0a7c567",
+      "files": 9
+    }
+  ],
+  "proofOwners": "All actual HTTP/client/executor/review/bag/CAS/WAL owners drained/closed; separate reader exited0",
+  "limits": [
+    "Manual KG input is not authenticated source truth or English/legal entailment. KIF acceptance covers the existing bounded ground binary fragment, not general KIF execution.",
+    "HTTP observer facade decodes strict UTF8; these new runs do not establish production malformed-raw-byte transport handling or OS/network containment.",
+    "Clean close/reopen is not crash or power-loss recovery.",
+    "Annotation coverage does not verify derivation rules, complete proof validity or inference performance. Missing seat predictions remain MISSING.",
+    "Different exact propositions at one natural angular address still refuse; no role-variable NARS queries, source retraction or general training are added.",
+    "Newer R3b source already published on master is retained; runtime evidence here is solely the frozen08dd artifact."
+  ],
+  "laterAlreadyPublishedProductionBase": "4212c6cae4b196bdc6ff8802c384d3a332c5a051",
+  "upstreamFilesAfterTestedSource": [
+    "src/commonMain/kotlin/borg/trikeshed/forge/sheet/CursorSheet.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncConfixSelection.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncNodeKey.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LlvmConfixContract.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDocumentSource.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/DocumentCurationLegos.kt",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/DocumentSpans.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/kanban/module/LlvmConfixRunTest.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/DocumentSpansTest.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/LcncConfixSelectionTest.kt"
+  ],
+  "newProductionChangesRelativeToConcurrentMaster": [],
+  "publicationScope": "Evidence-only relative to concurrent R3b master4212. All426 tests and new runtime/CLI proofs remain pinned to08dd/main72f740. Newer already-published R3b behavior is preserved, not claimed as exercised by these v73 proofs.",
+  "activeNextSlices": [
+    "Expose existing reviewed taxonomy proof paths as ordered premises with exact English/KIF source quotations in Documents; retain currentness/authentication and visible bounds.",
+    "Build the next combined source including newer R3b document traversal and these tested KIF/coverage changes.",
+    "Continue generic visual SPARQL, corpus recall/LDA comparison, difficult-page OCR, contained Hermes/Pi and typed NARS role reasoning as separate measured work; none are declared complete by this slice."
+  ]
+}
