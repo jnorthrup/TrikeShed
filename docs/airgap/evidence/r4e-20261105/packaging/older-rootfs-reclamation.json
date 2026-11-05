@@ -1,0 +1,14 @@
+[
+  {
+    "removed": "/workspace/airgap-r4b-proof/rootfs",
+    "retained": "/workspace/library-files/airgap-document-r4b-linux-x64-2026-11-05.tar.gz",
+    "sha256": "065ca62ee7d4e75a0564440a70736b22b548ca7699479f516becf9245916fbfa",
+    "reason": "Reproducible scratch rootfs, preserving the published primary archive, manifests, source companions and accepted proof states"
+  },
+  {
+    "removed": "/workspace/airgap-r4c-proof/rootfs",
+    "retained": "/workspace/library-files/airgap-document-r4c-linux-x64-2026-11-05.tar.gz",
+    "sha256": "13d6c58e339cfd5ba14d71b8e68ab4a1cb0c14eac5f5c931814a6f051b24054c",
+    "reason": "Reproducible scratch rootfs, preserving the published primary archive, manifests, source companions and accepted proof states"
+  }
+]

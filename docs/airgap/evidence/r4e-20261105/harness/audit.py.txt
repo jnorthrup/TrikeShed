@@ -1,0 +1,31 @@
+from pathlib import Path
+import json,hashlib,math,sys
+home=Path('/workspace/airgap-r4e-proof');art=home/sys.argv[1];cas=art/'state/runtime/cas/sha256'
+def get(cid):
+ h=cid.removeprefix('sha256:');data=(cas/('/'.join(h[:4])+'/'+h[4:])).read_bytes();assert hashlib.sha256(data).hexdigest()==h;return data
+count=0
+for p in cas.rglob('*'):
+ if p.is_file():assert hashlib.sha256(p.read_bytes()).hexdigest()==''.join(p.relative_to(cas).parts);count+=1
+browser=json.loads((art/'browser.json').read_text());before=json.loads((art/'state-before-crash.json').read_text());after=json.loads((art/'state/state-recover.json').read_text());inspected=json.loads((art/'state/state-inspect.json').read_text())
+old=browser['running'];interrupted=browser['interrupted'];completed=browser['completed']
+assert len(before['runs'])==1 and len(after['runs'])==2 and after['runs']==inspected['runs']
+assert before['documents']==after['documents']==inspected['documents']
+assert after['runs']['lcnc/run/'+old['runId']]==interrupted and old['runId']!=completed['runId']
+assert old['status']=='running' and interrupted['status']=='interrupted' and completed['status']=='completed'
+assert interrupted['previousReceiptCid']==old['receiptCid'] and interrupted['error']=='runtime_restarted'
+assert interrupted.get('outputs') is None and interrupted.get('invocationsCid') is None
+for row in [old,interrupted,completed]:
+ command=json.loads(get(row['receiptCid']));assert command['jobId']=='lcnc/run/'+row['runId'];saved=command['lcncRun']
+ for key in ['runId','status','programCid','previousReceiptCid']:assert saved.get(key)==row.get(key),(key,saved,row)
+assert old['programCid']==interrupted['programCid']==completed['programCid']
+program=json.loads(get(completed['programCid']));assert len(program['nodes'])==5 and len(program['wires'])==8
+ledger=json.loads(get(completed['invocationsCid']));assert ledger['runId']==completed['runId'] and ledger['programCid']==completed['programCid']
+assert [r['wire']['index'] for r in ledger['observations'] if r['phase']=='consumed']==list(range(8))
+quote=completed['outputs']['selection']['value'];text=get(quote['extractedTextCid']).decode('utf8')
+def integer(x):assert isinstance(x,(int,float)) and math.isfinite(x) and int(x)==x;return int(x)
+begin,end=integer(quote['begin']),integer(quote['end']);assert text.encode('utf-16-le')[begin*2:end*2].decode('utf-16-le')==quote['quote'];assert len(get(quote['originalCid']))==111243 and any(a['page']==10 for a in quote['anchors'])
+assert completed['outputs']['scan']['runtime']['liveBytesAfter']==0
+assert not (art/'state/cleanup-run.json').exists()
+for mode in ['recover','inspect']:assert all(json.loads((art/'state'/('cleanup-'+mode+'.json')).read_text()).values())
+record={'casObjectsVerified':count,'before':browser['before'],'oldRunId':old['runId'],'newRunId':completed['runId'],'runningReceiptCid':old['receiptCid'],'interruptedReceiptCid':interrupted['receiptCid'],'completedReceiptCid':completed['receiptCid'],'previousReceiptIdentityVerified':True,'newRunIdentityDistinct':True,'programIdentityUnchanged':True,'noInventedInterruptedOutputsOrInvocations':True,'identicalRowsAfterFinalRestart':True,'sixDocumentRevisionsUnchanged':True,'consumedWires':8,'nativeLiveBytesAfter':0,'exactUtf16Quotation':True,'writerCleanupAbsent':True,'recoverAndInspectorCleanupCompleted':True}
+(art/'independent-audit.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record,indent=2))

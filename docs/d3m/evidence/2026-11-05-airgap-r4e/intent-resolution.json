@@ -1,0 +1,9 @@
+{
+  "mergeCommit": "8a04bd4244951cb4056bd4c3413db80d5316312c",
+  "path": "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt",
+  "baseBehavior": "toString() produced Kotlin map notation for structured wire values",
+  "sharedIntent": "Preserve encoded String bytes and serialize structured values with existing jsonOf",
+  "resolution": "Same serialization intent in both branches; retain structured input name value, existing cast/fallback expression, raw-text byte preservation and incoming Unicode/quote/array/null geometry coverage. No blanket side preference.",
+  "retainedEvidence": "conflict index and all three blob stages under conflicts/",
+  "validation": "Full combined-source JVM and affected-target checks will include incoming structured Unicode selection test"
+}

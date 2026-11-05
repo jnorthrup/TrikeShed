@@ -15,7 +15,8 @@ and D3M integration record. A planned gate is not a completed release.
 | R4b: narrower profile and forced-exit recovery | 23 dependency jars, inert named preset, exact receipt recovery after SIGKILL at a completed receipt | [Verified increment](07-runtime-profile-recovery.md), [237 regressions and extracted-archive proof](evidence/r4b-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4b.md) |
 | R4c: interrupted execution | SIGKILL at three node boundaries, preserved interrupted receipts, explicit new execution and third-JVM inspection | [Verified increment](08-interrupted-execution.md), [247 regressions and three archive scenarios](evidence/r4c-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4c.md) |
 | R4d: storage publication | Parent-directory barriers, final-WAL-fsync EIO/SIGKILL and same-run inspection without retry | [Verified increment](09-storage-publication.md), [264 passing tests and 17 browser cases](evidence/r4d-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4d.md) |
-| R4e: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
+| R4e: exclusive WAL ownership | Lease before recovery, competing-process refusal, crash/close release and retained-store recovery boundaries | [Verified increment](10-wal-ownership.md), [287 passing tests and 21 browser cases](evidence/r4e-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4e.md) |
+| R4f: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
 verifies the native inert Documents-to-Panels handoff, ten URL/ownership guards,
@@ -191,3 +192,21 @@ browser cases, seven startup refusals and five integrity refusals. D3M retains
 integration fix. The [runbook](09-storage-publication.md) retains failed
 attempts, exact identities and measurements. The kernel survives these process
 faults; power-loss safety and full vendor/native rebuild closure remain open.
+
+## R4e acceptance
+
+The board WAL now owns an exclusive filesystem lease before opening or
+recovering its file. A direct two-owner overwrite baseline, current red/green
+checks and separate packaged JVM contenders demonstrate the fix. Reaping a
+killed owner and normal close each permit a later owner, with the retained
+receipt and six document revisions unchanged. Two constructed short tails
+recover as interrupted; complete CRC corruption and missing/changed CAS
+payloads refuse admission.
+
+The combined source passes 287 selected JVM checks with one conditional
+external-solver skip, fresh affected-target compilation and 21 browser cases.
+D3M retains 544 frozen refs through three merges with two preserved
+conflicts and intent resolutions. The [runbook](10-wal-ownership.md) separates
+historical-output inspection, fresh native execution and fault scope.
+Power-loss safety, cross-platform ownership proof and full vendor/native
+source rebuild closure remain open.

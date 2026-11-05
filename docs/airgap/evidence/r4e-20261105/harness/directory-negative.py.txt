@@ -1,0 +1,13 @@
+from pathlib import Path
+import subprocess,json,os,signal,sys
+h=Path('/workspace/airgap-r4e-proof');accepted=h/sys.argv[1];a=h/sys.argv[2];a.mkdir(exist_ok=False);state=a/'state';state.mkdir()
+cmd=json.loads((accepted/'processes.json').read_text())['processes'][0]['command'];cmd[cmd.index('--bind')+1]=str(state)
+trace=['strace','-f','-yy','-ttt','-e','trace=fsync','-P','/state/runtime/cas','--inject=fsync:error=EIO:when=1','-o',str(a/'syscalls.txt')]+cmd
+with (a/'process.txt').open('w') as log:
+ p=subprocess.Popen(trace,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+ try:p.wait(timeout=40)
+ except subprocess.TimeoutExpired:os.killpg(p.pid,signal.SIGKILL);p.wait();raise
+text=(a/'process.txt').read_text();syscalls=(a/'syscalls.txt').read_text();assert p.returncode==1 and 'Input/output error' in text and 'JvmFileOperations.mkdirs' in text
+assert 'EIO (Input/output error) (INJECTED)' in syscalls and '/state/runtime/cas>' in syscalls
+assert 'trikeshed-kanban: listening' not in text and not (state/'runtime/admission.json').exists() and not (state/'runtime/.kanban').exists()
+r={'case':'directory-fsync-eio','command':trace,'exit':p.returncode,'injectedPath':'/state/runtime/cas','expectedFailure':'Input/output error in JvmFileOperations.mkdirs','listenerOpened':False,'admissionPublished':False,'boardWalCreated':False,'result':'PASS'};(a/'results.json').write_text(json.dumps([r],indent=2)+'\n');print(json.dumps({k:v for k,v in r.items() if k!='command'},indent=2))

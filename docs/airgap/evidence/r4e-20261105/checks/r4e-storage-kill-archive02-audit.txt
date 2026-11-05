@@ -1,0 +1,56 @@
+{
+  "fault": "kill",
+  "casObjectsVerified": 27,
+  "walBefore": {
+    "bytes": 278,
+    "frames": [
+      {
+        "sequence": 1,
+        "jobId": "lcnc/run/c36f2613-536c-4820-be23-b7445269aa0a",
+        "cid": "sha256:50bfb081301f3762d85761459e45e833a1de9d8bf9e15f5b4aa728946ea649d7",
+        "status": "queued"
+      },
+      {
+        "sequence": 2,
+        "jobId": "lcnc/run/c36f2613-536c-4820-be23-b7445269aa0a",
+        "cid": "sha256:c72b46272187f279708a6adb464bdd376c290e036124055a98b911773575b3e8",
+        "status": "running"
+      }
+    ]
+  },
+  "walAfter": {
+    "bytes": 417,
+    "frames": [
+      {
+        "sequence": 1,
+        "jobId": "lcnc/run/c36f2613-536c-4820-be23-b7445269aa0a",
+        "cid": "sha256:50bfb081301f3762d85761459e45e833a1de9d8bf9e15f5b4aa728946ea649d7",
+        "status": "queued"
+      },
+      {
+        "sequence": 2,
+        "jobId": "lcnc/run/c36f2613-536c-4820-be23-b7445269aa0a",
+        "cid": "sha256:c72b46272187f279708a6adb464bdd376c290e036124055a98b911773575b3e8",
+        "status": "running"
+      },
+      {
+        "sequence": 3,
+        "jobId": "lcnc/run/c36f2613-536c-4820-be23-b7445269aa0a",
+        "cid": "sha256:13d9525cbede42d5455f6bfb9104bf43f6a0c9fc24778a09f964b831a55c9943",
+        "status": "completed"
+      }
+    ]
+  },
+  "allFrameCrc32cVerified": true,
+  "walUnchangedByReopening": true,
+  "sameRunRecoveredCompleted": true,
+  "noNewRunSubmitted": true,
+  "liveBoardDidNotAcknowledgeFailedFlush": null,
+  "liveBoardReadAfterFault": "unavailable after SIGKILL",
+  "sameSixDocuments": true,
+  "exactQuotationVerified": true,
+  "nativeLiveBytesAfter": 0,
+  "inspectorCleanupVerified": true,
+  "writerCleanupReportAvailable": false,
+  "scope": "Process/syscall fault with surviving host kernel and readable WAL bytes; not power loss or a calibrated durability guarantee"
+}

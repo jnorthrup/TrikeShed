@@ -1,0 +1,33 @@
+Exception in thread "main" java.lang.IllegalStateException: Kanban module open failed
+	at borg.trikeshed.kanban.module.KanbanModule.open(KanbanModule.kt:1114)
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt$main$3.invokeSuspend(AirgapDocumentMain.kt:132)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt.main(AirgapDocumentMain.kt:36)
+	Suppressed: java.lang.IllegalStateException: Kanban module cleanup failed
+		at borg.trikeshed.kanban.module.KanbanModule$open$cleanup$2.invokeSuspend(KanbanModule.kt:116)
+		at borg.trikeshed.kanban.module.KanbanModule$open$cleanup$2.invoke(KanbanModule.kt)
+		at borg.trikeshed.kanban.module.KanbanModule$open$cleanup$2.invoke(KanbanModule.kt)
+		at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatched(Undispatched.kt:66)
+		at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+		at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:497)
+		at kotlinx.coroutines.BuildersKt.withContext(Unknown Source)
+		at borg.trikeshed.kanban.module.KanbanModule.open$cleanup(KanbanModule.kt:79)
+		at borg.trikeshed.kanban.module.KanbanModule.open(KanbanModule.kt:1112)
+		... 10 more
+	Caused by: java.lang.IllegalStateException: Missing board WAL payload at sequence 3: sha256:13d9525cbede42d5455f6bfb9104bf43f6a0c9fc24778a09f964b831a55c9943
+		at borg.trikeshed.kanban.BoardStoreElement$open$3.invokeSuspend(BoardStoreElement.kt:286)
+		at borg.trikeshed.kanban.BoardStoreElement$open$3.invoke(BoardStoreElement.kt)
+		at borg.trikeshed.kanban.BoardStoreElement$open$3.invoke(BoardStoreElement.kt)
+		at borg.trikeshed.kanban.BoardFileWal.replay(BoardFileWal.kt:113)
+		at borg.trikeshed.kanban.JvmBoardWal.replay(JvmBoardWal.kt)
+		at borg.trikeshed.kanban.BoardStoreElement.open(BoardStoreElement.kt:278)
+		at borg.trikeshed.kanban.module.KanbanModule.open(KanbanModule.kt:124)
+		... 10 more
+Caused by: [CIRCULAR REFERENCE: java.lang.IllegalStateException: Missing board WAL payload at sequence 3: sha256:13d9525cbede42d5455f6bfb9104bf43f6a0c9fc24778a09f964b831a55c9943]

@@ -1,0 +1,19 @@
+from pathlib import Path
+import os,subprocess,sys,json,datetime
+mode=sys.argv[1];log=Path(sys.argv[2]);repo=Path('/workspace/TrikeShed' if mode=='jvm' else '/workspace/TrikeShed-target-checks')
+env=os.environ.copy();env['JAVA_HOME']='/workspace/toolchains/graalvm-community-25.3.4.1+1.1'
+command=['./gradlew','--offline','--no-daemon','--max-workers=2']
+if mode=='jvm':
+    command+=['airgapDocumentInstall','jvmTest']
+    for name in ['DocumentSpansTest','LcncConfixSelectionTest','LcncConsumptionTest','LlvmScalarTest','LlvmConfixTest','LlvmScalarRunTest','LlvmConfixRunTest','WorkSelectNodeTest','FinanceKifPresetExecutionTest','AceContextNodesTest','BreadcrumbContextNodesTest','EnglishCopularPresetExecutionTest','LcncPinnedBindingTest','KanbanPinnedDispatchTest','WorkModelRouteTest','PropositionAttentionTest','DocumentEnglishRetainedWireTest','EnglishTaxonomyCarrierTest','EnglishTaxonomyExportGuardTest','ProjectCorpusVisitTest','CurationReviewedReadTest','CurationIntakeTest','CurationIntakeEligibilityTest','KgKifCommentTest','LegalRequiredAnchorCoverageTest','LegalRequiredAnchorCoverageCliTest','KgPredicateNamespaceTest','KgRdfFidelityTest','KgPropositionIdentityTest','KgRouteErrorTest','KgRetentionTest','KgHttpUtf8Test','LcncConfixPickPathContractTest','ReviewedTaxonomyProofPathsTest','ReviewedTaxonomyProofPathsReadTest','EnglishTaxonomyWireTest','ProjectDbBindingTest','ReviewedTaxonomyProofGraphTest','ReviewedTaxonomyQueryViewTest','ReviewedTaxonomyQuadQueryWireTest','ReviewedTaxonomyWireTest','EnglishCorpusWireTest','RetainedNalImplicationTest','SyntheticNalExperimentCliTest','FilePublicationTest','EnglishNalPresetTest','EnglishNalPresetExecutionTest','PresetAssemblyTest','BoardFileWalLeaseTest','EnglishGuardAttachmentsTest','EnglishGuardQueryViewTest','EnglishLegalPatternsWireTest']:
+        command+=['--tests','*.'+name]
+    command+=['muxClasspath']
+else:
+    env['GRADLE_USER_HOME']='/workspace/gradle-offline-cache'
+    command+=['-PkotlinJsApps=spacegraph','stageKotlinJs'] if mode=='browser' else ['-PkotlinJsApps=documents,spacegraph','stageKotlinJs','compileKotlinJs','compileKotlinWasmJs','compileKotlinWasmWasi','compileKotlinLinuxX64']
+command=['unshare','--user','--map-current-user','--net','--keep-caps','sh','-c','ip link set lo up && exec "$@"','airgap-check']+command
+record={'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'command':command,'cwd':str(repo)}
+with log.open('w') as stream:result=subprocess.run(command,cwd=repo,env=env,stdout=stream,stderr=subprocess.STDOUT)
+record.update(exit=result.returncode,finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat())
+log.with_suffix('.json').write_text(json.dumps(record,indent=2)+'\n')
+print(json.dumps(record,indent=2));raise SystemExit(result.returncode)

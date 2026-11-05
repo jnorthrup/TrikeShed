@@ -1,0 +1,50 @@
+[
+  {
+    "file": "conflicts/aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt.stage1",
+    "mode": "100644",
+    "stage": 1,
+    "gitObjectId": "6a08aec2bfe3745bcefbec3e7671dd824edbc943",
+    "sha256": "081a5b201680656dfc5d7988c5f5e0450ccd7cff6b2c331b7b0fee7ae73c4624",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt.stage2",
+    "mode": "100644",
+    "stage": 2,
+    "gitObjectId": "77925e8db0f57371a5a33ee8a33a7acce86951d0",
+    "sha256": "7c6170f93809c462147ff374bd63f706c0670a942766661fb25c71b23c1b36ec",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt.stage3",
+    "mode": "100644",
+    "stage": 3,
+    "gitObjectId": "d31afb7336ec5212efaf5c5c8a75c2a58462810d",
+    "sha256": "870d106e6298d59ca0fc4eb472bd2fb5cfdef167cc518b3d8fc21532dc171ce6",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "publication/conflicts/c9298dc6846281de16475878c92ff8ca3b56b5c8/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt.stage1",
+    "mode": "100644",
+    "stage": 1,
+    "gitObjectId": "76e1c1d9eb5a6267048d0735fb806cdbdce23af2",
+    "sha256": "2a776b3b3e6e0ef0de5412ff769a6f701b5507db5f604ddf37a2bd53877d9ea8",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "publication/conflicts/c9298dc6846281de16475878c92ff8ca3b56b5c8/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt.stage2",
+    "mode": "100644",
+    "stage": 2,
+    "gitObjectId": "c464cafc22b936119ed3f7397ffa64e3e4755c33",
+    "sha256": "925c0c41fd26c695c090e2df5706b5301b160f71008a6bc278c0feefb078700b",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "publication/conflicts/c9298dc6846281de16475878c92ff8ca3b56b5c8/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt.stage3",
+    "mode": "100644",
+    "stage": 3,
+    "gitObjectId": "e26bd31ce1bfb1d5c208467eb031d428a0b86474",
+    "sha256": "87d278cc1d53b002b0e0c5ea99af72ea38b3d66d850982cf4404f4f596b67671",
+    "matchesConflictIndex": true
+  }
+]

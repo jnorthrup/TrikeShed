@@ -1,0 +1,1008 @@
+94832 1793855875.384323 write(5<{eventfd-count=0, eventfd-id=10, eventfd-semaphore=0}>, "\1\0\0\0\0\0\0\0", 8) = 8
+94833 1793855875.386323 write(6</proc/94833/uid_map>, "0 0 1\n", 6) = 6
+94833 1793855875.386473 write(6</proc/94833/setgroups>, "deny\n", 5) = 5
+94833 1793855875.386602 write(6</proc/94833/gid_map>, "0 0 1\n", 6) = 6
+94833 1793855875.387580 mkdir("newroot", 0755) = 0
+94833 1793855875.387794 mkdir("oldroot", 0755) = 0
+94833 1793855875.388186 mkdir("proc", 0755) = 0
+94833 1793855875.388604 mkdirat(7</newroot>, ".", 0755) = -1 EEXIST (File exists)
+94833 1793855875.389553 mkdirat(7</newroot>, "state", 0755) = -1 EEXIST (File exists)
+94833 1793855875.390349 mkdirat(6</newroot>, "tmp", 0755) = -1 EEXIST (File exists)
+94833 1793855875.390837 mkdirat(6</newroot>, "proc", 0755) = -1 EEXIST (File exists)
+94833 1793855875.391563 mkdirat(6</newroot>, "dev", 0755) = -1 EEXIST (File exists)
+94833 1793855875.395707 mkdirat(7</newroot/dev>, "shm", 0755) = 0
+94833 1793855875.395781 mkdirat(7</newroot/dev>, "pts", 0755) = 0
+94835 1793855875.400550 write(1<pipe:[549892]>, "/opt/trikeshed\n", 15) = 15
+94835 1793855875.400669 +++ exited with 0 +++
+94834 1793855875.400724 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=3, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94836 1793855875.401920 write(1<pipe:[549893]>, "Linux\n", 6) = 6
+94836 1793855875.402027 +++ exited with 0 +++
+94834 1793855875.402067 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=4, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94837 1793855875.402551 write(1<pipe:[549894]>, "16384\n", 6) = 6
+94837 1793855875.402626 +++ exited with 0 +++
+94834 1793855875.402660 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=5, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94834 1793855875.403518 write(1</dev/null<char 1:3>>, "/usr/bin/xargs\n", 15) = 15
+94839 1793855875.404551 write(1<pipe:[550915]>, "\"--enable-native-access=ALL-UNNAMED\" \"-Xmx768m\" \"-XX:ActiveProcessorCount=2\" \"-Dpolyglot.engine.WarnInterpreterOnly=false\" \"-Dtrikeshed.airgap=true\"  \n", 151) = 151
+94839 1793855875.404735 +++ exited with 0 +++
+94838 1793855875.404904 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=7, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94843 1793855875.410634 write(1<pipe:[550916]>, "--enable-native-access=ALL-UNNAMED\n", 35) = 35
+94843 1793855875.410784 +++ exited with 0 +++
+94840 1793855875.410824 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=11, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94844 1793855875.413235 write(1<pipe:[550916]>, "-Xmx768m\n", 9) = 9
+94844 1793855875.413604 +++ exited with 0 +++
+94840 1793855875.413662 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=12, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94845 1793855875.415106 write(1<pipe:[550916]>, "-XX:ActiveProcessorCount=2\n", 27) = 27
+94845 1793855875.415243 +++ exited with 0 +++
+94840 1793855875.415295 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=13, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94846 1793855875.418115 write(1<pipe:[550916]>, "-Dpolyglot.engine.WarnInterpreterOnly=false\n", 44) = 44
+94846 1793855875.418341 +++ exited with 0 +++
+94840 1793855875.418393 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=14, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94847 1793855875.421024 write(1<pipe:[550916]>, "-Dtrikeshed.airgap=true\n", 24) = 24
+94847 1793855875.421241 +++ exited with 0 +++
+94840 1793855875.421294 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=15, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94841 1793855875.421418 write(1<pipe:[550917]>, "--enable-native-access=ALL-UNNAMED\n-Xmx768m\n-XX:ActiveProcessorCount=2\n-Dpolyglot.engine.WarnInterpreterOnly=false\n-Dtrikeshed.airgap=true\n", 139) = 139
+94840 1793855875.421583 +++ exited with 0 +++
+94838 1793855875.421629 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=8, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94841 1793855875.421644 +++ exited with 0 +++
+94842 1793855875.421668 write(1<pipe:[549895]>, "--enable-native-access=ALL-UNNAMED -Xmx768m -XX:ActiveProcessorCount=2 -Dpolyglot.engine.WarnInterpreterOnly=false -Dtrikeshed.airgap=true ", 139 <unfinished ...>
+94838 1793855875.421847 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=9, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94842 1793855875.421883 <... write resumed>) = 139
+94842 1793855875.422044 +++ exited with 0 +++
+94838 1793855875.422081 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=10, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94838 1793855875.422277 +++ exited with 0 +++
+94834 1793855875.422303 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=6, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94848 1793855875.436658 mkdir("/tmp/hsperfdata_demo", 0755) = 0
+94848 1793855875.437428 ftruncate(6</tmp/hsperfdata_demo/2>, 0) = 0
+94848 1793855875.437493 ftruncate(6</tmp/hsperfdata_demo/2>, 32768) = 0
+94848 1793855875.437572 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.437750 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.437857 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.437938 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.438019 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.438101 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.438180 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.438262 write(6</tmp/hsperfdata_demo/2>, "\0", 1) = 1
+94848 1793855875.440381 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=NULL} ---
+94854 1793855875.470838 +++ exited with 0 +++
+94848 1793855875.692241 mkdir("/state/runtime", 0777) = 0
+94848 1793855875.741564 mkdir("/state/runtime/couch", 0777) = 0
+94848 1793855875.743654 fsync(13</state/runtime/couch>) = 0
+94848 1793855875.745611 fsync(13</state/runtime>) = 0
+94848 1793855875.803275 write(16</state/runtime/couch/.HEAD.2244227024881510974.tmp>, "\243dhead\366ecount\0fformatmcouch-root-v1", 35) = 35
+94848 1793855875.803527 fsync(16</state/runtime/couch/.HEAD.2244227024881510974.tmp>) = 0
+94848 1793855875.804588 rename("/state/runtime/couch/.HEAD.2244227024881510974.tmp", "/state/runtime/couch/HEAD") = 0
+94848 1793855875.804754 fsync(16</state/runtime/couch>) = 0
+94848 1793855875.944235 mkdir("/state/runtime/project-couch", 0777) = 0
+94848 1793855875.944494 fsync(16</state/runtime/project-couch>) = 0
+94848 1793855875.945722 fsync(16</state/runtime>) = 0
+94848 1793855875.946028 mkdir("/state/runtime/project-couch/coinbase-suski", 0777) = 0
+94848 1793855875.946154 fsync(16</state/runtime/project-couch/coinbase-suski>) = 0
+94848 1793855875.946755 fsync(16</state/runtime/project-couch>) = 0
+94848 1793855875.948528 write(17</state/runtime/project-couch/coinbase-suski/.HEAD.3534616036005509039.tmp>, "\243dhead\366ecount\0fformatmcouch-root-v1", 35) = 35
+94848 1793855875.948616 fsync(17</state/runtime/project-couch/coinbase-suski/.HEAD.3534616036005509039.tmp>) = 0
+94848 1793855875.949131 rename("/state/runtime/project-couch/coinbase-suski/.HEAD.3534616036005509039.tmp", "/state/runtime/project-couch/coinbase-suski/HEAD") = 0
+94848 1793855875.949234 fsync(17</state/runtime/project-couch/coinbase-suski>) = 0
+94848 1793855875.960205 mkdir("/state/runtime/project-manifests", 0777) = 0
+94848 1793855875.963645 write(17</state/runtime/.projects.tsv.14924079934188017601.tmp>, "coinbase-suski\tassets\t@upload\n", 30) = 30
+94848 1793855875.963758 fsync(17</state/runtime/.projects.tsv.14924079934188017601.tmp>) = 0
+94848 1793855875.964333 rename("/state/runtime/.projects.tsv.14924079934188017601.tmp", "/state/runtime/projects.tsv") = 0
+94848 1793855875.964456 fsync(17</state/runtime>) = 0
+94848 1793855875.979408 mkdir("/state/runtime/files/coinbase-suski", 0777) = -1 ENOENT (No such file or directory)
+94848 1793855875.979747 mkdir("/state/runtime/files", 0777) = 0
+94848 1793855875.979899 mkdir("/state/runtime/files/coinbase-suski", 0777) = 0
+94848 1793855875.980131 write(17</state/runtime/files/coinbase-suski/coinbase-suski.pdf>, "%PDF-1.6\r%\342\343\317\323\r\n486 0 obj\r<</Linearized 1/L 111243/O 488/E 53869/N 12/T 110792/H [ 494 308]>>\rendobj\r             \r\n503 0 obj\r<</DecodeParms<</Columns 4/Predict"..., 111243) = 111243
+94848 1793855875.988435 mkdir("/state/runtime/cas", 0777) = 0
+94848 1793855875.988855 fsync(17</state/runtime/cas>) = 0
+94848 1793855875.989624 fsync(17</state/runtime>) = 0
+94848 1793855875.989877 mkdir("/state/runtime/cas/sha256", 0777) = 0
+94848 1793855875.989988 fsync(17</state/runtime/cas/sha256>) = 0
+94848 1793855875.990608 fsync(17</state/runtime/cas>) = 0
+94848 1793855875.990823 mkdir("/state/runtime/cas/sha256/5", 0777) = 0
+94848 1793855875.990951 fsync(17</state/runtime/cas/sha256/5>) = 0
+94848 1793855875.991524 fsync(17</state/runtime/cas/sha256>) = 0
+94848 1793855875.991719 mkdir("/state/runtime/cas/sha256/5/9", 0777) = 0
+94848 1793855875.991827 fsync(17</state/runtime/cas/sha256/5/9>) = 0
+94848 1793855875.993141 fsync(17</state/runtime/cas/sha256/5>) = 0
+94848 1793855875.993295 mkdir("/state/runtime/cas/sha256/5/9/1", 0777) = 0
+94848 1793855875.993397 fsync(17</state/runtime/cas/sha256/5/9/1>) = 0
+94848 1793855875.994060 fsync(17</state/runtime/cas/sha256/5/9>) = 0
+94848 1793855875.994210 mkdir("/state/runtime/cas/sha256/5/9/1/f", 0777) = 0
+94848 1793855875.994311 fsync(17</state/runtime/cas/sha256/5/9/1/f>) = 0
+94848 1793855875.994977 fsync(17</state/runtime/cas/sha256/5/9/1>) = 0
+94848 1793855875.995834 write(17</state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.6180084111077744857.tmp>, "%PDF-1.6\r%\342\343\317\323\r\n486 0 obj\r<</Linearized 1/L 111243/O 488/E 53869/N 12/T 110792/H [ 494 308]>>\rendobj\r             \r\n503 0 obj\r<</DecodeParms<</Columns 4/Predict"..., 111243) = 111243
+94848 1793855875.995929 fsync(17</state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.6180084111077744857.tmp>) = 0
+94848 1793855875.996456 rename("/state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.6180084111077744857.tmp", "/state/runtime/cas/sha256/5/9/1/f/0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f") = 0
+94848 1793855875.996563 fsync(17</state/runtime/cas/sha256/5/9/1/f>) = 0
+94848 1793855876.011866 mkdir("/state/runtime/cas/sha256/0", 0777) = 0
+94848 1793855876.012039 fsync(17</state/runtime/cas/sha256/0>) = 0
+94848 1793855876.012812 fsync(17</state/runtime/cas/sha256>) = 0
+94848 1793855876.012970 mkdir("/state/runtime/cas/sha256/0/6", 0777) = 0
+94848 1793855876.013074 fsync(17</state/runtime/cas/sha256/0/6>) = 0
+94848 1793855876.013655 fsync(17</state/runtime/cas/sha256/0>) = 0
+94848 1793855876.013859 mkdir("/state/runtime/cas/sha256/0/6/0", 0777) = 0
+94848 1793855876.013967 fsync(17</state/runtime/cas/sha256/0/6/0>) = 0
+94848 1793855876.014968 fsync(17</state/runtime/cas/sha256/0/6>) = 0
+94848 1793855876.015156 mkdir("/state/runtime/cas/sha256/0/6/0/2", 0777) = 0
+94848 1793855876.015264 fsync(17</state/runtime/cas/sha256/0/6/0/2>) = 0
+94848 1793855876.016132 fsync(17</state/runtime/cas/sha256/0/6/0>) = 0
+94848 1793855876.016624 write(17</state/runtime/cas/sha256/0/6/0/2/.f91f4bac12ad8fb4b79aaf751a8021899972b089c5bcb5fce43ab47de5c0.1461771713609915737.tmp>, "\251c_idrcoinbase-suski.pdfdcodee12332flengthf111243gagentIdlbrowser-drophrevisionfuploadhsequencem1793855875981icodeRing8b44icontentIdxGsha256:591f0fdecf41cb29742"..., 233) = 233
+94848 1793855876.016708 fsync(17</state/runtime/cas/sha256/0/6/0/2/.f91f4bac12ad8fb4b79aaf751a8021899972b089c5bcb5fce43ab47de5c0.1461771713609915737.tmp>) = 0
+94848 1793855876.017341 rename("/state/runtime/cas/sha256/0/6/0/2/.f91f4bac12ad8fb4b79aaf751a8021899972b089c5bcb5fce43ab47de5c0.1461771713609915737.tmp", "/state/runtime/cas/sha256/0/6/0/2/f91f4bac12ad8fb4b79aaf751a8021899972b089c5bcb5fce43ab47de5c0") = 0
+94848 1793855876.017486 fsync(17</state/runtime/cas/sha256/0/6/0/2>) = 0
+94848 1793855876.025236 mkdir("/state/runtime/cas/sha256/1", 0777) = 0
+94848 1793855876.025597 fsync(17</state/runtime/cas/sha256/1>) = 0
+94848 1793855876.026465 fsync(17</state/runtime/cas/sha256>) = 0
+94848 1793855876.026628 mkdir("/state/runtime/cas/sha256/1/a", 0777) = 0
+94848 1793855876.026966 fsync(17</state/runtime/cas/sha256/1/a>) = 0
+94848 1793855876.027670 fsync(17</state/runtime/cas/sha256/1>) = 0
+94848 1793855876.027861 mkdir("/state/runtime/cas/sha256/1/a/e", 0777) = 0
+94848 1793855876.028038 fsync(17</state/runtime/cas/sha256/1/a/e>) = 0
+94848 1793855876.028603 fsync(17</state/runtime/cas/sha256/1/a>) = 0
+94848 1793855876.028829 mkdir("/state/runtime/cas/sha256/1/a/e/b", 0777) = 0
+94848 1793855876.028950 fsync(17</state/runtime/cas/sha256/1/a/e/b>) = 0
+94848 1793855876.029508 fsync(17</state/runtime/cas/sha256/1/a/e>) = 0
+94848 1793855876.030192 write(17</state/runtime/cas/sha256/1/a/e/b/.6445610bf94d52c4a7042a5a0f16b5b3dc1b2f70c382861ae0a92248e38d.10738055696499191907.tmp>, "\251bidrcoinbase-suski.pdfcrevxI1-sha256:0602f91f4bac12ad8fb4b79aaf751a8021899972b089c5bcb5fce43ab47de5c0dbodyxGsha256:0602f91f4bac12ad8fb4b79aaf751a8021899972b089"..., 250) = 250
+94848 1793855876.030267 fsync(17</state/runtime/cas/sha256/1/a/e/b/.6445610bf94d52c4a7042a5a0f16b5b3dc1b2f70c382861ae0a92248e38d.10738055696499191907.tmp>) = 0
+94848 1793855876.031029 rename("/state/runtime/cas/sha256/1/a/e/b/.6445610bf94d52c4a7042a5a0f16b5b3dc1b2f70c382861ae0a92248e38d.10738055696499191907.tmp", "/state/runtime/cas/sha256/1/a/e/b/6445610bf94d52c4a7042a5a0f16b5b3dc1b2f70c382861ae0a92248e38d") = 0
+94848 1793855876.031165 fsync(17</state/runtime/cas/sha256/1/a/e/b>) = 0
+94848 1793855876.033570 write(17</state/runtime/project-couch/coinbase-suski/.HEAD.16500707783243068549.tmp>, "\243dheadxGsha256:1aeb6445610bf94d52c4a7042a5a0f16b5b3dc1b2f70c382861ae0a92248e38decount\1fformatmcouch-root-v1", 107) = 107
+94848 1793855876.033652 fsync(17</state/runtime/project-couch/coinbase-suski/.HEAD.16500707783243068549.tmp>) = 0
+94848 1793855876.034283 rename("/state/runtime/project-couch/coinbase-suski/.HEAD.16500707783243068549.tmp", "/state/runtime/project-couch/coinbase-suski/HEAD") = 0
+94848 1793855876.034419 fsync(17</state/runtime/project-couch/coinbase-suski>) = 0
+94848 1793855876.041358 write(17</state/runtime/project-manifests/coinbase-suski.tsv>, "coinbase-suski.pdf\tsha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\t111243\n", 98) = 98
+94848 1793855876.042658 write(17</state/runtime/files/coinbase-suski/coinbase-suski.pdf.notes.md>, "url: https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\nretrieved: 2026-11-04T23:32:18Z\n", 95) = 95
+94848 1793855876.043302 mkdir("/state/runtime/cas/sha256/3", 0777) = 0
+94848 1793855876.043435 fsync(17</state/runtime/cas/sha256/3>) = 0
+94848 1793855876.044214 fsync(17</state/runtime/cas/sha256>) = 0
+94848 1793855876.044459 mkdir("/state/runtime/cas/sha256/3/9", 0777) = 0
+94848 1793855876.044643 fsync(17</state/runtime/cas/sha256/3/9>) = 0
+94848 1793855876.045230 fsync(17</state/runtime/cas/sha256/3>) = 0
+94848 1793855876.045395 mkdir("/state/runtime/cas/sha256/3/9/7", 0777) = 0
+94848 1793855876.045567 fsync(17</state/runtime/cas/sha256/3/9/7>) = 0
+94848 1793855876.046117 fsync(17</state/runtime/cas/sha256/3/9>) = 0
+94848 1793855876.046362 mkdir("/state/runtime/cas/sha256/3/9/7/7", 0777) = 0
+94848 1793855876.046483 fsync(17</state/runtime/cas/sha256/3/9/7/7>) = 0
+94848 1793855876.046937 fsync(17</state/runtime/cas/sha256/3/9/7>) = 0
+94848 1793855876.047576 write(17</state/runtime/cas/sha256/3/9/7/7/.41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679.3503381354560777829.tmp>, "url: https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\nretrieved: 2026-11-04T23:32:18Z\n", 95) = 95
+94848 1793855876.047819 fsync(17</state/runtime/cas/sha256/3/9/7/7/.41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679.3503381354560777829.tmp>) = 0
+94848 1793855876.048417 rename("/state/runtime/cas/sha256/3/9/7/7/.41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679.3503381354560777829.tmp", "/state/runtime/cas/sha256/3/9/7/7/41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679") = 0
+94848 1793855876.048548 fsync(17</state/runtime/cas/sha256/3/9/7/7>) = 0
+94848 1793855876.053981 mkdir("/state/runtime/cas/sha256/6", 0777) = 0
+94848 1793855876.054133 fsync(17</state/runtime/cas/sha256/6>) = 0
+94848 1793855876.054800 fsync(17</state/runtime/cas/sha256>) = 0
+94848 1793855876.055185 mkdir("/state/runtime/cas/sha256/6/e", 0777) = 0
+94848 1793855876.055315 fsync(17</state/runtime/cas/sha256/6/e>) = 0
+94848 1793855876.055767 fsync(17</state/runtime/cas/sha256/6>) = 0
+94848 1793855876.055919 mkdir("/state/runtime/cas/sha256/6/e/a", 0777) = 0
+94848 1793855876.056036 fsync(17</state/runtime/cas/sha256/6/e/a>) = 0
+94848 1793855876.056524 fsync(17</state/runtime/cas/sha256/6/e>) = 0
+94848 1793855876.056671 mkdir("/state/runtime/cas/sha256/6/e/a/5", 0777) = 0
+94848 1793855876.056801 fsync(17</state/runtime/cas/sha256/6/e/a/5>) = 0
+94848 1793855876.057302 fsync(17</state/runtime/cas/sha256/6/e/a>) = 0
+94848 1793855876.058854 write(17</state/runtime/cas/sha256/6/e/a/5/.2bb74dba905e28139f7845b7c95f7997ef836ecd9e7848b1f4114827c14c.6392337592828122557.tmp>, "\251c_idx\33coinbase-suski.pdf.notes.mddcodee57223flengthb95gagentIdlbrowser-drophrevisionfuploadhsequencem1793855876042icodeRing8c135icontentIdxGsha256:397741ff3a44"..., 238) = 238
+94848 1793855876.058972 fsync(17</state/runtime/cas/sha256/6/e/a/5/.2bb74dba905e28139f7845b7c95f7997ef836ecd9e7848b1f4114827c14c.6392337592828122557.tmp>) = 0
+94848 1793855876.059524 rename("/state/runtime/cas/sha256/6/e/a/5/.2bb74dba905e28139f7845b7c95f7997ef836ecd9e7848b1f4114827c14c.6392337592828122557.tmp", "/state/runtime/cas/sha256/6/e/a/5/2bb74dba905e28139f7845b7c95f7997ef836ecd9e7848b1f4114827c14c") = 0
+94848 1793855876.059860 fsync(17</state/runtime/cas/sha256/6/e/a/5>) = 0
+94848 1793855876.066867 mkdir("/state/runtime/cas/sha256/7", 0777) = 0
+94848 1793855876.067039 fsync(17</state/runtime/cas/sha256/7>) = 0
+94848 1793855876.067796 fsync(17</state/runtime/cas/sha256>) = 0
+94848 1793855876.068184 mkdir("/state/runtime/cas/sha256/7/3", 0777) = 0
+94848 1793855876.068321 fsync(17</state/runtime/cas/sha256/7/3>) = 0
+94848 1793855876.068804 fsync(17</state/runtime/cas/sha256/7>) = 0
+94848 1793855876.068970 mkdir("/state/runtime/cas/sha256/7/3/b", 0777) = 0
+94848 1793855876.069088 fsync(17</state/runtime/cas/sha256/7/3/b>) = 0
+94848 1793855876.069574 fsync(17</state/runtime/cas/sha256/7/3>) = 0
+94848 1793855876.070080 mkdir("/state/runtime/cas/sha256/7/3/b/8", 0777) = 0
+94848 1793855876.070212 fsync(17</state/runtime/cas/sha256/7/3/b/8>) = 0
+94848 1793855876.070948 fsync(17</state/runtime/cas/sha256/7/3/b>) = 0
+94848 1793855876.071480 write(17</state/runtime/cas/sha256/7/3/b/8/.5a1210f41722f22c391926caab5b8291ff46e1afd4e30aefff5570f90997.4389634604864554326.tmp>, "\251bidx\33coinbase-suski.pdf.notes.mdcrevxI1-sha256:6ea52bb74dba905e28139f7845b7c95f7997ef836ecd9e7848b1f4114827c14cdbodyxGsha256:6ea52bb74dba905e28139f7845b7c95f79"..., 332) = 332
+94848 1793855876.071550 fsync(17</state/runtime/cas/sha256/7/3/b/8/.5a1210f41722f22c391926caab5b8291ff46e1afd4e30aefff5570f90997.4389634604864554326.tmp>) = 0
+94848 1793855876.072058 rename("/state/runtime/cas/sha256/7/3/b/8/.5a1210f41722f22c391926caab5b8291ff46e1afd4e30aefff5570f90997.4389634604864554326.tmp", "/state/runtime/cas/sha256/7/3/b/8/5a1210f41722f22c391926caab5b8291ff46e1afd4e30aefff5570f90997") = 0
+94848 1793855876.072178 fsync(17</state/runtime/cas/sha256/7/3/b/8>) = 0
+94848 1793855876.075647 write(17</state/runtime/project-couch/coinbase-suski/.HEAD.7551625271377408482.tmp>, "\243dheadxGsha256:73b85a1210f41722f22c391926caab5b8291ff46e1afd4e30aefff5570f90997ecount\2fformatmcouch-root-v1", 107) = 107
+94848 1793855876.075798 fsync(17</state/runtime/project-couch/coinbase-suski/.HEAD.7551625271377408482.tmp>) = 0
+94848 1793855876.076297 rename("/state/runtime/project-couch/coinbase-suski/.HEAD.7551625271377408482.tmp", "/state/runtime/project-couch/coinbase-suski/HEAD") = 0
+94848 1793855876.076445 fsync(17</state/runtime/project-couch/coinbase-suski>) = 0
+94848 1793855876.079406 write(17</state/runtime/project-manifests/coinbase-suski.tsv>, "coinbase-suski.pdf.notes.md\tsha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\t95\n", 103) = 103
+94867 1793855876.091978 mkdir("/tmp/project-source-1631974797053314266", 0700) = 0
+94867 1793855876.094480 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "%PDF-1.6\r%\342\343\317\323\r\n486 0 obj\r<</Linearized 1/L 111243/O 488/E 53869/N 12/T 110792/H [ 494 308]>>\rendobj\r             \r\n503 0 obj\r<</DecodeParms<</Columns 4/Predict"..., 8192) = 8192
+94867 1793855876.094630 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "f\252\204\253\266\345\200\225\274\0165\261 \254\224\23\316\254,\251\f\222[9\364\204\201;\363\26034R\35\3739_\370\247\f\337\217\342\261\17^\21m\354\314\357[i%\354YC\25\343_\30\353\320\\\330\212#\232\267\301F\311\375\244\f\r}\326\246\323k\221\207\327\202WY5\265Y\342\356\261\367\215\306f\357\334\210\0215FK\30\245\356\351A\214\317\300I\365S\2152\237\344\377\25`\0\260Oy\344\r\nendstream\rendobj\r498 0 obj\r<</F"..., 8192) = 8192
+94867 1793855876.094824 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\367>\317\373<\356\264\"\244\365ei}`8\256\364)\237(\377T\30Q\361*1\205VFQL\2635\242\264N\27I\0233\20M\0176\242\316F\324H*p!\351/P\2003m\342\fq\1\244\22\341\232\241\342P\211\304\2\25\254P\2412\237\212Y\347!(\227\36\3\302\21\211U\236\260@\360\366\361\230\310n~q/~\261\177Q\20\277\345_\274\r\367\357\252\366\227\350L\316\345\337\316\376p\233\246\230\262\3370\226.\352\317\36\31\360\206\364l\260}+;\221\250\356\312\265\240k\251\312DBV\245\25"..., 8192) = 8192
+94867 1793855876.094948 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "0\333\213\230`\306i!IX\236q\233\240\221$\r\4\02160xLK\10\v\2w\2303\224\234\10\17\32\306\300q\215\367\365\227\vm\2\251\n\t\241]8!\314\10\206va\4!\377\0252M(:\216N\243\301\265MM\315\215\3561\364\344\211Db\32\275\242r\314\306\261\271\321\253\21\222\253\271@U\320\25\fp\276mD\265\30\336\6<\204\267\f\355\375|p\33!{\312\267\201\212R\264\350\255\212%\365\242\250\226*YG(P\311\6\37R\222#\374\20\260\366\5Q\235F\20\214\274Q\3\3674\234"..., 8192) = 8192
+94867 1793855876.095039 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\0\273\256\242\326\201\22\370\212N\354\373\2-M1\225\350\26\310s\227\346\301V0\6>\302\373y\10\3664\326\377\4\350\1I\340\"VG\304'\247T\246\233\364$\35\"N\22\305\250\235:\361\354~\365\253$\243U\246\377zt5PIz\225<0\r\26\300\222\364\252\333\304\373\213\213Vvyj\371\312\262\374\343\342\234N\277\266\226\313\t\313\372\35\23\217\314\212_\226\234=\274h\315\261\2267\323\333-\273\253I\372\329\240\4<p\3pr\330<\271l\336\275O\372E\377\242\225\3\231O\27\255k\202,"..., 8192) = 8192
+94867 1793855876.095128 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\340\375\361\353C\257o\336\4\226o\357\370\251\322\245(\352R\32y\3\343PB\373VZ\225\17\362\341j[\324\245\231\302\200\306\334\r\272Y\2\202,\200ga\0344wrXVV\v\3Q\27 \20,\334*\f\23-2A\v\262N\317\344\211\220\201\216\260\236j\247\6\250(\365\1u\225\272G=\242R\374\324 \2527:]O\365S\32\212\212\341_K>\255\206q0\v\230 \3632\323\303le\3662\303\314i\346O\314g\314-\346>\303x\230\r\350\360\0:\274\304P\20\335\332\300\f0Q\206d\30"..., 8192) = 8192
+94867 1793855876.095216 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\22;\334.3\304g\370R\34\300k\345B5\227\312E\274R\nNw\320)\245\235X([\350\222\332D\313\325]b\5\"\263\33m\265\371x4\16\261\315\34225f\16\33>l\310\340A\351\3\323R\235)\311\3\222\372\367K\354\333\307\321;A\353\325\363\261\36\361\335\273\305u\355\322\271S\307\330\230\350\16\355\333E\265m\23\31a\267\251\212\24L)Y\216\3542MO,\323\225DGN\216\323,;<\250\360\334UQ\246\343cN\317\276WG\327\312,5\355^\315LhV}E3\363\266f\346\35"..., 8192) = 8192
+94867 1793855876.095308 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\344\262V\373P\333\337\233i2\202L\306\240\360\236\344\25\271E-\327\353W\335\274\201\355\27202*/,P\360&\231#\367\7\260\223`\351\356\303\335\275\373\307\232\270\361\22\337\353\374QQhAp|\222\6f\5\323\36o\341\352\3237\2\256\336G\17\263\316\"\324\341\332B\221]\10\36\354\361\300\261\304\2735\250K\26\\\211\10\20\246\35\226\35\23\204E~%1h\27788\364\33\302\244\335\376S\330\0\241\234(\257\351\0201\\@\274o\275\330\244\221\251\2406\336j\2(w\202\220\331\243E2hA\354"..., 8192) = 8192
+94867 1793855876.095402 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\237\347\350\n\36xs \34\1\334;\217\276\342?z\230\5~\20=\314i\376e\365\253K\372\17\316\366\267\333\367oA\vw\322XD\200\304\3204\360\374,e\212'Aj\23\370\270\327%\247Wm\250\335\252y\212sn\253C\335^\16\36L\202;\r\370\1\267\377\\\241\"\315\274 \241$\210\274%\243|?{\200`W[E\267\262\320\233\252.\265\2445\37\326\240\374\330C\325\17\263\246\225\214H\231\323F\1HY\240\316f+\213\202\266\362Y\331\254\306L\206=\204\266\305F$h\374[\2325U\241\350"..., 8192) = 8192
+94867 1793855876.095491 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\16\310B\353\24\263\36\241\371\10\30\207\30\3568\346\261V\32K\257\266\267\275\341\213\367EvW\264l`\217\217\331CYg}\331\324\216A\226S\177R\302\220\2625=\301\34f7\3C\365\277\245\355\22\226\n_\207`\16\35S\212\377Ov\327\263\213\17\227\277\2759\277\232/\25Wl\366\303\302\202\nx\227Z\f\235\271\374\355\202\0376~\254\276\201(W\251k\343\23\337\357\273\345\24\327)\342*3\36\3118KW\237\256~\246\335Cld7\267\7\377H'\376\365\342\362-\342\f\331\232R\206#\17Y\316"..., 8192) = 8192
+94867 1793855876.095580 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "esources<</ExtGState<</GS0 504 0 R>>/Font<</TT0 45 0 R/TT1 44 0 R>>/ProcSet[/PDF/Text]>>/Rotate 0/StructParents 9/Tabs/S/Type/Page>>\rendobj\r20 0 obj\r<</Filter/F"..., 8192) = 8192
+94867 1793855876.095667 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\215?\324\6G,Jc\305NaJ\326@O1v0\256\231\307\355W\371\352p\235t\351\212\21d\337\207^\337\6\312\16\304g\272\247\"E\31\356N\30|#\304\255\212\355Vn\32b\241\r./\240\302r\303\24\276\26E#q\217\241\371\355\306bU\200\5\332\327\312Nabr\313\302\300\3359\374h\347\2144\277\242R\33\t\336lW\204T*)\240\202\322r\252\240\203\332F\202\3641o\213\241\342\344J\235\300\360\321\227\240\224\321\351\20\246\276\330\17!N\26\226@5W\323\352\224\315\3371-\"\312\250"..., 8192) = 8192
+94867 1793855876.095782 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "\253\322b\247!l1\211\355\236\327\247\24\32+r,\257\356\227on?\322\v*=g\231\357\310\317')\23t\7#\230\252\365\374^$3\211\260\231\304F9\350a\261\177$*?\336~\224\373\376k\205\362y\226\267X\317WoJ\323|t$)\314f9\30\336^\177|\2400\264\22\206NF/c\220\261\4b~\343\327\307\177=\314sv\344\2378\27\344\vN\6\371\202\263Ay\2133$_8N\221|\3419G\346\300\346$\311\27\221\263d\216xN\223\231\240\346D\231\257\200Se\2762\234,\233"..., 8192) = 8192
+94867 1793855876.095961 write(18</tmp/project-source-1631974797053314266/coinbase-suski.pdf>, "Q\31\307\261\310\235\224\361N\344F\37\234x\343\340\232\276#r.\273\320\360\301\21x r\216\277\243\307\301U\0203\257q\25\304\310k\\\5\255E\343*h\26\251\177)UM=rg]\305l\310\r\7*\32\271\331@\241Y\334h\240\220\254N1Q\241X\334\214\247\20,n\304SL\205\334\204\207\207b\341\216\21\232%\32\347\0264\261\17\16\221\343 \21%\266[\377\341'\276\365\353\337\21;\361/}\375xp\360\273\0\3\0\276N\7\312\r\nendstream\rendobj\r3"..., 4747) = 4747
+94867 1793855876.102417 write(24<pipe:[550921]>, "f\250\0\0", 4) = 4
+94867 1793855876.102491 write(24<pipe:[550921]>, "\21\0\0\0\22\0\0\0\23\0\0\0\24\0\0\0\25\0\0\0\26\0\0\0\31\0\0\0\32\0\0\0\27\0\0\0\30\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0pj\0\204i\177\0\0\3\0\0\0\0\0\0\0\320h\0\204i\177\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1\0\0\0", 96) = 96
+94867 1793855876.102561 write(24<pipe:[550921]>, "\3\0\0\0C\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94867 1793855876.102625 write(24<pipe:[550921]>, "pdfinfo\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bin\0/bin\0", 137) = 137
+94870 1793855876.103126 write(26<pipe:[550922]>, "\377\377\0\0", 4) = 4
+94870 1793855876.135236 write(1<pipe:[550919]>, "Title:           23-3 Coinbase, Inc. v. Suski (05/23/2024)\nCreator:         PScript5.dll Version 5.2.2\nProducer:        Acrobat Distiller 23.0 (Windows)\nCreatio"..., 560) = 560
+94870 1793855876.136380 +++ exited with 0 +++
+94867 1793855876.136393 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=38, si_uid=0, si_status=0, si_utime=0, si_stime=1 /* 0.01 s */} ---
+94867 1793855876.156274 write(42<pipe:[550928]>, "f\250\0\0", 4) = 4
+94867 1793855876.156362 write(42<pipe:[550928]>, "#\0\0\0$\0\0\0%\0\0\0&\0\0\0'\0\0\0(\0\0\0+\0\0\0,\0\0\0)\0\0\0*\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\320\271\1\204i\177\0\0\6\0\0\0Coll@\272\1\204i\177\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1\0\0\0", 96) = 96
+94867 1793855876.156415 write(42<pipe:[550928]>, "\6\0\0\0R\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94867 1793855876.156453 write(42<pipe:[550928]>, "pdftotext\0-enc\0UTF-8\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bin\0/bin\0", 152) = 152
+94872 1793855876.158182 write(44<pipe:[550929]>, "\377\377\0\0", 4) = 4
+94872 1793855876.203753 write(1<pipe:[550926]>, "(Slip Opinion)\n\nOCTOBER TERM, 2023\n\n1\n\nSyllabus\nNOTE: Where it is feasible, a syllabus (headnote) will be released, as is\nbeing done in connection with this cas"..., 4096) = 4096
+94872 1793855876.207699 write(1<pipe:[550926]>, "ovision. Rather, where a challenge applies \342\200\234equally\342\200\235 to the whole contract and to an arbitration or delegation\nprovision, a court must address that challeng"..., 4096) = 4096
+94872 1793855876.211578 write(1<pipe:[550926]>, "act at issue, we would not be deciding\nthis case, since the Arbitration Agreement quite clearly\nsends to arbitration disputes between Coinbase and its users, in"..., 4096) = 4096
+94872 1793855876.215128 write(1<pipe:[550926]>, ", will resolve threshold arbitrability questions\nas well as underlying merits disputes.\342\200\235 Henry Schein, Inc.\nv. Archer & White Sales, Inc., 586 U. S. 63, 65 (2"..., 4096) = 4096
+94872 1793855876.219206 write(1<pipe:[550926]>, "n. None of these reasons persuades us to do so.\nFirst, Coinbase invokes the so-called severability principle. Under the severability principle, \342\200\234an arbitratio"..., 4096) = 4096
+94872 1793855876.222962 write(1<pipe:[550926]>, "d be to impermissibly \342\200\234 \342\200\230elevate [a delegation provision] over other forms of\ncontract.\342\200\231 \342\200\235 Ibid. (quoting Prima Paint Corp. v. Flood &\nConklin Mfg. Co.,"..., 3305) = 3305
+94872 1793855876.223588 +++ exited with 0 +++
+94834 1793855876.223617 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=40, si_uid=0, si_status=0, si_utime=2 /* 0.02 s */, si_stime=1 /* 0.01 s */} ---
+94867 1793855876.229210 mkdir("/tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer", 0777) = -1 ENOENT (No such file or directory)
+94867 1793855876.229773 mkdir("/tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f", 0777) = -1 ENOENT (No such file or directory)
+94867 1793855876.230189 mkdir("/tmp/.ocr/coinbase-suski/coinbase-suski.pdf", 0777) = -1 ENOENT (No such file or directory)
+94867 1793855876.230523 mkdir("/tmp/.ocr/coinbase-suski", 0777) = -1 ENOENT (No such file or directory)
+94867 1793855876.230957 mkdir("/tmp/.ocr", 0777) = 0
+94867 1793855876.231015 mkdir("/tmp/.ocr/coinbase-suski", 0777) = 0
+94867 1793855876.231064 mkdir("/tmp/.ocr/coinbase-suski/coinbase-suski.pdf", 0777) = 0
+94867 1793855876.231112 mkdir("/tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f", 0777) = 0
+94867 1793855876.231165 mkdir("/tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer", 0777) = 0
+94869 1793855876.252760 write(42<pipe:[547044]>, "f\250\0\0", 4) = 4
+94869 1793855876.253057 write(42<pipe:[547044]>, "#\0\0\0$\0\0\0%\0\0\0&\0\0\0'\0\0\0(\0\0\0+\0\0\0,\0\0\0)\0\0\0*\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\320\213\0|i\177\0\0\v\0\0\0atiop\214\0|i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94869 1793855876.253121 write(42<pipe:[547044]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94869 1793855876.253170 write(42<pipe:[547044]>, "pdftotext\0-enc\0UTF-8\0-f\0002\0-l\0002\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94868 1793855876.253938 write(52<pipe:[544735]>, "f\250\0\0", 4) = 4
+94868 1793855876.253993 write(52<pipe:[544735]>, "-\0\0\0.\0\0\0/\0\0\0000\0\0\0001\0\0\0002\0\0\0005\0\0\0006\0\0\0003\0\0\0004\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0P1\0\210i\177\0\0\v\0\0\0eImp\3601\0\210i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94868 1793855876.254043 write(52<pipe:[544735]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94868 1793855876.254085 write(52<pipe:[544735]>, "pdftotext\0-enc\0UTF-8\0-f\0001\0-l\0001\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94875 1793855876.254803 write(44<pipe:[547045]>, "\377\377\0\0", 4) = 4
+94876 1793855876.255135 write(54<pipe:[544736]>, "\377\377\0\0", 4) = 4
+94875 1793855876.311578 write(1<pipe:[547042]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t2\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t2\t0\t0\t0\t0"..., 4096) = 4096
+94875 1793855876.311886 write(1<pipe:[547042]>, "0\t-1\t###LINE###\n5\t2\t1\t2\t5\t0\t165.24\t210.14\t34.50\t10.81\t100\tmatter.\342\200\235\n5\t2\t1\t2\t5\t1\t205.38\t210.14\t20.10\t10.81\t100\tFirst\n5\t2\t1\t2\t5\t2\t228.25\t210.14\t32.28\t10.81\t100\tO"..., 4096) = 4096
+94875 1793855876.312232 write(1<pipe:[547042]>, "5.87\t33.95\t10.81\t100\tcontract\n5\t2\t1\t2\t12\t3\t242.02\t285.87\t15.67\t10.81\t100\tand\n5\t2\t1\t2\t12\t4\t261.66\t285.87\t13.50\t10.81\t100\tthe\n5\t2\t1\t2\t12\t5\t279.13\t285.87\t25.03\t10."..., 4096) = 4096
+94875 1793855876.312421 write(1<pipe:[547042]>, "\n5\t2\t1\t2\t19\t3\t237.91\t361.60\t19.49\t10.81\t100\tfrom\n5\t2\t1\t2\t19\t4\t260.52\t361.60\t13.50\t10.81\t100\tthe\n5\t2\t1\t2\t19\t5\t277.13\t361.60\t43.54\t10.81\t100\tremainder\n5\t2\t1\t2\t19\t"..., 4096) = 4096
+94875 1793855876.312615 write(1<pipe:[547042]>, "1\t10.81\t100\tat\n5\t2\t1\t2\t26\t3\t201.79\t437.39\t12.51\t10.81\t100\t71.\n4\t2\t1\t2\t27\t0\t174.951000\t448.185000\t280.801800\t10.809000\t-1\t###LINE###\n5\t2\t1\t2\t27\t0\t174.95\t448.19\t3"..., 4096) = 4096
+94875 1793855876.313128 write(1<pipe:[547042]>, "\t1\t2\t34\t3\t251.69\t523.91\t8.00\t10.81\t100\tto\n5\t2\t1\t2\t34\t4\t262.85\t523.91\t14.70\t10.81\t100\ttwo\n5\t2\t1\t2\t34\t5\t280.68\t523.91\t40.59\t10.81\t100\tcontracts,\n5\t2\t1\t2\t34\t6\t324."..., 3135) = 3135
+94875 1793855876.314071 +++ exited with 0 +++
+94834 1793855876.314122 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=43, si_uid=0, si_status=0, si_utime=1 /* 0.01 s */, si_stime=1 /* 0.01 s */} ---
+94876 1793855876.314601 write(1<pipe:[544733]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t1\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t1\t0\t0\t0\t0"..., 4096) = 4096
+94876 1793855876.314830 write(1<pipe:[544733]>, "\t4\t248.15\t186.66\t22.43\t8.43\t100\tDetroit\n5\t1\t3\t1\t4\t5\t272.50\t186.66\t23.47\t8.43\t100\tTimber\n5\t1\t3\t1\t4\t6\t297.89\t186.66\t5.98\t8.43\t100\t&\n5\t1\t3\t1\t4\t7\t305.85\t186.66\t25.2"..., 4096) = 4096
+94876 1793855876.315047 write(1<pipe:[544733]>, "752000\t290.507400\t10.809000\t-1\t###LINE###\n5\t1\t5\t3\t2\t0\t165.25\t352.75\t21.99\t10.81\t100\tform,\n5\t1\t5\t3\t2\t1\t191.50\t352.75\t15.67\t10.81\t100\tand\n5\t1\t5\t3\t2\t2\t211.37\t352.7"..., 4096) = 4096
+94876 1793855876.315178 write(1<pipe:[544733]>, ".86\t10.81\t100\thave\n5\t1\t5\t3\t9\t6\t348.67\t428.48\t15.96\t10.81\t100\tsole\n5\t1\t5\t3\t9\t7\t371.53\t428.48\t47.50\t10.81\t100\tjurisdiction\n5\t1\t5\t3\t9\t8\t425.96\t428.48\t7.50\t10.81\t10"..., 4096) = 4096
+94876 1793855876.315322 write(1<pipe:[544733]>, "81\t100\tNinth\n5\t1\t5\t3\t16\t9\t426.61\t504.27\t29.19\t10.81\t100\tCircuit\n4\t1\t5\t3\t17\t0\t165.249000\t515.067000\t37.998000\t10.809000\t-1\t###LINE###\n5\t1\t5\t3\t17\t0\t165.25\t515.07\t"..., 4096) = 4096
+94876 1793855876.315697 write(1<pipe:[544733]>, "\t604.65\t27.78\t10.81\t100\tsimply\n5\t1\t5\t4\t7\t1\t195.25\t604.65\t40.63\t10.81\t100\tcontracts,\n5\t1\t5\t4\t7\t2\t238.12\t604.65\t13.50\t10.81\t100\tthe\n5\t1\t5\t4\t7\t3\t253.86\t604.65\t17.5"..., 1629) = 1629
+94876 1793855876.316210 +++ exited with 0 +++
+94877 1793855876.316487 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=44, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94869 1793855876.329452 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00002.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t2\t0\t0\t0\t0\t651\t475\t21\t45\t100\t2\n5\t2\t0\t1\t0\t0\t1033\t475\t217\t45\t100\tCOINBASE,\n5\t2"..., 16086) = 16086
+94869 1793855876.332658 write(42<pipe:[547096]>, "f\250\0\0", 4) = 4
+94869 1793855876.332744 write(42<pipe:[547096]>, "#\0\0\0$\0\0\0%\0\0\0&\0\0\0'\0\0\0(\0\0\0+\0\0\0,\0\0\0)\0\0\0*\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\360\343\0|i\177\0\0\v\0\0\0e\1\0\31\220\344\0|i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94869 1793855876.332795 write(42<pipe:[547096]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94869 1793855876.332834 write(42<pipe:[547096]>, "pdftotext\0-enc\0UTF-8\0-f\0003\0-l\0003\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94878 1793855876.334784 write(44<pipe:[547097]>, "\377\377\0\0", 4) = 4
+94868 1793855876.341553 write(42</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00001.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t1\t0\t0\t0\t0\t651\t483\t64\t35\t100\t(Slip\n5\t1\t0\t0\t0\t1\t723\t483\t118\t35\t100\tOpinion)\n5"..., 14613) = 14613
+94868 1793855876.348561 write(45<pipe:[544741]>, "f\250\0\0", 4) = 4
+94868 1793855876.348663 write(45<pipe:[544741]>, "#\0\0\0&\0\0\0(\0\0\0)\0\0\0*\0\0\0+\0\0\0.\0\0\0/\0\0\0,\0\0\0-\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\0K\0\210i\177\0\0\v\0\0\0i\177\0\0\240K\0\210i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94868 1793855876.348739 write(45<pipe:[544741]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94868 1793855876.348795 write(45<pipe:[544741]>, "pdftotext\0-enc\0UTF-8\0-f\0004\0-l\0004\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94879 1793855876.349989 write(47<pipe:[544742]>, "\377\377\0\0", 4) = 4
+94878 1793855876.383985 write(1<pipe:[547094]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t3\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t3\t0\t0\t0\t0"..., 4096) = 4096
+94878 1793855876.384212 write(1<pipe:[547094]>, "225.555000\t36.815400\t10.809000\t-1\t###FLOW###\n4\t3\t4\t0\t0\t0\t287.580000\t225.555000\t36.815400\t10.809000\t-1\t###LINE###\n5\t3\t4\t0\t0\t0\t287.58\t225.55\t14.32\t10.81\t100\tNo.\n5"..., 4096) = 4096
+94878 1793855876.384364 write(1<pipe:[547094]>, "r\n5\t3\t6\t0\t3\t5\t329.19\t364.24\t25.85\t13.19\t100\tmust\n5\t3\t6\t0\t3\t6\t359.38\t364.24\t31.96\t13.19\t100\tdecide\n5\t3\t6\t0\t3\t7\t395.67\t364.24\t13.04\t13.19\t100\tall\n5\t3\t6\t0\t3\t8\t413."..., 4096) = 4096
+94878 1793855876.384513 write(1<pipe:[547094]>, "100\tmatter\n5\t3\t6\t0\t11\t6\t317.47\t470.02\t14.04\t13.19\t100\tfor\n5\t3\t6\t0\t11\t7\t334.67\t470.02\t16.49\t13.19\t100\tthe\n5\t3\t6\t0\t11\t8\t354.23\t470.02\t50.57\t13.19\t100\tarbitrator\n5"..., 4096) = 4096
+94878 1793855876.384938 write(1<pipe:[547094]>, "\theld\n4\t3\t6\t0\t20\t0\t156.245580\t589.068480\t299.422404\t13.186980\t-1\t###LINE###\n5\t3\t6\t0\t20\t0\t156.25\t589.07\t21.39\t13.19\t100\tthat\n5\t3\t6\t0\t20\t1\t181.60\t589.07\t42.77\t13."..., 1083) = 1083
+94878 1793855876.385720 +++ exited with 0 +++
+94869 1793855876.385738 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=46, si_uid=0, si_status=0, si_utime=1 /* 0.01 s */, si_stime=0} ---
+94869 1793855876.389810 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00003.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t3\t0\t0\t0\t0\t1018\t475\t72\t45\t100\tCite\n5\t3\t0\t0\t0\t1\t1100\t475\t49\t45\t100\tas:\n5\t3\t0\t"..., 11234) = 11234
+94869 1793855876.391849 write(45<pipe:[547141]>, "f\250\0\0", 4) = 4
+94869 1793855876.391934 write(45<pipe:[547141]>, "#\0\0\0$\0\0\0%\0\0\0'\0\0\0)\0\0\0+\0\0\0.\0\0\0/\0\0\0,\0\0\0-\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\360\343\0|i\177\0\0\v\0\0\0e\1\0\0310\347\0|i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94869 1793855876.392008 write(45<pipe:[547141]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94869 1793855876.392075 write(45<pipe:[547141]>, "pdftotext\0-enc\0UTF-8\0-f\0005\0-l\0005\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94879 1793855876.393122 write(1<pipe:[544739]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t4\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t4\t0\t0\t0\t0"..., 4096) = 4096
+94879 1793855876.393293 write(1<pipe:[544739]>, "52\t13.19\t100\tCoinbase.\n5\t4\t2\t1\t2\t6\t377.53\t244.60\t12.83\t13.19\t100\tTo\n5\t4\t2\t1\t2\t7\t393.67\t244.60\t18.73\t13.19\t100\tbuy\n5\t4\t2\t1\t2\t8\t415.78\t244.60\t19.14\t13.19\t100\tand\n"..., 4096) = 4096
+94879 1793855876.393461 write(1<pipe:[544739]>, ".04\t13.19\t100\tpretation\n5\t4\t2\t2\t2\t1\t231.20\t367.60\t10.37\t13.19\t100\tor\n5\t4\t2\t2\t2\t2\t247.46\t367.60\t56.62\t13.19\t100\tapplication\n5\t4\t2\t2\t2\t3\t309.98\t367.60\t9.16\t13.19\t"..., 4096) = 4096
+94879 1793855876.393616 write(1<pipe:[544739]>, "6.261960\t492.651900\t299.512440\t13.186980\t-1\t###LINE###\n5\t4\t2\t3\t3\t0\t156.26\t492.65\t19.56\t13.19\t100\tthis\n5\t4\t2\t3\t3\t1\t181.41\t492.65\t24.65\t13.19\t100\tcase,\n5\t4\t2\t3\t3\t"..., 4096) = 4096
+94880 1793855876.393933 write(47<pipe:[547142]>, "\377\377\0\0", 4) = 4
+94879 1793855876.394085 write(1<pipe:[544739]>, "eement,\n5\t4\t2\t3\t11\t2\t248.12\t598.43\t16.49\t13.19\t100\tthe\n5\t4\t2\t3\t11\t3\t268.76\t598.43\t37.27\t13.19\t100\tOfficial\n5\t4\t2\t3\t11\t4\t310.18\t598.43\t28.70\t13.19\t100\tRules\n5\t4\t"..., 623) = 623
+94879 1793855876.394813 +++ exited with 0 +++
+94871 1793855876.394941 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=47, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94868 1793855876.400153 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00004.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t4\t0\t0\t0\t0\t651\t474\t21\t45\t100\t2\n5\t4\t0\t1\t0\t0\t1033\t474\t217\t45\t100\tCOINBASE,\n5\t4"..., 11104) = 11104
+94868 1793855876.407649 write(45<pipe:[544748]>, "f\250\0\0", 4) = 4
+94868 1793855876.407757 write(45<pipe:[544748]>, "#\0\0\0&\0\0\0'\0\0\0(\0\0\0*\0\0\0+\0\0\0.\0\0\0/\0\0\0,\0\0\0-\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\0K\0\210i\177\0\0\v\0\0\0i\177\0\0\20`\0\210i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94868 1793855876.407811 write(45<pipe:[544748]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94868 1793855876.407861 write(45<pipe:[544748]>, "pdftotext\0-enc\0UTF-8\0-f\0006\0-l\0006\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94881 1793855876.409359 write(47<pipe:[544749]>, "\377\377\0\0", 4) = 4
+94881 1793855876.447511 write(1<pipe:[544746]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t6\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t6\t0\t0\t0\t0"..., 4096) = 4096
+94881 1793855876.447743 write(1<pipe:[544746]>, "38.61\t52.67\t13.19\t100\trevocation\n5\t6\t2\t0\t6\t8\t355.40\t238.61\t9.14\t13.19\t100\tof\n5\t6\t2\t0\t6\t9\t368.92\t238.61\t18.70\t13.19\t100\tany\n5\t6\t2\t0\t6\t10\t391.99\t238.61\t48.82\t13.1"..., 4096) = 4096
+94881 1793855876.447883 write(1<pipe:[544746]>, "\t6\t2\t0\t14\t0\t156.267540\t344.388960\t299.498166\t13.186980\t-1\t###LINE###\n5\t6\t2\t0\t14\t0\t156.27\t344.39\t48.24\t13.19\t100\tdecisions\342\200\231\n5\t6\t2\t0\t14\t1\t208.96\t344.39\t8.55\t13."..., 4096) = 4096
+94881 1793855876.448021 write(1<pipe:[544746]>, "\t156.26\t436.97\t72.46\t13.19\t100\tConsequently,\n5\t6\t2\t0\t21\t1\t232.04\t436.97\t16.50\t13.19\t100\tthe\n5\t6\t2\t0\t21\t2\t251.85\t436.97\t21.40\t13.19\t100\tfirst\n5\t6\t2\t0\t21\t3\t276.62"..., 4096) = 4096
+94881 1793855876.448387 write(1<pipe:[544746]>, "NE###\n5\t6\t2\t0\t29\t0\t156.26\t542.75\t8.94\t13.19\t100\tv.\n5\t6\t2\t0\t29\t1\t168.98\t542.75\t33.98\t13.19\t100\tArcher\n5\t6\t2\t0\t29\t2\t206.73\t542.75\t9.35\t13.19\t100\t&\n5\t6\t2\t0\t29\t3\t21"..., 3846) = 3846
+94881 1793855876.448992 +++ exited with 0 +++
+94834 1793855876.449040 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=49, si_uid=0, si_status=0, si_utime=1 /* 0.01 s */, si_stime=1 /* 0.01 s */} ---
+94880 1793855876.450520 write(1<pipe:[547139]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t5\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t5\t0\t0\t0\t0"..., 4096) = 4096
+94880 1793855876.450766 write(1<pipe:[547139]>, "4.65\t235.60\t9.77\t13.19\t100\tto\n5\t5\t3\t0\t6\t2\t218.21\t235.60\t16.49\t13.19\t100\tthe\n5\t5\t3\t0\t6\t3\t238.55\t235.60\t58.04\t13.19\t100\tjurisdiction\n5\t5\t3\t0\t6\t4\t300.38\t235.60\t9.1"..., 4096) = 4096
+94880 1793855876.450996 write(1<pipe:[547139]>, ".65\t360.59\t29.27\t13.19\t100\tCourt\n5\t5\t3\t1\t7\t8\t383.65\t360.59\t14.11\t13.19\t100\tfor\n5\t5\t3\t1\t7\t9\t401.48\t360.59\t16.47\t13.19\t100\tthe\n5\t5\t3\t1\t7\t10\t421.67\t360.59\t34.02\t13"..., 4096) = 4096
+94880 1793855876.451228 write(1<pipe:[547139]>, "\t3\t1\t16\t5\t344.86\t479.63\t31.73\t13.19\t100\tclause\n5\t5\t3\t1\t16\t6\t381.69\t479.63\t10.17\t13.19\t100\tin\n5\t5\t3\t1\t16\t7\t396.96\t479.63\t16.47\t13.19\t100\tthe\n5\t5\t3\t1\t16\t8\t418.54\t"..., 4096) = 4096
+94880 1793855876.451708 write(1<pipe:[547139]>, "13.19\t100\tcontract\n5\t5\t3\t1\t25\t2\t232.42\t598.61\t56.05\t13.19\t100\tsupersedes\n5\t5\t3\t1\t25\t3\t291.12\t598.61\t12.82\t13.19\t100\tan\n5\t5\t3\t1\t25\t4\t306.59\t598.61\t33.80\t13.19\t10"..., 833) = 833
+94880 1793855876.452670 +++ exited with 0 +++
+94834 1793855876.452703 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=48, si_uid=0, si_status=0, si_utime=1 /* 0.01 s */, si_stime=2 /* 0.02 s */} ---
+94869 1793855876.456722 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00005.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t5\t0\t0\t0\t0\t1018\t474\t72\t45\t100\tCite\n5\t5\t0\t0\t0\t1\t1100\t474\t49\t45\t100\tas:\n5\t5\t0\t"..., 11326) = 11326
+94869 1793855876.458182 write(42<pipe:[547186]>, "f\250\0\0", 4) = 4
+94869 1793855876.458272 write(42<pipe:[547186]>, "#\0\0\0$\0\0\0%\0\0\0&\0\0\0'\0\0\0(\0\0\0+\0\0\0,\0\0\0)\0\0\0*\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\360\343\0|i\177\0\0\v\0\0\0e\1\0\0310\347\0|i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94869 1793855876.458330 write(42<pipe:[547186]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94869 1793855876.458384 write(42<pipe:[547186]>, "pdftotext\0-enc\0UTF-8\0-f\0007\0-l\0007\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94868 1793855876.460127 write(42</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00006.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t6\t0\t0\t0\t0\t651\t474\t21\t45\t100\t4\n5\t6\t0\t1\t0\t0\t1033\t474\t217\t45\t100\tCOINBASE,\n5\t6"..., 13706) = 13706
+94882 1793855876.462266 write(44<pipe:[547187]>, "\377\377\0\0", 4) = 4
+94868 1793855876.462958 write(50<pipe:[547191]>, "f\250\0\0", 4) = 4
+94868 1793855876.463030 write(50<pipe:[547191]>, "*\0\0\0,\0\0\0-\0\0\0.\0\0\0/\0\0\0000\0\0\0003\0\0\0004\0\0\0001\0\0\0002\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\0K\0\210i\177\0\0\v\0\0\0i\177\0\0\200\246\0\210i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94868 1793855876.463077 write(50<pipe:[547191]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94868 1793855876.463138 write(50<pipe:[547191]>, "pdftotext\0-enc\0UTF-8\0-f\08\0-l\08\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94883 1793855876.464282 write(52<pipe:[547192]>, "\377\377\0\0", 4) = 4
+94883 1793855876.501980 write(1<pipe:[547189]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t8\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t8\t0\t0\t0\t0"..., 4096) = 4096
+94883 1793855876.502192 write(1<pipe:[547189]>, "35.61\t44.33\t13.19\t100\tselection\n5\t8\t2\t0\t6\t2\t241.60\t235.61\t31.80\t13.19\t100\tclause\n5\t8\t2\t0\t6\t3\t278.59\t235.61\t57.22\t13.19\t100\tsuperseded\n5\t8\t2\t0\t6\t4\t341.03\t235.61\t"..., 4096) = 4096
+94883 1793855876.502561 write(1<pipe:[547189]>, ".,\n5\t8\t2\t0\t15\t3\t296.17\t354.59\t12.22\t13.19\t100\t49\n5\t8\t2\t0\t15\t4\t312.30\t354.59\t10.39\t13.19\t100\tF.\n5\t8\t2\t0\t15\t5\t326.60\t354.59\t17.03\t13.19\t100\t4th\n5\t8\t2\t0\t15\t6\t347.5"..., 4096) = 4096
+94883 1793855876.502742 write(1<pipe:[547189]>, "86980\t-1\t###LINE###\n5\t8\t2\t0\t23\t0\t156.25\t460.37\t42.13\t13.19\t100\twhether\n5\t8\t2\t0\t23\t1\t202.23\t460.37\t16.55\t13.19\t100\tthe\n5\t8\t2\t0\t23\t2\t222.63\t460.37\t34.21\t13.19\t100"..., 4096) = 4096
+94883 1793855876.503186 write(1<pipe:[547189]>, "2\t9.77\t13.19\t100\tto\n5\t8\t2\t0\t31\t7\t363.79\t566.22\t16.48\t13.19\t100\tthe\n5\t8\t2\t0\t31\t8\t383.10\t566.22\t55.78\t13.19\t100\tarbitration\n5\t8\t2\t0\t31\t9\t441.71\t566.22\t14.03\t13.19"..., 1855) = 1855
+94883 1793855876.503948 +++ exited with 0 +++
+94868 1793855876.503963 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=51, si_uid=0, si_status=0, si_utime=1 /* 0.01 s */, si_stime=1 /* 0.01 s */} ---
+94868 1793855876.507949 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00008.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t8\t0\t0\t0\t0\t651\t474\t21\t45\t100\t6\n5\t8\t0\t1\t0\t0\t1033\t474\t217\t45\t100\tCOINBASE,\n5\t8"..., 12215) = 12215
+94868 1793855876.509737 write(45<pipe:[547242]>, "f\250\0\0", 4) = 4
+94868 1793855876.509850 write(45<pipe:[547242]>, "#\0\0\0&\0\0\0(\0\0\0)\0\0\0*\0\0\0+\0\0\0.\0\0\0/\0\0\0,\0\0\0-\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\0K\0\210i\177\0\0\v\0\0\0i\177\0\0\200\246\0\210i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94868 1793855876.509967 write(45<pipe:[547242]>, "\v\0\0\0a\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94868 1793855876.510056 write(45<pipe:[547242]>, "pdftotext\0-enc\0UTF-8\0-f\09\0-l\09\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/bi"..., 167) = 167
+94884 1793855876.512121 write(47<pipe:[547243]>, "\377\377\0\0", 4) = 4
+94882 1793855876.513279 write(1<pipe:[547184]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t7\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t7\t0\t0\t0\t0"..., 4096) = 4096
+94882 1793855876.513447 write(1<pipe:[547184]>, "\tagreed\n5\t7\t3\t0\t5\t3\t316.13\t222.35\t9.77\t13.19\t100\tto\n5\t7\t3\t0\t5\t4\t328.67\t222.35\t45.62\t13.19\t100\tarbitrate\n5\t7\t3\t0\t5\t5\t377.00\t222.35\t16.55\t13.19\t100\tthe\n5\t7\t3\t0\t5\t"..., 4096) = 4096
+94882 1793855876.513606 write(1<pipe:[547184]>, "\t3\t0\t13\t5\t299.81\t328.13\t34.20\t13.19\t100\tagreed\n5\t7\t3\t0\t13\t6\t336.59\t328.13\t28.71\t13.19\t100\tabout\n5\t7\t3\t0\t13\t7\t367.86\t328.13\t20.72\t13.19\t100\tthat\n5\t7\t3\t0\t13\t8\t391"..., 4096) = 4096
+94882 1793855876.513776 write(1<pipe:[547184]>, "3\t0\t21\t2\t211.70\t433.97\t22.40\t13.19\t100\tthey\n5\t7\t3\t0\t21\t3\t236.69\t433.97\t16.08\t13.19\t100\tdid\n5\t7\t3\t0\t21\t4\t255.37\t433.97\t17.93\t13.19\t100\tso.\342\200\235\n5\t7\t3\t0\t21\t5\t278.51"..., 4096) = 4096
+94882 1793855876.514441 write(1<pipe:[547184]>, ".01\t25.25\t13.19\t100\tcides\n5\t7\t3\t1\t3\t1\t184.96\t562.01\t65.61\t13.19\t100\tarbitrability.\n5\t7\t3\t1\t3\t2\t257.55\t562.01\t22.55\t13.19\t100\tThis\n5\t7\t3\t1\t3\t3\t283.60\t562.01\t21.5"..., 2169) = 2169
+94882 1793855876.515626 +++ exited with 0 +++
+94834 1793855876.515666 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=50, si_uid=0, si_status=0, si_utime=0, si_stime=1 /* 0.01 s */} ---
+94869 1793855876.517858 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00007.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t7\t0\t0\t0\t0\t1018\t474\t72\t45\t100\tCite\n5\t7\t0\t0\t0\t1\t1100\t474\t49\t45\t100\tas:\n5\t7\t0\t"..., 12367) = 12367
+94869 1793855876.523918 write(45<pipe:[547287]>, "f\250\0\0", 4) = 4
+94869 1793855876.523997 write(45<pipe:[547287]>, "#\0\0\0$\0\0\0%\0\0\0'\0\0\0)\0\0\0+\0\0\0.\0\0\0/\0\0\0,\0\0\0-\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\240\347\0|i\177\0\0\v\0\0\0e\1\0\31P\347\0|i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94869 1793855876.524069 write(45<pipe:[547287]>, "\v\0\0\0c\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94869 1793855876.524172 write(45<pipe:[547287]>, "pdftotext\0-enc\0UTF-8\0-f\00010\0-l\00010\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/"..., 169) = 169
+94885 1793855876.526288 write(47<pipe:[547288]>, "\377\377\0\0", 4) = 4
+94884 1793855876.563661 write(1<pipe:[547240]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t9\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t9\t0\t0\t0\t0"..., 4096) = 4096
+94884 1793855876.563945 write(1<pipe:[547240]>, ".19\t100\testablishes\n5\t9\t3\t0\t6\t3\t309.89\t235.61\t21.38\t13.19\t100\tthat\n5\t9\t3\t0\t6\t4\t334.28\t235.61\t6.10\t13.19\t100\ta\n5\t9\t3\t0\t6\t5\t343.40\t235.61\t27.49\t13.19\t100\tparty\n5\t"..., 4096) = 4096
+94884 1793855876.564155 write(1<pipe:[547240]>, "99.444364\t13.186980\t-1\t###LINE###\n5\t9\t3\t0\t14\t0\t156.24\t341.39\t41.52\t13.19\t100\tcontract\n5\t9\t3\t0\t14\t1\t201.77\t341.39\t19.20\t13.19\t100\tand\n5\t9\t3\t0\t14\t2\t224.93\t341.39\t"..., 4096) = 4096
+94884 1793855876.564343 write(1<pipe:[547240]>, "0\tthat\n5\t9\t3\t0\t21\t3\t268.87\t433.97\t63.18\t13.19\t100\t[arbitration]\n5\t9\t3\t0\t21\t4\t335.96\t433.97\t61.48\t13.19\t100\tagreement.\342\200\235\n5\t9\t3\t0\t21\t5\t405.24\t433.97\t24.05\t13.19\t"..., 4096) = 4096
+94884 1793855876.564505 write(1<pipe:[547240]>, "9.201000\t299.550600\t10.809000\t-1\t###LINE###\n5\t9\t3\t1\t6\t0\t156.24\t549.20\t31.13\t10.81\t100\tpointed\n5\t9\t3\t1\t6\t1\t189.71\t549.20\t13.49\t10.81\t100\tout\n5\t9\t3\t1\t6\t2\t205.54\t5"..., 4096) = 4096
+94884 1793855876.564951 write(1<pipe:[547240]>, ".13\t15.47\t10.81\t100\tlike\n5\t9\t3\t1\t12\t12\t366.60\t614.13\t61.30\t10.81\t100\tRent-A-Center,\n5\t9\t3\t1\t12\t13\t430.25\t614.13\t25.45\t10.81\t100\twhere\n4\t9\t3\t1\t13\t0\t156.231000\t62"..., 802) = 802
+94884 1793855876.565772 +++ exited with 0 +++
+94868 1793855876.565910 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=52, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94885 1793855876.567213 write(1<pipe:[547285]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t10\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t10\t0\t0\t0"..., 4096) = 4096
+94885 1793855876.567428 write(1<pipe:[547285]>, "22.35\t37.04\t13.19\t100\tdecides\n5\t10\t2\t0\t5\t3\t270.60\t222.35\t30.32\t13.19\t100\twhich\n5\t10\t2\t0\t5\t4\t305.54\t222.35\t9.15\t13.19\t100\tof\n5\t10\t2\t0\t5\t5\t319.32\t222.35\t16.55\t13."..., 4096) = 4096
+94885 1793855876.567620 write(1<pipe:[547285]>, "10\t2\t0\t13\t2\t222.65\t328.13\t6.10\t13.19\t100\ta\n5\t10\t2\t0\t13\t3\t231.89\t328.13\t51.16\t13.19\t100\tsuccessful\n5\t10\t2\t0\t13\t4\t286.19\t328.13\t48.31\t13.19\t100\tchallenge\n5\t10\t2\t0"..., 4096) = 4096
+94868 1793855876.567887 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00009.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t9\t0\t0\t0\t0\t1018\t474\t72\t45\t100\tCite\n5\t9\t0\t0\t0\t1\t1100\t474\t49\t45\t100\tas:\n5\t9\t0\t"..., 14417) = 14417
+94885 1793855876.568043 write(1<pipe:[547285]>, "\t-1\t###LINE###\n5\t10\t2\t0\t21\t0\t156.24\t433.97\t46.82\t13.19\t100\tcontract.\342\200\231\n5\t10\t2\t0\t21\t1\t204.42\t433.97\t4.27\t13.19\t100\t\342\200\235\n5\t10\t2\t0\t21\t2\t218.94\t433.97\t24.06\t13.19\t1"..., 3350) = 3350
+94885 1793855876.569645 +++ exited with 0 +++
+94869 1793855876.569717 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=53, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+94869 1793855876.571485 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00010.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t10\t0\t0\t0\t0\t651\t474\t21\t45\t100\t8\n5\t10\t0\t1\t0\t0\t1033\t474\t217\t45\t100\tCOINBASE,\n5"..., 10290) = 10290
+94868 1793855876.573528 write(42<pipe:[547293]>, "f\250\0\0", 4) = 4
+94868 1793855876.574455 write(42<pipe:[547293]>, "%\0\0\0&\0\0\0'\0\0\0(\0\0\0#\0\0\0)\0\0\0+\0\0\0,\0\0\0$\0\0\0*\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0000\265\0\210i\177\0\0\v\0\0\0i\177\0\0\240\265\0\210i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94868 1793855876.574591 write(42<pipe:[547293]>, "\v\0\0\0c\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94869 1793855876.574714 write(52<pipe:[547298]>, "f\250\0\0", 4 <unfinished ...>
+94868 1793855876.574750 write(42<pipe:[547293]>, "pdftotext\0-enc\0UTF-8\0-f\00011\0-l\00011\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/"..., 169 <unfinished ...>
+94869 1793855876.574800 <... write resumed>) = 4
+94868 1793855876.574817 <... write resumed>) = 169
+94869 1793855876.574850 write(52<pipe:[547298]>, "-\0\0\0.\0\0\0/\0\0\0000\0\0\0001\0\0\0002\0\0\0005\0\0\0006\0\0\0003\0\0\0004\0\0\0\377\377\377\377\377\377\377\377\377\377\377\377\2\0\0\0\360\343\0|i\177\0\0\v\0\0\0e\1\0\31P\347\0|i\177\0\0\0\0\0\0\0\0\0\0\1\0\0\0\1\0\0\0", 96) = 96
+94869 1793855876.574963 write(52<pipe:[547298]>, "\v\0\0\0c\0\0\0\3\0\0\0!\0\0\0\0\0\0\0\4\0\0\0%\0\0\0", 28) = 28
+94869 1793855876.575067 write(52<pipe:[547298]>, "pdftotext\0-enc\0UTF-8\0-f\00012\0-l\00012\0-tsv\0/tmp/project-source-1631974797053314266/coinbase-suski.pdf\0-\0TERM=xterm-256color\0LANG=C.UTF-8\0/opt/trikeshed/jdk/bin\0/usr/"..., 169) = 169
+94887 1793855876.577946 write(54<pipe:[547299]>, "\377\377\0\0", 4) = 4
+94886 1793855876.578077 write(44<pipe:[547294]>, "\377\377\0\0", 4) = 4
+94887 1793855876.619061 write(1<pipe:[547296]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t12\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t12\t0\t0\t0"..., 4096) = 4096
+94887 1793855876.619270 write(1<pipe:[547296]>, ".16\t13.19\t100\t1,\n5\t12\t2\t0\t5\t6\t318.61\t222.35\t19.13\t13.19\t100\tand\n5\t12\t2\t0\t5\t7\t341.94\t222.35\t35.63\t13.19\t100\tparties\n5\t12\t2\t0\t5\t8\t381.78\t222.35\t17.70\t13.19\t100\tca"..., 4096) = 4096
+94887 1793855876.619710 write(1<pipe:[547296]>, ".01\t13.19\t100\tsimply\n5\t12\t2\t0\t12\t5\t322.42\t314.93\t47.12\t13.19\t100\treaffirms\n5\t12\t2\t0\t12\t6\t373.45\t314.93\t82.31\t13.19\t100\twell-established\n4\t12\t2\t0\t13\t0\t156.250980"..., 3736) = 3736
+94886 1793855876.619766 write(1<pipe:[547291]>, "level\tpage_num\tpar_num\tblock_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n1\t11\t0\t0\t0\t0\t0.000000\t0.000000\t612.000000\t792.000000\t-1\t###PAGE###\n3\t11\t0\t0\t0"..., 4096) = 4096
+94886 1793855876.619915 write(1<pipe:[547291]>, "FLOW###\n4\t11\t6\t0\t0\t0\t167.169300\t283.784700\t157.025208\t13.186980\t-1\t###LINE###\n5\t11\t6\t0\t0\t0\t167.17\t283.78\t6.10\t13.19\t100\tJ\n5\t11\t6\t0\t0\t1\t173.34\t285.74\t35.59\t10.81"..., 4096) = 4096
+94886 1793855876.620046 write(1<pipe:[547291]>, "1\t6\t0\t7\t6\t367.45\t379.37\t17.71\t13.19\t100\tcan\n5\t11\t6\t0\t7\t7\t388.29\t379.37\t27.90\t13.19\t100\tagree\n5\t11\t6\t0\t7\t8\t419.26\t379.37\t9.77\t13.19\t100\tto\n5\t11\t6\t0\t7\t9\t432.10\t37"..., 4096) = 4096
+94886 1793855876.620175 write(1<pipe:[547291]>, "13.19\t100\tthe\n5\t11\t6\t0\t15\t6\t305.47\t485.15\t35.64\t13.19\t100\tparties\n5\t11\t6\t0\t15\t7\t344.42\t485.15\t24.23\t13.19\t100\thave\n5\t11\t6\t0\t15\t8\t371.96\t485.15\t37.26\t13.19\t100\ta"..., 4096) = 4096
+94887 1793855876.620442 +++ exited with 0 +++
+94886 1793855876.620496 write(1<pipe:[547291]>, "\n5\t11\t6\t0\t22\t3\t268.80\t577.73\t42.15\t13.19\t100\tbetween\n5\t11\t6\t0\t22\t4\t314.68\t577.73\t16.49\t13.19\t100\tthe\n5\t11\t6\t0\t22\t5\t334.90\t577.73\t38.70\t13.19\t100\tparties,\n5\t11\t6"..., 1354) = 1354
+94868 1793855876.620546 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=55, si_uid=0, si_status=0, si_utime=1 /* 0.01 s */, si_stime=0} ---
+94886 1793855876.621192 +++ exited with 0 +++
+94871 1793855876.621251 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=54, si_uid=0, si_status=0, si_utime=1 /* 0.01 s */, si_stime=0} ---
+94869 1793855876.623050 write(36</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00012.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t12\t0\t0\t0\t0\t651\t474\t21\t45\t100\t2\n5\t12\t0\t1\t0\t0\t1033\t474\t217\t45\t100\tCOINBASE,\n5"..., 7953) = 7953
+94868 1793855876.623272 write(35</tmp/.ocr/coinbase-suski/coinbase-suski.pdf/591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f/layer/00011.tsv>, "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n5\t11\t0\t0\t0\t0\t1018\t475\t72\t45\t100\tCite\n5\t11\t0\t0\t0\t1\t1100\t475\t49\t45\t100\tas:\n5\t11"..., 11544) = 11544
+94869 1793855876.674310 write(35</state/runtime/files/coinbase-suski/coinbase-suski.pdf.footnotes.tsv>, "page\tfolio\tsections\tfrom\tmarker\tordinal\tcontinued\tstream\ttext\n9\t\t\t9\t\t0\t1\t0\t\342\200\224\342\200\224\342\200\224\342\200\224\342\200\224\342\200\224 *Coinbase\342\200\231s argument that respondents failed to challenge the de"..., 1082) = 1082
+94869 1793855876.675190 mkdir("/state/runtime/cas/sha256/f", 0777) = 0
+94869 1793855876.675367 fsync(35</state/runtime/cas/sha256/f>) = 0
+94869 1793855876.676233 fsync(35</state/runtime/cas/sha256>) = 0
+94869 1793855876.676633 mkdir("/state/runtime/cas/sha256/f/f", 0777) = 0
+94869 1793855876.676794 fsync(35</state/runtime/cas/sha256/f/f>) = 0
+94869 1793855876.677367 fsync(35</state/runtime/cas/sha256/f>) = 0
+94869 1793855876.677517 mkdir("/state/runtime/cas/sha256/f/f/7", 0777) = 0
+94869 1793855876.677647 fsync(35</state/runtime/cas/sha256/f/f/7>) = 0
+94869 1793855876.678178 fsync(35</state/runtime/cas/sha256/f/f>) = 0
+94869 1793855876.678460 mkdir("/state/runtime/cas/sha256/f/f/7/9", 0777) = 0
+94869 1793855876.678622 fsync(35</state/runtime/cas/sha256/f/f/7/9>) = 0
+94869 1793855876.679210 fsync(35</state/runtime/cas/sha256/f/f/7>) = 0
+94869 1793855876.679887 write(35</state/runtime/cas/sha256/f/f/7/9/.19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101.12189578296584485002.tmp>, "page\tfolio\tsections\tfrom\tmarker\tordinal\tcontinued\tstream\ttext\n9\t\t\t9\t\t0\t1\t0\t\342\200\224\342\200\224\342\200\224\342\200\224\342\200\224\342\200\224 *Coinbase\342\200\231s argument that respondents failed to challenge the de"..., 1082) = 1082
+94869 1793855876.679959 fsync(35</state/runtime/cas/sha256/f/f/7/9/.19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101.12189578296584485002.tmp>) = 0
+94869 1793855876.680498 rename("/state/runtime/cas/sha256/f/f/7/9/.19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101.12189578296584485002.tmp", "/state/runtime/cas/sha256/f/f/7/9/19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101") = 0
+94869 1793855876.680619 fsync(35</state/runtime/cas/sha256/f/f/7/9>) = 0
+94869 1793855876.684537 mkdir("/state/runtime/cas/sha256/4", 0777) = 0
+94869 1793855876.684748 fsync(35</state/runtime/cas/sha256/4>) = 0
+94869 1793855876.685363 fsync(35</state/runtime/cas/sha256>) = 0
+94869 1793855876.685613 mkdir("/state/runtime/cas/sha256/4/f", 0777) = 0
+94869 1793855876.685756 fsync(35</state/runtime/cas/sha256/4/f>) = 0
+94869 1793855876.686284 fsync(35</state/runtime/cas/sha256/4>) = 0
+94869 1793855876.686446 mkdir("/state/runtime/cas/sha256/4/f/3", 0777) = 0
+94869 1793855876.686562 fsync(35</state/runtime/cas/sha256/4/f/3>) = 0
+94869 1793855876.687162 fsync(35</state/runtime/cas/sha256/4/f>) = 0
+94869 1793855876.687322 mkdir("/state/runtime/cas/sha256/4/f/3/b", 0777) = 0
+94869 1793855876.687450 fsync(35</state/runtime/cas/sha256/4/f/3/b>) = 0
+94869 1793855876.687965 fsync(35</state/runtime/cas/sha256/4/f/3>) = 0
+94869 1793855876.688456 write(35</state/runtime/cas/sha256/4/f/3/b/.336dde09005fd682f4a6c4874b8920131a856a5bc100fda2e5285cbc5736.5325825427497699183.tmp>, "\251c_idx coinbase-suski.pdf.footnotes.tsvdcodee56474flengthd1082gagentIdlbrowser-drophrevisionfuploadhsequencem1793855876674icodeRing8c154icontentIdxGsha256:ff791"..., 257) = 257
+94869 1793855876.688534 fsync(35</state/runtime/cas/sha256/4/f/3/b/.336dde09005fd682f4a6c4874b8920131a856a5bc100fda2e5285cbc5736.5325825427497699183.tmp>) = 0
+94869 1793855876.689069 rename("/state/runtime/cas/sha256/4/f/3/b/.336dde09005fd682f4a6c4874b8920131a856a5bc100fda2e5285cbc5736.5325825427497699183.tmp", "/state/runtime/cas/sha256/4/f/3/b/336dde09005fd682f4a6c4874b8920131a856a5bc100fda2e5285cbc5736") = 0
+94869 1793855876.689187 fsync(35</state/runtime/cas/sha256/4/f/3/b>) = 0
+94869 1793855876.692997 mkdir("/state/runtime/cas/sha256/4/5", 0777) = 0
+94869 1793855876.693345 fsync(35</state/runtime/cas/sha256/4/5>) = 0
+94869 1793855876.694054 fsync(35</state/runtime/cas/sha256/4>) = 0
+94869 1793855876.694236 mkdir("/state/runtime/cas/sha256/4/5/9", 0777) = 0
+94869 1793855876.694364 fsync(35</state/runtime/cas/sha256/4/5/9>) = 0
+94869 1793855876.694903 fsync(35</state/runtime/cas/sha256/4/5>) = 0
+94869 1793855876.695087 mkdir("/state/runtime/cas/sha256/4/5/9/4", 0777) = 0
+94869 1793855876.695204 fsync(35</state/runtime/cas/sha256/4/5/9/4>) = 0
+94869 1793855876.695761 fsync(35</state/runtime/cas/sha256/4/5/9>) = 0
+94869 1793855876.696228 write(35</state/runtime/cas/sha256/4/5/9/4/.ae17498d6130f97b5f9261da07d89af49da1f467f3bcf837b31a57eefae9.8866130837172109139.tmp>, "\251bidx coinbase-suski.pdf.footnotes.tsvcrevxI1-sha256:4f3b336dde09005fd682f4a6c4874b8920131a856a5bc100fda2e5285cbc5736dbodyxGsha256:4f3b336dde09005fd682f4a6c4874"..., 337) = 337
+94869 1793855876.696297 fsync(35</state/runtime/cas/sha256/4/5/9/4/.ae17498d6130f97b5f9261da07d89af49da1f467f3bcf837b31a57eefae9.8866130837172109139.tmp>) = 0
+94869 1793855876.696852 rename("/state/runtime/cas/sha256/4/5/9/4/.ae17498d6130f97b5f9261da07d89af49da1f467f3bcf837b31a57eefae9.8866130837172109139.tmp", "/state/runtime/cas/sha256/4/5/9/4/ae17498d6130f97b5f9261da07d89af49da1f467f3bcf837b31a57eefae9") = 0
+94869 1793855876.696975 fsync(35</state/runtime/cas/sha256/4/5/9/4>) = 0
+94869 1793855876.700276 write(35</state/runtime/project-couch/coinbase-suski/.HEAD.10194222398548301276.tmp>, "\243dheadxGsha256:4594ae17498d6130f97b5f9261da07d89af49da1f467f3bcf837b31a57eefae9ecount\3fformatmcouch-root-v1", 107) = 107
+94869 1793855876.700362 fsync(35</state/runtime/project-couch/coinbase-suski/.HEAD.10194222398548301276.tmp>) = 0
+94869 1793855876.700897 rename("/state/runtime/project-couch/coinbase-suski/.HEAD.10194222398548301276.tmp", "/state/runtime/project-couch/coinbase-suski/HEAD") = 0
+94869 1793855876.701025 fsync(35</state/runtime/project-couch/coinbase-suski>) = 0
+94869 1793855876.703264 write(35</state/runtime/project-manifests/coinbase-suski.tsv>, "coinbase-suski.pdf.footnotes.tsv\tsha256:ff7919835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101\t1082\n", 110) = 110
+94869 1793855876.704728 write(35</state/runtime/files/coinbase-suski/coinbase-suski.pdf.extract.md>, "# coinbase-suski.pdf\n\n(Slip Opinion)\n\n1\n\nSyllabus\n\nNOTE: Where it is feasible, a syllabus (headnote) will be released, as is\nbeing done in connection with this "..., 23021) = 23021
+94869 1793855876.705348 mkdir("/state/runtime/cas/sha256/5/9/3", 0777) = 0
+94869 1793855876.705489 fsync(35</state/runtime/cas/sha256/5/9/3>) = 0
+94869 1793855876.706228 fsync(35</state/runtime/cas/sha256/5/9>) = 0
+94869 1793855876.706462 mkdir("/state/runtime/cas/sha256/5/9/3/f", 0777) = 0
+94869 1793855876.706583 fsync(35</state/runtime/cas/sha256/5/9/3/f>) = 0
+94869 1793855876.707283 fsync(35</state/runtime/cas/sha256/5/9/3>) = 0
+94869 1793855876.708285 write(35</state/runtime/cas/sha256/5/9/3/f/.d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801.13646100482813978060.tmp>, "# coinbase-suski.pdf\n\n(Slip Opinion)\n\n1\n\nSyllabus\n\nNOTE: Where it is feasible, a syllabus (headnote) will be released, as is\nbeing done in connection with this "..., 23021) = 23021
+94869 1793855876.708372 fsync(35</state/runtime/cas/sha256/5/9/3/f/.d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801.13646100482813978060.tmp>) = 0
+94869 1793855876.708892 rename("/state/runtime/cas/sha256/5/9/3/f/.d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801.13646100482813978060.tmp", "/state/runtime/cas/sha256/5/9/3/f/d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801") = 0
+94869 1793855876.709011 fsync(35</state/runtime/cas/sha256/5/9/3/f>) = 0
+94869 1793855876.715872 mkdir("/state/runtime/cas/sha256/5/d", 0777) = 0
+94869 1793855876.716045 fsync(35</state/runtime/cas/sha256/5/d>) = 0
+94869 1793855876.716665 fsync(35</state/runtime/cas/sha256/5>) = 0
+94869 1793855876.717023 mkdir("/state/runtime/cas/sha256/5/d/e", 0777) = 0
+94869 1793855876.717169 fsync(35</state/runtime/cas/sha256/5/d/e>) = 0
+94869 1793855876.717600 fsync(35</state/runtime/cas/sha256/5/d>) = 0
+94869 1793855876.717867 mkdir("/state/runtime/cas/sha256/5/d/e/a", 0777) = 0
+94869 1793855876.718033 fsync(35</state/runtime/cas/sha256/5/d/e/a>) = 0
+94869 1793855876.718557 fsync(35</state/runtime/cas/sha256/5/d/e>) = 0
+94869 1793855876.719132 write(35</state/runtime/cas/sha256/5/d/e/a/.1f358c298de414d192f00990ac18e57bbf959c1f4b6eb8acf6d8ade4c140.1004532065762269237.tmp>, "\251c_idx\35coinbase-suski.pdf.extract.mddcodee51496flengthe23021gagentIdlbrowser-drophrevisionfuploadhsequencem1793855876704icodeRing8b40icontentIdxGsha256:593fd408"..., 242) = 242
+94869 1793855876.719217 fsync(35</state/runtime/cas/sha256/5/d/e/a/.1f358c298de414d192f00990ac18e57bbf959c1f4b6eb8acf6d8ade4c140.1004532065762269237.tmp>) = 0
+94869 1793855876.719744 rename("/state/runtime/cas/sha256/5/d/e/a/.1f358c298de414d192f00990ac18e57bbf959c1f4b6eb8acf6d8ade4c140.1004532065762269237.tmp", "/state/runtime/cas/sha256/5/d/e/a/1f358c298de414d192f00990ac18e57bbf959c1f4b6eb8acf6d8ade4c140") = 0
+94869 1793855876.719885 fsync(35</state/runtime/cas/sha256/5/d/e/a>) = 0
+94869 1793855876.730959 mkdir("/state/runtime/cas/sha256/5/a", 0777) = 0
+94869 1793855876.731153 fsync(35</state/runtime/cas/sha256/5/a>) = 0
+94869 1793855876.731857 fsync(35</state/runtime/cas/sha256/5>) = 0
+94869 1793855876.732212 mkdir("/state/runtime/cas/sha256/5/a/6", 0777) = 0
+94869 1793855876.732367 fsync(35</state/runtime/cas/sha256/5/a/6>) = 0
+94869 1793855876.733100 fsync(35</state/runtime/cas/sha256/5/a>) = 0
+94869 1793855876.733321 mkdir("/state/runtime/cas/sha256/5/a/6/0", 0777) = 0
+94869 1793855876.733483 fsync(35</state/runtime/cas/sha256/5/a/6/0>) = 0
+94869 1793855876.734083 fsync(35</state/runtime/cas/sha256/5/a/6>) = 0
+94869 1793855876.734612 write(35</state/runtime/cas/sha256/5/a/6/0/.8769845cc4d575a955bb3131ec2fb78a0e10bfead316d103dc07e031c8ec.3823801657966045604.tmp>, "\251bidx\35coinbase-suski.pdf.extract.mdcrevxI1-sha256:5dea1f358c298de414d192f00990ac18e57bbf959c1f4b6eb8acf6d8ade4c140dbodyxGsha256:5dea1f358c298de414d192f00990ac18"..., 334) = 334
+94869 1793855876.734704 fsync(35</state/runtime/cas/sha256/5/a/6/0/.8769845cc4d575a955bb3131ec2fb78a0e10bfead316d103dc07e031c8ec.3823801657966045604.tmp>) = 0
+94869 1793855876.739363 rename("/state/runtime/cas/sha256/5/a/6/0/.8769845cc4d575a955bb3131ec2fb78a0e10bfead316d103dc07e031c8ec.3823801657966045604.tmp", "/state/runtime/cas/sha256/5/a/6/0/8769845cc4d575a955bb3131ec2fb78a0e10bfead316d103dc07e031c8ec") = 0
+94869 1793855876.739515 fsync(35</state/runtime/cas/sha256/5/a/6/0>) = 0
+94869 1793855876.746618 write(35</state/runtime/project-couch/coinbase-suski/.HEAD.11857090010930250628.tmp>, "\243dheadxGsha256:5a608769845cc4d575a955bb3131ec2fb78a0e10bfead316d103dc07e031c8ececount\4fformatmcouch-root-v1", 107) = 107
+94869 1793855876.746732 fsync(35</state/runtime/project-couch/coinbase-suski/.HEAD.11857090010930250628.tmp>) = 0
+94869 1793855876.747328 rename("/state/runtime/project-couch/coinbase-suski/.HEAD.11857090010930250628.tmp", "/state/runtime/project-couch/coinbase-suski/HEAD") = 0
+94869 1793855876.747477 fsync(35</state/runtime/project-couch/coinbase-suski>) = 0
+94869 1793855876.749352 write(35</state/runtime/project-manifests/coinbase-suski.tsv>, "coinbase-suski.pdf.extract.md\tsha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\t23021\n", 108) = 108
+94869 1793855876.749975 write(35</state/runtime/files/coinbase-suski/coinbase-suski.pdf.extract-origin.tsv>, "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\tsha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801", 143) = 143
+94869 1793855876.750526 mkdir("/state/runtime/cas/sha256/a", 0777) = 0
+94869 1793855876.750657 fsync(35</state/runtime/cas/sha256/a>) = 0
+94869 1793855876.751274 fsync(35</state/runtime/cas/sha256>) = 0
+94869 1793855876.751502 mkdir("/state/runtime/cas/sha256/a/5", 0777) = 0
+94869 1793855876.751621 fsync(35</state/runtime/cas/sha256/a/5>) = 0
+94869 1793855876.752130 fsync(35</state/runtime/cas/sha256/a>) = 0
+94869 1793855876.752299 mkdir("/state/runtime/cas/sha256/a/5/c", 0777) = 0
+94869 1793855876.752412 fsync(35</state/runtime/cas/sha256/a/5/c>) = 0
+94869 1793855876.752825 fsync(35</state/runtime/cas/sha256/a/5>) = 0
+94869 1793855876.753075 mkdir("/state/runtime/cas/sha256/a/5/c/0", 0777) = 0
+94869 1793855876.753659 fsync(35</state/runtime/cas/sha256/a/5/c/0>) = 0
+94869 1793855876.754233 fsync(35</state/runtime/cas/sha256/a/5/c>) = 0
+94869 1793855876.754923 write(35</state/runtime/cas/sha256/a/5/c/0/.c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52.2771231719734411065.tmp>, "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\tsha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801", 143) = 143
+94869 1793855876.755012 fsync(35</state/runtime/cas/sha256/a/5/c/0/.c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52.2771231719734411065.tmp>) = 0
+94869 1793855876.755475 rename("/state/runtime/cas/sha256/a/5/c/0/.c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52.2771231719734411065.tmp", "/state/runtime/cas/sha256/a/5/c/0/c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52") = 0
+94869 1793855876.755608 fsync(35</state/runtime/cas/sha256/a/5/c/0>) = 0
+94869 1793855876.757025 mkdir("/state/runtime/cas/sha256/e", 0777) = 0
+94869 1793855876.757178 fsync(35</state/runtime/cas/sha256/e>) = 0
+94869 1793855876.757765 fsync(35</state/runtime/cas/sha256>) = 0
+94869 1793855876.758071 mkdir("/state/runtime/cas/sha256/e/5", 0777) = 0
+94869 1793855876.758207 fsync(35</state/runtime/cas/sha256/e/5>) = 0
+94869 1793855876.758610 fsync(35</state/runtime/cas/sha256/e>) = 0
+94869 1793855876.758788 mkdir("/state/runtime/cas/sha256/e/5/2", 0777) = 0
+94869 1793855876.759391 fsync(35</state/runtime/cas/sha256/e/5/2>) = 0
+94869 1793855876.759965 fsync(35</state/runtime/cas/sha256/e/5>) = 0
+94869 1793855876.760138 mkdir("/state/runtime/cas/sha256/e/5/2/7", 0777) = 0
+94869 1793855876.760262 fsync(35</state/runtime/cas/sha256/e/5/2/7>) = 0
+94869 1793855876.761003 fsync(35</state/runtime/cas/sha256/e/5/2>) = 0
+94869 1793855876.761855 write(35</state/runtime/cas/sha256/e/5/2/7/.bfe84e1e31ac42bab782c2a0c53ba1c0b20aaf457082ee729f86573874ce.5359560351200804468.tmp>, "\251c_idx%coinbase-suski.pdf.extract-origin.tsvdcodee33949flengthc143gagentIdlbrowser-drophrevisionfuploadhsequencem1793855876750icodeRing8c157icontentIdxGsha256:a"..., 261) = 261
+94869 1793855876.761936 fsync(35</state/runtime/cas/sha256/e/5/2/7/.bfe84e1e31ac42bab782c2a0c53ba1c0b20aaf457082ee729f86573874ce.5359560351200804468.tmp>) = 0
+94869 1793855876.762395 rename("/state/runtime/cas/sha256/e/5/2/7/.bfe84e1e31ac42bab782c2a0c53ba1c0b20aaf457082ee729f86573874ce.5359560351200804468.tmp", "/state/runtime/cas/sha256/e/5/2/7/bfe84e1e31ac42bab782c2a0c53ba1c0b20aaf457082ee729f86573874ce") = 0
+94869 1793855876.762551 fsync(35</state/runtime/cas/sha256/e/5/2/7>) = 0
+94869 1793855876.767196 mkdir("/state/runtime/cas/sha256/8", 0777) = 0
+94869 1793855876.767341 fsync(35</state/runtime/cas/sha256/8>) = 0
+94869 1793855876.767946 fsync(35</state/runtime/cas/sha256>) = 0
+94869 1793855876.768258 mkdir("/state/runtime/cas/sha256/8/b", 0777) = 0
+94869 1793855876.768389 fsync(35</state/runtime/cas/sha256/8/b>) = 0
+94869 1793855876.769149 fsync(35</state/runtime/cas/sha256/8>) = 0
+94869 1793855876.769308 mkdir("/state/runtime/cas/sha256/8/b/1", 0777) = 0
+94869 1793855876.769423 fsync(35</state/runtime/cas/sha256/8/b/1>) = 0
+94869 1793855876.770204 fsync(35</state/runtime/cas/sha256/8/b>) = 0
+94869 1793855876.770367 mkdir("/state/runtime/cas/sha256/8/b/1/a", 0777) = 0
+94869 1793855876.770485 fsync(35</state/runtime/cas/sha256/8/b/1/a>) = 0
+94869 1793855876.771115 fsync(35</state/runtime/cas/sha256/8/b/1>) = 0
+94869 1793855876.771840 write(35</state/runtime/cas/sha256/8/b/1/a/.ca90b16185b8febbd141e090a42e09e973c4ffa055d492c09a177dd4fcf1.2141599772925315389.tmp>, "\251bidx%coinbase-suski.pdf.extract-origin.tsvcrevxI1-sha256:e527bfe84e1e31ac42bab782c2a0c53ba1c0b20aaf457082ee729f86573874cedbodyxGsha256:e527bfe84e1e31ac42bab782"..., 342) = 342
+94869 1793855876.771926 fsync(35</state/runtime/cas/sha256/8/b/1/a/.ca90b16185b8febbd141e090a42e09e973c4ffa055d492c09a177dd4fcf1.2141599772925315389.tmp>) = 0
+94869 1793855876.772415 rename("/state/runtime/cas/sha256/8/b/1/a/.ca90b16185b8febbd141e090a42e09e973c4ffa055d492c09a177dd4fcf1.2141599772925315389.tmp", "/state/runtime/cas/sha256/8/b/1/a/ca90b16185b8febbd141e090a42e09e973c4ffa055d492c09a177dd4fcf1") = 0
+94869 1793855876.772530 fsync(35</state/runtime/cas/sha256/8/b/1/a>) = 0
+94869 1793855876.774998 write(35</state/runtime/project-couch/coinbase-suski/.HEAD.3181448878166282842.tmp>, "\243dheadxGsha256:8b1aca90b16185b8febbd141e090a42e09e973c4ffa055d492c09a177dd4fcf1ecount\5fformatmcouch-root-v1", 107) = 107
+94869 1793855876.775082 fsync(35</state/runtime/project-couch/coinbase-suski/.HEAD.3181448878166282842.tmp>) = 0
+94869 1793855876.775605 rename("/state/runtime/project-couch/coinbase-suski/.HEAD.3181448878166282842.tmp", "/state/runtime/project-couch/coinbase-suski/HEAD") = 0
+94869 1793855876.775776 fsync(35</state/runtime/project-couch/coinbase-suski>) = 0
+94869 1793855876.777101 write(35</state/runtime/project-manifests/coinbase-suski.tsv>, "coinbase-suski.pdf.extract-origin.tsv\tsha256:a5c0c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52\t143\n", 114) = 114
+94869 1793855876.784646 write(35</state/runtime/files/coinbase-suski/coinbase-suski.pdf.extract.json>, "{\"version\":1, \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"originalRev\":\"1-sha256:0602f91f4bac12ad8fb4b79aaf751a802"..., 97806) = 97806
+94869 1793855876.785293 mkdir("/state/runtime/cas/sha256/4/4", 0777) = 0
+94869 1793855876.785429 fsync(35</state/runtime/cas/sha256/4/4>) = 0
+94869 1793855876.786205 fsync(35</state/runtime/cas/sha256/4>) = 0
+94869 1793855876.786440 mkdir("/state/runtime/cas/sha256/4/4/1", 0777) = 0
+94869 1793855876.786563 fsync(35</state/runtime/cas/sha256/4/4/1>) = 0
+94869 1793855876.787218 fsync(35</state/runtime/cas/sha256/4/4>) = 0
+94869 1793855876.787423 mkdir("/state/runtime/cas/sha256/4/4/1/1", 0777) = 0
+94869 1793855876.787543 fsync(35</state/runtime/cas/sha256/4/4/1/1>) = 0
+94869 1793855876.788163 fsync(35</state/runtime/cas/sha256/4/4/1>) = 0
+94869 1793855876.788655 write(35</state/runtime/cas/sha256/4/4/1/1/.0db3fcb9098485332d4a6cad2445850f49e7897c54a264a61e70d4b1e78b.6690681223543746938.tmp>, "{\"version\":1, \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"originalRev\":\"1-sha256:0602f91f4bac12ad8fb4b79aaf751a802"..., 97806) = 97806
+94869 1793855876.788762 fsync(35</state/runtime/cas/sha256/4/4/1/1/.0db3fcb9098485332d4a6cad2445850f49e7897c54a264a61e70d4b1e78b.6690681223543746938.tmp>) = 0
+94869 1793855876.789267 rename("/state/runtime/cas/sha256/4/4/1/1/.0db3fcb9098485332d4a6cad2445850f49e7897c54a264a61e70d4b1e78b.6690681223543746938.tmp", "/state/runtime/cas/sha256/4/4/1/1/0db3fcb9098485332d4a6cad2445850f49e7897c54a264a61e70d4b1e78b") = 0
+94869 1793855876.789384 fsync(35</state/runtime/cas/sha256/4/4/1/1>) = 0
+94869 1793855876.798352 mkdir("/state/runtime/cas/sha256/e/2", 0777) = 0
+94869 1793855876.798511 fsync(35</state/runtime/cas/sha256/e/2>) = 0
+94869 1793855876.799597 fsync(35</state/runtime/cas/sha256/e>) = 0
+94869 1793855876.799863 mkdir("/state/runtime/cas/sha256/e/2/c", 0777) = 0
+94869 1793855876.800635 fsync(35</state/runtime/cas/sha256/e/2/c>) = 0
+94869 1793855876.801458 fsync(35</state/runtime/cas/sha256/e/2>) = 0
+94869 1793855876.801625 mkdir("/state/runtime/cas/sha256/e/2/c/d", 0777) = 0
+94869 1793855876.801779 fsync(35</state/runtime/cas/sha256/e/2/c/d>) = 0
+94869 1793855876.802959 fsync(35</state/runtime/cas/sha256/e/2/c>) = 0
+94869 1793855876.803569 write(35</state/runtime/cas/sha256/e/2/c/d/.456aec0906bd78a09b6d2e0a20b656286c9c9bd6c29a713d54bc5383997a.12859027861298418037.tmp>, "\251c_idx\37coinbase-suski.pdf.extract.jsondcoded3112flengthe97806gagentIdlbrowser-drophrevisionfuploadhsequencem1793855876784icodeRing8b40icontentIdxGsha256:44110db"..., 246) = 246
+94869 1793855876.803651 fsync(35</state/runtime/cas/sha256/e/2/c/d/.456aec0906bd78a09b6d2e0a20b656286c9c9bd6c29a713d54bc5383997a.12859027861298418037.tmp>) = 0
+94869 1793855876.804182 rename("/state/runtime/cas/sha256/e/2/c/d/.456aec0906bd78a09b6d2e0a20b656286c9c9bd6c29a713d54bc5383997a.12859027861298418037.tmp", "/state/runtime/cas/sha256/e/2/c/d/456aec0906bd78a09b6d2e0a20b656286c9c9bd6c29a713d54bc5383997a") = 0
+94869 1793855876.804305 fsync(35</state/runtime/cas/sha256/e/2/c/d>) = 0
+94869 1793855876.809447 mkdir("/state/runtime/cas/sha256/1/e", 0777) = 0
+94869 1793855876.809730 fsync(35</state/runtime/cas/sha256/1/e>) = 0
+94869 1793855876.810444 fsync(35</state/runtime/cas/sha256/1>) = 0
+94869 1793855876.810701 mkdir("/state/runtime/cas/sha256/1/e/6", 0777) = 0
+94869 1793855876.810827 fsync(35</state/runtime/cas/sha256/1/e/6>) = 0
+94869 1793855876.811378 fsync(35</state/runtime/cas/sha256/1/e>) = 0
+94869 1793855876.811543 mkdir("/state/runtime/cas/sha256/1/e/6/8", 0777) = 0
+94869 1793855876.811786 fsync(35</state/runtime/cas/sha256/1/e/6/8>) = 0
+94869 1793855876.812507 fsync(35</state/runtime/cas/sha256/1/e/6>) = 0
+94869 1793855876.813059 write(35</state/runtime/cas/sha256/1/e/6/8/.52009052f47633578dd615b44ba4b25713ee1ccd88f3f5b994e40403a2b6.8126986509017756946.tmp>, "\251bidx\37coinbase-suski.pdf.extract.jsoncrevxI1-sha256:e2cd456aec0906bd78a09b6d2e0a20b656286c9c9bd6c29a713d54bc5383997adbodyxGsha256:e2cd456aec0906bd78a09b6d2e0a20"..., 336) = 336
+94869 1793855876.813191 fsync(35</state/runtime/cas/sha256/1/e/6/8/.52009052f47633578dd615b44ba4b25713ee1ccd88f3f5b994e40403a2b6.8126986509017756946.tmp>) = 0
+94869 1793855876.813661 rename("/state/runtime/cas/sha256/1/e/6/8/.52009052f47633578dd615b44ba4b25713ee1ccd88f3f5b994e40403a2b6.8126986509017756946.tmp", "/state/runtime/cas/sha256/1/e/6/8/52009052f47633578dd615b44ba4b25713ee1ccd88f3f5b994e40403a2b6") = 0
+94869 1793855876.813820 fsync(35</state/runtime/cas/sha256/1/e/6/8>) = 0
+94869 1793855876.815905 write(35</state/runtime/project-couch/coinbase-suski/.HEAD.8336175357651679488.tmp>, "\243dheadxGsha256:1e6852009052f47633578dd615b44ba4b25713ee1ccd88f3f5b994e40403a2b6ecount\6fformatmcouch-root-v1", 107) = 107
+94869 1793855876.815987 fsync(35</state/runtime/project-couch/coinbase-suski/.HEAD.8336175357651679488.tmp>) = 0
+94869 1793855876.816465 rename("/state/runtime/project-couch/coinbase-suski/.HEAD.8336175357651679488.tmp", "/state/runtime/project-couch/coinbase-suski/HEAD") = 0
+94869 1793855876.816583 fsync(35</state/runtime/project-couch/coinbase-suski>) = 0
+94869 1793855876.818796 write(35</state/runtime/project-manifests/coinbase-suski.tsv>, "coinbase-suski.pdf.extract.json\tsha256:44110db3fcb9098485332d4a6cad2445850f49e7897c54a264a61e70d4b1e78b\t97806\n", 110) = 110
+94848 1793855877.052819 mkdir("/state/runtime/cas/sha256/c", 0777) = 0
+94848 1793855877.053183 fsync(35</state/runtime/cas/sha256/c>) = 0
+94848 1793855877.054287 fsync(35</state/runtime/cas/sha256>) = 0
+94848 1793855877.054601 mkdir("/state/runtime/cas/sha256/c/f", 0777) = 0
+94848 1793855877.054795 fsync(35</state/runtime/cas/sha256/c/f>) = 0
+94848 1793855877.055818 fsync(35</state/runtime/cas/sha256/c>) = 0
+94848 1793855877.056053 mkdir("/state/runtime/cas/sha256/c/f/e", 0777) = 0
+94848 1793855877.056209 fsync(35</state/runtime/cas/sha256/c/f/e>) = 0
+94848 1793855877.057024 fsync(35</state/runtime/cas/sha256/c/f>) = 0
+94848 1793855877.057244 mkdir("/state/runtime/cas/sha256/c/f/e/2", 0777) = 0
+94848 1793855877.057398 fsync(35</state/runtime/cas/sha256/c/f/e/2>) = 0
+94848 1793855877.058246 fsync(35</state/runtime/cas/sha256/c/f/e>) = 0
+94848 1793855877.059037 write(35</state/runtime/cas/sha256/c/f/e/2/.e3cbea51232fa845db6d6b2f0edd5e4403f46bd7fca8caf6b00f265f2213.11399980993982477695.tmp>, "\254dnamercoinbase-suski.pdfganchors\231\1\257\252cend\30$dpage\1ebegin\26efoliod2023etable\366gdiagram\366gsection\366junresolved\203etablegdiagramgsectionkcoordinates\204\31\2\213\31\1\343\30\276\30#pcoordinate"..., 65627) = 65627
+94848 1793855877.059182 fsync(35</state/runtime/cas/sha256/c/f/e/2/.e3cbea51232fa845db6d6b2f0edd5e4403f46bd7fca8caf6b00f265f2213.11399980993982477695.tmp>) = 0
+94848 1793855877.059816 rename("/state/runtime/cas/sha256/c/f/e/2/.e3cbea51232fa845db6d6b2f0edd5e4403f46bd7fca8caf6b00f265f2213.11399980993982477695.tmp", "/state/runtime/cas/sha256/c/f/e/2/e3cbea51232fa845db6d6b2f0edd5e4403f46bd7fca8caf6b00f265f2213") = 0
+94848 1793855877.059983 fsync(35</state/runtime/cas/sha256/c/f/e/2>) = 0
+94848 1793855877.063348 write(35</state/runtime/.admission.json.8826910216323443222.tmp>, "{\"document\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sh"..., 3062) = 3062
+94848 1793855877.063455 fsync(35</state/runtime/.admission.json.8826910216323443222.tmp>) = 0
+94848 1793855877.064062 rename("/state/runtime/.admission.json.8826910216323443222.tmp", "/state/runtime/admission.json") = 0
+94848 1793855877.064186 fsync(35</state/runtime>) = 0
+94848 1793855877.088537 write(35</state/runtime/add-mlir.bc.json>, "{\"module\":\"/opt/trikeshed/modules/add-mlir.bc\", \"sha256\":\"75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b\", \"abi\":\"i32(i32,i32)\", \"export\":\"add"..., 162) = 162
+94848 1793855877.089245 write(35</state/runtime/confix.bc.json>, "{\"module\":\"/opt/trikeshed/modules/confix.bc\", \"sha256\":\"25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3\", \"abi\":\"confix.flat/1\", \"maxInputBytes"..., 185) = 185
+94874 1793855877.223091 mkdir("/state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach", 0777) = -1 ENOENT (No such file or directory)
+94874 1793855877.223672 mkdir("/state/home", 0777) = 0
+94874 1793855877.223805 mkdir("/state/home/.cache", 0777) = 0
+94874 1793855877.223870 mkdir("/state/home/.cache/org.graalvm.polyglot", 0777) = 0
+94874 1793855877.223932 mkdir("/state/home/.cache/org.graalvm.polyglot/engine", 0777) = 0
+94874 1793855877.223995 mkdir("/state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach", 0777) = 0
+94874 1793855877.224200 mkdir("/state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691", 0700) = 0
+94874 1793855877.225312 mkdir("/state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691/bin", 0777) = 0
+94874 1793855877.226177 write(35</state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691/bin/libtruffleattach.so>, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\320\20\0\0\0\0\0\0@\0\0\0\0\0\0\0\0\v\1\0\0\0\0\0\0\0\0\0@\08\0\t\0@\0\"\0!\0\1\0\0\0\4\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\360\10\0\0\0\0\0\0\360\10\0\0\0\0\0\0\0\20\0\0\0\0\0\0\1\0\0\0\5\0\0\0\0\20\0\0\0\0\0\0\0\20\0\0\0\0\0\0\0\20\0\0\0\0\0\0005\10\0\0\0\0\0\0"..., 16384) = 16384
+94874 1793855877.226389 write(35</state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691/bin/libtruffleattach.so>, "\2\24\315'\0\0\20\5\32_\20\0\0\n`\2\27\362'\0\0\30\5\32A3\0\0\nb\2\25\f(\0\0 \5\32'-\0\0\nd\2\0341(\0\0(\5\32<\24\0\0\nf\2\24L(\0\0000\5\32\377'\0\0\ni\2\27f(\0\08\5\32\374\t\0\0\nk\2\25\f(\0\0@\5\32\317\25\0\0\nm\2\33\205(\0\0H\5\32P\6\0\0\no\2\24\240(\0\0P\5\32>1\0\0\ns\2\25\272(\0\0X\5\32<\30\0\0\nv\2\34\336(\0\0`\5\32\203"..., 16384) = 16384
+94874 1793855877.226545 write(35</state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691/bin/libtruffleattach.so>, "e:\0\0\0357\5\0\0\35\202:\0\0\0$\321\6\0\0\v\345\2\30VO\0\0\7\10\\O\0\0\36\224O\0\0\35,I\0\0\0354\24\0\0\35\372\3\0\0\35\343\3\0\0\35\36\3\0\0\35\343\3\0\0\35A\3\0\0\35\321K\0\0\35\232*\0\0\35\224O\0\0\0\7\10\232O\0\0\7\10@\0\0\0$69\0\0\v\361\2\30\255O\0\0\7\10\263O\0\0\36\315O\0\0\35,I\0\0\0354\24\0\0\35e:\0\0\35\372\3\0\0\0$\350\24\0\0\v\367\2\30\255O\0\0"..., 16384) = 16384
+94874 1793855877.226708 write(35</state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691/bin/libtruffleattach.so>, "TENDED_ENTER\0jcharArray\0JVMTI_EVENT_VIRTUAL_THREAD_END\0GetOwnedMonitorStackDepthInfo\0ForceEarlyReturnDouble\0CallByteMethodA\0supplierClassGlobal\0IsVirtualThread\0"..., 16384) = 16384
+94874 1793855877.226860 write(35</state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691/bin/libtruffleattach.so>, "\0\0\0\0\334\1\0\0\0\0\0\0\4\0\363\1T\237\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0@\1\0\0\0\0\0\0f\1\0\0\0\0\0\0\1\0Qf\1\0\0\0\0\0\0\331\1\0\0\0\0\0\0\1\0^\331\1\0\0\0\0\0\0\334\1\0\0\0\0\0\0\4\0\363\1Q\237\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0@\1\0\0\0\0\0\0f\1\0\0\0\0\0\0\1\0Rf\1\0\0\0\0\0\0\327\1\0\0\0\0\0\0\1\0]"..., 4992) = 4992
+94874 1793855877.227587 rename("/state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/4381796741559840691", "/state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811") = 0
+94874 1793855877.408937 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called\nWARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.run"..., 455) = 455
+94874 1793855877.595126 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x8} ---
+94874 1793855877.867781 mkdir("/state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native", 0777) = -1 ENOENT (No such file or directory)
+94874 1793855877.868025 mkdir("/state/home/.cache/org.graalvm.polyglot/llvm", 0777) = 0
+94874 1793855877.868127 mkdir("/state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native", 0777) = 0
+94874 1793855877.868283 mkdir("/state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075", 0700) = 0
+94874 1793855877.868756 mkdir("/state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075", 0777) = -1 EEXIST (File exists)
+94874 1793855877.869320 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\20\356\1\0\0\0\0\0\0\0\0\0@\08\0\t\0@\0&\0$\0\6\0\0\0\4\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0@\0\0\0\0\0\0\0\370\1\0\0\0\0\0\0\370\1\0\0\0\0\0\0\10\0\0\0\0\0\0\0\1\0\0\0\4\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\254:\0\0\0\0\0\0"..., 16384) = 16384
+94874 1793855877.869482 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "\367\211\375\350\370\r\0\0H\211\303D\213 E1\355\211\357L\211\376L\211\3621\300\350\220\16\0\0\203\370\377u\6D++D\211\350D\211#H\203\304\10[A\\A]A^A_]\303\314\314\314UAWAVSPI\211\366I\211\377\350\256\r\0\0H\211\303\213(\277\1\0\0\0L\211\376L\211\362\350\271\20\0\0\203\370\377u\0041\300+\3\211+H\203\304\10[A^A_]\303\314\314\314UAWAVSPI\211\366\211\375\350o\r\0\0H\211\303D\2138\277\1\0\0\0\211\356L\211"..., 16384) = 16384
+94874 1793855877.869591 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "Z\f\212\17\10\0000\0\0\0\20\0\0\0\0\0@\200!\225.\6\224\3\0\200\3\0\0\0\0\0\0\0\0\200\0C*w\f\n\7\10\2000\0\0\0\20\0\0\0\0\0@\200!\325<\6U\5\0\200\5\0\0\0\0\0\0\0\0\200\0C*\224\f\214\n\10\0\6\0\0@\0\0\0\0\0\0\1\206T.\31L\36\0\0\n\0\0\0\0\0\0\0\0\0\2\f\251\3022 < \0000\0\0\0\1\0\0\0\0\0\4\30R\225e@}\0\0\10\0\0\0\0\0\0\0\0\0\0100\244\312\313\240\370\200\0"..., 16384) = 16384
+94874 1793855877.869717 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "eContextTruffleContextnewObjectRefreleaseObjectRefreleaseAndReturnisSameObjectnewClosureRefreleaseClosureRefgetClosureObjectexceptionCheck_Bool__TruffleThreadAP"..., 16384) = 16384
+94874 1793855877.869829 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "\372l(\33\377\2A\237\215e\343_\30H\200\214\32\26\5\246\6\0104\304\340\340\203\20\4\2030\240\7\243 jX<\230\32@\20\2056\230\215\177A\220\1\1\326\260(@5\300 \nm4\33\377\202\360\2!\250aQ\200j\200!\204@F\r\213\202T\3\0Hd\20\204@\r\213\202T\3\20\214\23jX\24\244\32\0\0\2056\232\215\177!\30P\201\10\1\2\324\260(05\200\220r\30\243\206E\201\251\1\212Ph\243\331\370\27\202\26\324\260(05\300\221\0001\0\5\0\0\0[\4\300\324\266\fA"..., 16384) = 16384
+94874 1793855877.869961 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "\377\0$\0\0002\0\0\0\27\0\0\0002\0\0\0\27\0\0\0\377\377\377\377\0$\0\0I\0\0\0\27\0\0\0I\0\0\0\27\0\0\0\377\377\377\377\0$\0\0`\0\0\0\27\0\0\0`\0\0\0\27\0\0\0\377\377\377\377\0$\0\0w\0\0\0\27\0\0\0w\0\0\0\27\0\0\0\377\377\377\377\0$\0\0\216\0\0\0\5\0\0\0\216\0\0\0\5\0\0\0\377\377\377\377\210$\0\0\223\0\0\0\27\0\0\0\223\0\0\0\27\0\0\0\377\377\377\377\0$\0\0\252\0\0\0\4\0\0\0\252\0\0"..., 16384) = 16384
+94874 1793855877.870063 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "\0\0\f_\0\0*\346\f\0\0\24\353\f\0\0\26\360\f\0\0\33e\20\16\232\37a\10\r\0\0\16\234\0\37d\24\r\0\0\16\235\2\0\t\20\r\0\0c\r\34\nb\7\2!\f\1\0\0\"8\6\0\0\16\0*%\r\0\0\24*\r\0\0\26/\r\0\0+g*6\r\0\0\24;\r\0\0\26@\r\0\0+i*G\r\0\0\24L\r\0\0\26Q\r\0\0+k*X\r\0\0\24]\r\0\0\26b\r\0\0+m*i\r\0\0\24n\r\0\0\26s\r\0\0+o*z\r\0\0\24"..., 16384) = 16384
+94874 1793855877.870184 write(35</state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075/libsulong-native.so>, "f\v<\2\t\0\1\1\4\0\0\t\2\260N\0\0\0\0\0\0\3\325\0\1\5\5\n\363X\5\23f\5\5\310ff\v<\2\t\0\1\1\4\0\0\t\2\360N\0\0\0\0\0\0\3\331\0\1\5\5\ngX\5\17f\5\5t\6\3\245\177X\6\3\333\0..\v<\2\5\0\1\1\4\0\0\t\2 O\0\0\0\0\0\0\3\335\0\1\5\5\n\273X\5\17f\5\5\236\6\3\241\177X\6\3\337\0..\v<\2\v\0\1\1\4\0\0\t\2`O\0\0\0\0\0\0\3\341\0\1\5\5\n\363X\5"..., 14224) = 14224
+94874 1793855877.870377 rename("/state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/13513671974451480075", "/state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/73eca9f2f6321f37ef6ce019ea92e3723e18ca1de9d44d707476a10dfdbee93b") = 0
+94874 1793855877.907620 mkdir("/state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi", 0777) = -1 ENOENT (No such file or directory)
+94874 1793855877.907884 mkdir("/state/home/.cache/org.graalvm.polyglot/internal_nfi-native", 0777) = 0
+94874 1793855877.907989 mkdir("/state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi", 0777) = 0
+94874 1793855877.908173 mkdir("/state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599", 0700) = 0
+94874 1793855877.908730 mkdir("/state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin", 0777) = 0
+94874 1793855877.909298 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\177ELF\2\1\1\0\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0\0000\0\0\0\0\0\0@\0\0\0\0\0\0\0\350s\6\0\0\0\0\0\0\0\0\0@\08\0\n\0@\0%\0$\0\1\0\0\0\4\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\240\33\0\0\0\0\0\0\240\33\0\0\0\0\0\0\0\20\0\0\0\0\0\0\1\0\0\0\5\0\0\0\0 \0\0\0\0\0\0\0 \0\0\0\0\0\0\0 \0\0\0\0\0\0m\307\0\0\0\0\0\0"..., 16384) = 16384
+94874 1793855877.909468 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\230\265\0\0H\211\337H\211\306H\213\3\377\220\10\1\0\0H\211\337H\2155K\260\0\0H\211E H\213\3\377P0H\211\337H\215\r\240\265\0\0H\215\25i\265\0\0I\211\304H\213\3L\211\346\377\220\360\2\0\0H\215\rR\260\0\0L\211\346H\211\337H\211E(H\213\3H\215\25C\265\0\0\377\220\360\2\0\0H\211\337H\2155~\260\0\0H\211E0H\213\3\377P0H\215\r\275\260\0\0H\215\25)\265\0\0H\211\337H\211\306H\213\3\377\220\360\2\0\0H\211\337H\2155\345"..., 16384) = 16384
+94874 1793855877.909600 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "u\336H\213A(H\205\300u\325H\205\333\17\204\307\373\377\377H\211\320L)\340H9\307\17\203\270\373\377\377L\213\25n\262\0\0L9\323\17\202\346\257\377\377N\215\f#L9\313\17\203\331\257\377\377H\213K\30L\213[0H9\331\17\204\271\10\0\0H\213C\20L9\320\17\202\273\257\377\377H\211H\30H\211A\20M\205\333tnH\213C8H\215PJI;\234\305P\2\0\0\17\204v\t\0\0M9\323\17\202\217\257\377\377I9[ \17\204.\n\0\0I\211K(L9\321\17\202x\257\377"..., 16384) = 16384
+94874 1793855877.909762 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "L\213\24$H\215\0047H\211\20H\211H\10H\211h\20L\211P\30H\211\305I\211\372M\211\303I\213:I\213r\10I\213R\20I\213J\30M\213B M\213J(A\213\202\260\0\0\0\205\300\17\205\332\0\0\0I\215\242\270\0\0\0AZA\377\323H\215e\30H\213M\0H\213}\10H\213m\20\200\371\17D\17\266\321L\215\35\30\0\0\0\17\207\244\0\0\0O\215\24\323H\215t$\354A\377\342f\17\37D\0\0\303\17\37\200\0\0\0\0\17\266\300H\211\7\303\220\17\267\300H\211\7\303\220"..., 16384) = 16384
+94874 1793855877.909899 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\16\20F\16\30J\17\vw\10\200\0?\32;*3$\"\0\0\0\0\20\0\0\0D\0\0\0\3600\377\377\5\0\0\0\0\0\0\0\20\0\0\0X\0\0\0\3540\377\377\r\0\0\0\0\0\0\0\20\0\0\0l\0\0\0\3500\377\377\r\0\0\0\0\0\0\0(\0\0\0\200\0\0\0\3440\377\3771\0\0\0\0B\16\20\214\2A\16\30\206\3D\16 \203\4f\16\30A\16\20B\16\10\0\0\0\24\0\0\0\254\0\0\0\3700\377\377\31\0\0\0\0D\16\20Q\16\10\0\20\0\0\0\304\0\0\0"..., 16384) = 16384
+94874 1793855877.910031 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\2\0\0m\33\0\0\t\211\23\0\0\t=\3\0\0\tT\3\0\0\t\214\4\0\0\31\0\3\10N\33\0\0\10\275\2\0\0\226\33\0\0\t\211\23\0\0\t=\3\0\0\tT\3\0\0\t\214\4\0\0\t\311\25\0\0\0\3\10s\33\0\0\10\275\2\0\0\277\33\0\0\t\211\23\0\0\t=\3\0\0\tT\3\0\0\t\214\4\0\0\t\363\25\0\0\0\3\10\234\33\0\0\10\337\2\0\0\344\33\0\0\t\211\23\0\0\t=\3\0\0\tT\3\0\0\t\214\4\0\0\31\0\3\10\305\33\0\0\10\337\2\0\0\r"..., 16384) = 16384
+94874 1793855877.910206 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\0\t\201\4\0\0\0\3\10\305\37\0\0\10\270\2\0\0\375\37\0\0\t\225\23\0\0\tI\3\0\0\t\201\4\0\0\0\3\10\344\37\0\0\10\r\3\0\0\34 \0\0\t\225\23\0\0\tI\3\0\0\t\201\4\0\0\0\3\10\3 \0\0\10%\3\0\0; \0\0\t\225\23\0\0\tI\3\0\0\t\201\4\0\0\0\3\10\" \0\0\n[ \0\0\t\225\23\0\0\tI\3\0\0\t\201\4\0\0\tI\3\0\0\0\3\10A \0\0\n{ \0\0\t\225\23\0\0\tI\3\0\0\t\201\4\0\0\t"..., 16384) = 16384
+94874 1793855877.910340 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\0\0\3\10\f\23\0\0\30-\23\0\0\27\264\21\0\0\27;\0\0\0\0\3\10\35\23\0\0\26\306\0\0\0G\23\0\0\27\264\21\0\0\27\306\0\0\0\0\3\0103\23\0\0\26h\1\0\0a\23\0\0\27\264\21\0\0\27h\1\0\0\0\3\10M\23\0\0\30w\23\0\0\27\264\21\0\0\27h\1\0\0\0\3\10g\23\0\0\26\371\0\0\0\226\23\0\0\27\264\21\0\0\27h\1\0\0\27h\1\0\0\0\3\10}\23\0\0\26h\1\0\0\260\23\0\0\27\264\21\0\0\27\177\1\0\0\0\3\10\234\23"..., 16384) = 16384
+94874 1793855877.910467 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\25\373\0\0\0\344\37\0\0\26\266\21\0\0\26\201\1\0\0\26\271\2\0\0\26 \24\0\0\0\6\10\306\37\0\0\25\352\0\0\0\4 \0\0\26\266\21\0\0\26\201\1\0\0\26\271\2\0\0\30\0\6\10\352\37\0\0\25\352\0\0\0( \0\0\26\266\21\0\0\26\201\1\0\0\26\271\2\0\0\26\366\23\0\0\0\6\10\n \0\0\25\352\0\0\0L \0\0\26\266\21\0\0\26\201\1\0\0\26\271\2\0\0\26 \24\0\0\0\6\10. \0\0\25\f\1\0\0l \0\0\26\266\21\0\0\26\201\1\0\0"..., 16384) = 16384
+94874 1793855877.910597 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\68\2\30\240\35\0\0\200\4\25\223\26\0\0\6:\2\27\222#\0\0\210\4\25=\2\0\0\6<\2\30\261#\0\0\220\4\25b\1\0\0\6>\2\25\320#\0\0\230\4\25d\n\0\0\6@\2\25\357#\0\0\240\4\25\226\30\0\0\6B\2\26\16$\0\0\250\4\25x\7\0\0\6D\2\24-$\0\0\260\4\25\236\3\0\0\6F\2\25L$\0\0\270\4\25\374\20\0\0\6H\2\26k$\0\0\300\4\25D\26\0\0\6J\2\27\212$\0\0\310\4\25W\4\0\0\6M\2\24\252$\0\0\320\4"..., 16384) = 16384
+94874 1793855877.910754 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\25j\1\0\0\272\22\0\0\26\266\21\0\0\26\201\1\0\0\26\242\2\0\0\26\373\0\0\0\0\6\10\234\22\0\0\25\310\0\0\0\324\22\0\0\26\266\21\0\0\26\215\1\0\0\0\6\10\300\22\0\0\25\310\0\0\0\363\22\0\0\26\266\21\0\0\26\201\1\0\0\26\302\0\0\0\0\6\10\332\22\0\0\25\215\1\0\0\10\23\0\0\26\266\21\0\0\0\6\10\371\22\0\0\27\31\23\0\0\26\266\21\0\0\0\6\10\16\23\0\0\27/\23\0\0\26\266\21\0\0\26\302\0\0\0\0\6\10\37\23\0\0\25\310\0\0\0I"..., 16384) = 16384
+94874 1793855877.910884 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "&3\0\0\2\10\7$\35\0\0\3)\0\0\0\2\10\5\243\n\0\0\0043\33\0\0\7\4y\0\0\0\4S\16y\0\0\0\5\21\35\0\0\1\5\217\36\0\0\2\5\5\33\0\0\3\5\302\34\0\0\3\5O\36\0\0\4\5\324\31\0\0\5\5\222\31\0\0\2\0\2\4\7)\35\0\0\0063\33\0\0\4\177\3<\0\0\0\6h2\0\0\5\221\0325\0\0\0\6\234+\0\0\5\326\27)\0\0\0\7\4\5int\0\2\10\5\236\n\0\0\2\20\4\362*\0\0\10\235\35\0\0\30\6\201\20\373\0\0"..., 16384) = 16384
+94874 1793855877.911084 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "A\0\0Rm\0\2*\16.\271\17\0\0PW=\0\0\2+\16\n\230\0\0\0P\31C\0\0\2,\16\17\227\16\0\0Osp\0\2-\16\17\227\16\0\0QP\3314\0\0\2/\16\v\344\2\0\0Pq5\0\0\0020\16\f\230\0\0\0Po,\0\0\0021\16\21\227\16\0\0QOp\0\0023\16\21]\r\0\0P(5\0\0\0024\16\16\230\0\0\0QOtp\0\0027\16\23#\16\0\0`\34A\0\0OXP\0\2>\16\v#\16\0\0OR\0\2>\16\v#\16\0\0`\324"..., 16384) = 16384
+94874 1793855877.911313 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "1\23\0\0000\253\1\0*\253\1\0005<\23\0\0\177\253\1\0y\253\1\0CG\23\0\0CT\23\0\0006[\251\0\0\0\0\0\0h\23\0\0\272\22\0\0007\1T\2}\0007\1Q\0010\08K0\0\0\0\0\0\0\200\5\0\0\0\0+3\247\0\0\0\0\0\0\211\5\0\0\0\2\1\2w\10\0\0D\fI\0\0\1`\1\1\207\0\0\0\1b\23\0\0E\247\17\0\0\1`\1\35\244\1\0\0E\370F\0\0\1`\19b\23\0\0E\362H\0\0\1a\1\v\327\22\0\0EMH"..., 16384) = 16384
+94874 1793855877.911449 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "ce-25.0.4.1-jvmci-25.3-b22/include/linux\0labsjdk-ce-25.0.4.1-jvmci-25.3-b22/include\0/usr/include\0main/truffle/mxbuild/linux-amd64/libffi/linux-amd64/glibc/libff"..., 16384) = 16384
+94874 1793855877.911575 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\10!\5\1\3\212\177\1\5\3\24\5\5\23\5\3L\5\37\6\1\5\6g\5\37s\5\6=\5\37;\5\3\6g\5\6\6\1\5\7\6k\5\v\6\3\355\0\1\5\16\3\223\177ft\5\7\6\3\333\0\1\5\n\6\1\5\4\6\330u\6\254\5\1\6\3\235}\1\5\3\24\5\7\6\26\5\t\322\5\3\6\255\5\n\6\326\5\3\6\255\23\23\5\7\6\1\5\3\6\203\5\6\6\1\5\5\6\333\5\n\6\1\5\10\10\236\5\"\6\201\4\3\5\1\3\365|\1\5\3\24\5\n\6\1\10.\4\1\5\"\3\211\3"..., 16384) = 16384
+94874 1793855877.911748 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "Method\0SetStaticIntField\0GetIntField\0CallStaticDoubleMethodV\0jarray\0NewCharArray\0SetFloatArrayRegion\0JNIWeakGlobalRefType\0CallStaticVoidMethodA\0CallNonvirtualSh"..., 16384) = 16384
+94874 1793855877.911881 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "ssecount\0stack\0X86_64_COMPLEX_X87_CLASS\0ffi_closure_unix64\0__int128\0trampoline\0ffi_prep_closure_loc_efi64\0in_return\0X86_64_NO_CLASS\0examine_argument\0trampoline_"..., 16384) = 16384
+94874 1793855877.912007 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\0\0\0\1\0]\336\f\0\0\0\0\0\0\337\f\0\0\0\0\0\0\4\0\363\1Q\237\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\226\f\0\0\0\0\0\0\235\f\0\0\0\0\0\0\1\0P\235\f\0\0\0\0\0\0\331\f\0\0\0\0\0\0\1\0S\331\f\0\0\0\0\0\0\337\f\0\0\0\0\0\0\1\0P\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\240\v\0\0\0\0\0\0\270\v\0\0\0\0\0\0\1\0U\270\v\0\0\0\0\0\0]\f\0"..., 16384) = 16384
+94874 1793855877.912133 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\0\0\0\0\1\0_\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\1\0\0\0\0\0\326\0\0\0\0\0\0\0\355\0\0\0\0\0\0\0\2\0000\237\355\0\0\0\0\0\0\0\374\0\0\0\0\0\0\0\1\0P\0\1\0\0\0\0\0\0\31\1\0\0\0\0\0\0\1\0P\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0\0\0\1\2\0\0\2\2\0\1\0\0\1\1\0\0\0\0\0\0\0\6\0\326\0\0\0\0\0\0\0\355\0\0\0\0\0\0\0\2\0000\237\355\0\0\0\0\0\0\0\22\1"..., 16384) = 16384
+94874 1793855877.912256 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\0\0\0\1\0U\311\214\0\0\0\0\0\0\33\215\0\0\0\0\0\0\1\0U\335\216\0\0\0\0\0\0\350\216\0\0\0\0\0\0\1\0U\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\311|\0\0\0\0\0\0\323|\0\0\0\0\0\0\t\0p\0\10 $\10 &\237\336|\0\0\0\0\0\0[}\0\0\0\0\0\0;\0\t\377y\0\37y\0\32\22(\6\0\23\10 /\22\0000\26\0221\32(\t\0001%\26#\1\26"..., 16384) = 16384
+94874 1793855877.912380 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "t\215\0\0\0\0\0\0\1\0\\\322\216\0\0\0\0\0\0\335\216\0\0\0\0\0\0\1\0\\\350\216\0\0\0\0\0\0\360\216\0\0\0\0\0\0\1\0S\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\2\0\0\1\1\0\0\0\0\0\0\0\0\0\0\0\0\5\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0B\177\0\0\0\0\0\0{\177\0\0\0\0\0\0\2\0000\237{\177\0\0\0\0\0\0\223\177\0\0\0\0\0\0\1\0S\223\177\0\0\0\0\0\0\242\177\0\0\0\0\0\0\1\0"..., 16384) = 16384
+94874 1793855877.912563 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "%8\32\10\377\32$\n\0\20\34@%4\32\10\377\32$\n\0@\34@%2\32\10\377\32$?%|\08%|\08%\n\0\1\34@%8\32\10\377\32$|\08%|\08%\n\0\1\34@%8\32\10\377\32$\n\0\20\34@%4\32\10\377\32$\n\0@\34@%2\32\34|\08%\n\0\1\34@%8\32|\08%|\08%\n\0\1\34@%8\32\10\377\32$\n\0\20\34@%4\32!\34#\16\237\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 16384) = 16384
+94874 1793855877.912728 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\1\0]\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\300\253\0\0\0\0\0\0\370\253\0\0\0\0\0\0\1\0X\370\253\0\0\0\0\0\0;\254\0\0\0\0\0\0\4\0\363\1X\237;\254\0\0\0\0\0\0D\254\0\0\0\0\0\0\1\0XD\254\0\0\0\0\0\0r\254\0\0\0\0\0\0\4\0\363\1X\237r\254\0\0\0\0\0\0\211\254\0\0\0\0\0\0\1\0X\211\254\0\0\0\0\0\0\231\254\0\0\0\0\0\0\4\0\363\1X\237\0\0\0\0\0"..., 16384) = 16384
+94874 1793855877.912873 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\0\0\0\0\0\0\3\0\0\0\0\0\0*\3\0\0\0\0\0\0\1\0X*\3\0\0\0\0\0\0\204\3\0\0\0\0\0\0\4\0\363\1X\237\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\3\0\0\0\0\0\0\0\0\3\0\0\0\0\0\0*\3\0\0\0\0\0\0\1\0U*\3\0\0\0\0\0\0a\3\0\0\0\0\0\0\1\0Sa\3\0\0\0\0\0\0g\3\0\0\0\0\0\0\4\0\363\1U\237g\3\0\0\0\0\0\0\204\3\0\0\0\0\0\0\1\0S\0\0\0\0\0\0\0\0\0\0\0"..., 16384) = 16384
+94874 1793855877.913013 write(35</state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599/bin/libtrufflenfi.so>, "\7\0\0\0\0\0\0\33\7\0\0\0\0\0\0 \7\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0!\7\0\0\0\0\0\0(\7\0\0\0\0\0\0,\7\0\0\0\0\0\0/\7\0\0\0\0\0\0003\7\0\0\0\0\0\08\7\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0R\7\0\0\0\0\0\0Y\7\0\0\0\0\0\0]\7\0\0\0\0\0\0`\7\0\0\0\0\0\0a\7\0\0\0\0\0\0f\7\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"..., 15656) = 15656
+94874 1793855877.913190 rename("/state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/10925586736237089599", "/state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/5dc05a25edb6ca1cd6e9c82b8311373566bb05a1b676c06ea09ab2295d126c6d") = 0
+94848 1793855878.576619 mkdir("/state/runtime/.kanban", 0777) = 0
+94848 1793855878.576902 fsync(35</state/runtime/.kanban>) = 0
+94848 1793855878.578127 fsync(35</state/runtime>) = 0
+94848 1793855878.879850 io_uring_setup(256, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=256, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 35<anon_inode:[io_uring]>
+94848 1793855878.881869 io_uring_register(35<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94848 1793855878.892245 io_uring_enter(35<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94848 1793855878.909046 fsync(36</state/runtime>) = 0
+94848 1793855878.915249 io_uring_setup(256, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=256, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 36<anon_inode:[io_uring]>
+94848 1793855878.915428 io_uring_register(36<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94848 1793855878.916108 io_uring_enter(36<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94848 1793855878.920847 fsync(37</state/runtime/.kanban/board.wal>) = 0
+94848 1793855878.921624 io_uring_setup(256, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=256, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 38<anon_inode:[io_uring]>
+94848 1793855878.921901 io_uring_register(38<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94848 1793855878.922470 io_uring_enter(38<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94848 1793855878.922866 fsync(39</state/runtime/.kanban>) = 0
+94848 1793855879.686804 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x8} ---
+94848 1793855880.297433 mkdir("/state/runtime/host", 0777) = 0
+94848 1793855880.300496 write(38</state/runtime/host/.causal.wal>, "\312\5\241\1", 4) = 4
+94848 1793855880.300575 write(38</state/runtime/host/.causal.wal>, "\0\0\0\1", 4) = 4
+94848 1793855880.300635 fsync(38</state/runtime/host/.causal.wal>) = 0
+94869 1793855880.309015 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "Replayed 0 nodes into CausalGraphNodeIndex\n", 43) = 43
+94869 1793855880.327482 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "multicast join failed: No multicast-capable interface found\n", 60) = 60
+94869 1793855880.327774 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "multicast joined: 0 groups\n", 27) = 27
+94869 1793855880.328921 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "trikeshed-kanban: listening on :18764  donor=<none>\n", 52) = 52
+94869 1793855880.328977 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "Endpoints (CCEK): GET / (Forge PWA) /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor /api/invoke\n", 158) = 158
+94874 1793855880.399110 io_uring_setup(2, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=2, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 45<anon_inode:[io_uring]>
+94874 1793855880.399486 io_uring_register(45<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94874 1793855880.400161 io_uring_enter(45<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94869 1793855880.408095 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=1\n", 23) = 23
+94874 1793855880.409406 io_uring_setup(2, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=2, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 46<anon_inode:[io_uring]>
+94874 1793855880.409824 io_uring_register(46<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94874 1793855880.410306 io_uring_enter(46<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94893 1793855880.414650 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=1 frame complete proto=Http bytes=132 seq-alloc\n", 60) = 60
+94893 1793855880.419696 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=1 accept ok=true\n", 29) = 29
+94869 1793855880.430879 write(46</state/run-status.txt>, "Name:\tjava\nUmask:\t0077\nState:\tS (sleeping)\nTgid:\t2\nNgid:\t0\nPid:\t2\nPPid:\t1\nTracerPid:\t0\nUid:\t0\t0\t0\t0\nGid:\t0\t0\t0\t0\nFDSize:\t64\nGroups:\t \nNStgid:\t2\nNSpid:\t2\nNSpgid:"..., 1119) = 1119
+94869 1793855880.433441 write(46</state/run-maps.txt>, "17000000-17001000 ---p 00000000 00:00 0 \n17001000-174af000 rw-p 00001000 00:1b 277024                             /opt/trikeshed/jdk/lib/server/classes.jsa\n174a"..., 8192) = 8192
+94869 1793855880.433930 write(46</state/run-maps.txt>, "\n7f79bc400000-7f79bcd00000 rw-p 00000000 00:00 0 \n7f79bcd00000-7f79bce00000 rw-p 00000000 00:00 0 \n7f79bce00000-7f79bd5e0000 rw-p 00000000 00:00 0 \n7f79bd5e0000"..., 8192) = 8192
+94869 1793855880.434342 write(46</state/run-maps.txt>, "412525                     /state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811/bin/"..., 8192) = 8192
+94869 1793855880.434412 write(46</state/run-maps.txt>, "inux-gnu/libc.so.6\n7f7a00a38000-7f7a00a45000 rw-p 00000000 00:00 0 \n7f7a00a45000-7f7a00a54000 r-xp 00000000 00:1b 276993                     /opt/trikeshed/jdk/"..., 1317) = 1317
+94869 1793855880.434643 write(46</state/run-mountinfo.txt>, "85 39 0:27 /workspace/airgap-r4e-proof/unpacked/airgap-document-rootfs / ro,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/er"..., 1684) = 1684
+94874 1793855880.435252 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x8} ---
+94874 1793855880.437513 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[KANBAN] forge shell prewarmed\n", 31) = 31
+94892 1793855880.445118 write(45<TCPv6:[547302]>, "HTTP/1.1 200 OK\r\nContent-Length: 6741\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"document\":{\"p"..., 6886) = 6886
+94869 1793855880.446307 write(43<pipe:[551224]>, "\0", 1) = 1
+94869 1793855881.018330 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=2\n", 23) = 23
+94893 1793855881.022054 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=2 frame complete proto=Http bytes=663 seq-alloc\n", 60) = 60
+94893 1793855881.022826 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=2 accept ok=true\n", 29) = 29
+94892 1793855881.027445 write(45<TCPv6:[547508]>, "HTTP/1.1 200 OK\r\nContent-Length: 33595\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n<!doctype html>\n<html"..., 33734) = 33734
+94867 1793855881.029327 write(43<pipe:[551224]>, "\0", 1) = 1
+94867 1793855881.046561 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=3\n", 23) = 23
+94867 1793855881.048003 write(43<pipe:[551224]>, "\0", 1) = 1
+94893 1793855881.048726 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=3 frame complete proto=Http bytes=552 seq-alloc\n", 60) = 60
+94867 1793855881.050017 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=4\n", 23) = 23
+94867 1793855881.050838 write(43<pipe:[551224]>, "\0", 1) = 1
+94892 1793855881.051043 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=4 frame complete proto=Http bytes=557 seq-alloc\n", 60) = 60
+94892 1793855881.051570 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=4 accept ok=true\n", 29) = 29
+94893 1793855881.053656 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=3 accept ok=true\n", 29) = 29
+94868 1793855881.055827 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=5\n", 23 <unfinished ...>
+94893 1793855881.055866 write(45<TCPv6:[547511]>, "HTTP/1.1 200 OK\r\nContent-Length: 4629\r\nContent-Type: text/css; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n:root{--application-nav"..., 4766 <unfinished ...>
+94868 1793855881.055937 <... write resumed>) = 23
+94893 1793855881.056328 <... write resumed>) = 4766
+94892 1793855881.056630 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=5 frame complete proto=Http bytes=549 seq-alloc\n", 60) = 60
+94868 1793855881.057208 write(43<pipe:[551224]>, "\0", 1) = 1
+94892 1793855881.058864 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=5 accept ok=true\n", 29) = 29
+94893 1793855881.059237 write(46<TCPv6:[551318]>, "HTTP/1.1 200 OK\r\nContent-Length: 3406\r\nContent-Type: text/css; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n.alloc-inspector{box-si"..., 3543) = 3543
+94892 1793855881.060341 write(47<TCPv6:[551319]>, "HTTP/1.1 200 OK\r\nContent-Length: 4709\r\nContent-Type: text/css; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n#world{z-index:2}\n#blip"..., 4846) = 4846
+94874 1793855881.061029 write(43<pipe:[551224]>, "\0", 1 <unfinished ...>
+94867 1793855881.061057 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=6\n", 23) = 23
+94874 1793855881.061277 <... write resumed>) = 1
+94874 1793855881.062999 write(43<pipe:[551224]>, "\0", 1) = 1
+94893 1793855881.063417 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=6 frame complete proto=Http bytes=554 seq-alloc\n", 60) = 60
+94873 1793855881.064001 write(43<pipe:[551224]>, "\0", 1) = 1
+94893 1793855881.064309 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=6 accept ok=true\n", 29) = 29
+94867 1793855881.064664 write(43<pipe:[551224]>, "\0", 1) = 1
+94893 1793855881.066635 write(48<TCPv6:[547515]>, "HTTP/1.1 200 OK\r\nContent-Length: 7939\r\nContent-Type: text/css; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n/* The optional project"..., 8076) = 8076
+94874 1793855881.067605 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=7\n", 23) = 23
+94892 1793855881.068304 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=7 frame complete proto=Http bytes=550 seq-alloc\n", 60) = 60
+94892 1793855881.069605 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=7 accept ok=true\n", 29) = 29
+94874 1793855881.069782 write(43<pipe:[551224]>, "\0", 1) = 1
+94892 1793855881.134858 write(45<TCPv6:[551330]>, "HTTP/1.1 200 OK\r\nContent-Length: 1807256\r\nContent-Type: application/javascript; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n/*! Fo"..., 1807410) = 1807410
+94874 1793855881.145820 write(43<pipe:[551224]>, "\0", 1) = 1
+94874 1793855881.498009 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=8\n", 23) = 23
+94892 1793855881.498997 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=8 frame complete proto=Http bytes=533 seq-alloc\n", 60) = 60
+94892 1793855881.500248 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=8 accept ok=true\n", 29) = 29
+94873 1793855881.503289 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=9\n", 23) = 23
+94873 1793855881.504317 write(43<pipe:[551224]>, "\0", 1) = 1
+94892 1793855881.504521 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=9 frame complete proto=Http bytes=588 seq-alloc\n", 60) = 60
+94873 1793855881.504746 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=10\n", 24) = 24
+94893 1793855881.505140 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=10 frame complete proto=Http bytes=590 seq-alloc\n", 61) = 61
+94893 1793855881.505359 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=10 accept ok=true\n", 30) = 30
+94892 1793855881.507497 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=9 accept ok=true\n", 29) = 29
+94893 1793855881.509638 write(46<TCPv6:[551338]>, "HTTP/1.1 404 Not Found\r\nContent-Length: 48\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"error\":\""..., 198) = 198
+94874 1793855881.510372 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x8} ---
+94893 1793855881.515976 write(47<TCPv6:[552087]>, "HTTP/1.1 404 Not Found\r\nContent-Length: 43\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"error\":\""..., 193) = 193
+94869 1793855881.516173 write(43<pipe:[551224]>, "\0", 1) = 1
+94869 1793855881.516809 write(43<pipe:[551224]>, "\0", 1) = 1
+94892 1793855881.626484 write(45<TCPv6:[550040]>, "HTTP/1.1 200 OK\r\nContent-Length: 304237\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"contracts\":"..., 304384) = 304384
+94874 1793855881.629693 write(43<pipe:[551224]>, "\0", 1) = 1
+94874 1793855881.654444 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=11\n", 24) = 24
+94893 1793855881.655159 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=11 frame complete proto=Http bytes=534 seq-alloc\n", 61) = 61
+94893 1793855881.656302 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=11 accept ok=true\n", 30) = 30
+94892 1793855881.737651 write(40<TCPv6:[552090]>, "HTTP/1.1 200 OK\r\nContent-Length: 276556\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"modules\":{\""..., 276703) = 276703
+94874 1793855881.742651 write(43<pipe:[551224]>, "\0", 1) = 1
+94869 1793855881.748340 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=12\n", 24) = 24
+94892 1793855881.749024 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=12 frame complete proto=Http bytes=533 seq-alloc\n", 61) = 61
+94892 1793855881.749470 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=12 accept ok=true\n", 30) = 30
+94893 1793855881.751650 write(40<TCPv6:[551347]>, "HTTP/1.1 200 OK\r\nContent-Length: 2347\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"presets\":[{\"n"..., 2492) = 2492
+94868 1793855881.752937 write(43<pipe:[551224]>, "\0", 1) = 1
+94869 1793855881.757849 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=13\n", 24) = 24
+94893 1793855881.759108 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=13 frame complete proto=Http bytes=533 seq-alloc\n", 61) = 61
+94893 1793855881.759516 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=13 accept ok=true\n", 30) = 30
+94892 1793855881.761278 write(45<TCPv6:[551350]>, "HTTP/1.1 200 OK\r\nContent-Length: 2347\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"presets\":[{\"n"..., 2492) = 2492
+94873 1793855881.762238 write(43<pipe:[551224]>, "\0", 1) = 1
+94873 1793855882.052163 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=14\n", 24) = 24
+94892 1793855882.054248 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=14 frame complete proto=Http bytes=556 seq-alloc\n", 61) = 61
+94892 1793855882.055410 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=14 accept ok=true\n", 30) = 30
+94892 1793855882.064080 write(40<TCPv6:[551352]>, "HTTP/1.1 404 Not Found\r\nContent-Length: 73\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"error\":\""..., 223) = 223
+94868 1793855882.075116 write(43<pipe:[551224]>, "\0", 1) = 1
+94868 1793855882.075444 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=15\n", 24) = 24
+94893 1793855882.081797 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=15 frame complete proto=Http bytes=525 seq-alloc\n", 61) = 61
+94893 1793855882.083535 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=15 accept ok=true\n", 30) = 30
+94892 1793855882.088090 write(45<TCPv6:[551353]>, "HTTP/1.1 200 OK\r\nContent-Length: 13\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"panels\":[]}", 156) = 156
+94867 1793855882.088831 write(43<pipe:[551224]>, "\0", 1) = 1
+94867 1793855882.212193 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=16\n", 24) = 24
+94892 1793855882.213420 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=16 frame complete proto=Http bytes=2741 seq-alloc\n", 62) = 62
+94892 1793855882.213920 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=16 accept ok=true\n", 30) = 30
+94869 1793855882.242055 mkdir("/state/runtime/cas/sha256/3/e", 0777) = 0
+94869 1793855882.242360 fsync(45</state/runtime/cas/sha256/3/e>) = 0
+94869 1793855882.243494 fsync(45</state/runtime/cas/sha256/3>) = 0
+94869 1793855882.243760 mkdir("/state/runtime/cas/sha256/3/e/0", 0777) = 0
+94869 1793855882.243891 fsync(45</state/runtime/cas/sha256/3/e/0>) = 0
+94869 1793855882.244548 fsync(45</state/runtime/cas/sha256/3/e>) = 0
+94869 1793855882.244692 mkdir("/state/runtime/cas/sha256/3/e/0/9", 0777) = 0
+94869 1793855882.244812 fsync(45</state/runtime/cas/sha256/3/e/0/9>) = 0
+94869 1793855882.245279 fsync(45</state/runtime/cas/sha256/3/e/0>) = 0
+94869 1793855882.245946 write(45</state/runtime/cas/sha256/3/e/0/9/.0a28550f87435d0f698cc88d87fb22868e5d970f74b807c5f04d02a6f83b.6952102779026629967.tmp>, "{\"nodes\":[{\"id\":\"document\", \"type\":\"json.value\", \"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\""..., 2523) = 2523
+94869 1793855882.246033 fsync(45</state/runtime/cas/sha256/3/e/0/9/.0a28550f87435d0f698cc88d87fb22868e5d970f74b807c5f04d02a6f83b.6952102779026629967.tmp>) = 0
+94869 1793855882.246528 rename("/state/runtime/cas/sha256/3/e/0/9/.0a28550f87435d0f698cc88d87fb22868e5d970f74b807c5f04d02a6f83b.6952102779026629967.tmp", "/state/runtime/cas/sha256/3/e/0/9/0a28550f87435d0f698cc88d87fb22868e5d970f74b807c5f04d02a6f83b") = 0
+94869 1793855882.246646 fsync(45</state/runtime/cas/sha256/3/e/0/9>) = 0
+94869 1793855882.292721 mkdir("/state/runtime/cas/sha256/e/8", 0777) = 0
+94869 1793855882.292948 fsync(45</state/runtime/cas/sha256/e/8>) = 0
+94869 1793855882.293658 fsync(45</state/runtime/cas/sha256/e>) = 0
+94869 1793855882.294020 mkdir("/state/runtime/cas/sha256/e/8/1", 0777) = 0
+94869 1793855882.294174 fsync(45</state/runtime/cas/sha256/e/8/1>) = 0
+94869 1793855882.294528 fsync(45</state/runtime/cas/sha256/e/8>) = 0
+94869 1793855882.294792 mkdir("/state/runtime/cas/sha256/e/8/1/3", 0777) = 0
+94869 1793855882.294941 fsync(45</state/runtime/cas/sha256/e/8/1/3>) = 0
+94869 1793855882.295573 fsync(45</state/runtime/cas/sha256/e/8/1>) = 0
+94869 1793855882.296274 write(45</state/runtime/cas/sha256/e/8/1/3/.827a6da09df3ab0f3c33341384e13f5ca7061fe42b7e25180f831bd2f507.4552918751245890255.tmp>, "{\"type\":\"submit\", \"jobId\":\"lcnc/run/83ea8631-3d1a-4e45-9724-fc19982230f3\", \"expectedRevision\":0, \"idempotencyKey\":\"lcnc/run/83ea8631-3d1a-4e45-9724-fc19982230f3"..., 926) = 926
+94869 1793855882.296357 fsync(45</state/runtime/cas/sha256/e/8/1/3/.827a6da09df3ab0f3c33341384e13f5ca7061fe42b7e25180f831bd2f507.4552918751245890255.tmp>) = 0
+94869 1793855882.296894 rename("/state/runtime/cas/sha256/e/8/1/3/.827a6da09df3ab0f3c33341384e13f5ca7061fe42b7e25180f831bd2f507.4552918751245890255.tmp", "/state/runtime/cas/sha256/e/8/1/3/827a6da09df3ab0f3c33341384e13f5ca7061fe42b7e25180f831bd2f507") = 0
+94869 1793855882.297019 fsync(45</state/runtime/cas/sha256/e/8/1/3>) = 0
+94869 1793855882.302364 io_uring_enter(36<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94869 1793855882.305697 fsync(37</state/runtime/.kanban/board.wal>) = 0
+94869 1793855882.307103 io_uring_setup(256, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=256, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 45<anon_inode:[io_uring]>
+94869 1793855882.307381 io_uring_register(45<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94869 1793855882.307791 io_uring_enter(45<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94869 1793855882.309104 fsync(46</state/runtime/.kanban>) = 0
+94869 1793855882.318184 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x8} ---
+94869 1793855882.318388 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=NULL} ---
+94869 1793855882.590354 mkdir("/state/runtime/cas/sha256/3/a", 0777) = 0
+94869 1793855882.590642 fsync(45</state/runtime/cas/sha256/3/a>) = 0
+94869 1793855882.591475 fsync(45</state/runtime/cas/sha256/3>) = 0
+94869 1793855882.591763 mkdir("/state/runtime/cas/sha256/3/a/c", 0777) = 0
+94869 1793855882.591906 fsync(45</state/runtime/cas/sha256/3/a/c>) = 0
+94869 1793855882.592470 fsync(45</state/runtime/cas/sha256/3/a>) = 0
+94869 1793855882.592629 mkdir("/state/runtime/cas/sha256/3/a/c/a", 0777) = 0
+94869 1793855882.592798 fsync(45</state/runtime/cas/sha256/3/a/c/a>) = 0
+94869 1793855882.593361 fsync(45</state/runtime/cas/sha256/3/a/c>) = 0
+94869 1793855882.593949 write(45</state/runtime/cas/sha256/3/a/c/a/.3f212458ec7a61c8042b014b59ed814d4e3e3124f2a7ad0ec8cfae8f45c6.10192136625373979844.tmp>, "{\"type\":\"start\", \"jobId\":\"lcnc/run/83ea8631-3d1a-4e45-9724-fc19982230f3\", \"expectedRevision\":1, \"idempotencyKey\":\"lcnc/run/83ea8631-3d1a-4e45-9724-fc19982230f3:"..., 1561) = 1561
+94869 1793855882.594045 fsync(45</state/runtime/cas/sha256/3/a/c/a/.3f212458ec7a61c8042b014b59ed814d4e3e3124f2a7ad0ec8cfae8f45c6.10192136625373979844.tmp>) = 0
+94869 1793855882.594586 rename("/state/runtime/cas/sha256/3/a/c/a/.3f212458ec7a61c8042b014b59ed814d4e3e3124f2a7ad0ec8cfae8f45c6.10192136625373979844.tmp", "/state/runtime/cas/sha256/3/a/c/a/3f212458ec7a61c8042b014b59ed814d4e3e3124f2a7ad0ec8cfae8f45c6") = 0
+94869 1793855882.594749 fsync(45</state/runtime/cas/sha256/3/a/c/a>) = 0
+94869 1793855882.595890 io_uring_enter(36<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94869 1793855882.596310 fsync(37</state/runtime/.kanban/board.wal>) = 0
+94869 1793855882.597091 io_uring_setup(256, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=256, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 45<anon_inode:[io_uring]>
+94869 1793855882.597484 io_uring_register(45<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94869 1793855882.597934 io_uring_enter(45<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94869 1793855882.598327 fsync(46</state/runtime/.kanban>) = 0
+94868 1793855882.720260 mkdir("/state/runtime/cas/sha256/6/1", 0777) = 0
+94868 1793855882.720554 fsync(45</state/runtime/cas/sha256/6/1>) = 0
+94868 1793855882.721413 fsync(45</state/runtime/cas/sha256/6>) = 0
+94868 1793855882.721700 mkdir("/state/runtime/cas/sha256/6/1/c", 0777) = 0
+94868 1793855882.721832 fsync(45</state/runtime/cas/sha256/6/1/c>) = 0
+94868 1793855882.722366 fsync(45</state/runtime/cas/sha256/6/1>) = 0
+94868 1793855882.722558 mkdir("/state/runtime/cas/sha256/6/1/c/1", 0777) = 0
+94868 1793855882.722671 fsync(45</state/runtime/cas/sha256/6/1/c/1>) = 0
+94868 1793855882.723226 fsync(45</state/runtime/cas/sha256/6/1/c>) = 0
+94868 1793855882.723804 write(45</state/runtime/cas/sha256/6/1/c/1/.7671e23f53bf4c4942546eb6bb2d36593b8dfbe67692d8950bbaaf5e76c6.793857541008364329.tmp>, "{\"schema\":\"document-spans/1\", \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd408837476"..., 2028) = 2028
+94868 1793855882.723900 fsync(45</state/runtime/cas/sha256/6/1/c/1/.7671e23f53bf4c4942546eb6bb2d36593b8dfbe67692d8950bbaaf5e76c6.793857541008364329.tmp>) = 0
+94868 1793855882.724431 rename("/state/runtime/cas/sha256/6/1/c/1/.7671e23f53bf4c4942546eb6bb2d36593b8dfbe67692d8950bbaaf5e76c6.793857541008364329.tmp", "/state/runtime/cas/sha256/6/1/c/1/7671e23f53bf4c4942546eb6bb2d36593b8dfbe67692d8950bbaaf5e76c6") = 0
+94868 1793855882.724566 fsync(45</state/runtime/cas/sha256/6/1/c/1>) = 0
+94869 1793855882.981575 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x14} ---
+94869 1793855883.024569 mkdir("/state/runtime/cas/sha256/8/3", 0777) = 0
+94869 1793855883.024860 fsync(45</state/runtime/cas/sha256/8/3>) = 0
+94869 1793855883.025868 fsync(45</state/runtime/cas/sha256/8>) = 0
+94869 1793855883.026281 mkdir("/state/runtime/cas/sha256/8/3/6", 0777) = 0
+94869 1793855883.026433 fsync(45</state/runtime/cas/sha256/8/3/6>) = 0
+94869 1793855883.027103 fsync(45</state/runtime/cas/sha256/8/3>) = 0
+94869 1793855883.027307 mkdir("/state/runtime/cas/sha256/8/3/6/b", 0777) = 0
+94869 1793855883.027441 fsync(45</state/runtime/cas/sha256/8/3/6/b>) = 0
+94869 1793855883.028067 fsync(45</state/runtime/cas/sha256/8/3/6>) = 0
+94869 1793855883.028794 write(45</state/runtime/cas/sha256/8/3/6/b/.a3209c69f98fdb2cfc1faa670086b7b003284679febe1276bc1b0ed189ee.11649798130755560617.tmp>, "\246dkindolcnc-root-stategorigins\243eterms\200gorigins\200hbindings\200goutputs\245dscan\252bok\365drows\230\227\245ctaghIoObjectdopen\0eclose\31\7\353edepth\0hchildren\230\32\1\2\3\4\5\6\7\10\t\n\v\f\r\16\17\20\21\22\23\24\25\26\27\30\30\30\31\30\32\245"..., 18909) = 18909
+94869 1793855883.028900 fsync(45</state/runtime/cas/sha256/8/3/6/b/.a3209c69f98fdb2cfc1faa670086b7b003284679febe1276bc1b0ed189ee.11649798130755560617.tmp>) = 0
+94869 1793855883.029554 rename("/state/runtime/cas/sha256/8/3/6/b/.a3209c69f98fdb2cfc1faa670086b7b003284679febe1276bc1b0ed189ee.11649798130755560617.tmp", "/state/runtime/cas/sha256/8/3/6/b/a3209c69f98fdb2cfc1faa670086b7b003284679febe1276bc1b0ed189ee") = 0
+94869 1793855883.029721 fsync(45</state/runtime/cas/sha256/8/3/6/b>) = 0
+94869 1793855883.039200 mkdir("/state/runtime/cas/sha256/1/c", 0777) = 0
+94869 1793855883.039393 fsync(45</state/runtime/cas/sha256/1/c>) = 0
+94869 1793855883.040331 fsync(45</state/runtime/cas/sha256/1>) = 0
+94869 1793855883.040659 mkdir("/state/runtime/cas/sha256/1/c/6", 0777) = 0
+94869 1793855883.040807 fsync(45</state/runtime/cas/sha256/1/c/6>) = 0
+94869 1793855883.041505 fsync(45</state/runtime/cas/sha256/1/c>) = 0
+94869 1793855883.041715 mkdir("/state/runtime/cas/sha256/1/c/6/c", 0777) = 0
+94869 1793855883.041847 fsync(45</state/runtime/cas/sha256/1/c/6/c>) = 0
+94869 1793855883.042451 fsync(45</state/runtime/cas/sha256/1/c/6>) = 0
+94869 1793855883.043169 write(45</state/runtime/cas/sha256/1/c/6/c/.94232837cee1120d41ac4bab3b4dec44054bd0a8223eed3127ba6c7e5cd7.9913616461254583041.tmp>, "{\"entries\":[{\"ordinal\":1, \"nodeId\":\"document\", \"type\":\"json.value\", \"path\":[], \"parent\":null, \"iteration\":null, \"status\":\"completed\", \"frameId\":0, \"documentName"..., 19168) = 19168
+94869 1793855883.043289 fsync(45</state/runtime/cas/sha256/1/c/6/c/.94232837cee1120d41ac4bab3b4dec44054bd0a8223eed3127ba6c7e5cd7.9913616461254583041.tmp>) = 0
+94869 1793855883.044222 rename("/state/runtime/cas/sha256/1/c/6/c/.94232837cee1120d41ac4bab3b4dec44054bd0a8223eed3127ba6c7e5cd7.9913616461254583041.tmp", "/state/runtime/cas/sha256/1/c/6/c/94232837cee1120d41ac4bab3b4dec44054bd0a8223eed3127ba6c7e5cd7") = 0
+94869 1793855883.044387 fsync(45</state/runtime/cas/sha256/1/c/6/c>) = 0
+94874 1793855883.052067 mkdir("/state/runtime/cas/sha256/c/d", 0777) = 0
+94874 1793855883.052225 fsync(45</state/runtime/cas/sha256/c/d>) = 0
+94874 1793855883.053037 fsync(45</state/runtime/cas/sha256/c>) = 0
+94874 1793855883.055050 mkdir("/state/runtime/cas/sha256/c/d/7", 0777) = 0
+94874 1793855883.055233 fsync(45</state/runtime/cas/sha256/c/d/7>) = 0
+94874 1793855883.055918 fsync(45</state/runtime/cas/sha256/c/d>) = 0
+94874 1793855883.056115 mkdir("/state/runtime/cas/sha256/c/d/7/a", 0777) = 0
+94874 1793855883.056248 fsync(45</state/runtime/cas/sha256/c/d/7/a>) = 0
+94874 1793855883.056985 fsync(45</state/runtime/cas/sha256/c/d/7>) = 0
+94874 1793855883.057667 write(45</state/runtime/cas/sha256/c/d/7/a/.b09d8978c6bc31aa09a953ea4df1628bc3b829639830f117b82aaa35380c.14562600014235591455.tmp>, "{\"kind\":\"oroboros-debug\", \"runId\":\"83ea8631-3d1a-4e45-9724-fc19982230f3\", \"programCid\":\"sha256:3e090a28550f87435d0f698cc88d87fb22868e5d970f74b807c5f04d02a6f83b\""..., 27939) = 27939
+94874 1793855883.057788 fsync(45</state/runtime/cas/sha256/c/d/7/a/.b09d8978c6bc31aa09a953ea4df1628bc3b829639830f117b82aaa35380c.14562600014235591455.tmp>) = 0
+94874 1793855883.058415 rename("/state/runtime/cas/sha256/c/d/7/a/.b09d8978c6bc31aa09a953ea4df1628bc3b829639830f117b82aaa35380c.14562600014235591455.tmp", "/state/runtime/cas/sha256/c/d/7/a/b09d8978c6bc31aa09a953ea4df1628bc3b829639830f117b82aaa35380c") = 0
+94874 1793855883.058554 fsync(45</state/runtime/cas/sha256/c/d/7/a>) = 0
+94868 1793855883.062244 mkdir("/state/runtime/cas/sha256/5/8", 0777) = 0
+94868 1793855883.062456 fsync(45</state/runtime/cas/sha256/5/8>) = 0
+94868 1793855883.063240 fsync(45</state/runtime/cas/sha256/5>) = 0
+94868 1793855883.063557 mkdir("/state/runtime/cas/sha256/5/8/7", 0777) = 0
+94868 1793855883.063775 fsync(45</state/runtime/cas/sha256/5/8/7>) = 0
+94868 1793855883.064411 fsync(45</state/runtime/cas/sha256/5/8>) = 0
+94868 1793855883.064609 mkdir("/state/runtime/cas/sha256/5/8/7/e", 0777) = 0
+94868 1793855883.064785 fsync(45</state/runtime/cas/sha256/5/8/7/e>) = 0
+94868 1793855883.070961 fsync(45</state/runtime/cas/sha256/5/8/7>) = 0
+94868 1793855883.071744 write(45</state/runtime/cas/sha256/5/8/7/e/.bb065d8adc1f1276b33b72ba286611170093ac1684b5416efec97e2a82a1.4264417419302202990.tmp>, "{\"type\":\"complete\", \"jobId\":\"lcnc/run/83ea8631-3d1a-4e45-9724-fc19982230f3\", \"expectedRevision\":2, \"idempotencyKey\":\"lcnc/run/83ea8631-3d1a-4e45-9724-fc19982230"..., 27569) = 27569
+94868 1793855883.071841 fsync(45</state/runtime/cas/sha256/5/8/7/e/.bb065d8adc1f1276b33b72ba286611170093ac1684b5416efec97e2a82a1.4264417419302202990.tmp>) = 0
+94868 1793855883.072544 rename("/state/runtime/cas/sha256/5/8/7/e/.bb065d8adc1f1276b33b72ba286611170093ac1684b5416efec97e2a82a1.4264417419302202990.tmp", "/state/runtime/cas/sha256/5/8/7/e/bb065d8adc1f1276b33b72ba286611170093ac1684b5416efec97e2a82a1") = 0
+94868 1793855883.072697 fsync(45</state/runtime/cas/sha256/5/8/7/e>) = 0
+94868 1793855883.073968 io_uring_enter(36<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94868 1793855883.074549 fsync(37</state/runtime/.kanban/board.wal>) = 0
+94868 1793855883.075515 io_uring_setup(256, {flags=IORING_SETUP_CQSIZE|IORING_SETUP_SUBMIT_ALL|IORING_SETUP_COOP_TASKRUN, sq_thread_cpu=0, sq_thread_idle=0, sq_entries=256, cq_entries=4096, features=IORING_FEAT_SINGLE_MMAP|IORING_FEAT_NODROP|IORING_FEAT_SUBMIT_STABLE|IORING_FEAT_RW_CUR_POS|IORING_FEAT_CUR_PERSONALITY|IORING_FEAT_FAST_POLL|IORING_FEAT_POLL_32BITS|IORING_FEAT_SQPOLL_NONFIXED|IORING_FEAT_EXT_ARG|IORING_FEAT_NATIVE_WORKERS|IORING_FEAT_RSRC_TAGS|IORING_FEAT_CQE_SKIP|IORING_FEAT_LINKED_FILE|IORING_FEAT_REG_REG_RING|IORING_FEAT_RECVSEND_BUNDLE|IORING_FEAT_MIN_TIMEOUT|0x30000, sq_off={head=0, tail=4, ring_mask=16, ring_entries=24, flags=36, dropped=32, array=65600, user_addr=0}, cq_off={head=8, tail=12, ring_mask=20, ring_entries=28, overflow=44, cqes=64, flags=40, user_addr=0}}) = 45<anon_inode:[io_uring]>
+94868 1793855883.075927 io_uring_register(45<anon_inode:[io_uring]>, IORING_REGISTER_PROBE, {last_op=62 /* IORING_OP_??? */, ops_len=63, ops=[{op=IORING_OP_NOP, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITEV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSYNC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE_FIXED, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_ADD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_POLL_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYNC_FILE_RANGE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECVMSG, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TIMEOUT_REMOVE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ACCEPT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_ASYNC_CANCEL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINK_TIMEOUT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CONNECT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FALLOCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_CLOSE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FILES_UPDATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_STATX, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WRITE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MADVISE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RECV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_OPENAT2, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_EPOLL_CTL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SPLICE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_PROVIDE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_REMOVE_BUFFERS, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_TEE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SHUTDOWN, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_RENAMEAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_UNLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MKDIRAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SYMLINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LINKAT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_MSG_RING, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FSETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FGETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_GETXATTR, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SOCKET, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_URING_CMD, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SEND_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_SENDMSG_ZC, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_READ_MULTISHOT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_WAITID, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAIT, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAKE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FUTEX_WAITV, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FIXED_FD_INSTALL, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_FTRUNCATE, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_BIND, flags=IO_URING_OP_SUPPORTED}, {op=IORING_OP_LISTEN, flags=IO_URING_OP_SUPPORTED}, {op=58 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=59 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=60 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=61 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}, {op=62 /* IORING_OP_??? */, flags=IO_URING_OP_SUPPORTED}]}, 256) = 0
+94868 1793855883.076280 io_uring_enter(45<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0) = 1
+94868 1793855883.076629 fsync(46</state/runtime/.kanban>) = 0
+94893 1793855883.092014 write(40<TCPv6:[550042]>, "HTTP/1.1 200 OK\r\nContent-Length: 27344\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"runId\":\"83ea"..., 27490) = 27490
+94868 1793855883.093290 write(43<pipe:[551224]>, "\0", 1) = 1
+94874 1793855883.182806 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=17\n", 24) = 24
+94893 1793855883.183672 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=17 frame complete proto=Http bytes=609 seq-alloc\n", 61) = 61
+94893 1793855883.185148 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=17 accept ok=true\n", 30) = 30
+94867 1793855883.200202 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=18\n", 24) = 24
+94893 1793855883.203979 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=18 frame complete proto=Http bytes=269 seq-alloc\n", 61 <unfinished ...>
+94892 1793855883.204033 write(40<TCPv6:[550043]>, "HTTP/1.1 200 OK\r\nContent-Length: 19168\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"entries\":[{\""..., 19314) = 19314
+94893 1793855883.204302 <... write resumed>) = 61
+94874 1793855883.204461 write(43<pipe:[551224]>, "\0", 1) = 1
+94874 1793855883.206107 write(40</state/run-status.txt>, "Name:\tjava\nUmask:\t0077\nState:\tS (sleeping)\nTgid:\t2\nNgid:\t0\nPid:\t2\nPPid:\t1\nTracerPid:\t0\nUid:\t0\t0\t0\t0\nGid:\t0\t0\t0\t0\nFDSize:\t64\nGroups:\t \nNStgid:\t2\nNSpid:\t2\nNSpgid:"..., 1119) = 1119
+94874 1793855883.208599 write(40</state/run-maps.txt>, "17000000-17001000 ---p 00000000 00:00 0 \n17001000-174af000 rw-p 00001000 00:1b 277024                             /opt/trikeshed/jdk/lib/server/classes.jsa\n174a"..., 8192) = 8192
+94874 1793855883.209242 write(40</state/run-maps.txt>, "\n7f79bd600000-7f79bd900000 rw-p 00000000 00:00 0 \n7f79bd900000-7f79bda00000 rw-p 00000000 00:00 0 \n7f79bda00000-7f79bdbe0000 rw-p 00000000 00:00 0 \n7f79bdbe0000"..., 8192) = 8192
+94874 1793855883.210790 write(40</state/run-maps.txt>, "11000 00:1b 412534                     /state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/5dc05a25edb6ca1cd6e9c82b8311373566bb05a1b676c06ea09ab2"..., 8192) = 8192
+94874 1793855883.210928 write(40</state/run-maps.txt>, "r--p 0001d000 00:1b 276434                     /lib/x86_64-linux-gnu/libz.so.1\n7f7a00850000-7f7a00851000 rw-p 0001e000 00:1b 276434                     /lib/x86"..., 2007) = 2007
+94874 1793855883.211315 write(40</state/run-mountinfo.txt>, "85 39 0:27 /workspace/airgap-r4e-proof/unpacked/airgap-document-rootfs / ro,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/er"..., 1684) = 1684
+94874 1793855883.213523 write(40</state/state-run.json>, "{\"document\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sh"..., 8192) = 8192
+94874 1793855883.213938 write(40</state/state-run.json>, "7bf801\", \"rev\":\"1-sha256:5dea1f358c298de414d192f00990ac18e57bbf959c1f4b6eb8acf6d8ade4c140\", \"seq\":3}, \"sourceCid\":\"sha256:cfe2e3cbea51232fa845db6d6b2f0edd5e4403"..., 8192) = 8192
+94874 1793855883.214023 write(40</state/state-run.json>, "dren\":[]}, {\"open\":1126, \"close\":1134, \"tag\":\"IoString\", \"depth\":7, \"children\":[]}, {\"open\":1137, \"close\":1143, \"tag\":\"IoString\", \"depth\":7, \"children\":[]}, {\"o"..., 8192) = 8192
+94874 1793855883.214130 write(40</state/state-run.json>, "ategory\":\"document\", \"provenance\":{\"finalUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\", \"notesCid\":\"sha256:397741ff3a44af70fd50e3a82d6fe83486"..., 8192) = 8192
+94874 1793855883.214193 write(40</state/state-run.json>, "ument-entry.jar:/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar:/opt/trikeshed/lib/kotlinx-coroutines-core-jvm-1.11.0.jar:/opt/trikeshed/lib"..., 1366) = 1366
+94893 1793855883.214511 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=18 accept ok=true\n", 30 <unfinished ...>
+94892 1793855883.214606 write(45<TCPv6:[550044]>, "HTTP/1.1 200 OK\r\nContent-Length: 17\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"finished\":true}", 160 <unfinished ...>
+94893 1793855883.214661 <... write resumed>) = 30
+94892 1793855883.216029 <... write resumed>) = 160
+94868 1793855883.216432 write(43<pipe:[551224]>, "\0", 1) = 1
+94868 1793855883.217484 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] accepted conn=19\n", 24) = 24
+94892 1793855883.217996 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=19 frame complete proto=Http bytes=533 seq-alloc\n", 61) = 61
+94892 1793855883.218596 write(2</workspace/airgap-r4e-proof/trace-archive01/run.txt>, "[BIND] conn=19 accept ok=true\n", 30) = 30
+94848 1793855883.227118 write(43<pipe:[551224]>, "\0", 1) = 1
+94867 1793855883.235878 write(43<pipe:[551224]>, "\0", 1) = 1
+94867 1793855883.236562 write(43<pipe:[551224]>, "\0", 1) = 1
+94893 1793855883.240268 +++ exited with 0 +++
+94892 1793855883.244317 +++ exited with 0 +++
+94848 1793855883.387880 write(13</state/cleanup-run.json>, "{\"moduleOwnerCompleted\":true, \"nativeRootDrained\":true, \"listenerJoined\":true}", 78) = 78
+95030 1793855883.390742 +++ exited with 0 +++
+95032 1793855883.391732 +++ exited with 0 +++
+95031 1793855883.391933 +++ exited with 0 +++
+95033 1793855883.392149 +++ exited with 0 +++
+94855 1793855883.392827 +++ exited with 0 +++
+94852 1793855883.393022 +++ exited with 0 +++
+94853 1793855883.393132 +++ exited with 0 +++
+94850 1793855883.393218 +++ exited with 0 +++
+94859 1793855883.393609 +++ exited with 0 +++
+94856 1793855883.393875 +++ exited with 0 +++
+94848 1793855883.393930 +++ exited with 0 +++
+94890 1793855883.394217 +++ exited with 0 +++
+94888 1793855883.394224 +++ exited with 0 +++
+94877 1793855883.394227 +++ exited with 0 +++
+94871 1793855883.394230 +++ exited with 0 +++
+94868 1793855883.394233 +++ exited with 0 +++
+94889 1793855883.394236 +++ exited with 0 +++
+94874 1793855883.394239 +++ exited with 0 +++
+94873 1793855883.394242 +++ exited with 0 +++
+94869 1793855883.394245 +++ exited with 0 +++
+94867 1793855883.394248 +++ exited with 0 +++
+94866 1793855883.394251 +++ exited with 0 +++
+94865 1793855883.394254 +++ exited with 0 +++
+94862 1793855883.394264 +++ exited with 0 +++
+94861 1793855883.394267 +++ exited with 0 +++
+94860 1793855883.394270 +++ exited with 0 +++
+94857 1793855883.394279 +++ exited with 0 +++
+94891 1793855883.394288 +++ exited with 0 +++
+94864 1793855883.394291 +++ exited with 0 +++
+94863 1793855883.394295 +++ exited with 0 +++
+94858 1793855883.394303 +++ exited with 0 +++
+94849 1793855883.394306 +++ exited with 0 +++
+94851 1793855883.413426 +++ exited with 0 +++
+94834 1793855883.413451 +++ exited with 0 +++
+94833 1793855883.413496 write(4<{eventfd-count=0, eventfd-id=9, eventfd-semaphore=0}>, "\1\0\0\0\0\0\0\0", 8) = 8
+94832 1793855883.413901 +++ exited with 0 +++
+94833 1793855883.414191 +++ exited with 0 +++

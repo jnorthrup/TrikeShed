@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishLegalPatternsWireTest[jvm]" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-05T05:32:49.031Z" hostname="0d6dfba25614" time="1.026">
+  <properties/>
+  <testcase name="staleAndLateCurrentnessAndUnexpectedFieldsRefuseWithoutClaimingApproval()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.029"/>
+  <testcase name="queryDrainCompletesAcceptedPatternWorkWithoutRecursiveAdmissionDeadlock()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.285"/>
+  <testcase name="oversizedLegalGraphRefusesWithoutOmittingObservedFields()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.324"/>
+  <testcase name="visualQuantityQueryReturnsExactSourceAndCandidateScopeThroughTheSameOwner()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.086"/>
+  <testcase name="unknownQuantitiesHaveNoInventedIntegerAndStaleCurrentSourcesRefuse()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.083"/>
+  <testcase name="retainedModalRolesDurationAndNegatedGuardStayUnreviewedAndExact()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.036"/>
+  <testcase name="copiedQuantityBindingsAndConflictingNumeralsRemainUnresolved()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.021"/>
+  <testcase name="originalCanonicalGuardReceiptsReplayThroughExistingWireAndQueryWithoutAParser()[jvm]" classname="borg.trikeshed.forge.server.EnglishLegalPatternsWireTest" time="0.152"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

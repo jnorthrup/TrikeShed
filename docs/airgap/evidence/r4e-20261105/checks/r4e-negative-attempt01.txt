@@ -1,0 +1,30 @@
+[
+  {
+    "case": "empty-inspection",
+    "exit": 1,
+    "listenerOpened": false,
+    "expectedFailure": "inspect requires an existing runtime",
+    "result": "PASS"
+  },
+  {
+    "case": "existing-run",
+    "exit": 1,
+    "listenerOpened": false,
+    "expectedFailure": "run requires fresh state",
+    "result": "PASS"
+  },
+  {
+    "case": "missing-module",
+    "exit": 1,
+    "listenerOpened": false,
+    "expectedFailure": "add-mlir.bc",
+    "result": "PASS"
+  },
+  {
+    "case": "changed-module",
+    "exit": 1,
+    "listenerOpened": false,
+    "expectedFailure": "Pinned module differs: confix.bc",
+    "result": "PASS"
+  }
+]

@@ -1,0 +1,15 @@
+application-stage-final02 PASS
+package-manifest PASS
+package-verify PASS
+integrity PASS
+archive-first PASS
+archive-second PASS
+archive-extract PASS
+unpacked-verify PASS
+Traceback (most recent call last):
+  File "/workspace/airgap-r4e-proof/release.py", line 19, in <module>
+    run(prefix+[str(h/'owner.py'),'owner-archive01'],'owner-archive01',env)
+  File "/workspace/airgap-r4e-proof/release.py", line 6, in run
+    assert p.returncode==0,(name,p.returncode)
+           ^^^^^^^^^^^^^^^
+AssertionError: ('owner-archive01', 1)

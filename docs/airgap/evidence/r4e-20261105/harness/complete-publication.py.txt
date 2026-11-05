@@ -1,0 +1,14 @@
+from pathlib import Path
+import subprocess,time,json
+h=Path('/workspace/airgap-r4e-proof');ready=Path('/workspace/r4e-combined-check02.json')
+deadline=time.monotonic()+900
+while not ready.exists():
+ assert time.monotonic()<deadline,'JVM build completion record timed out'
+ time.sleep(1)
+assert json.loads(ready.read_text())['exit']==0,'JVM build failed; dependent checks not started'
+with Path('/workspace/r4e-release-publication-log.txt').open('w') as release_log,Path('/workspace/r4e-target-controller02.txt').open('w') as target_log:
+ release=subprocess.Popen(['python3',str(h/'release-publication.py')],stdout=release_log,stderr=subprocess.STDOUT)
+ target=subprocess.Popen(['python3',str(h/'check-targets.py')],stdout=target_log,stderr=subprocess.STDOUT)
+ exits={'release':release.wait(),'targets':target.wait()}
+ print(json.dumps(exits),flush=True)
+ assert all(x==0 for x in exits.values()),exits

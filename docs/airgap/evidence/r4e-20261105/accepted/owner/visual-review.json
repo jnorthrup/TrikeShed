@@ -1,0 +1,12 @@
+{
+  "previousAttempt": "owner-archive03",
+  "previousResult": "All behavioral assertions and independent audit passed; expanded selected card extended beyond capture viewport.",
+  "action": "After verifying the quotation, press the existing Fit control; require full selected-passage bounds within the visible viewport and preserve all ownership and no-Run assertions.",
+  "reviewed": [
+    "after-restart.png",
+    "after-restart-passage.png"
+  ],
+  "observation": "All five nodes are visible after fitting. Exact UTF-16 bounds, original/extracted content links, scope and SHA-256 quotation match are readable in the separate passage capture.",
+  "productCodeChanged": false,
+  "behavioralCases": 4
+}

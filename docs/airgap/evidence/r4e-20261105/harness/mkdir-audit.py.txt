@@ -1,0 +1,32 @@
+from pathlib import Path
+import json,re,sys
+h=Path('/workspace/airgap-r4e-proof');a=h/sys.argv[1];lines=(a/'syscalls.txt').read_text().splitlines();pending={};events=[]
+for line in lines:
+ m=re.match(r'^(\d+) ([0-9.]+) (.*)$',line)
+ if not m:continue
+ pid,t,body=m.groups()
+ if '<unfinished ...>' in body:pending[pid]=(float(t),body.replace('<unfinished ...>',''));continue
+ resumed=re.match(r'<\.\.\. (\w+) resumed>(.*)',body)
+ if resumed:
+  prior=pending.pop(pid,None)
+  if prior is None:continue
+  body=prior[1]+resumed[2]
+ events.append({'pid':int(pid),'time':float(t),'call':body})
+created=[];renames=[];syncs=[]
+for i,event in enumerate(events):
+ body=event['call']
+ m=re.match(r'mkdir\("(/state/runtime/cas/sha256[^\"]*)", .*\)\s+= 0$',body)
+ if m:created.append((i,m[1]))
+ m=re.match(r'rename\("[^\"]*", "([^\"]*)"\)\s+= 0$',body)
+ if m:renames.append((i,m[1]))
+ m=re.match(r'fsync\(\d+<([^>]+)>\)\s+= 0$',body)
+ if m:syncs.append((i,m[1]))
+rows=[]
+for index,directory in created:
+ parent=str(Path(directory).parent);publications=[i for i,name in renames if i>index and name.startswith(directory+'/')];assert publications,directory
+ first=min(publications);barriers=[i for i,name in syncs if index<i<first and name==parent]
+ rows.append({'directory':directory,'parent':parent,'creation':events[index],'firstDescendantPublication':events[first],'parentSyncBeforePublication':events[min(barriers)] if barriers else None})
+assert len(rows)>50;miss=[row for row in rows if row['parentSyncBeforePublication'] is None];browser=json.loads((a/'browser.json').read_text());assert browser['receipt']['status']=='completed' and browser['receipt']['ok'] and not browser['errors'];assert json.loads((a/'process.json').read_text())['exit']==0
+result={'newCasShardDirectories':len(rows),'parentsSyncedBeforeDescendantPublication':len(rows)-len(miss),'missingParentSyncs':len(miss),'rows':rows,'kernelRingSetupObserved':any('io_uring_setup(' in e['call'] and re.search(r'= \d+',e['call']) for e in events),'scope':'Observed syscall order in a completed packaged traversal; no power-loss or vendor filesystem guarantee'}
+(a/'mkdir-audit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({k:v for k,v in result.items() if k!='rows'},indent=2))
+if len(sys.argv)>2 and sys.argv[2]=='require':assert not miss

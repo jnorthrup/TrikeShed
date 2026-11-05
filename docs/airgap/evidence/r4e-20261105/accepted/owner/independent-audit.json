@@ -1,0 +1,44 @@
+{
+  "casObjectsVerified": 27,
+  "walBytes": 417,
+  "walSha256": "acdba628a101a974b0830809a4d02306e83d002ca87bac82e8b2d67741a99c19",
+  "frames": [
+    {
+      "sequence": 1,
+      "jobId": "lcnc/run/e11c8d18-4228-47f6-ac34-93800d5f1511",
+      "cid": "sha256:df2b389ca6765f513e810c0124517cade5afff2ce367918f0ce4a6d3967192e3",
+      "status": "queued"
+    },
+    {
+      "sequence": 2,
+      "jobId": "lcnc/run/e11c8d18-4228-47f6-ac34-93800d5f1511",
+      "cid": "sha256:681fc0dac13ba7b886d010e511bf09336714c540c68ae3c0e4763125441b94aa",
+      "status": "running"
+    },
+    {
+      "sequence": 3,
+      "jobId": "lcnc/run/e11c8d18-4228-47f6-ac34-93800d5f1511",
+      "cid": "sha256:1bd51e049168af64f29cb254b28e10d592ec90c29b57dcfc38b8f5457ae84532",
+      "status": "completed"
+    }
+  ],
+  "allFrameCrc32cVerified": true,
+  "receiptAndDocumentsUnchanged": true,
+  "browserRunSubmissions": 0,
+  "exactQuotationVerified": true,
+  "processExits": [
+    137,
+    0
+  ],
+  "probeExits": [
+    42,
+    42,
+    0
+  ],
+  "crashedOwnerReapedWithoutCleanup": true,
+  "normalOwnerCleanupVerified": true,
+  "probeClassSha256": "9144b1ec04e4a702ae4e0c3ca2becf7835abf7b528c3cdfc0180355692dbfa49",
+  "seedSourceCommit": "8579dcad12d3b22c84ef3017157bf41e9a0fdbaf",
+  "runtimeSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+  "scope": "Linux JVM ownership and inspection of completed R4d records. Historical native outputs are verified as retained bytes; new native execution is covered separately."
+}

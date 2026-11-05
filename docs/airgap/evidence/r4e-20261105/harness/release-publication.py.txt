@@ -1,0 +1,38 @@
+from pathlib import Path
+import subprocess,json,hashlib,os
+h=Path('/workspace/airgap-r4e-proof');repo=Path('/workspace/TrikeShed')
+def run(args,name,env=None):
+ with (Path('/workspace')/('r4e-'+name+'.txt')).open('w') as log:p=subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,env=env)
+ assert p.returncode==0,(name,p.returncode)
+ print(name,'PASS',flush=True)
+def record(p):return {'file':str(p),'bytes':p.stat().st_size,'sha256':hashlib.file_digest(p.open('rb'),'sha256').hexdigest()}
+build=json.loads(Path('/workspace/r4e-combined-check02.json').read_text());assert build['exit']==0 and build['sourceCommit']==subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
+# Break any application links before replacing bytes; the immutable R4d base remains independently verified.
+staged=repo/'build/install/airgap-document'
+for p in staged.rglob('*'):
+ if p.is_file():
+  dest=h/'rootfs/opt/trikeshed'/p.relative_to(staged)
+  if dest.exists():dest.unlink()
+for name in ['package-identity.json','SHA256SUMS','opt/trikeshed/classpath.txt']:
+ p=h/'rootfs'/name
+ if p.exists():p.unlink()
+run(['python3',str(h/'assemble.py'),'application'],'application-publication')
+profile=json.loads((h/'runtime-profile.json').read_text());profile['jarBytes']=sum(p.stat().st_size for p in (h/'rootfs/opt/trikeshed/lib').glob('*.jar'));(h/'runtime-profile.json').write_text(json.dumps(profile,indent=2)+'\n')
+run(['python3',str(h/'package.py'),'manifest'],'publication-manifest');run(['python3',str(h/'package.py'),'verify'],'publication-verify');run(['python3',str(h/'integrity-publication.py')],'publication-integrity')
+first=Path('/workspace/library-files/airgap-document-r4e-linux-x64-2026-11-05.tar.gz');second=h/'reproducibility-second.tar.gz'
+for p,name in [(first,'publication-archive-first'),(second,'publication-archive-second')]:run(['python3',str(h/'package.py'),'archive',str(p)],name)
+a,b=record(first),record(second);assert a['sha256']==b['sha256'];(h/'reproducibility.json').write_text(json.dumps({'first':a,'second':b,'identical':True,'scope':'Deterministic pinned-byte packaging; not source-build reproducibility'},indent=2)+'\n')
+(h/'publication-duplicate-reclamation.json').write_text(json.dumps({'removedScratch':b,'retainedPrimary':a},indent=2)+'\n');second.unlink()
+unpacked=h/'unpacked';unpacked.mkdir(exist_ok=False);run(['tar','-xzpf',str(first),'--no-same-owner','-C',str(unpacked)],'publication-extract')
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(unpacked/'airgap-document-rootfs');run(['python3',str(h/'package.py'),'verify'],'publication-unpacked-verify',env)
+prefix=['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4e-proof','python3']
+run(prefix+[str(h/'owner.py'),'owner-archive03'],'owner-archive03',env);run(['python3',str(h/'owner-audit.py'),'owner-archive03'],'owner-archive03-audit')
+run(prefix+[str(h/'trace.py'),'trace-archive02'],'trace-archive02',env);run(['python3',str(h/'mkdir-audit.py'),'trace-archive02','require'],'mkdir-archive-audit02')
+for fault in ['eio','kill']:
+ name='storage-'+fault+'-archive02';run(prefix+[str(h/'storage.py'),name,'selection',fault],name,env);run(['python3',str(h/'storage-audit.py'),name],name+'-audit')
+name='interruption-selection-archive02';run(prefix+[str(h/'run.py'),name,'selection'],name,env);run(['python3',str(h/'audit.py'),name],'interruption-selection-audit02')
+run(prefix+[str(h/'negative.py'),name,'negative-attempt02'],'negative-attempt02',env);run(prefix+[str(h/'recovery-negative.py'),name,'recovery-negative-attempt02'],'recovery-negative-attempt02',env)
+run(prefix+[str(h/'directory-negative.py'),'storage-eio-archive02','directory-negative-archive02'],'directory-negative-archive02',env)
+run(prefix+[str(h/'recovery-publication.py'),'recovery-archive03'],'recovery-archive03',env)
+# Confirm immutable previous runtime after all shared-base reads and application replacements.
+run(['python3','/workspace/airgap-r4d-proof/package.py','verify'],'previous-rootfs-unchanged')
