@@ -1,0 +1,103 @@
+"""Prepared v78 recorded-data checks. No runtime, build, parser or query execution."""
+from pathlib import Path
+import hashlib,json,runpy
+CORE=Path(__file__).with_name('v77-audit.py.txt')
+assert hashlib.sha256(CORE.read_bytes()).hexdigest()=='8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763'
+V77=runpy.run_path(str(CORE))
+need=V77['need'];cid=V77['cid'];load=V77['load'];check_report=V77['check_report'];AuditError=V77['AuditError']
+
+def original_case(proof,label):
+    folder=proof/'inputs'/label
+    body=load(folder/'response.json');source=(folder/'source.txt').read_bytes()
+    inspection=body['receiptCid'];raw=(folder/'cas-readbacks'/(inspection[7:]+'.cbor')).read_bytes()
+    need(cid(raw)==inspection and V77['decode_cbor'](raw)=={k:v for k,v in body.items() if k!='receiptCid'},'Genuine canonical inspection bytes')
+    need(cid(source)==body['originalCid']==body['extractedTextCid'],'Exact genuine original/extracted source bytes')
+    need((folder/'cas-readbacks'/(body['extractedTextCid'][7:]+'.txt')).read_bytes()==source,'Materialized genuine source readback')
+    need((folder/'status.txt').read_text().strip()=='200','Original producer retained receipt HTTP status')
+    request=load(folder/'request.json');row=load(folder/'source-row.json')
+    need(body['selection']=={k:request[k] for k in ['project','id','cid','rev','seq']} and body['sourceSnapshots']==[row],'Original source selection/revision unchanged')
+    return body,source.decode('utf8',errors='strict')
+
+def envelope(output,body,text,expected_status):
+    report=output['report'];summary=check_report(report,body,text,expected_status=='EVALUATED')
+    need(report['status']==output['status']==expected_status and output['inspectionCid']==body['receiptCid'] and output['frameCid']==report['frameCid'],'Owner forwards exact nested report identities/status')
+    source=output['source']
+    need(source['receiptCid']==body['receiptCid'] and source['originalCid']==body['originalCid'] and source['extractedTextCid']==body['extractedTextCid'] and source['namedGraph']==report['source']['graphIri'],'Owner physical receipt/source namespace')
+    need(source['mode']=='current' and source['historical'] is False and source['currentness']=='checked-before-and-after-evaluation' and source['admission']=='not-performed','Outer current check distinct from inner historical report')
+    need(source['parserExecution']=='not-reverified' and source['semanticAuthority']==source['producerAuthority']=='not-established' and source['reviewStatus']=='unreviewed','No producer/semantic/review authority upgrade')
+    expected=[]
+    for premise in report['premises']:
+        for occurrence in premise['occurrences']:
+            sentence=next(s for s in body['sentences'] if s['index']==occurrence['sentenceIndex'])
+            expected.append({**sentence['quotation'],
+              'inspectionCid':body['receiptCid'],'frameCid':report['frameCid'],
+              'occurrenceCid':occurrence['occurrenceCid'],'propositionCid':premise['propositionCid'],
+              'annotationCid':occurrence['annotationCid'],'contributionCid':premise['contributionCid'],
+              'sentenceIndex':occurrence['sentenceIndex'],'sentenceIri':occurrence['sentenceIri'],
+              'subjectNodeIri':occurrence['subjectNodeIri'],'predicateNodeIri':occurrence['predicateNodeIri'],
+              'objectNodeIri':occurrence['objectNodeIri'],
+              'meaning':'same premise occurrence; presentation only, not another evidence unit'})
+    expected.sort(key=lambda p:p['begin'])
+    need(output['passages']==expected,'Every exact original/extracted quotation and occurrence linkage in source order')
+    return summary
+
+def json_block(attempt,identity):
+    need(isinstance(identity,str) and __import__('re').fullmatch(r'sha256:[a-f0-9]{64}',identity),'Full retained output/program/run/invocation CID')
+    raw=(attempt/'durable-readbacks'/(identity[7:]+'.json')).read_bytes()
+    need(cid(raw)==identity,'Fetched complete JSON content identity')
+    return load(attempt/'durable-readbacks'/(identity[7:]+'.json')),raw
+
+def references(attempt,run):
+    reply=run['reply']
+    for field,payload in [('receiptCid','durable'),('programCid','program'),('invocationsCid','invocations')]:
+        decoded,_=json_block(attempt,reply[field]);need(decoded==run[payload],'Actual fetched '+payload+' equals retained JSON')
+    if 'outputCid' in reply:
+        computed=run['complete'].get('outputs',{}).get('evaluate',{}).get('frameCid')
+        need(reply['outputCid']!=computed,'Computed frame CID cannot stand in for a retained full output receipt')
+        decoded,raw=json_block(attempt,reply['outputCid']);need(decoded==run['complete'] and reply['outputPreview'] is True,'Preview resolves only through actual complete retained output JSON')
+    else:need(run['complete']==reply,'Unretained ordinary response remains actual response')
+    command=run['durable'];saved=command['lcncRun']
+    need(command['jobId']=='lcnc/run/'+reply['runId'] and command['owner']=='lcnc-runner' and
+         saved['runId']==reply['runId'] and saved['programCid']==reply['programCid'] and saved['status']==reply['status'],'Actual board command binds run/status/admitted program')
+    return run['complete']
+
+def source_focus(focus,run,body,text):
+    index=focus['index'];output=run['complete']['outputs']['evaluate'];selected=run['complete']['outputs']['passage']
+    need(type(index) is int and 0<=index<len(output['passages']),'Selected occurrence ordinal')
+    need(selected['found'] is True and selected['path']==str(index) and selected['geometry']==focus['geometry']=='kotlin','Actual Kotlin selection geometry and ordinal')
+    need(selected['value']==focus['passage']==output['passages'][index],'Visible focused occurrence is the selected full quotation')
+    need(selected['sourceCid']==focus['geometrySourceCid'] and selected['sourceCid']!=body['extractedTextCid'],'JSON geometry identity remains separate from English source identity')
+    need(focus['beforeUrl']==focus['afterUrl'],'Source focus preserves route/URL')
+    need('Selected passage · kotlin JSON geometry' in focus['cardText'] and 'SHA-256 verified · quotation matches exact UTF-16 range.' in focus['cardText'],'Actual truthful geometry/verified-source UI text')
+    quote=focus['passage'];need(quote['quote'] in focus['verifiedContext'] and quote['quote']==V77['utf16'](text,quote['begin'],quote['end']),'Visible context contains exact UTF16 source quotation')
+    # This can be an actual CAS response or a serializer preimage reconstructed
+    # from the full fetched value. Matching its CID does not establish CAS storage.
+    raw=run['geometryInputUtf8'].encode('utf8',errors='strict')
+    need(V77['b64'](run['geometryInputBase64'])==raw and cid(raw)==selected['sourceCid'] and json.loads(raw)==output['passages'],'Selected JSON preimage bytes/CID')
+    need(run['selectedConfix']==selected,'Complete actual Kotlin selector output')
+    span=selected['byteSpan'];begin,end=span['open'],span['close']
+    need(span['unit']=='utf8-byte-inclusive' and type(begin) is type(end) is int and 0<=begin<=end<len(raw),'Real original JSON inclusive byte span')
+    need(json.loads(raw[begin:end+1])==quote,'Selected JSON bytes encode the exact quotation object')
+
+def state_delta(before,after):
+    for state in [before,after]:
+        need(state['beliefBagPresent'] is state['kifBankPresent'] is state['narsRetePresent'] is False,'No bag/KIF/NARS engine configured in observed host')
+        need(all(v is False for v in state['intakeHooks'].values()),'No configured automatic intake hooks in observed host')
+        need(state['guestInstalled']==state['guestMounted']==[] and state['configuredModelCount']==0 and state['modelEndpointsPresent'] is False,'Observed empty guest modules and endpointless provider configuration')
+    def facts(s):return {(f['partition'],f['id']):f for f in s['reteFacts']}
+    a,b=facts(before),facts(after)
+    changes=[{'partition':k[0],'id':k[1],'before':a.get(k),'after':b.get(k)} for k in sorted(a.keys()|b.keys()) if a.get(k)!=b.get(k)]
+    boards=sorted(k for k in before['blackboard'].keys()|after['blackboard'].keys() if before['blackboard'].get(k)!=after['blackboard'].get(k))
+    # Concrete kinds/deltas are retained for assessment. Legitimate module workflow
+    # facts are not relabeled English/NAL observation admission or forced to zero.
+    return {'reteChanges':changes,'changedBlackboardKeys':boards,'packBefore':before['pack'],'packAfter':after['pack']}
+
+def program_shape(run,inspection,path,fanout=False):
+    program=run['program'];nodes=program['nodes'];by_id={n['id']:n for n in nodes}
+    expected={'instructions':'note','receipt':'scope.in','mode':'text.value','evaluate':'document.english.nal','report':'display','passage':'confix.pickPath','source':'display','report-out':'scope.out','passages-out':'scope.out','frame-out':'scope.out','source-out':'scope.out'}
+    if fanout:expected.update({'copy-'+str(i):'display' for i in range(8)})
+    need(len(by_id)==len(nodes) and {k:n['type'] for k,n in by_id.items()}==expected,'Exact actual offered/fanout node vocabulary; no hidden parser/provider/admission')
+    need(by_id['receipt']['params']['default']==inspection and by_id['mode']['params']['value']=='current' and by_id['passage']['params']['path']==str(path) and by_id['passage']['params']['geometry']=='kotlin','Actual authored receipt/mode/selection controls')
+    need(set(by_id['evaluate'].get('params',{}))<= {'receiptCid','mode'} and all(isinstance(v,str) for v in by_id['evaluate'].get('params',{}).values()),'Evaluator params permit only declared receipt/mode strings; wired presence overrides palette defaults')
+    requested={n['id']:n for n in run['request']['document']['nodes']}
+    need(set(requested)==set(by_id) and all(requested[k]['type']==v['type'] and requested[k].get('params',{})==v.get('params',{}) for k,v in by_id.items()),'Captured UI request controls bind frozen admitted program')

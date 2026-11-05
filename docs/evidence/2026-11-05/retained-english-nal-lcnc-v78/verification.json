@@ -1,0 +1,87 @@
+{
+  "kind": "retained-english-nal-lcnc-v78-evidence/1",
+  "frozenSource": "aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26",
+  "mainSha256": "5370a549d963f871d8bdd81328bc28a3f00a064807334d3dabd47e95d6ddf036",
+  "documentsSha256": "f35b8b9991ffb58dba1962a0a021169965f0b560d7f5d1e327ae8e2b6be9639a",
+  "panelsSha256": "fd19345d638b5542c9d36f5ccf1ea6887542368d35dd716984ff01bb23979c3a",
+  "pagesSha256": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5",
+  "buildTests": 489,
+  "buildFailures": 0,
+  "archiveSha256": "c474b1f42c695285c562e4ab914b68566d67c58eb1c29e6e71bce9d6051bde41",
+  "archiveBytes": 10284330,
+  "archiveMembers": 246,
+  "uncompressedBytes": 109355038,
+  "selectedCases": [
+    "S12",
+    "G03",
+    "G04"
+  ],
+  "actualSelectedAttempt": "native-attempt2",
+  "writerPid": 129422,
+  "readerPid": 129618,
+  "runs": 8,
+  "sourceFocus": 5,
+  "afterCloseJsonReadbacks": 25,
+  "afterCloseHistoricalSourceReceiptBlocks": 6,
+  "amendedSourceBytes": 106,
+  "readerPackBytes": 2067301,
+  "readerPackSha256": "97c9dfc4e2a8b2f4aa1b7433f867d7688390b2ac87a285baa2828dbea6241911",
+  "readerPackUnchanged": true,
+  "fullFanoutOutputBytes": 280607,
+  "narrowContentStatus": 413,
+  "productionRawBlockStatus": 200,
+  "freshCurrentRefusalStatus": 400,
+  "actualCurrentnessReads": [
+    14,
+    15
+  ],
+  "reteFacts": [
+    1,
+    9
+  ],
+  "blackboardKeys": [
+    1,
+    33
+  ],
+  "historicalRefRecords": 17,
+  "activeDigestRefs": 0,
+  "fullRuntimePackPublished": false,
+  "audit": {
+    "audit.py": "708ea90441ae151e1d8092ce92e37e68339b3440c18074ebfe78f606f400bf0e",
+    "visual_checks.py": "051115f91dfae0048e9be4e2ce1be2c25b502be42a3a1fcdd4d9a1c9c066832f",
+    "v77-audit.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763",
+    "README.txt": "dea369990219ab7ccafc58bda50888217d00bf3df952346da357abb50cf8d31e",
+    "final-strict/result.json": "862eeca8effbdcf79a9c4b0fad53038002cd59fbfe8a0e850b695fee8c34f442",
+    "final-strict/report.txt": "408a9e1951528c1f8fb014d65aefc39e20c371525f4b6ac2c8172264d411fdd8",
+    "final-recorded/result.json": "5e836454332dba4ded2d4863bbddd157424828892141d3487eb14977ed1f5f0b",
+    "final-recorded/report.txt": "16070f1129dfcf7c9228a13a43f46294ef36f1faf66171c0662b9632beed58e6"
+  },
+  "outerScreenshots": {
+    "verified-source-occurrence.png": {
+      "original": "native-attempt2/native-kotlin-geometry-verified-source-occurrence.png",
+      "sha256": "f8928a11110223239c84db81fc55b514911720a3410cb6be26796ca86a127994"
+    },
+    "readable-workflow.png": {
+      "original": "native-attempt2/native-readable-retained-nal-source-workflow.png",
+      "sha256": "2c7496937d2bc91e2cd65f9d696aaff758121f85b08be86610c052219c6ce878"
+    },
+    "inert-preset.png": {
+      "original": "native-attempt2/native-inert-retained-nal-preset.png",
+      "sha256": "79a4ee59b1242ff1c8c42656dc013379b8498ebea475d49ac6ca14a6613f3fb6"
+    },
+    "retained-output-reference.png": {
+      "original": "native-attempt2/native-real-retained-large-output-reference.png",
+      "sha256": "6d1f241ecbdafe33ef3922a3ee190b9a7cc1d75856da5aa9d8461369f18ac20b"
+    },
+    "fresh-current-refusal.png": {
+      "original": "native-attempt2/native-same-current-program-fresh-refusal.png",
+      "sha256": "4638ef79ae545e611dc2d7f576beea8522bf1bf9b6b717e42b9b4b24155b8a91"
+    },
+    "attempt1-obscured-source-occurrence.png": {
+      "original": "native-attempt1/native-kotlin-geometry-verified-source-occurrence.png",
+      "sha256": "ce6b243a653d5575c1f817c5e0344a81c72f805a67e5d6a56fdb10034d70c61f"
+    }
+  },
+  "preserved": "Both actual native attempts and exact observer inputs/PNGs; first build488/4 failures; final489 success; initial audit assumption failure and all strict/recorded snapshots",
+  "scope": "Limited atomic NAL/source/workflow consistency; no legal accuracy, parser execution authentication, independent evidence, semantic truth, live observation admission or full R4 OS seal. Omitted full pack/prefix/REF paths are recorded external metadata; no portable CAS bundle."
+}
