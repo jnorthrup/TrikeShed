@@ -1,0 +1,115 @@
+V83 exact-role independent recorded-data audit — FINAL
+
+Selected closed native data: nars-exact-role-v83-native-proof/native-attempt4.
+Writer149040; reader149240. Source87e7bb3e945546137c595ff5aaf53781f4168275.
+The auditor directory retains its unexecuted v82 preparation name. No v82 native
+snapshot/runtime is claimed. This Python audit launches no JVM, parser, query
+engine, NARS actor, browser, build, container or network namespace.
+
+Restore unchanged audit.py.txt as audit.py and checks.py.txt as checks.py in an
+external directory; retain receipt-core.py.txt beside them unchanged. Python3
+standard library only. Set ATTEMPT to extracted native-attempt4, AUDITOR to the
+restored scripts and OUT to a separate writable output directory. Run:
+
+python3 "$AUDITOR/audit.py" "$ATTEMPT" \
+ --source-head 87e7bb3e945546137c595ff5aaf53781f4168275 \
+ --main-sha f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff \
+ --documents-sha ecfb8d28d05fd609f477287db7ae3fd50acd6700cfadeef3d7560b48f3c6cbd7 \
+ --panels-sha b5687bffb634f5436b61187629617fd501f573a1e91b11bc84e9fe9eaa1ac797 \
+ --recorded-only --out "$OUT"
+
+Exit0 produces result.json/report.txt. PASS is recorded-data consistency, not a
+new production/runtime test. Public mode verifies supplied raw blocks, records,
+WALs and recorded artifact metadata without opening external JAR/full-pack paths.
+Without --recorded-only, the original frozen120production-JAR/browser paths and
+closed local CAS pack must remain accessible; those actual bytes are rehashed.
+Strict and portable outputs intentionally differ in artifactVerification.
+Expected exact result/report/script hashes are in manifest.json.
+
+Public minimum consumed: selected attempt inputs/{C2.kif,unsupported.kif,
+missing-definition.kif,bounded-65.kif} and input-manifest.json; actual GO/startup/
+http-result/browser-primary-result/primitive-boundaries/cleanup/reopened JSON;
+all responseFile paths and request.bin bytes named by the166actual request
+records (including exact public browser POST); readback-index and all117indexed
+CAS readbacks/113unique content blocks, including BOTH C2definitions, all65unique
+control definitions and actual signal spill; all after-close readback files;
+after-close-readbacks/{beliefs.wal,board.wal}; artifact-metadata source-head.txt,
+sha256.json/classpath.txt; classpath/writer-command/reader-command/network/
+controller-before-netns JSON and writer/reader/driver/namespace exit files;
+exact observer-inputs and actual PNG(s). Keep original actual logs, preparation,
+protocol, raw requests/responses and preserved failed attempts alongside this
+minimum. Retained local full packs, JARs/classes/models and unrelated old source
+cases need not ship. Supplied blocks are CID authenticated; omitted complete CAS
+and external artifacts are not a portable full runtime. No REF availability claim.
+
+C2 is an explicit MANUAL KIF46byte claim, SHA256
+856e48302ec7ce9e8db378cad6244b49c8510d80376b914c95c37a811420ba05.
+Real BeliefWire HTTP409 is nontransactional partial processing: first pays is
+admitted, later owes conflicts at the same feature-coded angular coordinate but
+different exact source-scoped proposition PID. Both canonical CBOR definitions
+were retained. Independent canonical decode/reencode binds full sourceContext,
+ordered lexical predicate/subject/object, copula/relation and null entity IDs.
+Legacy signal.subjectCid falls back to sourceCID for routing; it is NOT a new
+subject entity identity. Full source quotation/range stays distinct from roles.
+
+Fixed4/5BGP text and typed RDF URI/plain lexical literal responses are checked
+against supplied source/definition preimages; this is not a new SPARQL or KIF
+engine. Actual documentary rows become beliefs only for exact resident PID and
+structure. Typed angular/propositionCid keys are null unless exactly ONE complete
+documentary match is an exact resident; residency never chooses among ambiguous
+rows. Actual public Import is inert; explicit Run wires the new typed id outputs
+directly into separate nal.attend. Confix is display inspection, not an id cast.
+Present-null wired identities return attended.error before stale authored valid
+IDs can reach the writer; old unwired behavior is not broadened by this audit.
+
+Actual16public-runner boundaries separate read-only lexical selection from
+legitimate normal LCNC CAS/WAL/blackboard/card writes. Selection writes no bag/
+budget/CAS/WAL; explicit priority changes preserve signal, evidence, basis and D/Q
+using existing Float32P20 quantization. Duplicate attention adds no frame.
+Whole unsupported source refuses without cherry-picking its first positive
+atom. Source-only missing unrelated labels/Clerk/Record definition returns its
+actual exact-CID404. All65label-control definitions are retained-only artifacts,
+not assertions; bounded/incomplete returns no rows. Complete reversed roles yield
+lexical NO_MATCH, not legal UNKNOWN or falsehood. Protocol status populations in
+result/report are separate from semantic benchmarks or admitted-claim counts.
+
+The637byte configured DOC-LOG1 WAL is independently parsed as WAL1 version,
+big-endian length/sequence and CRC32C. R,B,A,A,D,E encode one actual admitted
+observation, two changed budgets, tick and spill. Actual E plus hash-verified
+SignalCodec bytes support final empty production replay; bare fresh-bag emptiness
+would not suffice. No active priority recovery is claimed after eviction.
+Board WAL42frames/14recovered cards and actual retained command/program/invocation
+references are checked separately. Writer/reader Jobs close, and actual CAS/both
+WAL hashes stay unchanged during separate reader. This is local configured replay,
+not hostile-write, crash/power-loss/physical-disk or full R4 rootfs evidence.
+
+Final profile explicitly sets optional ModuleContext.turnReview=null only for
+KanbanModule's board-review bridge. Separate REAL opened TurnReviewElement remains
+bound to BeliefWire and drains/closes. Actual flags and origins are checked;
+there is no product/policy bypass, parser/model/SDK or pretend empty bag owner.
+Earlier native-attempt3 had that optional bridge enabled: four runs/twelve board
+commits caused real three CAUSALITY and two ATTRACTION workflow-review admissions.
+Its recall primitive stayed1→1 and target signal unchanged, while whole host grew
+1→6 and the one-resident assertion failed. Preserve those raw records under their
+actual configuration; do not relabel them final or claim all bag unchanged.
+Native-attempt1 external observer compile typo and attempt2 browser timeout
+(after actual C2partial409, before any LCNC Run) also remain preserved; attempt2
+cause was not established from an old DOM capture. Final fresh4 is not a reset.
+
+Auditor history: v83-attempt1 failed because public palette materializes existing
+k=16/blank optional identity/budget defaults. Exact source/results are preserved;
+subsequent check permits ONLY those declared defaults while preserving authored
+values and typed wires, and binds admitted serializer fields to actual POST.
+v83-attempt2 failed comparing raw percent-encoded block URL to a decoded CID;
+its source/result remain. The actual request is now decoded before exact-CID
+comparison. v83-attempt3 and4 passes precede final additional explicit profile,
+workflow, resource/hash/report bindings; their exact scripts remain preserved.
+No native data or production source was changed by the auditor.
+
+Six small in-memory mutations (no full65MBhost copies) reject substituted source
+context, lexical object as IRI, typed identity for PID mismatch, null-wire authored
+fallback, attention evidence increase and false complete bounded-source status.
+No semantic/legal accuracy, English/parser interpretation, producer/source
+identity authentication, source currentness, review authority, inference truth,
+independent evidence/benchmark completeness or new admission claim is made.
+Prior v80 model/parser and v81 lease proofs retain their own artifact pins.

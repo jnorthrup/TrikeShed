@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""V83 recorded-data audit. No JVM, browser, parser, selector or inference execution."""
+import argparse,copy,hashlib,json,base64
+from pathlib import Path
+from urllib.parse import urlsplit,unquote
+from checks import *
+PINS={'sourceHead':'87e7bb3e945546137c595ff5aaf53781f4168275','mainSha256':'f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff','documentsSha256':'ecfb8d28d05fd609f477287db7ae3fd50acd6700cfadeef3d7560b48f3c6cbd7','spacegraphSha256':'b5687bffb634f5436b61187629617fd501f573a1e91b11bc84e9fe9eaa1ac797'}
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def stamp(raw):return {'bytes':len(raw),'sha256':sha(raw)}
+def raw_block(attempt,identity):
+    need(isinstance(identity,str) and re.fullmatch(r'sha256:[a-f0-9]{64}',identity),'Full CAS identity')
+    raw=(attempt/'cas-readbacks'/(identity[7:]+'.bin')).read_bytes();need(cid(raw)==identity,'Actual supplied raw CAS hash');return raw
+def origins(values,main):need(values and all(unquote(urlsplit(v).path)==main for v in values.values()),'Every actual production origin is pinned final main JAR')
+def artifacts(attempt,args):
+    go=load(attempt/'GO.json');need(go['rootGreen'] is True and all(go[k]==v for k,v in PINS.items()),'Actual final v83 ROOTGO pins')
+    need(args.source_head==go['sourceHead'] and args.main_sha==go['mainSha256'] and args.documents_sha==go['documentsSha256'] and args.panels_sha==go['spacegraphSha256'],'Explicit source/main/browser pins')
+    folder=attempt/'artifact-metadata' if args.recorded_only else Path(go['snapshot']);manifest=load(folder/'sha256.json')
+    need((folder/'source-head.txt').read_text().strip()==args.source_head and sha((folder/'source-head.txt').read_bytes())==manifest['source-head.txt'],'Actual frozen source metadata')
+    for name,key in [('main.jar','mainSha256'),('documents.js','documentsSha256'),('spacegraph.js','spacegraphSha256')]:
+        need(manifest[name]==go[key],'Frozen artifact hash metadata')
+        if not args.recorded_only:need(sha((folder/name).read_bytes())==go[key],'Actual frozen artifact bytes')
+    cp=load(attempt/'classpath.json');rows=cp['productionClasspath'];paths=[r['path'] for r in rows]
+    need(len(paths)==len(set(paths))==120 and paths[0]==str(Path(go['snapshot'])/'main.jar') and len(manifest['dependencies'])==119,'Exact120production-JAR classpath')
+    need((folder/'classpath.txt').read_text().strip().split(':')==paths,'Recorded final classpath text')
+    for row in rows:
+        expected=args.main_sha if row['path']==paths[0] else manifest['dependencies'][row['path']]
+        need(row['sha256']==expected,'Every recorded dependency hash')
+        if not args.recorded_only:need(sha(Path(row['path']).read_bytes())==expected,'Actual dependency JAR bytes')
+    for role,entry in [('writer','FixtureKt'),('reader','ReopenKt')]:
+        command=load(attempt/(role+'-command.json'));index=command.index('-cp')
+        need(command[index+2]=='proof.exactrole.'+entry and command[index+1].split(':')==[cp['observerClasses']]+paths+[cp['assetJar']['path']],'Actual observer/production/assets entrypoint and classpath')
+    for name,key in [('spacegraph','spacegraphSha256'),('documents','documentsSha256')]:need(cp['assetJar']['entries']['web/kotlin/'+name+'/'+name+'.js']['sha256']==go[key],'Actual asset-only final browser hashes')
+    return paths[0]
+def admitted_document(document):
+    expected={k:document.get(k,default) for k,default in [('wires',[]),('controls',{}),('kanban',None),('view',None),('seq',1)]}
+    expected['nodes']=[{k:n.get(k,default) for k,default in [('id',None),('type',None),('params',{}),('x',0),('y',0),('width',None),('height',None),('collapsed',False),('subprogram',None),('children',[])]} for n in document['nodes']]
+    return expected
+def references(attempt,run):
+    reply=run['http']['response'];complete=run['complete'];authored=run['document'];actual_request=json.loads(base64.b64decode(run['http']['requestBase64'],validate=True));document=actual_request['document']
+    need(document['wires']==authored['wires'] and document['controls']==authored['controls'] and [(n['id'],n['type']) for n in document['nodes']]==[(n['id'],n['type']) for n in authored['nodes']],'Actual public import/request preserves authored controls and typed wiring; viewport is captured separately')
+    palette_defaults={'nal.recall':{'k':'16'},'nal.attend':{'angular':'','propositionCid':'','p':'','d':'','q':''}}
+    for actual,original in zip(document['nodes'],authored['nodes']):
+        params=original.get('params',{});defaults=palette_defaults.get(actual['type'],{});expected={**params,**{k:v for k,v in defaults.items() if k in actual.get('params',{}) and k not in params}}
+        need(actual.get('params',{})==expected,'Actual authored values unchanged; only explicit existing palette defaults may be materialized')
+    if reply.get('outputCid'):need(json.loads(raw_block(attempt,reply['outputCid']))==complete,'Actual complete retained output JSON, no invented hydration')
+    else:need(complete==reply,'Actual inline complete response')
+    if reply.get('programCid'):need(json.loads(raw_block(attempt,reply['programCid']))==admitted_document(document),'Actual saved admitted document including serializer defaults')
+    if reply.get('receiptCid'):
+        command=json.loads(raw_block(attempt,reply['receiptCid']));saved=command['lcncRun']
+        need(command['jobId']=='lcnc/run/'+reply['runId'] and command['owner']=='lcnc-runner' and saved['runId']==reply['runId'] and saved['programCid']==reply['programCid'] and saved['status']==reply['status'],'Actual saved workflow command binds run/program/status')
+        if 'outputs' in saved:need(saved['outputs']==complete.get('outputs',{}),'Full retained command output equals actual response')
+    if reply.get('invocationsCid'):
+        ledger=json.loads(raw_block(attempt,reply['invocationsCid']));need(all(e['documentCid']==reply['programCid'] for e in ledger['entries']),'Actual final-program invocation references')
+        return ledger
+    return None
+def request_bytes(attempt,record):
+    raw=(attempt/record['responseFile']).read_bytes();need(len(raw)==record['responseBytes'] and cid(raw)==record['responseSha256'],'Actual HTTP response bytes/status record binding')
+    if record['response'] is not None:need(json.loads(raw)==record['response'],'Actual raw HTTP JSON equals structured capture')
+    if record['requestBase64'] is not None:
+        request=base64.b64decode(record['requestBase64'],validate=True);need((attempt/(record['label']+'-request.bin')).read_bytes()==request,'Actual HTTP request bytes')
+    return raw
+def audit(attempt,args):
+    main=artifacts(attempt,args);start=load(attempt/'startup.json');result=load(attempt/'http-result.json');cleanup=load(attempt/'cleanup.json');reopen=load(attempt/'reopened.json')
+    need(result['result']==reopen['result']=='PASS','Selected actual closed native result')
+    origins(start['origins'],main);origins(reopen['origins'],main)
+    configuration=start['ownerConfiguration'];need(configuration['moduleTurnReviewPresent'] is False and configuration['beliefWireReviewOpened'] is True and configuration['priorityFloor']==.5 and configuration['decay']=='identity' and configuration['flushEvery']==1000,'Explicit final manual-KIF-only owner profile: optional module review bridge absent; real separate BeliefWire review owner open')
+    need(start['baseline']['bagRows']==[] and start['baseline']['bagSize']==0,'Control retention before C2 performs no assertion admission')
+    for state in [start['baseline']]+[row['state'] for row in result['states']]:
+        need(state['moduleTurnReviewPresent'] is False and state['beliefWireReviewOpened'] is True and state['beliefWireReviewAdmissionClosed'] is False and state['beliefBagPresent'] is True and state['kifBankPresent'] is state['narsRetePresent'] is False,'Actual final owner composition; review owner stays live through protocol')
+        need(state['guestInstalled']==state['guestMounted']==[] and state['modelEndpointsPresent'] is False and state['configuredModelCount']==0,'Actual configured empty SDK/no generative endpoints')
+        need(state['bagSize']==len(state['bagRows']) and state['bagSize'] in [0,1] and all(row['propositionCid']==result['initialResident']['propositionCid'] for row in state['bagRows']),'Final scoped host has only admitted C2 pays resident; no optional board-review induction')
+        need(all(f['partition']=='board' and f['fields']['kind'] in ['now','card'] for f in state['reteFacts']),'Actual framework board/clock facts recorded separately from bag observations')
+    need({'KgRetention','KgNalBridge','NalNodes','BeliefsNodes','SignalCodec','BeliefBagElement','BeliefWire','SparqlWire','SparqlSurface','QuadStore','LcncRunService'}<=set(start['origins']),'Actual final selector/actor/query/transport production origins')
+    for name in ['writer','reader','driver','namespace']:need((attempt/(name+'.exit')).read_text().strip()=='0','Actual '+name+' exit0')
+    input_manifest=load(attempt/'input-manifest.json')
+    for name,record in input_manifest.items():need(stamp((attempt/'inputs'/name).read_bytes())=={'bytes':record['bytes'],'sha256':record['sha256']},'Exact labelled manual/control source bytes')
+    need((attempt/'inputs/C2.kif').read_bytes()==C2 and cid(C2)==C2_CID and start['sourceC2']['cid']==C2_CID,'Exact46byte C2 manual claim source')
+    partial=result['partialIntake'];need(partial['path']=='/api/beliefs/kg' and partial['status']==409 and base64.b64decode(partial['requestBase64'])==C2 and partial['response']['admission']['issue']=='PROPOSITION_MISMATCH' and partial['response']['processing']=='earlier-statements-may-have-been-processed','Actual production partial-admission collision409, not all claims admitted')
+    for record in result['requests']:request_bytes(attempt,record)
+    initial=result['initialResident'];angular=initial['angular'];pays_pid=initial['propositionCid'];need(angular==c2_angular(),'Actual existing feature coordinate of declared tokens')
+    signal=row_signal(initial,C2_CID,pays_pid);need(initial['evidence']=={'positive':900,'negative':0},'Actual source assertion weight, not calibrated parser truth')
+    need(definition(raw_block(attempt,pays_pid),C2_CID,'pays','Tenant','Landlord')==pays_pid,'Full pays definition PID')
+    runs=result['runs'];by_label={r['label']:r for r in runs};need(len(by_label)==len(runs)==14,'Actual planned fourteen LCNC runs')
+    ledgers={r['label']:references(attempt,r) for r in runs}
+    pays=by_label['pays-primary-structured'];pays_output=pays['complete']['outputs']['recall'];need(typed_target(pays_output) is not None,'Primary has unique exact resident typed IDs')
+    selected(pays_output['selection'],C2_CID,'pays','Tenant','Landlord',2,'MATCH_RESIDENT',angular,pays_pid)
+    owes=by_label['owes-documentary-mismatch'];owes_output=owes['complete']['outputs']['recall'];need(typed_target(owes_output) is None,'Colliding owes documentary row is not resident identity')
+    owes_pid=owes_output['selection']['matches'][0]['propositionCid'];need(owes_pid!=pays_pid and definition(raw_block(attempt,owes_pid),C2_CID,'owes','Tenant','Landlord')==owes_pid,'Both lexical proposition definitions retained; exact source PID differs despite routing collision')
+    selected(owes_output['selection'],C2_CID,'owes','Tenant','Landlord',2,'RESIDENT_PID_MISMATCH',angular,owes_pid)
+    for label in ['pays-repeat-selection','typed-null-target-no-authored-fallback','evicted-documentary-selection']:
+        output=by_label[label]['complete']['outputs']['recall'];typed_target(output)
+        expected_status='MATCH_NOT_RESIDENT' if label.startswith('evicted') else 'RESIDENT_PID_MISMATCH' if label.startswith('typed-null') else 'MATCH_RESIDENT'
+        selected(output['selection'],C2_CID,'owes' if label.startswith('typed-null') else 'pays','Tenant','Landlord',2,expected_status,angular,owes_pid if label.startswith('typed-null') else pays_pid)
+    reverse=by_label['reversed-role-no-match']['complete']['outputs']['recall'];need(typed_target(reverse) is None and reverse['selection']['status']=='NO_MATCH_IN_COMPLETE_SOURCE' and reverse['selection']['complete'] is True and reverse['selection']['matches']==[] and reverse['selection']['results']['results']['bindings']==[],'Complete reversed lexical roles have no match, not legal UNKNOWN')
+    for filename,status in [('unsupported.kif','UNSUPPORTED_SOURCE_PROFILE'),('missing-definition.kif','UNVERIFIED_SOURCE'),('bounded-65.kif','BOUNDED')]:
+        run=by_label[filename.split('.')[0]+'-incomplete-control'];output=run['complete']['outputs']['recall'];typed_target(output);incomplete(output['selection'],status)
+        meta=start['negativeFixtures'][filename];need(raw_block(attempt,meta['sourceCid'])==(attempt/'inputs'/filename).read_bytes(),'Actual negative fixture source, not fabricated producer assertion')
+        if filename=='bounded-65.kif':
+            need(len(meta['definitionCids'])==len(set(meta['definitionCids']))==65,'Actual unique65 retained definition controls')
+            actual=set(meta['definitionCids']);expected=set()
+            for i in range(65):
+                expected_body={'kind':'kg-source-proposition/1','sourceContext':meta['sourceCid'],'predicate':'labels','subject':'Clerk'+str(i),'object':'Record','subjectCid':None,'objectCid':None,'copula':'PRODUCT','relation':'MATCH','temporal':None};identity=cid(C['canonical'](expected_body));need(identity in actual,'All explicit unique bounded-control definitions retained');definition(raw_block(attempt,identity),meta['sourceCid'],'labels','Clerk'+str(i),'Record');expected.add(identity)
+            need(actual==expected,'No duplicate/unrelated definitions counted as bound')
+        elif filename=='missing-definition.kif':
+            missing=next(r for r in result['requests'] if r['label']=='missing-unrelated-definition-block');need(missing['status']==404 and meta['expectedMissingDefinitionCid'] in unquote(missing['path']),'Actual missing unrelated definition raw404, no deleted/overlaid admitted artifact')
+            absent={'kind':'kg-source-proposition/1','sourceContext':meta['sourceCid'],'predicate':'labels','subject':'Clerk','object':'Record','subjectCid':None,'objectCid':None,'copula':'PRODUCT','relation':'MATCH','temporal':None}
+            need(cid(C['canonical'](absent))==meta['expectedMissingDefinitionCid'],'Unavailable definition404 is the exact unrelated labels/Clerk/Record source proposition, not an arbitrary missing CID')
+    primitive=load(attempt/'primitive-boundaries.json');need(primitive==result['primitiveBoundaries'],'Exact actual unchanged-runner primitive boundary record')
+    eligible=0;nulls=0
+    for entry in primitive:
+        need(unquote(urlsplit(entry['delegateCodeSource']).path)==main,'Actual public production delegate CodeSource')
+        before,after=entry['before'],entry['after'];need(before['pack']==after['pack'],'Primitive selection/attention itself writes no CAS; framework writes remain separate')
+        if entry['kind']=='nal.recall':
+            need(before==after,'Read-only lexical selector preserves all signal/budget/WAL bytes')
+            if 'output' in entry:typed_target(entry['output'])
+        elif entry.get('refusal'):need(before==after,'Refused explicit attention preserves method-boundary state')
+        elif 'error' in entry['output']['attended']:
+            null_identity_refusal(entry);nulls+=1
+        else:
+            need(entry['kind']=='nal.attend' and entry['output']['attended']['processed'] is True,'Actual separate explicit processed attention')
+            unchanged(before,after,True);eligible+=1
+    need(nulls==1 and eligible==3,'Actual typed-null refusal and three explicit primary/duplicate/lower attention calls')
+    null_run=by_label['typed-null-target-no-authored-fallback'];need(null_run['complete']['outputs']['attend']['attended']=={'error':'angular required'},'Actual typed-null wire does not reactivate stale valid authored target')
+    explicit_priority(pays['before'],pays['after'],.95);explicit_priority(by_label['explicit-lower-priority-for-eviction']['before'],by_label['explicit-lower-priority-for-eviction']['after'],.1);unchanged(by_label['duplicate-pays-attention']['before'],by_label['duplicate-pays-attention']['after'])
+    browser=load(attempt/'browser-primary-result.json');need(browser['result']=='PASS' and browser['importAutomaticRuns']==0 and browser['errors']==browser['external']==[] and browser['http']==pays['http'],'Actual public typed browser run and recorded request, no automatic Import run')
+    need(len(browser['stages'])==2 and len(browser['stages'][0]['nodeIds'])==11 and len(browser['stages'][1]['nodeIds'])==8 and all(s['automaticRuns']==0 for s in browser['stages']),'Actual inert offered preset readiness then eight-node public Import')
+    primary_doc=browser['actualRequest']['document'];wires=primary_doc['wires'];need({'from':['recall','angular'],'to':['attend','angular']} in wires and {'from':['recall','propositionCid'],'to':['attend','propositionCid']} in wires and not any(w['from'][0] in ['angular','pid'] and w['to'][0]=='attend' for w in wires),'Actual typed id outputs directly feed separate explicit attention; Confix JSON inspection is not an id conversion')
+    need(any(n['id']=='acknowledgement' and 'processed' in n['text'] for n in browser['domNodes']),'Actual visible processed attention acknowledgement')
+    for label,issue in [('owes-attention-writer-refusal','PROPOSITION_MISMATCH'),('evicted-attention-writer-refusal','RESIDENT_REQUIRED')]:need(by_label[label]['after']['lastAdmissionRefusal']['issue']==issue and by_label[label]['http']['response']['ok'] is False,'Actual writer gate rejects stale/wrong exact identity')
+    need(result['eviction']['tick']['path']=='/api/beliefs/tick' and result['eviction']['tick']['status']==200 and result['eviction']['after']['bagRows']==result['final']['bagRows']==[],'Actual low-budget public tick evicts before fresh writer recheck')
+    belief_raw=(attempt/'after-close-readbacks/beliefs.wal').read_bytes();belief_frames=frames(belief_raw,True);need(belief_frames==reopen['beliefFrames'],'Independent configured DocumentAppendLog/WAL1CRC32C parse')
+    projection=belief_projection(belief_frames,signal,angular);need(reopen['replayedBagRows']==[],'Fresh production WAL replay agrees with derived final eviction, not bare empty bag inference')
+    need(raw_block(attempt,cid(signal))==signal,'Actual evicted signal CAS spill preserves exact evidence/identity bytes')
+    board_raw=(attempt/'after-close-readbacks/board.wal').read_bytes();board_frames=frames(board_raw);need(board_frames==reopen['boardFrames'],'Independent actual framework board journal parse')
+    recovered=reopen['recoveredBoardCards'];need(len(recovered)==len(runs)==14 and len(board_frames)==42,'Actual fourteen workflow cards and submit/start/settlement board frames')
+    last_pointers={frame['payloadUtf8'].rsplit('\t',1)[0]:(frame['sequence'],frame['payloadUtf8'].rsplit('\t',1)[1]) for frame in board_frames}
+    for card,run in zip(recovered,runs):
+        reply=run['http']['response'];need(card['label']==run['label'] and card['jobId']==reply['jobId'] and card['commandCid']==reply['receiptCid'] and card['command']==json.loads(raw_block(attempt,reply['receiptCid'])) and last_pointers[card['jobId']]==(card['sequence'],card['commandCid']),'Actual production recovered board card binds final retained command and WAL pointer')
+    need(reopen['writerPid']==cleanup['pid']==result['final']['pid'] and reopen['readerPid']!=cleanup['pid'] and reopen['writerCleanup']==cleanup,'Distinct actual closed writer/reader ownership')
+    need(all(cleanup[k] is True for k in ['listenerJoined','moduleDrained','reviewOwnerCompleted','bagOwnerCompleted','bagWorkerCompleted','ownerCompleted','casClosed','guestModulesClosed']) and cleanup['remainingChildren']==0,'Actual writer owners drained/closed')
+    need(all(reopen[k] is True for k in ['bagOwnerCompleted','boardOwnerCompleted','ownerCompleted','casClosed','guestModulesClosed']) and reopen['remainingChildren']==0 and reopen['beforeOpen']==reopen['afterClose'],'Actual production reader closes with identical CAS and both WALs')
+    need(stamp(belief_raw)==cleanup['closedBeliefWal']==reopen['beforeOpen']['beliefWal'] and stamp(board_raw)==cleanup['closedBoardWal']==reopen['beforeOpen']['boardWal'] and cleanup['closedPack']==reopen['beforeOpen']['pack'],'Exact after-close byte bindings')
+    index=load(attempt/'readback-index.json');need(index==result['reads'] and len(index)==len(reopen['readbacks']),'Every actual indexed readback compared after close')
+    for row,closed in zip(index,reopen['readbacks']):
+        raw=raw_block(attempt,row['cid']);need(len(raw)==row['bytes']==closed['bytes'] and closed['cid']==row['cid']==row['sha256'] and closed['sha256']==sha(raw) and row['role']==closed['role'] and (attempt/closed['file']).read_bytes()==raw,'Exact supplied content/role preserved by separate reader')
+    if not args.recorded_only:need(stamp((attempt/'runtime/cas/pack').read_bytes())==cleanup['closedPack'],'Actual local closed complete CAS pack bytes')
+    network=load(attempt/'network.json');outside=load(attempt/'controller-before-netns.json');need(network['networkNamespace']==result['final']['networkNamespace'] and network['networkNamespace']!=outside['networkNamespace'] and {r['ifname'] for r in json.loads(network['interfaces'])}=={'lo'} and json.loads(network['routes'])==[] and network['externalTcp']['errno']==101,'Actual strict loopback namespace, not full rootfs seal')
+    controls=[]
+    def rejects(label,fn):
+        try:fn()
+        except (AuditError,ValueError,KeyError,TypeError,StopIteration):controls.append({'mutation':label,'result':'REJECTED'})
+        else:raise AuditError('Mutated copy accepted: '+label)
+    body=C['decode_cbor'](raw_block(attempt,pays_pid));body['sourceContext']='sha256:'+'0'*64;rejects('substituted-definition-source-context',lambda:definition(C['canonical'](body),C2_CID,'pays','Tenant','Landlord'))
+    bad=copy.deepcopy(pays_output['selection']);bad['results']['results']['bindings'][0]['object']['type']='uri';rejects('lexical-object-substituted-as-IRI',lambda:selected(bad,C2_CID,'pays','Tenant','Landlord',2,'MATCH_RESIDENT',angular,pays_pid))
+    bad=copy.deepcopy(owes_output);bad['angular']=angular;bad['propositionCid']=owes_pid;rejects('typed-identity-for-documentary-PID-mismatch',lambda:typed_target(bad))
+    null_boundary=next(e for e in primitive if 'error' in e.get('output',{}).get('attended',{}));bad=copy.deepcopy(null_boundary);bad['output']={'attended':{'processed':True,'propositionCid':pays_pid}};rejects('null-wire-reactivates-authored-identity',lambda:null_identity_refusal(bad))
+    changed=next(e for e in primitive if e['kind']=='nal.attend' and e.get('output',{}).get('attended',{}).get('changed') is True);bad=copy.deepcopy(changed['after']);bad['bagRows'][0]['evidence']['positive']+=1;rejects('attention-adds-evidence',lambda:unchanged(changed['before'],bad,True))
+    bad=copy.deepcopy(by_label['bounded-65-incomplete-control']['complete']['outputs']['recall']['selection']);bad['complete']=True;rejects('bounded-source-relabelled-complete',lambda:incomplete(bad,'BOUNDED'))
+    names=['GO.json','startup.json','http-result.json','browser-primary-result.json','primitive-boundaries.json','cleanup.json','reopened.json','readback-index.json','classpath.json','writer-command.json','reader-command.json','network.json']
+    run_population={};selection_population={}
+    for run in runs:
+        status=run['http']['response']['status'];run_population[status]=run_population.get(status,0)+1
+        output=run['complete'].get('outputs',{}).get('recall',{})
+        if 'selection' in output:
+            status=output['selection']['status'];selection_population[status]=selection_population.get(status,0)+1
+    return {'result':'PASS_RECORDED_EXACT_ROLE_CONSISTENCY','sourceHead':args.source_head,'mainSha256':args.main_sha,'documentsSha256':args.documents_sha,'panelsSha256':args.panels_sha,'writerPid':cleanup['pid'],'readerPid':reopen['readerPid'],'ownerConfiguration':configuration,'C2sourceCid':C2_CID,'paysPropositionCid':pays_pid,'owesPropositionCid':owes_pid,'angular':angular,'runs':len(runs),'runStatusPopulation':run_population,'selectionStatusPopulation':selection_population,'primitiveBoundaries':len(primitive),'readbacks':len(index),'retainedControlDefinitions':65,'beliefWal':stamp(belief_raw),'beliefWalProjection':projection,'boardWal':stamp(board_raw),'boardFrames':len(board_frames),'mutatedCopyControls':controls,'recordSha256':{n:sha((attempt/n).read_bytes()) for n in names},'inputSha256':{p.name:sha(p.read_bytes()) for p in sorted((attempt/'inputs').iterdir()) if p.is_file()},'observerSourceSha256':{p.name:sha(p.read_bytes()) for p in sorted((attempt/'observer-inputs').iterdir()) if p.is_file()},'imageSha256':{p.name:sha(p.read_bytes()) for p in sorted(attempt.glob('*.png'))},'artifactVerification':'recorded metadata only; external JAR/fullpack availability not checked' if args.recorded_only else 'actual frozen120JAR/browser and local closed complete CAS bytes additionally rehashed','scope':'Source-local manual-KIF lexical selection and exact current resident eligibility, explicit budget-only attention and configured WAL replay. Final optional module board-review bridge absent; separate real BeliefWire review owner remained open/drained. Earlier attempt3 enabled bridge and admitted five unrelated workflow-review signals, preserved under that different configuration. No semantic/legal accuracy, parser/LLM/model execution, source authentication/currentness/review authority, inference truth, generic admission or full R4 rootfs/hardware/crash durability claim.'}
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('attempt',type=Path);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--recorded-only',action='store_true')
+    for flag in ['source-head','main-sha','documents-sha','panels-sha']:parser.add_argument('--'+flag,required=True)
+    args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    try:result=audit(args.attempt,args)
+    except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:result={'result':'FAIL','error':str(error)}
+    result['auditScriptSha256']=sha(Path(__file__).read_bytes());result['supportSha256']={n:sha(Path(__file__).with_name(n).read_bytes()) for n in ['checks.py','receipt-core.py.txt']}
+    (args.out/'result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
+    lines=[result['result'],result.get('scope',result.get('error',''))]
+    if result['result'].startswith('PASS'):
+        lines+=['Source '+result['sourceHead']+'; main '+result['mainSha256'],
+          'Actual C2 manual46byte intake: HTTP409 partial processing. First pays resident admitted; later owes exact source PID collides at same angular. Both canonical definitions and exact original source remain retained. No all-claims-admitted or source-authentication claim.',
+          'Actual typed RDF/plain lexical roles and fixed4/5BGP text agree with retained ordered tokens/context; null documentary entity IDs stay null despite legacy signal subjectCid source-routing fallback.',
+          'Fourteen real LCNC runs: '+json.dumps(result['runStatusPopulation'],sort_keys=True)+'. Selection responses: '+json.dumps(result['selectionStatusPopulation'],sort_keys=True)+'. These are protocol populations, not semantic benchmark results.',
+          'Public browser11node inert preset→8node imported graph→explicit Run uses actual typed angular/PID outputs into separate attention. Confix inspects only; unique resident eligibility and null-wire error guard verified before authored fallback/writer.',
+          'Sixteen actual public-runner boundaries separate read-only recall/CAS/WAL invariance from legitimate framework writes. Explicit priority changes quantize P20 and preserve D/Q, signal bytes, evidence/basis; duplicate action adds no frame.',
+          'Unsupported whole source, exact missing unrelated-definition404 and65unique canonical retained-only controls produce incomplete/no-row responses. Complete reversed roles produce lexical NO_MATCH, not legal UNKNOWN.',
+          'Actual low priority/public tick removes resident; fresh documentary selection remains nonresident and exact writer recheck refuses revival. Supplied configured DOC-LOG1 independently checks637bytes/CRC32C and R,B,A,A,D,E; actual E/spill supports empty replay rather than bare fresh-bag inference.',
+          'Actual framework board WAL42frames/14recovered cards and117readbacks (including65control definitions) agree after close. Writer '+str(result['writerPid'])+' / reader '+str(result['readerPid'])+' distinct; CAS and both WAL hashes unchanged across reader.',
+          'Final explicit profile disables only optional module board review; separate real BeliefWire review owner opened/drained. Earlier attempt3 five unrelated workflow-review admissions remain preserved under original enabled profile.',
+          'Six proportional mutated copies rejected. '+result['artifactVerification']+'.']
+    (args.out/'report.txt').write_text('\n'.join(lines)+'\n');print(json.dumps({'result':result['result'],'error':result.get('error'),'out':str(args.out)}));raise SystemExit(0 if result['result'].startswith('PASS') else 1)
