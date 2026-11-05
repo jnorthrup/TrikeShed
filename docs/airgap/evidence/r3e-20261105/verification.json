@@ -4,11 +4,12 @@
   "testedSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
   "testedSourceTree": "f7a2307948a01bae1109c0931277d2f9dd83c907",
   "integration": {
-    "integratedCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+    "integratedCommit": "cf544ffd37f291287ea7ec09aa1a538db5ce7893",
     "testedCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
     "targetCompilationCommit": "d1e5d413259e191a9aa6cff15998f6df2b50aa38",
     "frozenRefCounts": [
       556,
+      557,
       557
     ],
     "latestInventory": {
@@ -16,13 +17,23 @@
       "remoteBranchHeads": 547,
       "remoteHeadAliases": 1
     },
-    "merges": 6,
+    "merges": 7,
     "conflictedFiles": 0,
     "allFrozenTipsAreAncestors": true,
     "equivalentCorrections": "Production and fixture bracket corrections merge automatically with the independently written equivalent fixes; both histories retained.",
     "sourceContinuity": "../../../airgap/evidence/r3e-20261105/final-source-continuity.json",
     "localMachine": "Cloud checkout /workspace/TrikeShed; Jim Mac unchanged",
-    "pushPolicy": "Ordinary master push; no force, pruning, or branch deletion. Final remote readback recorded separately."
+    "pushPolicy": "Ordinary master push; no force, pruning, or branch deletion. Final remote readback recorded separately.",
+    "finalValidationCommit": "cf544ffd37f291287ea7ec09aa1a538db5ce7893",
+    "finalReconciliation": "final/intent-resolution.json",
+    "finalFocusedTests": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 5
+    },
+    "runtimeSourceAndBuildInputsUnchanged": true
   },
   "sourceSha256": {
     "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40",
@@ -1255,5 +1266,20 @@
     "Pinned-byte packaging does not close full vendor/native source rebuild provenance or machine power-loss durability."
   ],
   "reproduction": "../../15-wire-geometry.md",
-  "evidenceStanding": "Original failure logs, candidate packages, CAS/WAL state and profile bytes retained. Preliminary, baseline, diagnostic and accepted scopes are separate. Authored whitespace checks exclude exact raw evidence paths; manifests verify bytes and membership."
+  "evidenceStanding": "Original failure logs, candidate packages, CAS/WAL state and profile bytes retained. Preliminary, baseline, diagnostic and accepted scopes are separate. Authored whitespace checks exclude exact raw evidence paths; manifests verify bytes and membership.",
+  "finalValidation": {
+    "sourceCommit": "cf544ffd37f291287ea7ec09aa1a538db5ce7893",
+    "testTotals": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 5
+    },
+    "runtimeInputsUnchanged": true,
+    "updatedTestSha256": "9f92a9c7e92fb1accf30bb1be7a2950d822d50d4fcc042893312aae60b0ed69c",
+    "sourceSupplement": "strict-row-validation.patch.txt",
+    "sourceSupplementSha256": "2e852d5e5c4d66e914d664ede19e22c15997b4d90922a9a9a33914436c9ba0c3",
+    "sourceSupplementScope": "Apply after the R3e final source archive to add the newly retained assertions. The exact src/ subtree matches validationCommit. Publication documentation/evidence are supplied separately."
+  }
 }

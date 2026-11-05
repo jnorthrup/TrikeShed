@@ -1,0 +1,26 @@
+{
+  "sourceCommit": "cf544ffd37f291287ea7ec09aa1a538db5ce7893",
+  "startedAt": "2026-11-05T10:16:29.813060+00:00",
+  "command": [
+    "unshare",
+    "--user",
+    "--map-current-user",
+    "--net",
+    "--keep-caps",
+    "sh",
+    "-c",
+    "ip link set lo up && exec \"$@\"",
+    "airgap-horn-final",
+    "./gradlew",
+    "--offline",
+    "--no-daemon",
+    "--max-workers=2",
+    "jvmTest",
+    "--tests",
+    "*.LinearArrayMapTest",
+    "--tests",
+    "*.NativeHornQueryViewTest"
+  ],
+  "exit": 0,
+  "finishedAt": "2026-11-05T10:17:42.991003+00:00"
+}

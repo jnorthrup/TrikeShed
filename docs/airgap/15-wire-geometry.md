@@ -240,6 +240,18 @@ Horn executable. Their names are retained in `skipped-tests.json`; the native
 Sulong scalar/Confix browser path executes separately and is not skipped.
 No source or test exclusions were introduced.
 
+A final D3M branch adds malformed-row assertions and a query-local copy
+workaround for the map-hash defect. Reconciliation
+`cf544ffd37f291287ea7ec09aa1a538db5ce7893` keeps every new assertion and uses the
+already corrected common map contract without copying or normalizing rows.
+Five focused map/Horn tests pass with the added extra-field, non-string and
+duplicate-key cases. Production source and build inputs remain byte-identical
+to the packaged source; only the test file changes. The retained
+`strict-row-validation.patch.txt` applies after the final source archive and
+reconstructs the exact integrated `src/` subtree. These five checks are a
+focused rerun, not five additional unique tests in the 316-test suite.
+
+
 JS main, Documents, Wasm-JS, Wasm-WASI and Linux x64 compilation pass at
 `d1e5d413259e191a9aa6cff15998f6df2b50aa38`. The only runtime source difference
 at the final commit is the Spacegraph endpoint factory correction, which the
