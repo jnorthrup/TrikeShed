@@ -1,0 +1,35 @@
+from pathlib import Path
+import json,hashlib,os,shutil,subprocess,tarfile,gzip
+h=Path('/workspace/airgap-r3c-proof');repo=Path('/workspace/TrikeShed');root=h/'rootfs';base=Path('/workspace/airgap-r4f-proof/rootfs')
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+base_archive=Path('/workspace/library-files/airgap-document-r4f-linux-x64-2026-11-05.tar.gz');base_sha='28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58';assert sha(base_archive)==base_sha
+subprocess.run(['python3','/workspace/airgap-r4f-proof/package.py','verify'],check=True)
+jar='opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar'
+for dest,source in [(jar,Path('/workspace/TrikeShed-target-checks/build/libs')/Path(jar).name),('opt/trikeshed/README.md',repo/'release/airgap-document/README.md')]:
+ (root/dest).unlink();shutil.copy2(source,root/dest)
+subprocess.run(['python3',str(h/'package.py'),'manifest'],check=True)
+subprocess.run(['python3',str(h/'package.py'),'verify'],check=True)
+changed=[p.relative_to(root).as_posix() for p in sorted(root.rglob('*')) if p.is_file() and sha(p)!=sha(base/p.relative_to(root))]
+assert changed==['SHA256SUMS','opt/trikeshed/README.md',jar,'package-identity.json'],changed
+update=h/'runtime-update';update.mkdir();payload=update/'airgap-document-rootfs'
+for name in changed:
+ p=payload/name;p.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(root/name,p)
+record={'baseArchive':{'file':base_archive.name,'bytes':base_archive.stat().st_size,'sha256':base_sha},'targetSourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'unchangedJvmSourceCommit':'4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab','files':{name:{'before':sha(base/name),'after':sha(root/name)} for name in changed},'scope':'Layered runtime update. Requires the exact immutable R4f runtime; only the Spacegraph jar, runtime instructions and package manifests change. No new engine, JVM, native module or dependency.'}
+(update/'UPDATE.json').write_text(json.dumps(record,indent=2)+'\n')
+(update/'README.md').write_text('''# R3c runtime update\n\nThis archive is an overlay, not a standalone runtime. Retain the exact R4f Linux x86-64 runtime named and hashed in UPDATE.json. Verify that base archive's SHA-256, then extract it into a fresh installation directory. Extract this update into that same directory. Both archives use airgap-document-rootfs/; the update replaces only the four paths enumerated in UPDATE.json. Do not overlay a running installation or overwrite writable runtime state.\n\nInside airgap-document-rootfs, verify `sha256sum --check SHA256SUMS` and the complete file/directory membership and modes against package-identity.json. Use the retained package verifier for the latter checks. Apply the recorded read-only filesystem, writable state, UTF-8 locale and isolated network launch from the runbook. The host kernel, bwrap and browser remain external inputs.\n\nThe new browser bundle adds continuous display speed, presentation-only pause/resume and bounded pinned transfer inspection. JVM/Sulong execution, native buffers and durable storage are unchanged. This update does not establish dense recursive visualization, machine power-loss durability or full vendor/native rebuild provenance.\n''')
+def archive(dest):
+ with dest.open('wb') as raw,gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0,compresslevel=6) as gz,tarfile.open(fileobj=gz,mode='w|',format=tarfile.PAX_FORMAT) as tar:
+  for p in sorted(update.rglob('*')):
+   if not p.is_file():continue
+   info=tar.gettarinfo(str(p),arcname=p.relative_to(update).as_posix());info.uid=info.gid=0;info.uname=info.gname='';info.mtime=0;info.pax_headers={}
+   if p.is_file():
+    with p.open('rb') as f:tar.addfile(info,f)
+   else:tar.addfile(info)
+dest=Path('/workspace/library-files/airgap-document-r3c-runtime-update-2026-11-05.tar.gz');assert not dest.exists();archive(dest);duplicate=h/'runtime-update-second.tar.gz';archive(duplicate);assert sha(dest)==sha(duplicate);duplicate.unlink()
+installed=h/'installed';installed.mkdir();shutil.copytree(base,installed/'airgap-document-rootfs',copy_function=os.link)
+for name in changed:(installed/'airgap-document-rootfs'/name).unlink()
+subprocess.run(['tar','-xzpf',str(dest),'--no-same-owner','-C',str(installed)],check=True)
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(installed/'airgap-document-rootfs');subprocess.run(['python3',str(h/'package.py'),'verify'],env=env,check=True)
+record.update(archive={'file':str(dest),'sha256':sha(dest),'bytes':dest.stat().st_size},identicalTwoAssemblies=True,installedRoot=str(installed/'airgap-document-rootfs'),installation='Verified immutable R4f root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete final membership/mode/hash verification passes. No mutation of the R4f root.')
+(h/'runtime-update.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record,indent=2))

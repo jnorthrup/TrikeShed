@@ -1,0 +1,19 @@
+{
+  "baseSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "targetSourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+  "targetTree": "7a5d4193ce991cea407e02e99263c668645cc2cb",
+  "requiredSourceChain": [
+    {
+      "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+    },
+    {
+      "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+      "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+    }
+  ],
+  "patchSha256": "45be5cc336d1c0e81c789b685534770a57d4e4f0cd7c841722603f95a466f492",
+  "verifiedAppliedTreeMatches": true,
+  "dependencyChanges": [],
+  "scope": "Apply after the R4f source update on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open."
+}

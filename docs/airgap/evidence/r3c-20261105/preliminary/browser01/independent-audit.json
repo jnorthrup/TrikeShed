@@ -1,0 +1,33 @@
+{
+  "kind": "document",
+  "casObjectsVerified": 27,
+  "walFramesVerified": [
+    {
+      "cid": "sha256:60d87f5d1aa13ac2cd7a0ec06acdce4123d36cde853c316aff566d7decd299da",
+      "status": "queued"
+    },
+    {
+      "cid": "sha256:0bc8dece909552c6d2b18f048ab7bad16bfbcf6c1d713775709c680aafc5548b",
+      "status": "running"
+    },
+    {
+      "cid": "sha256:b3de560dbe4a06a233b32c865d0a811076c023235da72702d2f57ace2010bbc4",
+      "status": "completed"
+    }
+  ],
+  "runId": "02a836ee-438d-4ae6-9daf-4541d6ca2e2f",
+  "programCid": "sha256:c6b32c6e8a14e57d4ba10fdefa8a1b615c3ce19231973816ced92a02a9e7f172",
+  "receiptCid": "sha256:b3de560dbe4a06a233b32c865d0a811076c023235da72702d2f57ace2010bbc4",
+  "mappedReceivedSelections": 8,
+  "mappedWires": 8,
+  "ownerOmissionsInFinalLedger": 0,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0,
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "b7c7140c58e5fee4b1bea3161a5b9477c42a72f7331f39e08241faead3bd9be5",
+  "frameIntervals": {},
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}

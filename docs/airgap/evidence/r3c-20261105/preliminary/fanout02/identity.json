@@ -1,0 +1,5 @@
+{
+  "root": "/workspace/airgap-r3c-proof/rootfs",
+  "packageManifestSha256": "527126c9e016caba03c037a12f211507491d500bfee54b1f0982f65390b89e02",
+  "bundleSha256": "c379cbfacab0434e3eb5a5eeabb61525a141e328840a9550de6db2dbe0a94d02"
+}

@@ -287,6 +287,7 @@ private const val STORE_KEY = "trikeshed.panels.v3"
 
 fun Panels.saveDoc() {
     documentRevision++
+    trace.changed()
     facets.changed()
     // History first: a ?load= view is ephemeral for the SCRATCH, but undo is not autosave.
     history.record(JSON.stringify(serialize()))

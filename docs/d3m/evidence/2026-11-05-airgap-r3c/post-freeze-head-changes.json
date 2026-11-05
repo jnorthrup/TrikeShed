@@ -1,0 +1,10 @@
+{
+  "refs/heads/codex/native-horn-role-integration-20261105": {
+    "before": null,
+    "after": "bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70"
+  },
+  "refs/heads/master": {
+    "before": "c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2",
+    "after": "bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70"
+  }
+}

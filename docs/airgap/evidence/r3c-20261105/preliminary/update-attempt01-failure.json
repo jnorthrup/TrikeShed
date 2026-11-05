@@ -1,0 +1,6 @@
+{
+  "failure": "Final extracted update failed complete directory-mode verification. Overlay directory entries inherited staging umask rather than the unchanged base modes.",
+  "fix": "The overlay contains only the four changed files and metadata files; it carries no directory entries. The preexisting base directory modes remain unchanged. Strict directory membership/mode verification is retained.",
+  "preliminaryArchive": "preliminary-runtime-update.tar.gz",
+  "candidateNotPublished": true
+}

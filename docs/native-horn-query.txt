@@ -1,5 +1,32 @@
 Bounded native review-observation query — 2026-11-02
 
+Checked binding receipts — 2026-11-05
+
+Published source bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70 adds a
+native-horn-checked-proof/1 sibling to each supported native result. The same
+certificate-checking pass exposes typed constant/literal bindings, rule-scoped
+variable references, ordered premise paths and the exact source-node catalog.
+The raw proof structure remains unchanged. The references identify normalized
+forms and source occurrences; they are not character spans or entity identities.
+UNKNOWN retains null proof and checkedProof. These receipts add no NARS evidence.
+
+An internal trusted-host manualTheory fixture validates all 1..32 forms of one
+hash-checked source and refuses any excluded form before execution. It requires
+explicit host assumptions and supplies no public admission route, authenticated
+review, source-currentness guarantee or automatic English translation. Existing
+public review/taxonomy authorization and before/after checks remain in place.
+
+All 528 selected checks passed with native configuration and three browser
+builds. A separate final-JAR observer exercised eight actual theories: original
+S5/S6 stayed UNKNOWN; a separately authored positive supported operator=Lark and
+resource=Harbor. Duplicated authorization kept alternative witnesses, removal of
+the last authorization returned UNKNOWN, and role/authorization mismatches
+remained UNKNOWN. See evidence/2026-11-05/native-horn-bindings-v85 for the exact
+artifact pins, recorded finite-certificate audit and execution limits. This is
+inference relative to declared premises, not a legal-comprehension benchmark.
+
+The sections below retain the earlier increments and their original artifact pins.
+
 POST /api/documents/review/horn-query is an authenticated, non-consuming read
 with the same snapshotCid/expectedRevision/goal fields as /horn-input. Only
 containsMandatorySelection and needsMapping are accepted. Neither endpoint

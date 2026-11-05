@@ -1,0 +1,32 @@
+{
+  "baseSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "targetSourceCommit": "97df0b59e5445e318f7f337ea0d4c395d17428ce",
+  "targetTree": "470b6317ed5d46fba12c43064852e75f4b47041a",
+  "requiredSourceChain": [
+    {
+      "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+    },
+    {
+      "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+      "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+    }
+  ],
+  "patchSha256": "516e2d107910b1c5254ba799afbd00823200c6c151dd0c6763a3c426334c120e",
+  "verifiedAppliedTreeMatches": true,
+  "dependencyChanges": [],
+  "scope": "Apply after the R4f source update on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+  "archive": {
+    "file": "/workspace/library-files/airgap-document-r3c-integrated-sources-update-v2-2026-11-05.tar.gz",
+    "bytes": 61097145,
+    "sha256": "50bbcd685959e755556af45f83440f052c918c62c0f13ce8e20cb6aa1b6e3106"
+  },
+  "packagingCorrection": {
+    "previousArchiveRetained": {
+      "file": "/workspace/library-files/airgap-document-r3c-integrated-sources-update-2026-11-05.tar.gz",
+      "bytes": 61097144,
+      "sha256": "77e85460f48c58f509c2edb10607265ffd25b0dd6dbf3c600b94b98e16d6c63d"
+    },
+    "change": "README and its manifest describe the integrated JVM/common changes; source patch, base chain and verified target tree are identical."
+  }
+}

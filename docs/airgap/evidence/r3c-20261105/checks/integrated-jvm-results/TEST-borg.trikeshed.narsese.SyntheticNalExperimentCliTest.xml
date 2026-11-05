@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="SyntheticNalExperimentCliTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:48:24.296Z" hostname="0d6dfba25614" time="0.018">
+  <properties/>
+  <testcase name="historicalReadRefusesDamagedRecordTailsWithoutRepairingTheEvidencePack()[jvm]" classname="borg.trikeshed.narsese.SyntheticNalExperimentCliTest" time="0.015"/>
+  <testcase name="missingInspectionRefusesAfterOpeningAnExistingPackWithoutSyntheticFallback()[jvm]" classname="borg.trikeshed.narsese.SyntheticNalExperimentCliTest" time="0.003"/>
+  <testcase name="retainedArgumentsNeverFallBackToTheSyntheticExperimentOrCreateMissingStores()[jvm]" classname="borg.trikeshed.narsese.SyntheticNalExperimentCliTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

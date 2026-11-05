@@ -1,0 +1,20 @@
+{
+  "reviewed": [
+    "document-update01/transfer-table.png",
+    "fanout-update02/fanout-observation-coverage.png",
+    "observation-coverage.png"
+  ],
+  "findings": "Bounded transfer viewport and sticky labels keep counts readable; pinned event text scrolls independently. Full graph screenshots show actual scale and overlay positions; they do not prove dense-graph readability. Final document bounds are asserted in the browser record.",
+  "preliminaryVisualFix": "The first working UI placed the pin below a long unbounded table. The accepted bundle bounds the table and keeps its labels sticky.",
+  "figure": "Measured execution and observation counts use separate panels and units; labels, endpoints and coverage note inspected as readable.",
+  "integratedReview": [
+    "accepted/integrated-document/transfer-table.png",
+    "accepted/integrated-fanout/fanout-observation-coverage.png",
+    "observation-coverage-integrated.png"
+  ],
+  "finalReview": [
+    "accepted/final-document/transfer-table.png",
+    "accepted/final-fanout/fanout-observation-coverage.png",
+    "observation-coverage-final.png"
+  ]
+}
