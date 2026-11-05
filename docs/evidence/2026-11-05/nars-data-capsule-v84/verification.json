@@ -1,0 +1,101 @@
+{
+  "kind": "nars-data-capsule-v84-evidence/1",
+  "runtimeSource": "87e7bb3e945546137c595ff5aaf53781f4168275",
+  "externalMainSha256": "f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff",
+  "docsBase": "c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2",
+  "semanticInputFiles": [
+    {
+      "relativePath": "cas/pack",
+      "bytes": 366478,
+      "sha256": "a7ba5f6e7c0e0cb25909566ba31169b372984c68e54e8711e69bcdf61a71a566"
+    },
+    {
+      "relativePath": "beliefs.wal",
+      "bytes": 637,
+      "sha256": "b03f753a36f90c205fb45d9f67c4ee5736a0779118341b3789fc30abfaf32da4"
+    },
+    {
+      "relativePath": "host/.kanban/board.wal",
+      "bytes": 5838,
+      "sha256": "eb04f8089e2231334d3b29ef67bd9e5861491dbf63590aa45d6d641f4d164cdd"
+    }
+  ],
+  "semanticInputBytes": 372953,
+  "capsulePack": {
+    "records": 166,
+    "allBlob": true,
+    "referenceRecords": 0,
+    "fullDigestUnique": 166,
+    "selectedUniqueReadbacks": 113
+  },
+  "readerPid": 150089,
+  "actualBoundedReads": 166,
+  "selectedExports": 113,
+  "beliefFrames": 6,
+  "boardFrames": 42,
+  "recoveredCards": 14,
+  "queryResult": "MATCH_NOT_RESIDENT; beliefs empty, angular/propositionCid null",
+  "noNewAdmissionAttentionTick": true,
+  "generatedLeaseSidecarNotInput": true,
+  "originalPathsHiddenBeforeAfter": true,
+  "allThreeDataFilesUnchanged": true,
+  "mutationsRejected": 4,
+  "archive": {
+    "bytes": 178741,
+    "sha256": "506f6780ff2914d43896d3ea243d4cbc3329fc34855b5ea43b8e2a040c9c95bc",
+    "members": 169,
+    "uncompressedBytes": 979353
+  },
+  "audit": {
+    "kind": "nars-data-capsule-independent-audit-files/1",
+    "sourceHead": "87e7bb3e945546137c595ff5aaf53781f4168275",
+    "selectedAttempt": "nars-data-capsule-v84-proof/attempt2",
+    "files": {
+      "audit.py": {
+        "bytes": 22978,
+        "sha256": "762b07918ab172a4a24681b7c785f3ae11c074b1182319a73314fa9da2efe330"
+      },
+      "checks.py": {
+        "bytes": 12169,
+        "sha256": "821d31b608d0d39e0cd90a8cbafab3470bcd53a6d24abd7a7b369497987ed73c"
+      },
+      "receipt-core.py.txt": {
+        "bytes": 33996,
+        "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+      },
+      "README.txt": {
+        "bytes": 6488,
+        "sha256": "13ea4180cb4e791f4b9527b3fbed9747bde129b8a512b7973534af4e87f1d9f3"
+      },
+      "attempt1/audit.py.txt": {
+        "bytes": 19958,
+        "sha256": "7b4cd1813a9a4864b2893707b4f4cdd629ecf2d963f5effc2ab4932916512af3"
+      },
+      "attempt1/result.json": {
+        "bytes": 4816,
+        "sha256": "363a7c5978b81dd7246855c4d0139860b23750aaeb3272cbd1338bbe0bf1eaa6"
+      },
+      "attempt1/report.txt": {
+        "bytes": 579,
+        "sha256": "b9d95afc2e3c37b89ad32435d14d460ac0c3185c56ce9d4a227235e606351896"
+      },
+      "final/result.json": {
+        "bytes": 4979,
+        "sha256": "cb512e116f1cccd5073e54fdf977d9b2c428be4ebede5b56bf06c65f4b9125e6"
+      },
+      "final/report.txt": {
+        "bytes": 2529,
+        "sha256": "de6f4099447b2b9176fe1932681a081070e5fd98cd3d5e4d3fadf428ed06b1ef"
+      },
+      "repeat/result.json": {
+        "bytes": 4979,
+        "sha256": "cb512e116f1cccd5073e54fdf977d9b2c428be4ebede5b56bf06c65f4b9125e6"
+      },
+      "repeat/report.txt": {
+        "bytes": 2529,
+        "sha256": "de6f4099447b2b9176fe1932681a081070e5fd98cd3d5e4d3fadf428ed06b1ef"
+      }
+    }
+  },
+  "scope": "Actual local3-file data relocation/replay/query with oldproducerroot hidden; external runtime/expectations required. Public default Python audit checks supplied data/recorded metadata only; optional external artifact mode was not executed. No executable portability/fullR4seal/hostileescape/crashpowerloss/networkfederation/sourceauthority claim. V83 package unchanged."
+}

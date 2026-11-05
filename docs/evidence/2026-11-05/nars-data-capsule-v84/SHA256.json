@@ -1,0 +1,14 @@
+{
+  "README.md": "419cc706cd803fd85f21f9d02f15ccc2d40428361f1e7d65399b4492a681ced8",
+  "auditor-source-manifest.json": "cd555f6869918f3057f262e5bb56dada23ba6a8d926d36a6a9760f7814977fe1",
+  "checks.py.txt": "821d31b608d0d39e0cd90a8cbafab3470bcd53a6d24abd7a7b369497987ed73c",
+  "receipt-core.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763",
+  "recorded-audit-report.txt": "de6f4099447b2b9176fe1932681a081070e5fd98cd3d5e4d3fadf428ed06b1ef",
+  "recorded-audit-result.json": "cb512e116f1cccd5073e54fdf977d9b2c428be4ebede5b56bf06c65f4b9125e6",
+  "recorded-audit-usage.txt": "13ea4180cb4e791f4b9527b3fbed9747bde129b8a512b7973534af4e87f1d9f3",
+  "recorded-audit.py.txt": "762b07918ab172a4a24681b7c785f3ae11c074b1182319a73314fa9da2efe330",
+  "records-manifest.json": "1f465ea047945d4a0b745d57b74519099f3f8b29638fb3947e96099d6d2de8ac",
+  "records.tar.gz": "506f6780ff2914d43896d3ea243d4cbc3329fc34855b5ea43b8e2a040c9c95bc",
+  "replay-recorded.py.txt": "62fc480ec830015e23240cc66e1e04dbdd6bbe2e319bff11d6d6ac02d6d6125e",
+  "verification.json": "031139fed3564034ace84660f1281d772b3e2060a517844fd788ca9f397d546d"
+}
