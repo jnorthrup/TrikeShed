@@ -1,0 +1,124 @@
+"""Recorded projection/typed-row consistency only; no query execution or proof search."""
+import hashlib,json,math,runpy,struct
+from pathlib import Path
+ROOT=Path(__file__).parent
+assert hashlib.sha256((ROOT/'certificate-core.py.txt').read_bytes()).hexdigest()=='3090d99851f84b1638033c0a6fa0c8c950aa656045daa1c5e3ec9b1b5b5095ba'
+C=runpy.run_path(str(ROOT/'certificate-core.py.txt'))
+need=C['need'];cid=C['cid'];canonical=C['canonical'];AuditError=C['AuditError']
+SCHEMA='native-horn-proof-quads/1'
+DATASET='reviewed-native-horn-proof-projection'
+PREFIX='urn:trikeshed:native-horn-proof-quads:1:'
+VOCAB=PREFIX+'vocab:'
+XSD='http://www.w3.org/2001/XMLSchema#integer'
+FIELDS='inputCid frameId snapshotCid revision readCid approvalCid decisionCid reviewer synthetic policy scope coverage selectionCount selectionLimit status semantics firstProofOnly query proof checkedProof sourceEvidence hostRules execution solverStepBudget nativeBinarySha256 nativeAdapterSha256 sumoNixRevision'.split()
+VARS={'bindings':'binding variable kind value source sourceCid form referenceMode'.split(),'premises':'use ordinal child childForm kind source sourceCid form'.split()}
+RULES=['(=> (and (subclass ?x ?y) (subclass ?y ?z)) (subclass ?x ?z))','(=> (and (instance ?x ?y) (subclass ?y ?z)) (instance ?x ?z))','(=> (subclass ?x ?y) (subclass ?x ?x))','(=> (subclass ?x ?y) (subclass ?y ?y))','(=> (instance ?x ?y) (subclass ?y ?y))']
+def normalized(v):
+    if isinstance(v,bool) or v is None or isinstance(v,str):return v
+    if isinstance(v,(float,int)):
+        need(math.isfinite(v) and 0<=v<=9007199254740991 and int(v)==v,'Safe integral projection number')
+        return int(v)
+    if isinstance(v,list):return [normalized(x) for x in v]
+    need(isinstance(v,dict) and all(isinstance(k,str) for k in v),'Exact string-keyed context map')
+    return {k:normalized(x) for k,x in v.items()}
+def projection(report,mlir):
+    context={k:report.get(k) for k in FIELDS};context['mlirNixRevision']=mlir
+    return cid(canonical(normalized({'kind':SCHEMA,'context':context})))
+def iri(graph,path):return graph+'/step/'+('.'.join(str(normalized(v)) for v in path) if path else 'root')
+def uri(v):return {'type':'uri','value':v}
+def literal(v):return {'type':'literal','value':v}
+def key(v):return json.dumps(v,sort_keys=True,separators=(',',':'),ensure_ascii=False)
+def certificate_check(report,input_raw,source_raw):
+    need(report['kind']=='reviewed-kif-native-result/1' and report['status']=='SUPPORTED' and report['policy']=='reviewed-kif-positive-taxonomy/1' and report['authority']=='reviewed-read-only-not-a-sink-permit','Actual host reviewed taxonomy result scope')
+    need(report['scope']=='host-explicit-assertions' and report['ontology'] is None and report['coverage']=='positive-reviewed-selected-snapshot' and report['selectionCount']==3 and report['selectionLimit']==123,'Complete three-selection positive reviewed profile')
+    need(report['hostRules']==RULES and report['firstProofOnly'] is True,'Existing fixed taxonomy rules and first-proof scope')
+    need(cid(input_raw)==report['inputCid'],'Actual process input byte identity')
+    data=json.loads(input_raw);need(data['frameId']==report['frameId'] and cid(canonical(normalized({k:v for k,v in data.items() if k!='frameId'})))==report['frameId'],'Derived canonical frame domain, not CAS receipt')
+    need(data['rules']==[C['sexps'](r)[0] for r in RULES] and data['excluded']==[],'Exact five fixed native rules, no excluded fragment fallback')
+    source=source_raw.decode('utf8',errors='strict');source_cid=cid(source_raw);evidence=report['sourceEvidence'];facts=[];fact_sources=[]
+    need(len(source_raw)==76 and source_cid=='sha256:1f3ea0d40ae890046b811f4891f9bc67cbaee38b1ccf910c1551beed00cc608e','Actual complete authored manual KIF fixture')
+    for occurrence,q in evidence.items():
+        need(q['kind']=='reviewed-kif-native-occurrence/1' and occurrence=='selection:'+cid(canonical(normalized(q)))[7:],'Canonical occurrence identity binds complete quotation metadata')
+        need(all(q[k]==report[k] for k in ['readCid','snapshotCid','approvalCid']),'Exact reviewed occurrence lineage')
+        begin,end=normalized(q['begin']),normalized(q['end']);units=source.encode('utf-16-le')
+        need(q['originalCid']==q['textCid']==source_cid and 0<=begin<end<=len(units)//2 and units[2*begin:2*end].decode('utf-16-le')==q['quote'],'Exact original/extracted KIF UTF16 half-open quote')
+        fact=C['ground'](q['quote']);facts.append(fact)
+        matches=[r for r in data['provenance']['facts'] if r['source']['id']==occurrence]
+        need(len(matches)==1 and matches[0]['fact']==fact,'Every approved occurrence appears in actual native input, including unused selection')
+        s=matches[0]['source'];need(s['sourceCid']==source_cid and s['text']==q['quote'] and s['review']=='APPROVED' and cid(canonical(normalized({k:v for k,v in s.items() if k!='sourceNodeId'})))==s['sourceNodeId'],'Source receipt full content identity and exact quote')
+        fact_sources.append(matches[0])
+    need(len(evidence)==3 and sorted(map(key,data['facts']))==sorted(map(key,facts)) and sorted(map(key,data['provenance']['facts']))==sorted(map(key,fact_sources)),'All three approved selections feed native input without pagination/cherry-picking')
+    need(sorted(C['render'](x) for x in facts)==['(instance Tenant Person)','(subclass Person Agent)','(subclass Unrelated Other)'],'Exact manual selected assumption forms')
+    for i,row in enumerate(data['provenance']['rules']):
+        s=row['source'];need(s['id']=='host-rule:'+str(i+1) and s['text']==RULES[i] and s['sourceRevision']=='reviewed-kif-positive-taxonomy/1' and s['sourceCid']==cid(RULES[i].encode()) and cid(canonical(normalized({k:v for k,v in s.items() if k!='sourceNodeId'})))==s['sourceNodeId'],'Exact normalized host-rule source receipt')
+    need(len(data['provenance']['rules'])==5 and data['query']==['instance','Tenant','Agent'],'Exact fixed native query')
+    expected=C['checked_projection'](report['proof'],data,report['inputCid'])
+    need(expected==report['checkedProof'],'Finite supplied native certificate binds ordered premises, shared variables, typed values and source receipts')
+    used=[s for s in expected['sources'].values() if not s['id'].startswith('host-rule:')]
+    need(len(used)==2 and len(expected['steps'])==3 and len(expected['steps'][-1]['premises'])==2,'Two actual sources used, unused third remains context, not evidence vote')
+    return data
+def expected_rows(report,graph,view):
+    proof=report['checkedProof'];sources=proof['sources'];steps={tuple(s['path']):s for s in proof['steps']};step=steps[()];root=iri(graph,[])
+    need(step['kind']=='derived','Fixed starters select actual derived root')
+    def source(i):return uri(graph+'/source/'+i.removeprefix('sha256:'))
+    def source_cid(i):return uri('urn:sha256:'+sources[i]['sourceCid'].removeprefix('sha256:'))
+    out=[]
+    if view=='bindings':
+        for ordinal,b in enumerate(step['bindings']):
+            term=b['term'];kind=term['kind'];need(kind in ('constant','literal'),'Typed scalar binding')
+            for i in b['ruleSourceNodeIds']:
+                record=sources[i]
+                out.append({'binding':uri(root+'/binding/'+str(ordinal)),'variable':literal(b['variable']),'kind':literal(kind),'value':literal(term['token' if kind=='constant' else 'spelling']),'source':source(i),'sourceCid':source_cid(i),'form':literal(record['text']),'referenceMode':literal('host-rule-normalized-form' if record['id'].startswith('host-rule:') else 'reviewed-kif-exact-quotation')})
+    else:
+        for use in step['premises']:
+            child=steps[tuple(use['path'])];ordinal=normalized(use['ordinal'])
+            for i in child['sourceNodeIds' if child['kind']=='asserted' else 'ruleSourceNodeIds']:
+                out.append({'use':uri(root+'/use/'+str(ordinal)),'ordinal':{'type':'literal','value':str(ordinal),'datatype':XSD},'child':uri(iri(graph,use['path'])),'childForm':literal(child['normalForm']),'kind':literal(child['kind']),'source':source(i),'sourceCid':source_cid(i),'form':literal(sources[i]['text'])})
+    need(len({key(r) for r in out})==len(out),'Expected rows are distinct, alternatives not votes')
+    return out
+def program_check(program,graph,view):
+    need(program['controls']['inspectionOnly'] is True,'Inspection-only fixed query')
+    nodes=program['nodes'];patterns=[n for n in nodes if n['type']=='sparql.pattern'];variables=[n for n in nodes if n['type']=='sparql.variable']
+    need(len(patterns)==8 and len(variables)==8 and len(nodes)==17,'Exactly two fixed eight-BGP views')
+    need(all(n['type'] in ('sparql.select','sparql.variable','sparql.pattern') for n in nodes),'No dispatch/procedure/global dataset query nodes')
+    need([n['params']['name'] for n in variables]==['?'+v for v in VARS[view]],'Exact eight typed result variables')
+    root='<'+iri(graph,[])+'>'
+    triples=([(root,'binding','?binding'),('?binding','variable','?variable'),('?binding','termKind','?kind'),('?binding','spelling','?value'),('?binding','ruleSource','?source'),('?source','sourceCid','?sourceCid'),('?source','exportText','?form'),('?source','referenceMode','?referenceMode')] if view=='bindings' else [(root,'premiseUse','?use'),('?use','ordinal','?ordinal'),('?use','childStep','?child'),('?child','normalForm','?childForm'),('?child','kind','?kind'),('?child','sourceReference','?source'),('?source','sourceCid','?sourceCid'),('?source','exportText','?form')])
+    for n,(s,p,o) in zip(patterns,triples):
+        need(n['params']=={'subject':s,'predicate':'<'+VOCAB+p+'>','object':o,'graph':'<'+graph+'>'},'All fixed patterns name exact fresh projection graph')
+    need(not program.get('kanban') and not any(n.get('subprogram') or n.get('children') for n in nodes),'No program dispatch')
+def view_check(plain,group,view,projection_cid,descriptor,mlir):
+    report=group['response'];value=report['quadQuery'];graph=PREFIX+projection_cid.removeprefix('sha256:')
+    need(projection(report,mlir)==projection_cid,'Response retains complete exact reviewed context')
+    need(value['kind']=='reviewed-native-horn-quad-query/1' and value['schema']==SCHEMA and value['dataset']==DATASET and value['graph']==graph,'Request-local graph/schema identity')
+    need(value['persistence']=='request-local' and value['authority']=='authenticated-reviewed-read-not-a-sink-permit','Physical projection cannot claim sink permission')
+    physical=value['physicalSource']
+    need(all(physical[k]==v for k,v in {'selected':'quad-store','sources':['quad-store'],'scope':'raw-matched-data','reviewAuthority':'not-established','bindingProvenance':'not-established','sampling':'single-source'}.items()),'Physical raw source remains separate from host review authority')
+    provenance=value['provenance']
+    need(all(provenance[k]==v for k,v in descriptor.items()),'All projection descriptor fields retained')
+    normalized(provenance['checkedAsOf'])
+    revisions={s['sourceRevision'] for s in plain['checkedProof']['sources'].values() if not s['id'].startswith('host-rule:')}
+    need(len(revisions)==1 and provenance['sourceRevision'] in revisions,'Exact documentary source revision')
+    expected=expected_rows(plain,graph,view);result=value['results'];rows=result['results']['bindings']
+    need(result['head']['vars']==VARS[view],'Exact SPARQL result columns')
+    need(len(rows)==len(expected) and len({key(r) for r in rows})==len(rows) and {key(r) for r in rows}=={key(r) for r in expected},'Complete exact typed row coverage, no repeated/substituted row')
+    need(group['answerRows']==expected,'Client public answer uses semantic premise/binding order')
+    program_check(group['program'],graph,view)
+    need(group['query']==value['query'],'Actual lowered query is the posted starter query')
+    return len(rows)
+def wal_frames(raw,review=False):
+    at=8 if review else 0;previous=0;rows=[]
+    if review:need(raw[:8]==b'DOC-LOG1','Actual review WAL type')
+    def crc32c(data):
+        crc=0xffffffff
+        for byte in data:
+            crc^=byte
+            for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+        return crc^0xffffffff
+    while at<len(raw):
+        need(len(raw)-at>=22,'Complete WAL frame')
+        magic,version,seq,n=struct.unpack_from('>4sHqi',raw,at);end=at+18+n
+        need(magic==b'WAL1' and version==1 and seq>previous and 0<=n<=10*1024*1024 and end+4<=len(raw),'Exact WAL frame type/order/bounds')
+        need(crc32c(raw[at:end])==struct.unpack_from('>I',raw,end)[0],'Independent WAL CRC32C')
+        payload=raw[at+18:end];rows.append({'sequence':seq,'payload':payload});previous=seq;at=end+4
+    return rows

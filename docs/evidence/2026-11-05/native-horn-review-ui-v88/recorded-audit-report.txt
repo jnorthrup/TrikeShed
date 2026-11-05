@@ -1,0 +1,9 @@
+PASS: v88 selected closed browser records; six rejected mutated-copy controls.
+Actual protected native report/typed inspectors and exact KIF quotes versus normalized-rule cards verified.
+Unchanged held responses do not repaint after actual goal and graph A/B/A invalidation; structured400/413 preserves validated plain report while401/malformed/stale clears it.
+Exact source/frame/review identities,14actual native evaluations and after-close12selected blocks/11unique plus review2/board6 CRC frames verified.
+Program-details DOM text NOT_EXERCISED: all three innerText captures of closed-details PRE are empty. Actual posted programs and server-lowered SPARQL are independently checked.
+First-report oversized/profile-limit behavior SOURCE-REVIEWED ONLY.
+One real derived root; no distinct-step switch or credential change while query is busy. Forget is after completed output and visibly says credential removed; it clears/disables native result.
+Standalone Documents reader is not connected; actual actions are in the Spacegraph Documents review-output node. No private layout/PDF data included.
+Recorded canonical identities, supplied-certificate/typed-row and UI ownership consistency. Actual Spacegraph Documents review output actions, synthetic approved manual KIF assumptions; no standalone Documents reader, native LCNC runner, arbitrary native admission, independent solver/search, legal/source authentication, private PDF/layout baseline or portable executable/full isolation claim. First-report oversized/profile-limit behavior is SOURCE-REVIEWED ONLY, not browser verified. Public replay authenticates supplied selected bytes and metadata; omitted full packs/REF/native/JAR dependencies are not availability proofs.
