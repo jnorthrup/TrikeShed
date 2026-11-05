@@ -1,0 +1,1636 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as configuration cache cannot be reused because environment variable 'CODEX_TOOL_CALL_ID' has changed.
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateComposeResClass SKIPPED
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :generateForgeAssets UP-TO-DATE
+> Task :fetchSumoCorpus UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+> Task :kotlinKotlinNpmCachesSetup
+> Task :kotlinNodeJsSetup UP-TO-DATE
+> Task :kotlinRestoreYarnLock UP-TO-DATE
+> Task :kotlinYarnSetup UP-TO-DATE
+> Task :jsBenchPackageJson UP-TO-DATE
+> Task :jsDocumentsPackageJson UP-TO-DATE
+> Task :jsForgePackageJson UP-TO-DATE
+> Task :jsGraalPackageJson UP-TO-DATE
+> Task :jsHarnessPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPackageJson UP-TO-DATE
+> Task :jsPackageJson UP-TO-DATE
+> Task :jsPagesPackageJson UP-TO-DATE
+> Task :jsSpacegraphPackageJson UP-TO-DATE
+> Task :jsTestPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPackageJson UP-TO-DATE
+> Task :jsViewserverPackageJson UP-TO-DATE
+> Task :jsBenchPublicPackageJson UP-TO-DATE
+> Task :jsDocumentsPublicPackageJson UP-TO-DATE
+> Task :jsForgePublicPackageJson UP-TO-DATE
+> Task :jsGraalPublicPackageJson UP-TO-DATE
+> Task :jsHarnessPublicPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPublicPackageJson UP-TO-DATE
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :jsPagesPublicPackageJson UP-TO-DATE
+> Task :jsPublicPackageJson UP-TO-DATE
+> Task :jsSpacegraphPublicPackageJson UP-TO-DATE
+> Task :jsTestPublicPackageJson UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses UP-TO-DATE
+> Task :jsUringBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsViewserverPublicPackageJson UP-TO-DATE
+> Task :jvmJar UP-TO-DATE
+> Task :kotlinPackageJsonUmbrella UP-TO-DATE
+> Task :rootPackageJson UP-TO-DATE
+> Task :kotlinNpmInstall UP-TO-DATE
+> Task :convertXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsSpacegraph NO-SOURCE
+> Task :assembleJsSpacegraphResources UP-TO-DATE
+> Task :unpackSkikoWasmRuntime SKIPPED
+> Task :jsSpacegraphProcessResources UP-TO-DATE
+> Task :checkJsMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForJsMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsMain NO-SOURCE
+> Task :generateResourceAccessorsForJsMain SKIPPED
+> Task :generateActualResourceCollectorsForJsMain SKIPPED
+> Task :compileKotlinJs UP-TO-DATE
+> Task :checkJsSpacegraphComposeLibrariesCompatibility
+> Task :generateResourceAccessorsForJsSpacegraph SKIPPED
+> Task :jsResolveResourcesFromDependencies UP-TO-DATE
+> Task :assembleJsMainResources UP-TO-DATE
+> Task :jsResolveSelfResourcesCopyHierarchicalMultiplatformResources UP-TO-DATE
+> Task :jsAggregateResources UP-TO-DATE
+> Task :jsProcessResources UP-TO-DATE
+> Task :jsMainClasses UP-TO-DATE
+> Task :compileTestKotlinJvm UP-TO-DATE
+> Task :compileJvmTestJava NO-SOURCE
+> Task :jvmTestClasses UP-TO-DATE
+> Task :airgapDocumentEntryJar UP-TO-DATE
+> Task :kotlinStoreYarnLock UP-TO-DATE
+> Task :buildJvmKernels UP-TO-DATE
+> Task :hotswapAgentJar UP-TO-DATE
+
+> Task :jvmTest
+WARNING: package jdk.internal.classfile.instruction not in java.base
+WARNING: package jdk.internal.classfile.constantpool not in java.base
+WARNING: package jdk.internal.classfile not in java.base
+
+LinearArrayMapTest[jvm] > indexedReifiedMapsKeepHashesAndEntryMembershipWithNulls()[jvm] STARTED
+
+LinearArrayMapTest[jvm] > indexedReifiedMapsKeepHashesAndEntryMembershipWithNulls()[jvm] PASSED
+
+LinearArrayMapTest[jvm] > reifiedRowsRetainMapAndEntryHashEqualityAcrossFieldOrder()[jvm] STARTED
+
+LinearArrayMapTest[jvm] > reifiedRowsRetainMapAndEntryHashEqualityAcrossFieldOrder()[jvm] PASSED
+
+CurationIntakeEligibilityTest[jvm] > eligibilityIsRecheckedBeforeQueuedWorkStarts()[jvm] STARTED
+
+CurationIntakeEligibilityTest[jvm] > eligibilityIsRecheckedBeforeQueuedWorkStarts()[jvm] PASSED
+
+CurationIntakeEligibilityTest[jvm] > resumeAndExplicitOffersDoNotAdmitIneligibleProjects()[jvm] STARTED
+
+CurationIntakeEligibilityTest[jvm] > resumeAndExplicitOffersDoNotAdmitIneligibleProjects()[jvm] STANDARD_ERROR
+    [INTAKE] secondary/agreement.pdf: null statements from null sections
+    [INTAKE] secondary: 1 curated, 0 failed — brief published
+
+CurationIntakeEligibilityTest[jvm] > resumeAndExplicitOffersDoNotAdmitIneligibleProjects()[jvm] PASSED
+
+CurationIntakeEligibilityTest[jvm] > defaultEligibilityStillAdmitsDocuments()[jvm] STARTED
+
+CurationIntakeEligibilityTest[jvm] > defaultEligibilityStillAdmitsDocuments()[jvm] STANDARD_ERROR
+    [INTAKE] secondary/agreement.pdf: null statements from null sections
+    [INTAKE] secondary: 1 curated, 0 failed — brief published
+
+CurationIntakeEligibilityTest[jvm] > defaultEligibilityStillAdmitsDocuments()[jvm] PASSED
+
+CurationIntakeTest[jvm] > replacementUploadWaitsUntilTheRemovalHookHasFinished()[jvm] STARTED
+
+CurationIntakeTest[jvm] > replacementUploadWaitsUntilTheRemovalHookHasFinished()[jvm] STANDARD_ERROR
+    [OROBOROS] project db legal: removed 1 docs under agreement.pdf
+    [OROBOROS] project db unmounted: legal
+
+CurationIntakeTest[jvm] > replacementUploadWaitsUntilTheRemovalHookHasFinished()[jvm] PASSED
+
+CurationIntakeTest[jvm] > ownerCancellationCancelsAnAdmittedLinkGrab()[jvm] STARTED
+
+CurationIntakeTest[jvm] > ownerCancellationCancelsAnAdmittedLinkGrab()[jvm] STANDARD_ERROR
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > ownerCancellationCancelsAnAdmittedLinkGrab()[jvm] PASSED
+
+CurationIntakeTest[jvm] > resumeVisitsDocumentsWithoutMaterializingTheCorpus()[jvm] STARTED
+
+CurationIntakeTest[jvm] > resumeVisitsDocumentsWithoutMaterializingTheCorpus()[jvm] STANDARD_ERROR
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > resumeVisitsDocumentsWithoutMaterializingTheCorpus()[jvm] PASSED
+
+CurationIntakeTest[jvm] > drainWaitsForAdmittedDocumentLinkGrab()[jvm] STARTED
+
+CurationIntakeTest[jvm] > drainWaitsForAdmittedDocumentLinkGrab()[jvm] STANDARD_ERROR
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > drainWaitsForAdmittedDocumentLinkGrab()[jvm] PASSED
+
+CurationIntakeTest[jvm] > blockedPolicyFailsClosedWithoutParsingJoiningOrScoring()[jvm] STARTED
+
+CurationIntakeTest[jvm] > blockedPolicyFailsClosedWithoutParsingJoiningOrScoring()[jvm] STANDARD_ERROR
+    [INTAKE] project/agreement.pdf FAILED: Intake policy blocked: unreadable policy
+
+CurationIntakeTest[jvm] > blockedPolicyFailsClosedWithoutParsingJoiningOrScoring()[jvm] PASSED
+
+CurationIntakeTest[jvm] > blockedCurationBoundsExtractedDocumentsAndDrainFinishesEachAdmission()[jvm] STARTED
+
+CurationIntakeTest[jvm] > blockedCurationBoundsExtractedDocumentsAndDrainFinishesEachAdmission()[jvm] STANDARD_ERROR
+    [INTAKE] project/book-0.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-1.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-2.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-3.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-4.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-5.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-6.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-7.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-8.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-9.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-10.pdf: 1 statements from 1 sections
+    [INTAKE] project/book-11.pdf: 1 statements from 1 sections
+    [INTAKE] project: 12 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > blockedCurationBoundsExtractedDocumentsAndDrainFinishesEachAdmission()[jvm] PASSED
+
+CurationIntakeTest[jvm] > removalDuringJoinReportsUncertainMembershipAndKeepsTheReplacement()[jvm] STARTED
+
+CurationIntakeTest[jvm] > removalDuringJoinReportsUncertainMembershipAndKeepsTheReplacement()[jvm] STANDARD_ERROR
+    [INTAKE] project/agreement.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 1 failed — brief published
+
+CurationIntakeTest[jvm] > removalDuringJoinReportsUncertainMembershipAndKeepsTheReplacement()[jvm] PASSED
+
+CurationIntakeTest[jvm] > drainingRejectsExternalOffersAndFinishesRecursivelyLandedDocuments()[jvm] STARTED
+
+CurationIntakeTest[jvm] > drainingRejectsExternalOffersAndFinishesRecursivelyLandedDocuments()[jvm] STANDARD_ERROR
+    [INTAKE] project/root.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 0 failed — brief published
+    [INTAKE] project/child.pdf: null statements from null sections
+    [INTAKE] project: 2 curated, 0 failed — brief published
+    [OROBOROS] project db unmounted: project
+
+CurationIntakeTest[jvm] > drainingRejectsExternalOffersAndFinishesRecursivelyLandedDocuments()[jvm] PASSED
+
+CurationIntakeTest[jvm] > internallyCancelledJoinSettlesFailureAndKeepsTheConsumerAvailable()[jvm] STARTED
+
+CurationIntakeTest[jvm] > internallyCancelledJoinSettlesFailureAndKeepsTheConsumerAvailable()[jvm] STANDARD_ERROR
+    [INTAKE] project/second.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 1 failed — brief published
+
+CurationIntakeTest[jvm] > internallyCancelledJoinSettlesFailureAndKeepsTheConsumerAvailable()[jvm] PASSED
+
+CurationIntakeTest[jvm] > concurrentLinkIndexReadersShareAndRetryCancelledInitialization()[jvm] STARTED
+
+CurationIntakeTest[jvm] > concurrentLinkIndexReadersShareAndRetryCancelledInitialization()[jvm] STANDARD_ERROR
+    [GRAB] project/second.pdf: 0 referenced, 0 landed, 0 held already (depth 1)
+    [GRAB] project/third.pdf: 0 referenced, 0 landed, 0 held already (depth 1)
+    [GRAB] project/second.pdf: 0 referenced, 0 landed, 0 held already (depth 1)
+
+CurationIntakeTest[jvm] > concurrentLinkIndexReadersShareAndRetryCancelledInitialization()[jvm] PASSED
+
+CurationIntakeTest[jvm] > reviewIntakeDoesNotOverwriteABookAlreadyInAConstellation()[jvm] STARTED
+
+CurationIntakeTest[jvm] > reviewIntakeDoesNotOverwriteABookAlreadyInAConstellation()[jvm] STANDARD_ERROR
+    [INTAKE] project/agreement.pdf FAILED: Review intake would overwrite a joined book
+
+CurationIntakeTest[jvm] > reviewIntakeDoesNotOverwriteABookAlreadyInAConstellation()[jvm] PASSED
+
+CurationIntakeTest[jvm] > selectedProviderIsFrozenPerAdmissionAndDrainWaitsForScoring()[jvm] STARTED
+
+CurationIntakeTest[jvm] > selectedProviderIsFrozenPerAdmissionAndDrainWaitsForScoring()[jvm] STANDARD_ERROR
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project/book.pdf FAILED: provider unavailable
+    [INTAKE] project: 1 curated, 1 failed — brief published
+
+CurationIntakeTest[jvm] > selectedProviderIsFrozenPerAdmissionAndDrainWaitsForScoring()[jvm] PASSED
+
+CurationIntakeTest[jvm] > grabsApplyBackpressureAtTheDocumentLimit()[jvm] STARTED
+
+CurationIntakeTest[jvm] > grabsApplyBackpressureAtTheDocumentLimit()[jvm] STANDARD_ERROR
+    [INTAKE] project/book-0.pdf: null statements from null sections
+    [INTAKE] project/book-1.pdf: null statements from null sections
+    [INTAKE] project/book-2.pdf: null statements from null sections
+    [INTAKE] project/book-3.pdf: null statements from null sections
+    [INTAKE] project/book-4.pdf: null statements from null sections
+    [INTAKE] project/book-5.pdf: null statements from null sections
+    [INTAKE] project/book-6.pdf: null statements from null sections
+    [INTAKE] project/book-7.pdf: null statements from null sections
+    [INTAKE] project/book-8.pdf: null statements from null sections
+    [INTAKE] project/book-9.pdf: null statements from null sections
+    [INTAKE] project: 10 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > grabsApplyBackpressureAtTheDocumentLimit()[jvm] PASSED
+
+CurationIntakeTest[jvm] > followupUsesLatestModeAndProviderAfterSuspendedReview()[jvm] STARTED
+
+CurationIntakeTest[jvm] > followupUsesLatestModeAndProviderAfterSuspendedReview()[jvm] STANDARD_ERROR
+    [INTAKE] project/agreement.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > followupUsesLatestModeAndProviderAfterSuspendedReview()[jvm] PASSED
+
+CurationIntakeTest[jvm] > forgettingDuringReviewCurationDoesNotPublishAStaleReceipt()[jvm] STARTED
+
+CurationIntakeTest[jvm] > forgettingDuringReviewCurationDoesNotPublishAStaleReceipt()[jvm] PASSED
+
+CurationIntakeTest[jvm] > concurrentDrainsWaitForCancelledWorkToReleaseInference()[jvm] STARTED
+
+CurationIntakeTest[jvm] > concurrentDrainsWaitForCancelledWorkToReleaseInference()[jvm] PASSED
+
+CurationIntakeTest[jvm] > ownerCancellationDuringRemovedJoinReportsUncertaintyAndPropagates()[jvm] STARTED
+
+CurationIntakeTest[jvm] > ownerCancellationDuringRemovedJoinReportsUncertaintyAndPropagates()[jvm] PASSED
+
+CurationIntakeTest[jvm] > resumeContinuesAfterAProjectBecomesUnavailable()[jvm] STARTED
+
+CurationIntakeTest[jvm] > resumeContinuesAfterAProjectBecomesUnavailable()[jvm] STANDARD_ERROR
+    [INTAKE] Project backing changed or unavailable during visit: gone
+    [INTAKE] good/book.pdf: null statements from null sections
+    [INTAKE] good: 1 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > resumeContinuesAfterAProjectBecomesUnavailable()[jvm] PASSED
+
+CurationIntakeTest[jvm] > reviewIntakeFailsWithoutRetainedSourceRatherThanExtractingOrPublishing()[jvm] STARTED
+
+CurationIntakeTest[jvm] > reviewIntakeFailsWithoutRetainedSourceRatherThanExtractingOrPublishing()[jvm] STANDARD_ERROR
+    [INTAKE] project/agreement.pdf FAILED: Review-required intake needs a retained source
+
+CurationIntakeTest[jvm] > reviewIntakeFailsWithoutRetainedSourceRatherThanExtractingOrPublishing()[jvm] PASSED
+
+CurationIntakeTest[jvm] > forgottenQueuedDocumentIsReleasedWithoutExtraction()[jvm] STARTED
+
+CurationIntakeTest[jvm] > forgottenQueuedDocumentIsReleasedWithoutExtraction()[jvm] STANDARD_ERROR
+    [INTAKE] project/held.pdf: null statements from null sections
+
+CurationIntakeTest[jvm] > forgottenQueuedDocumentIsReleasedWithoutExtraction()[jvm] PASSED
+
+CurationIntakeTest[jvm] > resumedDocumentsUseRetainedProviderAndLegacyDocumentsDoNotScore()[jvm] STARTED
+
+CurationIntakeTest[jvm] > resumedDocumentsUseRetainedProviderAndLegacyDocumentsDoNotScore()[jvm] STANDARD_ERROR
+    [INTAKE] project/legacy.pdf: null statements from null sections
+    [INTAKE] project/selected.pdf: null statements from null sections
+    [INTAKE] project: 2 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > resumedDocumentsUseRetainedProviderAndLegacyDocumentsDoNotScore()[jvm] PASSED
+
+CurationIntakeTest[jvm] > cancelledOwnedResumeStopsEnumeratingDocuments()[jvm] STARTED
+
+CurationIntakeTest[jvm] > cancelledOwnedResumeStopsEnumeratingDocuments()[jvm] PASSED
+
+CurationIntakeTest[jvm] > drainingRejectsFollowUpsForAnInFlightDocument()[jvm] STARTED
+
+CurationIntakeTest[jvm] > drainingRejectsFollowUpsForAnInFlightDocument()[jvm] STANDARD_ERROR
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > drainingRejectsFollowUpsForAnInFlightDocument()[jvm] PASSED
+
+CurationIntakeTest[jvm] > ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount()[jvm] STARTED
+
+CurationIntakeTest[jvm] > ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount()[jvm] STANDARD_ERROR
+    [INTAKE] project/book-0.pdf: null statements from null sections
+    [INTAKE] project/book-1.pdf: null statements from null sections
+    [INTAKE] project/book-2.pdf: null statements from null sections
+
+CurationIntakeTest[jvm] > ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount()[jvm] PASSED
+
+CurationIntakeTest[jvm] > reofferedRevisionIsProcessedAfterRunningCurationWhetherOrNotItWasForgotten()[jvm] STARTED
+
+CurationIntakeTest[jvm] > reofferedRevisionIsProcessedAfterRunningCurationWhetherOrNotItWasForgotten()[jvm] PASSED
+
+CurationIntakeTest[jvm] > reviewIntakeSharesReducedProfileBookIdentityWithHostNodes()[jvm] STARTED
+
+CurationIntakeTest[jvm] > reviewIntakeSharesReducedProfileBookIdentityWithHostNodes()[jvm] PASSED
+
+CurationIntakeTest[jvm] > reviewIntakeRetainsSourceAndReceiptWithoutPublishing()[jvm] STARTED
+
+CurationIntakeTest[jvm] > reviewIntakeRetainsSourceAndReceiptWithoutPublishing()[jvm] PASSED
+
+CurationIntakeTest[jvm] > replacedSelectedTextCannotBeCuratedAsTheSelectedRevision()[jvm] STARTED
+
+CurationIntakeTest[jvm] > replacedSelectedTextCannotBeCuratedAsTheSelectedRevision()[jvm] STANDARD_ERROR
+    [INTAKE] legal/agreement.txt FAILED: Selected document revision changed before curation or join
+    [OROBOROS] project db unmounted: legal
+
+CurationIntakeTest[jvm] > replacedSelectedTextCannotBeCuratedAsTheSelectedRevision()[jvm] PASSED
+
+CurationIntakeTest[jvm] > forgettingDuringLegacyCurationDoesNotJoinADeletedDocument()[jvm] STARTED
+
+CurationIntakeTest[jvm] > forgettingDuringLegacyCurationDoesNotJoinADeletedDocument()[jvm] PASSED
+
+CurationIntakeTest[jvm] > repeatedReviewReplacesObservationAndBookIdentityTracksItsInputs()[jvm] STARTED
+
+CurationIntakeTest[jvm] > repeatedReviewReplacesObservationAndBookIdentityTracksItsInputs()[jvm] PASSED
+
+CurationIntakeTest[jvm] > repeatedFollowUpsRetainOneLatestAdmission()[jvm] STARTED
+
+CurationIntakeTest[jvm] > repeatedFollowUpsRetainOneLatestAdmission()[jvm] STANDARD_ERROR
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project: 2 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > repeatedFollowUpsRetainOneLatestAdmission()[jvm] PASSED
+
+CurationIntakeTest[jvm] > startedLegacyReofferJoinsLatestSourceWhileQueuedDuplicatesCoalesce()[jvm] STARTED
+
+CurationIntakeTest[jvm] > startedLegacyReofferJoinsLatestSourceWhileQueuedDuplicatesCoalesce()[jvm] STANDARD_ERROR
+    [INTAKE] project/agreement.pdf: null statements from null sections
+    [INTAKE] project/agreement.pdf: null statements from null sections
+    [INTAKE] project: 2 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > startedLegacyReofferJoinsLatestSourceWhileQueuedDuplicatesCoalesce()[jvm] PASSED
+
+CurationIntakeTest[jvm] > ownerCancellationSettlesActiveQueuedAndFollowUpAdmissions()[jvm] STARTED
+
+CurationIntakeTest[jvm] > ownerCancellationSettlesActiveQueuedAndFollowUpAdmissions()[jvm] PASSED
+
+CurationIntakeTest[jvm] > drainWaitsForOwnedResumeAndCuratesItsDiscoveredDocuments()[jvm] STARTED
+
+CurationIntakeTest[jvm] > drainWaitsForOwnedResumeAndCuratesItsDiscoveredDocuments()[jvm] STANDARD_ERROR
+    [INTAKE] project/book.pdf: null statements from null sections
+    [INTAKE] project: 1 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > drainWaitsForOwnedResumeAndCuratesItsDiscoveredDocuments()[jvm] PASSED
+
+CurationIntakeTest[jvm] > reviewIntakeRejectsAResultWithoutAnUnreviewedReceipt()[jvm] STARTED
+
+CurationIntakeTest[jvm] > reviewIntakeRejectsAResultWithoutAnUnreviewedReceipt()[jvm] STANDARD_ERROR
+    [INTAKE] project/agreement.pdf FAILED: book.curate returned no receipt
+    [INTAKE] project/agreement.pdf FAILED: Review-required curation must return unreviewed candidates
+    [INTAKE] project/agreement.pdf FAILED: book.curate returned a different ontology
+    [INTAKE] project/agreement.pdf FAILED: book.curate returned a different book
+
+CurationIntakeTest[jvm] > reviewIntakeRejectsAResultWithoutAnUnreviewedReceipt()[jvm] PASSED
+
+CurationIntakeTest[jvm] > selectedProjectTextIsSourceBoundAndAwaitingReviewWithoutAutomaticAdmission()[jvm] STARTED
+
+CurationIntakeTest[jvm] > selectedProjectTextIsSourceBoundAndAwaitingReviewWithoutAutomaticAdmission()[jvm] STANDARD_ERROR
+    [OROBOROS] project db unmounted: legal
+
+CurationIntakeTest[jvm] > selectedProjectTextIsSourceBoundAndAwaitingReviewWithoutAutomaticAdmission()[jvm] PASSED
+
+CurationIntakeTest[jvm] > newAdmissionWaitsUntilIdleSettlementFinishes()[jvm] STARTED
+
+CurationIntakeTest[jvm] > newAdmissionWaitsUntilIdleSettlementFinishes()[jvm] STANDARD_ERROR
+    [INTAKE] project/first.pdf: null statements from null sections
+    [INTAKE] project/second.pdf: null statements from null sections
+    [INTAKE] project: 2 curated, 0 failed — brief published
+
+CurationIntakeTest[jvm] > newAdmissionWaitsUntilIdleSettlementFinishes()[jvm] PASSED
+
+DocumentEnglishRetainedWireTest[jvm] > staleSourcesAndALateMutationBeforePublicationReturnNoInspection()[jvm] STARTED
+
+DocumentEnglishRetainedWireTest[jvm] > staleSourcesAndALateMutationBeforePublicationReturnNoInspection()[jvm] PASSED
+
+DocumentEnglishRetainedWireTest[jvm] > retainedOpeningReturnsTheActualPayloadAndExactOriginalCborWithoutAReaderOrNewReceipt()[jvm] STARTED
+
+DocumentEnglishRetainedWireTest[jvm] > retainedOpeningReturnsTheActualPayloadAndExactOriginalCborWithoutAReaderOrNewReceipt()[jvm] PASSED
+
+DocumentEnglishRetainedWireTest[jvm] > validLegacyPayloadKeepsItsOriginalIdentitySpellingWithoutInventingNodes()[jvm] STARTED
+
+DocumentEnglishRetainedWireTest[jvm] > validLegacyPayloadKeepsItsOriginalIdentitySpellingWithoutInventingNodes()[jvm] PASSED
+
+DocumentEnglishRetainedWireTest[jvm] > drainWithdrawsBothRoutesAndWaitsForAcceptedInspectionAndRetainedOpening()[jvm] STARTED
+
+DocumentEnglishRetainedWireTest[jvm] > drainWithdrawsBothRoutesAndWaitsForAcceptedInspectionAndRetainedOpening()[jvm] PASSED
+
+DocumentEnglishRetainedWireTest[jvm] > retainedOpeningRequiresExactEightFieldsSourceIdentityAndRangeEvenForIdenticalOtherDocuments()[jvm] STARTED
+
+DocumentEnglishRetainedWireTest[jvm] > retainedOpeningRequiresExactEightFieldsSourceIdentityAndRangeEvenForIdenticalOtherDocuments()[jvm] PASSED
+
+DocumentEnglishRetainedWireTest[jvm] > missingMalformedTamperedOversizedAndCorruptRetainedBlocksRefuseBoundedlyWithoutInitializingAReader()[jvm] STARTED
+
+DocumentEnglishRetainedWireTest[jvm] > missingMalformedTamperedOversizedAndCorruptRetainedBlocksRefuseBoundedlyWithoutInitializingAReader()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > optionalSearchPreservesLegacyBytesAndBindsOnlyItsQueryReceipt()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > optionalSearchPreservesLegacyBytesAndBindsOnlyItsQueryReceipt()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > offeredLocalCorpusPresetRunsTheRegisteredOwnerAndReturnsStatisticsWithSearch()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > offeredLocalCorpusPresetRunsTheRegisteredOwnerAndReturnsStatisticsWithSearch()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > wiredOptionalTopicsReachTheRegisteredCorpusRunnerWithPresencePrecedence()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > wiredOptionalTopicsReachTheRegisteredCorpusRunnerWithPresencePrecedence()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > twoVerifiedReceiptsProduceExactConcordanceAndOptionalReproducibleTopics()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > twoVerifiedReceiptsProduceExactConcordanceAndOptionalReproducibleTopics()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > overlapsDuplicatesStaleSourcesAndInvalidTopicRequestsRefuse()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > overlapsDuplicatesStaleSourcesAndInvalidTopicRequestsRefuse()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > samplerWorkAndFullResponseBoundsRefuseWithoutPublishingPartialDerivedReceipts()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > samplerWorkAndFullResponseBoundsRefuseWithoutPublishingPartialDerivedReceipts()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > malformedAndOversizedSearchesRefuseWithoutPartialHitsOrNewDerivedReceipts()[jvm] STARTED
+
+> Task :compileSpacegraphKotlinJs
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///workspace/TrikeShed/src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt:50:68 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///workspace/TrikeShed/src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRunners.kt:16:130 Expression is unused.
+
+> Task :jsSpacegraphClasses
+
+> Task :jvmTest
+
+EnglishCorpusWireTest[jvm] > malformedAndOversizedSearchesRefuseWithoutPartialHitsOrNewDerivedReceipts()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > searchUsesTheSamePolicyAndExplicitNoMatchDatasetWithoutChangingTopics()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > searchUsesTheSamePolicyAndExplicitNoMatchDatasetWithoutChangingTopics()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > currentSearchChecksBeforeAfterWorkAndAfterRetentionWhileSnapshotsStayHistorical()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > currentSearchChecksBeforeAfterWorkAndAfterRetentionWhileSnapshotsStayHistorical()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson()[jvm] PASSED
+
+EnglishCorpusWireTest[jvm] > optionalViewPreservesLegacyRequestsAndHttpAndLcncRefuseExplicitNullOrUnknown()[jvm] STARTED
+
+EnglishCorpusWireTest[jvm] > optionalViewPreservesLegacyRequestsAndHttpAndLcncRefuseExplicitNullOrUnknown()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > staleAndLateCurrentnessAndUnexpectedFieldsRefuseWithoutClaimingApproval()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > staleAndLateCurrentnessAndUnexpectedFieldsRefuseWithoutClaimingApproval()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > queryDrainCompletesAcceptedPatternWorkWithoutRecursiveAdmissionDeadlock()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > queryDrainCompletesAcceptedPatternWorkWithoutRecursiveAdmissionDeadlock()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > oversizedLegalGraphRefusesWithoutOmittingObservedFields()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > oversizedLegalGraphRefusesWithoutOmittingObservedFields()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > visualQuantityQueryReturnsExactSourceAndCandidateScopeThroughTheSameOwner()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > visualQuantityQueryReturnsExactSourceAndCandidateScopeThroughTheSameOwner()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > unknownQuantitiesHaveNoInventedIntegerAndStaleCurrentSourcesRefuse()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > unknownQuantitiesHaveNoInventedIntegerAndStaleCurrentSourcesRefuse()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > retainedModalRolesDurationAndNegatedGuardStayUnreviewedAndExact()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > retainedModalRolesDurationAndNegatedGuardStayUnreviewedAndExact()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > copiedQuantityBindingsAndConflictingNumeralsRemainUnresolved()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > copiedQuantityBindingsAndConflictingNumeralsRemainUnresolved()[jvm] PASSED
+
+EnglishLegalPatternsWireTest[jvm] > originalCanonicalGuardReceiptsReplayThroughExistingWireAndQueryWithoutAParser()[jvm] STARTED
+
+EnglishLegalPatternsWireTest[jvm] > originalCanonicalGuardReceiptsReplayThroughExistingWireAndQueryWithoutAParser()[jvm] PASSED
+
+EnglishNalPresetExecutionTest[jvm] > currentMutationRefusesButExplicitHistoricalModeKeepsTheExactReport()[jvm] STARTED
+
+EnglishNalPresetExecutionTest[jvm] > currentMutationRefusesButExplicitHistoricalModeKeepsTheExactReport()[jvm] PASSED
+
+EnglishNalPresetExecutionTest[jvm] > unsupportedRecordedEnglishIsAWholeFrameStatusWithoutFallback()[jvm] STARTED
+
+EnglishNalPresetExecutionTest[jvm] > unsupportedRecordedEnglishIsAWholeFrameStatusWithoutFallback()[jvm] PASSED
+
+EnglishNalPresetExecutionTest[jvm] > unknownNullAndMissingInputsRefuseAndDrainRemovesOnlyItsOwnRegistration()[jvm] STARTED
+
+EnglishNalPresetExecutionTest[jvm] > unknownNullAndMissingInputsRefuseAndDrainRemovesOnlyItsOwnRegistration()[jvm] PASSED
+
+EnglishNalPresetExecutionTest[jvm] > actualRegisteredPresetKeepsExactReportAndEverySameSourceOccurrence()[jvm] STARTED
+
+EnglishNalPresetExecutionTest[jvm] > actualRegisteredPresetKeepsExactReportAndEverySameSourceOccurrence()[jvm] PASSED
+
+EnglishNalPresetExecutionTest[jvm] > postEvaluationCurrentnessCheckRejectsAChangedSource()[jvm] STARTED
+
+EnglishNalPresetExecutionTest[jvm] > postEvaluationCurrentnessCheckRejectsAChangedSource()[jvm] PASSED
+
+EnglishNalPresetExecutionTest[jvm] > productionLargeOutputReferencesPreserveTheFullReportAcrossFileStoreReopen()[jvm] STARTED
+
+EnglishNalPresetExecutionTest[jvm] > productionLargeOutputReferencesPreserveTheFullReportAcrossFileStoreReopen()[jvm] PASSED
+
+EnglishTaxonomyWireTest[jvm] > authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses()[jvm] STARTED
+
+EnglishTaxonomyWireTest[jvm] > authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses()[jvm] PASSED
+
+EnglishTaxonomyWireTest[jvm] > staleEnglishRefusesAnExistingCarrierAtFreezeApprovalAndQuery()[jvm] STARTED
+
+EnglishTaxonomyWireTest[jvm] > staleEnglishRefusesAnExistingCarrierAtFreezeApprovalAndQuery()[jvm] PASSED
+
+EnglishTaxonomyWireTest[jvm] > protectedQuadQueryReturnsBothEnglishAndKifWitnessesWithoutNewAuthority()[jvm] STARTED
+
+EnglishTaxonomyWireTest[jvm] > protectedQuadQueryReturnsBothEnglishAndKifWitnessesWithoutNewAuthority()[jvm] PASSED
+
+EnglishTaxonomyWireTest[jvm] > prepareDoesNotSupersedeApprovalButSameContextFreezeDoesAndOtherContextsStaySeparate()[jvm] STARTED
+
+EnglishTaxonomyWireTest[jvm] > prepareDoesNotSupersedeApprovalButSameContextFreezeDoesAndOtherContextsStaySeparate()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > visitorCanStopBeforeASecondDocumentIsRead()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > visitorCanStopBeforeASecondDocumentIsRead()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > extractionDoesNotMineAfterEvidenceReadFailure()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > extractionDoesNotMineAfterEvidenceReadFailure()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > casCapturePreservesCompoundTypesAndAliases()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > casCapturePreservesCompoundTypesAndAliases()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > visitorDoesNotSwallowCancellationCaughtByItsLastCallback()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > visitorDoesNotSwallowCancellationCaughtByItsLastCallback()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > duplicateAttachmentFieldsAreRejectedBeforeRevisionPublication()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > duplicateAttachmentFieldsAreRejectedBeforeRevisionPublication()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > visitorEmitsOnCallerContextAndStopsWhenItsJobIsCancelled()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > visitorEmitsOnCallerContextAndStopsWhenItsJobIsCancelled()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > visitorRetainsCommittedIdentityWhenFieldListsAreMutated()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > visitorRetainsCommittedIdentityWhenFieldListsAreMutated()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > casCaptureRetainsDistinctMapKeysWithTheSameCanonicalText()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > casCaptureRetainsDistinctMapKeysWithTheSameCanonicalText()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > missingOriginDoesNotHideCorruptCompletionOrTriggerMining()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > missingOriginDoesNotHideCorruptCompletionOrTriggerMining()[jvm] STANDARD_ERROR
+    [OROBOROS] project db project: removed 1 docs under book.pdf.extract-origin.tsv
+
+ProjectCorpusVisitTest[jvm] > missingOriginDoesNotHideCorruptCompletionOrTriggerMining()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > extractionDoesNotCombineOldAnchorsWithAReplacementCompletion()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > extractionDoesNotCombineOldAnchorsWithAReplacementCompletion()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > casBodyBytesRemainStableWhenHeadAliasesChangeDuringPublication()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > casBodyBytesRemainStableWhenHeadAliasesChangeDuringPublication()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > casBodyBytesOwnEncodedCompoundContentsWhileHeadPreservesTypes()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > casBodyBytesOwnEncodedCompoundContentsWhileHeadPreservesTypes()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > missingProjectIsAnIncompleteVisit()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > missingProjectIsAnIncompleteVisit()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > visitorFailsIfTheProjectIsRemountedMidScan()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > visitorFailsIfTheProjectIsRemountedMidScan()[jvm] STANDARD_ERROR
+    [OROBOROS] project db unmounted: project
+
+ProjectCorpusVisitTest[jvm] > visitorFailsIfTheProjectIsRemountedMidScan()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > extractionPropagatesCancellationRaisedDuringSynchronousEvidenceRead()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > extractionPropagatesCancellationRaisedDuringSynchronousEvidenceRead()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > extractionRequiresVerifiedPdfFootnotes()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > extractionRequiresVerifiedPdfFootnotes()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > visitorObservesCurrentRevisionsAndSkipsDeletedOrNewSlots()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > visitorObservesCurrentRevisionsAndSkipsDeletedOrNewSlots()[jvm] STANDARD_ERROR
+    [OROBOROS] project db project: removed 1 docs under gone.pdf
+
+ProjectCorpusVisitTest[jvm] > visitorObservesCurrentRevisionsAndSkipsDeletedOrNewSlots()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > casCaptureRetainsOpaqueValuesWhileHashingTheirCanonicalString()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > casCaptureRetainsOpaqueValuesWhileHashingTheirCanonicalString()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > casCaptureRejectsCyclesAndExcessiveDepthBeforePublication()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > casCaptureRejectsCyclesAndExcessiveDepthBeforePublication()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > casStoreCapturesAttachmentFieldsBeforeHashingAndPublication()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > casStoreCapturesAttachmentFieldsBeforeHashingAndPublication()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > mountedReadsVerifyBytesEvenWhenTheCidIsUnchanged()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > mountedReadsVerifyBytesEvenWhenTheCidIsUnchanged()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > mountedReadsFailClosedWhenTheExposedHeadBodyIsMutated()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > mountedReadsFailClosedWhenTheExposedHeadBodyIsMutated()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > conflictsAndIdempotentReplicationShortCircuitBeforeBodyCapture()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > conflictsAndIdempotentReplicationShortCircuitBeforeBodyCapture()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > directTextExtractionDoesNotMixSourceRevisions()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > directTextExtractionDoesNotMixSourceRevisions()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > mountedVisitorMatchesGatewayDeletionAndMissingCidRules()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > mountedVisitorMatchesGatewayDeletionAndMissingCidRules()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > concurrentVisitsOnlyEmitCommittedRevisionTuples()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > concurrentVisitsOnlyEmitCommittedRevisionTuples()[jvm] PASSED
+
+ProjectCorpusVisitTest[jvm] > mountedReadsRejectMissingOrInvalidDeclaredLengths()[jvm] STARTED
+
+ProjectCorpusVisitTest[jvm] > mountedReadsRejectMissingOrInvalidDeclaredLengths()[jvm] PASSED
+
+ProjectDbBindingTest[jvm] > mismatchedProjectSurfacesCannotEnterTheRegistry()[jvm] STARTED
+
+ProjectDbBindingTest[jvm] > mismatchedProjectSurfacesCannotEnterTheRegistry()[jvm] PASSED
+
+ProjectDbBindingTest[jvm] > durableCommitOwnerRejectsAVolatileStoresCas()[jvm] STARTED
+
+ProjectDbBindingTest[jvm] > durableCommitOwnerRejectsAVolatileStoresCas()[jvm] PASSED
+
+ProjectDbBindingTest[jvm] > storeBackedByAnotherCasCannotEnterRegistry()[jvm] STARTED
+
+ProjectDbBindingTest[jvm] > storeBackedByAnotherCasCannotEnterRegistry()[jvm] PASSED
+
+ProjectDbBindingTest[jvm] > consistentlyBoundProjectCanEnterTheRegistry()[jvm] STARTED
+
+ProjectDbBindingTest[jvm] > consistentlyBoundProjectCanEnterTheRegistry()[jvm] PASSED
+
+ProjectDbBindingTest[jvm] > unverifiedStoreCannotEnterRegistry()[jvm] STARTED
+
+ProjectDbBindingTest[jvm] > unverifiedStoreCannotEnterRegistry()[jvm] PASSED
+
+ProjectDbBindingTest[jvm] > durableCommitOwnerMustUseTheStoresCas()[jvm] STARTED
+
+ProjectDbBindingTest[jvm] > durableCommitOwnerMustUseTheStoresCas()[jvm] PASSED
+
+ReviewedKifWireTest[jvm] > reviewedKifRetainsExactEvidenceAndInvalidatesOnSourceRevision()[jvm] STARTED
+
+ReviewedKifWireTest[jvm] > reviewedKifRetainsExactEvidenceAndInvalidatesOnSourceRevision()[jvm] PASSED
+
+ReviewedKifWireTest[jvm] > reviewedKifRunsThroughPinnedNativeSolver()[jvm] STARTED
+
+ReviewedKifWireTest[jvm] > reviewedKifRunsThroughPinnedNativeSolver()[jvm] SKIPPED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > querySyntaxAndBudgetRefusalsHaveNoPartialBindingsOrAuthorityFallback()[jvm] STARTED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > querySyntaxAndBudgetRefusalsHaveNoPartialBindingsOrAuthorityFallback()[jvm] PASSED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > currentHostQueryUsesOffPagePremisesAndKeepsPhysicalAndReviewedAuthoritySeparate()[jvm] STARTED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > currentHostQueryUsesOffPagePremisesAndKeepsPhysicalAndReviewedAuthoritySeparate()[jvm] PASSED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > optionalSourceProfileLimitDoesNotChangePlainReportAcceptance()[jvm] STARTED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > optionalSourceProfileLimitDoesNotChangePlainReportAcceptance()[jvm] PASSED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > finalReadRefusesSourceChangeDuringQueryAndWithdrawnApproval()[jvm] STARTED
+
+ReviewedTaxonomyQuadQueryWireTest[jvm] > finalReadRefusesSourceChangeDuringQueryAndWithdrawnApproval()[jvm] PASSED
+
+ReviewedTaxonomyWireTest[jvm] > authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit()[jvm] STARTED
+
+ReviewedTaxonomyWireTest[jvm] > authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit()[jvm] PASSED
+
+ReviewedTaxonomyWireTest[jvm] > configuredNativeEndpointRunsActualReviewedQuery()[jvm] STARTED
+
+ReviewedTaxonomyWireTest[jvm] > configuredNativeEndpointRunsActualReviewedQuery()[jvm] SKIPPED
+
+BoardFileWalLeaseTest[jvm] > directoryAliasesShareOwnershipWhileDistinctDirectoriesRemainIndependent()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > directoryAliasesShareOwnershipWhileDistinctDirectoriesRemainIndependent()[jvm] PASSED
+
+BoardFileWalLeaseTest[jvm] > corruptFrameRefusalReleasesTheLeaseWithoutChangingTheWal()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > corruptFrameRefusalReleasesTheLeaseWithoutChangingTheWal()[jvm] PASSED
+
+BoardFileWalLeaseTest[jvm] > channelOpenFailureReleasesTheLease()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > channelOpenFailureReleasesTheLease()[jvm] PASSED
+
+BoardFileWalLeaseTest[jvm] > anotherOwnerCannotRecoverOrOverwriteTheActiveWal()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > anotherOwnerCannotRecoverOrOverwriteTheActiveWal()[jvm] PASSED
+
+KanbanPinnedDispatchTest[jvm] > queuedRunUsesItsPinnedWorkgroupDespiteNearerWildcard()[jvm] STARTED
+
+KanbanPinnedDispatchTest[jvm] > queuedRunUsesItsPinnedWorkgroupDespiteNearerWildcard()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] STARTED
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/home/agent/.gradle/caches/modules-2/files-2.1/org.graalvm.truffle/truffle-runtime/25.3.4.1/5f9818cd0413f63bdf1fe52ba4f2fc2786f4cbb7/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+
+> Task :jvmTest
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] STARTED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > nativeSelectionConsumesOptionalPortSpellingsThroughTheActualRoute()[jvm] STARTED
+
+LlvmConfixRunTest[jvm] > nativeSelectionConsumesOptionalPortSpellingsThroughTheActualRoute()[jvm] PASSED
+
+LlvmScalarRunTest[jvm] > mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm] STARTED
+
+LlvmScalarRunTest[jvm] > mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm] PASSED
+
+LlvmScalarRunTest[jvm] > failedConfiguredBootstrapReleasesItsRootOwner()[jvm] STARTED
+
+LlvmScalarRunTest[jvm] > failedConfiguredBootstrapReleasesItsRootOwner()[jvm] PASSED
+
+CurationReviewedReadTest[jvm] > realRetainedBookReadDoesNotAppendOrSpendRelease()[jvm] STARTED
+
+CurationReviewedReadTest[jvm] > realRetainedBookReadDoesNotAppendOrSpendRelease()[jvm] PASSED
+
+CurationReviewedReadTest[jvm] > authenticationRevisionAndCurrentnessCannotBeSuppliedByCaller()[jvm] STARTED
+
+CurationReviewedReadTest[jvm] > authenticationRevisionAndCurrentnessCannotBeSuppliedByCaller()[jvm] PASSED
+
+DocumentSpansTest[jvm] > compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm] STARTED
+
+DocumentSpansTest[jvm] > compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm] PASSED
+
+DocumentSpansTest[jvm] > oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm] STARTED
+
+DocumentSpansTest[jvm] > oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm] PASSED
+
+DocumentSpansTest[jvm] > continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm] STARTED
+
+DocumentSpansTest[jvm] > continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm] PASSED
+
+DocumentSpansTest[jvm] > pausedReferenceCannotConsumeARevisedProjectDocument()[jvm] STARTED
+
+DocumentSpansTest[jvm] > pausedReferenceCannotConsumeARevisedProjectDocument()[jvm] PASSED
+
+EnglishCopularPresetExecutionTest[jvm] > actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm] STARTED
+
+EnglishCopularPresetExecutionTest[jvm] > actualCopiedAndNegatedCopularReadingsRemainSourceLinkedSyntax()[jvm] PASSED
+
+EnglishCopularPresetExecutionTest[jvm] > currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm] STARTED
+
+EnglishCopularPresetExecutionTest[jvm] > currentSourceChangeRefusesWhileExplicitSnapshotKeepsRecordedQualifications()[jvm] PASSED
+
+EnglishCopularPresetExecutionTest[jvm] > forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm] STARTED
+
+EnglishCopularPresetExecutionTest[jvm] > forgedSourceWordsAndNinthPatternRefuseWithoutPartialResults()[jvm] PASSED
+
+EnglishCorpusPresetTest[jvm] > offeredCorpusSearchUsesTheExistingTypedOwnerAndExplicitDatasetInputs()[jvm] STARTED
+
+EnglishCorpusPresetTest[jvm] > offeredCorpusSearchUsesTheExistingTypedOwnerAndExplicitDatasetInputs()[jvm] PASSED
+
+EnglishGuardQueryViewTest[jvm] > absentSectionIsLegacyWhileUnknownOmittedDuplicateOrUnboundTypedRowsRefuse()[jvm] STARTED
+
+EnglishGuardQueryViewTest[jvm] > absentSectionIsLegacyWhileUnknownOmittedDuplicateOrUnboundTypedRowsRefuse()[jvm] PASSED
+
+EnglishGuardQueryViewTest[jvm] > matrixAndSubordinateCuesAndQuotationIndicatorsRemainSeparateFromNormDiagnostics()[jvm] STARTED
+
+EnglishGuardQueryViewTest[jvm] > matrixAndSubordinateCuesAndQuotationIndicatorsRemainSeparateFromNormDiagnostics()[jvm] PASSED
+
+EnglishGuardQueryViewTest[jvm] > eightPatternTypedRowsPreserveTheUnmarkedCoordinatedTargetAndFullSourceIdentity()[jvm] STARTED
+
+EnglishGuardQueryViewTest[jvm] > eightPatternTypedRowsPreserveTheUnmarkedCoordinatedTargetAndFullSourceIdentity()[jvm] PASSED
+
+EnglishNalPresetTest[jvm] > offeredReportUsesTypedRetainedInputsAndExistingQuotationFocus()[jvm] STARTED
+
+EnglishNalPresetTest[jvm] > offeredReportUsesTypedRetainedInputsAndExistingQuotationFocus()[jvm] PASSED
+
+EnglishNalPresetTest[jvm] > explicitModeAndReceiptDoNotChangeOtherOfferedEnglishConstructions()[jvm] STARTED
+
+EnglishNalPresetTest[jvm] > explicitModeAndReceiptDoNotChangeOtherOfferedEnglishConstructions()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > deeplyNestedCarrierAndPreliminaryRecordDecodeRefuseAtStructuralBound()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > sourceProfileRefusesQualifiersPastQuotedCoordinationAndUnknownIdentityWithoutInvalidatingObservations()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > exactTwoOccurrenceTranslationHasOwnKifSourceAndResolvableSidecars()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > familyUsesStableProjectDocumentContextNotTranslationCidAndNoPreparationApproval()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > sidecarQuoteNodeDeclarationAndKifIdentityTamperingFailsClosed()[jvm] PASSED
+
+EnglishTaxonomyCarrierTest[jvm] > declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm] STARTED
+
+EnglishTaxonomyCarrierTest[jvm] > declarationsRequireExactAbsoluteKifConstantsSortsAndNoUndeclaredFields()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > manualKifRetainsSingleAndMultipleSnapshotExports()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > manualKifRetainsSingleAndMultipleSnapshotExports()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm] PASSED
+
+EnglishTaxonomyExportGuardTest[jvm] > eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm] STARTED
+
+EnglishTaxonomyExportGuardTest[jvm] > eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm] PASSED
+
+FinanceKifPresetExecutionTest[jvm] > formulaPresetRunsTheSharedInspectionRunnerWithoutAnAssertionService()[jvm] STARTED
+
+FinanceKifPresetExecutionTest[jvm] > formulaPresetRunsTheSharedInspectionRunnerWithoutAnAssertionService()[jvm] PASSED
+
+FinanceKifPresetExecutionTest[jvm] > financePresetReadsCurrentDocumentsAndConservesExactReviewTotals()[jvm] STARTED
+
+FinanceKifPresetExecutionTest[jvm] > financePresetReadsCurrentDocumentsAndConservesExactReviewTotals()[jvm] PASSED
+
+LcncConfixPickPathContractTest[jvm] > registeredDefaultProducesAllPortsAndWiresObjectsArraysScalarsFalseAndNull()[jvm] STARTED
+
+LcncConfixPickPathContractTest[jvm] > registeredDefaultProducesAllPortsAndWiresObjectsArraysScalarsFalseAndNull()[jvm] PASSED
+
+LcncConfixPickPathContractTest[jvm] > structuredJsonPortSerializesQuotesUnicodeArraysAndNullBeforeSelection()[jvm] STARTED
+
+LcncConfixPickPathContractTest[jvm] > structuredJsonPortSerializesQuotesUnicodeArraysAndNullBeforeSelection()[jvm] PASSED
+
+LcncConfixPickPathContractTest[jvm] > sourceIdentityAndInclusiveSpanReferToOriginalUtf8NotTheSheetProjection()[jvm] STARTED
+
+LcncConfixPickPathContractTest[jvm] > sourceIdentityAndInclusiveSpanReferToOriginalUtf8NotTheSheetProjection()[jvm] PASSED
+
+LcncConfixPickPathContractTest[jvm] > nativeMetadataStillSelectsNativeAndCannotFallBackToKotlin()[jvm] STARTED
+
+LcncConfixPickPathContractTest[jvm] > nativeMetadataStillSelectsNativeAndCannotFallBackToKotlin()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > realNativeRowsSelectAfterGuestClosure()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > realNativeRowsSelectAfterGuestClosure()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > inlineConsumptionReferencesTheEnclosingOutputOwner()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > inlineConsumptionReferencesTheEnclosingOutputOwner()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > interventionReplacesWireAttributionAndSharesTheAcknowledgedControlSequence()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > interventionReplacesWireAttributionAndSharesTheAcknowledgedControlSequence()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > cancelledPausedConsumerDoesNotClaimWireDelivery()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > cancelledPausedConsumerDoesNotClaimWireDelivery()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > intervenedBindingIsLinkedThroughItsActualScopeInputProducer()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > intervenedBindingIsLinkedThroughItsActualScopeInputProducer()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > finalEvidenceTrimmingRecountsTheStreamInsteadOfPreservingAStaleSummary()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > finalEvidenceTrimmingRecountsTheStreamInsteadOfPreservingAStaleSummary()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > manyPortsRetainAuthoredPositionsAndTheirExistingSingleValueShape()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > manyPortsRetainAuthoredPositionsAndTheirExistingSingleValueShape()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > singlePortRecordsOnlyTheLastFedWireIncludingDuplicateEndpoints()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > singlePortRecordsOnlyTheLastFedWireIncludingDuplicateEndpoints()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > omittedSelectionsAndWindowEvictionKeepExactCountsAndPositions()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > omittedSelectionsAndWindowEvictionKeepExactCountsAndPositions()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > missingRequiredInputAndGuardedScopesDoNotEmitConsumedSuccess()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > missingRequiredInputAndGuardedScopesDoNotEmitConsumedSuccess()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > pulseConsumesTheActualWarmFrameWithoutInventingAProducerInvocation()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > pulseConsumesTheActualWarmFrameWithoutInventingAProducerInvocation()[jvm] PASSED
+
+LcncConsumptionTest[jvm] > repeatedNamedFramesUseTheirActualProducerAndDocumentIdentity()[jvm] STARTED
+
+LcncConsumptionTest[jvm] > repeatedNamedFramesUseTheirActualProducerAndDocumentIdentity()[jvm] PASSED
+
+LcncPinnedBindingTest[jvm] > failedBindingPreparationLeavesNoRegistrationAndCanRetry()[jvm] STARTED
+
+LcncPinnedBindingTest[jvm] > failedBindingPreparationLeavesNoRegistrationAndCanRetry()[jvm] PASSED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] STARTED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] PASSED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] STARTED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] STARTED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] PASSED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] STARTED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] PASSED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] PASSED
+
+LlvmScalarTest[jvm] > nativeDeniedControlStillRefusesLlvm()[jvm] STARTED
+
+LlvmScalarTest[jvm] > nativeDeniedControlStillRefusesLlvm()[jvm] PASSED
+
+LlvmScalarTest[jvm] > cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm] STARTED
+
+LlvmScalarTest[jvm] > cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm] PASSED
+
+LlvmScalarTest[jvm] > drainSettlesAcceptedQueueBeforeClosingContext()[jvm] STARTED
+
+LlvmScalarTest[jvm] > drainSettlesAcceptedQueueBeforeClosingContext()[jvm] PASSED
+
+LlvmScalarTest[jvm] > runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm] STARTED
+
+LlvmScalarTest[jvm] > runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm] PASSED
+
+LlvmScalarTest[jvm] > invalidModuleOpenReleasesSeatForRetry()[jvm] STARTED
+
+LlvmScalarTest[jvm] > invalidModuleOpenReleasesSeatForRetry()[jvm] PASSED
+
+LlvmScalarTest[jvm] > profileIsStrictOperatorConfiguration()[jvm] STARTED
+
+LlvmScalarTest[jvm] > profileIsStrictOperatorConfiguration()[jvm] PASSED
+
+LlvmScalarTest[jvm] > verifiedBinaryExecutesAndCopiesHostScalars()[jvm] STARTED
+
+LlvmScalarTest[jvm] > verifiedBinaryExecutesAndCopiesHostScalars()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > wholeManualPreparationKeepsAllFormsAndImmutableSuppliedControls()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > wholeManualPreparationKeepsAllFormsAndImmutableSuppliedControls()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > sharedVariableAndOrderedPremisesRefuse()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > sharedVariableAndOrderedPremisesRefuse()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > differentQueryRefuses()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > differentQueryRefuses()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > oneUnsupportedOrUnverifiedFormRefusesTheWholeManualTheory()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > oneUnsupportedOrUnverifiedFormRefusesTheWholeManualTheory()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > validCertificateAndUnknown()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > validCertificateAndUnknown()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > roleBindingsAndOrderedUsesComeFromTheExistingCertificateCheck()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > roleBindingsAndOrderedUsesComeFromTheExistingCertificateCheck()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > incorrectRuleOrRuleSourceRefuses()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > incorrectRuleOrRuleSourceRefuses()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > repeatedOccurrencesStayAlternativeWitnessesAndLiteralBindingsStayTyped()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > repeatedOccurrencesStayAlternativeWitnessesAndLiteralBindingsStayTyped()[jvm] PASSED
+
+NativeHornCertificateTest[jvm] > wrongLeafSourceRefuses()[jvm] STARTED
+
+NativeHornCertificateTest[jvm] > wrongLeafSourceRefuses()[jvm] PASSED
+
+NativeHornQueryTest[jvm] > incorrectExecutablePinRefusesExecution()[jvm] STARTED
+
+NativeHornQueryTest[jvm] > incorrectExecutablePinRefusesExecution()[jvm] SKIPPED
+
+NativeHornQueryTest[jvm] > observationWallLimitIncludesPostQueryRecheck()[jvm] STARTED
+
+NativeHornQueryTest[jvm] > observationWallLimitIncludesPostQueryRecheck()[jvm] SKIPPED
+
+NativeHornQueryTest[jvm] > realNativeReviewQueryAndNoProofKeepWorldUnknown()[jvm] STARTED
+
+NativeHornQueryTest[jvm] > realNativeReviewQueryAndNoProofKeepWorldUnknown()[jvm] SKIPPED
+
+NativeHornQueryTest[jvm] > realNativeManualRoleJoinKeepsSourcesBindingsAndNegativeControlsSeparate()[jvm] STARTED
+
+NativeHornQueryTest[jvm] > realNativeManualRoleJoinKeepsSourcesBindingsAndNegativeControlsSeparate()[jvm] SKIPPED
+
+NativeHornQueryTest[jvm] > observationWallLimitIncludesReviewedSourcePreparation()[jvm] STARTED
+
+NativeHornQueryTest[jvm] > observationWallLimitIncludesReviewedSourcePreparation()[jvm] SKIPPED
+
+NativeHornQueryViewTest[jvm] > integerAndJsonNumberDomainsKeepTheSameGraphAndBothEightPatternPrograms()[jvm] STARTED
+
+NativeHornQueryViewTest[jvm] > integerAndJsonNumberDomainsKeepTheSameGraphAndBothEightPatternPrograms()[jvm] PASSED
+
+NativeHornQueryViewTest[jvm] > completeSourceContextAndProjectionBoundsRefuseWithoutPartialGraphs()[jvm] STARTED
+
+NativeHornQueryViewTest[jvm] > completeSourceContextAndProjectionBoundsRefuseWithoutPartialGraphs()[jvm] PASSED
+
+NativeHornQueryViewTest[jvm] > typedSourceRowsMissingPremisesAndChangedFramesCannotBecomeAnswers()[jvm] STARTED
+
+NativeHornQueryViewTest[jvm] > typedSourceRowsMissingPremisesAndChangedFramesCannotBecomeAnswers()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > everyPresetNodeTypeIsContractDeclared()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > everyPresetNodeTypeIsContractDeclared()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > tribunalCarriesBoundedLoopAbortEdgesAndValidates()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > tribunalCarriesBoundedLoopAbortEdgesAndValidates()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > everyPresetWireConnectsPortsWithMatchingKinds()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > everyPresetWireConnectsPortsWithMatchingKinds()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > presetsAreOfferedNotInstalled()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > presetsAreOfferedNotInstalled()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > allOfferedPresetsExistAndRoundTrip()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > allOfferedPresetsExistAndRoundTrip()[jvm] PASSED
+
+PresetAssemblyTest[jvm] > presetsCarryViewportGeometryForRoundTripping()[jvm] STARTED
+
+PresetAssemblyTest[jvm] > presetsCarryViewportGeometryForRoundTripping()[jvm] PASSED
+
+ReviewedTaxonomyProofGraphTest[jvm] > optionalProfileRefusesCompleteOversizeGraphsAndEscapedTermsWithoutClipping()[jvm] STARTED
+
+ReviewedTaxonomyProofGraphTest[jvm] > optionalProfileRefusesCompleteOversizeGraphsAndEscapedTermsWithoutClipping()[jvm] PASSED
+
+ReviewedTaxonomyProofGraphTest[jvm] > alternativeUsesSharedSourcesReflexivityAndIncompleteStatusesRetainTheirMeaning()[jvm] STARTED
+
+ReviewedTaxonomyProofGraphTest[jvm] > alternativeUsesSharedSourcesReflexivityAndIncompleteStatusesRetainTheirMeaning()[jvm] PASSED
+
+ReviewedTaxonomyProofGraphTest[jvm] > literalTokensAndSeparateEnglishKifQuotationsRoundTripWithoutEntityPromotion()[jvm] STARTED
+
+ReviewedTaxonomyProofGraphTest[jvm] > literalTokensAndSeparateEnglishKifQuotationsRoundTripWithoutEntityPromotion()[jvm] PASSED
+
+ReviewedTaxonomyProofGraphTest[jvm] > fullOffPageBasisFeedsActualTypedQuadQuery()[jvm] STARTED
+
+ReviewedTaxonomyProofGraphTest[jvm] > fullOffPageBasisFeedsActualTypedQuadQuery()[jvm] PASSED
+
+ReviewedTaxonomyProofPathsReadTest[jvm] > protectedReportResolvesOffPagePremisesAndRefusesStaleOrWithdrawnApproval()[jvm] STARTED
+
+ReviewedTaxonomyProofPathsReadTest[jvm] > protectedReportResolvesOffPagePremisesAndRefusesStaleOrWithdrawnApproval()[jvm] PASSED
+
+ReviewedTaxonomyProofPathsTest[jvm] > existingCharacterProfileAdmitsUtf8ReceiptsLargerThanOneMiB()[jvm] STARTED
+
+ReviewedTaxonomyProofPathsTest[jvm] > existingCharacterProfileAdmitsUtf8ReceiptsLargerThanOneMiB()[jvm] PASSED
+
+ReviewedTaxonomyProofPathsTest[jvm] > alteredLinksQuotesAndOccurrenceMetadataAreRefused()[jvm] STARTED
+
+ReviewedTaxonomyProofPathsTest[jvm] > alteredLinksQuotesAndOccurrenceMetadataAreRefused()[jvm] PASSED
+
+ReviewedTaxonomyProofPathsTest[jvm] > actualPathsRetainOnlyTheirOrderedPremisesAndAllSelectedSources()[jvm] STARTED
+
+ReviewedTaxonomyProofPathsTest[jvm] > actualPathsRetainOnlyTheirOrderedPremisesAndAllSelectedSources()[jvm] PASSED
+
+ReviewedTaxonomyProofPathsTest[jvm] > alternativesDuplicatesAndReflexivityRetainActualOccurrenceWitnesses()[jvm] STARTED
+
+ReviewedTaxonomyProofPathsTest[jvm] > alternativesDuplicatesAndReflexivityRetainActualOccurrenceWitnesses()[jvm] PASSED
+
+ReviewedTaxonomyProofPathsTest[jvm] > actualBoundsAndNonBmpByteFramingSurviveProjection()[jvm] STARTED
+
+ReviewedTaxonomyProofPathsTest[jvm] > actualBoundsAndNonBmpByteFramingSurviveProjection()[jvm] PASSED
+
+ReviewedTaxonomyQueryViewTest[jvm] > actualEightPatternEnglishQueryRetainsExactLiteralEvidenceAndSyntheticLineage()[jvm] STARTED
+
+ReviewedTaxonomyQueryViewTest[jvm] > actualEightPatternEnglishQueryRetainsExactLiteralEvidenceAndSyntheticLineage()[jvm] PASSED
+
+ReviewedTaxonomyQueryViewTest[jvm] > substitutedKindsSourcesRowsAndReviewProvenanceCannotBecomeDisplayBindings()[jvm] STARTED
+
+ReviewedTaxonomyQueryViewTest[jvm] > substitutedKindsSourcesRowsAndReviewProvenanceCannotBecomeDisplayBindings()[jvm] PASSED
+
+ReviewedTaxonomyQueryViewTest[jvm] > actualTwelvePremiseQueryDisplaysNumericOrderWithoutAnOrderingClaim()[jvm] STARTED
+
+ReviewedTaxonomyQueryViewTest[jvm] > actualTwelvePremiseQueryDisplaysNumericOrderWithoutAnOrderingClaim()[jvm] PASSED
+
+WorkModelRouteTest[jvm] > selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm] STARTED
+
+WorkModelRouteTest[jvm] > selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm] STANDARD_OUT
+    WorkModelRouteTest paid: mode=pinned-fixture-503; fakeHtxCalls=1
+
+WorkModelRouteTest[jvm] > selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm] PASSED
+
+WorkModelRouteTest[jvm] > selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm] STARTED
+
+WorkModelRouteTest[jvm] > selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm] STANDARD_OUT
+    WorkModelRouteTest keyless HTTP: mode=pinned-fixture-success; fakeHtxCalls=1; empty-offer-and-invalid-selection-checks=executed
+
+WorkModelRouteTest[jvm] > selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm] PASSED
+
+WorkSelectNodeTest[jvm] > guardedRingsRunOnlyTheSelectedBranch()[jvm] STARTED
+
+WorkSelectNodeTest[jvm] > guardedRingsRunOnlyTheSelectedBranch()[jvm] PASSED
+
+WorkSelectNodeTest[jvm] > refusesAmbiguousIdsAndInexactLimits()[jvm] STARTED
+
+WorkSelectNodeTest[jvm] > refusesAmbiguousIdsAndInexactLimits()[jvm] PASSED
+
+WorkSelectNodeTest[jvm] > excludesUnknownExpiredUnavailableAndOverBudgetQuotes()[jvm] STARTED
+
+WorkSelectNodeTest[jvm] > excludesUnknownExpiredUnavailableAndOverBudgetQuotes()[jvm] PASSED
+
+WorkSelectNodeTest[jvm] > selectsLowestDeclaredPriceAcrossModelAndService()[jvm] STARTED
+
+WorkSelectNodeTest[jvm] > selectsLowestDeclaredPriceAcrossModelAndService()[jvm] PASSED
+
+KgHttpUtf8Test[jvm] > malformedKgBodyRefusesBeforeRouteDispatch()[jvm] STARTED
+
+KgHttpUtf8Test[jvm] > malformedKgBodyRefusesBeforeRouteDispatch()[jvm] PASSED
+
+KgHttpUtf8Test[jvm] > nonKgBodyKeepsExistingTextDecoding()[jvm] STARTED
+
+KgHttpUtf8Test[jvm] > nonKgBodyKeepsExistingTextDecoding()[jvm] PASSED
+
+KgHttpUtf8Test[jvm] > validKgBodyKeepsOriginalUnicodeWhitespaceAndLineEndings()[jvm] STARTED
+
+KgHttpUtf8Test[jvm] > validKgBodyKeepsOriginalUnicodeWhitespaceAndLineEndings()[jvm] PASSED
+
+AceContextNodesTest[jvm] > normalizedFrameNameTakesPrecedenceOverOptionalAlias()[jvm] STARTED
+
+AceContextNodesTest[jvm] > normalizedFrameNameTakesPrecedenceOverOptionalAlias()[jvm] PASSED
+
+AceContextNodesTest[jvm] > optionalFrameWiresRetainPayloadIdentity()[jvm] STARTED
+
+AceContextNodesTest[jvm] > optionalFrameWiresRetainPayloadIdentity()[jvm] PASSED
+
+AceContextNodesTest[jvm] > frameParametersRemainDefaultsAndNullWiresMaskThem()[jvm] STARTED
+
+AceContextNodesTest[jvm] > frameParametersRemainDefaultsAndNullWiresMaskThem()[jvm] PASSED
+
+BreadcrumbContextNodesTest[jvm] > boundedRecallReportsOmissionAndKeepsDisjointRangesDistinct()[jvm] STARTED
+
+BreadcrumbContextNodesTest[jvm] > boundedRecallReportsOmissionAndKeepsDisjointRangesDistinct()[jvm] PASSED
+
+BreadcrumbContextNodesTest[jvm] > sourceRecallSelectsTheChildAndPreservesExactRawEvidence()[jvm] STARTED
+
+BreadcrumbContextNodesTest[jvm] > sourceRecallSelectsTheChildAndPreservesExactRawEvidence()[jvm] PASSED
+
+BreadcrumbContextNodesTest[jvm] > offeredPresetProjectsAndExpandsLocalEvidenceWithoutAModel()[jvm] STARTED
+
+BreadcrumbContextNodesTest[jvm] > offeredPresetProjectsAndExpandsLocalEvidenceWithoutAModel()[jvm] PASSED
+
+BreadcrumbContextNodesTest[jvm] > invalidBudgetsAndUnknownContextsRefuseWithoutCreatingMemory()[jvm] STARTED
+
+BreadcrumbContextNodesTest[jvm] > invalidBudgetsAndUnknownContextsRefuseWithoutCreatingMemory()[jvm] PASSED
+
+ExactRoleRecallTest[jvm] > uniqueDocumentaryResidentTargetsTypeCheckAndWireToSeparateAttentionWithoutAvailabilityDisambiguation()[jvm] STARTED
+
+ExactRoleRecallTest[jvm] > uniqueDocumentaryResidentTargetsTypeCheckAndWireToSeparateAttentionWithoutAvailabilityDisambiguation()[jvm] PASSED
+
+ExactRoleRecallTest[jvm] > structuredCanonicalAndOptionalWirePresenceNeverFallBackFromNullOrBadRequest()[jvm] STARTED
+
+ExactRoleRecallTest[jvm] > structuredCanonicalAndOptionalWirePresenceNeverFallBackFromNullOrBadRequest()[jvm] PASSED
+
+ExactRoleRecallTest[jvm] > lexicalLiteralsRemainTypedAndNeverBecomeInjectedPatternsOrEntityFallbacks()[jvm] STARTED
+
+ExactRoleRecallTest[jvm] > lexicalLiteralsRemainTypedAndNeverBecomeInjectedPatternsOrEntityFallbacks()[jvm] PASSED
+
+ExactRoleRecallTest[jvm] > sameAngularOwesAndOtherContextRemainDocumentaryMatchesWithoutWrongResidentAttention()[jvm] STARTED
+
+ExactRoleRecallTest[jvm] > sameAngularOwesAndOtherContextRemainDocumentaryMatchesWithoutWrongResidentAttention()[jvm] PASSED
+
+ExactRoleRecallTest[jvm] > unsupportedWholeSourcesAndMissingUnrelatedDefinitionsNeverReturnPartialNoMatch()[jvm] STARTED
+
+ExactRoleRecallTest[jvm] > unsupportedWholeSourcesAndMissingUnrelatedDefinitionsNeverReturnPartialNoMatch()[jvm] PASSED
+
+ExactRoleRecallTest[jvm] > actualC2StructuredWireSelectsPaysThenExplicitAttentionChangesOnlyBudget()[jvm] STARTED
+
+ExactRoleRecallTest[jvm] > actualC2StructuredWireSelectsPaysThenExplicitAttentionChangesOnlyBudget()[jvm] PASSED
+
+ExactRoleRecallTest[jvm] > duplicateOccurrencesAndRepeatedSelectionNeverAddEvidenceAndEvictionCannotBeRevived()[jvm] STARTED
+
+ExactRoleRecallTest[jvm] > duplicateOccurrencesAndRepeatedSelectionNeverAddEvidenceAndEvictionCannotBeRevived()[jvm] PASSED
+
+KgKifCommentTest[jvm] > commentsDoNotTurnMalformedMixedOrUnsupportedTailsIntoFacts()[jvm] STARTED
+
+KgKifCommentTest[jvm] > commentsDoNotTurnMalformedMixedOrUnsupportedTailsIntoFacts()[jvm] PASSED
+
+KgKifCommentTest[jvm] > leadingAndTrailingCommentsUseTheStrictKifCrossing()[jvm] STARTED
+
+KgKifCommentTest[jvm] > leadingAndTrailingCommentsUseTheStrictKifCrossing()[jvm] PASSED
+
+KgKifCommentTest[jvm] > wireRefusesTheWholeCommentedInputBeforeRetentionAndKeepsTheOwnerHealthy()[jvm] STARTED
+
+KgKifCommentTest[jvm] > wireRefusesTheWholeCommentedInputBeforeRetentionAndKeepsTheOwnerHealthy()[jvm] PASSED
+
+KgKifCommentTest[jvm] > wireRetainsExactCommentedSourceAndItsDefinitionWithoutNormalizing()[jvm] STARTED
+
+KgKifCommentTest[jvm] > wireRetainsExactCommentedSourceAndItsDefinitionWithoutNormalizing()[jvm] PASSED
+
+KgPredicateNamespaceTest[jvm] > arbitraryNamespacesAndCaseLookalikesCannotSupplyTypeCausalityOrNegation()[jvm] STARTED
+
+KgPredicateNamespaceTest[jvm] > arbitraryNamespacesAndCaseLookalikesCannotSupplyTypeCausalityOrNegation()[jvm] PASSED
+
+KgPredicateNamespaceTest[jvm] > barePolicyAliasesRemainWholeTokensWithoutIriOrWhitespaceRepair()[jvm] STARTED
+
+KgPredicateNamespaceTest[jvm] > barePolicyAliasesRemainWholeTokensWithoutIriOrWhitespaceRepair()[jvm] PASSED
+
+KgPredicateNamespaceTest[jvm] > ownedLcncCausalProjectionKeepsOnlyItsExactDeclaredPredicate()[jvm] STARTED
+
+KgPredicateNamespaceTest[jvm] > ownedLcncCausalProjectionKeepsOnlyItsExactDeclaredPredicate()[jvm] PASSED
+
+KgPredicateNamespaceTest[jvm] > customCausalAndNegativeRdfCannotBecomeEternalRulesOrNegativeEvidence()[jvm] STARTED
+
+KgPredicateNamespaceTest[jvm] > customCausalAndNegativeRdfCannotBecomeEternalRulesOrNegativeEvidence()[jvm] PASSED
+
+KgPredicateNamespaceTest[jvm] > strictRdfExpansionUsesTheNamespaceInsteadOfThePrefixName()[jvm] STARTED
+
+KgPredicateNamespaceTest[jvm] > strictRdfExpansionUsesTheNamespaceInsteadOfThePrefixName()[jvm] PASSED
+
+KgPredicateNamespaceTest[jvm] > genuineExpandedRdfRdfsAndOwlPredicatesKeepTheirDeclaredNalProjection()[jvm] STARTED
+
+KgPredicateNamespaceTest[jvm] > genuineExpandedRdfRdfsAndOwlPredicatesKeepTheirDeclaredNalProjection()[jvm] PASSED
+
+KgPropositionIdentityTest[jvm] > knownIdentitySurvivesCasAndWalAndRefusalsDoNotRewriteHistory()[jvm] STARTED
+
+KgPropositionIdentityTest[jvm] > knownIdentitySurvivesCasAndWalAndRefusalsDoNotRewriteHistory()[jvm] PASSED
+
+KgPropositionIdentityTest[jvm] > knownUnknownMixingCannotUpgradeOrEraseIdentityInEitherDirection()[jvm] STARTED
+
+KgPropositionIdentityTest[jvm] > knownUnknownMixingCannotUpgradeOrEraseIdentityInEitherDirection()[jvm] PASSED
+
+KgPropositionIdentityTest[jvm] > identityPreservesPredicateOrderedRolesTemporalAndDeclaredContextButExcludesEvidence()[jvm] STARTED
+
+KgPropositionIdentityTest[jvm] > identityPreservesPredicateOrderedRolesTemporalAndDeclaredContextButExcludesEvidence()[jvm] PASSED
+
+KgPropositionIdentityTest[jvm] > naturalPredicateCollisionRefusesBeforeSameReceiptReplayAndKeepsActorHealthy()[jvm] STARTED
+
+KgPropositionIdentityTest[jvm] > naturalPredicateCollisionRefusesBeforeSameReceiptReplayAndKeepsActorHealthy()[jvm] PASSED
+
+KgPropositionIdentityTest[jvm] > strictKifRetainsBinaryGroundLiteralsAndRejectsScopedOrLossyForms()[jvm] STARTED
+
+KgPropositionIdentityTest[jvm] > strictKifRetainsBinaryGroundLiteralsAndRejectsScopedOrLossyForms()[jvm] PASSED
+
+KgPropositionIdentityTest[jvm] > codecKeepsHistoricalNullBytesAndReadsTenElevenAndTwelveFields()[jvm] STARTED
+
+KgPropositionIdentityTest[jvm] > codecKeepsHistoricalNullBytesAndReadsTenElevenAndTwelveFields()[jvm] PASSED
+
+KgPropositionIdentityTest[jvm] > realTextAndCursorConsumersCannotCrossPredicatesOrPartiallyMintMalformedKif()[jvm] STARTED
+
+KgPropositionIdentityTest[jvm] > realTextAndCursorConsumersCannotCrossPredicatesOrPartiallyMintMalformedKif()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > unsupportedAndMalformedInputNeverYieldsAValidPrefix()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > unsupportedAndMalformedInputNeverYieldsAValidPrefix()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > prefixesShorthandAndPredicateIriMappingRemainExplicit()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > prefixesShorthandAndPredicateIriMappingRemainExplicit()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > actualTextConsumerIsAtomicAtParsingAndOtherEntryPointsRemainSeparate()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > languageDatatypeAndLexicalSpellingRemainPartOfTheTerm()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > languageDatatypeAndLexicalSpellingRemainPartOfTheTerm()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > textConsumerTreatsInterchangeMarkersInsideRdfLiteralsAsData()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > textConsumerTreatsInterchangeMarkersInsideRdfLiteralsAsData()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > iriLiteralAndBlankNodeKindsDoNotCollapseInTheSameSourceContext()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > iriLiteralAndBlankNodeKindsDoNotCollapseInTheSameSourceContext()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > punctuationEscapesAndUnicodeRemainOneCompleteLiteral()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > punctuationEscapesAndUnicodeRemainOneCompleteLiteral()[jvm] PASSED
+
+KgRdfFidelityTest[jvm] > structuralCommentLineEndingsPreserveAllTriplesAndLongLiteralContent()[jvm] STARTED
+
+KgRdfFidelityTest[jvm] > structuralCommentLineEndingsPreserveAllTriplesAndLongLiteralContent()[jvm] PASSED
+
+KgRetentionTest[jvm] > malformedUnicodeRefusesBeforeRetentionAndSourceWordsAreNeverNormalized()[jvm] STARTED
+
+KgRetentionTest[jvm] > malformedUnicodeRefusesBeforeRetentionAndSourceWordsAreNeverNormalized()[jvm] PASSED
+
+KgRetentionTest[jvm] > countByteAggregateAndIdentityLimitsRefuseBeforeWrites()[jvm] STARTED
+
+KgRetentionTest[jvm] > countByteAggregateAndIdentityLimitsRefuseBeforeWrites()[jvm] PASSED
+
+KgRetentionTest[jvm] > drainWaitsForAdmittedRetentionAndImmutablePayloadsKeepTheirBytes()[jvm] STARTED
+
+KgRetentionTest[jvm] > drainWaitsForAdmittedRetentionAndImmutablePayloadsKeepTheirBytes()[jvm] PASSED
+
+KgRetentionTest[jvm] > httpAndLcncUseTheSameRetentionAndIdentityReadSurfaces()[jvm] STARTED
+
+KgRetentionTest[jvm] > httpAndLcncUseTheSameRetentionAndIdentityReadSurfaces()[jvm] PASSED
+
+KgRetentionTest[jvm] > everyArtifactMustReadBackBeforeAnyImportedMintAndRefusalKeepsActorHealthy()[jvm] STARTED
+
+KgRetentionTest[jvm] > everyArtifactMustReadBackBeforeAnyImportedMintAndRefusalKeepsActorHealthy()[jvm] PASSED
+
+KgRetentionTest[jvm] > lfFramedHttpKeepsTheEntireBodyBeforeAnEmbeddedCrLfSeparator()[jvm] STARTED
+
+KgRetentionTest[jvm] > lfFramedHttpKeepsTheEntireBodyBeforeAnEmbeddedCrLfSeparator()[jvm] PASSED
+
+KgRetentionTest[jvm] > wrongPutSyncAndCorruptReadbackNeverMintOrStopTheOwner()[jvm] STARTED
+
+KgRetentionTest[jvm] > wrongPutSyncAndCorruptReadbackNeverMintOrStopTheOwner()[jvm] PASSED
+
+KgRetentionTest[jvm] > originalSourceAndExactExistingDefinitionResolveBeforeAdmissionAndAfterArchive()[jvm] STARTED
+
+KgRetentionTest[jvm] > originalSourceAndExactExistingDefinitionResolveBeforeAdmissionAndAfterArchive()[jvm] PASSED
+
+KgRetentionTest[jvm] > missingCasAndUnboundedCasRefuseBeforeWritesWhileDirectMintStillWorks()[jvm] STARTED
+
+KgRetentionTest[jvm] > missingCasAndUnboundedCasRefuseBeforeWritesWhileDirectMintStillWorks()[jvm] PASSED
+
+KgRouteErrorTest[jvm] > invalidInputReturns400WithoutMintAndTheNextValidRequestWorks()[jvm] STARTED
+
+KgRouteErrorTest[jvm] > invalidInputReturns400WithoutMintAndTheNextValidRequestWorks()[jvm] PASSED
+
+KgRouteErrorTest[jvm] > retentionRefusalsKeepExisting503And413Responses()[jvm] STARTED
+
+KgRouteErrorTest[jvm] > retentionRefusalsKeepExisting503And413Responses()[jvm] PASSED
+
+KgRouteErrorTest[jvm] > admissionConflictReturns409AndDoesNotPretendTheProcessedPrefixRolledBack()[jvm] STARTED
+
+KgRouteErrorTest[jvm] > admissionConflictReturns409AndDoesNotPretendTheProcessedPrefixRolledBack()[jvm] PASSED
+
+KgRouteErrorTest[jvm] > cancellationIsPropagatedInsteadOfBecomingAnHttpInputError()[jvm] STARTED
+
+KgRouteErrorTest[jvm] > cancellationIsPropagatedInsteadOfBecomingAnHttpInputError()[jvm] PASSED
+
+LegalRequiredAnchorCoverageCliTest[jvm] > requiredAnchorCodecRejectsWrongTypeAndInvalidDeclarationBeforePreparing()[jvm] STARTED
+
+LegalRequiredAnchorCoverageCliTest[jvm] > requiredAnchorCodecRejectsWrongTypeAndInvalidDeclarationBeforePreparing()[jvm] PASSED
+
+LegalRequiredAnchorCoverageCliTest[jvm] > oldManifestAndMissingSeatKeepOldOutcomesAndBlindIdentity()[jvm] STARTED
+
+LegalRequiredAnchorCoverageCliTest[jvm] > oldManifestAndMissingSeatKeepOldOutcomesAndBlindIdentity()[jvm] PASSED
+
+LegalRequiredAnchorCoverageCliTest[jvm] > suppliedPartialAndFullCorpusControlsSeparateAgreementFromCoverage()[jvm] STARTED
+
+LegalRequiredAnchorCoverageCliTest[jvm] > suppliedPartialAndFullCorpusControlsSeparateAgreementFromCoverage()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > repeatedTextAtAnotherOffsetCannotCoverTheRequiredOccurrence()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > repeatedTextAtAnotherOffsetCannotCoverTheRequiredOccurrence()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > emptyDuplicateForeignAndWrongRoleRequirementsAreInvalidFixtures()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > emptyDuplicateForeignAndWrongRoleRequirementsAreInvalidFixtures()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > allExactAnchorsCoverTheDeclarationIndependentlyOfLabelAgreement()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > allExactAnchorsCoverTheDeclarationIndependentlyOfLabelAgreement()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > oneSupportingQuoteDoesNotCoverBothRequiredAnchors()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > oneSupportingQuoteDoesNotCoverBothRequiredAnchors()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > malformedDuplicateSpuriousAndWrongRoleQuotesCannotEarnCoverage()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > malformedDuplicateSpuriousAndWrongRoleQuotesCannotEarnCoverage()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > explicitUnknownWithNoQuotesIsNotVacuousRequiredContextCoverage()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > explicitUnknownWithNoQuotesIsNotVacuousRequiredContextCoverage()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > undeclaredRequirementsPreserveIdentityAndLegacyAgreement()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > undeclaredRequirementsPreserveIdentityAndLegacyAgreement()[jvm] PASSED
+
+LegalRequiredAnchorCoverageTest[jvm] > missingAndDuplicatePredictionsHaveNoCoverageComparison()[jvm] STARTED
+
+LegalRequiredAnchorCoverageTest[jvm] > missingAndDuplicatePredictionsHaveNoCoverageComparison()[jvm] PASSED
+
+PropositionAttentionTest[jvm] > mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers()[jvm] STARTED
+
+PropositionAttentionTest[jvm] > mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers()[jvm] PASSED
+
+PropositionAttentionTest[jvm] > lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity()[jvm] STARTED
+
+PropositionAttentionTest[jvm] > lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity()[jvm] PASSED
+
+PropositionAttentionTest[jvm] > httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409()[jvm] STARTED
+
+PropositionAttentionTest[jvm] > httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409()[jvm] PASSED
+
+PropositionAttentionTest[jvm] > exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes()[jvm] STARTED
+
+PropositionAttentionTest[jvm] > exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes()[jvm] PASSED
+
+PropositionAttentionTest[jvm] > sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer()[jvm] STARTED
+
+PropositionAttentionTest[jvm] > sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer()[jvm] PASSED
+
+PropositionAttentionTest[jvm] > productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence()[jvm] STARTED
+
+PropositionAttentionTest[jvm] > productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence()[jvm] PASSED
+
+RetainedNalImplicationTest[jvm] > directionAndMissingPremiseDiscriminateDeductionFromWeakInduction()[jvm] STARTED
+
+RetainedNalImplicationTest[jvm] > directionAndMissingPremiseDiscriminateDeductionFromWeakInduction()[jvm] PASSED
+
+RetainedNalImplicationTest[jvm] > partialCopiedUnreportedAndNormalizedFramesRefuseBeforePairExecution()[jvm] STARTED
+
+RetainedNalImplicationTest[jvm] > partialCopiedUnreportedAndNormalizedFramesRefuseBeforePairExecution()[jvm] PASSED
+
+RetainedNalImplicationTest[jvm] > heldOutDeductionKeepsExactSourceAndFullIdentityPreimages()[jvm] STARTED
+
+RetainedNalImplicationTest[jvm] > heldOutDeductionKeepsExactSourceAndFullIdentityPreimages()[jvm] PASSED
+
+RetainedNalImplicationTest[jvm] > rawClauseBoundPrecedesDeduplicationAndCapsOrderedPairs()[jvm] STARTED
+
+RetainedNalImplicationTest[jvm] > rawClauseBoundPrecedesDeduplicationAndCapsOrderedPairs()[jvm] PASSED
+
+RetainedNalImplicationTest[jvm] > anyUnaccountedNegativeModalQuotationRoleOrContextRefusesWholeFrame()[jvm] STARTED
+
+RetainedNalImplicationTest[jvm] > anyUnaccountedNegativeModalQuotationRoleOrContextRefusesWholeFrame()[jvm] PASSED
+
+RetainedNalImplicationTest[jvm] > separateInspectionsNeverSupplyACombinedFrameOrSurfaceIdentity()[jvm] STARTED
+
+RetainedNalImplicationTest[jvm] > separateInspectionsNeverSupplyACombinedFrameOrSurfaceIdentity()[jvm] PASSED
+
+RetainedNalImplicationTest[jvm] > s12OccurrencesRemainDependentAndOnlyOriginalPremisesFeedOneLevel()[jvm] STARTED
+
+RetainedNalImplicationTest[jvm] > s12OccurrencesRemainDependentAndOnlyOriginalPremisesFeedOneLevel()[jvm] PASSED
+
+SyntheticNalExperimentCliTest[jvm] > historicalReadRefusesDamagedRecordTailsWithoutRepairingTheEvidencePack()[jvm] STARTED
+
+SyntheticNalExperimentCliTest[jvm] > historicalReadRefusesDamagedRecordTailsWithoutRepairingTheEvidencePack()[jvm] PASSED
+
+SyntheticNalExperimentCliTest[jvm] > missingInspectionRefusesAfterOpeningAnExistingPackWithoutSyntheticFallback()[jvm] STARTED
+
+SyntheticNalExperimentCliTest[jvm] > missingInspectionRefusesAfterOpeningAnExistingPackWithoutSyntheticFallback()[jvm] PASSED
+
+SyntheticNalExperimentCliTest[jvm] > retainedArgumentsNeverFallBackToTheSyntheticExperimentOrCreateMissingStores()[jvm] STARTED
+
+SyntheticNalExperimentCliTest[jvm] > retainedArgumentsNeverFallBackToTheSyntheticExperimentOrCreateMissingStores()[jvm] PASSED
+
+EnglishGuardAttachmentsTest[jvm] > overlappingUnlessMarkerLabelsKeepBothOrdinalsAndOneObservedAttachment()[jvm] STARTED
+
+EnglishGuardAttachmentsTest[jvm] > overlappingUnlessMarkerLabelsKeepBothOrdinalsAndOneObservedAttachment()[jvm] PASSED
+
+EnglishGuardAttachmentsTest[jvm] > fullCopiedIdentityAndPartialUnicodeRangeRemainSourceObservationsOnly()[jvm] STARTED
+
+EnglishGuardAttachmentsTest[jvm] > fullCopiedIdentityAndPartialUnicodeRangeRemainSourceObservationsOnly()[jvm] PASSED
+
+EnglishGuardAttachmentsTest[jvm] > coordinatedUnmarkedTargetAndQuotedNestedAttachmentAreNeverChosenOrRewritten()[jvm] STARTED
+
+EnglishGuardAttachmentsTest[jvm] > coordinatedUnmarkedTargetAndQuotedNestedAttachmentAreNeverChosenOrRewritten()[jvm] PASSED
+
+EnglishGuardAttachmentsTest[jvm] > completeAttachmentBudgetRefusesBeforeReturningAnIncompleteSection()[jvm] STARTED
+
+EnglishGuardAttachmentsTest[jvm] > completeAttachmentBudgetRefusesBeforeReturningAnIncompleteSection()[jvm] PASSED
+
+EnglishGuardAttachmentsTest[jvm] > legacyAbsenceProjectsWhilePresentUnknownMissingDuplicatedAndSubstitutedBindingsRefuse()[jvm] STARTED
+
+EnglishGuardAttachmentsTest[jvm] > legacyAbsenceProjectsWhilePresentUnknownMissingDuplicatedAndSubstitutedBindingsRefuse()[jvm] PASSED
+
+EnglishGuardAttachmentsTest[jvm] > pinnedMatrixAndGuardNegationHaveDifferentDirectHeadsAndExistingDiagnostics()[jvm] STARTED
+
+EnglishGuardAttachmentsTest[jvm] > pinnedMatrixAndGuardNegationHaveDifferentDirectHeadsAndExistingDiagnostics()[jvm] PASSED
+
+EnglishGuardAttachmentsTest[jvm] > quadEngineReturnsBothTypedAttachmentRowsWithFixtureInspectionProvenance()[jvm] STARTED
+
+EnglishGuardAttachmentsTest[jvm] > quadEngineReturnsBothTypedAttachmentRowsWithFixtureInspectionProvenance()[jvm] PASSED
+
+FilePublicationTest[jvm] > directoryPublicationFollowsAnExistingSymlinkWithoutReplacingIt()[jvm] STARTED
+
+FilePublicationTest[jvm] > directoryPublicationFollowsAnExistingSymlinkWithoutReplacingIt()[jvm] PASSED
+
+FilePublicationTest[jvm] > atomicReplacementPreservesTheOpenedReaderAndCreatesAncestors()[jvm] STARTED
+
+FilePublicationTest[jvm] > atomicReplacementPreservesTheOpenedReaderAndCreatesAncestors()[jvm] PASSED
+
+FilePublicationTest[jvm] > directoryPublicationRefusesAFileAncestorAndAnExistingExclusiveLeaf()[jvm] STARTED
+
+FilePublicationTest[jvm] > directoryPublicationRefusesAFileAncestorAndAnExistingExclusiveLeaf()[jvm] PASSED
+
+> Task :muxClasspath UP-TO-DATE
+> Task :compileSpacegraphProductionExecutableKotlinJs
+> Task :jsSpacegraphSpacegraphProductionExecutableCompileSync
+
+> Task :jsBrowserSpacegraphProductionWebpack
+asset size limit: The following asset(s) exceed the recommended size limit (244 KiB).
+This can impact web performance.
+Assets: 
+  spacegraph.js (1.85 MiB)
+entrypoint size limit: The following entrypoint(s) combined asset size exceeds the recommended limit (244 KiB). This can impact web performance.
+Entrypoints:
+  main (1.85 MiB)
+      spacegraph.js
+webpack performance recommendations: 
+You can limit the size of your bundles by using import() or require.ensure to lazy load some parts of your application.
+For more info visit https://webpack.js.org/guides/code-splitting/
+asset spacegraph.js 1.85 MiB [emitted] [minimized] [big] (name: main) 2 related assets
+orphan modules 969 KiB [orphan] 1576 modules
+runtime modules 1.07 KiB 3 modules
+cacheable modules 5.47 MiB
+  modules with warnings 4.43 MiB [true warnings]
+    ./kotlin/TrikeShed-spacegraph.js 1.66 MiB [built] [code generated] [35 warnings]
+    ./kotlin/kotlin-kotlin-stdlib.js 413 KiB [built] [code generated] [14 warnings]
+    ./kotlin/TrikeShed.js 2.05 MiB [built] [code generated] [39 warnings]
+    ./kotlin/kotlinx-coroutines-core.js 316 KiB [built] [code generated] [80 warnings]
+    ./kotlin/kotlinx-atomicfu.js 9.43 KiB [built] [code generated] [5 warnings]
+  modules by path ../../node_modules/ 1.05 MiB
+    modules by path ../../node_modules/d3-quadtree/src/*.js 11.5 KiB
+      ../../node_modules/d3-quadtree/src/index.js 51 bytes [built] [code generated]
+      ../../node_modules/d3-quadtree/src/quadtree.js + 13 modules 11.4 KiB [built] [code generated]
+    ../../node_modules/lucide/dist/esm/lucide.js + 1548 modules 1.01 MiB [built] [code generated]
+    ../../node_modules/d3-force/src/index.js + 13 modules 23.2 KiB [built] [code generated]
+webpack 5.108.1 compiled with 3 warnings in 25508 ms
+
+> Task :airgapDocumentPagesJar
+> Task :airgapDocumentStartScripts
+> Task :airgapDocumentInstall
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 31s
+65 actionable tasks: 13 executed, 52 up-to-date
+Configuration cache entry stored.

@@ -1,0 +1,34 @@
+{
+  "baseArchive": {
+    "file": "airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+    "bytes": 36928779,
+    "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006"
+  },
+  "requiredRuntimeChain": [
+    {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    {
+      "file": "airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+      "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006"
+    }
+  ],
+  "targetSourceCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+  "basePackageSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+  "files": {
+    "SHA256SUMS": {
+      "before": "0195f2d597367b9a3a4588eae425768b711d0714f777b5de131ca0c602a70341",
+      "after": "04558bd3b335d53b4a1ec7130b99b98f475d3eb4ff1d38e1f8165880f8dab9d8"
+    },
+    "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+      "before": "4a6fbcf3d7a6d8a10f678938aa24a2e599842c027f4c238052526795889f07db",
+      "after": "b9882602c6c0653f1c2df307ac7d8a700c2afd2400d1350717f35dd34394fc91"
+    },
+    "package-identity.json": {
+      "before": "db1cc17a1b94ef22a4c8b2446f5de9e2bbbb645cb216c0b110a426206e8e60fa",
+      "after": "09cb4d6d4d36c6c776ad3f4352cb76d38846819846a726522a6591fd660fac36"
+    }
+  },
+  "scope": "Browser-only overlay over the exact R3e final installation, itself over R4f. Only the Spacegraph web jar and root manifests change. One SVG-level pointer handler uses the existing page owner, replacing direct handlers on disposable wire paths. Aggregate retained output maps are bounded to 1 MiB, verified against declared bytes and SHA-256, and projected only while the canvas definition and owner remain current. JVM jars, dependencies, native modules and durable storage bytes are unchanged."
+}

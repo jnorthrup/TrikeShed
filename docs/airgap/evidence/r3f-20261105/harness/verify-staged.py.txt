@@ -1,0 +1,17 @@
+from pathlib import Path
+import hashlib,json,subprocess
+repo=Path('/workspace/TrikeShed');h=Path('/workspace/airgap-r3f-proof')
+def git(*args):return subprocess.check_output(['git',*args],cwd=repo,text=True).strip()
+source='9111a78b733dc30736d066b7d2e5fc9ed87e882f';assert not git('diff','--cached',source,'--','src','build.gradle.kts','settings.gradle.kts','gradle.properties','release','gradle','gradlew','gradlew.bat')
+files=[];counts={}
+for name in ['docs/airgap/evidence/r3f-20261105','docs/d3m/evidence/2026-11-05-airgap-r3f']:
+ root=repo/name;manifest=json.loads((root/'SHA256.json').read_text());assert set(manifest)=={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and p!=root/'SHA256.json'}
+ for p,d in manifest.items():
+  with (root/p).open('rb') as f:assert hashlib.file_digest(f,'sha256').hexdigest()==d,p
+  files.append(name+'/'+p)
+ files.append(name+'/SHA256.json');counts[name]=len(manifest)
+rows={line.split('\t')[1]:line.split()[1] for line in git('ls-files','--stage').splitlines()};hashes=subprocess.check_output(['git','hash-object','--stdin-paths'],input='\n'.join(files)+'\n',cwd=repo,text=True).splitlines();assert len(hashes)==len(files)
+for p,d in zip(files,hashes):assert rows[p]==d,p
+anc=set(git('rev-list','HEAD').splitlines())
+for p in [h/'integration-inputs.json',h/'publication-freeze/integration-inputs.json']:assert all(r['commit'] in anc for r in json.loads(p.read_text())['refs'])
+r={'testedSource':source,'stagedTree':git('write-tree'),'sourceAndBuildUnchanged':True,'manifestCounts':counts,'indexMatchesEveryEvidenceFile':True,'allFrozenTipsAreAncestors':True};(h/'staged-verification.json').write_text(json.dumps(r,indent=2)+'\n');print(json.dumps(r,indent=2))

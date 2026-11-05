@@ -41,8 +41,15 @@ private fun boot() {
                 try { val d = JSON.parse<dynamic>(str(e.data)); if (truthy(d) && d.key == "lcnc/vocabulary") p.launchJs { p.syncContracts(announce = false); p.buildPalette() } } catch (x: dynamic) {}
             }
         } catch (x: dynamic) {}
-        p.launchJs { start(p) }
+        loadConstruction(p)
     }
+}
+
+private fun loadConstruction(p: Panels, revision: Int = p.documentRevision) {
+    val load = p.page.submit { start(p, revision) }
+    p.constructionLoad = load
+    p.constructionControls()
+    load?.invokeOnCompletion { if (p.constructionLoad === load) p.constructionControls() }
 }
 
 /** boot: restore, or seed the starter panel. Boot waits for contract hydration. */
@@ -106,7 +113,7 @@ private suspend fun start(p: Panels, revision: Int = p.documentRevision) {
         byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true; byId("debugBtn")?.disabled = true
     }
     if (!p.syncContracts()) {
-        p.refuseLoad("Contract vocabulary is unavailable; startup is paused") { p.launchJs { start(p, revision) } }
+        p.refuseLoad("Contract vocabulary is unavailable; startup is paused") { loadConstruction(p, revision) }
         return
     }
     p.syncLanes()
@@ -223,6 +230,15 @@ private fun seedOpsBoard(p: Panels): Boolean {
 /** every control on the bar, the canvas gestures, keys */
 private fun wire(p: Panels) {
     val vp = p.viewport
+    p.page.on(p.wiresSvg, "pointerdown", { e ->
+        val path = if (e.target.closest != null) e.target.closest("path[data-wire-index]") else null
+        val index = if (path != null) str(path.getAttribute("data-wire-index")).toIntOrNull() else null
+        if (index != null && p.wiresSvg.contains(path) && index in arr(p.graph.wires).indices) {
+            e.stopPropagation()
+            p.graph.wires.splice(index, 1)
+            p.redraw(); p.save()
+        }
+    })
     p.page.on(p.world, "pointerdown", { e ->
         val hitEl = if (e.target.closest != null) e.target.closest(".node") else undefined
         val picked = p.nodes().firstOrNull { it.el === hitEl }
@@ -261,7 +277,7 @@ private fun wire(p: Panels) {
     p.installVisualQuery()
     p.installVisualSqlQuery()
     val debug = document.createElement("button").asDynamic()
-    debug.id = "debugBtn"; debug.textContent = "Debug nodes"
+    debug.id = "debugBtn"; debug.textContent = "Debug nodes"; debug.disabled = true
     debug.title = "Run once in the daemon; step nodes and rings, or enter in-process JS/Python/Ruby source. Pauses count toward timeouts."
     byId("runBtn").parentNode.insertBefore(debug, byId("stopBtn"))
     p.page.on(debug, "click", { p.admitProgram(debug = true) })
@@ -272,7 +288,7 @@ private fun wire(p: Panels) {
     byId("runBtn").parentNode.insertBefore(oroboros, byId("stopBtn"))
     p.page.on(oroboros, "click", { p.openOroboros() })
     val live = document.createElement("button").asDynamic()
-    live.id = "liveBtn"; live.textContent = "Live"; live.setAttribute("aria-label", "Run live panel")
+    live.id = "liveBtn"; live.textContent = "Live"; live.disabled = true; live.setAttribute("aria-label", "Run live panel")
     live.title = "Run once in the daemon, then admit root gestures against its retained receipt"
     byId("runBtn").parentNode.insertBefore(live, byId("stopBtn"))
     p.page.on(live, "click", { p.admitProgram(live = true) })
@@ -334,8 +350,9 @@ private fun wire(p: Panels) {
         val blob = js("new Blob(parts, blobType)")
         val a = document.createElement("a").asDynamic(); a.href = js("URL").createObjectURL(blob); a.download = "panel-graph.json"; a.click()
     })
-    p.page.on(byId("importBtn"), "click", { byId("fileIn").click() })
+    p.page.on(byId("importBtn"), "click", { if (!truthy(byId("importBtn").disabled)) byId("fileIn").click() })
     p.page.on(byId("fileIn"), "change", { e ->
+        if (truthy(e.target.disabled)) { e.target.value = ""; return@on }
         val f = e.target.files[0]
         if (f != null) p.launchJs {
             try {

@@ -1,0 +1,7 @@
+{
+  "path": "/workspace/airgap-r4f-proof/source-update/trikeshed.patch",
+  "bytes": 75447550,
+  "sha256": "172ecb7fcd94ddd6f29a3307eca58b94a8f7f6ca1145bcee2739ce6d40b9f7f0",
+  "archive": "/workspace/library-files/airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+  "member": "airgap-document-source-update/trikeshed.patch"
+}

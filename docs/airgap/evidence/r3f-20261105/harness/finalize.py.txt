@@ -1,0 +1,19 @@
+from pathlib import Path
+import json,shutil,hashlib,subprocess
+repo=Path('/workspace/TrikeShed');h=Path('/workspace/airgap-r3f-proof');out=repo/'docs/airgap/evidence/r3f-20261105';d3=repo/'docs/d3m/evidence/2026-11-05-airgap-r3f'
+def save(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def git(*args):return subprocess.check_output(['git',*args],cwd=repo,text=True).strip()
+assert not git('diff','9111a78b7','HEAD','--','src','build.gradle.kts','settings.gradle.kts','gradle.properties','release','gradle','gradlew','gradlew.bat')
+shutil.copytree(h/'publication-freeze02',d3/'publication-freeze02');shutil.copytree(repo/'.git/d3m/airgap-wire-lifetime-publication02-20261105',d3/'publication02')
+for name in ['fetch-publication02.py','integrate-publication02.py']:shutil.copy2(h/name,d3/(name+'.txt'))
+for name in ['verify-staged.py','finalize.py']:shutil.copy2(h/name,out/'harness'/(name+'.txt'))
+packet=json.loads((h/'publication-freeze02/integration-inputs.json').read_text());anc=set(git('rev-list','HEAD').splitlines());assert all(r['commit'] in anc for r in packet['refs']);latest=packet['refs']
+r=json.loads((d3/'verification.json').read_text());r.update(integratedCommit=git('rev-parse','HEAD'),frozenRefCounts=[557,559,560],latestInventory={'local':sum(x['ref'].startswith('refs/heads/') for x in latest),'remoteBranchHeads':sum(x['ref'].startswith('refs/remotes/') and not x['ref'].endswith('/HEAD') for x in latest),'remoteHeadAliases':sum(x['ref'].endswith('/HEAD') for x in latest)},merges=4,publicationContinuation='92510e6a1 merged at 97fbadd1b; documentation-only integration evidence. Tested production source and build inputs unchanged.');save(d3/'verification.json',r)
+v=json.loads((out/'verification.json').read_text());v['integration']=r;save(out/'verification.json',v)
+continuity={'testedSourceCommit':git('rev-parse','9111a78b7'),'integratedCommit':git('rev-parse','HEAD'),'sourceAndBuildUnchanged':True,'changedPaths':git('diff','--name-only','9111a78b7','HEAD').splitlines(),'scope':'Only documentation and evidence changed after the exact tested package.'};save(out/'publication-source-continuity.json',continuity)
+save(out/'publication-verification-notes.json',{'initialStagingRefusal':'Independent index check found aggregate-before-edit.png absent because a repository ignore rule excluded new images. All raw evidence directories were then explicitly staged with git add -f; every manifest member and index blob matched before commit.','noAcceptanceFromExitAlone':True})
+p=repo/'docs/d3m/2026-11-05-airgap-r3f.md';s=p.read_text().replace('557 and 559 refs. The later inventory has 549 remote branch heads','557, 559 and 560 refs. The last inventory has 550 remote branch heads').replace('| `55d110f1d` | Remote master with exact tested/inherited source versions | `a49058908` |','| `55d110f1d` | Remote master with exact tested/inherited source versions | `a49058908` |\n| `92510e6a1` | Documentation-only native KIF UI integration record | `97fbadd1b` |').replace('All three three-way merges','All four three-way merges');p.write_text(s)
+for root in [out,d3]:save(root/'SHA256.json',{p.relative_to(root).as_posix():sha(p) for p in sorted(root.rglob('*')) if p.is_file() and p!=root/'SHA256.json'})
+print(json.dumps(r,indent=2))

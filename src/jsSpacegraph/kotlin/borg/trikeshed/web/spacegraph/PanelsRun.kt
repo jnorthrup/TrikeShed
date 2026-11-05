@@ -128,18 +128,30 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
                 ". Inspect run records before retrying; no automatic retry.")
         } finally {
             programRunning = false
-            byId("runBtn").disabled = truthy(graph.controls?.inspectionOnly)
-            byId("liveBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
-            byId("debugBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
+            constructionControls()
             if (debug) debugger.finish()
         }
         return null
     } finally { releaseProgram(selected) }
 }
 
+/** Bounded immutable JSON for display; neither a currentness check nor execution authority. */
+suspend fun retainedJson(cid: String, expectedBytes: Int? = null): dynamic {
+    require(Regex("sha256:[0-9a-f]{64}").matches(cid)) { "Invalid retained JSON content ID" }
+    val response = fetchJs("/api/v0/block/get?arg=" + encodeURIComponent(cid))
+    require(truthy(response.ok)) { "Retained JSON unavailable" }
+    val bytes = PatchRead.bytes(response) // Existing 1 MiB stream bound, including absent/false Content-Length.
+    require(expectedBytes == null || num(bytes.byteLength) == expectedBytes.toDouble()) { "Retained JSON byte count mismatch" }
+    val digest = awaitJs(js("crypto.subtle.digest('SHA-256', bytes)"))
+    val actual: String = "sha256:" + js("Array.from(new Uint8Array(digest), function(b){return b.toString(16).padStart(2,'0')}).join('')")
+    require(actual == cid) { "Retained JSON content identity mismatch" }
+    val retained: String = js("new TextDecoder('utf-8', {fatal:true}).decode(bytes)")
+    return JSON.parse(retained)
+}
+
 /** Receipt outputs are presentation only. The daemon's retained frame owns every later input. */
 suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {
-    val outputs = run.outputs ?: return
+    var outputs = run.outputs ?: return
     val canvas = graph
     val projected = nodes().filter { !truthy(it._parentScope) }
     val definition = LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, document)
@@ -159,6 +171,21 @@ suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> B
         return matching
     }
     if (!current()) return
+    if (run.outputPreview == true && outputs.previewOnly == true) {
+        val cid = str(outputs.retainedCid)
+        val limit = 1024 * 1024
+        require(Regex("sha256:[0-9a-f]{64}").matches(cid) && outputs.contentType == "application/json") {
+            "Invalid retained node outputs reference"
+        }
+        require(typeOf(outputs.bytes) == "number" && num(outputs.bytes).isFinite() &&
+            num(outputs.bytes) in 1.0..limit.toDouble() && num(outputs.bytes) % 1.0 == 0.0) {
+            "Retained node outputs exceed the 1 MiB display read limit or have an invalid byte count"
+        }
+        val decoded = retainedJson(cid, num(outputs.bytes).toInt())
+        require(decoded != null && typeOf(decoded) == "object" && !isArray(decoded)) { "Retained node outputs are not an object" }
+        require(current()) { "Program or output owner changed during retained outputs read" }
+        outputs = decoded
+    }
     // Replace display snapshots before asynchronous reads; these never feed execution.
     for (n in projected) {
         n._lastOut = undefined
@@ -386,9 +413,7 @@ fun Panels.load(data: dynamic): Boolean {
     val g = obj(); g.nodes = jsArray(); g.wires = jsArray(); g.seq = if (truthy(data.seq)) data.seq else 1
     g.controls = if (truthy(data.controls)) spread(data.controls) else undefined
     graph = g
-    byId("runBtn").disabled = programRunning || truthy(graph.controls?.inspectionOnly)
-    byId("liveBtn")?.disabled = programRunning || truthy(graph.controls?.inspectionOnly)
-    byId("debugBtn")?.disabled = programRunning || truthy(graph.controls?.inspectionOnly)
+    constructionControls()
     val savedCamera = data.view
     // three passes: CLONE the tree (children stay the SAME objects flattened into G.nodes), BUILD, MOUNT
     fun cloneNode(sn: dynamic): dynamic {

@@ -488,3 +488,7 @@ acceptance. Execute the changed platform boundary against the actual packaged
 artifact; preserve any failed candidate and its identity before rebuilding.
 Keep measurement clocks and reporting thresholds explicit, and retain adverse
 or overlapping results without turning them into an unsupported speedup claim.
+Require complete expected evidence in the independent audit; a zero driver
+exit does not establish that an awaited interaction or every check finished.
+When a later experiment disproves an earlier diagnosis, correct the current
+documentation and preserve the original evidence with its actual standing.

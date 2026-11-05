@@ -1,0 +1,17 @@
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "runId": "cc24a382-9e44-419d-ae5f-0dbaa1123873",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:09fbeeadde639b090b7388ccd27b6067c8103fec90b93d10f6af1c4491d8cdc6",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}

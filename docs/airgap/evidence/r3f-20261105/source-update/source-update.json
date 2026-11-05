@@ -1,0 +1,31 @@
+{
+  "baseSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+  "targetSourceCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+  "targetTree": "89e6ee8737b1b47c3ef5421da022636c487c6d2b",
+  "requiredSourceChain": [
+    {
+      "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+    },
+    {
+      "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+      "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+    },
+    {
+      "file": "airgap-document-r3c-final-sources-update-2026-11-05.tar.gz",
+      "sha256": "dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f"
+    },
+    {
+      "file": "airgap-document-r3d-final-sources-update-2026-11-05.tar.gz",
+      "sha256": "a57105c0fbf9fea0f2d9b3a0bfbc566eeeaf531df75d52b7e1ef543c566ce1c6"
+    },
+    {
+      "file": "airgap-document-r3e-final-sources-update-2026-11-05.tar.gz",
+      "sha256": "bcef7f2000025f3e2a807bb0536ea84c19d6e48180d2e55fc8dc0568d3cfac75"
+    }
+  ],
+  "patchSha256": "dc81a8dfa5c11884fa35cc889f031de4ca1740ef5ff63baf29e53e31bd15db66",
+  "verifiedAppliedTreeMatches": true,
+  "dependencyChanges": [],
+  "scope": "Apply after the R3e final source update, following R3d final, R3c final and R4f on the R4e source base. Do not separately apply the R3e strict-row validation supplement; its assertions are already included here. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open."
+}

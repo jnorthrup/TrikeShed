@@ -1,0 +1,52 @@
+from pathlib import Path
+import json,hashlib,os,shutil,subprocess,tarfile,gzip
+h=Path('/workspace/airgap-r3f-proof');repo=Path('/workspace/TrikeShed');root=h/'release-rootfs';base=Path('/workspace/airgap-r3e-proof/installed-final/airgap-document-rootfs')
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+base_archive=Path('/workspace/library-files/airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz');base_sha='b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006';assert sha(base_archive)==base_sha
+verify_env=os.environ.copy();verify_env['TRIKESHED_PROOF_ROOT']=str(base)
+subprocess.run(['python3','/workspace/airgap-r3e-proof/package-final.py','verify'],env=verify_env,check=True)
+shutil.copytree(base,root,copy_function=os.link)
+staged=Path('/workspace/TrikeShed/build/install/airgap-document')
+for source in sorted(staged.rglob('*')):
+ if not source.is_file():continue
+ dest=root/'opt/trikeshed'/source.relative_to(staged)
+ assert dest.is_file(), str(dest)
+ if sha(source)==sha(dest):continue
+ dest.unlink();shutil.copy2(source,dest)
+for name in ['SHA256SUMS','package-identity.json']:(root/name).unlink()
+subprocess.run(['python3',str(h/'package-release.py'),'manifest'],check=True)
+subprocess.run(['python3',str(h/'package-release.py'),'verify'],check=True)
+changed=[p.relative_to(root).as_posix() for p in sorted(root.rglob('*')) if p.is_file() and sha(p)!=sha(base/p.relative_to(root))]
+assert all(name in ['SHA256SUMS','opt/trikeshed/README.md','opt/trikeshed/bin/airgap-document','package-identity.json'] or name.startswith('opt/trikeshed/lib/TrikeShed') for name in changed),changed
+assert set(changed)=={'SHA256SUMS','package-identity.json','opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar'},changed
+update=h/'runtime-release-update';update.mkdir();payload=update/'airgap-document-rootfs'
+for name in changed:
+ p=payload/name;p.parent.mkdir(parents=True,exist_ok=True);os.link(root/name,p)
+chain=[{'file':'airgap-document-r4f-linux-x64-2026-11-05.tar.gz','sha256':'28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58'},{'file':base_archive.name,'sha256':base_sha}]
+for row in chain:assert sha(Path('/workspace/library-files')/row['file'])==row['sha256']
+record={'baseArchive':{'file':base_archive.name,'bytes':base_archive.stat().st_size,'sha256':base_sha},'requiredRuntimeChain':chain,'targetSourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'basePackageSourceCommit':json.loads((base/'package-identity.json').read_text())['sourceCommit'],'files':{name:{'before':sha(base/name),'after':sha(root/name)} for name in changed},'scope':'Browser-only overlay over the exact R3e final installation, itself over R4f. Only the Spacegraph web jar and root manifests change. One SVG-level pointer handler uses the existing page owner, replacing direct handlers on disposable wire paths. Aggregate retained output maps are bounded to 1 MiB, verified against declared bytes and SHA-256, and projected only while the canvas definition and owner remain current. JVM jars, dependencies, native modules and durable storage bytes are unchanged.'}
+(update/'UPDATE.json').write_text(json.dumps(record,indent=2)+'\n')
+(update/'README.md').write_text("""# R3f runtime update
+
+This overlay requires the exact R4f Linux x86-64 runtime followed by the R3e final runtime update named and hashed in UPDATE.json. Verify both archives and extract them, in that order, into a fresh installation directory. Then extract this archive into the same directory. All use airgap-document-rootfs/. Do not overwrite a running installation or writable state.
+
+Verify sha256sum --check SHA256SUMS and the complete membership/modes in package-identity.json with the retained verifier. Retain the documented read-only root, separate writable state, UTF-8 locale and loopback-only namespace launch. Host kernel, bwrap and browser remain external inputs.
+
+Only the web jar and manifests change. Wire pointer editing is delegated to one handler under the existing page owner, which removes it on close. Retained aggregate output maps are read within 1 MiB and checked for byte count, SHA-256, and current canvas ownership before projection. This fixes wire editing after awaited page shutdown; it does not establish shutdown correctness for every other UI control, large-graph frame-rate acceptance or absence of all memory leaks. The baseline diagnostic did not show listener growth across 100 redraws after forced GC.
+""")
+def archive(dest):
+ with dest.open('wb') as raw,gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0,compresslevel=6) as gz,tarfile.open(fileobj=gz,mode='w|',format=tarfile.PAX_FORMAT) as tar:
+  for p in sorted(update.rglob('*')):
+   if not p.is_file():continue
+   info=tar.gettarinfo(str(p),arcname=p.relative_to(update).as_posix());info.uid=info.gid=0;info.uname=info.gname='';info.mtime=0;info.pax_headers={}
+   if p.is_file():
+    with p.open('rb') as f:tar.addfile(info,f)
+   else:tar.addfile(info)
+dest=Path('/workspace/library-files/airgap-document-r3f-release-runtime-update-2026-11-05.tar.gz');assert not dest.exists();archive(dest);duplicate=h/'runtime-release-update-second.tar.gz';archive(duplicate);assert sha(dest)==sha(duplicate);duplicate.unlink()
+installed=h/'installed-release';installed.mkdir();shutil.copytree(base,installed/'airgap-document-rootfs',copy_function=os.link)
+for name in changed:(installed/'airgap-document-rootfs'/name).unlink()
+subprocess.run(['tar','-xzpf',str(dest),'--no-same-owner','-C',str(installed)],check=True)
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(installed/'airgap-document-rootfs');subprocess.run(['python3',str(h/'package-release.py'),'verify'],env=env,check=True)
+record.update(archive={'file':str(dest),'sha256':sha(dest),'bytes':dest.stat().st_size},identicalTwoAssemblies=True,installedRoot=str(installed/'airgap-document-rootfs'),installation='Verified immutable R3e final root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete combined membership/mode/hash verification passes. No mutation of the R3e or R4f roots.')
+(h/'runtime-release-update.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record,indent=2))

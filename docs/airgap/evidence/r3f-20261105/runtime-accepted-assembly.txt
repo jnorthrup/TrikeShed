@@ -1,0 +1,46 @@
+package membership, modes and SHA-256 verified
+manifest 1355 files 998263897 bytes
+package membership, modes and SHA-256 verified
+package membership, modes and SHA-256 verified
+{
+  "baseArchive": {
+    "file": "airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+    "bytes": 36928779,
+    "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006"
+  },
+  "requiredRuntimeChain": [
+    {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    {
+      "file": "airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+      "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006"
+    }
+  ],
+  "targetSourceCommit": "f536cc763cd0fbe9fdfafc5cc6649955fbdd7dc4",
+  "basePackageSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+  "files": {
+    "SHA256SUMS": {
+      "before": "0195f2d597367b9a3a4588eae425768b711d0714f777b5de131ca0c602a70341",
+      "after": "5d122d324aecd9ce0970481f5c221d745eab26c0a4615c979df528ba968b9537"
+    },
+    "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+      "before": "4a6fbcf3d7a6d8a10f678938aa24a2e599842c027f4c238052526795889f07db",
+      "after": "db62951c75149a4e751e327e10b4677bc0ae5a40af92d8bce07bc75740fc72b2"
+    },
+    "package-identity.json": {
+      "before": "db1cc17a1b94ef22a4c8b2446f5de9e2bbbb645cb216c0b110a426206e8e60fa",
+      "after": "a889efbc39e5ae9e5cc70a5e4645783258d2c12efff1ebacb67c7dfa72e56970"
+    }
+  },
+  "scope": "Browser-only overlay over the exact R3e final installation, itself over R4f. Only the Spacegraph web jar and root manifests change. One SVG-level pointer handler uses the existing page owner, replacing direct handlers on disposable wire paths. Aggregate retained output maps are bounded to 1 MiB, verified against declared bytes and SHA-256, and projected only while the canvas definition and owner remain current. JVM jars, dependencies, native modules and durable storage bytes are unchanged.",
+  "archive": {
+    "file": "/workspace/library-files/airgap-document-r3f-final-runtime-update-2026-11-05.tar.gz",
+    "sha256": "57c3637fb2fe9eac2ff88e5fbfa2567218c3cd427bc9979684ae4557cb578bda",
+    "bytes": 2268121
+  },
+  "identicalTwoAssemblies": true,
+  "installedRoot": "/workspace/airgap-r3f-proof/installed-accepted/airgap-document-rootfs",
+  "installation": "Verified immutable R3e final root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete combined membership/mode/hash verification passes. No mutation of the R3e or R4f roots."
+}
