@@ -8,6 +8,7 @@ import borg.trikeshed.narsese.*
 import borg.trikeshed.parse.*
 import borg.trikeshed.litebike.WireHttpResponse
 import borg.trikeshed.relaxfactory.CouchHttpSurface
+import borg.trikeshed.rdf.SparqlSurface
 import borg.trikeshed.userspace.nio.file.spi.*
 import kotlinx.coroutines.*
 
@@ -20,6 +21,8 @@ class DocumentReviewWire private constructor(
     private val corpus: ProjectCorpus,
     private val nativeHorn: NativeHornQuery?,
 ) {
+    private class QueryRefusal(val status: Int, val code: String, reason: String) : IllegalArgumentException(reason)
+
     companion object {
         fun revision(value: Any?): Long {
             val number = (value as? Number)?.toDouble()
@@ -383,7 +386,7 @@ class DocumentReviewWire private constructor(
                                 report
                             }
                             endpoint.endsWith("/taxonomy-plan") -> withContext(checkNotNull(actor)) {
-                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"), setOf("offset", "limit"))
+                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"), setOf("offset", "limit", "program"))
                                 val goal = input["goal"] as? Map<*, *> ?: error("Taxonomy goal required")
                                 fields(goal, setOf("predicate", "subject", "object"))
                                 fun term(key: String) = goal[key] as? String ?: error("Goal $key must be text")
@@ -393,7 +396,12 @@ class DocumentReviewWire private constructor(
                                 val report = ReviewedTaxonomyPlan.report(review, ctx.casStore, cid("snapshotCid"), revision(),
                                     term("predicate"), term("subject"), term("object"), page("offset", 0), page("limit", 64))
                                 require(jsonOf(report).encodeToByteArray().size <= 1048576) { "Taxonomy report exceeds 1MiB" }
-                                report
+                                if ("program" !in input) report else {
+                                    val result = report + _m["quadQuery" j taxonomyQuery(report, input["program"], cid("snapshotCid"), revision())]
+                                    if (jsonOf(result).encodeToByteArray().size > 1048576)
+                                        throw QueryRefusal(413, "reviewed_taxonomy_query_response_limit", "Taxonomy report and query exceed 1MiB")
+                                    result
+                                }
                             }
                             endpoint.endsWith("/snapshot") -> review.snapshot(input["kind"] as String, cid("receiptCid"),
                                 (input["selection"] as List<*>).map { it as String })
@@ -421,7 +429,96 @@ class DocumentReviewWire private constructor(
                 }
             }
         } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: QueryRefusal) { json(_m["error" j "reviewed_taxonomy_query_refused",
+            "queryStatus" j failure.status, "code" j failure.code, "reason" j failure.message], failure.status) }
         catch (failure: Exception) { json(mapOf("error" to failure.message), 409) }
+    }
+
+    /** Query syntax has no permission fields or executable control surface. No procedure is dispatched. */
+    private fun queryProgram(value: Any?): Map<*, *> = try {
+        val program = value as? Map<*, *> ?: error("Query program must be a non-null object")
+        fields(program, _s["nodes", "wires", "controls"], _s["kanban", "view", "seq"])
+        require(program["kanban"] == null) { "Query program cannot contain a Kanban procedure" }
+        val controls = program["controls"] as? Map<*, *> ?: error("Query controls required")
+        fields(controls, _s["inspectionOnly"], _s["humanOversight", "matingPoints"])
+        require(controls["inspectionOnly"] == true) { "Query program must be inspection-only" }
+        require("humanOversight" !in controls || controls["humanOversight"] is Boolean) { "Invalid query presentation control" }
+        require(controls["matingPoints"] == null || controls["matingPoints"] == emptyList<Any?>()) {
+            "Query program cannot contain mating points"
+        }
+        val nodes = program["nodes"] as? List<*> ?: error("Query nodes required")
+        val wires = program["wires"] as? List<*> ?: error("Query wires required")
+        if (nodes.size > 128 || wires.size > 128) throw QueryRefusal(413, "visual_query_limit", "Visual query has too many nodes or wires")
+        val contracts = SparqlGraph.contracts().associateBy { it.type }
+        for (raw in nodes) {
+            val node = raw as? Map<*, *> ?: error("Query node must be an object")
+            fields(node, _s["id", "type"], _s["params", "x", "y", "width", "height", "collapsed", "subprogram", "children"])
+            require(node["subprogram"] == null && (node["children"] == null || node["children"] == emptyList<Any?>())) {
+                "Query nodes cannot dispatch subprograms or children"
+            }
+            for (key in s_["x", "y", "width", "height"].view) require(node[key] == null ||
+                (node[key] as? Number)?.toDouble()?.isFinite() == true) { "Invalid query presentation number" }
+            require("collapsed" !in node || node["collapsed"] is Boolean) { "Invalid query presentation control" }
+            val contract = contracts[node["type"]] ?: error("Unsupported query node type")
+            if (node["params"] != null) {
+                val params = node["params"] as? Map<*, *> ?: error("Query node params must be an object")
+                require(params.keys.all { it is String && it in contract.params } && params.values.all { it is String }) {
+                    "Unexpected query node parameter"
+                }
+            }
+        }
+        for (raw in wires) fields(raw as? Map<*, *> ?: error("Query wire must be an object"), _s["from", "to"])
+        if (program["view"] != null) {
+            val view = program["view"] as? Map<*, *> ?: error("Query view must be an object")
+            fields(view, emptySet(), _s["x", "y", "z"])
+            require(view.values.all { (it as? Number)?.toDouble()?.isFinite() == true }) { "Invalid query viewport" }
+        }
+        require("seq" !in program || (program["seq"] as? Number)?.toDouble()?.let {
+            it.isFinite() && it in 0.0..Int.MAX_VALUE.toDouble() && it % 1.0 == 0.0
+        } == true) { "Invalid query sequence" }
+        // The bounded visual owner repeats compilation and applies the shared work/result guards.
+        SparqlGraph.lower(LcncProgramConfix.fromJson("reviewed taxonomy query", jsonOf(program)))
+        program
+    } catch (cancelled: CancellationException) { throw cancelled }
+      catch (failure: QueryRefusal) { throw failure }
+      catch (failure: Exception) { throw QueryRefusal(400, "invalid_visual_program", failure.message ?: "Invalid visual query program") }
+
+    /** Only this authenticated host-created report supplies the temporary graph; no CAS receipt is assumed. */
+    private suspend fun taxonomyQuery(report: Map<String, Any?>, value: Any?, snapshot: ContentId,
+                                      expectedRevision: Long): Map<String, Any?> {
+        val program = queryProgram(value)
+        val projection = try { ReviewedTaxonomyProofGraph.project(report) }
+            catch (failure: ReviewedTaxonomyProofGraph.SourceProfileRefused) {
+                val reason = when (failure.code) {
+                    "reviewed_taxonomy_source_profile_limit" -> "Complete reviewed proof exceeds the optional query source limits"
+                    "reviewed_taxonomy_source_unavailable" -> "Reviewed source has no supported proof-query projection"
+                    else -> "Reviewed query source profile refused"
+                }
+                throw QueryRefusal(failure.status, failure.code, reason)
+            }
+        val visual = SparqlWire(SparqlSurface(projection.store))
+        val reply = requireNotNull(visual.route("POST", "/sparql/visual", "POST /sparql/visual HTTP/1.1\r\n\r\n" +
+            jsonOf(_m["dataset" j "quad-store", "program" j program]), null))
+        if (reply.status != 200) {
+            val error = runCatching { reifyStrict(reply.body) as? Map<*, *> }.getOrNull()
+            throw QueryRefusal(reply.status, "visual_query_refused", error?.get("error") as? String ?: "Bounded visual query refused")
+        }
+        val output = reifyStrict(reply.body) as? Map<*, *> ?: error("Invalid bounded visual query response")
+        // The same actor must still own the exact current approval after evaluation, including English origin checks.
+        val checked = review.taxonomyRead(snapshot, expectedRevision)
+        require(checked.snapshotCid == snapshot && checked.revision == expectedRevision &&
+            report["snapshotCid"] == checked.snapshotCid.value && revision(report["revision"]) == checked.revision &&
+            report["readCid"] == checked.readCid.value && report["approvalCid"] == checked.approvalCid.value &&
+            report["decisionCid"] == checked.decisionCid.value && report["sourceRevision"] == checked.candidate.sourceRevision &&
+            report["reviewer"] == checked.reviewer && report["synthetic"] == checked.synthetic) {
+            "Reviewed material changed during query"
+        }
+        return _m["kind" j "reviewed-taxonomy-quad-query/1", "schema" j ReviewedTaxonomyProofGraph.SCHEMA,
+            "dataset" j ReviewedTaxonomyProofGraph.DATASET, "graph" j projection.graph,
+            "query" j output["query"], "results" j output["results"], "physicalSource" j output["source"],
+            "provenance" j (projection.descriptor + _m["checkedAsOf" j checked.asOf,
+                "reviewer" j checked.reviewer, "synthetic" j checked.synthetic]),
+            "persistence" j "request-local", "authority" j "authenticated-reviewed-read-not-a-sink-permit"]
     }
 
     suspend fun stopAdmission() {

@@ -88,6 +88,17 @@ class ReviewedTaxonomyWireTest {
             assertEquals(walSize, Files.size(wal), "Refused GET must not append a review event")
             val first = request("taxonomy-plan", goal(approved["revision"]))
             val second = request("taxonomy-plan", goal(approved["revision"]))
+            val program = reifyMap(LcncProgramConfix.toJson(LcncProgram("norm metadata query", s_[
+                LcncNode("select", SparqlGraph.SELECT),
+                LcncNode("variable", SparqlGraph.VARIABLE, _m["name" j "?subject"]),
+                LcncNode("pattern", SparqlGraph.PATTERN, _m["subject" j "?subject", "predicate" j "<urn:test:predicate>", "object" j "?object"])],
+                s_[LcncWire("variable", "variable", "select", "variables"), LcncWire("pattern", "pattern", "select", "patterns")],
+                controls = LcncConfixControls(inspectionOnly = true))))
+            val unavailable = request("taxonomy-plan", goal(approved["revision"]) + _m["program" j program], status = 409)
+            assertEquals("reviewed_taxonomy_query_refused", unavailable["error"])
+            assertEquals("reviewed_taxonomy_source_unavailable", unavailable["code"])
+            assertFalse("results" in unavailable || "quadQuery" in unavailable)
+            assertEquals(walSize, Files.size(wal), "An unavailable optional query cannot spend the norm permit")
             val page = first["page"] as Map<*, *>
             assertEquals(0, (page["offset"] as Number).toInt())
             assertEquals(64, (page["limit"] as Number).toInt())
