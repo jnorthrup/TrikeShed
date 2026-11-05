@@ -1,5 +1,29 @@
 Bounded native review-observation query — 2026-11-02
 
+Blackboard proof inspection — source92510e6a1bff13a71b0ad9a76ba261498932e9ba
+
+The actual document.reviewSnapshot output's review panel now offers derived-step
+selection, Inspect substitutions and Inspect premise sources. Both actions use
+the authenticated request-local quad owner and validate the returned typed rows
+against the displayed approved proof. Exact document quotations retain their
+UTF16 spans; normalized host rules explicitly have no document quotation spans.
+Goal, graph, credential and source changes invalidate old results. Structured
+400/413 query refusals preserve an already validated plain native proof.
+
+The combined source passed540 selected JVM checks and all three browser builds,
+including the shared LinearArrayMap entry equality/hash correction that replaces
+the earlier local row-copy workaround. The real public Import/Run/review flow,
+both inspectors, delayed goal/graph A-to-B-to-A responses, refusals and source
+amendment passed against the exact frozen artifacts. Six screenshots and a fresh
+public replay with six mutation controls are retained under
+evidence/2026-11-05/native-horn-review-ui-v88. Runtime and audit failures remain.
+
+This is the Spacegraph review-output panel. Standalone Documents navigation and
+an editable protected native query canvas remain separate work. Program details
+stayed collapsed, so their visible text was not captured; posted programs and
+returned SPARQL were checked. First-report size-limit behavior is source-reviewed
+only. The retained records do not establish English or legal semantic accuracy.
+
 Reviewed native proof quads — source973b078dc929adfbbbedd28345b2980ee5d08a56
 
 The existing authenticated /api/documents/review/taxonomy-query accepts an

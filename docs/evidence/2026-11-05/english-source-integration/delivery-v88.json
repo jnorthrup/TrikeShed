@@ -1,0 +1,60 @@
+{
+  "source": "92510e6a1bff13a71b0ad9a76ba261498932e9ba",
+  "checks": 540,
+  "artifacts": {
+    "main.jar": "f784107dd8f0fe0471e9ee0c43edccc9debce8a5e323844f0d7a22b40eaf533e",
+    "documents.js": "4aa634be72b1d8e2657a1e8dcc75e138b8a3bd0195ae58b09714824f9f0bbd35",
+    "spacegraph.js": "324325a57bcbf55db29d3bca9e4b8730ad7695dd7217173e4e27df177807676d",
+    "pages.js": "f1c1458fc3900b8e57c5eea5683ca33ab05334d7368c4e38bc50850cdc074de5"
+  },
+  "nativeUI": {
+    "root": "/workspace/library-files/native-horn-docs-v88-native-proof",
+    "selected": "native-attempt4",
+    "writerPid": 184978,
+    "readerPid": 185285,
+    "allFourExits": 0,
+    "publicReviewRuns": 2,
+    "bindingRows": 3,
+    "premiseRows": 2,
+    "sourceFocus": 3,
+    "nativeEvaluations": 14,
+    "samePidSelfExecs": 14,
+    "totalSuccessfulNativeExecve": 28,
+    "afterCloseReadbacks": 12,
+    "uniqueReadbacks": 11,
+    "reviewFrames": 2,
+    "boardFrames": 6,
+    "boardCards": 2,
+    "closedManifestSha256": "5f925b434191db6e43ab33e70e29cdfbe8f187a44af49bedcd641dd40c045eec",
+    "nativeSummarySha256": "78aeddb78163b1143fb72113248166bd78ec585332522518c9390629783100e8",
+    "rootViewedSelectedPngs": 6,
+    "controls": "heldactualgoalABA+graphABA nooldpaint/0autoRun; real400/413 invalidprogram retainedplainproof; labelledmalformedtyped200/authstripped401 invalidated; actualsourceamend109B\u2192409unconfirmed/rows0",
+    "fixture": "UnreviewedmanualKIFcarrier productioncodec fixture, actualpublicsnapshotRun/authapproveR2; notpubliccuratorintake"
+  },
+  "independentAudit": {
+    "root": "/workspace/library-files/native-horn-docs-v88-independent-audit",
+    "result": "PASS",
+    "publicResultSha256": "18355b9dfa9096db5872b7ebcef5b434dd9bce887a7de5a3c0832e6c62a47702",
+    "auditSha256": "0e6d905043ed7d1bd0cffb677f7501e33500538ea37ad517fe977f8dda59f8c8",
+    "manifestSha256": "7549b28cb204a969ce83a381080fff5f3eae1f7ab3dc07cb607eb48c9ddb45ab",
+    "mutantsRejected": 6,
+    "strictLocal120JarAndAssetHashMode": "EXECUTEDPASS byteidenticaldefaultresult; notfullclosure"
+  },
+  "captureLimits": [
+    "Programdetails PRE innerTextempty becauseclosed; visibletextNOTEXERCISED, actualpostedprogram/returnedSPARQL checked",
+    "First-report oversized/profilelimit source-reviewed only",
+    "No busycredentialchange or distinctderivedstep control; Forgetaftercompletion exercised",
+    "Spacegraphreviewoutputpane only; standaloneDocuments reader/deeplink/protectednativecanvas remaingaps",
+    "Firstbindingcolumnsscreenshot horizontallyclipped760px actualscrolltable; alltypedDOMcolumnsverified",
+    "No privatePDF/layout/Englishlegalsemanticaccuracy/fullisolation/portableexecutablenewclaims"
+  ],
+  "publicEvidence": "../native-horn-review-ui-v88/README.md",
+  "publicEvidenceCommit": "4d650db3ccac6b2f1d2dba86a5979df59591b36b",
+  "publicArchiveSha256": "54c662a30f88aee78933d897686494b8b938b23dea515cb8ec25038c44047aed",
+  "publicArchiveMembers": 375,
+  "publicArchiveRawBytes": 94732469,
+  "rootFreshPublicReplay": "PASS exact18355b9dfa9096db5872b7ebcef5b434dd9bce887a7de5a3c0832e6c62a47702",
+  "sourceAlreadyPublishedByPeer": "97fbadd1bc018c6daa8410627a79631843fd0b7b viaPR1110; currentmaster259982561e7e95223c310a06483021e06a8c6e00",
+  "laterInheritedChanges": "R3f Main/Panels/PanelsReceipts/PanelsRun changes are already public; v88 native evidence remains pinned92510e/f784 and does not certify newer JS. Next root combined build will validate inherited source.",
+  "remaining": "Standalone Documents/review deep link, protected editable native query canvas, Import readiness fix, ordered English relation-frame and Camel child implementation and selected-page furniture projection; semantic16 MISSING16/scored0. Goal remains ACTIVE."
+}
