@@ -14,6 +14,7 @@ import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
 import java.nio.file.Path
+import java.lang.System as JvmSystem
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
@@ -225,9 +226,9 @@ class CamelCorpusRoutingExecutionTest {
 /** Test code only, pinned by the internal class-directory factory. No production fault option. */
 object BlockedCamelCorpusWorker {
     @JvmStatic fun main(args: Array<String>) {
-        require(args.isEmpty() && System.getenv("TRIKESHED_AIRGAP") == "1")
+        require(args.isEmpty() && JvmSystem.getenv("TRIKESHED_AIRGAP") == "1")
         val route = CamelRuntime.start("deadline-fixture", "direct:deadline-fixture", "mock:deadline-fixture")
-        println("CAMEL_TEST_ENTERED:${route.status()}"); System.out.flush()
+        println("CAMEL_TEST_ENTERED:${route.status()}"); JvmSystem.out.flush()
         while (true) Thread.sleep(1000)
     }
 }
@@ -236,7 +237,7 @@ object BlockedCamelCorpusWorker {
 object InvalidUtf8CamelCorpusWorker {
     @JvmStatic fun main(args: Array<String>) {
         CamelCorpusWorker.main(args)
-        System.out.write(255); System.out.flush()
+        JvmSystem.out.write(255); JvmSystem.out.flush()
     }
 }
 
@@ -244,6 +245,6 @@ object InvalidUtf8CamelCorpusWorker {
 object OverflowCamelCorpusWorker {
     @JvmStatic fun main(args: Array<String>) {
         CamelCorpusWorker.main(args)
-        System.out.write(ByteArray(CamelCorpusProcess.OUTPUT_LIMIT) { 120 }); System.out.flush()
+        JvmSystem.out.write(ByteArray(CamelCorpusProcess.OUTPUT_LIMIT) { 120 }); JvmSystem.out.flush()
     }
 }
