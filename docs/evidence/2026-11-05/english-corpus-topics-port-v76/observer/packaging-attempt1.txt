@@ -1,0 +1,1 @@
+Initial packaging assertion counted 120 production JARs as total classpath entries. Actual captured classpaths contain 121 entries: one observer class directory plus 120 production/dependency JARs. Runtime observations were unaffected. Corrected packaging counts are recorded separately; no runtime repeated.

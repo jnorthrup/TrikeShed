@@ -1,0 +1,153 @@
+package proof.englishcorpusport
+
+import borg.trikeshed.couch.*
+import borg.trikeshed.dag.*
+import borg.trikeshed.forge.server.*
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.subvm.GuestModules
+import borg.trikeshed.job.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.memory.*
+import borg.trikeshed.module.*
+import borg.trikeshed.nlp.EnglishCorpus
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import kotlinx.coroutines.*
+import java.io.File
+
+/** External observer only: production public APIs and archived genuine parser receipt, no fresh parsing. */
+fun main() = runBlocking {
+    fun env(key: String) = requireNotNull(java.lang.System.getenv(key)) { "$key required" }
+    val out = File(env("PROOF_ROOT")); val snapshot = File(env("PROOF_SNAPSHOT")); val root = File(out, "runtime")
+    val head = File(snapshot, "source-head.txt").readText().trim()
+    check(head == env("EXPECTED_SOURCE_HEAD"))
+    val mainJar = File(EnglishCorpusWire::class.java.protectionDomain.codeSource.location.toURI())
+    check(mainJar.isFile && mainJar.extension == "jar" && ContentId.of(mainJar.readBytes()).hex == env("EXPECTED_MAIN_SHA256").removePrefix("sha256:"))
+    val cp = java.lang.System.getProperty("java.class.path").split(File.pathSeparator)
+    check(File(cp.first()).canonicalFile == File(env("PROOF_OBSERVER_CLASSES")).canonicalFile)
+    check(cp.drop(1).all { File(it).isFile && File(it).extension == "jar" })
+    val code = linkedMapOf<String, String>()
+    for (type in s_[EnglishCorpusWire::class.java, LcncRunner::class.java, EnglishCorpus::class.java,
+        EnglishObservationGraph::class.java, PackCasStore::class.java].view) {
+        val jar = File(type.protectionDomain.codeSource.location.toURI())
+        check(jar.canonicalFile == mainJar.canonicalFile)
+        code[type.name] = jar.absolutePath
+    }
+    val files = JvmFileOperations()
+    if (env("PROOF_STAGE") == "reopen") {
+        val writer = reifyStrict(File(out, "writer.json").readText()) as Map<*, *>
+        val cas = PackCasStore(files, File(root, "cas").absolutePath)
+        try {
+            val ids = writer["retainedCids"] as List<*>
+            val verified = ids.map { raw ->
+                val id = ContentId(raw as String); val bytes = requireNotNull(cas.getBounded(id, 8 * 1024 * 1024))
+                check(ContentId.of(bytes) == id)
+                _m["cid" j id.value, "bytes" j bytes.size, "boundedReadback" j true]
+            }
+            val original = EnglishObservationGraph.read(cas, ContentId(writer["inspectionCid"] as String))
+            check(original.source.originalCid.value == writer["originalSourceCid"])
+            File(out, "reopen.json").writeText(jsonOf(_m["result" j "PASS", "sourceHead" j head,
+                "mainJar" j mainJar.absolutePath, "codeSources" j code, "retained" j verified,
+                "inspectionCid" j original.receiptCid.value, "source" j original.descriptor("current"),
+                "scope" j "Fresh reader process after all writer owners closed; bounded hash readback only, no parser or execution"]))
+        } finally { cas.close() }
+        return@runBlocking
+    }
+    check(env("PROOF_STAGE") == "writer")
+    val expected = env("PROOF_EXPECT"); check(expected in s_["red", "green"])
+    val setup = reifyStrict(File(out, "setup.json").readText()) as Map<*, *>
+    val selection = setup["selection"] as Map<*, *>; val project = selection["project"] as String; val id = selection["id"] as String
+    val inspectionCid = ContentId(setup["inspectionCid"] as String)
+    check(inspectionCid.value == "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d")
+    val packBefore = File(root, "cas/pack").readBytes()
+    val originals = s_["files/$project/$id", "project-couch/$project/HEAD", "project-intake-policy/$project.guard", "project-manifests/$project.tsv", "projects.tsv"]
+        .view.associateWith { File(root, it).readBytes() }
+    val cas = PackCasStore(files, File(root, "cas").absolutePath)
+    val store = CouchStoreFactory.casBacked(cas); val gateway = CouchAttachmentGateway(store, cas)
+    val dbs = ProjectDbRegistry("primary")
+    val scopes = ProjectScopes(files, gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, store))), cas, null,
+        projectDbs = dbs, ledgerFile = File(root, "projects.tsv"), filesRoot = File(root, "files"))
+    scopes.remountLedger()
+    val corpus = JvmProjectCorpus(dbs, scopes, ProjectMiner(dbs, scopes, cas, null, File(root, "files")))
+    val owner = SupervisorJob(coroutineContext[Job])
+    val ctx = ModuleContext(Couch("topics-port-observer", store, cas), ReteNetwork(), ReteProductionRegistry(), null, null,
+        ConfixBlackboard.empty(), cas, gateway, ModuleRouteRegistry(), CoroutineScope(Dispatchers.IO + owner + files),
+        { 123L }, File(root, "topics-port-owner").apply { mkdirs() })
+    val wire = EnglishCorpusWire(ctx, corpus); wire.attach()
+    val retained = linkedSetOf(inspectionCid.value)
+    fun remember(value: Map<*, *>) { for (key in s_["receiptCid", "corpusCid", "matrixCid", "topicCid"].view) (value[key] as? String)?.let(retained::add) }
+    try {
+        val recorded = EnglishObservationGraph.read(cas, inspectionCid)
+        retained.add(recorded.source.originalCid.value); retained.add(recorded.source.extractedTextCid.value)
+        val current = requireNotNull(corpus.document(project, id))
+        check(current.cid == selection["cid"] && current.rev == selection["rev"] && current.seq.toDouble() == (selection["seq"] as Number).toDouble())
+        check(recorded.selection.project == project && recorded.selection.id == id && recorded.selection.cid == current.cid)
+        for (row in requireNotNull(recorded.sourceSnapshots)) check(corpus.document(row.project, row.id) == row)
+        val ids = _l[inspectionCid.value]
+        val config = _m["topics" j 2, "iterations" j 10, "seed" j 7, "alpha" j .1, "beta" j .01]
+        suspend fun canonical(topics: Any?): Map<*, *> {
+            val route = requireNotNull(ctx.routes.match(EnglishCorpusWire.PATH))
+            val reply = requireNotNull(route.route("POST", EnglishCorpusWire.PATH,
+                jsonOf(_m["receiptCids" j ids, "mode" j "current", "topics" j topics]), null))
+            check(reply.status == 200) { reply.body }
+            return (reifyStrict(reply.body) as Map<*, *>).also(::remember)
+        }
+        suspend fun graph(inputs: Map<String, Any?>, authored: String = "null"): Map<String, Any?> {
+            val nodes = mutableListOf<LcncNode>(); val wires = mutableListOf<LcncWire>()
+            nodes.add(LcncNode("receipts", "json.value", _m["value" j jsonOf(ids)])); nodes.add(LcncNode("mode", "text.value", _m["value" j "current"]))
+            wires.add(LcncWire("receipts", "value", "corpus", "receiptCids")); wires.add(LcncWire("mode", "value", "corpus", "mode"))
+            for ((i, input) in inputs.entries.withIndex()) {
+                nodes.add(LcncNode("topic-$i", "json.value", _m["value" j jsonOf(input.value)])); wires.add(LcncWire("topic-$i", "value", "corpus", input.key))
+            }
+            nodes.add(LcncNode("corpus", EnglishCorpusWire.TYPE, _m["topics" j authored]))
+            for (port in s_["topics", "topicCid"].view) {
+                nodes.add(LcncNode("out-$port", LcncContracts.SCOPE_OUT, _m["name" j port, "kind" j "json"]))
+                wires.add(LcncWire("corpus", port, "out-$port", "value"))
+            }
+            val program = LcncProgram("retained-English-topics-port", nodes.toSeries(), wires.toSeries())
+            val result = LcncRunner(PureNodes.registry { 123L } + ctx.lcncRunners).runProcedure(program)
+            val output = result.nodeOutputs.getValue("corpus").also(::remember)
+            for (port in s_["topics", "topicCid"].view) check(result.returns.containsKey(port) && result.returns[port] == output[port])
+            return _m["program" j reifyStrict(LcncProgramConfix.toJson(program)), "output" j output, "returns" j result.returns]
+        }
+        val canonicalModel = canonical(config); val canonicalNull = canonical(null)
+        check(canonicalModel["topics"] is Map<*, *> && canonicalModel["topicCid"] is String)
+        val configured = graph(_m["topics?" j config]); val aliasNull = graph(_m["topics?" j null], jsonOf(config))
+        val normalizedNull = graph(_m["topics?" j config, "topics" j null], jsonOf(config))
+        val invalid = s_[config + _m["topics" j 17], config + _m["extra" j true], "invalid"].view.map { value ->
+            try { _m["input" j value, "refused" j false, "unexpectedSuccess" j graph(_m["topics?" j value], jsonOf(config))] }
+            catch (refused: IllegalArgumentException) { _m["input" j value, "refused" j true, "exception" j refused::class.simpleName, "message" j refused.message] }
+        }
+        val checks = _m["aliasConfigMatchesCanonicalHttpRoute" j (configured["output"] == canonicalModel),
+            "aliasNullOverridesAuthored" j (aliasNull["output"] == canonicalNull), "canonicalNullWinsAlias" j (normalizedNull["output"] == canonicalNull),
+            "invalidAliasesRefuse" j invalid.all { it["refused"] == true }]
+        check(ctx.blackboard.snapshot().values.isEmpty() && ctx.rete.snapshot().size == 0 && ctx.beliefBag == null && ctx.kifBank == null && ctx.narsRete == null)
+        val passed = checks.values.all { it == true }
+        val report = _m["result" j (if (passed) "GREEN" else "RED_REPRODUCED"), "expected" j expected, "checks" j checks,
+            "sourceHead" j head, "mainJar" j mainJar.absolutePath, "codeSources" j code, "classpath" j cp,
+            "inspectionCid" j inspectionCid.value, "originalSourceCid" j recorded.source.originalCid.value,
+            "recordedParser" j recorded.inventory["parser"], "parserClaim" j "Exact archived 3f9588 receipt and recorded parser metadata; no fresh parser or model invocation or reauthentication",
+            "selection" j selection, "currentProjectDoc" j current.toMap(), "sourceSnapshots" j recorded.sourceSnapshots?.map { it.toMap() },
+            "canonicalTransport" j "Public production ModuleRouteRegistry POST handler, in process; no socket-HTTP claim",
+            "config" j config, "canonicalConfig" j canonicalModel, "canonicalNull" j canonicalNull,
+            "configuredGraph" j configured, "aliasNullGraph" j aliasNull, "canonicalNullGraph" j normalizedNull, "invalidAliases" j invalid,
+            "retainedCids" j retained.toList(), "blackboardUnchangedEmpty" j true, "reteUnchangedEmpty" j true,
+            "beliefBagConfigured" j false, "kifBankConfigured" j false, "narsReteConfigured" j false,
+            "mountedGuestModules" j GuestModules.mounted(), "scope" j "Descriptive source-pinned corpus/LDA only; genuine archived synthetic pilot text, no user PDF or world-fact admission")
+        File(out, "writer.json").writeText(jsonOf(report)); println(jsonOf(_m["result" j report["result"], "checks" j checks]))
+        if (expected == "green") check(passed) else check(!passed && checks["aliasConfigMatchesCanonicalHttpRoute"] == false)
+    } finally {
+        wire.drain(); scopes.drain(); owner.complete(); owner.join(); cas.close()
+        check(owner.isCompleted && owner.children.none())
+        for ((path, bytes) in originals) check(File(root, path).readBytes().contentEquals(bytes)) { "Original source/head changed: $path" }
+        val after = File(root, "cas/pack").readBytes()
+        check(after.size >= packBefore.size && after.copyOfRange(0, packBefore.size).contentEquals(packBefore))
+        File(out, "cleanup.json").writeText(jsonOf(_m["corpusWireDrained" j true, "routesRemoved" j (ctx.routes.match(EnglishCorpusWire.PATH) == null),
+            "runnerRemoved" j (EnglishCorpusWire.TYPE !in ctx.lcncRunners), "projectScopesDrained" j true,
+            "ownerCompleted" j owner.isCompleted, "remainingChildren" j owner.children.count(), "casClosed" j true,
+            "originalSourceAndHeadsUnchanged" j true, "inputCasPrefixUnchanged" j true, "inputCasBytes" j packBefore.size)))
+    }
+}

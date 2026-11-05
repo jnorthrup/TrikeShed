@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source /workspace/.trikeshed-cloud/activate.sh
+corpus_proof=/workspace/library-files/english-corpus-topics-port-proof
+corpus_snapshot=${1:?immutable snapshot required}
+corpus_output=${2:?fresh observer class directory required}
+corpus_cp=$(cat "$corpus_snapshot/classpath.txt")
+corpus_compiler=$(rg --files --no-ignore /workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21 | rg '\.jar$' | head -n 1)
+mkdir "$corpus_output"
+java -Xmx768m -cp "$corpus_compiler:$corpus_cp" org.jetbrains.kotlin.cli.jvm.K2JVMCompiler -no-stdlib -no-reflect -jvm-target 25 -classpath "$corpus_cp" -d "$corpus_output" "$corpus_proof/Observer.kt"
