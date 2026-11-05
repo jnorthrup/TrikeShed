@@ -15,6 +15,7 @@ object DocumentSpans {
             val cas = CasStoreKey.require()
             val source = DocumentCurationLegos.retainSource(cas, inputs["source"])
             require(DocumentCurationLegos.current(owner.value, source)) { "Source revision is no longer current" }
+            DocumentCurationLegos.consumed(source)
             val manifest = cas.put(CanonicalCbor.encodeMap(DocumentCuratorCodec.source(source) - "text"))
             fun integer(name: String, default: Int, range: IntRange): Int {
                 val text = node.params[name] ?: return default

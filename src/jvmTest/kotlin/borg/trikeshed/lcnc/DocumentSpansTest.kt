@@ -5,6 +5,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.*
 import borg.trikeshed.parse.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.test.*
 
 class DocumentSpansTest {
@@ -76,7 +77,14 @@ class DocumentSpansTest {
         val reference = DocumentCurationLegos.source(cas, corpus).execute(
             LcncNode("source", "document.source", _m["view" j "reference"]), _m["doc" j doc.toMap()])["source"]
         val runner = DocumentSpans.runner(cas, corpus)
-        runner.execute(LcncNode("spans", "document.spans"), _m["source" j reference])
+        val ledger = LcncConsumedLedger()
+        withContext(ledger) {
+            DocumentCurationLegos.source(cas, corpus).execute(LcncNode("ref", "document.source", _m["view" j "reference"]),
+                _m["source" j reference])
+            runner.execute(LcncNode("spans", "document.spans"), _m["source" j reference])
+        }
+        assertEquals(2, ledger.entries().size)
+        assertEquals(_s["case/opinion.pdf", "case/opinion.pdf.extract.md"], ledger.entries().map { it.id }.toSet())
         corpus.put("case", "opinion.pdf", "%PDF-revised-test-only".encodeToByteArray())
         assertFails { runner.execute(LcncNode("spans", "document.spans"), _m["source" j reference]) }
     }

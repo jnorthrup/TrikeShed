@@ -52,6 +52,7 @@ object DocumentCurationLegos {
         val retained = if (doc != null) projectSource(cas, owner.value,
             requireNotNull((doc as? Map<*, *>)?.let(ProjectDoc::fromMap)) { "$SOURCE.doc must be a ProjectDoc" })
         else retainSource(cas, input).also { require(current(owner.value, it)) { "Source revision is no longer current" } }
+        consumed(retained)
         val reference = DocumentCuratorCodec.source(retained)
         val cid = cas.put(CanonicalCbor.encodeMap(reference - "text"))
         cas.sync()
@@ -89,11 +90,15 @@ object DocumentCurationLegos {
         check(cas.put(bytes) == source.originalCid)
         check(cas.put(extracted.text.encodeToByteArray()) == source.extractedTextCid)
         cas.sync()
-        currentCoroutineContext()[LcncConsumedLedger]?.apply {
-            consumed(LcncConsumedLedger.PROJECT, "${original.project}/${original.id}", original.cid, original.seq, original.rev)
-            consumed(LcncConsumedLedger.PROJECT, "${extracted.project}/${extracted.id}", extracted.cid, extracted.seq, extracted.rev)
-        }
+        consumed(source)
         return retainSource(cas, source)
+    }
+
+    /** References consume the same pinned project revisions as a fresh ProjectDoc read. */
+    suspend fun consumed(source: DocumentSource) {
+        val ledger = currentCoroutineContext()[LcncConsumedLedger] ?: return
+        for (revision in s_[source.project, source.extraction].view) if (revision != null)
+            ledger.consumed(LcncConsumedLedger.PROJECT, "${revision.project}/${revision.id}", revision.cid, revision.seq, revision.rev)
     }
 
     /** Read-only: review checks must never mine, repair, or silently replace a source revision. */
