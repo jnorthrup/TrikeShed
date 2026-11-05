@@ -1,0 +1,120 @@
+{
+  "kind": "corpus-lexical-query-v86-evidence/1",
+  "source": "1aa29894aeeb290a5644b3370fd895f261f576d2",
+  "mainSha256": "e4fa6c396fbff190d160c084df0ac6991ab35ebac44149c4736a18c59165382a",
+  "tests": 535,
+  "actualLCNCCompletedRuns": 2,
+  "readbackRecords": 28,
+  "uniqueBlocks": 18,
+  "boardWal": {
+    "frames": 6,
+    "bytes": 834
+  },
+  "closedPackBytes": 560273,
+  "readerPackUnchanged": true,
+  "activeREFs": 1,
+  "currentSourceBytes": 134,
+  "publicFullPack": false,
+  "rankingUnits": {
+    "physicalDocuments": 1,
+    "inspectionRanges": 2,
+    "lexicalSentences": 5
+  },
+  "directTermPostingsCodeSource": "NOT separately captured",
+  "actualPNGs": 6,
+  "presentationScope": "All actual source/data UI accepted; source witness and wordcloud/read/refusal/historical screens readable. Overview clips rightmost scope outputs after display expansion; static note reports Unavailable: No runtime owner is bound although actual program completes. Preserve as-is, no full-fit/perfect-UI claim or cosmetic rerun.\n\nLegacy0e468/coreb83b/matrix20b are genuine priorv80 verification expectations, not preinstalled seeded outputs. Freshowner reproduced exact no-query bytes. Runtime materialized ONLY genuine two inspections/source from retained inputs; all new search/topic/run outputs were produced by final owner.\n",
+  "archive": {
+    "bytes": 2209073,
+    "sha256": "b3ebb89d9139d68a3c148d55bad9cb1565d39bc7d2f416a19ea9dd4f9b0b9b7a",
+    "members": 156,
+    "uncompressedBytes": 20166725
+  },
+  "audit": {
+    "kind": "corpus-lcnc-query-independent-audit-files/1",
+    "sourceHead": "1aa29894aeeb290a5644b3370fd895f261f576d2",
+    "selectedAttempt": "corpus-lcnc-v86-native-proof/native-attempt1",
+    "files": {
+      "audit.py": {
+        "bytes": 30197,
+        "sha256": "38cc2e318afc081f9c5d01098e518dc8b39895a5e2006a7d2737bbe1d507b6c1"
+      },
+      "checks.py": {
+        "bytes": 13060,
+        "sha256": "92c7f323e741b4a2c78af3fe78c8903695ced954f6e33ff9f52848fd6b31f74c"
+      },
+      "receipt-core.py.txt": {
+        "bytes": 33996,
+        "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+      },
+      "README.txt": {
+        "bytes": 7920,
+        "sha256": "ebdadeb9b0b293d93640e5f24f9414e2e499268e83009ef85a5b0f9b5f1ba583"
+      },
+      "final/result.json": {
+        "bytes": 7525,
+        "sha256": "a2fea4698626fd2ae5301966263a8af080550b910d26d69c02249a4ef81fc93a"
+      },
+      "final/report.txt": {
+        "bytes": 3498,
+        "sha256": "8f682865299fe9728cea6414119c1b897339ed57b1e6b5eb3ac9245e8f0bba03"
+      },
+      "repeat/result.json": {
+        "bytes": 7525,
+        "sha256": "a2fea4698626fd2ae5301966263a8af080550b910d26d69c02249a4ef81fc93a"
+      },
+      "repeat/report.txt": {
+        "bytes": 3498,
+        "sha256": "8f682865299fe9728cea6414119c1b897339ed57b1e6b5eb3ac9245e8f0bba03"
+      },
+      "attempt1/audit.py.txt": {
+        "bytes": 26421,
+        "sha256": "3218209725addb5171cfdbc17956f4659acb4a9eaeb6393212f3372f46c670cc"
+      },
+      "attempt1/checks.py.txt": {
+        "bytes": 13060,
+        "sha256": "92c7f323e741b4a2c78af3fe78c8903695ced954f6e33ff9f52848fd6b31f74c"
+      },
+      "attempt1/result.json": {
+        "bytes": 385,
+        "sha256": "a835866d9787fb94eabc4df83da8e23b015e4dd036dde2844447d4be144c6889"
+      },
+      "attempt1/report.txt": {
+        "bytes": 57,
+        "sha256": "9280628212ddbdf61c4ee70ebcbf77a5d672452627f47128d1e24e783f0e6eed"
+      },
+      "attempt2/audit.py.txt": {
+        "bytes": 26407,
+        "sha256": "06e945f2b26fcc435602a44e35e4ef2d837eca5f9aae21d978054e267468f3e2"
+      },
+      "attempt2/checks.py.txt": {
+        "bytes": 13060,
+        "sha256": "92c7f323e741b4a2c78af3fe78c8903695ced954f6e33ff9f52848fd6b31f74c"
+      },
+      "attempt2/result.json": {
+        "bytes": 397,
+        "sha256": "7ffed3f4ebbbf828610615f168e1a74389b7c5654369ef0d734b13e25c6147af"
+      },
+      "attempt2/report.txt": {
+        "bytes": 69,
+        "sha256": "2b9663ccfcfb2e0e1a4213588de8c9a6654226f3e780c9744441f3cac5ef04f6"
+      },
+      "attempt3/audit.py.txt": {
+        "bytes": 26504,
+        "sha256": "41ae59a3c8fec98b527748bb2fc6eabf9978b3ad17eb57923bda7890bdea4cf5"
+      },
+      "attempt3/checks.py.txt": {
+        "bytes": 13060,
+        "sha256": "92c7f323e741b4a2c78af3fe78c8903695ced954f6e33ff9f52848fd6b31f74c"
+      },
+      "attempt3/result.json": {
+        "bytes": 7525,
+        "sha256": "d9802f834bdc98400b828539feddf42b8b7ebb9fdb63ca6cd3553ce6b6c1967a"
+      },
+      "attempt3/report.txt": {
+        "bytes": 847,
+        "sha256": "f81be4fb356610eccd3f689b193ba6c913796e45584af7445276972715c4512a"
+      }
+    }
+  },
+  "scope": "Recorded source/query/stat/topic identity + existing score math only; no freshNLP/model/independence/confidence/portableCAS/fullseal/HornWIP claim"
+}

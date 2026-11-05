@@ -1,0 +1,116 @@
+V86 independent corpus LCNC query recorded-data audit — FINAL
+
+Selected actual closed data: corpus-lcnc-v86-native-proof/native-attempt1.
+Writer163060/reader163277. Finalsource1aa29894aeeb290a5644b3370fd895f261f576d2,
+maine4fa6c396fbff190d160c084df0ac6991ab35ebac44149c4736a18c59165382a.
+No JVM/NLP/parser/browser/retrieval engine/model sampler/build/namespace launched
+by this Python audit. Existing supplied retained CBOR/record math only.
+
+Restore unchanged audit.py.txt as audit.py and checks.py.txt as checks.py in an
+EXTERNAL directory; retain receipt-core.py.txt beside them unchanged. Python3
+stdlib only. Set PROOF to extracted directory with inputs/,corpus-inputs.json,
+closed-pack-inventory.json,native-summary.json,native-attempt1/; AUDITOR to scripts
+and OUT to a separate writable output directory. Run:
+
+python3 "$AUDITOR/audit.py" "$PROOF" \
+ --source-head 1aa29894aeeb290a5644b3370fd895f261f576d2 \
+ --main-sha e4fa6c396fbff190d160c084df0ac6991ab35ebac44149c4736a18c59165382a \
+ --documents-sha 4afe537ee61120cca73a57edf28904c20311b417313ea7b75de7a3cc3444e2b1 \
+ --panels-sha 9218cc3f29024ff003973ee70b3654937e09d3bd9e784eab8fbeac79651193aa \
+ --out "$OUT"
+
+Exit0 writes result.json/report.txt. Default PUBLIC mode checks supplied content
+and recorded artifact/inventory metadata; no external JAR, old REF target, SDK,
+model or runtimepack paths are opened. Optional --check-external-artifacts hashes
+current external120JAR/browser/localclosedpack bytes if available; this optional
+mode was NOT executed by this auditor. No --recorded-only flag is needed. Final
+hashes in manifest.json; repeat default audit output is byte-identical.
+
+Public minimum consumed:
+- corpus-inputs.json, native-summary.json(final778fb...visualscope),
+  closed-pack-inventory.json and six prior allowlisted blocks under inputs/:
+  retained/{06d92...,d975...,2d357...}.bin and legacy-corpus/{0e468...,b83b...,20b...}.bin
+  under exact fullCID filenames. First3 are actual retained inputs; last3 are
+  comparison expectations, never seeded owner outputs.
+- native-attempt1/{GO.json,startup.json,browser-result.json,cleanup.json,reopened.json,
+  readback-index.json,classpath.json,network.json,controller-before-netns.json,
+  writer-command.json,reader-command.json}, four exitfiles; artifact-metadata
+  {source-head.txt,sha256.json,classpath.txt}; exact observer-inputs, actualPNG(s),
+  all28indexed CASreadbacks/18unique .bin blocks plus after-close readback files,
+  actual-source-amendment-request.txt and after-close-readbacks/actual-amended-S12-
+  source.txt/board.wal; every actual record label's -response.json rawHTTP file.
+Keep rawrequests/controls/offeredpreset/source/protocol/controller/logs/manifests
+and build535fixture history alongside this minimum. No whole17case sourcearchive,
+full129885Boriginal prefix/runtimepack, binary/JAR/classes/models/privatePDF need
+ship. Supplied blocks authenticate by CID; fullpack/current REF availability is
+not portable or independently rehashed in public mode. This is not a capsule.
+
+Two exact genuine prior CoreNLP4.6 inspections remain immutable:
+06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824 [0,40),
+d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a [40,105).
+Both use original/extracted105B S12source2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac.
+Canonical original CBOR/hash, source/parser-input substring hashes, receipt-local
+sentence indexes, exact absoluteUTF16/token quotes are checked. No new English
+parse or source dictionary/receipt relabelling. Producer metadata is historical,
+not newly authenticated source/parser quality or loaded-model availability.
+
+Actual owner omitted query/view reproduces exact old0e468receipt bytes and
+coreb83b/matrix20b; explicit14node all-lexical query may legitimately add view/search
+and alter outerreceipt while same dataset remains. Corpus matrix is ONE original/
+extracted document,20raw/15included tokens. BM25 indexes FIVE nonempty included
+lexical sentences: imply N5/df5, not corpus term.documentFrequency1. Direct finite
+score check uses existing LUCENE IDF log(1+(N-df+.5)/(df+.5)) and TFC tf/(k1*(1-b)+
+k1*b*docLen/avgLen+tf), no extra(k1+1). Every hit retains all original matching
+occurrences; repetitions are retrieval occurrences, not independent evidence.
+
+Seed7/2topics/8iterations/alpha.1/beta.01 model's source/core/matrix/CID/config,
+counts conservation and posterior normalization are checked. Same topicfc55...
+across imply and NOT_REPORTED_V86 query; distinct query-bound receipts. No Gibbs
+resampling or semantic topic-correctness claim. Successful zero lexical hits
+make no absence/legal truth claim. Query/null/invalid/stale are not reclassified
+as empty success; explicit query:null409 does not write derivedCAS.
+
+Actual public14node graph binds JSONreceipts/query? and explicit source mode into
+existing corpus owner, then display/scope outputs. Program/invocation/fullretained
+command and ordinary inline response match; no large-output/automatic hydration
+claim. Actual five Docs wordcloud/concordance source cards and one inert offered
+copular popup select originalI/wholeinspection range, not sentence range or query
+term filter. Exact9URLkeys/noautofilter/credentials; zero automatic/parser/copular
+queries, only2explicitcorpusRuns.
+
+Real source upload yields134B9375a3...rev2/seq17; current API/Docs409 clear cloud0.
+Explicit snapshot mode Run returns old-source5hits with historical/not-checked
+source envelope. Old completed current output was as-of its original run; it is
+not current after amendment. Same immutable core/matrix does not imply current
+physical head. Actual after-close reader exports current mirror and oldsource
+CBORs separately; all28readbacks/18unique content,6CRC32Cboardframes/two actual
+recovered DONEcards and sourcehead/WAL/CAS recorded hashes agree after close.
+Operational workflow blackboard/CAS/boardRete writes are expected, not blanket0.
+No SDK/provider/bag/KIF/NARS planes configured. TermPostings directCodeSource was
+not separately captured; EnglishCorpus/owner finalmain origins and math checked.
+
+Closed inventory discloses94BLOB+18historicalREF records/current94BLOB+1REF. The
+latest REF is the REAL amended134B S12file path; reader verified/exported those
+bytes without promotion. Default audit validates inventory/header geometry and
+recorded pack/prefix hashes, not omitted fullpack bytes/old REF availability.
+This is not a self-contained reopenedPackCAS/noREF/data-portability claim.
+Loopbackonly namespace is recorded, no full R4/filesystem/hardware/airgap claim.
+
+Presentation limits are preserved AS-IS: overview clips right scope-outs and
+static note shows unavailable/no-owner badge despite completed actualRun. Root
+accepted source/data UI with readable sourceCIDs/quotes/spans; no claim allnodes
+Fit or fully polished UX and no cosmetic rerun. AllactualPNG hashes retained;
+independent data audit does not independently attest pixel rendering.
+
+History: initial535build had2fixtureerrors (test-onlydisplayregistry/producerorder
+fix, production4artifactbytes unchanged), rootfinal535zero/errors/skips. Controller
+GO-hashshape preflight failed before compile/JVM/native; preserve exactfailure.
+Independent attempt1 failed guessed observer package corpuslcnc vsactual
+corpusquery; attempt2 failed replay hash field-name payloadSha256 vsactual
+sha256. Exact source/results saved; protocol-field corrections only. No ENOSPC
+audit failure occurred. Attempt3 passed; final adds rawHTTP/vocabulary/report
+bindings and repeats byte-identically. Six small mutants reject original token
+span, selected dataset, BM25score, historical→current relabel, seed/topicID and
+stale source old-hit reuse. No source/runtime corrections or extra testmatrix.
+No legal accuracy, new semantic understanding, sourceauth, confidence uplift,
+independent evidence, nativeHorn/Camel isolation or model-quality claim.
