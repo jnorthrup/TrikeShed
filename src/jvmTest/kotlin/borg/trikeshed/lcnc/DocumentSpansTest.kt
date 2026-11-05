@@ -74,8 +74,10 @@ class DocumentSpansTest {
         corpus.put("case", "opinion.pdf", "%PDF-test-only".encodeToByteArray())
         corpus.put("case", "opinion.pdf.extract.md", "Exact extracted body".encodeToByteArray())
         val doc = assertNotNull(corpus.document("case", "opinion.pdf"))
-        val reference = DocumentCurationLegos.source(cas, corpus).execute(
-            LcncNode("source", "document.source", _m["view" j "reference"]), _m["doc" j doc.toMap()])["source"]
+        val reference = reifyStrict(jsonOf(DocumentCurationLegos.source(cas, corpus).execute(
+            LcncNode("source", "document.source", _m["view" j "reference"]), _m["doc" j doc.toMap()])["source"])) as Map<String, Any?>
+        val project = reference["project"] as Map<String, Any?>
+        assertFails { DocumentCurationLegos.retainSource(cas, reference + _m["project" j (project + _m["seq" j 0.5])]) }
         val runner = DocumentSpans.runner(cas, corpus)
         val ledger = LcncConsumedLedger()
         withContext(ledger) {

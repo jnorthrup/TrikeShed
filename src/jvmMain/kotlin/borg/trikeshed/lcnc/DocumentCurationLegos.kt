@@ -410,8 +410,19 @@ object DocumentCurationLegos {
                     for ((key, value) in supplied) if (key != "sourceCid" && key != "text")
                         put(requireNotNull(key as? String), value)
                 }
-                require(claimed.keys.all { it in manifest } && CanonicalCbor.encodeMap(claimed).contentEquals(
-                    CanonicalCbor.encodeMap(manifest.filterKeys { it in claimed }))) { "Source reference differs from retained manifest" }
+                // JSON transports exact small integers as Double; that is not a source revision change.
+                // Keep the manifest's actual bytes/CID and reject fractional or inexact substitutions.
+                fun numeric(value: Any?): Any? = when (value) {
+                    is Map<*, *> -> value.mapValues { numeric(it.value) }
+                    is List<*> -> value.map(::numeric)
+                    is Double -> if (value.isFinite() && value % 1.0 == 0.0 &&
+                        value >= -9_007_199_254_740_991.0 && value <= 9_007_199_254_740_991.0) value.toLong() else value
+                    else -> value
+                }
+                require(claimed.keys.all { it in manifest } && CanonicalCbor.encodeMap(claimed.mapValues { numeric(it.value) }).contentEquals(
+                    CanonicalCbor.encodeMap(manifest.filterKeys { it in claimed }.mapValues { numeric(it.value) }))) {
+                    "Source reference differs from retained manifest"
+                }
                 if ("text" in supplied) manifest + _m["text" j supplied["text"]] else manifest
             }
             require(fields["base64"] == null) { "File bytes require the document extraction feed" }

@@ -43,7 +43,9 @@ satisfy the lineage boundary used by this run.
 
 ```mermaid
 flowchart LR
-  D["ProjectDoc revision"] --> S["document.source"]
+  D["ProjectDoc revision"] --> A["Production source admission"]
+  A --> R["Retained source manifest"]
+  R --> S["document.source"]
   S --> P["document.spans"]
   P --> N["vm.llvm.confix"]
   P --> Q["confix.pickPath"]
@@ -53,12 +55,19 @@ flowchart LR
   N -. "measured invocation" .-> E["Immutable run evidence"]
 ```
 
-The fixture uses a `json.value` node to carry the pinned `ProjectDoc` map. Its
-fields are the real project, document ID, content ID, store revision and
-sequence, not a filename resolved to whichever file exists later.
-`document.source` checks those identities against `JvmProjectCorpus`, obtains
-the completed extraction, hashes the exact original and extracted bytes,
-checks lineage/currentness again and records both consumed revisions.
+Preparation admits the real `ProjectDoc` through `document.source` against
+`JvmProjectCorpus`: it obtains the completed extraction, hashes the exact
+original and extracted bytes, checks lineage/currentness again and retains
+its manifest. This happens before the animated run. The graph's `json.value`
+node then carries that pinned source reference into `document.source.source?`.
+An untyped object does not satisfy a `ProjectDoc` port; the initial probe
+correctly refused that construction instead of coercing its declared kind.
+
+The graph resolves the retained reference, verifies its bytes and current
+project/extraction revisions again, and records both consumed revisions.
+`document.spans` also records those dependencies when used directly. Repeated
+consumption of the same revision is deduplicated by the existing ledger. A
+manifest reference is not a filename resolved to whichever file exists later.
 
 `view=reference` keeps source output small. The full metadata and layout map
 is retained in canonical CBOR without its text body. The text remains a
