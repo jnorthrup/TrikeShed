@@ -1,4 +1,21 @@
 NARS / reviewed-corpus structured activation — bounded read-only review
+Verified follow-up, 2026-11-05: source87e7bb3e945546137c595ff5aaf53781f4168275
+implements complete-source exact lexical role selection over a request-local
+quad store. Documentary matches remain visible independently of bag residency.
+Typed angular/propositionCid outputs require exactly one documentary match and
+an exact current resident; separate nal.attend checks the full PID and refuses
+wired null identities before authored fallback. The actual14-run proof changes
+budget only, preserving evidence/basis/SignalCodec, and recovers both configured
+journals. See evidence/2026-11-05/nars-exact-role-v83. This supersedes the earlier
+angular-only Attend observation below; it does not implement corpus training,
+automatic premise approval or semantic confidence calibration.
+
+Sourcebafb47f3bb4977c0ed8e6abfde53cafa2a12bf70 additionally exposes checked
+native Horn variable bindings and ordered premise/source references. Those
+receipts remain separate from bag admission and induction; repeated source
+occurrences are alternative witnesses, not extra evidence. The original dated
+assessment below remains a record of its then-current source and future work.
+
 2026-11-02. No code edits/build/test executions. Inspected root /workspace/TrikeShed and activation plan in /workspace/TrikeShed-kif-bridge.
 
 Actual bounds
