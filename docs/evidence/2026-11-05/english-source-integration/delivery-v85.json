@@ -1,0 +1,29 @@
+{
+  "sourceMaster": "bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70",
+  "sourceChecks": 528,
+  "mainSha256": "a02c27f9a6153376ab6b73ae10c481c6a0e549f2d282510db834962fe21e9cf2",
+  "nativeDelivery": "PASS",
+  "nativeCases": 8,
+  "supported": 3,
+  "unknown": 5,
+  "independentMutationsRejected": 6,
+  "observerPid": 155443,
+  "nativeChildPids": [
+    155468,
+    155476,
+    155479,
+    155481,
+    155483,
+    155485,
+    155487,
+    155490
+  ],
+  "nativeInvocations": 8,
+  "successfulExecveEvents": 16,
+  "remainingChildren": 0,
+  "publicEvidence": "../native-horn-bindings-v85/README.md",
+  "independentPublicResultSha256": "286f44dddcec3ebb3f75503ff74469c2343de3a3e890ac3c128fc7d1c1304058",
+  "rootFreshPublicReplay": "PENDING_PACKAGE",
+  "sourceReferences": "Whole-sourceCID +normalizedformordinals/rule-scopedvariables, not character spans/entityIDs",
+  "scope": "Actual trusted-host declared manualtheories, finite checkedcertificateprojection. Public reviewed/taxonomyAPI authorization unchanged; genericmanualadmission/Englishinterpretation notimplemented. Semantic16 remains MISSING16/scored0."
+}
