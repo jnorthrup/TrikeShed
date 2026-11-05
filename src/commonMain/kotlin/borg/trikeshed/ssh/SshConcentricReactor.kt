@@ -1,12 +1,8 @@
 package borg.trikeshed.ssh
 
 import borg.trikeshed.context.Drain
-import borg.trikeshed.context.nuid.Capability
-import borg.trikeshed.context.nuid.Nuid
-import borg.trikeshed.context.nuid.Subnet
-import borg.trikeshed.context.nuid.capability
-import borg.trikeshed.context.nuid.subnet
-import borg.trikeshed.lib.j
+import borg.trikeshed.context.nuid.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.reactor.ReactorAction
 import borg.trikeshed.reactor.ReactorEndpoint
 import borg.trikeshed.reactor.ReactorResult
@@ -141,7 +137,7 @@ class SshClientElement(
         var paddingLen = blockSize - ((unpadded + 4) % blockSize)
         if (paddingLen < 4) paddingLen += blockSize
 
-        val packetLength = 1 + payload.size + paddingLen
+        val packetLength = unpadded + paddingLen
         val totalLength = 4 + packetLength
         val buf = ByteArray(totalLength)
 

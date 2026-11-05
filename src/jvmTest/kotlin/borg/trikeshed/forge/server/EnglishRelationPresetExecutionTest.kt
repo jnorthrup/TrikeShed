@@ -58,7 +58,7 @@ class EnglishRelationPresetExecutionTest {
     }
     private suspend fun evaluate(f: Fixture, mode: String = "snapshot", query: String = "{}") =
         LcncRunner(f.registry()).runProcedure(EnglishRelationPreset.build(f.snapshot.receiptCid.value, mode, query))
-    private fun untouched(f: Fixture) {
+    private suspend fun untouched(f: Fixture) {
         assertEquals(0, f.ctx.rete.snapshot().size); assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
         assertNull(f.ctx.beliefBag); assertNull(f.ctx.kifBank); assertNull(f.ctx.documentReview)
     }

@@ -38,7 +38,8 @@ class CamelCorpusRoutingExecutionTest {
             val words = Regex("[A-Za-z]+|[^\\sA-Za-z]").findAll(source).toList()
             val tokens = words.mapIndexed { i, word -> NlpToken(i + 1, word.range.first, word.range.last + 1,
                 word.value, word.value.lowercase(), "NN", "O") }.toSeries()
-            NlpDocument(source, s_[NlpSentence(0, 0, source.length, tokens, s_[NlpDependency(0, 1, "root")])],
+            NlpDocument(source, s_[NlpSentence(0, 0, source.length, tokens,
+                (0 until tokens.size).toSeries() α { i -> NlpDependency(if (i == 0) 0 else 1, i + 1, if (i == 0) "root" else "dep") })],
                 NlpMetadata("fixture", "CamelCorpusRoutingExecutionTest"))
         } }
         wire.attach(); val camel = CamelRouteLegos.register(ctx)

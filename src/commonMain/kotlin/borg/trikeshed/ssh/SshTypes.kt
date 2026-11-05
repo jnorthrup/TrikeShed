@@ -64,11 +64,7 @@ val SshPacket.payload: ByteArray get() = b
 /**
  * Capability for concentric SSH invocation within TrikeShed NUID routing.
  */
-data class SshCapability(val host: String, val port: Int = 22) : Capability("ssh") {
-    override fun familyRoot(): Capability = SshAll
-}
-
-data object SshAll : Capability("ssh*")
+typealias SshCapability = Capability.Ssh
 
 /**
  * Concentric boundary scope for SSH operations.

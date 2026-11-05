@@ -64,7 +64,7 @@ object CamelCorpusRouting {
         require(mode in _s["current", "snapshot"])
         return LcncProgram(NAME, s_[
             LcncNode("instructions", "note", _m["text" j "Choose the receipt CID produced by a corpus lexical search and the same explicit source mode. Run to inspect the local Camel Choice outcome. Matches retain the corpus's source sentences and token spans; ranking and topic weights are descriptive, not evidence confidence or legal approval."], x = 40.0, y = 20.0, width = 650.0),
-            LcncNode("receipt", "text.value", _m["value" j receiptCid], x = 40.0, y = 230.0),
+            LcncNode("receipt", LcncContracts.SCOPE_IN, _m["name" j "receiptCid", "kind" j "id", "default" j receiptCid], x = 40.0, y = 230.0),
             LcncNode("mode", "text.value", _m["value" j mode], x = 40.0, y = 430.0),
             LcncNode("route", TYPE, x = 390.0, y = 230.0),
             LcncNode("outcome", "display", x = 740.0, y = 230.0),
@@ -73,6 +73,7 @@ object CamelCorpusRouting {
             LcncNode("terminal", LcncContracts.SCOPE_OUT, _m["name" j "terminalCid", "kind" j "id"], x = 1090.0, y = 430.0),
         ], s_[LcncWire("receipt", "value", "route", "receiptCid"), LcncWire("mode", "value", "route", "mode"),
             LcncWire("route", "execution", "outcome", "x"), LcncWire("route", "source", "source", "x"),
-            LcncWire("route", "lane", "lane", "value"), LcncWire("route", "terminalCid", "terminal", "value")], seq = 8)
+            LcncWire("route", "lane", "lane", "value"), LcncWire("route", "terminalCid", "terminal", "value")],
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.65), seq = 8)
     }
 }

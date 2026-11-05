@@ -76,6 +76,9 @@ sealed class Capability(val category: String) {
     data object BlackBoard : Capability("blackboard") {
         override fun familyRoot(): Capability = BlackBoardAll
     }
+    data class Ssh(val host: String, val port: Int = 22) : Capability("ssh") {
+        override fun familyRoot(): Capability = SshAll
+    }
 
     /** Free-form catch-all for caps that don't fit a family yet. */
     data class Custom(val kind: String, val token: String) : Capability("custom") {
@@ -89,6 +92,7 @@ sealed class Capability(val category: String) {
     data object SctpAll : Capability("sctp*")
     data object ModelAll : Capability("modelmux*")
     data object BlackBoardAll : Capability("blackboard*")
+    data object SshAll : Capability("ssh*")
     data object CustomAll : Capability("custom*")
 
     data object Trajectory : Capability("trajectory") { override fun familyRoot() = TrajectoryAll }
