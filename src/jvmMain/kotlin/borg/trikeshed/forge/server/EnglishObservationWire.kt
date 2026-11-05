@@ -90,7 +90,7 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
                 "frameCid" j report.cid.value, "status" j report.value["status"],
                 "source" j (snapshot.descriptor(mode) + _m["currentness" j
                     if (mode == "current") "checked-before-and-after-query" else "not-checked",
-                    "admission" j "not-performed", "roleAuthority" j "recorded-parser-roles-only")])
+                    "admission" j "not-performed", "roleAuthority" j "recorded-parser-roles-only"])]
             require(jsonOf(output).encodeToByteArray().size <= EnglishRelationFrames.MAX_BYTES) { "Relation output limit" }
             EnglishObservationCurrent.check(corpus, s_[snapshot], mode)
             output
