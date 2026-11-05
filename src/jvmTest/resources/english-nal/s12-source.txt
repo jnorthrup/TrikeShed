@@ -1,0 +1,5 @@
+ALPHA implies BETA.
+BETA implies GAMMA.
+EPSILON implies GAMMA.
+EPSILON implies DELTA.
+ALPHA implies BETA.

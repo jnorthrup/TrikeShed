@@ -5,6 +5,7 @@ import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.WireHttpResponse
 import borg.trikeshed.module.ModuleContext
+import borg.trikeshed.narsese.SyntheticNalExperiment
 import borg.trikeshed.parse.*
 import borg.trikeshed.rdf.*
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
@@ -29,9 +30,47 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
         output as Map<String, Any?>
     }
 
+    /** Retained source hypotheses only; the existing queue owns currentness and lifecycle. */
+    private val nalRunner = LcncNodeRunner { node, inputs ->
+        val keys = _s["receiptCid", "mode"]
+        require(node.params.keys.all { it in keys } && inputs.keys.all { it in keys }) {
+            "Retained English NAL accepts only receiptCid and explicit mode"
+        }
+        fun parameter(key: String): Any? = if (key in inputs) inputs[key] else node.params[key]
+        val cid = ContentId(requireNotNull(parameter("receiptCid") as? String) { "Retained English inspection CID required" })
+        val mode = requireNotNull(parameter("mode") as? String) { "Explicit retained English source mode required" }
+        require(mode in _s["snapshot", "current"]) { "Retained English source mode must be snapshot or current" }
+        requests.call {
+            val snapshot = EnglishObservationGraph.read(ctx.casStore, cid)
+            EnglishObservationCurrent.check(corpus, s_[snapshot], mode)
+            val report = SyntheticNalExperiment.run(snapshot)
+            val passages = report.premises.view.flatMap { premise -> premise.occurrences.view.map { occurrence ->
+                val span = occurrence.span
+                val quotation = snapshot.source.quotation(span.begin, span.end)
+                require(quotation["quote"] == span.quote) { "Retained NAL occurrence differs from its source quotation" }
+                quotation + _m["inspectionCid" j cid.value, "frameCid" j report.frameCid.value,
+                    "occurrenceCid" j span.occurrenceCid.value, "propositionCid" j span.propositionCid.value,
+                    "annotationCid" j span.annotationCid.value, "contributionCid" j premise.contribution.cid.value,
+                    "sentenceIndex" j occurrence.sentenceIndex, "sentenceIri" j occurrence.sentenceIri,
+                    "subjectNodeIri" j occurrence.subjectNodeIri, "predicateNodeIri" j occurrence.predicateNodeIri,
+                    "objectNodeIri" j occurrence.objectNodeIri,
+                    "meaning" j "same premise occurrence; presentation only, not another evidence unit"]
+            } }.sortedBy { it["begin"] as Int }
+            val output = _m["report" j report.toMap(), "frameCid" j report.frameCid.value,
+                "inspectionCid" j cid.value, "status" j report.status.name, "passages" j passages,
+                "source" j (snapshot.descriptor(mode) + _m["currentness" j
+                    if (mode == "current") "checked-before-and-after-evaluation" else "not-checked",
+                    "admission" j "not-performed", "evaluation" j "read-only retained-English hypotheses"])]
+            require(jsonOf(output).encodeToByteArray().size <= MAX_NAL_RESPONSE) { "Retained English NAL output exceeds 4MiB" }
+            EnglishObservationCurrent.check(corpus, s_[snapshot], mode)
+            output
+        }
+    }
+
     fun attach() {
         ctx.routes.claim(OWNER, PATH, route = ::route)
         ctx.lcncRunners[TYPE] = runner
+        ctx.lcncRunners[EnglishNalContract.TYPE] = nalRunner
         statistics.attach()
         legalPatterns.attach()
     }
@@ -41,6 +80,7 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
         statistics.drain()
         legalPatterns.drain()
         if (ctx.lcncRunners[TYPE] === runner) ctx.lcncRunners.remove(TYPE)
+        if (ctx.lcncRunners[EnglishNalContract.TYPE] === nalRunner) ctx.lcncRunners.remove(EnglishNalContract.TYPE)
         requests.drain()
     }
 
@@ -79,6 +119,7 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
     catch (failure: Exception) { json(_m["error" j (failure.message ?: "English observation query refused")], 409) }
 
     companion object {
+        const val MAX_NAL_RESPONSE = 4 * 1024 * 1024
         const val TYPE = "document.english.query"
         const val OWNER = "document-english-observations"
         const val PATH = "/api/documents/english/query"
