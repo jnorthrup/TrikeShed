@@ -1,0 +1,34 @@
+{
+  "scope": "Interrupted direct document run, explicit new execution, then fresh inspector; real production owners",
+  "before": "selection",
+  "cases": {},
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:12973bd5e76d7c7acc6f3eefef4873446b1511e952e2cde9d8f8eeb7b079e6be\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:ccd5484e97118d30d58a9521e40a961890a6fa66716a6791cbfc787e1a40d285\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:652ed6133492d65aa462cd740dcdeb02a775f9202a12f1a06a55da1298d4a4eb\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"inputs\":{},\"debugToken\":\"837c580d-685e-4b89-8c68-f55a6038c3da\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"837c580d-685e-4b89-8c68-f55a6038c3da\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"8ec676bb-d449-4207-8674-aada07e46ae6\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"837c580d-685e-4b89-8c68-f55a6038c3da\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"8ec676bb-d449-4207-8674-aada07e46ae6\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"837c580d-685e-4b89-8c68-f55a6038c3da\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"8ec676bb-d449-4207-8674-aada07e46ae6\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"837c580d-685e-4b89-8c68-f55a6038c3da\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"8ec676bb-d449-4207-8674-aada07e46ae6\"}"
+    }
+  ],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "63b9d71fd9279dea83bfa4b4793426ff0fd9b2e5b06649aca50903a6b595c801",
+    "bytes": 1805728
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: /api/lcnc/debug?token=837c580d-685e-4b89-8c68-f55a6038c3da&runId=8ec676bb-d449-4207-8674-aada07e46ae6\n\n404 !== 200\n\n    at get (/workspace/airgap-r4c-proof/driver.cjs:12:79)\n    at async /workspace/airgap-r4c-proof/driver.cjs:28:14"
+}

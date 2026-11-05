@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LegalRequiredAnchorCoverageCliTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T03:35:17.864Z" hostname="0d6dfba25614" time="0.019">
+  <properties/>
+  <testcase name="requiredAnchorCodecRejectsWrongTypeAndInvalidDeclarationBeforePreparing()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest" time="0.006"/>
+  <testcase name="oldManifestAndMissingSeatKeepOldOutcomesAndBlindIdentity()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest" time="0.009"/>
+  <testcase name="suppliedPartialAndFullCorpusControlsSeparateAgreementFromCoverage()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

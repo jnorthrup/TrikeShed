@@ -1,0 +1,3359 @@
+{
+  "scope": "Interrupted direct document run, explicit new execution, then fresh inspector; real production owners",
+  "before": "selection",
+  "cases": {
+    "ownedBoundary": {
+      "result": "PASS",
+      "before": "selection",
+      "runId": "1c935388-4573-47f7-a4d2-a14b44b20de8",
+      "ordinal": 5,
+      "observations": {
+        "clockOrigin": "walk-start",
+        "attempted": 12,
+        "retained": 12,
+        "omitted": 0,
+        "firstSequence": 1,
+        "lastSequence": 12,
+        "lastObservedSequence": 12,
+        "coverage": "complete"
+      }
+    },
+    "lostResponse": {
+      "result": "PASS",
+      "unconfirmedOutcomeShown": true,
+      "noAutomaticRetry": true,
+      "debuggerText": "Request ended. A lost response is not proof of cancellation; use Reconnect this run or inspect Evidence. No matching durable outcome was returned. Do not infer success or cancellation."
+    },
+    "recovery": {
+      "result": "PASS",
+      "firstBoot": "8114afd8-f69e-4d10-8cd9-fc6686462931",
+      "secondBoot": "9be3e2f7-c471-49ca-80f0-0ba5e8a83b95",
+      "firstExit": 137,
+      "firstHostPid": 71505,
+      "secondHostPid": 71710,
+      "forcedJvmExit": true,
+      "javaReaped": true,
+      "cleanupRan": false,
+      "minerAbsent": true,
+      "sourceRevisionsUnchanged": true,
+      "oldRunNotReexecuted": true
+    },
+    "expiredControl": {
+      "result": "PASS",
+      "status": 404,
+      "body": {
+        "error": "debug_run_not_active",
+        "receipt": {
+          "runId": "1c935388-4573-47f7-a4d2-a14b44b20de8",
+          "programCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+          "status": "interrupted",
+          "error": "runtime_restarted",
+          "finishedAtMs": 1793848517386,
+          "receiptCid": "sha256:c4f05411210e091dbb4253e46b8736caf458836ddfd8a3b2d6c5d25aceb87870"
+        }
+      }
+    },
+    "interruptedInspection": {
+      "result": "PASS",
+      "text": "CONFIX & FACETS\nRefresh ✕\nInspected this canvas · blackboard revision 3\nUse cases\nWorkgroups\nCases\nConfix & facets\nLow code\nEvidence\n\nProgram identity: sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb\n\nNode inspection · last attempt in this tab. Refresh after running. These observations are not durable run receipts.\n\ndocument · json.value\nsource · document.source\npassages · document.spans\nscan · vm.llvm.confix\nselection · confix.pickPath\n\nNo attempt recorded in this tab.\n\nBindings identify dispatch owners, not readiness. Inputs and named scope bodies are checked when run.\n\ndocument · json.value · KOTLIN\nContext: LcncNodeKey.JSON_VALUE\n\nsource · document.source · KOTLIN\nContext: LcncNodeKey.DOCUMENT_SOURCE\nServices: CasStoreKey, ProjectCorpusKey\n\npassages · document.spans · KOTLIN\nContext: LcncNodeKey.DOCUMENT_SPANS\nServices: CasStoreKey, ProjectCorpusKey\n\nscan · vm.llvm.confix · KOTLIN\nContext: LcncNodeKey.VM_LLVM_CONFIX\n\nselection · confix.pickPath · KOTLIN\nContext: LcncNodeKey.CONFIX_PICK_PATH\n\nRecent recorded runs · up to eight immutable receipts. A matching program version does not mean its inputs or dependencies are still current.\n\nInspect receipt\n\nInline run · not saved-program history · interrupted · 1c935388-4573-47f7-a4d2-a14b44b20de8 · this version\n\nInspect 1c935388-4573-47f7-a4d2-a14b44b20de8\n\nairgap-coinbase-suski · 1c935388-4573-47f7-a4d2-a14b44b20de8 · interrupted\n\nReceipt: sha256:c4f05411210e091dbb4253e46b8736caf458836ddfd8a3b2d6c5d25aceb87870\nProgram: sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb\nSame program version as the captured canvas inspection.\n\nCaptured canvas program: sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb. Refresh to compare with the current canvas.\n\nStarted: 1793848513894 · finished: 1793848517386 (epoch ms)\n\nImmutable receipt JSON\nReceipt as Confix sheets\nInspect receipt in Confix\nInvocation inputs (root inputs, not per-node input snapshots)\nFailure / refusal diagnostics\nExecution budgets and version policy\n\nNo node output snapshot in this receipt. Earlier effects cannot be inferred from that absence.\n\nNo per-node invocation evidence was recorded for this receipt.\n\nConsumed evidence and runtime bindings\nFrozen program at invocation · sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb\nPinned subprogram versions\nPrevious state receipt\nRun records\nShared blackboard\n\nPointcuts · latest recorded value per site, daemon-wide. This is not the full trace, a breakpoint, or proof that this canvas executed.\n\nInspect pointcuts\nGraal workspace · VM terminals · Hermes\nDocument evidence and tuple sheets",
+      "noRecordedOutputAction": true
+    },
+    "explicitNewRun": {
+      "result": "PASS",
+      "oldRunId": "1c935388-4573-47f7-a4d2-a14b44b20de8",
+      "newRunId": "473ff644-1168-4125-a34e-2aab4ba3c617",
+      "programCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+      "oldReceiptUnchanged": true,
+      "sourceRevisionsUnchanged": true,
+      "consumedWires": 8,
+      "quote": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+      "nativeLiveBytesAfter": 0
+    },
+    "freshInspector": {
+      "result": "PASS",
+      "thirdBoot": "6c089e3b-d69b-4823-9f8f-d1e2a1e447f0",
+      "identicalRows": true,
+      "identicalDocuments": true,
+      "noNativeOrMiner": true,
+      "postRuns": 2
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"inputs\":{},\"debugToken\":\"c20bbc16-4d14-4510-945e-8a5d7676bd3c\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"c20bbc16-4d14-4510-945e-8a5d7676bd3c\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"1c935388-4573-47f7-a4d2-a14b44b20de8\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"c20bbc16-4d14-4510-945e-8a5d7676bd3c\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"1c935388-4573-47f7-a4d2-a14b44b20de8\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"c20bbc16-4d14-4510-945e-8a5d7676bd3c\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"1c935388-4573-47f7-a4d2-a14b44b20de8\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"c20bbc16-4d14-4510-945e-8a5d7676bd3c\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"1c935388-4573-47f7-a4d2-a14b44b20de8\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"inputs\":{}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":183.34210526315792,\"y\":-6.360902255639097,\"z\":0.9060150375939849}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":183.34210526315792,\"y\":-6.360902255639097,\"z\":0.9060150375939849}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":183.34210526315792,\"y\":-6.360902255639097,\"z\":0.9060150375939849}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null},\"compareProgramCid\":\"sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb\"}"
+    }
+  ],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "63b9d71fd9279dea83bfa4b4793426ff0fd9b2e5b06649aca50903a6b595c801",
+    "bytes": 1805728
+  },
+  "running": {
+    "runId": "1c935388-4573-47f7-a4d2-a14b44b20de8",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+    "inputs": {},
+    "status": "running",
+    "queuedAtMs": 1793848513495,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "c20bbc16-4d14-4510-945e-8a5d7676bd3c",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/1c935388-4573-47f7-a4d2-a14b44b20de8",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/1c935388-4573-47f7-a4d2-a14b44b20de8",
+    "sequence": 2,
+    "timelineRevision": 2,
+    "receiptCid": "sha256:5cbce519c5867404e0e0b6851c45b20cf32b35866e7b67f294f50191441c7da1",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793848513894,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:55e223c95e28b5a4e262139b39d93efcc500b08d9e3bfecef9dd6d09d6ac4b8f"
+  },
+  "liveDebug": {
+    "state": "paused",
+    "ordinal": 5,
+    "site": {
+      "invocationOrdinal": 5,
+      "nodeId": "selection",
+      "type": "confix.pickPath",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "params": {
+        "path": "spans.0.quotation",
+        "geometry": "native"
+      },
+      "inputsOmitted": "payload_limit",
+      "bindings": {},
+      "outputsOmitted": "payload_limit",
+      "depth": 0,
+      "frameId": 0,
+      "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+      "documentName": "airgap-coinbase-suski",
+      "scopeFrames": [
+        {
+          "depth": 0,
+          "bindings": {},
+          "outputsOmitted": "payload_limit"
+        }
+      ],
+      "scopeFramesTruncated": false,
+      "phase": "before",
+      "status": "running"
+    },
+    "detached": false,
+    "actions": [
+      "step",
+      "continue"
+    ],
+    "boundary": "cooperative node boundary; source controls only when advertised",
+    "pointcuts": {
+      "nodeIds": [],
+      "scope": null,
+      "automatic": "none"
+    },
+    "interventions": [],
+    "interventionsDropped": 0,
+    "controls": [
+      {
+        "sequence": 1,
+        "action": "step",
+        "status": "applied",
+        "ordinal": 1,
+        "nodeId": "document",
+        "path": [],
+        "effectOrdinal": 1,
+        "effectNodeId": "document",
+        "effectPath": []
+      },
+      {
+        "sequence": 2,
+        "action": "step",
+        "status": "applied",
+        "ordinal": 2,
+        "nodeId": "source",
+        "path": [],
+        "effectOrdinal": 2,
+        "effectNodeId": "source",
+        "effectPath": []
+      },
+      {
+        "sequence": 3,
+        "action": "step",
+        "status": "applied",
+        "ordinal": 3,
+        "nodeId": "passages",
+        "path": [],
+        "effectOrdinal": 3,
+        "effectNodeId": "passages",
+        "effectPath": []
+      },
+      {
+        "sequence": 4,
+        "action": "step",
+        "status": "applied",
+        "ordinal": 4,
+        "nodeId": "scan",
+        "path": [],
+        "effectOrdinal": 4,
+        "effectNodeId": "scan",
+        "effectPath": []
+      }
+    ],
+    "controlsDropped": 0,
+    "monitor": {
+      "epoch": 1,
+      "attached": true,
+      "mode": "logging",
+      "requestedMode": "logging",
+      "scope": null,
+      "pointcut": null,
+      "observed": 10,
+      "persistent": 1,
+      "aggregated": 0,
+      "overwritten": 0,
+      "valueTruncations": 6,
+      "complete": false,
+      "coverage": "attached runtime observations",
+      "durableLog": false,
+      "eventCapacity": 256,
+      "binCapacity": 120,
+      "binMillis": 250,
+      "eventsPerBin": 64,
+      "events": [
+        {
+          "sequence": 1,
+          "timeMillis": 84,
+          "scope": "local",
+          "pointcut": "receipt",
+          "kind": "persistent",
+          "persistent": true,
+          "before": {
+            "status": "queued",
+            "jobId": "lcnc/run/1c935388-4573-47f7-a4d2-a14b44b20de8",
+            "timelineRevision": 1,
+            "receiptCid": "sha256:55e223c95e28b5a4e262139b39d93efcc500b08d9e3bfecef9dd6d09d6ac4b8f"
+          },
+          "after": {
+            "status": "running",
+            "jobId": "lcnc/run/1c935388-4573-47f7-a4d2-a14b44b20de8",
+            "timelineRevision": 2,
+            "receiptCid": "sha256:5cbce519c5867404e0e0b6851c45b20cf32b35866e7b67f294f50191441c7da1",
+            "durability": "durable"
+          },
+          "truncated": false
+        },
+        {
+          "sequence": 2,
+          "timeMillis": 106,
+          "scope": "",
+          "pointcut": "document",
+          "kind": "begin",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 1,
+            "nodeId": "document",
+            "type": "json.value",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\", \"seq\":0.0}, \"ex"
+            },
+            "inputs": {},
+            "bindings": {},
+            "outputs": {},
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputs": {}
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "before",
+            "status": "running"
+          },
+          "truncated": true
+        },
+        {
+          "sequence": 3,
+          "timeMillis": 395,
+          "scope": "",
+          "pointcut": "document",
+          "kind": "completed",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 1,
+            "nodeId": "document",
+            "type": "json.value",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7\", \"seq\":0.0}, \"ex"
+            },
+            "inputs": {},
+            "bindings": {},
+            "outputs": {
+              "document": {
+                "value": {
+                  "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "name": "coinbase-suski.pdf",
+                  "mediaType": "application/pdf",
+                  "category": "document",
+                  "project": "<unexpanded>",
+                  "extraction": "<unexpanded>",
+                  "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+                }
+              }
+            },
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputs": {
+                  "document": "<unexpanded>"
+                }
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "after",
+            "status": "completed",
+            "result": {
+              "value": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf",
+                  "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "rev": "1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7",
+                  "seq": 0
+                },
+                "extraction": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf.extract.md",
+                  "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "rev": "1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1",
+                  "seq": 3
+                },
+                "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+              }
+            }
+          },
+          "truncated": true
+        },
+        {
+          "sequence": 4,
+          "timeMillis": 407,
+          "scope": "",
+          "pointcut": "source",
+          "kind": "begin",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 2,
+            "nodeId": "source",
+            "type": "document.source",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "view": "reference"
+            },
+            "inputs": {
+              "source?": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf",
+                  "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "rev": "1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7",
+                  "seq": 0
+                },
+                "extraction": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf.extract.md",
+                  "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "rev": "1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1",
+                  "seq": 3
+                },
+                "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+              }
+            },
+            "bindings": {},
+            "outputs": {
+              "document": {
+                "value": {
+                  "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "name": "coinbase-suski.pdf",
+                  "mediaType": "application/pdf",
+                  "category": "document",
+                  "project": "<unexpanded>",
+                  "extraction": "<unexpanded>",
+                  "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+                }
+              }
+            },
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputs": {
+                  "document": "<unexpanded>"
+                }
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "before",
+            "status": "running"
+          },
+          "truncated": true
+        },
+        {
+          "sequence": 5,
+          "timeMillis": 757,
+          "scope": "",
+          "pointcut": "source",
+          "kind": "completed",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 2,
+            "nodeId": "source",
+            "type": "document.source",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "view": "reference"
+            },
+            "inputs": {},
+            "bindings": {},
+            "outputs": {
+              "document": {
+                "value": {
+                  "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "name": "coinbase-suski.pdf",
+                  "mediaType": "application/pdf",
+                  "category": "document",
+                  "project": "<unexpanded>",
+                  "extraction": "<unexpanded>",
+                  "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+                }
+              },
+              "source": {
+                "source": {
+                  "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "name": "coinbase-suski.pdf",
+                  "mediaType": "application/pdf",
+                  "category": "document",
+                  "project": "<unexpanded>",
+                  "extraction": "<unexpanded>",
+                  "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+                }
+              }
+            },
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputs": {
+                  "document": "<unexpanded>",
+                  "source": "<unexpanded>"
+                }
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "after",
+            "status": "completed",
+            "result": {
+              "source": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf",
+                  "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "rev": "1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7",
+                  "seq": 0
+                },
+                "extraction": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf.extract.md",
+                  "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "rev": "1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1",
+                  "seq": 3
+                }
+              }
+            }
+          },
+          "truncated": true
+        },
+        {
+          "sequence": 6,
+          "timeMillis": 757,
+          "scope": "",
+          "pointcut": "passages",
+          "kind": "begin",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 3,
+            "nodeId": "passages",
+            "type": "document.spans",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "offset": "18477",
+              "count": "1",
+              "spanChars": "200",
+              "maxBytes": "8192"
+            },
+            "inputs": {
+              "source": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf",
+                  "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "rev": "1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7",
+                  "seq": 0
+                },
+                "extraction": {
+                  "project": "coinbase-suski",
+                  "id": "coinbase-suski.pdf.extract.md",
+                  "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "rev": "1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1",
+                  "seq": 3
+                },
+                "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+              }
+            },
+            "bindings": {},
+            "outputs": {
+              "document": {
+                "value": {
+                  "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "name": "coinbase-suski.pdf",
+                  "mediaType": "application/pdf",
+                  "category": "document",
+                  "project": "<unexpanded>",
+                  "extraction": "<unexpanded>",
+                  "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+                }
+              },
+              "source": {
+                "source": {
+                  "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                  "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                  "name": "coinbase-suski.pdf",
+                  "mediaType": "application/pdf",
+                  "category": "document",
+                  "project": "<unexpanded>",
+                  "extraction": "<unexpanded>",
+                  "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+                }
+              }
+            },
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputs": {
+                  "document": "<unexpanded>",
+                  "source": "<unexpanded>"
+                }
+              }
+            ]
+          },
+          "truncated": true
+        },
+        {
+          "sequence": 7,
+          "timeMillis": 1041,
+          "scope": "",
+          "pointcut": "passages",
+          "kind": "completed",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 3,
+            "nodeId": "passages",
+            "type": "document.spans",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "offset": "18477",
+              "count": "1",
+              "spanChars": "200",
+              "maxBytes": "8192"
+            },
+            "inputs": {},
+            "bindings": {},
+            "outputsOmitted": "payload_limit",
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputsOmitted": "payload_limit"
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "after",
+            "status": "completed",
+            "resultOmitted": "payload_limit"
+          },
+          "truncated": false
+        },
+        {
+          "sequence": 8,
+          "timeMillis": 1041,
+          "scope": "",
+          "pointcut": "scan",
+          "kind": "begin",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 4,
+            "nodeId": "scan",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "format": "JSON",
+              "data": ""
+            },
+            "inputs": {
+              "data?": "{\"schema\":\"document-spans/1\", \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"sourceManifestCid\":\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\", \"offsetUnit\":\"utf16\", \"rangeConvention\":\"half-open\", \"coverage\":\"extracted-text-window\", \"begin\":18477, \"end\":18654, \"textLength\":22686, \"complete\":false, \"nextOffset\":18654, \"spans\":[{\"index\":0, \"quotati"
+            },
+            "bindings": {},
+            "outputsOmitted": "payload_limit",
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputsOmitted": "payload_limit"
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "before",
+            "status": "running"
+          },
+          "truncated": true
+        },
+        {
+          "sequence": 9,
+          "timeMillis": 1667,
+          "scope": "",
+          "pointcut": "scan",
+          "kind": "completed",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 4,
+            "nodeId": "scan",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "format": "JSON",
+              "data": ""
+            },
+            "inputs": {},
+            "bindings": {},
+            "outputsOmitted": "payload_limit",
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputsOmitted": "payload_limit"
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "after",
+            "status": "completed",
+            "resultOmitted": "payload_limit"
+          },
+          "truncated": false
+        },
+        {
+          "sequence": 10,
+          "timeMillis": 1668,
+          "scope": "",
+          "pointcut": "selection",
+          "kind": "begin",
+          "persistent": false,
+          "before": {},
+          "after": {
+            "invocationOrdinal": 5,
+            "nodeId": "selection",
+            "type": "confix.pickPath",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "params": {
+              "path": "spans.0.quotation",
+              "geometry": "native"
+            },
+            "inputsOmitted": "payload_limit",
+            "bindings": {},
+            "outputsOmitted": "payload_limit",
+            "depth": 0,
+            "frameId": 0,
+            "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+            "documentName": "airgap-coinbase-suski",
+            "scopeFrames": [
+              {
+                "depth": 0,
+                "bindings": {},
+                "outputsOmitted": "payload_limit"
+              }
+            ],
+            "scopeFramesTruncated": false,
+            "phase": "before",
+            "status": "running"
+          },
+          "truncated": false
+        }
+      ],
+      "bins": [
+        {
+          "startMillis": 0,
+          "count": 2,
+          "persistent": 1,
+          "aggregated": 0
+        },
+        {
+          "startMillis": 250,
+          "count": 2,
+          "persistent": 0,
+          "aggregated": 0
+        },
+        {
+          "startMillis": 750,
+          "count": 2,
+          "persistent": 0,
+          "aggregated": 0
+        },
+        {
+          "startMillis": 1000,
+          "count": 2,
+          "persistent": 0,
+          "aggregated": 0
+        },
+        {
+          "startMillis": 1500,
+          "count": 2,
+          "persistent": 0,
+          "aggregated": 0
+        }
+      ]
+    },
+    "observationSchema": "lcnc-observations/1",
+    "observations": [
+      {
+        "invocationOrdinal": 1,
+        "nodeId": "document",
+        "type": "json.value",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "before",
+        "status": "running",
+        "sequence": 1,
+        "elapsedNanos": 8891062
+      },
+      {
+        "invocationOrdinal": 1,
+        "nodeId": "document",
+        "type": "json.value",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "after",
+        "status": "completed",
+        "sequence": 2,
+        "elapsedNanos": 297688695
+      },
+      {
+        "invocationOrdinal": 2,
+        "nodeId": "source",
+        "type": "document.source",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "before",
+        "status": "running",
+        "sequence": 3,
+        "elapsedNanos": 310127845
+      },
+      {
+        "invocationOrdinal": 2,
+        "nodeId": "source",
+        "type": "document.source",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentName": "airgap-coinbase-suski",
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "origin": "wire",
+        "producer": {
+          "invocationOrdinal": 1,
+          "nodeId": "document",
+          "type": "json.value",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+          "origin": "executed"
+        },
+        "wire": {
+          "index": 0,
+          "fromNode": "document",
+          "fromPort": "value",
+          "toNode": "source",
+          "toPort": "source?"
+        },
+        "phase": "consumed",
+        "status": "delivered",
+        "selection": {
+          "port": "source?",
+          "cardinality": "one",
+          "position": 0,
+          "count": 1,
+          "representation": "scalar"
+        },
+        "evidence": {
+          "status": "unavailable",
+          "reason": "value_identity_not_recorded"
+        },
+        "sequence": 4,
+        "elapsedNanos": 583759463
+      },
+      {
+        "invocationOrdinal": 2,
+        "nodeId": "source",
+        "type": "document.source",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "after",
+        "status": "completed",
+        "sequence": 5,
+        "elapsedNanos": 659629602
+      },
+      {
+        "invocationOrdinal": 3,
+        "nodeId": "passages",
+        "type": "document.spans",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "before",
+        "status": "running",
+        "sequence": 6,
+        "elapsedNanos": 660478284
+      },
+      {
+        "invocationOrdinal": 3,
+        "nodeId": "passages",
+        "type": "document.spans",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentName": "airgap-coinbase-suski",
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "origin": "wire",
+        "producer": {
+          "invocationOrdinal": 2,
+          "nodeId": "source",
+          "type": "document.source",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+          "origin": "executed"
+        },
+        "wire": {
+          "index": 1,
+          "fromNode": "source",
+          "fromPort": "source",
+          "toNode": "passages",
+          "toPort": "source"
+        },
+        "phase": "consumed",
+        "status": "delivered",
+        "selection": {
+          "port": "source",
+          "cardinality": "one",
+          "position": 0,
+          "count": 1,
+          "representation": "scalar"
+        },
+        "evidence": {
+          "status": "unavailable",
+          "reason": "value_identity_not_recorded"
+        },
+        "sequence": 7,
+        "elapsedNanos": 910277524
+      },
+      {
+        "invocationOrdinal": 3,
+        "nodeId": "passages",
+        "type": "document.spans",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "after",
+        "status": "completed",
+        "sequence": 8,
+        "elapsedNanos": 943039403
+      },
+      {
+        "invocationOrdinal": 4,
+        "nodeId": "scan",
+        "type": "vm.llvm.confix",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "before",
+        "status": "running",
+        "sequence": 9,
+        "elapsedNanos": 944097346
+      },
+      {
+        "invocationOrdinal": 4,
+        "nodeId": "scan",
+        "type": "vm.llvm.confix",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentName": "airgap-coinbase-suski",
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "origin": "wire",
+        "producer": {
+          "invocationOrdinal": 3,
+          "nodeId": "passages",
+          "type": "document.spans",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+          "origin": "executed"
+        },
+        "wire": {
+          "index": 2,
+          "fromNode": "passages",
+          "fromPort": "data",
+          "toNode": "scan",
+          "toPort": "data?"
+        },
+        "phase": "consumed",
+        "status": "delivered",
+        "selection": {
+          "port": "data?",
+          "cardinality": "one",
+          "position": 0,
+          "count": 1,
+          "representation": "scalar"
+        },
+        "evidence": {
+          "status": "unavailable",
+          "reason": "value_identity_not_recorded"
+        },
+        "sequence": 10,
+        "elapsedNanos": 1207504338
+      },
+      {
+        "invocationOrdinal": 4,
+        "nodeId": "scan",
+        "type": "vm.llvm.confix",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "after",
+        "status": "completed",
+        "sequence": 11,
+        "elapsedNanos": 1569747274
+      },
+      {
+        "invocationOrdinal": 5,
+        "nodeId": "selection",
+        "type": "confix.pickPath",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "documentName": "airgap-coinbase-suski",
+        "phase": "before",
+        "status": "running",
+        "sequence": 12,
+        "elapsedNanos": 1570803250
+      }
+    ],
+    "observationsDropped": 0,
+    "observationSummary": {
+      "clockOrigin": "walk-start",
+      "attempted": 12,
+      "retained": 12,
+      "omitted": 0,
+      "firstSequence": 1,
+      "lastSequence": 12,
+      "lastObservedSequence": 12,
+      "coverage": "complete"
+    },
+    "runId": "1c935388-4573-47f7-a4d2-a14b44b20de8",
+    "programCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+    "timeoutIncludesPauses": true
+  },
+  "interruptedVideo": "page@4d0f8ab1869d5b40a069cd52a2df6bfe.webm",
+  "interrupted": {
+    "runId": "1c935388-4573-47f7-a4d2-a14b44b20de8",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+    "inputs": {},
+    "status": "interrupted",
+    "queuedAtMs": 1793848513495,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "c20bbc16-4d14-4510-945e-8a5d7676bd3c",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/1c935388-4573-47f7-a4d2-a14b44b20de8",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/1c935388-4573-47f7-a4d2-a14b44b20de8",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793848513894,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:5cbce519c5867404e0e0b6851c45b20cf32b35866e7b67f294f50191441c7da1",
+    "ok": false,
+    "error": "runtime_restarted",
+    "finishedAtMs": 1793848517386,
+    "sequence": 3,
+    "timelineRevision": 3,
+    "receiptCid": "sha256:c4f05411210e091dbb4253e46b8736caf458836ddfd8a3b2d6c5d25aceb87870"
+  },
+  "completed": {
+    "runId": "473ff644-1168-4125-a34e-2aab4ba3c617",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+    "inputs": {},
+    "status": "completed",
+    "queuedAtMs": 1793848522020,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/473ff644-1168-4125-a34e-2aab4ba3c617",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/473ff644-1168-4125-a34e-2aab4ba3c617",
+    "sequence": 6,
+    "timelineRevision": 3,
+    "receiptCid": "sha256:122d95cf01eaa0015cec51b7f495696dec96b188a19767f7724a9e5bec92aaa5",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:09950cabaf7908fbf39b22845853ed6b19705035bcb6abb30c6b98c6e2eb21bb",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793848522205,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:d40058b3bfa13f9c622890ce737ffb2e3fecea35b7b1dbe1b8d93b04f45d38d1",
+    "returns": {},
+    "outputs": {
+      "document": {
+        "value": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "name": "coinbase-suski.pdf",
+          "mediaType": "application/pdf",
+          "category": "document",
+          "project": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf",
+            "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+            "rev": "1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7",
+            "seq": 0
+          },
+          "extraction": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf.extract.md",
+            "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+            "rev": "1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1",
+            "seq": 3
+          },
+          "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+        }
+      },
+      "source": {
+        "source": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "name": "coinbase-suski.pdf",
+          "mediaType": "application/pdf",
+          "category": "document",
+          "project": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf",
+            "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+            "rev": "1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7",
+            "seq": 0
+          },
+          "extraction": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf.extract.md",
+            "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+            "rev": "1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1",
+            "seq": 3
+          },
+          "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5"
+        }
+      },
+      "passages": {
+        "data": "{\"schema\":\"document-spans/1\", \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"sourceManifestCid\":\"sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5\", \"offsetUnit\":\"utf16\", \"rangeConvention\":\"half-open\", \"coverage\":\"extracted-text-window\", \"begin\":18477, \"end\":18654, \"textLength\":22686, \"complete\":false, \"nextOffset\":18654, \"spans\":[{\"index\":0, \"quotation\":{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"begin\":18477, \"end\":18654, \"quote\":\"took this case to decide whether, under the FAA, a court or\\nan arbitrator decides which of the two contractual provi-\\nsions controls. We decline to consider auxiliary questions\\n\", \"anchors\":[{\"begin\":18477, \"end\":18536, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 871, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18537, \"end\":18594, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 926, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18595, \"end\":18653, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 982, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}], \"unresolved\":[\"table\", \"diagram\"], \"category\":\"document\", \"provenance\":{\"finalUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\", \"notesCid\":\"sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\", \"retrieved\":\"2026-11-04T23:32:18Z\", \"requestedUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\"}, \"authentication\":\"unverified\", \"quotationSource\":\"extracted-text\"}}]}",
+        "batchCid": "sha256:4dd9c7cb3ebd8e019e902fbdb06134605e018b46cf1cb342e2a7af11299ee2d3",
+        "sourceCid": "sha256:67c45fda0de441d3d390f1cfa679e0286eace7df0ec2bd2ee5dd3af8b21837c5",
+        "count": 1,
+        "begin": 18477,
+        "end": 18654,
+        "nextOffset": 18654,
+        "complete": false,
+        "bytes": 2028
+      },
+      "scan": {
+        "ok": true,
+        "format": "JSON",
+        "sourceCid": "sha256:4dd9c7cb3ebd8e019e902fbdb06134605e018b46cf1cb342e2a7af11299ee2d3",
+        "sourceBytes": 2028,
+        "rowCount": 151,
+        "observedRows": 151,
+        "rows": [
+          {
+            "open": 0,
+            "close": 2027,
+            "tag": "IoObject",
+            "depth": 0,
+            "children": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ]
+          },
+          {
+            "open": 1,
+            "close": 8,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 10,
+            "close": 27,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 30,
+            "close": 42,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 44,
+            "close": 116,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 119,
+            "close": 136,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 138,
+            "close": 210,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 213,
+            "close": 231,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 233,
+            "close": 305,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 308,
+            "close": 319,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 321,
+            "close": 327,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 330,
+            "close": 346,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 348,
+            "close": 358,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 361,
+            "close": 370,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 372,
+            "close": 394,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 397,
+            "close": 403,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 405,
+            "close": 409,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 412,
+            "close": 416,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 418,
+            "close": 422,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 425,
+            "close": 436,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 438,
+            "close": 442,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 445,
+            "close": 454,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 456,
+            "close": 460,
+            "tag": "IoBoolean",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 463,
+            "close": 474,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 476,
+            "close": 480,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 483,
+            "close": 489,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 491,
+            "close": 2026,
+            "tag": "IoArray",
+            "depth": 1,
+            "children": [
+              27
+            ]
+          },
+          {
+            "open": 492,
+            "close": 2025,
+            "tag": "IoObject",
+            "depth": 2,
+            "children": [
+              28,
+              29,
+              30,
+              31
+            ]
+          },
+          {
+            "open": 493,
+            "close": 499,
+            "tag": "IoString",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 501,
+            "close": 501,
+            "tag": "IoDouble",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 504,
+            "close": 514,
+            "tag": "IoString",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 516,
+            "close": 2024,
+            "tag": "IoObject",
+            "depth": 3,
+            "children": [
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              131,
+              132,
+              135,
+              136,
+              137,
+              138,
+              147,
+              148,
+              149,
+              150
+            ]
+          },
+          {
+            "open": 517,
+            "close": 529,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 531,
+            "close": 603,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 606,
+            "close": 623,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 625,
+            "close": 697,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 700,
+            "close": 706,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 708,
+            "close": 712,
+            "tag": "IoDouble",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 715,
+            "close": 719,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 721,
+            "close": 725,
+            "tag": "IoDouble",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 728,
+            "close": 734,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 736,
+            "close": 917,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 920,
+            "close": 928,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 930,
+            "close": 1613,
+            "tag": "IoArray",
+            "depth": 4,
+            "children": [
+              44,
+              73,
+              102
+            ]
+          },
+          {
+            "open": 931,
+            "close": 1156,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60,
+              65,
+              66,
+              67,
+              68
+            ]
+          },
+          {
+            "open": 932,
+            "close": 938,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 940,
+            "close": 944,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 947,
+            "close": 951,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 953,
+            "close": 957,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 960,
+            "close": 965,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 967,
+            "close": 968,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 971,
+            "close": 977,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 979,
+            "close": 982,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 985,
+            "close": 993,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 995,
+            "close": 998,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1001,
+            "close": 1007,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1009,
+            "close": 1012,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1015,
+            "close": 1023,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1025,
+            "close": 1028,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1031,
+            "close": 1043,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1045,
+            "close": 1064,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              61,
+              62,
+              63,
+              64
+            ]
+          },
+          {
+            "open": 1046,
+            "close": 1048,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1051,
+            "close": 1053,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1056,
+            "close": 1059,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1062,
+            "close": 1063,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1067,
+            "close": 1084,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1086,
+            "close": 1100,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1103,
+            "close": 1114,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1116,
+            "close": 1155,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              69,
+              70,
+              71,
+              72
+            ]
+          },
+          {
+            "open": 1117,
+            "close": 1123,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1126,
+            "close": 1134,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1137,
+            "close": 1143,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1146,
+            "close": 1154,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1159,
+            "close": 1384,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              74,
+              75,
+              76,
+              77,
+              78,
+              79,
+              80,
+              81,
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              94,
+              95,
+              96,
+              97
+            ]
+          },
+          {
+            "open": 1160,
+            "close": 1166,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1168,
+            "close": 1172,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1175,
+            "close": 1179,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1181,
+            "close": 1185,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1188,
+            "close": 1193,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1195,
+            "close": 1196,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1199,
+            "close": 1205,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1207,
+            "close": 1210,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1213,
+            "close": 1221,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1223,
+            "close": 1226,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1229,
+            "close": 1235,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1237,
+            "close": 1240,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1243,
+            "close": 1251,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1253,
+            "close": 1256,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1259,
+            "close": 1271,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1273,
+            "close": 1292,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              90,
+              91,
+              92,
+              93
+            ]
+          },
+          {
+            "open": 1274,
+            "close": 1276,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1279,
+            "close": 1281,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1284,
+            "close": 1287,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1290,
+            "close": 1291,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1295,
+            "close": 1312,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1314,
+            "close": 1328,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1331,
+            "close": 1342,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1344,
+            "close": 1383,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              98,
+              99,
+              100,
+              101
+            ]
+          },
+          {
+            "open": 1345,
+            "close": 1351,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1354,
+            "close": 1362,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1365,
+            "close": 1371,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1374,
+            "close": 1382,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1387,
+            "close": 1612,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              123,
+              124,
+              125,
+              126
+            ]
+          },
+          {
+            "open": 1388,
+            "close": 1394,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1396,
+            "close": 1400,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1403,
+            "close": 1407,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1409,
+            "close": 1413,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1416,
+            "close": 1421,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1423,
+            "close": 1424,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1427,
+            "close": 1433,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1435,
+            "close": 1438,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1441,
+            "close": 1449,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1451,
+            "close": 1454,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1457,
+            "close": 1463,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1465,
+            "close": 1468,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1471,
+            "close": 1479,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1481,
+            "close": 1484,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1487,
+            "close": 1499,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1501,
+            "close": 1520,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              119,
+              120,
+              121,
+              122
+            ]
+          },
+          {
+            "open": 1502,
+            "close": 1504,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1507,
+            "close": 1509,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1512,
+            "close": 1515,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1518,
+            "close": 1519,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1523,
+            "close": 1540,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1542,
+            "close": 1556,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1559,
+            "close": 1570,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1572,
+            "close": 1611,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              127,
+              128,
+              129,
+              130
+            ]
+          },
+          {
+            "open": 1573,
+            "close": 1579,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1582,
+            "close": 1590,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1593,
+            "close": 1599,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1602,
+            "close": 1610,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1616,
+            "close": 1627,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1629,
+            "close": 1648,
+            "tag": "IoArray",
+            "depth": 4,
+            "children": [
+              133,
+              134
+            ]
+          },
+          {
+            "open": 1630,
+            "close": 1636,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1639,
+            "close": 1647,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1651,
+            "close": 1660,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1662,
+            "close": 1671,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1674,
+            "close": 1685,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1687,
+            "close": 1956,
+            "tag": "IoObject",
+            "depth": 4,
+            "children": [
+              139,
+              140,
+              141,
+              142,
+              143,
+              144,
+              145,
+              146
+            ]
+          },
+          {
+            "open": 1688,
+            "close": 1697,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1699,
+            "close": 1757,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1760,
+            "close": 1769,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1771,
+            "close": 1843,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1846,
+            "close": 1856,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1858,
+            "close": 1879,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1882,
+            "close": 1895,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1897,
+            "close": 1955,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1959,
+            "close": 1974,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1976,
+            "close": 1987,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1990,
+            "close": 2006,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 2008,
+            "close": 2023,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          }
+        ],
+        "fault": {
+          "code": 0,
+          "name": "none",
+          "at": 0,
+          "atKind": "none"
+        },
+        "runtime": {
+          "backend": "graalvm-llvm",
+          "moduleCid": "sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
+          "abi": "confix.flat/1",
+          "engineVersion": "25.3.4.1",
+          "llvmVersion": "22.1.8",
+          "nativeAccess": true,
+          "verifyBitcode": true,
+          "internalProgress": "unobserved",
+          "pauseBoundary": "between-scans",
+          "hardCancellation": false,
+          "nativeMemoryIsolation": false,
+          "loadNanos": 41525335,
+          "semanticProfile": "mlir-nix-confix-571b57d3",
+          "strictValidation": false,
+          "copyTransport": "packed-i32",
+          "scanNanos": 44177041,
+          "allocatedBytes": 543040,
+          "rowCapacity": 16384,
+          "guardsVerified": true,
+          "liveBytesAfter": 0,
+          "queueNanos": 701803,
+          "callNanos": 142880353
+        },
+        "sourceRetained": true
+      },
+      "selection": {
+        "found": true,
+        "path": "spans.0.quotation",
+        "value": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "begin": 18477,
+          "end": 18654,
+          "quote": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+          "anchors": [
+            {
+              "begin": 18477,
+              "end": 18536,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                871,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            },
+            {
+              "begin": 18537,
+              "end": 18594,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                926,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            },
+            {
+              "begin": 18595,
+              "end": 18653,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                982,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            }
+          ],
+          "unresolved": [
+            "table",
+            "diagram"
+          ],
+          "category": "document",
+          "provenance": {
+            "finalUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf",
+            "notesCid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+            "retrieved": "2026-11-04T23:32:18Z",
+            "requestedUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "geometry": "native",
+        "sourceCid": "sha256:4dd9c7cb3ebd8e019e902fbdb06134605e018b46cf1cb342e2a7af11299ee2d3",
+        "byteSpan": {
+          "open": 516,
+          "close": 2024,
+          "unit": "utf8-byte-inclusive"
+        },
+        "sheets": [
+          {
+            "id": "confix/spans.0.quotation",
+            "title": "spans.0.quotation",
+            "parent": null,
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "originalCid",
+                "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f"
+              ],
+              [
+                "extractedTextCid",
+                "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801"
+              ],
+              [
+                "begin",
+                18477
+              ],
+              [
+                "end",
+                18654
+              ],
+              [
+                "quote",
+                "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n"
+              ],
+              [
+                "anchors",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors"
+                }
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/unresolved"
+                }
+              ],
+              [
+                "category",
+                "document"
+              ],
+              [
+                "provenance",
+                {
+                  "sheet": "confix/spans.0.quotation/provenance"
+                }
+              ],
+              [
+                "authentication",
+                "unverified"
+              ],
+              [
+                "quotationSource",
+                "extracted-text"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors",
+            "title": "anchors",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0"
+                }
+              ],
+              [
+                1,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1"
+                }
+              ],
+              [
+                2,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0",
+            "title": "[0]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18477
+              ],
+              [
+                "end",
+                18536
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/0",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                871
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/0",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1",
+            "title": "[1]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18537
+              ],
+              [
+                "end",
+                18594
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/1",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                926
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/1",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2",
+            "title": "[2]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18595
+              ],
+              [
+                "end",
+                18653
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/2",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                982
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/2",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/provenance",
+            "title": "provenance",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "finalUrl",
+                "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+              ],
+              [
+                "notesCid",
+                "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679"
+              ],
+              [
+                "retrieved",
+                "2026-11-04T23:32:18Z"
+              ],
+              [
+                "requestedUrl",
+                "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+              ]
+            ]
+          }
+        ],
+        "sheet": {
+          "id": "confix/spans.0.quotation",
+          "title": "spans.0.quotation",
+          "parent": null,
+          "truncated": false,
+          "limit": null,
+          "columns": [
+            {
+              "name": "key",
+              "type": "IoString"
+            },
+            {
+              "name": "value",
+              "type": "Any"
+            }
+          ],
+          "rows": [
+            [
+              "originalCid",
+              "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f"
+            ],
+            [
+              "extractedTextCid",
+              "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801"
+            ],
+            [
+              "begin",
+              18477
+            ],
+            [
+              "end",
+              18654
+            ],
+            [
+              "quote",
+              "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n"
+            ],
+            [
+              "anchors",
+              {
+                "sheet": "confix/spans.0.quotation/anchors"
+              }
+            ],
+            [
+              "unresolved",
+              {
+                "sheet": "confix/spans.0.quotation/unresolved"
+              }
+            ],
+            [
+              "category",
+              "document"
+            ],
+            [
+              "provenance",
+              {
+                "sheet": "confix/spans.0.quotation/provenance"
+              }
+            ],
+            [
+              "authentication",
+              "unverified"
+            ],
+            [
+              "quotationSource",
+              "extracted-text"
+            ]
+          ]
+        }
+      }
+    },
+    "bindings": [],
+    "bindingsTruncated": false,
+    "promptVersions": {},
+    "consumed": [
+      {
+        "kind": "project",
+        "id": "coinbase-suski/coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "sequence": 0,
+        "rev": "1-sha256:d0d80cc7ff35bce5909eb9f64232ff5d28f921c535602f7fd94a006ca9f2e0a7"
+      },
+      {
+        "kind": "project",
+        "id": "coinbase-suski/coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "sequence": 3,
+        "rev": "1-sha256:5f39a155fb2bc20145ec7597d8451a34164615eb23145b1413b9c6a4637614a1"
+      }
+    ],
+    "consumedTruncated": false,
+    "inputFingerprint": "sha256:dfaae39c564ab90be703b7a10a7c405db9d06463ceaff1eb1836b3da0eae2574",
+    "rootStateCid": "sha256:546effb4e344c36dd3564ed06870ef546d25c3a467e8817619e499b6204cbdc2",
+    "rootStateFormat": "cbor",
+    "ok": true,
+    "finishedAtMs": 1793848522508,
+    "invocationsCid": "sha256:45c70b60b09c94d14a5541445aaded045ce2cd06955145c33f7fbc6c6493c215",
+    "oroborosCid": "sha256:47ae79e008f190a2f85989e7f3af8872b5d4280e468b86ef2b3385beb032214a",
+    "invocationsAttempted": 5,
+    "invocationsDropped": 0
+  },
+  "recoveryVideo": "page@20ecb44efd9f9cd5c36a8b261a0300ff.webm",
+  "inspectionVideo": "page@728d8a9e1640df5229dfd772c4c3ed42.webm"
+}

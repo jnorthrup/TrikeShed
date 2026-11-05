@@ -1,0 +1,15 @@
+application-stage PASS
+package-manifest PASS
+package-verify PASS
+integrity PASS
+archive-first PASS
+archive-second PASS
+archive-extract PASS
+unpacked-verify PASS
+Traceback (most recent call last):
+  File "/workspace/airgap-r4c-proof/release.py", line 26, in <module>
+    run(['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4c-proof','python',str(home/'run.py'),name,stage],name,env)
+  File "/workspace/airgap-r4c-proof/release.py", line 6, in run
+    assert p.returncode==0,(name,p.returncode)
+           ^^^^^^^^^^^^^^^
+AssertionError: ('interruption-document-archive01', 1)

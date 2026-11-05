@@ -1,0 +1,57 @@
+const {chromium}=require('playwright');
+const fs=require('fs'),path=require('path'),crypto=require('crypto'),assert=require('assert/strict');
+const root=process.argv[2],base=process.argv[3],stage=process.env.TRIKESHED_CRASH_BEFORE;
+const report={scope:'Interrupted direct document run, explicit new execution, then fresh inspector; real production owners',before:stage,cases:{},requests:[],errors:[]};
+const save=()=>fs.writeFileSync(path.join(root,'browser.json'),JSON.stringify(report,null,2));
+const sha=b=>'sha256:'+crypto.createHash('sha256').update(b).digest('hex');
+let browser,context,page;
+(async()=>{
+ browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ context=await browser.newContext({viewport:{width:1800,height:1200},recordVideo:{dir:path.join(root,'videos'),size:{width:1800,height:1200}}});
+ report.browser=browser.version();
+ const get=async route=>{const r=await context.request.get(base+route);assert.equal(r.status(),200,route);return r.json();};
+ const bytes=async cid=>{const r=await context.request.get(base+'/api/v0/block/get?arg='+encodeURIComponent(cid));assert.equal(r.status(),200);const b=await r.body();assert.equal(sha(b),cid);return b;};
+ const waitFile=async name=>{const end=Date.now()+90000;while(!fs.existsSync(path.join(root,name))){assert(Date.now()<end,'Restart timed out');await new Promise(r=>setTimeout(r,100));}return JSON.parse(fs.readFileSync(path.join(root,name)));};
+ const scratch=JSON.stringify({nodes:[],wires:[],seq:99});await context.addInitScript(s=>localStorage.setItem('trikeshed.panels.v3',s),scratch);
+ context.on('request',r=>{if(r.method()==='POST')report.requests.push({url:r.url(),body:r.postData()});});
+ context.on('response',async r=>{if(r.url().endsWith('/kotlin/spacegraph/spacegraph.js')){const b=await r.body();report.bundle={sha256:sha(b).slice(7),bytes:b.length};save();}});
+ const runs=()=>report.requests.filter(r=>new URL(r.url).pathname==='/api/lcnc/run');
+ async function open(){page=await context.newPage();page.on('pageerror',e=>report.errors.push(String(e)));await page.goto(base+'/panels?load=airgap-document',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelectorAll('.node').length===5);await page.locator('#panelName').fill('airgap-coinbase-suski');assert.equal(await page.evaluate(()=>localStorage.getItem('trikeshed.panels.v3')),scratch);}
+ async function receipt(cid){await page.locator('#facetsBtn').click();const d=page.getByRole('region',{name:'Workspace facets'});await d.getByRole('button',{name:'Evidence',exact:true}).click();await d.getByRole('textbox',{name:'Run receipt content ID'}).fill(cid);await d.getByRole('button',{name:'Inspect receipt',exact:true}).click();return d;}
+ async function closePage(name){report[name]=path.basename(await page.video().path());await page.close();}
+ const seed=await get('/__proof/state');assert.equal(seed.mode,'run');assert.equal(seed.minerInstalled,true);assert.equal(Object.keys(seed.runs).length,0);assert.equal(seed.workspaceVisible,false);assert.equal(seed.gradleCacheVisible,false);
+ await open();assert.equal(runs().length,0);await page.locator('#debugBtn').click();
+ const pause=async id=>page.waitForFunction(id=>document.querySelector('[data-debug-state]')?.textContent.includes('Paused before '+id),id,{timeout:60000});
+ await pause('document');
+ for(const id of ['source','passages','scan','selection']){if(id===stage&&stage==='document')break;if(stage==='document')break;await page.getByRole('button',{name:'Step into next node',exact:true}).click();await pause(id);if(id===stage)break;}
+ assert.equal(runs().length,1);const request=JSON.parse(runs()[0].body);const state=await get('/__proof/state'),old=Object.values(state.runs)[0];assert.equal(old.status,'running');assert.equal(old.outputs,undefined);assert.equal(old.invocationsCid,undefined);
+ const debug=await get('/api/lcnc/debug?token='+request.debugToken+'&runId='+old.runId);assert.equal(debug.state,'paused');assert.equal(debug.site.nodeId,stage);
+ report.running=old;report.liveDebug=debug;fs.writeFileSync(path.join(root,'live-debug-before-crash.json'),JSON.stringify(debug,null,2));
+ report.cases.ownedBoundary={result:'PASS',before:stage,runId:old.runId,ordinal:debug.ordinal,observations:debug.observationSummary};
+ await page.screenshot({path:path.join(root,'before-crash.png'),fullPage:true});save();
+ fs.writeFileSync(path.join(root,'restart-request.json'),JSON.stringify({boot:seed.boot,runId:old.runId,before:stage}));
+ const restart=await waitFile('restart-ready.json');assert.equal(restart.firstExit,137);assert.equal(restart.javaReaped,true);assert.equal(restart.cleanupRan,false);
+ await page.waitForFunction(()=>document.body.innerText.includes('Response interrupted; daemon outcome is unknown. Inspect run records before retrying.'),{timeout:10000});
+ report.cases.lostResponse={result:'PASS',unconfirmedOutcomeShown:true,noAutomaticRetry:runs().length===1};assert.equal(runs().length,1);
+ await page.screenshot({path:path.join(root,'outcome-unconfirmed.png'),fullPage:true});await closePage('interruptedVideo');
+ const recovered=await get('/__proof/state');assert.equal(recovered.mode,'recover');assert.equal(recovered.minerInstalled,false);assert.equal(recovered.assetsVisible,false);assert.equal(recovered.llvmInstalled,true);assert.equal(recovered.modulesVisible,true);assert.notEqual(recovered.boot,seed.boot);assert.deepEqual(recovered.documents,seed.documents);
+ const interrupted=recovered.runs['lcnc/run/'+old.runId];assert.equal(Object.keys(recovered.runs).length,1);assert.equal(interrupted.status,'interrupted');assert.equal(interrupted.error,'runtime_restarted');assert.equal(interrupted.ok,false);assert.equal(interrupted.previousReceiptCid,old.receiptCid);assert.equal(interrupted.outputs,undefined);assert.equal(interrupted.invocationsCid,undefined);
+ report.interrupted=interrupted;report.cases.recovery={result:'PASS',firstBoot:seed.boot,secondBoot:recovered.boot,...restart,minerAbsent:true,sourceRevisionsUnchanged:true,oldRunNotReexecuted:true};
+ const expired=await context.request.get(base+'/api/lcnc/debug?token='+request.debugToken+'&runId='+old.runId);assert.equal(expired.status(),404);const expiredBody=await expired.json();assert.equal(expiredBody.error,'debug_run_not_active');assert.equal(expiredBody.receipt.status,'interrupted');assert.equal(expiredBody.receipt.runId,old.runId);
+ report.cases.expiredControl={result:'PASS',status:404,body:expiredBody};
+ await open();let d=await receipt(interrupted.receiptCid);await d.getByText('No per-node invocation evidence was recorded for this receipt.',{exact:true}).waitFor();assert((await d.innerText()).includes('interrupted'));assert.equal(await d.getByRole('button',{name:'Show recorded outputs on matching canvas',exact:true}).count(),0);assert.equal(runs().length,1);
+ report.cases.interruptedInspection={result:'PASS',text:await d.innerText(),noRecordedOutputAction:true};await page.screenshot({path:path.join(root,'interrupted-receipt.png'),fullPage:true});await d.getByRole('button',{name:'Close facets',exact:true}).click();
+ const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/lcnc/run'&&r.request().method()==='POST',{timeout:120000});await page.locator('#runBtn').click();const completed=await(await response).json();report.completed=completed;
+ assert.equal(completed.status,'completed');assert.equal(completed.ok,true);assert.notEqual(completed.runId,old.runId);assert.equal(completed.programCid,old.programCid);assert.equal(runs().length,2);assert.equal(completed.outputs.scan.runtime.liveBytesAfter,0);assert.equal(completed.outputs.scan.runtime.guardsVerified,true);
+ const quote=completed.outputs.selection.value,text=await bytes(quote.extractedTextCid),original=await bytes(quote.originalCid);assert.equal(original.length,111243);assert.equal(text.toString('utf8').substring(quote.begin,quote.end),quote.quote);assert(quote.anchors.some(a=>a.page===10));
+ const ledger=await get('/api/lcnc/content?cid='+encodeURIComponent(completed.invocationsCid));assert.deepEqual(ledger.observations.filter(e=>e.phase==='consumed').map(e=>e.wire.index),[0,1,2,3,4,5,6,7]);
+ const now=await get('/__proof/state');assert.equal(Object.keys(now.runs).length,2);assert.deepEqual(now.runs['lcnc/run/'+old.runId],interrupted);assert.deepEqual(now.documents,seed.documents);
+ report.cases.explicitNewRun={result:'PASS',oldRunId:old.runId,newRunId:completed.runId,programCid:completed.programCid,oldReceiptUnchanged:true,sourceRevisionsUnchanged:true,consumedWires:8,quote:quote.quote,nativeLiveBytesAfter:0};
+ await page.screenshot({path:path.join(root,'explicit-new-run.png'),fullPage:true});save();await closePage('recoveryVideo');
+ fs.writeFileSync(path.join(root,'inspection-request.json'),JSON.stringify({boot:recovered.boot,receiptCid:completed.receiptCid}));const marker=await waitFile('inspection-ready.json');assert.equal(marker.secondExit,0);
+ const inspected=await get('/__proof/state');assert.equal(inspected.mode,'inspect');assert.equal(inspected.llvmInstalled,false);assert.equal(inspected.minerInstalled,false);assert.equal(inspected.assetsVisible,false);assert.equal(inspected.modulesVisible,false);assert(![seed.boot,recovered.boot].includes(inspected.boot));assert.deepEqual(inspected.runs,now.runs);assert.deepEqual(inspected.documents,seed.documents);
+ await open();d=await receipt(completed.receiptCid);const show=d.getByRole('button',{name:'Show recorded outputs on matching canvas',exact:true});await show.click();await d.getByRole('button',{name:'Close facets',exact:true}).click();
+ const selected=page.getByRole('region',{name:'Selected retained passage',exact:true});await selected.getByRole('button',{name:'Verify quotation against retained text',exact:true}).click();await selected.getByRole('status').filter({hasText:'quotation matches exact UTF-16 range'}).waitFor();assert.equal(runs().length,2);
+ report.cases.freshInspector={result:'PASS',thirdBoot:inspected.boot,identicalRows:true,identicalDocuments:true,noNativeOrMiner:true,postRuns:2};await page.screenshot({path:path.join(root,'fresh-inspection.png'),fullPage:true});report.inspectionVideo=path.basename(await page.video().path());
+ assert.equal(report.errors.length,0);save();await context.request.post(base+'/__proof/finish');
+})().catch(async e=>{report.failure=String(e.stack||e);save();if(page)await page.screenshot({path:path.join(root,'failure.png'),fullPage:true}).catch(()=>{});console.error(e);process.exitCode=1;}).finally(async()=>{if(context)await context.close().catch(()=>{});if(browser)await browser.close().catch(()=>{});save();});

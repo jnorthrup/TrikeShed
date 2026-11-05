@@ -1,0 +1,877 @@
+{
+  "testedSourceCommit": "d80e698139c69e70c594940b007a22673b193937",
+  "testTotals": {
+    "tests": 248,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  },
+  "testPasses": 247,
+  "conditionalSkips": [
+    "borg.trikeshed.forge.server.ReviewedTaxonomyWireTest.configuredNativeEndpointRunsActualReviewedQuery()[jvm]"
+  ],
+  "checks": {
+    "jvm": {
+      "sourceCommit": "d80e698139c69e70c594940b007a22673b193937",
+      "startedAt": "2026-11-05T03:33:47.102447+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-current-user",
+        "--net",
+        "--keep-caps",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-check",
+        "./gradlew",
+        "--offline",
+        "--no-daemon",
+        "--max-workers=2",
+        "airgapDocumentInstall",
+        "jvmTest",
+        "--tests",
+        "*.DocumentSpansTest",
+        "--tests",
+        "*.LcncConfixSelectionTest",
+        "--tests",
+        "*.LcncConsumptionTest",
+        "--tests",
+        "*.LlvmScalarTest",
+        "--tests",
+        "*.LlvmConfixTest",
+        "--tests",
+        "*.LlvmScalarRunTest",
+        "--tests",
+        "*.LlvmConfixRunTest",
+        "--tests",
+        "*.WorkSelectNodeTest",
+        "--tests",
+        "*.FinanceKifPresetExecutionTest",
+        "--tests",
+        "*.AceContextNodesTest",
+        "--tests",
+        "*.BreadcrumbContextNodesTest",
+        "--tests",
+        "*.EnglishCopularPresetExecutionTest",
+        "--tests",
+        "*.LcncPinnedBindingTest",
+        "--tests",
+        "*.KanbanPinnedDispatchTest",
+        "--tests",
+        "*.WorkModelRouteTest",
+        "--tests",
+        "*.PropositionAttentionTest",
+        "--tests",
+        "*.DocumentEnglishRetainedWireTest",
+        "--tests",
+        "*.EnglishTaxonomyCarrierTest",
+        "--tests",
+        "*.EnglishTaxonomyExportGuardTest",
+        "--tests",
+        "*.ProjectCorpusVisitTest",
+        "--tests",
+        "*.CurationReviewedReadTest",
+        "--tests",
+        "*.CurationIntakeTest",
+        "--tests",
+        "*.CurationIntakeEligibilityTest",
+        "--tests",
+        "*.KgKifCommentTest",
+        "--tests",
+        "*.LegalRequiredAnchorCoverageTest",
+        "--tests",
+        "*.LegalRequiredAnchorCoverageCliTest",
+        "--tests",
+        "*.KgPredicateNamespaceTest",
+        "--tests",
+        "*.KgRdfFidelityTest",
+        "--tests",
+        "*.KgPropositionIdentityTest",
+        "--tests",
+        "*.KgRouteErrorTest",
+        "--tests",
+        "*.KgRetentionTest",
+        "--tests",
+        "*.KgHttpUtf8Test",
+        "--tests",
+        "*.LcncConfixPickPathContractTest",
+        "--tests",
+        "*.ReviewedTaxonomyProofPathsTest",
+        "--tests",
+        "*.ReviewedTaxonomyProofPathsReadTest",
+        "--tests",
+        "*.EnglishTaxonomyWireTest",
+        "--tests",
+        "*.ProjectDbBindingTest",
+        "--tests",
+        "*.ReviewedTaxonomyProofGraphTest",
+        "--tests",
+        "*.ReviewedTaxonomyQueryViewTest",
+        "--tests",
+        "*.ReviewedTaxonomyQuadQueryWireTest",
+        "--tests",
+        "*.ReviewedTaxonomyWireTest",
+        "--tests",
+        "*.EnglishCorpusWireTest",
+        "--tests",
+        "*.RetainedNalImplicationTest",
+        "--tests",
+        "*.SyntheticNalExperimentCliTest",
+        "muxClasspath"
+      ],
+      "cwd": "/workspace/TrikeShed",
+      "exit": 0,
+      "finishedAt": "2026-11-05T03:35:18.670297+00:00"
+    },
+    "targets": {
+      "sourceCommit": "d80e698139c69e70c594940b007a22673b193937",
+      "startedAt": "2026-11-05T03:35:31.021405+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-current-user",
+        "--net",
+        "--keep-caps",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-check",
+        "./gradlew",
+        "--offline",
+        "--no-daemon",
+        "--max-workers=2",
+        "-PkotlinJsApps=documents,spacegraph",
+        "stageKotlinJs",
+        "compileKotlinJs",
+        "compileKotlinWasmJs",
+        "compileKotlinWasmWasi",
+        "compileKotlinLinuxX64"
+      ],
+      "cwd": "/workspace/TrikeShed-target-checks",
+      "exit": 0,
+      "finishedAt": "2026-11-05T03:43:01.029460+00:00"
+    }
+  },
+  "browser": {
+    "cases": 21,
+    "bundle": {
+      "sha256": "9101d4584f65247dc9e82cc9bb4ea8a3ca6b76cc19dbe288a89572803fa29361",
+      "bytes": 1805728
+    },
+    "scenarios": {
+      "document": {
+        "cases": 7,
+        "artifact": "accepted/document/browser.json",
+        "independentCasAudit": {
+          "casObjectsVerified": 30,
+          "before": "document",
+          "oldRunId": "c01ffa75-5351-40c2-8200-762428f6c366",
+          "newRunId": "d0a12675-ede1-4715-be2e-1b18e147a57b",
+          "runningReceiptCid": "sha256:4a9f2660a52e40788cb5c8971ca857b835b629097bd28c8905da0d7dc0569ee8",
+          "interruptedReceiptCid": "sha256:8882d6e0dd68121c89bb8395667352326607079cfa754fb94dfaadc9b63df4c1",
+          "completedReceiptCid": "sha256:d5de68f87f82298a81d25333f0848e64dab4f7c4f82cdfada7e59524341543bc",
+          "previousReceiptIdentityVerified": true,
+          "newRunIdentityDistinct": true,
+          "programIdentityUnchanged": true,
+          "noInventedInterruptedOutputsOrInvocations": true,
+          "identicalRowsAfterFinalRestart": true,
+          "sixDocumentRevisionsUnchanged": true,
+          "consumedWires": 8,
+          "nativeLiveBytesAfter": 0,
+          "exactUtf16Quotation": true,
+          "writerCleanupAbsent": true,
+          "recoverAndInspectorCleanupCompleted": true
+        }
+      },
+      "scan": {
+        "cases": 7,
+        "artifact": "accepted/scan/browser.json",
+        "independentCasAudit": {
+          "casObjectsVerified": 30,
+          "before": "scan",
+          "oldRunId": "efcead21-a3fb-47de-8aef-bfe9bf065e5a",
+          "newRunId": "2291a0fd-1e8f-4e28-adcd-6375049b7ff6",
+          "runningReceiptCid": "sha256:fb82bf3ec5fcf9b038bd0dfc558cb4aceb5238c37803b428f1087659da58ca9c",
+          "interruptedReceiptCid": "sha256:f79c93da94d17ce80ebdb4cbbcd94427dcd0fd5297b1af365cef109e51acf8bc",
+          "completedReceiptCid": "sha256:aea3d0efd8058748edf94c16390c03a897245a310d2af7e7aa51de44b6c8f311",
+          "previousReceiptIdentityVerified": true,
+          "newRunIdentityDistinct": true,
+          "programIdentityUnchanged": true,
+          "noInventedInterruptedOutputsOrInvocations": true,
+          "identicalRowsAfterFinalRestart": true,
+          "sixDocumentRevisionsUnchanged": true,
+          "consumedWires": 8,
+          "nativeLiveBytesAfter": 0,
+          "exactUtf16Quotation": true,
+          "writerCleanupAbsent": true,
+          "recoverAndInspectorCleanupCompleted": true
+        }
+      },
+      "selection": {
+        "cases": 7,
+        "artifact": "accepted/selection/browser.json",
+        "independentCasAudit": {
+          "casObjectsVerified": 30,
+          "before": "selection",
+          "oldRunId": "7672252a-6cb3-4cf3-9aef-def429f3a57e",
+          "newRunId": "2d999ee1-6a27-4396-8bf5-522516d204af",
+          "runningReceiptCid": "sha256:7be334fc4a8b80f48361d4415121afd2b63449711fa53b140c0806ee5d92c8a1",
+          "interruptedReceiptCid": "sha256:dc400c2c6c1b231c7d82bdc83428913644a1c363cc40f2382d5ee247c09323d8",
+          "completedReceiptCid": "sha256:d385f85644e35c3c6bdb5f61794ce563961acc2bbbb35f90cc8871fd73ac1aea",
+          "previousReceiptIdentityVerified": true,
+          "newRunIdentityDistinct": true,
+          "programIdentityUnchanged": true,
+          "noInventedInterruptedOutputsOrInvocations": true,
+          "identicalRowsAfterFinalRestart": true,
+          "sixDocumentRevisionsUnchanged": true,
+          "consumedWires": 8,
+          "nativeLiveBytesAfter": 0,
+          "exactUtf16Quotation": true,
+          "writerCleanupAbsent": true,
+          "recoverAndInspectorCleanupCompleted": true
+        }
+      }
+    }
+  },
+  "startupRefusalCases": 6,
+  "packageIntegrityRefusalCases": 5,
+  "metrics": [
+    {
+      "before": "document",
+      "mode": "run",
+      "startupSeconds": 3.4419781969991163,
+      "javaVmHwmKiB": 420512,
+      "javaCpuSeconds": 9.42,
+      "uptimeMs": 6364,
+      "boot": "e1ab7265-37db-4191-9683-04c118f38cd0",
+      "snapshotPoint": "before SIGKILL",
+      "exit": 137
+    },
+    {
+      "before": "document",
+      "mode": "recover",
+      "startupSeconds": 2.8435560860016267,
+      "javaVmHwmKiB": 413560,
+      "javaCpuSeconds": 10.53,
+      "uptimeMs": 8288,
+      "boot": "be0fad42-8030-48fe-bf1d-a38feb102381",
+      "snapshotPoint": "before normal shutdown",
+      "exit": 0
+    },
+    {
+      "before": "document",
+      "mode": "inspect",
+      "startupSeconds": 2.253013898000063,
+      "javaVmHwmKiB": 356512,
+      "javaCpuSeconds": 7.99,
+      "uptimeMs": 5545,
+      "boot": "b6e013ae-a11a-45e3-9cbe-049169dd5f3a",
+      "snapshotPoint": "before normal shutdown",
+      "exit": 0
+    },
+    {
+      "before": "scan",
+      "mode": "run",
+      "startupSeconds": 3.23570675800147,
+      "javaVmHwmKiB": 414956,
+      "javaCpuSeconds": 9.31,
+      "uptimeMs": 6763,
+      "boot": "02822201-a81f-46dd-a78f-75deab8954bb",
+      "snapshotPoint": "before SIGKILL",
+      "exit": 137
+    },
+    {
+      "before": "scan",
+      "mode": "recover",
+      "startupSeconds": 2.8401996030006558,
+      "javaVmHwmKiB": 433668,
+      "javaCpuSeconds": 10.23,
+      "uptimeMs": 8740,
+      "boot": "913af601-b9c3-48e5-bb7e-45341548096d",
+      "snapshotPoint": "before normal shutdown",
+      "exit": 0
+    },
+    {
+      "before": "scan",
+      "mode": "inspect",
+      "startupSeconds": 2.2432818739980576,
+      "javaVmHwmKiB": 367012,
+      "javaCpuSeconds": 7.76,
+      "uptimeMs": 5379,
+      "boot": "954493a8-5536-4792-8325-6ee3f8ddae0b",
+      "snapshotPoint": "before normal shutdown",
+      "exit": 0
+    },
+    {
+      "before": "selection",
+      "mode": "run",
+      "startupSeconds": 3.2385323799971957,
+      "javaVmHwmKiB": 456408,
+      "javaCpuSeconds": 10.4,
+      "uptimeMs": 7991,
+      "boot": "05b3d3cf-7fe7-40f8-b49e-4cacf8855cce",
+      "snapshotPoint": "before SIGKILL",
+      "exit": 137
+    },
+    {
+      "before": "selection",
+      "mode": "recover",
+      "startupSeconds": 2.844039368996164,
+      "javaVmHwmKiB": 475812,
+      "javaCpuSeconds": 11.28,
+      "uptimeMs": 9887,
+      "boot": "18eec354-f17a-40c1-9374-275491003557",
+      "snapshotPoint": "before normal shutdown",
+      "exit": 0
+    },
+    {
+      "before": "selection",
+      "mode": "inspect",
+      "startupSeconds": 2.0500985239996226,
+      "javaVmHwmKiB": 366884,
+      "javaCpuSeconds": 7.27,
+      "uptimeMs": 4911,
+      "boot": "e6c0bf28-d9d6-4d4a-8a4e-f766ffd671f0",
+      "snapshotPoint": "before normal shutdown",
+      "exit": 0
+    }
+  ],
+  "runtimeArchive": {
+    "file": "/workspace/library-files/airgap-document-r4c-linux-x64-2026-11-05.tar.gz",
+    "bytes": 460562545,
+    "sha256": "13d6c58e339cfd5ba14d71b8e68ab4a1cb0c14eac5f5c931814a6f051b24054c"
+  },
+  "sourceCompanion": {
+    "file": "/workspace/library-files/airgap-document-r4c-sources-2026-11-05.tar.gz",
+    "sha256": "44cfdf2bea24fd63d3eae88bf8308b62e05601d122e3f46736095fcb2a61817a",
+    "bytes": 680528672
+  },
+  "runtimeProfile": {
+    "jarCount": 26,
+    "dependencyJarCount": 23,
+    "jarBytes": 136684531,
+    "dependencies": [
+      {
+        "group": "org.jetbrains.kotlinx",
+        "name": "atomicfu-jvm",
+        "version": "0.33.0",
+        "file": "atomicfu-jvm-0.33.0.jar",
+        "sha256": "cdc94bfe4f739a0121860e61977d5c1e6a3d53c21f2471493393ba9e900d394e",
+        "pomFiles": [
+          "atomicfu-jvm-0.33.0.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.jetbrains.kotlinx__atomicfu-jvm-0.33.0-sources.jar",
+          "sha256": "09e8719c35c3491633ea8d0dfb2a0f1769dfff5a6bbaf55ee5412a6221331215"
+        }
+      },
+      {
+        "group": "org.jetbrains.kotlinx",
+        "name": "kotlinx-coroutines-core-jvm",
+        "version": "1.11.0",
+        "file": "kotlinx-coroutines-core-jvm-1.11.0.jar",
+        "sha256": "d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa",
+        "pomFiles": [
+          "kotlinx-coroutines-core-jvm-1.11.0.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.jetbrains.kotlinx__kotlinx-coroutines-core-jvm-1.11.0-sources.jar",
+          "sha256": "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a"
+        }
+      },
+      {
+        "group": "org.jetbrains.kotlinx",
+        "name": "kotlinx-serialization-core-jvm",
+        "version": "1.12.0",
+        "file": "kotlinx-serialization-core-jvm-1.12.0.jar",
+        "sha256": "bcfddcac76159058ba0953af05938c17111d238cd41be7191874656454d62f1a",
+        "pomFiles": [
+          "kotlinx-serialization-core-jvm-1.12.0.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.jetbrains.kotlinx__kotlinx-serialization-core-jvm-1.12.0-sources.jar",
+          "sha256": "b62fb8059123c43a72ddbe4aeaa8c92c8313d822c128ca2f861e3d91e35e5070"
+        }
+      },
+      {
+        "group": "org.jetbrains.kotlinx",
+        "name": "kotlinx-datetime-jvm",
+        "version": "0.8.0-0.6.x-compat",
+        "file": "kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar",
+        "sha256": "c764cb4882bb30a5b4279e07324ef60ed4f82f23a7bb420ee62550266d0f6162",
+        "pomFiles": [
+          "kotlinx-datetime-jvm-0.8.0-0.6.x-compat.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.jetbrains.kotlinx__kotlinx-datetime-jvm-0.8.0-0.6.x-compat-sources.jar",
+          "sha256": "d2d3e8cf389ab0f162c61a2cfdaec488fca766ee16b8da12ac81bd5d53500de2"
+        }
+      },
+      {
+        "group": "org.jetbrains.kotlin",
+        "name": "kotlin-stdlib",
+        "version": "2.4.21",
+        "file": "kotlin-stdlib-2.4.21.jar",
+        "sha256": "bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3",
+        "pomFiles": [
+          "kotlin-stdlib-2.4.21.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.jetbrains.kotlin__kotlin-stdlib-2.4.21-sources.jar",
+          "sha256": "1e29c0668b0aa555e7b154e5da2e8094e1b755cfee25737839195bbbdad8a4a2"
+        }
+      },
+      {
+        "group": "org.graalvm.truffle",
+        "name": "truffle-runtime",
+        "version": "25.3.4.1",
+        "file": "truffle-runtime-25.3.4.1.jar",
+        "sha256": "d74ff0b8eb9a5fec4a571f78bc21750ee41dfd454877b8cce8b33641efd90ae3",
+        "pomFiles": [
+          "truffle-runtime-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.truffle__truffle-runtime-25.3.4.1-sources.jar",
+          "sha256": "bc365db6f4765d57bc4779508dbe0fcdd2c379b4027eb954fd5b0c9e55c8a519"
+        }
+      },
+      {
+        "group": "org.graalvm.llvm",
+        "name": "llvm-language-native",
+        "version": "25.3.4.1",
+        "file": "llvm-language-native-25.3.4.1.jar",
+        "sha256": "b49d4ea22e77be015a8a4dedd497e725326add5c03297eafd8eca50806a388ef",
+        "pomFiles": [
+          "llvm-language-native-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.llvm__llvm-language-native-25.3.4.1-sources.jar",
+          "sha256": "4750d7a649d9326422ebcd8d592c4473abf9eb530f3dc3afa37592bfd1833c08"
+        }
+      },
+      {
+        "group": "org.graalvm.truffle",
+        "name": "truffle-nfi-libffi",
+        "version": "25.3.4.1",
+        "file": "truffle-nfi-libffi-25.3.4.1.jar",
+        "sha256": "edb64301941d86f785f748f70742614e625971adf4595789e3b7a068dcd574d3",
+        "pomFiles": [
+          "truffle-nfi-libffi-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.truffle__truffle-nfi-libffi-25.3.4.1-sources.jar",
+          "sha256": "b14b8c43f10450cac8b2c8af2d785e43fd22808a6505e0f7d571b2c26bc09f5c"
+        }
+      },
+      {
+        "group": "org.graalvm.truffle",
+        "name": "truffle-nfi-panama",
+        "version": "25.3.4.1",
+        "file": "truffle-nfi-panama-25.3.4.1.jar",
+        "sha256": "e3bdc4c7fa813218cf13a5210cfbc994ede13df5082326c2d709ce652a78ef2c",
+        "pomFiles": [
+          "truffle-nfi-panama-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.truffle__truffle-nfi-panama-25.3.4.1-sources.jar",
+          "sha256": "edec614bf9554c81685a6a8636c5352109234f9984a983dc3ea449a209368c24"
+        }
+      },
+      {
+        "group": "org.graalvm.llvm",
+        "name": "llvm-language-nfi",
+        "version": "25.3.4.1",
+        "file": "llvm-language-nfi-25.3.4.1.jar",
+        "sha256": "c3eed55afc590063636b939e0d75597dbe5d57edb5f237da898b179eaaaf02c9",
+        "pomFiles": [
+          "llvm-language-nfi-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.llvm__llvm-language-nfi-25.3.4.1-sources.jar",
+          "sha256": "f25574a58c939d63a64bb232f672cb276b726cad6ea2b48a407276bc391b2638"
+        }
+      },
+      {
+        "group": "org.graalvm.llvm",
+        "name": "llvm-language",
+        "version": "25.3.4.1",
+        "file": "llvm-language-25.3.4.1.jar",
+        "sha256": "c835fc80abdc818b7487c9e0b9ecd6c7cd59a7bbb7ac7041d6e2cda2be4b9335",
+        "pomFiles": [
+          "llvm-language-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.llvm__llvm-language-25.3.4.1-sources.jar",
+          "sha256": "716562a9c6cbe9201f53bc972d9eafbb1a692a9d9aebb9f177a541c5e0913f66"
+        }
+      },
+      {
+        "group": "org.graalvm.truffle",
+        "name": "truffle-nfi",
+        "version": "25.3.4.1",
+        "file": "truffle-nfi-25.3.4.1.jar",
+        "sha256": "5320c98ba65a13a4ad9609732efa1ca2742ede7892863a154b5a89c987491853",
+        "pomFiles": [
+          "truffle-nfi-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.truffle__truffle-nfi-25.3.4.1-sources.jar",
+          "sha256": "0a5352ff42259c9fd0930cdfb9bc2579dcdf85b5388c877d302e67185c4d4e41"
+        }
+      },
+      {
+        "group": "org.graalvm.llvm",
+        "name": "llvm-language-native-resources",
+        "version": "25.3.4.1",
+        "file": "llvm-language-native-resources-25.3.4.1.jar",
+        "sha256": "2b5fb413806a0046127c975dae8a55d1047b2c3757072b97cb9d06b024c541c3",
+        "pomFiles": [
+          "llvm-language-native-resources-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.llvm__llvm-language-native-resources-25.3.4.1-sources.jar",
+          "sha256": "1efc1ae1a952bacae491d594a1d41ed13e82a49ec47f8411d718be7726ab3ef5"
+        }
+      },
+      {
+        "group": "org.graalvm.llvm",
+        "name": "llvm-api",
+        "version": "25.3.4.1",
+        "file": "llvm-api-25.3.4.1.jar",
+        "sha256": "4e7bf9f0f6e41dbdb9fb68b2b9004548dcda154f83bd769609435f50d8ec593c",
+        "pomFiles": [
+          "llvm-api-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.llvm__llvm-api-25.3.4.1-sources.jar",
+          "sha256": "c5cb69dcbc32e57c9f740ac94216aec88b8673e1a790b42367c42289d49ce922"
+        }
+      },
+      {
+        "group": "org.graalvm.truffle",
+        "name": "truffle-api",
+        "version": "25.3.4.1",
+        "file": "truffle-api-25.3.4.1.jar",
+        "sha256": "f9efa18b1cb6c4e39862f5ac83a88ee4c9e31252c52c2ee5192c2a707cd9b27f",
+        "pomFiles": [
+          "truffle-api-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.truffle__truffle-api-25.3.4.1-sources.jar",
+          "sha256": "19b6c77ad407ca062d4334040177847e322d52ed2f04804953d54dd366579064"
+        }
+      },
+      {
+        "group": "org.graalvm.polyglot",
+        "name": "polyglot",
+        "version": "25.3.4.1",
+        "file": "polyglot-25.3.4.1.jar",
+        "sha256": "befec2cbfb6ca279a73ee20626718a917ab1d1a3970793698ddc11b4d41e0356",
+        "pomFiles": [
+          "polyglot-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.polyglot__polyglot-25.3.4.1-sources.jar",
+          "sha256": "fc796799f60b9463ea082ec8c8a9eed4b5d629035123933beec76e58c6cef28e"
+        }
+      },
+      {
+        "group": "org.jetbrains",
+        "name": "annotations",
+        "version": "23.0.0",
+        "file": "annotations-23.0.0.jar",
+        "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05",
+        "pomFiles": [
+          "annotations-23.0.0.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.jetbrains__annotations-23.0.0-sources.jar",
+          "sha256": "ff2309b42f7584520497bb48bc609aca04c9886cf48708f14be83f00423ec144"
+        }
+      },
+      {
+        "group": "org.graalvm.sdk",
+        "name": "jniutils",
+        "version": "25.3.4.1",
+        "file": "jniutils-25.3.4.1.jar",
+        "sha256": "b1d78402c744e5022fcb19f620644ab38b834c024020f3570dadaaf9cbe77067",
+        "pomFiles": [
+          "jniutils-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.sdk__jniutils-25.3.4.1-sources.jar",
+          "sha256": "b631b01238d9f090857d2c3b8124f037a420c0049efc87e7eba53434454ccc0e"
+        }
+      },
+      {
+        "group": "org.graalvm.sdk",
+        "name": "collections",
+        "version": "25.3.4.1",
+        "file": "collections-25.3.4.1.jar",
+        "sha256": "3d0d2287f0217e7e765a47d69681c0ac1bb4ef50d70c9440449e86045bbe158f",
+        "pomFiles": [
+          "collections-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.sdk__collections-25.3.4.1-sources.jar",
+          "sha256": "df2e466ad9dce602da3f77a0eee7a0b76eb7f72b9b07dc99ebb6b5cfbd8474be"
+        }
+      },
+      {
+        "group": "org.graalvm.sdk",
+        "name": "nativeimage",
+        "version": "25.3.4.1",
+        "file": "nativeimage-25.3.4.1.jar",
+        "sha256": "a4315500775e98d16f083812bf5b8b664d84abad736da14ebbea5b38d7752b0f",
+        "pomFiles": [
+          "nativeimage-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.sdk__nativeimage-25.3.4.1-sources.jar",
+          "sha256": "75c753c6811f070a7ecf9cac7b8372a51fff5c4df5361bf28590994fb47d983c"
+        }
+      },
+      {
+        "group": "org.graalvm.sdk",
+        "name": "word",
+        "version": "25.3.4.1",
+        "file": "word-25.3.4.1.jar",
+        "sha256": "fe1c3723e27907789732ac9f3d639ba6055d459529cfcfbd96156e73911ee7b7",
+        "pomFiles": [
+          "word-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.sdk__word-25.3.4.1-sources.jar",
+          "sha256": "2410996d807d8af10ec86e5c3ced95946c28003c944a22568cd3f1d87e2311f1"
+        }
+      },
+      {
+        "group": "org.graalvm.truffle",
+        "name": "truffle-compiler",
+        "version": "25.3.4.1",
+        "file": "truffle-compiler-25.3.4.1.jar",
+        "sha256": "a422df88ffaabe4669b8b6e5d63f04f2a8152e5fe763b3bfbf3dc58d7e5dd41c",
+        "pomFiles": [
+          "truffle-compiler-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.truffle__truffle-compiler-25.3.4.1-sources.jar",
+          "sha256": "12ac8500adf8679e4959866f9f89be1a65c96cc544334cd4ac6e3c6bfd571230"
+        }
+      },
+      {
+        "group": "org.graalvm.shadowed",
+        "name": "antlr4",
+        "version": "25.3.4.1",
+        "file": "antlr4-25.3.4.1.jar",
+        "sha256": "31f8c4fa0715ca486fa73dfb634537f74d4fae3d8786e37eea00994f8b10da7f",
+        "pomFiles": [
+          "antlr4-25.3.4.1.pom"
+        ],
+        "embeddedNotices": [],
+        "correspondingSource": {
+          "file": "org.graalvm.shadowed__antlr4-25.3.4.1-sources.jar",
+          "sha256": "3addb63be2b9b7ec40892ee3bb3620eb1980454e32b2bd9e85d798442a8b392d"
+        }
+      }
+    ],
+    "removedJarNames": [
+      "animation-core-desktop-1.12.2.jar",
+      "animation-desktop-1.12.2.jar",
+      "annotation-jvm-1.9.1.jar",
+      "annotations-40.0.0.jar",
+      "asm-9.11.1.jar",
+      "asm-tree-9.11.1.jar",
+      "bcpkix-jdk18on-1.85.jar",
+      "bcprov-jdk18on-1.85.jar",
+      "bcutil-jdk18on-1.85.jar",
+      "collection-jvm-1.5.0.jar",
+      "commons-math3-3.6.1.jar",
+      "core-common-2.2.0.jar",
+      "desktop-jvm-1.12.2.jar",
+      "foundation-desktop-1.12.2.jar",
+      "foundation-layout-desktop-1.12.2.jar",
+      "icu4j-25.3.4.1.jar",
+      "jbr-api-1.9.0.jar",
+      "jcodings-25.3.4.1.jar",
+      "jmh-core-1.37.jar",
+      "jmh-generator-annprocess-1.37.jar",
+      "joni-40.0.0.jar",
+      "jopt-simple-5.0.4.jar",
+      "js-language-25.3.4.1.jar",
+      "json-25.3.4.1.jar",
+      "jspecify-1.0.0.jar",
+      "kotlin-build-tools-api-2.4.21.jar",
+      "kotlin-compiler-embeddable-2.4.21.jar",
+      "kotlin-daemon-embeddable-2.4.21.jar",
+      "kotlin-reflect-1.6.10.jar",
+      "kotlin-script-runtime-2.4.21.jar",
+      "kotlin-scripting-common-2.4.21.jar",
+      "kotlin-scripting-compiler-embeddable-2.4.21.jar",
+      "kotlin-scripting-compiler-impl-embeddable-2.4.21.jar",
+      "kotlin-scripting-jvm-2.4.21.jar",
+      "kotlin-scripting-jvm-host-2.4.21.jar",
+      "lifecycle-common-jvm-2.11.0.jar",
+      "lifecycle-runtime-compose-desktop-2.11.0.jar",
+      "lifecycle-runtime-compose-desktop-2.9.6.jar",
+      "lifecycle-runtime-desktop-2.11.0.jar",
+      "lifecycle-viewmodel-compose-desktop-2.11.0.jar",
+      "lifecycle-viewmodel-desktop-2.11.0.jar",
+      "lifecycle-viewmodel-savedstate-desktop-2.11.0.jar",
+      "material-desktop-1.12.2.jar",
+      "material-icons-core-desktop-1.7.3.jar",
+      "material-icons-extended-desktop-1.7.3.jar",
+      "material-ripple-desktop-1.12.2.jar",
+      "material3-desktop-1.9.0.jar",
+      "navigationevent-compose-desktop-1.1.0.jar",
+      "navigationevent-compose-desktop-1.1.1.jar",
+      "navigationevent-desktop-1.1.1.jar",
+      "profiler-tool-25.3.4.1.jar",
+      "python-bouncycastle-support-25.3.4.1.jar",
+      "python-language-25.3.4.1.jar",
+      "python-resources-25.3.4.1.jar",
+      "regex-25.3.4.1.jar",
+      "requestfactory-client-2.13.1.jar",
+      "requestfactory-server-2.13.1.jar",
+      "resources-40.0.0.jar",
+      "runtime-40.0.0.jar",
+      "runtime-annotation-jvm-1.12.1.jar",
+      "runtime-desktop-1.12.1.jar",
+      "runtime-desktop-1.12.2.jar",
+      "runtime-retain-desktop-1.12.1.jar",
+      "runtime-saveable-desktop-1.12.1.jar",
+      "runtime-saveable-desktop-1.12.2.jar",
+      "savedstate-compose-desktop-1.3.6.jar",
+      "savedstate-compose-desktop-1.4.0.jar",
+      "savedstate-desktop-1.4.0.jar",
+      "shared-40.0.0.jar",
+      "skiko-awt-0.150.2.jar",
+      "skiko-awt-runtime-linux-x64-0.150.2.jar",
+      "slf4j-api-2.0.20.jar",
+      "sqlite-jdbc-3.53.4.0.jar",
+      "ui-backhandler-desktop-1.12.2.jar",
+      "ui-desktop-1.12.2.jar",
+      "ui-geometry-desktop-1.12.2.jar",
+      "ui-graphics-desktop-1.12.2.jar",
+      "ui-text-desktop-1.12.2.jar",
+      "ui-tooling-preview-desktop-1.12.2.jar",
+      "ui-unit-desktop-1.12.2.jar",
+      "ui-util-desktop-1.12.2.jar",
+      "validation-api-1.0.0.GA.jar",
+      "xz-25.3.4.1.jar",
+      "zstd-jni-1.5.7-24.jar"
+    ],
+    "scope": "Bounded PDF and native LLVM document graph; other daemon services are not included in this dependency profile"
+  },
+  "sourceSha256": {
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "release/airgap-document/README.md": "452fb66493139efc7ab9670af83c6d31b54c75d209a83357901ef5249f4bf5a0",
+    "src/commonMain/kotlin/borg/trikeshed/forge/sheet/CursorSheet.kt": "f402b9abb0f2040b06ee7d59cdc6e3003d1140a38025edd6c8a68fbe0a425775",
+    "src/commonMain/kotlin/borg/trikeshed/kif/Kif.kt": "97e1955bf17e8cda2ff0d0be92d3a67b44c075f9e89faae8294832b080f6f304",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncConfixSelection.kt": "dab6991b1c59917b105f4359cbff64890961a3bc5198a8b99e750900b0914d27",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "dc7906e2b4c98daa78c882658f7dda8afd4bbbd9068cf818654e3b1202a60019",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt": "081a5b201680656dfc5d7988c5f5e0450ccd7cff6b2c331b7b0fee7ae73c4624",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncNodeKey.kt": "626b1bd6be2ff68361610b26e6cca5a68271271387d4ded1150835bd7ebd5609",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LlvmConfixContract.kt": "c305ce7311eaf209d68757fdd8889053572b43fb64d9fbee4049fe584fe70652",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyPlan.kt": "eecdcbb0fe0b2767775b0de2657cbd6289ea26b072e79fe3915485384e82c9c8",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyProofGraph.kt": "ff0e03748329413df60489a304f82fbbabfc487ab593d666b65a22dc7cc04b78",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyProofPaths.kt": "f353c9a5d1b92b8e7a1bc602a43fe1a3e5ef879d5637529b99680548aaa13c7f",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyQueryView.kt": "6726a0340484387498b00def4fbf262f0e436581701b508af110c707b7c1529b",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/KgNalBridge.kt": "dc4af7f22ce73dd6ff695d6db52ef1694ce6b2bcbd6914559074cb42ca4f05f8",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/LegalNarsEvaluation.kt": "c03e8b0062f51881e32c029151aa2ee76db778359df25632bc60e227214e7129",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/SyntheticNalExperiment.kt": "7611f1fc635e1af8142e660314c213d0411c7001917120cf72ef42eb66c6d809",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyProofGraphTest.kt": "67dfeccc9206b0480dc48a02e7216052b91a081eb94d39a6015410290448392e",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyProofPathsTest.kt": "33d0e127521ec1b64e945ccf2ad8f0383576d4d484ea822dd6b4f75d51d45153",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyQueryViewTest.kt": "fc1a59f22404fca20a70d0ccff19c6cc17a6c610b51fbf69ad1a5abcb69b8c3f",
+    "src/commonTest/kotlin/borg/trikeshed/narsese/LegalRequiredAnchorCoverageTest.kt": "78dfca36afb23b4acd3319672320aaf85e9f62562efebd9ee14ff4a4fa64ede1",
+    "src/commonTest/kotlin/borg/trikeshed/narsese/RetainedNalImplicationTest.kt": "121be33d08c836516378443d4f13c90bd75c98cb86e50d8862e8d29768283d37",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt": "6b9192e2cbfa91bfc6176f9fc607de4c3dbc7f5bd2245928c008b91bbd6ab557",
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglishTaxonomy.kt": "5e323831b4bf0e2afd4dd4e77d78c29f141649bf753f654eede52114a8a21a95",
+    "src/jsMain/kotlin/borg/trikeshed/web/AppNav.kt": "f7a47541a643e1e79ccfc277257bb91961cf763a4ad011b3580234a6473bf9fb",
+    "src/jsMain/kotlin/borg/trikeshed/web/EnglishQueryNavigation.kt": "81d750908c659fdfa16568761bba0f914673d63b08f00e3dc4e949e06e148eb3",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Main.kt": "cea87073758571ee60965ceec77e0a435bd5b2e7c9b25f5be1b6df3b4d30bb4e",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "2488553641ed399c6636d8105a50f08104f9f8fb312652d565ea7a9926158c93",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDocumentSource.kt": "fa3c2ddd26f90af677e95b0b94672d155b76b9f3af26913147b3209b268fd20f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsEnglishQuery.kt": "7dc55d18532e3769105d521799832e486fba1c010450379033c766b41d9a6a58",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt": "050b187b5f8a4ffbc91c5f2ea552eda4586abc90db83777f990290bc713a66db",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "276b0885056604d11b51c123af293218b60b0b008575834d6f30dc7d305a1541",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "45c7b448190b213286638fb77db38ec3c8a378baabedc0d1a342a128e4a5161e",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/CurationIntake.kt": "51b6063d0e9313ac1cb39cb9d56db59dbe5aeb4b8d2c4ec594c9ccd2a05110e0",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt": "f803f753811815a613b06d17cfe7fab24d3154ba3de146485b3497a47a4fdcf8",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/EnglishCorpusWire.kt": "ab474e82624e4f1a72acbae17ee04d575769953ecb060b9b4fdfb147b8b356d3",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/DocumentCurationLegos.kt": "af48c12d4725d554e39ceee15644f251b6619fb43eab3229b441b0358f9e00e6",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/DocumentSpans.kt": "54e248b5bf5641c9649b9c2e9484ed3225bd2f47fcf5489cf2879db8bfe277c0",
+    "src/jvmMain/kotlin/borg/trikeshed/narsese/LegalNarsEvaluationCli.kt": "0df50135db0a7fc4cf4e3991cdb16fd6143a117b2b8e4bd7e9d0bf0f0f605aca",
+    "src/jvmMain/kotlin/borg/trikeshed/narsese/SyntheticNalExperimentCli.kt": "c3cb8e266dcd84d0feabe9ecccbb295608712d3170c1ef72b4438a8baefadf1c",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishCorpusWireTest.kt": "c6b8ee6a7c99418536916185d0b2efc16fab61a0aa28cd0242f4ac74416f8a60",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishTaxonomyWireTest.kt": "62aacf1a125d54c89979979577ae1f61fa08592e500635e2020ec5806fdc4139",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/ReviewedTaxonomyQuadQueryWireTest.kt": "daad98b70fc80806a820d74b7fd1220eaf8f0148c9fb3a2dd8b635b334269615",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/ReviewedTaxonomyWireTest.kt": "57b3f2694b665898aff4fea7143d35184dbcc3920d452ff2f539135c004b059f",
+    "src/jvmTest/kotlin/borg/trikeshed/kanban/module/LlvmConfixRunTest.kt": "98e85ae872d3332719cc9142fb147fd8c553567a7514b7bc0f221d9b29c85e94",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "7d8a34674fa01e26fb1fb4384a0af8e9397c5d1ab9fdc7f84069ff8acab4caa9",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/DocumentSpansTest.kt": "e91a31de345117c16225cdddcef4164e76790a6ad943536fb0d62d9be324ea61",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/LcncConfixPickPathContractTest.kt": "462b4e69824ad9467239282c08add1fef48d03a7fb1ba0d009c32c87c2bb336c",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/LcncConfixSelectionTest.kt": "6bc8e3ceb189f53c1ce9092387405fe21f9a83cacb2e83b27bc239066855f49c",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyProofPathsReadTest.kt": "01b1865fe69705386a79e9b7bf18c8fd13ed13e4a0d8b7f864e5897380e0a27c",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/WorkModelRouteTest.kt": "ad62eb3575f92b113a65890f5b3187c828472d18cb7a0475adfff0db384aae86",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/KgKifCommentTest.kt": "fbc04dca0d1cef48a3ada56bba8e5f1131cdd14628c081448cecf8093667b76a",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/LegalRequiredAnchorCoverageCliTest.kt": "6d44f7ec17b85fe1e0bbb519f94ea1ce742486e78eeff07368bf305d48152078",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/SyntheticNalExperimentCliTest.kt": "844621cb585b45a98407f92aa616859cbff13e1d1205b5b04e4442269bbc17cd",
+    "src/jvmTest/resources/documents/coinbase-suski/coinbase-suski.pdf": "591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+    "src/jvmTest/resources/documents/coinbase-suski/provenance.json": "a128fa9efc5528492c356de491600ca96472f69f3caf67e78eac83acd40d05b7"
+  },
+  "d3m": {
+    "refs": 540,
+    "remoteHeads": 530,
+    "localBranches": 9,
+    "merges": 6,
+    "conflictingMerges": 2,
+    "retainedResolutions": [
+      {
+        "file": "docs/airgap/README.md",
+        "intent": "Preserve both independent append-only sections: R4b acceptance and v77 retained-source deployment boundary",
+        "retainedStages": "conflicts/docs/airgap/README.md.stage1, .stage2, .stage3",
+        "index": "conflict-index.txt"
+      },
+      {
+        "file": "docs/airgap/README.md",
+        "intent": "Virtual merge-base disagreement only over a blank separator; retain both complete R4b acceptance and v77 deployment sections with one blank separator",
+        "retainedStages": "conflicts/58f1c44d1ac22c1aab22aea62aea627318dfcc6f/docs/airgap/README.md.stage1, .stage2, .stage3",
+        "index": "conflict-index-58f1c44d1ac22c1aab22aea62aea627318dfcc6f.txt"
+      },
+      "Concurrent production fix is byte-identical. Both test changes repair singleton access; preserve Series projection and existing view.single assertions under PRELOAD, without extra List materialization. Final source tree equals tested d80e69813."
+    ]
+  },
+  "limits": [
+    "Cloud Linux x86-64, not Jims Mac",
+    "External host kernel, bwrap, browser and controller",
+    "SIGKILL at three cooperative node boundaries; not an interrupted write or power loss",
+    "Live debug response is not a recovered durable invocation ledger",
+    "Explicit new direct run; no paused-stack restoration or universal queued-work policy",
+    "Full JDK retained; vendor/native source-build closure remains open",
+    "Retained NAL is bounded historical hypothesis evaluation; not independent English entailment or live admission"
+  ]
+}

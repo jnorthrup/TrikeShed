@@ -53,6 +53,18 @@ submitting a new run. The same named-preset link loads the recovered document
 definition for matching-canvas receipt inspection. Fresh-process evidence must identify both boots and
 verify the exact receipt, invocation ledger, source bytes and quotation.
 
+To execute again against the existing verified documents, use `recover`
+instead of `inspect`, and set both LLVM profile variables as in `run` mode.
+Recovery remounts and verifies the six retained document revisions without
+constructing a miner or extracting the PDF. It checks and registers the
+pinned native modules. The production run owner marks previously started,
+unfinished runs `interrupted` with `runtime_restarted`; a missing terminal
+invocation ledger remains unavailable. In this demonstrator's direct-run
+flow, reopening does not restart that interrupted execution. Choose Run or
+Debug explicitly to create a separate new run; keep the interrupted receipt
+as evidence. The general queued-work recovery policy remains owned by
+Kanban and is separate from this direct-run scenario.
+
 The JVM uses a 768 MiB maximum heap and reports two processors. These settings
 are not an OS memory limit or CPU quota. A native invocation can still run
 until its bounded computation returns; there is no hard native cancellation.

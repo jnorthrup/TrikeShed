@@ -1,0 +1,16 @@
+from pathlib import Path
+import subprocess,os
+home=Path('/workspace/airgap-r4c-proof')
+def run(args,name,env=None):
+ with (Path('/workspace')/('r4c-'+name+'.txt')).open('w') as log:p=subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,env=env)
+ assert p.returncode==0,(name,p.returncode)
+ print(name,'PASS',flush=True)
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(home/'unpacked/airgap-document-rootfs')
+run(['python',str(home/'package.py'),'verify'],'unpacked-reverify',env)
+for stage in ['document','scan','selection']:
+ name='interruption-'+stage+('-archive02' if stage=='document' else '-archive01')
+ run(['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4c-proof','python',str(home/'run.py'),name,stage],name,env)
+ run(['python',str(home/'audit.py'),name],'audit-'+stage)
+accepted='interruption-selection-archive01'
+run(['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4c-proof','python',str(home/'negative.py'),accepted,'negative-attempt01'],'negative-attempt01',env)
+run(['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4c-proof','python',str(home/'recovery-negative.py'),accepted,'recovery-negative-attempt01'],'recovery-negative-attempt01',env)

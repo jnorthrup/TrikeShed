@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4c-proof/integrate.py", line 26, in <module>
+    raise RuntimeError('Conflicts retained for intent review. '+result.stdout)
+RuntimeError: Conflicts retained for intent review. Auto-merging docs/airgap/README.md
+CONFLICT (content): Merge conflict in docs/airgap/README.md
+Automatic merge failed; fix conflicts and then commit the result.
+
