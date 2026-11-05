@@ -50,8 +50,20 @@ object NalNodes {
      * Mode param selects: `top` (priority-sorted), `sample` (stochastic),
      * `near` (angular neighborhood — requires `centroid` and `maxDistance` params).
      */
-    fun recallRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, _ ->
+    fun recallRunner(bag: BeliefBagElement): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
         val mode = node.params["mode"] ?: "top"
+        if (mode == "exact-role") {
+            require(!("request" in inputs && "request?" in inputs)) { "Exact role request supplied twice" }
+            val request = when {
+                "request" in inputs -> inputs["request"]
+                "request?" in inputs -> inputs["request?"]
+                else -> node.params["request"]
+            }
+            val selection = bag.recallRoles(request)
+            val matches = selection["matches"] as List<*>
+            return@boundLcnc _m["selection" j selection,
+                "beliefs" j matches.filter { (it as Map<*, *>)["residentStatus"] == "MATCH_RESIDENT" }]
+        }
         val k = node.params["k"]?.toIntOrNull() ?: 16
         val beliefs = when (mode) {
             "sample" -> {
