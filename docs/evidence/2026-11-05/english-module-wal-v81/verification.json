@@ -1,0 +1,146 @@
+{
+  "kind": "english-wal-v81-focused-evidence/1",
+  "sourceHead": "7fb91a0b56cd860a13ce0af8eeef10205e586314",
+  "GO": {
+    "rootGreen": true,
+    "sourceHead": "7fb91a0b56cd860a13ce0af8eeef10205e586314",
+    "snapshot": "/workspace/library-files/english-guard-delivery-post-r4e-v81-proof/snapshot",
+    "mainSha256": "5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c",
+    "spacegraphSha256": "d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b",
+    "documentsSha256": "c795ccc0168c36bf66b59a46acf07276b6813154e8515ef4ec018261f90d2086",
+    "pagesSha256": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5",
+    "totals": {
+      "tests": 507,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "dependencyJars": 119,
+    "totalClasspathJars": 120,
+    "issued": "2026-11-05T06:12:32.880529+00:00",
+    "scope": "Focused post-R4e real module/WAL single-owner lifecycle: retained S12 NAL run and G07 typed query/sourcefocus; real contender lease refusal; closed separate reader/recovery. Empty SDK/no new parser/model/admission. Strict loopback namespace, no full filesystem/hardware seal claim.",
+    "englishClassByteIdentity": 149,
+    "englishClassesUnchanged": true,
+    "documentsExecutableCodeUnchangedIgnoringInlineSourceMap": true
+  },
+  "writerPid": 143740,
+  "contenderPid": 143939,
+  "contenderExit": 42,
+  "readerPid": 143962,
+  "wal": {
+    "bytes": 417,
+    "sha256": "8579ebcdd44ab7fabaa39e76f83b0f99c0046e3f9ac5c3db5a59c99d573cebcb",
+    "frames": 3,
+    "sequences": [
+      1,
+      2,
+      3
+    ],
+    "finalCommandBodyActuallyRead": true,
+    "earlierPointerBodiesSupplied": false
+  },
+  "indexedCASReadbacks": 8,
+  "sourceHeadsUnchanged": true,
+  "SDKEmpty": true,
+  "freshParserCalls": 0,
+  "actualNALRuns": 1,
+  "G07TypedRows": 2,
+  "G07SourceFocuses": 2,
+  "mutationsRejected": 5,
+  "archive": {
+    "bytes": 986615,
+    "sha256": "e8d6c3685572348603356f44453a879f4aedb827bdc08568ae8a364a48697a9e",
+    "members": 94,
+    "uncompressedBytes": 8393296
+  },
+  "audit": {
+    "kind": "english-wal-independent-audit-files/1",
+    "sourceHead": "7fb91a0b56cd860a13ce0af8eeef10205e586314",
+    "selectedAttempt": "english-wal-v81-native-proof/native-attempt1",
+    "files": {
+      "audit.py": {
+        "bytes": 31411,
+        "sha256": "25d188b2ad9d98df9be93719e0d100dd8f12b044ba93ef81cfb0c64621e647b3"
+      },
+      "receipt-core.py.txt": {
+        "bytes": 33996,
+        "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+      },
+      "README.txt": {
+        "bytes": 5777,
+        "sha256": "06b6ce2021ba354ae418763ac48516806602b6515aa124a40e97d85077b9e802"
+      },
+      "attempt1/audit.py.txt": {
+        "bytes": 27356,
+        "sha256": "71c14d3320110e8775201367cc14ce32ac582622b28e4fd20dd03c178702ed51"
+      },
+      "attempt1/result.json": {
+        "bytes": 272,
+        "sha256": "8f6ed6071c45b42525eeeebba6dcbdbe53e5a50bf09ce3e54684768dd0087395"
+      },
+      "attempt1/report.txt": {
+        "bytes": 58,
+        "sha256": "a6a78bb93380b3ae7ab47e63032d0d11e3d97d003d687e4b24c3aa01309fa587"
+      },
+      "attempt2/audit.py.txt": {
+        "bytes": 27847,
+        "sha256": "55ab9ea8e6bd3ff02b20addef266dbfd707bb5b15089d1ddb79e96383987c01c"
+      },
+      "attempt2/result.json": {
+        "bytes": 6505,
+        "sha256": "a0b3444f3c93cfc93f5a3509117ef5d5167ae8da0e103ac88a74aee06f3ba268"
+      },
+      "attempt2/report.txt": {
+        "bytes": 569,
+        "sha256": "b39957a53f22f5b65f07eae9ba42a7c5192ff48ae6a2556941109380dcc7b6c3"
+      },
+      "final-strict/result.json": {
+        "bytes": 6505,
+        "sha256": "5fec61f6453b75ff15e606135b7d3c24370fe8371c8c7c6b9e9af3dd17ef0dd2"
+      },
+      "final-strict/report.txt": {
+        "bytes": 2073,
+        "sha256": "8890356028285b26f54ed3f27937bbcaa3ba4403cf82434f28f59b8d64e6cf4c"
+      },
+      "final-recorded/result.json": {
+        "bytes": 6495,
+        "sha256": "91ed3dfda93d493f1db4fa0eda7c6c18ab35dffd1c3810196b28393bbfde552a"
+      },
+      "final-recorded/report.txt": {
+        "bytes": 2063,
+        "sha256": "3416ef1df8d2f01feb2e40f3322a4dc7fc1ef3149e862563f2fa94de0b55d3ff"
+      }
+    }
+  },
+  "scope": "Actual417B exported WAL only; sidecar bytes represented by separate nonowning controller/probe metadata and holderstat-only telemetry, no inholder extra descriptor read/hash claim. No fullv80 parser/corpus/crash/powerloss/hostilewriter/seal repeat.",
+  "recordedComparisonToV80": {
+    "comparedEnglishClassCount": 149,
+    "englishClassesByteIdentical": true,
+    "changedClassEntries": [
+      "borg/trikeshed/kanban/BoardFileWal$Companion.class",
+      "borg/trikeshed/kanban/BoardFileWal$replay$1.class",
+      "borg/trikeshed/kanban/BoardFileWal.class",
+      "borg/trikeshed/lcnc/LcncKanbanExperience$registry$9.class"
+    ],
+    "javaScriptByteIdentical": {
+      "documents.js": false,
+      "spacegraph.js": true,
+      "pages.js": true
+    },
+    "scope": "Class-byte identity carries unchanged English behavior evidence; new focused proof exercises changed module WAL lifecycle only.",
+    "documentsRuntimeCode": {
+      "runtimeCodeIgnoringInlineSourceMapsIdentical": true,
+      "diffLineCount": 0,
+      "boundedDiff": [],
+      "webpackWrapperLineCount": 229,
+      "webpackEvalBodyCount": 8,
+      "metadataCorrection": "Original counter label said eval bodies but counted wrapper lines; byte comparison result unchanged."
+    }
+  },
+  "comparisonOldPins": {
+    "source": "fdfa355623f03958536089c81e87162e6c8313ff",
+    "mainSha256": "e2352d79aa5b8a6180ed7152897a80bd98d86a48cd3282e4656268ec1ee7bf0d",
+    "documentsSha256": "6e99a60f9942c1242ae20a016e1e7993294175f72d7a1b3638b3bcc760ab48cb",
+    "scope": "Root-recorded comparison metadata; no old/new binary comparison rerun by public recorded-only auditor"
+  }
+}

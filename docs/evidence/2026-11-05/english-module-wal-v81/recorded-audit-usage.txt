@@ -1,0 +1,85 @@
+V81 independent focused module/WAL recorded-data audit — FINAL
+
+Selected actual closed data: english-wal-v81-native-proof/native-attempt1.
+Writer143740; separate live contender143939 exit42; fresh reader143962.
+Final frozen source7fb91a0b56cd860a13ce0af8eeef10205e586314. No Java, build,
+parser, query engine, browser or namespace is launched by this Python audit.
+
+Restore unchanged audit.py.txt as audit.py in an external directory; retain
+receipt-core.py.txt beside it unchanged. Python3 standard library only. Set
+PROOF to the extracted proof directory containing inputs/ and native-attempt1/,
+AUDITOR to the restored scripts directory and OUT to a separate output directory.
+
+python3 "$AUDITOR/audit.py" "$PROOF" "$PROOF/native-attempt1" \
+ --source-head 7fb91a0b56cd860a13ce0af8eeef10205e586314 \
+ --main-sha 5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c \
+ --panels-sha d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b \
+ --documents-sha c795ccc0168c36bf66b59a46acf07276b6813154e8515ef4ec018261f90d2086 \
+ --recorded-only --out "$OUT"
+
+Exit0 produces result.json/report.txt and means recorded-data consistency PASS.
+Public recorded-only mode hashes supplied selected blocks, WAL, exact observer
+source/text records and images; it verifies recorded final artifact/classpath
+metadata. It does not open omitted external production JAR, SDK, complete CAS or
+producer REF paths. Without --recorded-only, the original frozen120production
+JAR/browser paths and closed local CAS/WAL must remain accessible; the strict
+mode additionally rehashes their actual bytes. Strict/portable result hashes
+intentionally differ in artifactVerification. Final hashes are in manifest.json.
+
+Consumed public minimum:
+- inputs/S12 and inputs/G07: original source.txt, request.json, response.json,
+  source-row.json, status.txt and exact materialized original inspection.cbor
+  and extracted-source.txt under their actual CID filenames in cas-readbacks/.
+- native-attempt1: GO/startup/browser-result/cleanup/reopened/classpath/network,
+  controller-before-netns/holder-before-contend/holder-after-contend,
+  contender/contender-controller-state, readback-index and writer/contender/
+  reader-command JSON; all five exit files; artifact-metadata/source-head.txt,
+  sha256.json and classpath.txt; all8 indexed cas-readbacks/*.bin;
+  after-close-readbacks/board.wal; exact observer-inputs and both PNGs.
+Keep actual raw HTTP responses, source preparation/protocol, logs/commands,
+compile records and copied source/closure metadata alongside this minimum as
+native provenance. Do not ship full original17-case runtime packs or unrelated
+source cases/JAR binaries for this focused replay. Supplied selected contents
+are CID authenticated; omitted full packs/REF dependencies are not portable.
+
+The unchanged earlier independent receipt-core.py.txt checks canonical CBOR,
+full-CID identity preimages, schema-derived node/source citations, all5original
+quotation occurrences, four source premises/twelve original pairs and existing
+Float32 milli-evidence math. The nested historical report remains hypothesis
+only; the actual outer English owner supplies distinct before/after currentness.
+This focused proof has no source amendment; original physical heads stay fixed.
+G07 raw advcl roles/typed candidate-local query rows and the unmarked Trustee
+branch stay intact; two source focuses preserve the URL. No helper is legal gold.
+
+The adapter independently parses actual417-byte WAL1 framing, big-endian version,
+strict sequence, length and CRC32C. Three pointers bind the captured submit/start/
+complete workflow records; only the final command body is supplied through an
+actual fetched CAS block. It binds exact run/program/invocation bytes, inline
+complete output and recovered DONE card. A computed NAL frameCID is not a saved
+CAS report. Real workflow blackboard and board Rete additions are expected,
+with no English/NAL live observation admission.
+
+The contender is a distinct real JVM on the same canonical active directory,
+WAL/sidecar inode and final production classes, while the holder remains live.
+Its actual production constructor refuses with lease exception and exit42;
+WAL/CAS/sourceheads/committed state stay unchanged. Holder telemetry stats the
+sidecar only: opening/closing another same-process sidecar descriptor could
+drop a POSIX record lock. Separate non-owning controller/probe hashes are safe.
+After graceful holder close, a distinct production BoardStoreElement reader
+acquires the released sidecar, replays/rebuilds the committed card and closes
+without changing sourceheads/WAL/sidecar/CAS. This is cooperating-owner local
+process evidence, not hostile-writer/lock-replacement resistance, crash/power-loss,
+physical-disk durability, remote-filesystem or full R4 rootfs isolation proof.
+Actual loopback namespace and empty configured SDK/providers are captured; prior
+v80 actual model/parser proof remains scoped to its original fdfa/mainE235 pins.
+
+Five mutations reject wrong active journal directory, contender PID equal to
+writer, changed committed WAL, corrupt WAL CRC and programCID substituted for
+recovered commandCID. Initial attempt1 failed an auditor assumption that raw UI
+document shape equals admitted program serialization. Its exact source/result
+are preserved. Actual LcncProgramConfix serializes explicit node/default fields,
+kanban:null and seq:1 and keeps name as separate request metadata; attempt2
+compared those exact documented fields and passed. Final checks add workflow/
+inode/currentness bindings and report detail. No native data/source was changed.
+No semantic/legal accuracy, producer/source authentication, calibrated truth,
+independent evidence, source16 completeness or new admission is established.
