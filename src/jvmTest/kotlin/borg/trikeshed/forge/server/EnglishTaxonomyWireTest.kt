@@ -117,6 +117,51 @@ class EnglishTaxonomyWireTest {
             "goal" j _m["predicate" j "instance", "subject" j tenant, "object" j target]], status)
     private fun family(review: Map<String, Any?>) = (review["snapshot"] as Map<*, *>)["family"]
 
+    @Test fun protectedQuadQueryReturnsBothEnglishAndKifWitnessesWithoutNewAuthority(): Unit = runBlocking {
+        withTimeout(20_000) {
+            val f = fixture("quad-query", coroutineContext[Job])
+            try {
+                val prepared = prepare(f)
+                val approved = decide(f, freeze(f, prepared), "approve")
+                val plain = query(f, approved)
+                assertFalse("quadQuery" in plain)
+                val wal = Files.size(f.wal); val board = f.ctx.blackboard.snapshot(); val rete = f.ctx.rete.snapshot().size
+                val body = _m["snapshotCid" j approved["snapshotCid"], "expectedRevision" j approved["revision"],
+                    "goal" j _m["predicate" j "instance", "subject" j tenant, "object" j agent],
+                    "program" j reviewedProofQueryProgram(plain, english = true)]
+                val result = request(f, "/taxonomy-plan", body)
+                assertEquals(plain, result - "quadQuery")
+                val q = result["quadQuery"] as Map<*, *>
+                val provenance = q["provenance"] as Map<*, *>
+                assertEquals(true, provenance["englishAvailable"])
+                assertEquals(result["reviewer"], provenance["reviewer"])
+                assertEquals(true, provenance["synthetic"])
+                assertEquals("not-established", (q["physicalSource"] as Map<*, *>)["reviewAuthority"])
+                val found = rows(((q["results"] as Map<*, *>)["results"] as Map<*, *>)["bindings"])
+                    .sortedBy { ((it["ordinal"] as Map<*, *>)["value"] as String).toInt() }
+                assertEquals(2, found.size)
+                assertEquals(_l["Tenant is a Person.", "A Person is an Agent."], found.map { (it["englishQuote"] as Map<*, *>)["value"] })
+                assertEquals(_l["(instance $tenant $person)", "(subclass $person $agent)"],
+                    found.map { (it["kifQuote"] as Map<*, *>)["value"] })
+                val paths = result["plan"] as Map<*, *>
+                val sources = rows(paths["sources"]).associateBy { ReviewedTaxonomyProofGraph.sourceIri(q["graph"] as String, it["nodeId"] as String) }
+                for (row in found) {
+                    assertEquals("uri", (row["source"] as Map<*, *>)["type"])
+                    val source = sources.getValue((row["source"] as Map<*, *>)["value"])
+                    val witness = rows(result["englishWitnesses"]).single { it["selectionId"] == source["selectionId"] }
+                    assertEquals((witness["englishQuotation"] as Map<*, *>)["quote"], (row["englishQuote"] as Map<*, *>)["value"])
+                    assertEquals((source["quotation"] as Map<*, *>)["quote"], (row["kifQuote"] as Map<*, *>)["value"])
+                    assertEquals("literal", (row["englishQuote"] as Map<*, *>)["type"])
+                }
+                assertEquals(wal, Files.size(f.wal)); assertEquals(board, f.ctx.blackboard.snapshot())
+                assertEquals(rete, f.ctx.rete.snapshot().size); assertNull(f.ctx.beliefBag); assertEquals(1, f.reads.count)
+                f.corpus.put("pilot", "agreement.txt", "A changed English source.".encodeToByteArray(), "text/plain")
+                val stale = request(f, "/taxonomy-plan", body, status = 409)
+                assertFalse("quadQuery" in stale || "results" in stale)
+            } finally { close(f) }
+        }
+    }
+
     @Test fun authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses(): Unit = runBlocking {
         withTimeout(20_000) {
             val f = fixture("flow", coroutineContext[Job])
