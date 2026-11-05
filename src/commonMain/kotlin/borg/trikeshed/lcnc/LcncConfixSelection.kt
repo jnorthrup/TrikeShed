@@ -2,11 +2,14 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.forge.sheet.confixCellSheets
+import borg.trikeshed.forge.sheet.confixSheets
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.parse.confix.*
 
-/** Consume copied JSON geometry; no scanner is entered on this path. */
+/** Select JSON cells from either the Kotlin index or explicitly supplied native geometry. */
 object LcncConfixSelection {
     /** JSON numbers cannot be decoded as CBOR solely from their first byte. */
     fun scalar(cell: ConfixCell): Any? = when (cell.row.tag) {
@@ -111,8 +114,8 @@ object LcncConfixSelection {
         else -> scalar(cell)
     }
 
-    fun select(json: String, path: String, rows: Any?, sourceCid: Any?, ok: Any?, format: Any?): Map<String, Any?> {
-        var cell = indexed(json, rows, sourceCid, ok, format).rootCell
+    private fun at(doc: ConfixDoc, path: String): ConfixCell? {
+        var cell = doc.rootCell
         for (segment in path.trim().removePrefix("/").replace('/', '.').split('.').filter(String::isNotEmpty)) {
             cell = cell?.let { parent -> when (parent.row.tag) {
                 IOMemento.IoObject -> parent[segment]
@@ -120,6 +123,29 @@ object LcncConfixSelection {
                 else -> null
             } }
         }
+        return cell
+    }
+
+    /** The original JSON supplies identity and byte offsets; legacy sheet layout remains a separate projection. */
+    fun select(json: String, path: String): Map<String, Any?> {
+        val bytes = json.encodeToByteArray(throwOnInvalidSequence = true)
+        reifyStrict(json)
+        val cell = at(confixDoc(bytes, Syntax.JSON), path)
+        val selected = cell?.let(::value)
+        val family = if (cell == null) emptyList() else {
+            // Preserve the Kotlin path's object/array nesting and scalar key/value sheet layout.
+            val shown = if (selected is Map<*, *> || selected is List<*>) selected else _m["value" j selected]
+            confixSheets("confix/$path", path, confixDoc(jsonOf(shown)))
+        }
+        return _m["found" j (cell != null), "path" j path, "value" j selected,
+            "geometry" j "kotlin", "sourceCid" j ContentId.of(bytes).value,
+            "byteSpan" j cell?.let { _m["open" j it.row.open, "close" j it.row.close, "unit" j "utf8-byte-inclusive"] },
+            "sheets" j family.map { it.toLcncMap() }, "sheet" j family.firstOrNull()?.toLcncMap()]
+    }
+
+    /** Consume copied native JSON geometry; no scanner is entered on this path. */
+    fun select(json: String, path: String, rows: Any?, sourceCid: Any?, ok: Any?, format: Any?): Map<String, Any?> {
+        val cell = at(indexed(json, rows, sourceCid, ok, format), path)
         val family = cell?.let { confixCellSheets("confix/$path", path, it, scalar = ::scalar) }.orEmpty()
         return _m["found" j (cell != null), "path" j path, "value" j cell?.let(::value),
             "geometry" j "native", "sourceCid" j sourceCid,
