@@ -5,7 +5,7 @@ Published source1aa29894aeeb290a5644b3370fd895f261f576d2 passes535 selected
 checks and all three browser builds. In Panels, choose the preset "Find sentences
 in a retained English corpus", supply retained inspection CIDs, an explicit
 current/snapshot mode and query {terms:[exact reported lemmas],limit:32}, then Run.
-It uses the existing BM25 search. Matching sentences retain every original token
+It uses the existing BM25 search. Matching sentences retain every matching original token
 span and source identity; corpus, matrix, word-selection policy and optional topic
 identities stay shared. The query and hits bind a separate response receipt.
 Omitting query preserves the earlier response bytes and canonical receipt CID.
