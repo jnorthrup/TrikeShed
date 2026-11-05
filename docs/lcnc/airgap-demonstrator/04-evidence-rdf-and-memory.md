@@ -75,3 +75,19 @@ SHACL-like shape checks can validate required fields and relationship structure.
 ## Acceptance conditions
 
 Follow one output back to exact source bytes through all transformations. Repeat the same proof via two paths and verify no extra empirical evidence appears. Keep conflicting assumptions in sibling scenarios without cross-contamination. Withdraw a review and verify current production eligibility changes while historical wiki pages remain inspectable. Recover the same provenance chain after restart from the semantic journal and immutable artifacts.
+
+## Implemented query-row boundary: R3e
+
+The [R3e integration](../../airgap/15-wire-geometry.md) retains bounded native
+Horn proof quads and two fixed inspection programmes over supplied proof and
+selection context. Typed source identity, ordered premise uses and exact row
+coverage remain refusal boundaries. These projections do not establish native
+execution, authenticated review or a production permit.
+
+An actual query-row failure exposed `LinearArrayMap` entries with identity
+hashing despite structural map equality. Entry equality/hash semantics are now
+corrected, so equal parsed nested rows remain usable in hash-based coverage
+and ordering. The query assertions were preserved. Before/after diagnostics
+use the actual quad engine and JSON reifier; tests cover reordered fields,
+nulls, indexed lookup and both hash-index directions. This common representation
+contract matters wherever an evidence row becomes a set member or lookup key.

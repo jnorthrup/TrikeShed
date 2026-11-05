@@ -1,0 +1,23 @@
+{
+  "runtimeTestedSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+  "validationCommit": "cf544ffd37f291287ea7ec09aa1a538db5ce7893",
+  "incomingTip": "42ebeb85705acc259a34b0f19fd23cafbc5a527f",
+  "mergeCommit": "20e5fc175f87ad58e3cab416305f9dee52a953a3",
+  "sourceDiff": [
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt"
+  ],
+  "runtimeSourceAndBuildInputsUnchanged": true,
+  "sourceSupplement": "strict-row-validation.patch.txt",
+  "appliedSourceSubtree": "ac677496bd010dcededb5d2fcb0bb4a3ab5ddaa9",
+  "sourceSupplementScope": "Apply after the R3e final source archive to add the newly retained assertions. The exact src/ subtree matches validationCommit. Publication documentation/evidence are supplied separately.",
+  "intent": "Retain strict typed-row coverage and all new malformed-row assertions. The common Map.Entry correction already supplies structural hashing; no query-local copy or normalization is necessary. Extra/duplicate fields remain in the original rows and fail exact structural coverage.",
+  "standing": "Five focused JVM tests pass with all newly retained extra/duplicate/non-string row assertions. Production source and build inputs are identical to the packaged tested source.",
+  "testTotals": {
+    "tests": 5,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 5
+  },
+  "sourceSupplementSha256": "2e852d5e5c4d66e914d664ede19e22c15997b4d90922a9a9a33914436c9ba0c3"
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "path": "docs/airgap/evidence/r3e-20261105",
+    "stagedFiles": 1333,
+    "allManifestedBytesEqualIndex": true
+  },
+  {
+    "path": "docs/d3m/evidence/2026-11-05-airgap-r3e",
+    "stagedFiles": 16,
+    "allManifestedBytesEqualIndex": true
+  }
+]

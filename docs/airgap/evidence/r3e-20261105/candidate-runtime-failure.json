@@ -1,0 +1,11 @@
+{
+  "candidateSourceCommit": "12db9aa42d2c9ea43215f3c189b7ab5e1011d415",
+  "candidateRuntime": "runtime-combined-update.json",
+  "candidateSourceArchive": "source-final-update.json",
+  "failedCase": "final-document",
+  "passedButSupersededCase": "final-ownership",
+  "error": "Dynamic endpoint infix j compiled to a missing JavaScript method; preset load failed after node creation and before wire display.",
+  "fixCommit": "5fdd0472c",
+  "correction": "Call the existing typed Twin<dynamic> factory. Preserve DOM materialization, exact load assertion and curve behavior.",
+  "timingStanding": "Functional checks overlapped target compilation; no performance standing. Candidate archive is retained for failure reproduction and is not the final runtime."
+}

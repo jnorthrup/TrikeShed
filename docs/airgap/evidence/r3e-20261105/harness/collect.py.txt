@@ -1,0 +1,51 @@
+from pathlib import Path
+import json,hashlib,subprocess,shutil,os,datetime
+h=Path('/workspace/airgap-r3e-proof');repo=Path('/workspace/TrikeShed');out=repo/'docs/airgap/evidence/r3e-20261105';out.mkdir();d3=repo/'docs/d3m/evidence/2026-11-05-airgap-r3e';d3.mkdir()
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def save(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def git(*args):return subprocess.check_output(['git',*args],cwd=repo,text=True).strip()
+def copy(p,q):q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
+source_commit='5fdd0472c115922287ba46a4977cb1134aa9017a'
+accepted=['final-geometry01','final-geometry02','final-geometry03','final-document02','final-ownership02'];baseline=['baseline-geometry01','baseline-geometry02','baseline-geometry03'];preliminary=[];profiles=[]
+for p in sorted(h.iterdir()):
+ if p.is_dir() and (p/'processes.json').exists():
+  category='accepted' if p.name in accepted else 'baseline' if p.name in baseline else 'diagnostic' if 'profile' in p.name else 'preliminary'
+  if category=='preliminary':preliminary.append(p.name)
+  if category=='diagnostic':profiles.append(p.name)
+  shutil.copytree(p,out/category/p.name)
+for folder in ['failed-jvm03','passed-jvm04','final-jvm-results']:shutil.copytree(h/folder,out/folder)
+for p in sorted(h.iterdir()):
+ if p.is_file() and p.suffix in ['.json','.txt','.svg','.png','.pdf']:copy(p,out/p.name)
+ if p.is_file() and p.suffix in ['.py','.cjs','.java']:copy(p,out/'harness'/(p.name+'.txt'))
+for name in ['package-identity.json','SHA256SUMS']:copy(h/'installed-final/airgap-document-rootfs'/name,out/'package'/name)
+for name in ['README.md','UPDATE.json']:copy(h/'runtime-final-update'/name,out/'package'/name)
+for name in ['README.md','source-update.json','SHA256.json']:copy(h/'final-source-update'/name,out/'source-update'/name)
+source=set(json.loads((repo/'docs/airgap/evidence/r3d-20261105/verification.json').read_text())['sourceSha256'])
+source.update(git('diff','--name-only','81438b129',source_commit,'--','src').splitlines());source.update(['AGENTS.md','PRELOAD.md','build.gradle.kts','settings.gradle.kts','gradle.properties']);source_hash={}
+for name in sorted(source):
+ p=repo/name
+ if p.is_file():
+  q=out/'source'/name;q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(subprocess.check_output(['git','show',source_commit+':'+name],cwd=repo));source_hash[name]=sha(q)
+copy(repo/'PRELOAD.md',out/'publication/PRELOAD.md')
+for name,label in [('airgap-wire-geometry-20261105','initial'),('airgap-wire-geometry-publication-20261105','publication')]:shutil.copytree(repo/'.git/d3m'/name,d3/label)
+for name in ['fetch.py','fetch-publication.py','integrate.py','integrate-publication.py']:copy(h/name,d3/(name+'.txt'))
+for name in ['integration-inputs.json','fetch.json','remote-heads.json']:copy(h/name,d3/name)
+shutil.copytree(h/'publication-freeze',d3/'publication-freeze')
+packets=[json.loads((h/'integration-inputs.json').read_text()),json.loads((h/'publication-freeze/integration-inputs.json').read_text())];refs=[r for p in packets for r in p['refs']];ancestors=set(git('rev-list','HEAD').splitlines());assert all(r['commit'] in ancestors for r in refs)
+assert not git('diff',source_commit,'HEAD','--','src','build.gradle.kts','settings.gradle.kts','gradle.properties','release','gradle','gradlew','gradlew.bat')
+steps=[]
+for label in ['initial','publication']:steps+=json.loads((d3/label/'integration-steps.json').read_text())
+counts=[len(p['refs']) for p in packets];latest=packets[-1]['refs'];count_kinds={'local':sum(r['ref'].startswith('refs/heads/') for r in latest),'remoteBranchHeads':sum(r['ref'].startswith('refs/remotes/') and not r['ref'].endswith('/HEAD') for r in latest),'remoteHeadAliases':sum(r['ref'].endswith('/HEAD') for r in latest)}
+d3record={'integratedCommit':git('rev-parse','HEAD'),'testedCommit':source_commit,'targetCompilationCommit':json.loads((h/'combined-targets.json').read_text())['sourceCommit'],'frozenRefCounts':counts,'latestInventory':count_kinds,'merges':len(steps),'conflictedFiles':0,'allFrozenTipsAreAncestors':True,'equivalentCorrections':'Production and fixture bracket corrections merge automatically with the independently written equivalent fixes; both histories retained.','sourceContinuity':'../../../airgap/evidence/r3e-20261105/final-source-continuity.json','localMachine':'Cloud checkout /workspace/TrikeShed; Jim Mac unchanged','pushPolicy':'Ordinary master push; no force, pruning, or branch deletion. Final remote readback recorded separately.'};save(d3/'verification.json',d3record)
+browser={};passes=recorded=0
+for case in accepted:
+ b=json.loads((h/case/'browser.json').read_text());a=json.loads((h/case/'independent-audit.json').read_text());cases={k:v['result'] for k,v in b['cases'].items()};passes+=sum(v=='PASS' for v in cases.values());recorded+=sum(v=='RECORDED' for v in cases.values());assert not b.get('error') and not b['errors'] and all(v in ['PASS','RECORDED'] for v in cases.values());browser[case]={'cases':cases,'audit':a,'evidence':'accepted/'+case}
+assert passes==35 and recorded==6
+ru=json.loads((h/'runtime-final-update.json').read_text());su=json.loads((h/'final-source-update.json').read_text());assert ru['targetSourceCommit']==su['targetSourceCommit']==source_commit
+limits=['65-node fixture only; sustained frame-rate acceptance and dense recursive/10k/50k graph capacity remain open.','Event Timing is thresholded/quantized; absent entries are unreported. Keyboard input is dispatched after receipt delivery, not physical input already queued during a prior stall.','Full canvas serialization, pairwise quadratic layout and page-owned listener retention remain.','Missing observed events are reported, never inferred from successful final values.','Seven external native solver checks skipped; projected supplied proof context is not proof of native execution or review authority.','Pinned-byte packaging does not close full vendor/native source rebuild provenance or machine power-loss durability.']
+record={'release':'R3e wire geometry and exact query rows','createdAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'testedSourceCommit':source_commit,'testedSourceTree':git('rev-parse',source_commit+'^{tree}'),'integration':d3record,'sourceSha256':source_hash,'testTotals':json.loads((h/'final-jvm-totals.json').read_text()),'browser':{'passed':passes,'measurementsRecorded':recorded,'frameMeasurements':3,'controlMeasurements':3,'bundleSha256':browser['final-geometry01']['audit']['bundleSha256'],'cases':browser},'comparison':json.loads((h/'comparison-runs.json').read_text()),'preliminaryRuns':preliminary,'diagnosticProfiles':profiles,'runtimeUpdate':ru,'sourceUpdate':su,'limits':limits,'reproduction':'../../15-wire-geometry.md','evidenceStanding':'Original failure logs, candidate packages, CAS/WAL state and profile bytes retained. Preliminary, baseline, diagnostic and accepted scopes are separate. Authored whitespace checks exclude exact raw evidence paths; manifests verify bytes and membership.'};save(out/'verification.json',record)
+host={'recordedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'kernel':subprocess.check_output(['uname','-srm'],text=True).strip(),'cpu':json.loads(subprocess.check_output(['lscpu','-J'],text=True)),'cpuMax':Path('/sys/fs/cgroup/cpu.max').read_text().strip(),'memoryMax':Path('/sys/fs/cgroup/memory.max').read_text().strip(),'browser':json.loads((h/'final-geometry01/browser.json').read_text())['browser'],'benchmarkInterference':'No Gradle build, profile or archive compression during alternating geometry comparison. Preliminary document/ownership cases overlapped target compilation and have no performance standing.'};save(out/'reference-host.json',host)
+(out/'README.md').write_text('# R3e evidence\n\nverification.json identifies the exact tested source, extracted final runtime, 35 final passing browser checks, three frame measurements, three control measurements and limits. Baselines, diagnostic profiles, harness pilots and the failed candidate document load remain distinct. Failed JVM attempts and complete failed query-test XML are retained. Raw bytes are immutable; reproduction scripts are inert .txt copies with this host\'s paths. Runtime/source overlays and the prior evidence bundle are separately named and hashed artifacts.\n')
+for root in [out,d3]:save(root/'SHA256.json',{p.relative_to(root).as_posix():sha(p) for p in sorted(root.rglob('*')) if p.is_file() and p!=root/'SHA256.json'})
+print(json.dumps({'evidence':str(out),'acceptedBrowserPasses':passes,'recordedMeasurements':recorded,'manifestFiles':len(json.loads((out/'SHA256.json').read_text())),'d3m':d3record},indent=2))

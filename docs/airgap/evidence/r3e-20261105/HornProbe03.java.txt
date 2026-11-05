@@ -1,0 +1,18 @@
+import java.util.*;
+import borg.trikeshed.lcnc.*;
+import borg.trikeshed.rdf.*;
+import borg.trikeshed.cursor.query.*;
+class HornProbe {
+ static Object plain(Object value) {if(value instanceof Map<?,?> m){var out=new LinkedHashMap<Object,Object>();m.forEach((k,v)->out.put(k,plain(v)));return out;}if(value instanceof List<?> l)return l.stream().map(HornProbe::plain).toList();return value;}
+ public static void main(String[] args) {
+  var report=NativeHornQueryViewTestKt.nativeHornGraphFixture("Tenant",false);
+  var projection=NativeHornProofGraph.INSTANCE.project(report);
+  for(boolean bindings:new boolean[]{true,false}) {
+   var starter=NativeHornQueryView.INSTANCE.starter(report,List.of(),bindings);
+   var query=SparqlGraph.INSTANCE.lower(starter.getProgram());
+   var raw=new SparqlSurface(projection.getStore(),ClosureExprCompiler.INSTANCE).answer(query,(borg.trikeshed.lib.Join)projection.getStore().scan(),"json","");
+   System.out.println("bindings="+bindings);System.out.println(raw.getBody());
+   var result=(Map<?,?>)borg.trikeshed.parse.ReifyKt.reifyStrict(raw.getBody());var row=(Map<?,?>)((List<?>)((Map<?,?>)result.get("results")).get("bindings")).get(0);var standard=plain(row);System.out.println("MAP equals="+row.equals(standard)+" reverse="+standard.equals(row)+" hash="+row.hashCode()+" standardHash="+standard.hashCode()+" lookup="+Map.of(standard,1).get(row));
+  }
+ }
+}

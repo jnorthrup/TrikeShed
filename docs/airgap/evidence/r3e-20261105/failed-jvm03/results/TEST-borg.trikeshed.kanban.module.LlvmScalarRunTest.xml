@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LlvmScalarRunTest[jvm]" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-11-05T09:36:22.208Z" hostname="0d6dfba25614" time="1.053">
+  <properties/>
+  <testcase name="mlirKernelProducesDurableLcncReceiptThatReopensWithoutExecution()[jvm]" classname="borg.trikeshed.kanban.module.LlvmScalarRunTest" time="1.048"/>
+  <testcase name="failedConfiguredBootstrapReleasesItsRootOwner()[jvm]" classname="borg.trikeshed.kanban.module.LlvmScalarRunTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

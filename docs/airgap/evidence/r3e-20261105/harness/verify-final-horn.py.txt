@@ -1,0 +1,6 @@
+from pathlib import Path
+import os,subprocess,json,datetime
+h=Path('/workspace/airgap-r3e-proof');repo=Path('/workspace/TrikeShed');env=os.environ.copy();env['JAVA_HOME']='/workspace/toolchains/graalvm-community-25.3.4.1+1.1';cmd=['unshare','--user','--map-current-user','--net','--keep-caps','sh','-c','ip link set lo up && exec "$@"','airgap-horn-final','./gradlew','--offline','--no-daemon','--max-workers=2','jvmTest','--tests','*.LinearArrayMapTest','--tests','*.NativeHornQueryViewTest']
+record={'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),'startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'command':cmd}
+with (h/'final-horn-check.txt').open('w') as f:r=subprocess.run(cmd,cwd=repo,env=env,stdout=f,stderr=subprocess.STDOUT)
+record.update(exit=r.returncode,finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat());(h/'final-horn-check.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record,indent=2));raise SystemExit(r.returncode)

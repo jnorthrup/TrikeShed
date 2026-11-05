@@ -1,0 +1,10 @@
+from pathlib import Path
+import os,subprocess,json,datetime
+h=Path('/workspace/airgap-r3e-proof');rows=[]
+for case,root in [('baseline-profile','/workspace/airgap-r3d-proof/installed-combined/airgap-document-rootfs'),('final-profile',str(h/'installed-final/airgap-document-rootfs'))]:
+ env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=root;cmd=['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','airgap-r3e','python3',str(h/'run.py'),case,'profile'];row={'case':case,'command':cmd,'startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat()}
+ with (h/(case+'-launch.txt')).open('w') as f:r=subprocess.run(cmd,env=env,stdout=f,stderr=subprocess.STDOUT)
+ row.update(exit=r.returncode,finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat());rows.append(row);(h/'profile-runs.json').write_text(json.dumps(rows,indent=2)+'\n');assert r.returncode==0,case
+ with (h/(case+'-audit.txt')).open('w') as f:subprocess.run(['python3',str(h/'audit.py'),case,'fanout'],stdout=f,stderr=subprocess.STDOUT,check=True)
+ with (h/(case+'-analysis.txt')).open('w') as f:subprocess.run(['python3',str(h/'profile.py'),case],stdout=f,stderr=subprocess.STDOUT,check=True)
+ print(case,'diagnostic profile and audit passed',flush=True)

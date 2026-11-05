@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishTaxonomyExportGuardTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T09:36:23.653Z" hostname="0d6dfba25614" time="0.048">
+  <properties/>
+  <testcase name="manualKifRetainsSingleAndMultipleSnapshotExports()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest" time="0.018"/>
+  <testcase name="anyCarrierRefusesMultipleReviewedHeadsInEitherOrder()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest" time="0.008"/>
+  <testcase name="persistedCarrierReadDoesNotSupplyMissingTranslationProvenance()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest" time="0.009"/>
+  <testcase name="eitherCarrierMarkerRefusesSingleReferenceNativeAndUnionExports()[jvm]" classname="borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest" time="0.011"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

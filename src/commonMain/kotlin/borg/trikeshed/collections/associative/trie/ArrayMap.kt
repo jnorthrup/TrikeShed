@@ -99,7 +99,13 @@ class LinearArrayMap<K : Any, V>(private val keyArray: Array<K>, private val val
             var i = 0
             override fun hasNext() = i < keyArray.size
             override fun next(): Map_Entry<K, V> { val k = keyArray[i]; val v = valueArray[i]; i++
-                return object : Map_Entry<K, V> { override val key get() = k; override val value get() = v } }
+                return object : Map_Entry<K, V> {
+                    override val key get() = k
+                    override val value get() = v
+                    override fun equals(other: Any?): Boolean = other is Map_Entry<*, *> && key == other.key && value == other.value
+                    override fun hashCode(): Int = key.hashCode() xor (value?.hashCode() ?: 0)
+                }
+            }
         }
     }
 

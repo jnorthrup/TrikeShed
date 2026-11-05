@@ -1,0 +1,43 @@
+from pathlib import Path
+import json,hashlib,subprocess,shutil,xml.etree.ElementTree as E
+h=Path('/workspace/airgap-r3e-proof');repo=Path('/workspace/TrikeShed');out=repo/'docs/airgap/evidence/r3e-20261105';d3=repo/'docs/d3m/evidence/2026-11-05-airgap-r3e'
+def save(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def copy(p,q):q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def git(*args):return subprocess.check_output(['git',*args],cwd=repo,text=True).strip()
+check=json.loads((h/'final-horn-check.json').read_text());assert check['exit']==0;head=git('rev-parse','HEAD');assert head==check['sourceCommit']
+shutil.copytree(repo/'build/test-results/jvmTest',h/'final-horn-results');roots=[E.parse(p).getroot() for p in (h/'final-horn-results').glob('TEST-*.xml')];counts={k:sum(int(r.get(k,0)) for r in roots) for k in ['tests','failures','errors','skipped']};counts['passed']=counts['tests']-counts['failures']-counts['errors']-counts['skipped'];assert counts=={'tests':5,'failures':0,'errors':0,'skipped':0,'passed':5};save(h/'final-horn-totals.json',counts)
+r=json.loads((h/'final-reconciliation.json').read_text());r['standing']='Five focused JVM tests pass with all newly retained extra/duplicate/non-string row assertions. Production source and build inputs are identical to the packaged tested source.';r['testTotals']=counts;r['sourceSupplementSha256']=sha(h/'strict-row-validation.patch.txt');save(h/'final-reconciliation.json',r);save(repo/'.git/d3m/airgap-wire-geometry-final-20261105/intent-resolution.json',r)
+shutil.copytree(repo/'.git/d3m/airgap-wire-geometry-final-20261105',d3/'final');shutil.copytree(h/'final-freeze',d3/'final-freeze')
+for name in ['fetch-final.py','integrate-final.py']:copy(h/name,d3/(name+'.txt'))
+for name in ['pre-push-heads01.json','final-incoming-horn.txt','final-reconciliation.json']:copy(h/name,d3/name)
+for name in ['final-horn-check.txt','final-horn-check.json','final-horn-totals.json','final-reconciliation.json','strict-row-validation.patch.txt','staged-verification.json']:copy(h/name,out/name)
+for name in ['verify-final-horn.py','finalize.py']:copy(h/name,out/'harness'/(name+'.txt'))
+shutil.copytree(h/'final-horn-results',out/'final-horn-results')
+test='src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt';copy(repo/test,out/'final-validation-source'/test)
+record=json.loads((d3/'verification.json').read_text());record.update(integratedCommit=head,finalValidationCommit=head,frozenRefCounts=[556,557,557],merges=7,finalReconciliation='final/intent-resolution.json',finalFocusedTests=counts,runtimeSourceAndBuildInputsUnchanged=True)
+anc=set(git('rev-list','HEAD').splitlines())
+for root in [h,h/'publication-freeze',h/'final-freeze']:
+ for row in json.loads((root/'integration-inputs.json').read_text())['refs']:assert row['commit'] in anc
+assert git('diff','--name-only','5fdd0472',head,'--','src')==test
+assert not git('diff','5fdd0472',head,'--','build.gradle.kts','settings.gradle.kts','gradle.properties','release','gradle','gradlew','gradlew.bat')
+save(d3/'verification.json',record)
+v=json.loads((out/'verification.json').read_text());v['integration']=record;v['finalValidation']={'sourceCommit':head,'testTotals':counts,'runtimeInputsUnchanged':True,'updatedTestSha256':sha(repo/test),'sourceSupplement':'strict-row-validation.patch.txt','sourceSupplementSha256':r['sourceSupplementSha256'],'sourceSupplementScope':r['sourceSupplementScope']};save(out/'verification.json',v)
+p=repo/'docs/d3m/2026-11-05-airgap-r3e.md';s=p.read_text().replace('556 and 557 refs.','556, 557 and 557 refs.').replace('All six three-way merges','All seven three-way merges');needle='| `173cb2de7` | Independently corrected Horn test fixture delimiters | `12db9aa42` |';s=s.replace(needle,needle+'\n| `42ebeb857` | Strict malformed-row assertions and a query-local structural-copy workaround | `20e5fc175` |')
+s=s.replace('Both histories remain. Automatic merge success','Both histories remain. The last incoming tip adds five malformed-row variants\ninside an existing test: extra outer/term fields, non-string values and repeated\nouter/term keys. Its query-local copy workaround is unnecessary after the common\nmap-entry correction. Reconciliation `cf544ffd3` retains all of those assertions\nand the original rows unchanged; five focused map/Horn tests pass. Exact\nstructural coverage rejects these variants without normalizing away fields.\nProduction source and build inputs match packaged commit `5fdd0472c`; only the\nstronger test file differs. The retained one-file source supplement reconstructs\nthe exact final `src/` subtree after the runtime source archive.\n\nAutomatic merge success');p.write_text(s)
+p=repo/'docs/airgap/15-wire-geometry.md';s=p.read_text();needle='No source or test exclusions were introduced.';s=s.replace(needle,needle+'''
+
+A final D3M branch adds malformed-row assertions and a query-local copy
+workaround for the map-hash defect. Reconciliation
+`cf544ffd37f291287ea7ec09aa1a538db5ce7893` keeps every new assertion and uses the
+already corrected common map contract without copying or normalizing rows.
+Five focused map/Horn tests pass with the added extra-field, non-string and
+duplicate-key cases. Production source and build inputs remain byte-identical
+to the packaged source; only the test file changes. The retained
+`strict-row-validation.patch.txt` applies after the final source archive and
+reconstructs the exact integrated `src/` subtree. These five checks are a
+focused rerun, not five additional unique tests in the 316-test suite.
+''');p.write_text(s)
+for root in [out,d3]:save(root/'SHA256.json',{p.relative_to(root).as_posix():sha(p) for p in sorted(root.rglob('*')) if p.is_file() and p!=root/'SHA256.json'})
+print(json.dumps(record,indent=2))

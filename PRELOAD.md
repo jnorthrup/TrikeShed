@@ -482,3 +482,9 @@ not a reason to duplicate effects. Keep failed verification evidence and the
 reason for its correction. Record tested commit/tree identities separately
 from later documentation-only publication commits, and verify that tested
 source and build inputs remain unchanged before relying on earlier checks.
+
+A conflict-free merge and successful compilation do not establish runtime
+acceptance. Execute the changed platform boundary against the actual packaged
+artifact; preserve any failed candidate and its identity before rebuilding.
+Keep measurement clocks and reporting thresholds explicit, and retain adverse
+or overlapping results without turning them into an unsupported speedup claim.

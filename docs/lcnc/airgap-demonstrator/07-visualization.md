@@ -141,3 +141,22 @@ This is a bounded improvement; quadratic layout, full-canvas serialization,
 projection batching, control-to-paint latency, culling and recursive scope
 navigation remain explicit work. No synthetic transfer replaces an omitted
 owner observation.
+
+## Implemented checkpoint: R3e
+
+[R3e](../../airgap/15-wire-geometry.md) snapshots distinct port geometry per
+redraw, supplies measured viewport dimensions to the existing curve projector,
+and attaches SVG paths/labels as one fragment. The snapshot is deliberately
+materialized at the DOM boundary; it cannot authorize geometry after a later
+edit or callback. The first compiled candidate exposed a dynamic-call runtime
+failure, retained with its correction through the existing typed Twin factory.
+
+Three matched 65-node runs verify 65 native outputs, wire alignment under fit,
+zoom and resize, real wire deletion and trace invalidation. Maximum frame gaps
+are 116.6–133.4 ms versus 116.7–149.9 ms on R3d with the same expanded driver.
+These small repetitions and keyboard Event Timing observations overlap;
+sustained performance acceptance remains open. A raw frame-timestamp difference
+can be negative and is explicitly excluded from latency claims. The runbook
+retains threshold/quantization, controller overhead and dispatch-after-receipt
+limits. Full-canvas serialization, quadratic overlap and listener retention
+still need bounded alternatives or longer-session evidence.

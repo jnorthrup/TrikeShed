@@ -1,0 +1,144 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: jvmTest --tests *.LinearArrayMapTest --tests *.NativeHornQueryViewTest
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :buildJvmKernels UP-TO-DATE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :fetchSumoCorpus UP-TO-DATE
+> Task :generateForgeAssets UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :hotswapAgentJar UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses UP-TO-DATE
+> Task :jvmJar UP-TO-DATE
+> Task :compileTestKotlinJvm
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt:105:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LcncNode'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt:107:39 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LcncNode'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt:111:57 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LcncNode'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt:112:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'LcncNode'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt:127:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'KanbanGraph'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/narsese/DocumentCuratorNlpRetentionTest.kt:58:34 Unnecessary non-null assertion (!!) on a non-null receiver of type 'NlpDocument'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/narsese/DocumentCuratorNlpRetentionTest.kt:60:38 Unnecessary non-null assertion (!!) on a non-null receiver of type 'NlpDocument'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/nlp/EnglishGuardAttachmentsTest.kt:73:65 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/nlp/EnglishGuardAttachmentsTest.kt:140:49 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/commonTest/kotlin/borg/trikeshed/nlp/EnglishGuardAttachmentsTest.kt:154:68 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/agent/modelmux/MuxTransportAdmissionTest.kt:70:24 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/CurationIntakeTest.kt:621:53 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/CurationIntakeTest.kt:970:53 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/DocumentEnglishWireTest.kt:157:60 The corresponding parameter in the supertype 'ProjectCorpus' is named 'id'. This may cause problems when calling this function with named arguments.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ManualProjectUploadTest.kt:88:57 'val id: Long' is deprecated. Deprecated in Java.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ManualProjectUploadTest.kt:92:64 'val id: Long' is deprecated. Deprecated in Java.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ManualProjectUploadTest.kt:111:42 'constructor(p0: String!): URL' is deprecated. Deprecated in Java.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ManualProjectUploadTest.kt:122:38 'constructor(p0: String!): URL' is deprecated. Deprecated in Java.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ManualProjectUploadTest.kt:132:30 'constructor(p0: String!): URL' is deprecated. Deprecated in Java.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ProjectCorpusVisitTest.kt:205:107 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/forge/server/ProjectCorpusVisitTest.kt:336:17 Expression is unused.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/graal/subvm/CoreNlpSourceTest.kt:38:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'NlpMetadata'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/graal/subvm/CoreNlpSourceTest.kt:69:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'NlpMetadata'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/graal/subvm/CoreNlpSourceTest.kt:69:87 Unnecessary non-null assertion (!!) on a non-null receiver of type 'NlpMetadata'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/graal/subvm/PythonWheelsTest.kt:166:22 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/graal/subvm/PythonWheelsTest.kt:189:30 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/hermes/HermesHandoffTest.kt:104:33 'fun subscribe(handler: (Join<Join<Any, (Any) -> Any?>, Join<Int, (Int) -> Byte>>) -> Unit): () -> Unit' is deprecated. Collect revisions and read snapshot()/replay(); this synchronous shim exists only for legacy callers.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/hermes/HermesPenDelegatesTest.kt:173:68 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/hermes/HermesVmConsoleTest.kt:302:36 Unnecessary safe call on a non-null receiver of type 'WireHttpResponse'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/kanban/module/LlvmScalarRunTest.kt:32:45 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt:191:44 Condition is always 'true'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/DocumentSpansTest.kt:58:42 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/DocumentSpansTest.kt:78:115 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/DocumentSpansTest.kt:79:44 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:73:39 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:74:47 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:156:58 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishTaxonomyCarrierTest.kt:168:36 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/BeliefAdmissionTest.kt:51:59 Unnecessary non-null assertion (!!) on a non-null receiver of type 'TemporalSignal'.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/JevaNativeFootprintTest.kt:16:22 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/JevaNativeFootprintTest.kt:17:21 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/JevaNativeFootprintTest.kt:50:22 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/JevaNativeFootprintTest.kt:51:21 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/JevaNativeWorkerIntegrationTest.kt:15:22 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/JevaNativeWorkerIntegrationTest.kt:16:21 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+
+> Task :compileJvmTestJava NO-SOURCE
+> Task :jvmTestClasses
+
+> Task :jvmTest
+WARNING: package jdk.internal.classfile.instruction not in java.base
+WARNING: package jdk.internal.classfile.constantpool not in java.base
+WARNING: package jdk.internal.classfile not in java.base
+
+LinearArrayMapTest[jvm] > indexedReifiedMapsKeepHashesAndEntryMembershipWithNulls()[jvm] STARTED
+
+LinearArrayMapTest[jvm] > indexedReifiedMapsKeepHashesAndEntryMembershipWithNulls()[jvm] PASSED
+
+LinearArrayMapTest[jvm] > reifiedRowsRetainMapAndEntryHashEqualityAcrossFieldOrder()[jvm] STARTED
+
+LinearArrayMapTest[jvm] > reifiedRowsRetainMapAndEntryHashEqualityAcrossFieldOrder()[jvm] PASSED
+
+NativeHornQueryViewTest[jvm] > integerAndJsonNumberDomainsKeepTheSameGraphAndBothEightPatternPrograms()[jvm] STARTED
+
+NativeHornQueryViewTest[jvm] > integerAndJsonNumberDomainsKeepTheSameGraphAndBothEightPatternPrograms()[jvm] PASSED
+
+NativeHornQueryViewTest[jvm] > completeSourceContextAndProjectionBoundsRefuseWithoutPartialGraphs()[jvm] STARTED
+
+NativeHornQueryViewTest[jvm] > completeSourceContextAndProjectionBoundsRefuseWithoutPartialGraphs()[jvm] PASSED
+
+NativeHornQueryViewTest[jvm] > typedSourceRowsMissingPremisesAndChangedFramesCannotBecomeAnswers()[jvm] STARTED
+
+NativeHornQueryViewTest[jvm] > typedSourceRowsMissingPremisesAndChangedFramesCannotBecomeAnswers()[jvm] PASSED
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 12s
+15 actionable tasks: 4 executed, 11 up-to-date
+Configuration cache entry stored.

@@ -1,0 +1,818 @@
+[
+  {
+    "case": "baseline-geometry01",
+    "kind": "baseline",
+    "startedAt": "2026-11-05T10:07:05.863887+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "baseline-geometry01",
+      "geometry"
+    ],
+    "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:07:18.464451+00:00",
+    "frames": {
+      "unit": "ms",
+      "samples": 160,
+      "p50": 16.699999999999818,
+      "p95": 33.399999999999636,
+      "maximum": 116.69999999999982,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "wireGeometry": "PASS",
+      "wireEdit": "PASS",
+      "frameMeasurement": "RECORDED",
+      "controlTiming": "RECORDED"
+    },
+    "control": {
+      "roundTripMs": 27.149829,
+      "keyboardEvents": [
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4350.29999999702,
+          "handlerStart": 4352.69999999553,
+          "label": "Resume display",
+          "nextAnimationFrame": 4354.9,
+          "handlerToFrame": 2.2000000044699846
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4356.29999999702,
+          "handlerStart": 4375,
+          "label": "Resume display",
+          "nextAnimationFrame": 4371.6,
+          "handlerToFrame": -3.399999999999636
+        },
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4545.79999999702,
+          "handlerStart": 4550.0999999940395,
+          "label": "Pause display",
+          "nextAnimationFrame": 4538.2,
+          "handlerToFrame": -11.899999994039717
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4558.89999999851,
+          "handlerStart": 4572.29999999702,
+          "label": "Pause display",
+          "nextAnimationFrame": 4554.9,
+          "handlerToFrame": -17.39999999702013
+        }
+      ],
+      "reportedKeyboardTimings": [
+        {
+          "name": "keydown",
+          "startTime": 4350.29999999702,
+          "processingStart": 4352.39999999851,
+          "processingEnd": 4353,
+          "duration": 72,
+          "interactionId": 4788
+        },
+        {
+          "name": "keyup",
+          "startTime": 4356.29999999702,
+          "processingStart": 4374.89999999851,
+          "processingEnd": 4375.19999999553,
+          "duration": 88,
+          "interactionId": 4788
+        },
+        {
+          "name": "keydown",
+          "startTime": 4545.79999999702,
+          "processingStart": 4550,
+          "processingEnd": 4550.19999999553,
+          "duration": 64,
+          "interactionId": 4795
+        },
+        {
+          "name": "keyup",
+          "startTime": 4558.89999999851,
+          "processingStart": 4572.29999999702,
+          "processingEnd": 4572.39999999851,
+          "duration": 72,
+          "interactionId": 4795
+        }
+      ]
+    },
+    "geometry": [
+      {
+        "view": "fit",
+        "visiblePairs": 64,
+        "clippedPairs": 0,
+        "maxScreenError": 5.434072916209426e-05
+      },
+      {
+        "view": "zoom",
+        "visiblePairs": 27,
+        "clippedPairs": 37,
+        "maxScreenError": 7.413886507163982e-05
+      },
+      {
+        "view": "resize",
+        "visiblePairs": 17,
+        "clippedPairs": 47,
+        "maxScreenError": 0.00011919452059596599
+      }
+    ]
+  },
+  {
+    "case": "final-geometry01",
+    "kind": "final",
+    "startedAt": "2026-11-05T10:07:18.501046+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "final-geometry01",
+      "geometry"
+    ],
+    "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:07:30.925145+00:00",
+    "frames": {
+      "unit": "ms",
+      "samples": 160,
+      "p50": 16.699999999999818,
+      "p95": 33.40000000000009,
+      "maximum": 116.69999999999982,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "wireGeometry": "PASS",
+      "wireEdit": "PASS",
+      "frameMeasurement": "RECORDED",
+      "controlTiming": "RECORDED"
+    },
+    "control": {
+      "roundTripMs": 30.548243,
+      "keyboardEvents": [
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4365.60000000149,
+          "handlerStart": 4380,
+          "label": "Resume display",
+          "nextAnimationFrame": 4375.2,
+          "handlerToFrame": -4.800000000000182
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4385.70000000298,
+          "handlerStart": 4391.4000000059605,
+          "label": "Resume display",
+          "nextAnimationFrame": 4392,
+          "handlerToFrame": 0.5999999940395355
+        },
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4551.20000000298,
+          "handlerStart": 4586.4000000059605,
+          "label": "Pause display",
+          "nextAnimationFrame": 4575.3,
+          "handlerToFrame": -11.100000005960283
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4598.80000000447,
+          "handlerStart": 4623,
+          "label": "Pause display",
+          "nextAnimationFrame": 4608.6,
+          "handlerToFrame": -14.399999999999636
+        }
+      ],
+      "reportedKeyboardTimings": [
+        {
+          "name": "keydown",
+          "startTime": 4365.60000000149,
+          "processingStart": 4379.80000000447,
+          "processingEnd": 4380.20000000298,
+          "duration": 96,
+          "interactionId": 1030
+        },
+        {
+          "name": "keyup",
+          "startTime": 4385.70000000298,
+          "processingStart": 4391.30000000447,
+          "processingEnd": 4391.70000000298,
+          "duration": 104,
+          "interactionId": 1030
+        },
+        {
+          "name": "keydown",
+          "startTime": 4551.20000000298,
+          "processingStart": 4586.30000000447,
+          "processingEnd": 4586.5,
+          "duration": 88,
+          "interactionId": 1037
+        },
+        {
+          "name": "keyup",
+          "startTime": 4598.80000000447,
+          "processingStart": 4622.9000000059605,
+          "processingEnd": 4623.20000000298,
+          "duration": 88,
+          "interactionId": 1037
+        }
+      ]
+    },
+    "geometry": [
+      {
+        "view": "fit",
+        "visiblePairs": 64,
+        "clippedPairs": 0,
+        "maxScreenError": 5.434072916209426e-05
+      },
+      {
+        "view": "zoom",
+        "visiblePairs": 27,
+        "clippedPairs": 37,
+        "maxScreenError": 9.918670017022424e-05
+      },
+      {
+        "view": "resize",
+        "visiblePairs": 17,
+        "clippedPairs": 47,
+        "maxScreenError": 8.840124514265656e-05
+      }
+    ]
+  },
+  {
+    "case": "final-geometry02",
+    "kind": "final",
+    "startedAt": "2026-11-05T10:07:30.961941+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "final-geometry02",
+      "geometry"
+    ],
+    "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:07:43.301453+00:00",
+    "frames": {
+      "unit": "ms",
+      "samples": 162,
+      "p50": 16.699999999999818,
+      "p95": 33.30000000000018,
+      "maximum": 133.40000000000055,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "wireGeometry": "PASS",
+      "wireEdit": "PASS",
+      "frameMeasurement": "RECORDED",
+      "controlTiming": "RECORDED"
+    },
+    "control": {
+      "roundTripMs": 15.772751,
+      "keyboardEvents": [
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4494,
+          "handlerStart": 4496.9000000059605,
+          "label": "Resume display",
+          "nextAnimationFrame": 4503.8,
+          "handlerToFrame": 6.899999994039717
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4502.20000000298,
+          "handlerStart": 4507.20000000298,
+          "label": "Resume display",
+          "nextAnimationFrame": 4503.8,
+          "handlerToFrame": -3.4000000029800503
+        },
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4697.9000000059605,
+          "handlerStart": 4713,
+          "label": "Pause display",
+          "nextAnimationFrame": 4703.7,
+          "handlerToFrame": -9.300000000000182
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4717.10000000149,
+          "handlerStart": 4726.9000000059605,
+          "label": "Pause display",
+          "nextAnimationFrame": 4720.4,
+          "handlerToFrame": -6.500000005960828
+        }
+      ],
+      "reportedKeyboardTimings": [
+        {
+          "name": "keydown",
+          "startTime": 4494,
+          "processingStart": 4496.70000000298,
+          "processingEnd": 4498.80000000447,
+          "duration": 80,
+          "interactionId": 3814
+        },
+        {
+          "name": "keyup",
+          "startTime": 4502.20000000298,
+          "processingStart": 4507.10000000149,
+          "processingEnd": 4507.30000000447,
+          "duration": 72,
+          "interactionId": 3814
+        },
+        {
+          "name": "keydown",
+          "startTime": 4697.9000000059605,
+          "processingStart": 4713,
+          "processingEnd": 4713.10000000149,
+          "duration": 56,
+          "interactionId": 3821
+        },
+        {
+          "name": "keyup",
+          "startTime": 4717.10000000149,
+          "processingStart": 4726.9000000059605,
+          "processingEnd": 4727,
+          "duration": 88,
+          "interactionId": 3821
+        }
+      ]
+    },
+    "geometry": [
+      {
+        "view": "fit",
+        "visiblePairs": 64,
+        "clippedPairs": 0,
+        "maxScreenError": 5.434072916209426e-05
+      },
+      {
+        "view": "zoom",
+        "visiblePairs": 25,
+        "clippedPairs": 39,
+        "maxScreenError": 8.628503474294957e-05
+      },
+      {
+        "view": "resize",
+        "visiblePairs": 17,
+        "clippedPairs": 47,
+        "maxScreenError": 0.00011598801431198115
+      }
+    ]
+  },
+  {
+    "case": "baseline-geometry02",
+    "kind": "baseline",
+    "startedAt": "2026-11-05T10:07:43.337802+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "baseline-geometry02",
+      "geometry"
+    ],
+    "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:07:56.165657+00:00",
+    "frames": {
+      "unit": "ms",
+      "samples": 159,
+      "p50": 16.699999999999818,
+      "p95": 33.399999999999636,
+      "maximum": 149.90000000000055,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "wireGeometry": "PASS",
+      "wireEdit": "PASS",
+      "frameMeasurement": "RECORDED",
+      "controlTiming": "RECORDED"
+    },
+    "control": {
+      "roundTripMs": 35.366436,
+      "keyboardEvents": [
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4471.5,
+          "handlerStart": 4481.10000000149,
+          "label": "Resume display",
+          "nextAnimationFrame": 4479,
+          "handlerToFrame": -2.100000001490116
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4482.20000000298,
+          "handlerStart": 4500.80000000447,
+          "label": "Resume display",
+          "nextAnimationFrame": 4495.6,
+          "handlerToFrame": -5.200000004469985
+        },
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4682.20000000298,
+          "handlerStart": 4686.20000000298,
+          "label": "Pause display",
+          "nextAnimationFrame": 4679,
+          "handlerToFrame": -7.200000002980232
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4689.89999999851,
+          "handlerStart": 4698.5,
+          "label": "Pause display",
+          "nextAnimationFrame": 4695.6,
+          "handlerToFrame": -2.899999999999636
+        }
+      ],
+      "reportedKeyboardTimings": [
+        {
+          "name": "keydown",
+          "startTime": 4471.5,
+          "processingStart": 4480.80000000447,
+          "processingEnd": 4481.30000000447,
+          "duration": 88,
+          "interactionId": 3200
+        },
+        {
+          "name": "keyup",
+          "startTime": 4482.20000000298,
+          "processingStart": 4500.70000000298,
+          "processingEnd": 4501.39999999851,
+          "duration": 96,
+          "interactionId": 3200
+        },
+        {
+          "name": "keydown",
+          "startTime": 4682.20000000298,
+          "processingStart": 4686.20000000298,
+          "processingEnd": 4686.30000000447,
+          "duration": 72,
+          "interactionId": 3207
+        },
+        {
+          "name": "keyup",
+          "startTime": 4689.89999999851,
+          "processingStart": 4698.39999999851,
+          "processingEnd": 4698.70000000298,
+          "duration": 80,
+          "interactionId": 3207
+        }
+      ]
+    },
+    "geometry": [
+      {
+        "view": "fit",
+        "visiblePairs": 64,
+        "clippedPairs": 0,
+        "maxScreenError": 5.434072916209426e-05
+      },
+      {
+        "view": "zoom",
+        "visiblePairs": 25,
+        "clippedPairs": 39,
+        "maxScreenError": 5.938915156311857e-05
+      },
+      {
+        "view": "resize",
+        "visiblePairs": 15,
+        "clippedPairs": 49,
+        "maxScreenError": 0.0001332264227306494
+      }
+    ]
+  },
+  {
+    "case": "baseline-geometry03",
+    "kind": "baseline",
+    "startedAt": "2026-11-05T10:07:56.203728+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "baseline-geometry03",
+      "geometry"
+    ],
+    "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:08:08.540462+00:00",
+    "frames": {
+      "unit": "ms",
+      "samples": 159,
+      "p50": 16.699999999999818,
+      "p95": 33.399999999999636,
+      "maximum": 116.69999999999982,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "wireGeometry": "PASS",
+      "wireEdit": "PASS",
+      "frameMeasurement": "RECORDED",
+      "controlTiming": "RECORDED"
+    },
+    "control": {
+      "roundTripMs": 22.173619,
+      "keyboardEvents": [
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4346.60000000149,
+          "handlerStart": 4349.39999999851,
+          "label": "Resume display",
+          "nextAnimationFrame": 4343.5,
+          "handlerToFrame": -5.899999998509884
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4357.5,
+          "handlerStart": 4366.80000000447,
+          "label": "Resume display",
+          "nextAnimationFrame": 4360.2,
+          "handlerToFrame": -6.60000000447053
+        },
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4534,
+          "handlerStart": 4538.30000000447,
+          "label": "Pause display",
+          "nextAnimationFrame": 4526.8,
+          "handlerToFrame": -11.500000004470166
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4553.5,
+          "handlerStart": 4572.10000000149,
+          "label": "Pause display",
+          "nextAnimationFrame": 4576.8,
+          "handlerToFrame": 4.699999998510066
+        }
+      ],
+      "reportedKeyboardTimings": [
+        {
+          "name": "keydown",
+          "startTime": 4346.60000000149,
+          "processingStart": 4349.20000000298,
+          "processingEnd": 4349.70000000298,
+          "duration": 64,
+          "interactionId": 2831
+        },
+        {
+          "name": "keyup",
+          "startTime": 4357.5,
+          "processingStart": 4366.80000000447,
+          "processingEnd": 4367,
+          "duration": 72,
+          "interactionId": 2831
+        },
+        {
+          "name": "keydown",
+          "startTime": 4534,
+          "processingStart": 4538.20000000298,
+          "processingEnd": 4538.39999999851,
+          "duration": 72,
+          "interactionId": 2838
+        },
+        {
+          "name": "keyup",
+          "startTime": 4553.5,
+          "processingStart": 4572.10000000149,
+          "processingEnd": 4572.39999999851,
+          "duration": 72,
+          "interactionId": 2838
+        }
+      ]
+    },
+    "geometry": [
+      {
+        "view": "fit",
+        "visiblePairs": 64,
+        "clippedPairs": 0,
+        "maxScreenError": 5.434072916209426e-05
+      },
+      {
+        "view": "zoom",
+        "visiblePairs": 27,
+        "clippedPairs": 37,
+        "maxScreenError": 7.927021197388723e-05
+      },
+      {
+        "view": "resize",
+        "visiblePairs": 17,
+        "clippedPairs": 47,
+        "maxScreenError": 0.00012610279695489583
+      }
+    ]
+  },
+  {
+    "case": "final-geometry03",
+    "kind": "final",
+    "startedAt": "2026-11-05T10:08:08.577411+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "final-geometry03",
+      "geometry"
+    ],
+    "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:08:20.898258+00:00",
+    "frames": {
+      "unit": "ms",
+      "samples": 167,
+      "p50": 16.699999999999818,
+      "p95": 33.29999999999973,
+      "maximum": 116.60000000000036,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "wireGeometry": "PASS",
+      "wireEdit": "PASS",
+      "frameMeasurement": "RECORDED",
+      "controlTiming": "RECORDED"
+    },
+    "control": {
+      "roundTripMs": 40.79004,
+      "keyboardEvents": [
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4381.19999999553,
+          "handlerStart": 4386.5,
+          "label": "Resume display",
+          "nextAnimationFrame": 4377,
+          "handlerToFrame": -9.5
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4388,
+          "handlerStart": 4407.89999999851,
+          "label": "Resume display",
+          "nextAnimationFrame": 4393.7,
+          "handlerToFrame": -14.199999998510066
+        },
+        {
+          "name": "keydown",
+          "trusted": true,
+          "eventTime": 4580,
+          "handlerStart": 4585.39999999851,
+          "label": "Pause display",
+          "nextAnimationFrame": 4560.3,
+          "handlerToFrame": -25.099999998509702
+        },
+        {
+          "name": "keyup",
+          "trusted": true,
+          "eventTime": 4608.29999999702,
+          "handlerStart": 4613.10000000149,
+          "label": "Pause display",
+          "nextAnimationFrame": 4593.7,
+          "handlerToFrame": -19.400000001490298
+        }
+      ],
+      "reportedKeyboardTimings": [
+        {
+          "name": "keydown",
+          "startTime": 4381.19999999553,
+          "processingStart": 4386.29999999702,
+          "processingEnd": 4386.60000000149,
+          "duration": 80,
+          "interactionId": 5033
+        },
+        {
+          "name": "keyup",
+          "startTime": 4388,
+          "processingStart": 4407.79999999702,
+          "processingEnd": 4408.10000000149,
+          "duration": 88,
+          "interactionId": 5033
+        },
+        {
+          "name": "keydown",
+          "startTime": 4580,
+          "processingStart": 4585.39999999851,
+          "processingEnd": 4585.39999999851,
+          "duration": 56,
+          "interactionId": 5040
+        },
+        {
+          "name": "keyup",
+          "startTime": 4608.29999999702,
+          "processingStart": 4613,
+          "processingEnd": 4613.19999999553,
+          "duration": 56,
+          "interactionId": 5040
+        }
+      ]
+    },
+    "geometry": [
+      {
+        "view": "fit",
+        "visiblePairs": 64,
+        "clippedPairs": 0,
+        "maxScreenError": 5.434072916209426e-05
+      },
+      {
+        "view": "zoom",
+        "visiblePairs": 27,
+        "clippedPairs": 37,
+        "maxScreenError": 5.293932632220524e-05
+      },
+      {
+        "view": "resize",
+        "visiblePairs": 17,
+        "clippedPairs": 47,
+        "maxScreenError": 0.00010159026150406299
+      }
+    ]
+  }
+]

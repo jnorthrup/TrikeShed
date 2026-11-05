@@ -1,0 +1,14 @@
+{
+  "inspected": [
+    "final-geometry01/wire-geometry-before-edit.png",
+    "final-document02/transfer-table.png",
+    "final-ownership02/changed-reference-refused.png",
+    "wire-comparison.png"
+  ],
+  "findings": [
+    "Zoomed/resized graph shows connected wires, recorded output and explicit owner omissions; many nodes are outside the viewport.",
+    "Document view retains eight observed transfers and keyboard selection.",
+    "Changed-reference screenshot shows edited input and refusal in the status bar; the one-node fit is heavily zoomed.",
+    "Comparison chart retains zero-based axes, readable labels and explicit overlapping-result/clock limitations."
+  ]
+}

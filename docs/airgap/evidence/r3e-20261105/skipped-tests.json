@@ -1,0 +1,37 @@
+[
+  {
+    "suite": "NativeHornQueryTest[jvm]",
+    "test": "incorrectExecutablePinRefusesExecution()[jvm]",
+    "reason": {}
+  },
+  {
+    "suite": "NativeHornQueryTest[jvm]",
+    "test": "observationWallLimitIncludesPostQueryRecheck()[jvm]",
+    "reason": {}
+  },
+  {
+    "suite": "NativeHornQueryTest[jvm]",
+    "test": "realNativeReviewQueryAndNoProofKeepWorldUnknown()[jvm]",
+    "reason": {}
+  },
+  {
+    "suite": "NativeHornQueryTest[jvm]",
+    "test": "realNativeManualRoleJoinKeepsSourcesBindingsAndNegativeControlsSeparate()[jvm]",
+    "reason": {}
+  },
+  {
+    "suite": "NativeHornQueryTest[jvm]",
+    "test": "observationWallLimitIncludesReviewedSourcePreparation()[jvm]",
+    "reason": {}
+  },
+  {
+    "suite": "ReviewedTaxonomyWireTest[jvm]",
+    "test": "configuredNativeEndpointRunsActualReviewedQuery()[jvm]",
+    "reason": {}
+  },
+  {
+    "suite": "ReviewedKifWireTest[jvm]",
+    "test": "reviewedKifRunsThroughPinnedNativeSolver()[jvm]",
+    "reason": {}
+  }
+]

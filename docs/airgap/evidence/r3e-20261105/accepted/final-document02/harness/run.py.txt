@@ -1,0 +1,52 @@
+from pathlib import Path
+import os,sys,subprocess,time,json,urllib.request,shutil,hashlib,zipfile,socket,errno
+h=Path('/workspace/airgap-r3e-proof');a=h/sys.argv[1];a.mkdir();root=Path(os.environ.get('TRIKESHED_PROOF_ROOT','/workspace/airgap-r4f-proof/rootfs'));state=a/'state';state.mkdir();base='http://127.0.0.1:18764';http=urllib.request.build_opener(urllib.request.ProxyHandler({}));processes=[];reports=[];logs=[];error=None;driver=None
+network={'namespace':os.readlink('/proc/self/ns/net'),'routes':json.loads(subprocess.check_output(['ip','-j','route'])),'addresses':json.loads(subprocess.check_output(['ip','-j','address']))};assert not network['routes'] and all(x['ifname']=='lo' for x in network['addresses'])
+with socket.socket() as s: s.settimeout(1);network['externalConnectErrno']=s.connect_ex(('1.1.1.1',443))
+assert network['externalConnectErrno']==errno.ENETUNREACH
+(a/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+(a/'harness').mkdir()
+for name in ['run.py',sys.argv[2]+'.cjs']:shutil.copy2(h/name,a/'harness'/(name+'.txt'))
+with zipfile.ZipFile(root/'opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar') as z: bundle=hashlib.sha256(z.read('web/kotlin/spacegraph/spacegraph.js')).hexdigest()
+(a/'identity.json').write_text(json.dumps({'root':str(root),'packageManifestSha256':hashlib.sha256((root/'package-identity.json').read_bytes()).hexdigest(),'bundleSha256':bundle},indent=2)+'\n')
+def get():
+ with http.open(base+'/__proof/state',timeout=3) as r:return json.load(r)
+def launch(mode):
+ cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--die-with-parent','--ro-bind',str(root),'/','--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv','--setenv','PATH','/opt/trikeshed/jdk/bin:/usr/bin:/bin','--setenv','JAVA_HOME','/opt/trikeshed/jdk','--setenv','HOME','/state/home','--setenv','LANG','C.UTF-8','--setenv','TRIKESHED_PDF_ROUTE','layer','--chdir','/state','--cap-drop','ALL']
+ if mode=='run':
+  for kind,name in [('SCALAR','add-mlir.bc'),('CONFIX','confix.bc')]:cmd+=['--setenv','TRIKESHED_LLVM_'+kind+'_PROFILE','/state/runtime/'+name+'.json']
+ else:
+  for path in ['/opt/trikeshed/assets','/opt/trikeshed/modules']:cmd+=['--tmpfs',path,'--remount-ro',path]
+  for path in ['/usr/bin/pdfinfo','/usr/bin/pdftotext']:cmd+=['--ro-bind','/dev/null',path]
+ cmd+=['/opt/trikeshed/bin/airgap-document','/state','/opt/trikeshed','18764',mode]
+ log=(a/(mode+'.txt')).open('w');logs.append(log);p=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT);row={'mode':mode,'command':cmd,'hostPid':p.pid};processes.append(p);reports.append(row);end=time.monotonic()+90
+ while True:
+  assert p.poll() is None,('early exit',mode,p.returncode)
+  try:ready=get();break
+  except OSError:assert time.monotonic()<end;time.sleep(.2)
+ (a/(mode+'-ready.json')).write_text(json.dumps(ready,indent=2)+'\n');return p,row
+def finish(p,row):
+ if p.poll() is None:
+  try:http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3).read()
+  except OSError:pass
+  try:p.wait(timeout=30)
+  except subprocess.TimeoutExpired:p.terminate();p.wait(timeout=10);row['forcedTermination']=True
+ row['exit']=p.returncode
+try:
+ writer,row=launch('run');env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright'
+ log=(a/'driver.txt').open('w');logs.append(log);driver=subprocess.Popen(['node',str(h/(sys.argv[2]+'.cjs')),str(a),base],env=env,stdout=log,stderr=subprocess.STDOUT);end=time.monotonic()+300;restarted=False
+ while driver.poll() is None:
+  assert time.monotonic()<end,'browser timeout'
+  if not restarted and (a/'restart-request.json').exists():
+   finish(writer,row);assert writer.returncode==0
+   inspector,inspection=launch('inspect');restarted=True;(a/'restart-ready.json').write_text('{}\n')
+  time.sleep(.1)
+ assert driver.returncode==0,('driver',driver.returncode)
+except BaseException as e:error=repr(e)
+finally:
+ if driver is not None and driver.poll() is None:driver.terminate();driver.wait(timeout=10)
+ for p,row in zip(processes,reports):finish(p,row)
+ for log in logs:log.close()
+ report={'error':error,'driverExit':driver.returncode if driver else None,'processes':reports};(a/'processes.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({'error':error,'driverExit':report['driverExit'],'exits':[p.returncode for p in processes]},indent=2))
+assert error is None,error
+assert all(p.returncode==0 for p in processes)

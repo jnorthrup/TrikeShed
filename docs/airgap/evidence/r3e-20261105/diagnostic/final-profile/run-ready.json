@@ -1,0 +1,256 @@
+{
+  "document": {
+    "project": "coinbase-suski",
+    "id": "coinbase-suski.pdf",
+    "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+    "rev": "1-sha256:25eed9be834186cbd5e59c3201d9678cd15fe587e72253c247c05e9dfa2355a6",
+    "seq": 0.0,
+    "length": 111243.0,
+    "contentType": "application/pdf"
+  },
+  "documents": [
+    {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf",
+      "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "rev": "1-sha256:25eed9be834186cbd5e59c3201d9678cd15fe587e72253c247c05e9dfa2355a6",
+      "seq": 0.0,
+      "length": 111243.0,
+      "contentType": "application/pdf"
+    },
+    {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf.extract.md",
+      "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+      "rev": "1-sha256:e2ea3d31905556ed2079dc6f25d6e6b22e31b38aa33f38d189b35ad9df311210",
+      "seq": 3.0,
+      "length": 23021.0,
+      "contentType": "text/markdown"
+    },
+    {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf.extract.json",
+      "cid": "sha256:b052dcab1cccdffcabba04c8a1a458a056915e4d8f6006a9610c20aa72c0789c",
+      "rev": "1-sha256:deafea4a9b339836137448b2bdcfb5eba776d28e0fd72ff25c8c6c2695a6aa91",
+      "seq": 5.0,
+      "length": 97806.0,
+      "contentType": "application/json"
+    },
+    {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf.extract-origin.tsv",
+      "cid": "sha256:a5c0c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52",
+      "rev": "1-sha256:e9ca0434e364f9dd9c4bae9ac2fa93f1d7242ac22c19be2a4ba2ced8dc2468ca",
+      "seq": 4.0,
+      "length": 143.0,
+      "contentType": "application/octet-stream"
+    },
+    {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf.notes.md",
+      "cid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+      "rev": "1-sha256:eab6615aad76edfefaf8d1872c55a6a25477c38ed6110ce65e029bfdb1792f6e",
+      "seq": 1.0,
+      "length": 95.0,
+      "contentType": "text/markdown"
+    },
+    {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf.footnotes.tsv",
+      "cid": "sha256:ff7919835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101",
+      "rev": "1-sha256:9950577b9b053e1d48b0892a2531abf252d01074eff9ed900b94bcd9a1c6e4a1",
+      "seq": 2.0,
+      "length": 1082.0,
+      "contentType": "application/octet-stream"
+    }
+  ],
+  "sourceReference": {
+    "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+    "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+    "name": "coinbase-suski.pdf",
+    "mediaType": "application/pdf",
+    "category": "document",
+    "project": {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf",
+      "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "rev": "1-sha256:25eed9be834186cbd5e59c3201d9678cd15fe587e72253c247c05e9dfa2355a6",
+      "seq": 0.0
+    },
+    "extraction": {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf.extract.md",
+      "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+      "rev": "1-sha256:e2ea3d31905556ed2079dc6f25d6e6b22e31b38aa33f38d189b35ad9df311210",
+      "seq": 3.0
+    },
+    "sourceCid": "sha256:6a5857cc75c84a73b4fe92a490563aec08b22e5fc98c7b337c32f32b3c1dce68"
+  },
+  "passageOffset": 18477.0,
+  "ingestion": {
+    "verdict": "ingested",
+    "id": "coinbase-suski.pdf",
+    "chars": 22686.0,
+    "route": "pdf pages (layer)",
+    "ms": 286.0
+  },
+  "canvas": {
+    "nodes": [
+      {
+        "id": "document",
+        "type": "json.value",
+        "x": 30,
+        "y": 800,
+        "params": {
+          "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:25eed9be834186cbd5e59c3201d9678cd15fe587e72253c247c05e9dfa2355a6\", \"seq\":0.0}, \"extraction\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf.extract.md\", \"cid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"rev\":\"1-sha256:e2ea3d31905556ed2079dc6f25d6e6b22e31b38aa33f38d189b35ad9df311210\", \"seq\":3.0}, \"sourceCid\":\"sha256:6a5857cc75c84a73b4fe92a490563aec08b22e5fc98c7b337c32f32b3c1dce68\"}"
+        }
+      },
+      {
+        "id": "source",
+        "type": "document.source",
+        "x": 30,
+        "y": 60,
+        "params": {
+          "view": "reference"
+        }
+      },
+      {
+        "id": "passages",
+        "type": "document.spans",
+        "x": 460,
+        "y": 60,
+        "params": {
+          "offset": "18477",
+          "count": "1",
+          "spanChars": "200",
+          "maxBytes": "8192"
+        }
+      },
+      {
+        "id": "scan",
+        "type": "vm.llvm.confix",
+        "x": 890,
+        "y": 60,
+        "params": {
+          "format": "JSON"
+        }
+      },
+      {
+        "id": "selection",
+        "type": "confix.pickPath",
+        "x": 1320,
+        "y": 60,
+        "params": {
+          "path": "spans.0.quotation",
+          "geometry": "native"
+        }
+      }
+    ],
+    "wires": [
+      {
+        "from": [
+          "document",
+          "value"
+        ],
+        "to": [
+          "source",
+          "source?"
+        ]
+      },
+      {
+        "from": [
+          "source",
+          "source"
+        ],
+        "to": [
+          "passages",
+          "source"
+        ]
+      },
+      {
+        "from": [
+          "passages",
+          "data"
+        ],
+        "to": [
+          "scan",
+          "data?"
+        ]
+      },
+      {
+        "from": [
+          "passages",
+          "data"
+        ],
+        "to": [
+          "selection",
+          "data?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "rows"
+        ],
+        "to": [
+          "selection",
+          "rows?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "sourceCid"
+        ],
+        "to": [
+          "selection",
+          "sourceCid?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "ok"
+        ],
+        "to": [
+          "selection",
+          "ok?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "format"
+        ],
+        "to": [
+          "selection",
+          "format?"
+        ]
+      }
+    ],
+    "seq": 1,
+    "view": {
+      "x": 245,
+      "y": 20,
+      "z": 0.8
+    }
+  },
+  "mode": "run",
+  "boot": "a3d029e3-3a80-43bb-ac8c-9a81a73db91c",
+  "pid": 2,
+  "reopened": false,
+  "minerInstalled": true,
+  "llvmInstalled": true,
+  "runs": {},
+  "javaHome": "/opt/trikeshed/jdk",
+  "classpath": "/opt/trikeshed/lib/TrikeShed-jvm-0.1.0-SNAPSHOT.jar:/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-entry.jar:/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar:/opt/trikeshed/lib/kotlinx-coroutines-core-jvm-1.11.0.jar:/opt/trikeshed/lib/atomicfu-jvm-0.33.0.jar:/opt/trikeshed/lib/kotlinx-serialization-core-jvm-1.12.0.jar:/opt/trikeshed/lib/kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar:/opt/trikeshed/lib/kotlin-stdlib-2.4.21.jar:/opt/trikeshed/lib/llvm-language-native-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-nfi-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-native-resources-25.3.4.1.jar:/opt/trikeshed/lib/truffle-runtime-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-libffi-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-panama-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-25.3.4.1.jar:/opt/trikeshed/lib/llvm-api-25.3.4.1.jar:/opt/trikeshed/lib/truffle-api-25.3.4.1.jar:/opt/trikeshed/lib/polyglot-25.3.4.1.jar:/opt/trikeshed/lib/annotations-23.0.0.jar:/opt/trikeshed/lib/jniutils-25.3.4.1.jar:/opt/trikeshed/lib/collections-25.3.4.1.jar:/opt/trikeshed/lib/nativeimage-25.3.4.1.jar:/opt/trikeshed/lib/word-25.3.4.1.jar:/opt/trikeshed/lib/antlr4-25.3.4.1.jar:/opt/trikeshed/lib/truffle-compiler-25.3.4.1.jar",
+  "nativeEncoding": "UTF-8",
+  "workspaceVisible": false,
+  "gradleCacheVisible": false,
+  "modulesVisible": true,
+  "assetsVisible": true,
+  "processors": 2,
+  "maxHeap": 805306368,
+  "processCpuNanos": 6760000000,
+  "uptimeMs": 3018
+}

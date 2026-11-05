@@ -1,0 +1,22 @@
+diff --git a/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt b/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt
+index f84eb0ef72065c8600733e12fe2ca0c5b642c19a..1ed814cbf6c34832060c937c8260c57fd5764e09 100644
+--- a/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt
++++ b/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt
+@@ -137,6 +137,17 @@ class NativeHornQueryViewTest {
+         assertFails { NativeHornQueryView.answer(report, withRows(_l[answers[0], answers[0]]), starter) }
+         val bad = answers[0] + _m["source" j (map(answers[0]["source"]) + _m["type" j "literal"])]
+         assertFails { NativeHornQueryView.answer(report, withRows(_l[bad, answers[1]]), starter) }
++        val extraRowField = answers[0] + _m["unexpected" j _m["type" j "literal", "value" j "preserve-and-refuse"]]
++        val extraTermField = answers[0] + _m["source" j (map(answers[0]["source"]) + _m["unexpected" j "preserve-and-refuse"])]
++        val nonStringValue = answers[0] + _m["ordinal" j (map(answers[0]["ordinal"]) + _m["value" j 0])]
++        for (changed in s_[extraRowField, extraTermField, nonStringValue].view)
++            assertFails { NativeHornQueryView.answer(report, withRows(_l[changed, answers[1]]), starter) }
++        val sourceJson = jsonOf(answers[0]["source"])
++        val duplicateTerm = reifyMap(sourceJson.dropLast(1) + ",\"value\":" + jsonOf(map(answers[0]["source"])["value"]) + "}")
++        val rowJson = jsonOf(answers[0])
++        val duplicateRow = reifyMap(rowJson.dropLast(1) + ",\"source\":" + sourceJson + "}")
++        for (changed in s_[answers[0] + _m["source" j duplicateTerm], duplicateRow].view)
++            assertFails { NativeHornQueryView.answer(report, withRows(_l[changed, answers[1]]), starter) }
+         assertFails { NativeHornQueryView.answer(report, response + _m["synthetic" j false], starter) }
+         val checked = map(report["checkedProof"]); val steps = rows(checked["steps"])
+         for (badSteps in s_[steps.drop(1), steps + steps[0], steps.dropLast(1) + (steps.last() + _m["path" j _l[7]])].view)
