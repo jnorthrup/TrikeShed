@@ -1,0 +1,111 @@
+{
+  "scope": "Production project miner, retained document source, bounded passages, LLVM scanner and native geometry selection; local transport fixture",
+  "cases": {
+    "nativeBoundaryPause": {
+      "result": "PASS",
+      "before": "selection",
+      "wire": 2,
+      "positions": [
+        [
+          "838.0020751953125",
+          "168.76455688476562"
+        ],
+        [
+          "847.0172119140625",
+          "164.9643096923828"
+        ]
+      ],
+      "caption": "OBSERVED TRANSFERS\nObserved execution · delayed display · 3b52066f-3a4e-4218-9f8d-52da06851b8d 3 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:a1e86da92b67ea3aaef61052e26c9204b2f6cc2a599dfcbb2bb8ae7eb28b086f\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:3f260a0a6d6253034b55539361d06be059f8dfcebfe55c332205ada4cd456656\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:c550d345f722d77f0de7223a01ba7976ecf402ea4044986f725608d1af6f57d0\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":0.8}},\"inputs\":{},\"debugToken\":\"6914f843-02d9-4c66-a358-27ef74a541b3\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"6914f843-02d9-4c66-a358-27ef74a541b3\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"3b52066f-3a4e-4218-9f8d-52da06851b8d\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"6914f843-02d9-4c66-a358-27ef74a541b3\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"3b52066f-3a4e-4218-9f8d-52da06851b8d\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"6914f843-02d9-4c66-a358-27ef74a541b3\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"3b52066f-3a4e-4218-9f8d-52da06851b8d\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"6914f843-02d9-4c66-a358-27ef74a541b3\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"3b52066f-3a4e-4218-9f8d-52da06851b8d\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"6914f843-02d9-4c66-a358-27ef74a541b3\",\"ordinal\":5,\"action\":\"continue\",\"runId\":\"3b52066f-3a4e-4218-9f8d-52da06851b8d\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:a1e86da92b67ea3aaef61052e26c9204b2f6cc2a599dfcbb2bb8ae7eb28b086f\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:3f260a0a6d6253034b55539361d06be059f8dfcebfe55c332205ada4cd456656\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:c550d345f722d77f0de7223a01ba7976ecf402ea4044986f725608d1af6f57d0\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":0.8}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    }
+  ],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "a563297d16136ec39e8782135373599f015110f1cb9721125adabdf818de4f8c",
+    "bytes": 1804732
+  },
+  "run": {
+    "runId": "3b52066f-3a4e-4218-9f8d-52da06851b8d",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:781ff7e6ce7b02c32feee5d647e325b1040eea4324577256d0bee284e66e183b",
+    "inputs": {},
+    "status": "failed",
+    "queuedAtMs": 1793837232901,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "6914f843-02d9-4c66-a358-27ef74a541b3",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/3b52066f-3a4e-4218-9f8d-52da06851b8d",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/3b52066f-3a4e-4218-9f8d-52da06851b8d",
+    "sequence": 3,
+    "timelineRevision": 3,
+    "receiptCid": "sha256:5790fe738cf0d34f90765f6f292d4f5110dccbe89489f18d51b7348d3d16b3ec",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:781ff7e6ce7b02c32feee5d647e325b1040eea4324577256d0bee284e66e183b",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:781ff7e6ce7b02c32feee5d647e325b1040eea4324577256d0bee284e66e183b",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793837233204,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:fb830c14aa2ce1c60a6983c87fab6f1f13d0f0e66d15c1158d0aeab663302c62",
+    "ok": false,
+    "phase": "execution",
+    "error": "confix.pickPath: json input or param required",
+    "finishedAtMs": 1793837235602,
+    "invocationsCid": "sha256:6a99774e78f15be7f508c58eab11ea235711310183da1f856b0610da4555ea45",
+    "oroborosCid": "sha256:b9c6711737829756d5b7acef65491c63e214376a2eaf0fe6678298a288811d52",
+    "invocationsAttempted": 5,
+    "invocationsDropped": 0
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n+ actual - expected\n\n+ 'failed'\n- 'completed'\n\n    at /workspace/airgap-r3b-proof/driver.cjs:53:65"
+}

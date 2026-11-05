@@ -1,0 +1,73 @@
+driver 1 fixture 0
+page.waitForFunction: Timeout 60000ms exceeded.
+    at pause (/workspace/airgap-r3b-proof/driver.cjs:27:29)
+    at /workspace/airgap-r3b-proof/driver.cjs:46:80 {
+  log: [],
+  name: 'TimeoutError'
+}
+
+frame complete proto=Http bytes=529 seq-alloc
+[BIND] conn=5 frame complete proto=Http bytes=536 seq-alloc
+[BIND] conn=8 accept ok=true
+[BIND] conn=7 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=5 accept ok=true
+[BIND] conn=6 frame complete proto=Http bytes=528 seq-alloc
+[BIND] conn=6 accept ok=true
+[BIND] conn=4 frame complete proto=Http bytes=531 seq-alloc
+[BIND] conn=7 accept ok=true
+[BIND] conn=4 accept ok=true
+[BIND] accepted conn=9
+[BIND] conn=9 frame complete proto=Http bytes=512 seq-alloc
+[BIND] conn=9 accept ok=true
+[BIND] accepted conn=10
+[BIND] conn=10 frame complete proto=Http bytes=567 seq-alloc
+[BIND] conn=10 accept ok=true
+[BIND] accepted conn=11
+[BIND] conn=11 frame complete proto=Http bytes=569 seq-alloc
+[BIND] conn=11 accept ok=true
+[BIND] accepted conn=12
+[BIND] conn=12 frame complete proto=Http bytes=513 seq-alloc
+[BIND] conn=12 accept ok=true
+[BIND] accepted conn=13
+[BIND] conn=13 frame complete proto=Http bytes=512 seq-alloc
+[BIND] conn=13 accept ok=true
+[BIND] accepted conn=14
+[BIND] conn=14 frame complete proto=Http bytes=504 seq-alloc
+[BIND] conn=14 accept ok=true
+[BIND] accepted conn=15
+[BIND] conn=15 frame complete proto=Http bytes=2709 seq-alloc
+[BIND] conn=15 accept ok=true
+[BIND] accepted conn=16
+[BIND] conn=16 frame complete proto=Http bytes=555 seq-alloc
+[BIND] conn=16 accept ok=true
+[BIND] accepted conn=17
+[BIND] conn=17 frame complete proto=Http bytes=555 seq-alloc
+[BIND] conn=17 accept ok=true
+[BIND] accepted conn=18
+[BIND] conn=18 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=18 accept ok=true
+[BIND] accepted conn=19
+[BIND] conn=19 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=19 accept ok=true
+[BIND] accepted conn=20
+[BIND] conn=20 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=20 accept ok=true
+[BIND] accepted conn=21
+[BIND] conn=21 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=21 accept ok=true
+[BIND] accepted conn=22
+[BIND] conn=22 frame complete proto=Http bytes=672 seq-alloc
+[BIND] conn=22 accept ok=true
+[BIND] accepted conn=23
+[BIND] conn=23 frame complete proto=Http bytes=596 seq-alloc
+[BIND] conn=23 accept ok=true
+[BIND] accepted conn=24
+[BIND] conn=24 frame complete proto=Http bytes=2861 seq-alloc
+[BIND] conn=24 accept ok=true
+[BIND] accepted conn=25
+[BIND] conn=25 frame complete proto=Http bytes=672 seq-alloc
+[BIND] conn=25 accept ok=true
+[BIND] accepted conn=26
+[BIND] conn=26 frame complete proto=Http bytes=202 seq-alloc
+[BIND] conn=26 accept ok=true
+

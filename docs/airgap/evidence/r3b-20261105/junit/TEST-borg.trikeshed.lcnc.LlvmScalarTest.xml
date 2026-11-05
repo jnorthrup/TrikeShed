@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LlvmScalarTest[jvm]" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-05T00:28:57.892Z" hostname="0d6dfba25614" time="0.266">
+  <properties/>
+  <testcase name="nativeDeniedControlStillRefusesLlvm()[jvm]" classname="borg.trikeshed.lcnc.LlvmScalarTest" time="0.049"/>
+  <testcase name="cancelledCallerJoinsItsAdmittedEffectBeforeSnapshot()[jvm]" classname="borg.trikeshed.lcnc.LlvmScalarTest" time="0.032"/>
+  <testcase name="drainSettlesAcceptedQueueBeforeClosingContext()[jvm]" classname="borg.trikeshed.lcnc.LlvmScalarTest" time="0.057"/>
+  <testcase name="runnerRejectsAuthorityAndNonI32InputsThenRecovers()[jvm]" classname="borg.trikeshed.lcnc.LlvmScalarTest" time="0.026"/>
+  <testcase name="invalidModuleOpenReleasesSeatForRetry()[jvm]" classname="borg.trikeshed.lcnc.LlvmScalarTest" time="0.074"/>
+  <testcase name="profileIsStrictOperatorConfiguration()[jvm]" classname="borg.trikeshed.lcnc.LlvmScalarTest" time="0.001"/>
+  <testcase name="verifiedBinaryExecutesAndCopiesHostScalars()[jvm]" classname="borg.trikeshed.lcnc.LlvmScalarTest" time="0.022"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

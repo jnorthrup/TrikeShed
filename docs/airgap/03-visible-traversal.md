@@ -1,11 +1,12 @@
 # R3: visible document traversal — implementation handoff
 
-Status: R3 remains open. [R3a](04-observed-transfers.md) implements selected-wire
+Status: [R3b](05-document-traversal.md) verifies the bounded real-PDF passage
+path. Dense recursive visualization remains open. [R3a](04-observed-transfers.md) implements selected-wire
 observations, bounded browser motion, recorded native inspection and explicit
 receipt playback. This handoff was written against R2 source
 `f91da5d6e2765debe3c85c0b2bcd081b5e7c90ea`; descriptions below of the
 then-current renderer and proposed schema are historical design context. Use
-R3a's implemented contract and evidence for current behavior.
+R3a's observation contract and R3b's document contract/evidence for current behavior.
 The [visualization blueprint](../lcnc/airgap-demonstrator/07-visualization.md)
 owns the wider design. This handoff identifies concrete seams after R2.
 

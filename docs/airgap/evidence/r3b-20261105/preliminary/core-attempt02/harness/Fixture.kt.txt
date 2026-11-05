@@ -1,0 +1,146 @@
+package proof.airgap
+
+import borg.trikeshed.couch.*
+import borg.trikeshed.forge.server.*
+import borg.trikeshed.collections.associative.*
+import borg.trikeshed.memory.*
+import borg.trikeshed.dag.*
+import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.job.*
+import borg.trikeshed.kernel.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.litebike.*
+import borg.trikeshed.module.*
+import borg.trikeshed.kanban.module.KanbanModule
+import borg.trikeshed.parse.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import kotlinx.coroutines.*
+import java.io.File
+
+/** Local fixture transport is the production userspace HTTP listener; every graph/LLVM call is production code. */
+fun main(args: Array<String>) = runBlocking {
+    val root = File(args[0]).apply { mkdirs() }; val repo = File(args[1]); val port = args[2].toInt()
+    val runtime = File(root, "runtime").apply { mkdirs() }
+    val files = JvmFileOperations(); val cas = FileCasStore(files, File(runtime, "cas").absolutePath)
+    val store = CouchStoreFactory.casBacked(cas); val routes = ModuleRouteRegistry()
+    val owners = mutableListOf<CompletableJob>()
+    fun context(): ModuleContext {
+        val owner = SupervisorJob(coroutineContext[Job]); owners.add(owner)
+        return ModuleContext(Couch("airgap-visible", store, cas), ReteNetwork(), ReteProductionRegistry(),
+            null, null, ConfixBlackboard.empty(), cas, CouchAttachmentGateway(store, cas), routes,
+            CoroutineScope(Dispatchers.IO + owner + files), { System.currentTimeMillis() }, runtime)
+    }
+    var ctx = context(); var kernel: KernelElement? = null; var handle: ModuleHandle? = null
+    val registry = ProjectDbRegistry("primary")
+    val gateway = CouchAttachmentGateway(store, cas)
+    val scopes = ProjectScopes(files, gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, store))),
+        cas, null, projectDbs = registry, ledgerFile = File(runtime, "projects.tsv"), filesRoot = File(runtime, "files"))
+    val miner = ProjectMiner(registry, scopes, cas, null, filesRoot = File(runtime, "files"))
+    val corpus = JvmProjectCorpus(registry, scopes, miner)
+    val project = scopes.beginUpload("coinbase-suski").name
+    val id = "coinbase-suski.pdf"
+    val original = File("/workspace/airgap-r3b-source/coinbase-suski.pdf").readBytes()
+    check(ContentId.of(original).hex == "591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f")
+    scopes.uploadPut(project, id, original)
+    scopes.uploadPut(project, id + ProjectNodes.NOTES_SUFFIX,
+        "url: https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\nretrieved: 2026-11-04T23:32:18Z\n".encodeToByteArray())
+    val ingestion = miner.ingest(project, id)
+    check(ingestion["verdict"] == "ingested") { ingestion }
+    val doc = checkNotNull(corpus.document(project, id))
+    val extracted = checkNotNull(corpus.extract(project, id, Int.MAX_VALUE / 4))
+    val passageAnchor = checkNotNull(extracted.anchors.firstOrNull { it.page == 10 && extracted.text.substring(it.begin, it.end).contains("court") }) { "Physical page 10 missing" }
+    val sourceDirectory = File(root, "source").apply { mkdirs() }
+    val documents = s_[id, id + ProjectNodes.EXTRACT_SUFFIX, id + ProjectNodes.EXTRACTION_SUFFIX,
+        id + ProjectNodes.EXTRACT_ORIGIN_SUFFIX, id + ProjectNodes.NOTES_SUFFIX, id + ProjectNodes.FOOTNOTES_SUFFIX].view
+        .map { checkNotNull(corpus.document(project, it)) }
+    for (entry in documents) {
+        val bytes = checkNotNull(corpus.bytes(project, entry.id))
+        check(ContentId.of(bytes).value == entry.cid)
+        File(sourceDirectory, entry.id).writeBytes(bytes)
+    }
+    File(root, "ingestion.json").writeText(jsonOf(_m["ingestion" j ingestion, "document" j doc.toMap(),
+        "documents" j documents.map(ProjectDoc::toMap), "extractedChars" j extracted.text.length,
+        "anchors" j extracted.anchors.size, "physicalPages" j extracted.anchors.mapNotNull { it.page }.distinct(),
+        "passageOffset" j passageAnchor.begin, "passageAnchor" j passageAnchor.toMap()]))
+    val sourceReference = DocumentCurationLegos.source(cas, corpus).execute(
+        LcncNode("admission", "document.source", _m["view" j "reference"]), _m["doc" j doc.toMap()])["source"]
+    ctx.lcncRunners[DocumentCurationLegos.SOURCE] = DocumentCurationLegos.source(cas, corpus)
+    ctx.lcncRunners[DocumentSpans.TYPE] = DocumentSpans.runner(cas, corpus)
+    fun profile(file: String, abi: String, more: Map<String, Any?>): String {
+        val module = File(repo, "src/jvmTest/resources/sulong/$file")
+        val path = File(runtime, "$file.json")
+        path.writeText(jsonOf(_m["module" j module.absolutePath, "sha256" j ContentId.of(module.readBytes()).hex,
+            "abi" j abi] + more)); return path.absolutePath
+    }
+    profile("add-mlir.bc", LlvmScalarProfile.ABI, _m["export" j "add"])
+    profile("confix.bc", LlvmConfixProfile.ABI, _m["maxInputBytes" j 65536, "maxRows" j 16384])
+    val cleanups = mutableListOf<suspend () -> Unit>()
+    kernel = checkNotNull(OroborosLcncWiring.vmLegos(ctx) { cleanups.add(it) })
+    check(LlvmScalarContract.TYPE in ctx.lcncRunners && LlvmConfixContract.TYPE in ctx.lcncRunners)
+    handle = KanbanModule().open(ctx)
+    val finish = CompletableDeferred<Unit>()
+    var reopened = false
+    suspend fun closeModule() {
+        routes.release("kanban")
+        try { handle?.drain(); handle?.close(); handle = null }
+        finally { while (cleanups.isNotEmpty()) cleanups.removeAt(cleanups.lastIndex).invoke(); kernel = null; owners.last().cancelAndJoin() }
+    }
+    fun report(): Map<String, Any?> {
+        val rows = ctx.blackboard.snapshot().values.filterKeys { it.startsWith("lcnc/run/") }
+        return _m["reopened" j reopened, "llvmInstalled" j (LlvmConfixContract.TYPE in ctx.lcncRunners), "runs" j rows, "document" j doc.toMap(), "passageOffset" j passageAnchor.begin, "sourceReference" j sourceReference]
+    }
+    fun exportArtifacts(stateName: String) {
+                File(root, stateName).writeText(jsonOf(report()))
+                val exported = File(root, "cas").apply { mkdirs() }
+                for (row in (report()["runs"] as Map<*, *>).values) {
+                    val receipt = row as? Map<*, *> ?: continue
+                    for (key in s_["programCid", "receiptCid", "invocationsCid", "oroborosCid", "rootStateCid"].view) {
+                        val cid = (receipt[key] as? String)?.let(::ContentId) ?: continue
+                        val bytes = checkNotNull(cas.get(cid)); check(ContentId.of(bytes) == cid)
+                        File(exported, cid.hex + if (key == "rootStateCid") ".cbor" else ".json").writeBytes(bytes)
+                    }
+                    for (output in (receipt["outputs"] as? Map<*, *>)?.values.orEmpty()) {
+                        val value = output as? Map<*, *> ?: continue
+                        for (key in s_["sourceCid", "batchCid", "retainedCid"].view) {
+                            val cid = (value[key] as? String)?.let(::ContentId) ?: continue
+                            val bytes = checkNotNull(cas.get(cid)); check(ContentId.of(bytes) == cid)
+                            File(exported, cid.hex + ".source").writeBytes(bytes)
+                        }
+                        val source = value["source"] as? Map<*, *> ?: continue
+                        val cid = (source["sourceCid"] as? String)?.let(::ContentId) ?: continue
+                        val bytes = checkNotNull(cas.get(cid)); check(ContentId.of(bytes) == cid)
+                        File(exported, cid.hex + ".cbor").writeBytes(bytes)
+                    }
+                }
+    }
+    val proof: ExtraRoute = { method, path, body, _ ->
+        when {
+            path == "/__proof/state" && method == "GET" -> JvmKanbanServer.HttpResponse(200, jsonOf(report()))
+            path == "/__proof/reopen" && method == "POST" -> {
+                check(!reopened); exportArtifacts("state-before-reopen.json"); closeModule(); ctx = context(); handle = KanbanModule().open(ctx); reopened = true
+                JvmKanbanServer.HttpResponse(200, jsonOf(report()))
+            }
+            path == "/__proof/finish" && method == "POST" -> {
+                exportArtifacts("state.json")
+                finish.complete(Unit); JvmKanbanServer.HttpResponse(200, "{\"finished\":true}")
+            }
+            path.startsWith("/api/v0/block/get?") && method == "GET" -> {
+                val reply = checkNotNull(CouchWireRouter(ctx.couch, "").handle(method, path, body.encodeToByteArray()))
+                JvmKanbanServer.HttpResponse(reply.status, "", reply.contentType, reply.bytes)
+            }
+            else -> null
+        }
+    }
+    val server = JvmKanbanServer(extraRoutes = _l[proof], stateDir = File(runtime, "host").apply { mkdirs() }, moduleRoutes = routes)
+    val listener = launch(Dispatchers.IO) { server.run(port, null) }
+    try { finish.await() }
+    finally {
+        withContext(NonCancellable) {
+            listener.cancelAndJoin(); closeModule(); scopes.drain()
+            File(root, "cleanup.json").writeText(jsonOf(_m["moduleOwnersCompleted" j owners.all { it.isCompleted },
+                "nativeRootDrained" j (kernel == null), "listenerJoined" j listener.isCompleted, "reopened" j reopened]))
+        }
+    }
+}

@@ -44,7 +44,7 @@ object DocumentCurationLegos {
     const val SOURCE = "document.source"
 
     /** Resolve one source through the existing project owner or retain explicitly attributed text. */
-    fun source(cas: CasStore, corpus: ProjectCorpus): LcncNodeRunner = boundLcnc(CasStoreKey(cas), boundLcnc(ProjectCorpusKey(corpus)) { owner, _, inputs ->
+    fun source(cas: CasStore, corpus: ProjectCorpus): LcncNodeRunner = boundLcnc(CasStoreKey(cas), boundLcnc(ProjectCorpusKey(corpus)) { owner, node, inputs ->
         val cas = CasStoreKey.require()
         val doc = inputs["doc"] ?: inputs["doc?"]
         val input = inputs["source"] ?: inputs["source?"]
@@ -52,10 +52,14 @@ object DocumentCurationLegos {
         val retained = if (doc != null) projectSource(cas, owner.value,
             requireNotNull((doc as? Map<*, *>)?.let(ProjectDoc::fromMap)) { "$SOURCE.doc must be a ProjectDoc" })
         else retainSource(cas, input).also { require(current(owner.value, it)) { "Source revision is no longer current" } }
+        consumed(retained)
         val reference = DocumentCuratorCodec.source(retained)
         val cid = cas.put(CanonicalCbor.encodeMap(reference - "text"))
         cas.sync()
-        mapOf("source" to (reference + ("sourceCid" to cid.value)))
+        val shown = if (node.params["view"] == "reference") reference.filterKeys {
+            it in _s["originalCid", "extractedTextCid", "name", "mediaType", "category", "project", "extraction"]
+        } else reference
+        _m["source" j (shown + _m["sourceCid" j cid.value])]
     })
 
     /** A ProjectDoc is a binary identity, never an alias for its extracted text. */
@@ -86,11 +90,15 @@ object DocumentCurationLegos {
         check(cas.put(bytes) == source.originalCid)
         check(cas.put(extracted.text.encodeToByteArray()) == source.extractedTextCid)
         cas.sync()
-        currentCoroutineContext()[LcncConsumedLedger]?.apply {
-            consumed(LcncConsumedLedger.PROJECT, "${original.project}/${original.id}", original.cid, original.seq, original.rev)
-            consumed(LcncConsumedLedger.PROJECT, "${extracted.project}/${extracted.id}", extracted.cid, extracted.seq, extracted.rev)
-        }
+        consumed(source)
         return retainSource(cas, source)
+    }
+
+    /** References consume the same pinned project revisions as a fresh ProjectDoc read. */
+    suspend fun consumed(source: DocumentSource) {
+        val ledger = currentCoroutineContext()[LcncConsumedLedger] ?: return
+        for (revision in s_[source.project, source.extraction].view) if (revision != null)
+            ledger.consumed(LcncConsumedLedger.PROJECT, "${revision.project}/${revision.id}", revision.cid, revision.seq, revision.rev)
     }
 
     /** Read-only: review checks must never mine, repair, or silently replace a source revision. */
@@ -392,7 +400,31 @@ object DocumentCurationLegos {
     /** Retain new text or resolve an exact retained source before entering the existing curator. */
     fun retainSource(cas: CasStore, value: Any?): DocumentSource {
         val retained = if (value is DocumentSource) value else {
-            val fields = requireNotNull(value as? Map<*, *>) { "$CURATE.source must be an object" }
+            val supplied = requireNotNull(value as? Map<*, *>) { "$CURATE.source must be an object" }
+            val fields = if (supplied["sourceCid"] == null) supplied else {
+                val cid = ContentId(requireNotNull(supplied["sourceCid"] as? String) { "Source manifest CID must be text" })
+                val bytes = requireNotNull(cas.get(cid)) { "Source manifest is unavailable" }
+                require(ContentId.of(bytes) == cid) { "Source manifest content identity mismatch" }
+                val manifest = CanonicalCbor.decodeMapBounded(bytes, 4 * 1024 * 1024, maxDepth = 24, maxItems = 262144)
+                val claimed = buildMap<String, Any?> {
+                    for ((key, value) in supplied) if (key != "sourceCid" && key != "text")
+                        put(requireNotNull(key as? String), value)
+                }
+                // JSON transports exact small integers as Double; that is not a source revision change.
+                // Keep the manifest's actual bytes/CID and reject fractional or inexact substitutions.
+                fun numeric(value: Any?): Any? = when (value) {
+                    is Map<*, *> -> value.mapValues { numeric(it.value) }
+                    is List<*> -> value.map(::numeric)
+                    is Double -> if (value.isFinite() && value % 1.0 == 0.0 &&
+                        value >= -9_007_199_254_740_991.0 && value <= 9_007_199_254_740_991.0) value.toLong() else value
+                    else -> value
+                }
+                require(claimed.keys.all { it in manifest } && CanonicalCbor.encodeMap(claimed.mapValues { numeric(it.value) }).contentEquals(
+                    CanonicalCbor.encodeMap(manifest.filterKeys { it in claimed }.mapValues { numeric(it.value) }))) {
+                    "Source reference differs from retained manifest"
+                }
+                if ("text" in supplied) manifest + _m["text" j supplied["text"]] else manifest
+            }
             require(fields["base64"] == null) { "File bytes require the document extraction feed" }
             val name = sourceName(fields)
             val original = fields["originalCid"]

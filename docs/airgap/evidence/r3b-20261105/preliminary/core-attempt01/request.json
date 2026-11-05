@@ -1,0 +1,129 @@
+{
+  "name": "airgap-coinbase-suski-core",
+  "document": {
+    "nodes": [
+      {
+        "id": "document",
+        "type": "json.value",
+        "params": {
+          "value": "{\"project\": \"coinbase-suski\", \"id\": \"coinbase-suski.pdf\", \"cid\": \"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\": \"1-sha256:c65416ee1b0cac72e69aa614dc8f2fd0d131dc7f92ac887e10ea563b23925127\", \"seq\": 0, \"length\": 111243, \"contentType\": \"application/pdf\"}"
+        }
+      },
+      {
+        "id": "source",
+        "type": "document.source",
+        "params": {
+          "view": "reference"
+        }
+      },
+      {
+        "id": "passages",
+        "type": "document.spans",
+        "params": {
+          "offset": "18194",
+          "count": "1",
+          "spanChars": "200",
+          "maxBytes": "8192"
+        }
+      },
+      {
+        "id": "scan",
+        "type": "vm.llvm.confix",
+        "params": {
+          "format": "JSON"
+        }
+      },
+      {
+        "id": "selection",
+        "type": "confix.pickPath",
+        "params": {
+          "path": "spans.0.quotation",
+          "geometry": "native"
+        }
+      }
+    ],
+    "wires": [
+      {
+        "from": [
+          "document",
+          "value"
+        ],
+        "to": [
+          "source",
+          "doc?"
+        ]
+      },
+      {
+        "from": [
+          "source",
+          "source"
+        ],
+        "to": [
+          "passages",
+          "source"
+        ]
+      },
+      {
+        "from": [
+          "passages",
+          "data"
+        ],
+        "to": [
+          "scan",
+          "data?"
+        ]
+      },
+      {
+        "from": [
+          "passages",
+          "data"
+        ],
+        "to": [
+          "selection",
+          "data?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "rows"
+        ],
+        "to": [
+          "selection",
+          "rows?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "sourceCid"
+        ],
+        "to": [
+          "selection",
+          "sourceCid?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "ok"
+        ],
+        "to": [
+          "selection",
+          "ok?"
+        ]
+      },
+      {
+        "from": [
+          "scan",
+          "format"
+        ],
+        "to": [
+          "selection",
+          "format?"
+        ]
+      }
+    ],
+    "seq": 1
+  }
+}

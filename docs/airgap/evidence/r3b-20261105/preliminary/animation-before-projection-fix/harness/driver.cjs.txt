@@ -1,0 +1,112 @@
+const { chromium } = require('playwright');
+const fs = require('fs'); const path = require('path'); const crypto = require('crypto'); const assert = require('assert/strict');
+const root = process.argv[2], base = process.argv[3]; fs.mkdirSync(root,{recursive:true});
+const graph={nodes:[
+ {id:'source',type:'vm.llvm.confix',x:30,y:60,params:{format:'JSON',data:'{"agreement":"Coinbase","revision":42,"active":true}'}},
+ {id:'summary',type:'vm.llvm.scalar',x:430,y:60,params:{left:'0',right:'100'}},
+ {id:'confirm',type:'vm.llvm.scalar',x:830,y:60,params:{left:'0',right:'1'}}],
+ wires:[{from:['source','rowCount'],to:['summary','left?']},{from:['summary','value'],to:['confirm','left?']}],seq:1,view:{x:245,y:20,z:1}};
+const report={scope:'Actual production Panels bundle, module routes and LLVM runtimes; synthetic JSON transport fixture',cases:{},requests:[],errors:[],responses:[]};
+function save(){fs.writeFileSync(path.join(root,'browser.json'),JSON.stringify(report,null,2));}
+(async()=>{
+ const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ report.browser=browser.version();const context=await browser.newContext({viewport:{width:1600,height:1100},recordVideo:{dir:path.join(root,'videos'),size:{width:1600,height:1100}}});
+ await context.addInitScript(value=>localStorage.setItem('trikeshed.panels.v3',JSON.stringify(value)),graph);
+ let page=await context.newPage();
+ page.on('pageerror',e=>report.errors.push(String(e)));
+ context.on('request',r=>{if(r.method()==='POST')report.requests.push({url:r.url(),method:r.method(),body:r.postData()});});
+ context.on('response',async r=>{if(r.url().endsWith('/kotlin/spacegraph/spacegraph.js')){const b=await r.body();report.bundle={sha256:crypto.createHash('sha256').update(b).digest('hex'),bytes:b.length};save();}});
+ const postRuns=()=>report.requests.filter(r=>new URL(r.url).pathname==='/api/lcnc/run').length;
+ const paused=async id=>page.waitForFunction(id=>document.querySelector('[data-debug-state]')?.textContent.includes('Paused before '+id),id,{timeout:60000});
+ const step=async()=>page.getByRole('button',{name:'Step into next node',exact:true}).click();
+ async function evidence(){
+  let drawer=page.getByRole('region',{name:'Workspace facets'});
+  if(!await drawer.count()){await page.locator('#facetsBtn').click();drawer=page.getByRole('region',{name:'Workspace facets'});await drawer.getByRole('button',{name:'Evidence',exact:true}).click();}
+  await drawer.getByRole('textbox',{name:'Run receipt content ID'}).waitFor();
+  const summary=drawer.locator('summary').filter({hasText:/^Node invocations ·/}).first();await summary.waitFor();
+  if(!await summary.evaluate(el=>el.parentElement.open))await summary.click();
+  await drawer.getByRole('button',{name:'Replay recorded wire activity',exact:true}).waitFor();return drawer;
+ }
+ try{
+  await page.goto(base+'/panels',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>document.querySelectorAll('.node').length===3,{timeout:60000});
+  await page.locator('#panelName').fill('airgap-visible-confix');
+  assert.equal(postRuns(),0,'Opening the construction must not execute LLVM');
+  const completed=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/lcnc/run'&&r.request().method()==='POST',{timeout:120000});
+  await page.locator('#debugBtn').click();await paused('source');await step();await paused('summary');await step();await paused('confirm');
+  await page.waitForSelector('[data-observed-wire="0"]',{timeout:10000});
+  const first=await page.locator('[data-observed-wire="0"]').evaluate(el=>({x:el.getAttribute('cx'),y:el.getAttribute('cy'),count:el.getAttribute('data-observed-count')}));
+  await page.waitForTimeout(100);
+  const second=await page.locator('[data-observed-wire="0"]').evaluate(el=>({x:el.getAttribute('cx'),y:el.getAttribute('cy')}));
+  assert(Number(first.x)!==Number(second.x)||Number(first.y)!==Number(second.y),'Measured transfer marker must move');
+  report.cases.liveTransfer={result:'PASS',first,second,caption:await page.getByRole('region',{name:'Observed wire activity'}).innerText()};
+  await page.screenshot({path:path.join(root,'live-consumed-wire.png'),fullPage:true});save();
+  await page.getByRole('button',{name:'Continue run',exact:true}).click();
+  const run=await (await completed).json();report.responses.push(run);assert.equal(run.status,'completed');assert.equal(run.outputs.source.rowCount,7);assert.equal(run.outputs.confirm.value,108);assert.equal(run.outputs.source.runtime.liveBytesAfter,0);
+  const ledger=await (await context.request.get(base+'/api/lcnc/content?cid='+encodeURIComponent(run.invocationsCid))).json();
+  assert.equal(ledger.observationSchema,'lcnc-observations/1');const transfers=ledger.observations.filter(e=>e.phase==='consumed');assert.equal(transfers.length,2);assert.deepEqual(transfers.map(e=>e.wire.index),[0,1]);assert(transfers.every(e=>e.documentCid===run.programCid));
+  report.cases.durableTransfers={result:'PASS',runId:run.runId,programCid:run.programCid,transfers,summary:ledger.observationSummary};
+  await page.getByRole('button',{name:'Close debugger',exact:true}).click();
+  let drawer=await evidence();
+  await drawer.locator('summary').filter({hasText:/#[0-9]+ · source/}).click();
+  await drawer.getByText('Recorded LLVM observation · confix.flat/1',{exact:true}).waitFor();
+  const rendered=await drawer.innerText();assert(rendered.includes('after release 0 bytes'));assert(!rendered.includes('Guest observation · undefined'));
+  report.cases.nativeInspection={result:'PASS',text:rendered};await page.screenshot({path:path.join(root,'native-invocation-inspection.png'),fullPage:true});
+  const before=postRuns();await drawer.getByRole('button',{name:'Replay recorded wire activity',exact:true}).click();
+  await page.waitForSelector('[data-observed-wire]');assert.equal(postRuns(),before);report.cases.replay={result:'PASS',postRuns:before,caption:await page.getByRole('region',{name:'Observed wire activity'}).innerText()};
+  await page.screenshot({path:path.join(root,'recorded-wire-playback.png'),fullPage:true});
+  await page.emulateMedia({reducedMotion:'reduce'});await page.waitForTimeout(1400);
+  await drawer.getByRole('button',{name:'Replay recorded wire activity',exact:true}).click();await page.waitForSelector('[data-observed-wire="0"]');
+  await page.getByRole('combobox',{name:'Activity display speed'}).selectOption('0.25');
+  const staticA=await page.locator('[data-observed-wire="0"]').evaluate(e=>[e.getAttribute('cx'),e.getAttribute('cy')]);await page.waitForTimeout(100);
+  const staticB=await page.locator('[data-observed-wire="0"]').evaluate(e=>[e.getAttribute('cx'),e.getAttribute('cy')]);assert.deepEqual(staticA,staticB);assert.equal(postRuns(),before);report.cases.reducedMotion={result:'PASS',position:staticA};
+  await drawer.getByRole('button',{name:'Close facets',exact:true}).click();
+  const cameraBefore=await page.locator('#world').evaluate(e=>e.style.transform);
+  await page.mouse.move(1500,300);await page.mouse.wheel(0,80);await page.waitForTimeout(100);
+  const cameraAfterZoom=await page.locator('#world').evaluate(e=>e.style.transform);assert.notEqual(cameraBefore,cameraAfterZoom);
+  await page.mouse.move(1500,300);await page.mouse.down();
+  const panStart=await page.locator('#world').evaluate(e=>e.style.transform.match(/-?[0-9.]+/g).map(Number));
+  await page.mouse.move(1460,320,{steps:5});
+  const panHeld=await page.locator('#world').evaluate(e=>e.style.transform.match(/-?[0-9.]+/g).map(Number));
+  assert(Math.abs((panHeld[4]-panStart[4])+40)<.5);assert(Math.abs((panHeld[5]-panStart[5])-20)<.5);
+  await page.mouse.up();await page.waitForTimeout(100);
+  const cameraAfterPan=await page.locator('#world').evaluate(e=>e.style.transform);assert.notEqual(cameraAfterZoom,cameraAfterPan);
+  const alignment=await page.evaluate(()=>{const dot=document.querySelector('[data-observed-wire="0"]'),path=document.querySelector('[data-wire-index="0"]'),p=path.getPointAtLength(path.getTotalLength()*.5);return {x:Number(dot.getAttribute('cx')),y:Number(dot.getAttribute('cy')),pathX:p.x,pathY:p.y};});
+  assert(Math.hypot(alignment.x-alignment.pathX,alignment.y-alignment.pathY)<1);assert.equal(postRuns(),before);
+  report.cases.camera={result:'PASS',cameraBefore,cameraAfterZoom,cameraAfterPan,panStart,panHeld,alignment,postRuns:postRuns()};
+  await page.screenshot({path:path.join(root,'camera-preserves-observed-wire.png'),fullPage:true});await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.locator('.node[data-id="source"] .hd').hover();await page.waitForFunction(()=>document.querySelector('#blip')?.textContent.includes('Recorded LLVM observation'));
+  const flyoverRows=await page.locator('#blip .row.g').evaluateAll(rows=>rows.filter(e=>!e.textContent.startsWith('source')).map(e=>({text:e.textContent,width:e.clientWidth,contentWidth:e.scrollWidth})));
+  assert(flyoverRows.some(r=>r.text==='After release 0 bytes'));assert(flyoverRows.every(r=>r.contentWidth<=r.width),'Native summary measurements must fit the callout');
+  report.cases.nativeFlyover={result:'PASS',text:await page.locator('#blip').innerText(),rows:flyoverRows};await page.screenshot({path:path.join(root,'native-flyover.png'),fullPage:true});assert.equal(postRuns(),before);
+  await page.mouse.move(1500,10);
+  drawer=await evidence();await drawer.getByRole('button',{name:'Replay recorded wire activity',exact:true}).click();await page.waitForSelector('[data-observed-wire]');
+  await drawer.getByRole('button',{name:'Close facets',exact:true}).click();
+  const right=page.locator('.node[data-id="summary"] .params label').filter({hasText:/^right$/}).locator('xpath=following-sibling::input[1]');await right.fill('200');
+  await page.waitForSelector('[aria-label="Observed wire activity"]',{state:'detached'});assert.equal(postRuns(),before);report.cases.editedDefinition={result:'PASS',staleActivityCleared:true};
+  await right.fill('100');
+  const stateBefore=await(await context.request.get(base+'/__proof/state')).json();assert.equal(Object.keys(stateBefore.runs).length,1);
+  report.liveVideo=path.basename(await page.video().path());await page.close();const reopened=await(await context.request.post(base+'/__proof/reopen')).json();assert.equal(reopened.reopened,true);assert.equal(reopened.llvmInstalled,false);
+  const again=await(await context.request.get(base+'/api/lcnc/content?cid='+encodeURIComponent(run.invocationsCid))).json();assert.deepEqual(again,ledger);report.cases.reopen={result:'PASS',nativeInstalled:false,identicalLedger:true};
+  page=await context.newPage();page.on('pageerror',e=>report.errors.push(String(e)));
+  await page.goto(base+'/panels',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelectorAll('.node').length===3);
+  await page.locator('#panelName').fill('airgap-visible-confix');
+  await page.locator('#facetsBtn').click();drawer=page.getByRole('region',{name:'Workspace facets'});await drawer.getByRole('button',{name:'Evidence',exact:true}).click();
+  async function inspectRetained(receipt){
+   await drawer.getByRole('textbox',{name:'Run receipt content ID'}).fill(receipt);
+   await drawer.getByRole('button',{name:'Inspect receipt',exact:true}).click();
+   const heading=drawer.locator('summary').filter({hasText:/^Node invocations ·/});await heading.waitFor();await heading.click();
+   const source=drawer.locator('summary').filter({hasText:/#[0-9]+ · source/});await source.waitFor();await source.click();
+   await drawer.getByText('Recorded LLVM observation · confix.flat/1',{exact:true}).waitFor();
+  }
+  await inspectRetained(run.receiptCid);assert.equal(postRuns(),before);
+  await drawer.getByRole('button',{name:'Replay recorded wire activity',exact:true}).click();await page.waitForSelector('[data-observed-wire]');assert.equal(postRuns(),before);
+  report.cases.reopenedBrowser={result:'PASS',postRuns:postRuns(),caption:await page.getByRole('region',{name:'Observed wire activity'}).innerText()};
+  await page.screenshot({path:path.join(root,'reopened-without-llvm.png'),fullPage:true});
+  const legacy=JSON.parse(fs.readFileSync(path.join(root,'legacy-response.json')));await inspectRetained(legacy.receiptCid);
+  assert.equal(await drawer.getByRole('button',{name:'Replay recorded wire activity',exact:true}).count(),0);assert.equal(postRuns(),before);
+  report.cases.legacyReceipt={result:'PASS',receiptCid:legacy.receiptCid,noFabricatedReplay:true,text:await drawer.innerText()};
+  report.reopenedVideo=path.basename(await page.video().path());assert.equal(report.errors.length,0);save();await context.request.post(base+'/__proof/finish').catch(()=>{});
+ }catch(error){report.failure=String(error.stack||error);save();await page.screenshot({path:path.join(root,'failure.png'),fullPage:true}).catch(()=>{});throw error;}
+ finally{await context.close();await browser.close();save();}
+})().catch(e=>{console.error(e);process.exitCode=1;});

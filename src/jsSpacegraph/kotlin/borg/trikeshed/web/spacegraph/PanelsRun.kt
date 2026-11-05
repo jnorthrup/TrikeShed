@@ -2,6 +2,7 @@ package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
 import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib._l
 import borg.trikeshed.web.patch.PatchKinds
 import kotlinx.browser.document
 import kotlinx.browser.localStorage
@@ -89,7 +90,7 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
                 }
                 var displayError = ""
                 try { if (current) {
-                    programOutputs(result, JSON.stringify(toConfix()))
+                    programOutputs(result, JSON.stringify(toConfix())) { trace.owns(activity) }
                     if (result.invocationsCid != null) try {
                         val retained = fetchJson("/api/lcnc/content?cid=" + encodeURIComponent(str(result.invocationsCid)))
                         require(retained.runId == result.runId && retained.programCid == result.programCid) { "Invocation identity changed" }
@@ -137,13 +138,14 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
 }
 
 /** Receipt outputs are presentation only. The daemon's retained frame owns every later input. */
-suspend fun Panels.programOutputs(run: dynamic, document: String) {
+suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {
     val outputs = run.outputs ?: return
     val canvas = graph
     val projected = nodes().filter { !truthy(it._parentScope) }
     val definition = LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, document)
-    fun current(): Boolean = !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(definition,
+    fun current(): Boolean = owned() && !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(definition,
         LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, JSON.stringify(toConfix())))
+    if (!current()) return
     // Replace display snapshots before asynchronous reads; these never feed execution.
     for (n in projected) {
         n._lastOut = undefined
@@ -512,6 +514,7 @@ suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
             renderDocumentReview(n, out)
         }
         runners["nars.reteFire"]?.render = { n, out -> renderSimulation(n, out) }
+        for (type in _l["document.source", "confix.pickPath"]) runners[type]?.render = { n, out -> renderDocumentSource(n, out) }
         // result.confirm is a SINK whose server runner answers with a ready HTML card (x)
         val confirm = runners["result.confirm"]
         if (confirm != null && confirm.render == null) confirm.render = { n, out ->

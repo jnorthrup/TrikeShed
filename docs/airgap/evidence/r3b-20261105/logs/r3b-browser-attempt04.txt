@@ -1,0 +1,68 @@
+driver 0 fixture 0
+
+onn=54 frame complete proto=Http bytes=531 seq-alloc
+[BIND] conn=54 accept ok=true
+[BIND] accepted conn=55
+[BIND] conn=55 frame complete proto=Http bytes=536 seq-alloc
+[BIND] conn=55 accept ok=true
+[BIND] accepted conn=56
+[BIND] conn=56 frame complete proto=Http bytes=528 seq-alloc
+[BIND] conn=56 accept ok=true
+[BIND] accepted conn=57
+[BIND] conn=57 frame complete proto=Http bytes=533 seq-alloc
+[BIND] accepted conn=58
+[BIND] conn=57 accept ok=true
+[BIND] conn=58 frame complete proto=Http bytes=529 seq-alloc
+[BIND] conn=58 accept ok=true
+[BIND] accepted conn=59
+[BIND] conn=59 frame complete proto=Http bytes=512 seq-alloc
+[BIND] conn=59 accept ok=true
+[BIND] accepted conn=60
+[BIND] conn=60 frame complete proto=Http bytes=567 seq-alloc
+[BIND] conn=60 accept ok=true
+[BIND] accepted conn=61
+[BIND] conn=61 frame complete proto=Http bytes=513 seq-alloc
+[BIND] conn=61 accept ok=true
+[BIND] accepted conn=62
+[BIND] conn=62 frame complete proto=Http bytes=512 seq-alloc
+[BIND] conn=62 accept ok=true
+[BIND] accepted conn=63
+[BIND] conn=63 frame complete proto=Http bytes=504 seq-alloc
+[BIND] conn=63 accept ok=true
+[BIND] accepted conn=64
+[BIND] conn=64 frame complete proto=Http bytes=512 seq-alloc
+[BIND] conn=64 accept ok=true
+[BIND] accepted conn=65
+[BIND] conn=65 frame complete proto=Http bytes=2777 seq-alloc
+[BIND] conn=65 accept ok=true
+[BIND] accepted conn=66
+[BIND] conn=66 frame complete proto=Http bytes=512 seq-alloc
+[BIND] conn=66 accept ok=true
+[BIND] accepted conn=67
+[BIND] conn=67 frame complete proto=Http bytes=2777 seq-alloc
+[BIND] conn=67 accept ok=true
+[BIND] accepted conn=68
+[BIND] conn=68 frame complete proto=Http bytes=588 seq-alloc
+[BIND] conn=68 accept ok=true
+[BIND] accepted conn=69
+[BIND] conn=69 frame complete proto=Http bytes=473 seq-alloc
+[BIND] conn=69 accept ok=true
+[BIND] accepted conn=70
+[BIND] conn=70 frame complete proto=Http bytes=631 seq-alloc
+[BIND] conn=70 accept ok=true
+[BIND] accepted conn=71
+[BIND] conn=71 frame complete proto=Http bytes=631 seq-alloc
+[BIND] conn=71 accept ok=true
+[BIND] accepted conn=72
+[BIND] conn=72 frame complete proto=Http bytes=588 seq-alloc
+[BIND] conn=72 accept ok=true
+[BIND] accepted conn=73
+[BIND] conn=73 frame complete proto=Http bytes=588 seq-alloc
+[BIND] conn=73 accept ok=true
+[BIND] accepted conn=74
+[BIND] conn=74 frame complete proto=Http bytes=588 seq-alloc
+[BIND] conn=74 accept ok=true
+[BIND] accepted conn=75
+[BIND] conn=75 frame complete proto=Http bytes=269 seq-alloc
+[BIND] conn=75 accept ok=true
+

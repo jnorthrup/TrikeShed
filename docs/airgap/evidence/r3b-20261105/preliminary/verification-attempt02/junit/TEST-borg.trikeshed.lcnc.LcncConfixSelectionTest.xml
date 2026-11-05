@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LcncConfixSelectionTest[jvm]" tests="4" skipped="0" failures="1" errors="0" timestamp="2026-11-04T23:53:46.197Z" hostname="0d6dfba25614" time="0.09">
+  <properties/>
+  <testcase name="geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm]" classname="borg.trikeshed.lcnc.LcncConfixSelectionTest" time="0.007"/>
+  <testcase name="realNativeRowsSelectAfterGuestClosure()[jvm]" classname="borg.trikeshed.lcnc.LcncConfixSelectionTest" time="0.081">
+    <failure message="org.opentest4j.AssertionFailedError: expected: &lt;35&gt; but was: &lt;35.0&gt;" type="org.opentest4j.AssertionFailedError">org.opentest4j.AssertionFailedError: expected: &lt;35&gt; but was: &lt;35.0&gt;
+	at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)
+	at org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:132)
+	at org.junit.jupiter.api.AssertEquals.failNotEqual(AssertEquals.java:197)
+	at org.junit.jupiter.api.AssertEquals.assertEquals(AssertEquals.java:182)
+	at org.junit.jupiter.api.Assertions.assertEquals(Assertions.java:1156)
+	at kotlin.test.junit5.JUnit5Asserter.assertEquals(JUnitSupport.kt:32)
+	at kotlin.test.AssertionsKt__AssertionsKt.assertEquals(Assertions.kt:83)
+	at kotlin.test.AssertionsKt.assertEquals(Unknown Source)
+	at kotlin.test.AssertionsKt__AssertionsKt.assertEquals$default(Assertions.kt:82)
+	at kotlin.test.AssertionsKt.assertEquals$default(Unknown Source)
+	at borg.trikeshed.lcnc.LcncConfixSelectionTest$realNativeRowsSelectAfterGuestClosure$1.invokeSuspend(LcncConfixSelectionTest.kt:24)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:278)
+	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:47)
+	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:278)
+	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:47)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(Unknown Source)
+	at borg.trikeshed.lcnc.LcncConfixSelectionTest.realNativeRowsSelectAfterGuestClosure(LcncConfixSelectionTest.kt:16)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm]" classname="borg.trikeshed.lcnc.LcncConfixSelectionTest" time="0.001"/>
+  <testcase name="scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm]" classname="borg.trikeshed.lcnc.LcncConfixSelectionTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

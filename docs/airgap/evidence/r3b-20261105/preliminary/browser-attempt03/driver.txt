@@ -1,0 +1,5 @@
+page.waitForResponse: Timeout 120000ms exceeded while waiting for event "response"
+    at /workspace/airgap-r3b-proof/driver.cjs:44:24 {
+  log: [],
+  name: 'TimeoutError'
+}

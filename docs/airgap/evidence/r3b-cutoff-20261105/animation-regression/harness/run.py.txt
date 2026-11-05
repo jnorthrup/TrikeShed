@@ -1,0 +1,56 @@
+from pathlib import Path
+import os,subprocess,time,urllib.request,json,hashlib,shutil,sys,socket,errno
+root=Path('/workspace/airgap-r3a-regression');art=root/sys.argv[1];art.mkdir(parents=True,exist_ok=False)
+network={'namespace':os.readlink('/proc/self/ns/net'),'addresses':json.loads(subprocess.check_output(['ip','-j','address'])),'routes':json.loads(subprocess.check_output(['ip','-j','route']))}
+assert not network['routes'] and all(row['ifname']=='lo' for row in network['addresses'])
+with socket.socket() as probe:
+    probe.settimeout(1)
+    network['externalConnectErrno']=probe.connect_ex(('1.1.1.1',443))
+assert network['externalConnectErrno']==errno.ENETUNREACH,network
+(art/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+snapshot=root/'snapshot';snapshot.mkdir(exist_ok=True)
+jar=Path('/workspace/TrikeShed/build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar')
+shutil.copyfile(jar,snapshot/'TrikeShed-jvm.jar')
+resources=snapshot/'resources/web/kotlin/spacegraph';resources.mkdir(parents=True,exist_ok=True)
+for p in Path('/workspace/TrikeShed-target-checks/build/generated/kotlinJs/resources/web/kotlin/spacegraph').iterdir():
+    if p.is_file():shutil.copyfile(p,resources/p.name)
+cp=(root/'runtime-classpath.txt').read_text().strip().replace(str(jar),str(snapshot/'TrikeShed-jvm.jar'))
+cp=str(root/'classes')+':'+str(snapshot/'resources')+':'+cp
+port=18763; base=f'http://127.0.0.1:{port}'
+env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright';env['TRIKESHED_LLVM_SCALAR_PROFILE']=str(art/'runtime/add-mlir.bc.json');env['TRIKESHED_LLVM_CONFIX_PROFILE']=str(art/'runtime/confix.bc.json')
+identity={'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd='/workspace/TrikeShed',text=True).strip(),'files':{str(p.relative_to(snapshot)):hashlib.sha256(p.read_bytes()).hexdigest() for p in snapshot.rglob('*') if p.is_file()},'compiler':'Kotlin 2.4.21 standalone fixture, no production class overlays','network':'Linux user/network namespace, loopback only'}
+identity['buildIdentity']=json.loads((root/'build-identity.json').read_text())
+for name,digest in identity['buildIdentity']['files'].items():assert identity['files'][name]==digest,name
+identity['fixtureClasses']={str(p.relative_to(root/'classes')):hashlib.sha256(p.read_bytes()).hexdigest() for p in (root/'classes').rglob('*.class')}
+identity['runtimeClasspath']=[{'path':p,'sha256':hashlib.sha256(Path(p).read_bytes()).hexdigest()} for p in (root/'runtime-classpath.txt').read_text().strip().split(':')]
+(art/'harness').mkdir()
+for name in ['Fixture.kt','driver.cjs','run.py','compile.py']:
+    shutil.copyfile(root/name,art/'harness'/(name+'.txt'))
+(art/'identity.json').write_text(json.dumps(identity,indent=2)+'\n')
+http=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+serverlog=(art/'fixture.txt').open('w');driverlog=(art/'driver.txt').open('w')
+server=subprocess.Popen(['/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/java','--enable-native-access=ALL-UNNAMED','-Xmx768m','-Dpolyglot.engine.WarnInterpreterOnly=false','-cp',cp,'proof.airgap.FixtureKt',str(art),'/workspace/TrikeShed',str(port)],env=env,stdout=serverlog,stderr=subprocess.STDOUT)
+code=None
+try:
+    end=time.monotonic()+90
+    while time.monotonic()<end:
+        if server.poll() is not None:raise RuntimeError('Fixture exited: '+str(server.returncode))
+        try:
+            with http.open(base+'/__proof/state',timeout=2) as r:
+                state=json.load(r)
+            if state.get('llvmInstalled'):break
+        except Exception:time.sleep(.2)
+    else:raise RuntimeError('Fixture not ready')
+    result=subprocess.run(['node',str(root/'driver.cjs'),str(art),base],env=env,stdout=driverlog,stderr=subprocess.STDOUT,timeout=240);code=result.returncode
+finally:
+    if server.poll() is None:
+        try:http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3).read()
+        except Exception:pass
+        try:server.wait(timeout=20)
+        except subprocess.TimeoutExpired:server.terminate();server.wait(timeout=10)
+    serverlog.close();driverlog.close()
+    (art/'exit.json').write_text(json.dumps({'driver':code,'fixture':server.returncode},indent=2)+'\n')
+    print('driver',code,'fixture',server.returncode)
+    print((art/'driver.txt').read_text()[-5000:])
+    print((art/'fixture.txt').read_text()[-2500:])
+if code!=0 or server.returncode!=0:raise SystemExit(1)
