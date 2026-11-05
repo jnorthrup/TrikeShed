@@ -1,0 +1,109 @@
+{
+  "kind": "native-horn-quads-v87-evidence/1",
+  "source": "973b078dc929adfbbbedd28345b2980ee5d08a56",
+  "mainSha256": "604099c30c9d40dd8c68080a9c4606d7a02d90783da38cdcbc07ae7bcef928af",
+  "tests": 538,
+  "selectedAttempt": 5,
+  "selectedMaterializedRecords": 188,
+  "manualSourceBytes": 76,
+  "amendedSourceBytes": 109,
+  "approvedSelections": 3,
+  "usedKIFPremises": 2,
+  "typedBindings": 3,
+  "orderedPremiseRows": 2,
+  "quads": 86,
+  "projectionCASGET": 404,
+  "nativeInputBytes": 4175,
+  "nativePIDs": 6,
+  "samePIDSelfReexecs": 6,
+  "afterCloseBlocks": 15,
+  "boardFrames": 3,
+  "reviewFrames": 2,
+  "queryPrimitiveState": {
+    "rete": [
+      1,
+      1
+    ],
+    "blackboard": [
+      2,
+      2
+    ]
+  },
+  "afterCorpusWorkflowState": {
+    "rete": 2,
+    "blackboard": 6
+  },
+  "separateCorpusUI": {
+    "programNodes": 14,
+    "snapshotRuns": 1,
+    "hits": 5,
+    "noteBadge": 0,
+    "afterResultFitAllNodeRectsInside": true,
+    "newHornAction": false
+  },
+  "strictArtifactAudit": "Executed PASS, identical result to default recorded-data mode",
+  "archive": {
+    "bytes": 2415106,
+    "sha256": "26a13a149c1a1f4090ca4ad6559fff05a9dca48ac5762aabb3300df10856c09a",
+    "members": 424,
+    "uncompressedBytes": 16788157
+  },
+  "audit": {
+    "defaultMode": "recorded-data-only",
+    "files": {
+      "README.txt": {
+        "bytes": 4188,
+        "sha256": "1406fd14c40c19de17cbf6ed4adee619b72171f226f4a9519e9956f4382ce5c4"
+      },
+      "attempt1/audit-failure.json": {
+        "bytes": 69,
+        "sha256": "fcef380faeaa01ee16808e4435ee2a5405426da9c48cfa7ead14102c1bbf4f5a"
+      },
+      "attempt1/audit.py.txt": {
+        "bytes": 19019,
+        "sha256": "1ecd95803b9c2417760b3f891522746f3b922b751d46a2e043a9a686cf90b0eb"
+      },
+      "attempt1/checks.py.txt": {
+        "bytes": 12697,
+        "sha256": "1f38edd6b8f5a2a419382f682fd3741516d2f83d2c4f0ae00dd4a73da2c101cb"
+      },
+      "audit.py": {
+        "bytes": 22358,
+        "sha256": "4723e6820ff3e67d6179cf2a03ac2171c3417afc59fc47c9981d263f5ca595c3"
+      },
+      "certificate-core.py.txt": {
+        "bytes": 9648,
+        "sha256": "3090d99851f84b1638033c0a6fa0c8c950aa656045daa1c5e3ec9b1b5b5095ba"
+      },
+      "checks.py": {
+        "bytes": 12697,
+        "sha256": "1f38edd6b8f5a2a419382f682fd3741516d2f83d2c4f0ae00dd4a73da2c101cb"
+      },
+      "final-closed/audit-report.txt": {
+        "bytes": 1109,
+        "sha256": "250109c46403bc1c61fc5542d61c1ddfcbd04604652582ca2a06515335a12877"
+      },
+      "final-closed/audit-result.json": {
+        "bytes": 3591,
+        "sha256": "4dcb5174c9805d14131953015ca0431bd9438c6ca31a674fa51557f464c35b77"
+      },
+      "receipt-core.py.txt": {
+        "bytes": 33996,
+        "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+      },
+      "strict-artifacts/audit-report.txt": {
+        "bytes": 1109,
+        "sha256": "250109c46403bc1c61fc5542d61c1ddfcbd04604652582ca2a06515335a12877"
+      },
+      "strict-artifacts/audit-result.json": {
+        "bytes": 3591,
+        "sha256": "4dcb5174c9805d14131953015ca0431bd9438c6ca31a674fa51557f464c35b77"
+      }
+    },
+    "kind": "native-horn-quads-independent-audit-manifest/1",
+    "mutatedControls": 6,
+    "result": "PASS",
+    "selected": "native-attempt5"
+  },
+  "scope": "Manual unreviewedcarrier hostcodec fixture +actual protected syntheticreview/native/API/helper queries only; no full productioncuratorintake/newnativecanvasDocsaction/semantictruth/portablepack/fullseal claim. Allfailedattempt effects preserved."
+}
