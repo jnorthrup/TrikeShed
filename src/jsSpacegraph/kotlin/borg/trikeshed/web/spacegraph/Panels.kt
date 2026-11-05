@@ -470,7 +470,7 @@ class Panels : PatchSurface {
             return measured[key]
         }
         // Snapshot geometry before attaching paths; shared ports are measured once per redraw.
-        val endpoints = (wires.toSeries() α { wr -> endpoint(wr.from, "out") j endpoint(wr.to, "in") }).toList()
+        val endpoints = (wires.toSeries() α { wr -> Twin<dynamic>(endpoint(wr.from, "out"), endpoint(wr.to, "in")) }).toList()
         val width = num(viewport.clientWidth); val height = num(viewport.clientHeight)
         val fragment = document.createDocumentFragment().asDynamic()
         val resolve = try { portKindResolver() } catch (_: dynamic) { null }
