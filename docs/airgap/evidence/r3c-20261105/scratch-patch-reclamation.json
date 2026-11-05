@@ -1,0 +1,20 @@
+[
+  {
+    "path": "/workspace/airgap-r3c-proof/source-update/trikeshed.patch",
+    "bytes": 57493367,
+    "sha256": "16bf077161f27d4fb3592982e139d94eff2ec14792f073a7f65ce198c124412e",
+    "retainedArchive": "/workspace/library-files/airgap-document-r3c-sources-update-2026-11-05.tar.gz"
+  },
+  {
+    "path": "/workspace/airgap-r3c-proof/source-integrated-update/trikeshed.patch",
+    "bytes": 91019127,
+    "sha256": "516e2d107910b1c5254ba799afbd00823200c6c151dd0c6763a3c426334c120e",
+    "retainedArchive": "/workspace/library-files/airgap-document-r3c-integrated-sources-update-v2-2026-11-05.tar.gz"
+  },
+  {
+    "path": "/workspace/airgap-r3c-proof/source-final-update/trikeshed.patch",
+    "bytes": 104425522,
+    "sha256": "45be5cc336d1c0e81c789b685534770a57d4e4f0cd7c841722603f95a466f492",
+    "retainedArchive": "/workspace/library-files/airgap-document-r3c-final-sources-update-2026-11-05.tar.gz"
+  }
+]

@@ -1,0 +1,18 @@
+from pathlib import Path
+import json
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+h=Path('/workspace/airgap-r3c-proof');r=json.loads((h/'fanout-final01/browser.json').read_text());case=r['cases']['measuredFanout'];coverage=r['cases']['receivedCoverage'];summary=r['ledger']['observationSummary'];assert case['scalarCalls']==65 and case['wires']==64
+plt.rcParams.update({'font.family':'DejaVu Sans','font.size':10})
+fig,axes=plt.subplots(1,2,figsize=(11,4.9),gridspec_kw={'width_ratios':[1,1.3]})
+ax=axes[0];counts=[case['wires'],coverage['mappedConsumedEvents']];ax.barh([1,0],counts,color=['#276b50','#bf741f'],height=.48);ax.set_yticks([1,0],['Branch results\nverified','Consumed transfers\nmapped by display']);ax.set_xlim(0,70);ax.set_xlabel('Count');ax.set_title('Execution and observed consumption',fontweight='bold',pad=18)
+for i,n in enumerate(counts):ax.text(n+1,1-i,str(n),va='center',fontweight='bold')
+ax=axes[1];n=summary['retained'];d=summary['omitted'];ax.barh([0],[n],color='#316e95',height=.45);ax.barh([0],[d],left=[n],color='#d5dce4',height=.45);ax.set_xlim(0,summary['attempted']);ax.set_ylim(-.6,.6);ax.set_yticks([]);ax.set_xticks([0,n,100,summary['attempted']]);ax.set_xlabel('Owner observations (phases and consumptions)');ax.set_title('Final retained ledger',fontweight='bold',pad=18);ax.text(n/2,0,str(n),color='white',ha='center',va='center',fontweight='bold');ax.text(n+d/2,0,str(d)+' omitted',ha='center',va='center',fontweight='bold');ax.text(0,-.48,'Retained suffix: sequences '+str(summary['firstSequence'])+'–'+str(summary['lastSequence']),fontsize=9)
+for ax in axes:
+ for side in ['top','right','left']:ax.spines[side].set_visible(False)
+ ax.tick_params(axis='y',length=0)
+fig.suptitle('One actual 65-node JVM/Sulong run, two evidence boundaries',fontsize=14,fontweight='bold',y=.98)
+fig.text(.03,.06,'Every displayed transfer matches a real observation. Final results do not supply missing transfer events.\nOwner omissions include phase records and may include events observed in an earlier snapshot.',fontsize=9,color='#334155')
+fig.subplots_adjust(left=.20,right=.97,top=.80,bottom=.27,wspace=.50)
+for ext in ['svg','pdf','png']:fig.savefig(h/('observation-coverage-final.'+ext),dpi=170)

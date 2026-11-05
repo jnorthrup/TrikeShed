@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ReviewedTaxonomyProofGraphTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:03:03.273Z" hostname="0d6dfba25614" time="0.395">
+  <properties/>
+  <testcase name="optionalProfileRefusesCompleteOversizeGraphsAndEscapedTermsWithoutClipping()[jvm]" classname="borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest" time="0.374"/>
+  <testcase name="alternativeUsesSharedSourcesReflexivityAndIncompleteStatusesRetainTheirMeaning()[jvm]" classname="borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest" time="0.007"/>
+  <testcase name="literalTokensAndSeparateEnglishKifQuotationsRoundTripWithoutEntityPromotion()[jvm]" classname="borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest" time="0.004"/>
+  <testcase name="fullOffPageBasisFeedsActualTypedQuadQuery()[jvm]" classname="borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

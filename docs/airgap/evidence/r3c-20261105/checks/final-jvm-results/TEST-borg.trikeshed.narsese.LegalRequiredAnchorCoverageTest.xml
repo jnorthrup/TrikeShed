@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LegalRequiredAnchorCoverageTest[jvm]" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:03:04.555Z" hostname="0d6dfba25614" time="0.005">
+  <properties/>
+  <testcase name="repeatedTextAtAnotherOffsetCannotCoverTheRequiredOccurrence()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.001"/>
+  <testcase name="emptyDuplicateForeignAndWrongRoleRequirementsAreInvalidFixtures()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.001"/>
+  <testcase name="allExactAnchorsCoverTheDeclarationIndependentlyOfLabelAgreement()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.0"/>
+  <testcase name="oneSupportingQuoteDoesNotCoverBothRequiredAnchors()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.0"/>
+  <testcase name="malformedDuplicateSpuriousAndWrongRoleQuotesCannotEarnCoverage()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.001"/>
+  <testcase name="explicitUnknownWithNoQuotesIsNotVacuousRequiredContextCoverage()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.0"/>
+  <testcase name="undeclaredRequirementsPreserveIdentityAndLegacyAgreement()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.001"/>
+  <testcase name="missingAndDuplicatePredictionsHaveNoCoverageComparison()[jvm]" classname="borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

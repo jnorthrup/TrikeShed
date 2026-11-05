@@ -186,5 +186,7 @@
   },
   "browser": "Chromium 154 headless, 1800\u00d71200",
   "jvm": "Packaged JDK with 768 MiB heap and ActiveProcessorCount=2; not an OS CPU quota",
-  "measurementScope": "Frame intervals are external browser rAF observations, not isolated renderer preparation. document-update01 ran concurrently with the failed fanout-update01 and source compression in separate no-egress namespaces. Accepted fanout-update02 runs separately. Preliminary fanout02 also ran separately."
+  "measurementScope": "Frame intervals are external browser rAF observations, not isolated renderer preparation. document-update01 ran concurrently with the failed fanout-update01 and source compression in separate no-egress namespaces. Accepted fanout-update02 runs separately. Preliminary fanout02 also ran separately.",
+  "integratedMeasurementScope": "document-integrated01 runs concurrently with cross-target Gradle compilation. The final fanout measurement is scheduled after compilation completes. Both use the extracted integrated update and separate no-egress namespaces.",
+  "finalMeasurementScope": "document-final01 and fanout-final01 run sequentially after final Gradle compilation. A final source-archive checksum and scratch-patch reclamation overlapped initial fanout process startup for less than one second; no Gradle build or archive compression ran during final frame measurement. Linux host and browser remain external inputs."
 }

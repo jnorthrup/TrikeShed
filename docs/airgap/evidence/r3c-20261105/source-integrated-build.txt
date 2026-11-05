@@ -1,0 +1,36 @@
+/workspace/airgap-r3c-proof/source-integrated-update/trikeshed.patch:24454: trailing whitespace.
+8f000000-8f001000 ---p 00000000 00:00 0 
+/workspace/airgap-r3c-proof/source-integrated-update/trikeshed.patch:24457: trailing whitespace.
+8fdaa000-90000000 ---p 00000000 00:00 0 
+/workspace/airgap-r3c-proof/source-integrated-update/trikeshed.patch:24458: trailing whitespace.
+90000000-90040000 rw-p 00000000 00:00 0 
+/workspace/airgap-r3c-proof/source-integrated-update/trikeshed.patch:24459: trailing whitespace.
+90040000-90100000 rw-p 00000000 00:00 0 
+/workspace/airgap-r3c-proof/source-integrated-update/trikeshed.patch:24460: trailing whitespace.
+90100000-90240000 rw-p 00000000 00:00 0 
+warning: squelched 11292 whitespace errors
+warning: 11297 lines add whitespace errors.
+{
+  "baseSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "targetSourceCommit": "97df0b59e5445e318f7f337ea0d4c395d17428ce",
+  "targetTree": "470b6317ed5d46fba12c43064852e75f4b47041a",
+  "requiredSourceChain": [
+    {
+      "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+    },
+    {
+      "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+      "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+    }
+  ],
+  "patchSha256": "516e2d107910b1c5254ba799afbd00823200c6c151dd0c6763a3c426334c120e",
+  "verifiedAppliedTreeMatches": true,
+  "dependencyChanges": [],
+  "scope": "Apply after the R4f source update on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+  "archive": {
+    "file": "/workspace/library-files/airgap-document-r3c-integrated-sources-update-2026-11-05.tar.gz",
+    "bytes": 61097144,
+    "sha256": "77e85460f48c58f509c2edb10607265ffd25b0dd6dbf3c600b94b98e16d6c63d"
+  }
+}

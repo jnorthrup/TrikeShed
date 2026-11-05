@@ -10,7 +10,7 @@ its observation coverage.
 
 This is a bounded continuation of [R3a](04-observed-transfers.md) and the
 [document traversal](05-document-traversal.md), running on the R4f sealed
-runtime with a browser update. It does not close recursive scope navigation,
+runtime with rebuilt JVM and browser jars after D3M integration. It does not close recursive scope navigation,
 large-graph rendering or the whole [visualization blueprint](../lcnc/airgap-demonstrator/07-visualization.md).
 The [verification packet](evidence/r3c-20261105/verification.json) and
 [D3M record](../d3m/2026-11-05-airgap-r3c.md) retain exact inputs and limits.
@@ -113,14 +113,28 @@ snapshot delivery does not double its count.
 ## Verification on the extracted update
 
 The exact updated browser bundle is
-`e698fc73adab72a1459e826a558c93f7461c537b00d08aabbf95c26ff4f883cd`.
-The source commit is `06da928c627b16db79abc97becaab483874102da`.
-All four changed browser source files and the release instructions match the
-offline build worktree by SHA-256. Spacegraph production compilation,
-webpack, staging and the dedicated web JAR task complete with no source or
-test exclusions. JVM, common/native code, engine modules, dependencies and
-build configuration are unchanged. No new JVM unit-test or cross-target
-compilation is claimed for those unchanged inputs.
+`7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74`.
+The tested combined source is `792a14c3b982956df3a139661797e171cba9b963`.
+Fresh offline JVM main and all test-source compilation, application install
+and selected regressions pass: **303 passed, six skipped, zero failures**.
+The six skips require a separately configured native Horn executable that is
+unavailable in this checkout. Nine certificate/preparation checks pass;
+this release does not claim a new external native Horn execution.
+
+Spacegraph production, JS/Documents, Wasm-JS, Wasm-WASI and Linux x64
+compilation passed at `97df0b59e`. The later source merge changes only JVM
+main/tests; all non-JVM source and build inputs are identical. Those target
+checks retain their original source identity. The final JVM is rebuilt and
+the installed browser bundle is verified byte-for-byte. No source or test
+exclusions are introduced. Engine modules, dependencies and build
+configuration are unchanged.
+
+The integration preserves read-only exact-role NARS recall and typed unique
+resident attention targets, with null wired identities refused before any
+authored fallback. It also preserves checked native Horn certificates with
+rule-scoped bindings and source references. Host-declared manual assumptions
+do not become review approval or establish real-world applicability. Incoming
+English WAL and exact-role replay evidence keeps its original tested scope.
 
 The accepted document case passes ten browser checks: continuous speed,
 display pause, held-marker camera alignment, execution completion during
@@ -150,9 +164,9 @@ the native scanner reports zero owned bytes after release.
 
 ## Rendering measurements and next work
 
-The final larger case records 112 external browser animation-frame intervals:
-p50 **16.7 ms**, p95 **33.4 ms**, maximum **1,016.6 ms**. The earlier isolated
-candidate recorded a 983.4 ms maximum. The long gap is material: this release
+The final larger case records 107 external browser animation-frame intervals:
+p50 **16.7 ms**, p95 **33.3 ms**, maximum **1,050.0 ms**.
+Earlier candidates recorded maxima of 983.4, 1,016.6 and 1,050.0 ms. The long gap is material: this release
 does not claim sustained game-quality rendering, a met frame budget or a
 10,000/50,000-node result. These intervals cover the actual headless-browser
 run, including output presentation and UI activity. They do not isolate
@@ -172,14 +186,14 @@ completed behavior in this release.
 
 ## Distribution and retained failures
 
-The runtime update is **2,263,306 bytes**, SHA-256
-`41a3acc274685e8afdcfa70ab31f6cb44e64d8e8fe5e163d6dc42a0fdc5e2a1a`.
+The runtime update is **36,867,527 bytes**, SHA-256
+`19ee8d8ea105f85784838f2c7799400fb9b2ca86c824db2344b0ec5e097fe018`.
 It requires the immutable R4f runtime, SHA-256
 `28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58`.
 Extract that verified base into a fresh installation, then extract
-`airgap-document-r3c-runtime-update-2026-11-05.tar.gz` into the same directory.
-The update replaces only the Spacegraph JAR, runtime README and two package
-manifests. It is not a standalone runtime. Verify SHA-256, complete membership
+`airgap-document-r3c-final-runtime-update-2026-11-05.tar.gz` into the same directory.
+The update replaces the JVM and Spacegraph JARs, runtime README and two
+package manifests. It is not a standalone runtime. Verify SHA-256, complete membership
 and modes before using the established isolated launch procedure.
 
 Two independently assembled update archives are byte-identical. The actual
@@ -188,11 +202,13 @@ hardlinked files first. All 1,355 inventory files, directory/file modes and
 hashes pass. Both accepted browser scenarios use that installed result. The
 unchanged R4f root is reverified afterwards.
 
-The corresponding source update is **38,393,268 bytes**, SHA-256
-`266f73dda1f07d39a47fb0e4c494b1ab88976d6647e794b3d1da574c94078798`.
-Apply it after the R4f source update on the R4e source companion. Its full-index
+The corresponding source update is **71,803,616 bytes**, SHA-256
+`dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f`.
+Use `airgap-document-r3c-final-sources-update-2026-11-05.tar.gz`.
+Apply it after the R4f source update on the R4e source companion. Earlier R3c
+source candidates are not required. Its full-index
 binary Git patch reproduces tree
-`a57ec88df23303981fdba9d87987785223ae692e` exactly in a temporary Git index.
+`7a5d4193ce991cea407e02e99263c668645cc2cb` exactly in a temporary Git index.
 No dependency source changes. Later evidence/publication documentation is
 separate from the tested code commit. Full vendor/native rebuild provenance
 and power-loss durability remain open.
@@ -208,7 +224,16 @@ different modes. The accepted overlay contains changed files only and
 preserves base directory modes. No integrity check was weakened. Raw logs
 and source bytes retain their original whitespace.
 
-D3M initially and before publication freezes 545 refs: 535 remote heads,
-nine local branches and `origin/HEAD`. All are contained; no new merge or
-conflict is required. No branch is preferred or deleted. Jim's Mac remains
-unchanged; this is the cloud Linux checkout and ordinary master publication.
+The source-package review also caught stale candidate README wording that
+described the JVM as unchanged. A corrected candidate archive and the final
+combined-source archive describe the actual rebuild; earlier archives and
+identities remain retained. Only verified archive-backed scratch patch copies
+and superseded scratch runtime roots were reclaimed for disk space.
+
+D3M initially freezes 545 refs. Publication detects concurrent work and
+rechecks 546, then 547 refs: 537 remote heads, nine local branches and
+`origin/HEAD`. Three chronological merges retain exact-role NARS work,
+native Horn binding receipts and subsequent replay evidence. No conflicts
+occur, no branch is preferred or deleted, and all frozen tips are ancestors
+of the result. Jim's Mac remains unchanged; this is the cloud Linux checkout
+and an ordinary master publication.

@@ -1,0 +1,20 @@
+[
+  {
+    "ref": "refs/remotes/origin/codex/native-horn-binding-receipt-20261105",
+    "commit": "2338a9ba0484aefce7ba2814ddad3d8954568bbf",
+    "time": 1793865501,
+    "before": "97df0b59e5445e318f7f337ea0d4c395d17428ce",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt  | 141 ++++++++++++++++++++-\n .../trikeshed/lcnc/NativeHornCertificateTest.kt    | 136 +++++++++++++++++++-\n .../borg/trikeshed/lcnc/NativeHornQueryTest.kt     |  51 ++++++++\n 3 files changed, 319 insertions(+), 9 deletions(-)\n",
+    "after": "56af0795fe948c41e12a6eb1519e792d1f401177"
+  },
+  {
+    "ref": "refs/remotes/origin/HEAD",
+    "commit": "c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2",
+    "time": 1793865556,
+    "before": "56af0795fe948c41e12a6eb1519e792d1f401177",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../english-source-integration/delivery-v83.json   |   23 +\n .../verification-v83.json                          | 1584 ++++++++++++\n .../2026-11-05/nars-exact-role-v83/README.md       |   71 +\n .../2026-11-05/nars-exact-role-v83/SHA256.json     |   17 +\n .../auditor-source-manifest.json                   |  103 +\n .../2026-11-05/nars-exact-role-v83/checks.py.txt   |  127 +\n ...exact-role-selection-and-explicit-attention.png |  Bin 0 -> 245165 bytes\n .../nars-exact-role-v83/receipt-core.py.txt        |  398 +++\n .../nars-exact-role-v83/recorded-audit-report.txt  |   13 +\n .../nars-exact-role-v83/recorded-audit-result.json |  128 +\n .../nars-exact-role-v83/recorded-audit-usage.txt   |  115 +\n .../nars-exact-role-v83/recorded-audit.py.txt      |  189 ++\n .../nars-exact-role-v83/records-manifest.json      | 2574 ++++++++++++++++++++\n .../2026-11-05/nars-exact-role-v83/records.tar.gz  |  Bin 0 -> 9918401 bytes\n .../nars-exact-role-v83/replay-recorded.py.txt     |   51 +\n .../nars-exact-role-v83/strict-audit-report.txt    |   13 +\n .../nars-exact-role-v83/strict-audit-result.json   |  128 +\n .../nars-exact-role-v83/verification.json          |  170 ++\n 18 files changed, 5704 insertions(+)\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/delivery-v83.json\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/verification-v83.json\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/README.md\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/SHA256.json\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/auditor-source-manifest.json\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/checks.py.txt\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/native-typed-exact-role-selection-and-explicit-attention.png\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/receipt-core.py.txt\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/recorded-audit-report.txt\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/recorded-audit-result.json\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/recorded-audit-usage.txt\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/recorded-audit.py.txt\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/records-manifest.json\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/records.tar.gz\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/replay-recorded.py.txt\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/strict-audit-report.txt\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/strict-audit-result.json\n create mode 100644 docs/evidence/2026-11-05/nars-exact-role-v83/verification.json\n",
+    "after": "792a14c3b982956df3a139661797e171cba9b963"
+  }
+]

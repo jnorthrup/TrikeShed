@@ -1,0 +1,5 @@
+# R3c source update
+
+Retain both source archives named and hashed in source-update.json. Begin with the R4e source companion and apply the R4f source update according to its instructions. That yields source commit 4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab and its unchanged dependency source inputs. Apply this archive's trikeshed.patch with `git apply --binary`. The patch includes every tracked change through targetSourceCommit; a temporary Git-index application reproduced targetTree exactly. Both JVM and browser sources include the D3M exact-role selection, null wired-identity refusal and checked native Horn proof projection. Native modules and dependency sources are unchanged.
+
+This archive is not standalone and does not include later evidence-publication commits. Complete vendor JDK patches and native-resource source rebuild provenance remain open. Use the source/build/runtime identities in the release verification packet to identify the combined JVM and browser builds and their unchanged native-module inputs.

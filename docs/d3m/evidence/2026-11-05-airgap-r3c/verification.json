@@ -1,10 +1,12 @@
 {
-  "testedSourceCommit": "06da928c627b16db79abc97becaab483874102da",
+  "testedSourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
   "initialRefs": 545,
   "publicationRefs": 545,
-  "merges": 0,
+  "merges": 3,
   "conflicts": 0,
   "allFrozenTipsContained": true,
   "publication": "Ordinary master push after exact source/evidence checks; publication readback is retained with the exported delivery.",
-  "jimMachine": "unchanged; cloud Linux checkout"
+  "jimMachine": "unchanged; cloud Linux checkout",
+  "finalRefs": 547,
+  "incomingMaster": "c4c07ef1150cb29affb74f1b8b8bcfb43a58d8e2"
 }

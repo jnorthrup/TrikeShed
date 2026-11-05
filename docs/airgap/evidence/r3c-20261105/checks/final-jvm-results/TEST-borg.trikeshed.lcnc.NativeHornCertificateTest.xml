@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="NativeHornCertificateTest[jvm]" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:03:02.599Z" hostname="0d6dfba25614" time="0.086">
+  <properties/>
+  <testcase name="wholeManualPreparationKeepsAllFormsAndImmutableSuppliedControls()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.005"/>
+  <testcase name="sharedVariableAndOrderedPremisesRefuse()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.005"/>
+  <testcase name="differentQueryRefuses()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.001"/>
+  <testcase name="oneUnsupportedOrUnverifiedFormRefusesTheWholeManualTheory()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.006"/>
+  <testcase name="validCertificateAndUnknown()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.001"/>
+  <testcase name="roleBindingsAndOrderedUsesComeFromTheExistingCertificateCheck()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.002"/>
+  <testcase name="incorrectRuleOrRuleSourceRefuses()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.001"/>
+  <testcase name="repeatedOccurrencesStayAlternativeWitnessesAndLiteralBindingsStayTyped()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.055"/>
+  <testcase name="wrongLeafSourceRefuses()[jvm]" classname="borg.trikeshed.lcnc.NativeHornCertificateTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

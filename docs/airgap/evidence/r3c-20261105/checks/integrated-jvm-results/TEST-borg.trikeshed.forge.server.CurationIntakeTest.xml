@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="CurationIntakeTest[jvm]" tests="37" skipped="0" failures="0" errors="0" timestamp="2026-11-05T07:48:04.418Z" hostname="0d6dfba25614" time="3.021">
+  <properties/>
+  <testcase name="replacementUploadWaitsUntilTheRemovalHookHasFinished()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="1.076"/>
+  <testcase name="ownerCancellationCancelsAnAdmittedLinkGrab()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.014"/>
+  <testcase name="resumeVisitsDocumentsWithoutMaterializingTheCorpus()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.003"/>
+  <testcase name="drainWaitsForAdmittedDocumentLinkGrab()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.507"/>
+  <testcase name="blockedPolicyFailsClosedWithoutParsingJoiningOrScoring()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.004"/>
+  <testcase name="blockedCurationBoundsExtractedDocumentsAndDrainFinishesEachAdmission()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.015"/>
+  <testcase name="removalDuringJoinReportsUncertainMembershipAndKeepsTheReplacement()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.004"/>
+  <testcase name="drainingRejectsExternalOffersAndFinishesRecursivelyLandedDocuments()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.009"/>
+  <testcase name="internallyCancelledJoinSettlesFailureAndKeepsTheConsumerAvailable()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.005"/>
+  <testcase name="concurrentLinkIndexReadersShareAndRetryCancelledInitialization()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.05"/>
+  <testcase name="reviewIntakeDoesNotOverwriteABookAlreadyInAConstellation()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.017"/>
+  <testcase name="selectedProviderIsFrozenPerAdmissionAndDrainWaitsForScoring()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.006"/>
+  <testcase name="grabsApplyBackpressureAtTheDocumentLimit()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.312"/>
+  <testcase name="followupUsesLatestModeAndProviderAfterSuspendedReview()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.006"/>
+  <testcase name="forgettingDuringReviewCurationDoesNotPublishAStaleReceipt()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.004"/>
+  <testcase name="concurrentDrainsWaitForCancelledWorkToReleaseInference()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.508"/>
+  <testcase name="ownerCancellationDuringRemovedJoinReportsUncertaintyAndPropagates()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.005"/>
+  <testcase name="resumeContinuesAfterAProjectBecomesUnavailable()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.003"/>
+  <testcase name="reviewIntakeFailsWithoutRetainedSourceRatherThanExtractingOrPublishing()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.002"/>
+  <testcase name="forgottenQueuedDocumentIsReleasedWithoutExtraction()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.002"/>
+  <testcase name="resumedDocumentsUseRetainedProviderAndLegacyDocumentsDoNotScore()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.003"/>
+  <testcase name="cancelledOwnedResumeStopsEnumeratingDocuments()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.006"/>
+  <testcase name="drainingRejectsFollowUpsForAnInFlightDocument()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.003"/>
+  <testcase name="ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.007"/>
+  <testcase name="reofferedRevisionIsProcessedAfterRunningCurationWhetherOrNotItWasForgotten()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.006"/>
+  <testcase name="reviewIntakeSharesReducedProfileBookIdentityWithHostNodes()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.01"/>
+  <testcase name="reviewIntakeRetainsSourceAndReceiptWithoutPublishing()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.005"/>
+  <testcase name="replacedSelectedTextCannotBeCuratedAsTheSelectedRevision()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.007"/>
+  <testcase name="forgettingDuringLegacyCurationDoesNotJoinADeletedDocument()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.003"/>
+  <testcase name="repeatedReviewReplacesObservationAndBookIdentityTracksItsInputs()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.005"/>
+  <testcase name="repeatedFollowUpsRetainOneLatestAdmission()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.056"/>
+  <testcase name="startedLegacyReofferJoinsLatestSourceWhileQueuedDuplicatesCoalesce()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.004"/>
+  <testcase name="ownerCancellationSettlesActiveQueuedAndFollowUpAdmissions()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.004"/>
+  <testcase name="drainWaitsForOwnedResumeAndCuratesItsDiscoveredDocuments()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.306"/>
+  <testcase name="reviewIntakeRejectsAResultWithoutAnUnreviewedReceipt()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.005"/>
+  <testcase name="selectedProjectTextIsSourceBoundAndAwaitingReviewWithoutAutomaticAdmission()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.021"/>
+  <testcase name="newAdmissionWaitsUntilIdleSettlementFinishes()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[[OROBOROS] project db legal: removed 1 docs under agreement.pdf
+[OROBOROS] project db unmounted: legal
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 0 failed — brief published
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 0 failed — brief published
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 0 failed — brief published
+[INTAKE] project/agreement.pdf FAILED: Intake policy blocked: unreadable policy
+[INTAKE] project/book-0.pdf: 1 statements from 1 sections
+[INTAKE] project/book-1.pdf: 1 statements from 1 sections
+[INTAKE] project/book-2.pdf: 1 statements from 1 sections
+[INTAKE] project/book-3.pdf: 1 statements from 1 sections
+[INTAKE] project/book-4.pdf: 1 statements from 1 sections
+[INTAKE] project/book-5.pdf: 1 statements from 1 sections
+[INTAKE] project/book-6.pdf: 1 statements from 1 sections
+[INTAKE] project/book-7.pdf: 1 statements from 1 sections
+[INTAKE] project/book-8.pdf: 1 statements from 1 sections
+[INTAKE] project/book-9.pdf: 1 statements from 1 sections
+[INTAKE] project/book-10.pdf: 1 statements from 1 sections
+[INTAKE] project/book-11.pdf: 1 statements from 1 sections
+[INTAKE] project: 12 curated, 0 failed — brief published
+[INTAKE] project/agreement.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 1 failed — brief published
+[INTAKE] project/root.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 0 failed — brief published
+[INTAKE] project/child.pdf: null statements from null sections
+[INTAKE] project: 2 curated, 0 failed — brief published
+[OROBOROS] project db unmounted: project
+[INTAKE] project/second.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 1 failed — brief published
+[GRAB] project/second.pdf: 0 referenced, 0 landed, 0 held already (depth 1)
+[GRAB] project/third.pdf: 0 referenced, 0 landed, 0 held already (depth 1)
+[GRAB] project/second.pdf: 0 referenced, 0 landed, 0 held already (depth 1)
+[INTAKE] project/agreement.pdf FAILED: Review intake would overwrite a joined book
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project/book.pdf FAILED: provider unavailable
+[INTAKE] project: 1 curated, 1 failed — brief published
+[INTAKE] project/book-0.pdf: null statements from null sections
+[INTAKE] project/book-1.pdf: null statements from null sections
+[INTAKE] project/book-2.pdf: null statements from null sections
+[INTAKE] project/book-3.pdf: null statements from null sections
+[INTAKE] project/book-4.pdf: null statements from null sections
+[INTAKE] project/book-5.pdf: null statements from null sections
+[INTAKE] project/book-6.pdf: null statements from null sections
+[INTAKE] project/book-7.pdf: null statements from null sections
+[INTAKE] project/book-8.pdf: null statements from null sections
+[INTAKE] project/book-9.pdf: null statements from null sections
+[INTAKE] project: 10 curated, 0 failed — brief published
+[INTAKE] project/agreement.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 0 failed — brief published
+[INTAKE] Project backing changed or unavailable during visit: gone
+[INTAKE] good/book.pdf: null statements from null sections
+[INTAKE] good: 1 curated, 0 failed — brief published
+[INTAKE] project/agreement.pdf FAILED: Review-required intake needs a retained source
+[INTAKE] project/held.pdf: null statements from null sections
+[INTAKE] project/legacy.pdf: null statements from null sections
+[INTAKE] project/selected.pdf: null statements from null sections
+[INTAKE] project: 2 curated, 0 failed — brief published
+[INTAKE] project/book-0.pdf FAILED: no runner 'book.curate'
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 0 failed — brief published
+[INTAKE] project/book-0.pdf: null statements from null sections
+[INTAKE] project/book-1.pdf: null statements from null sections
+[INTAKE] project/book-2.pdf: null statements from null sections
+[INTAKE] legal/agreement.txt FAILED: Selected document revision changed before curation or join
+[OROBOROS] project db unmounted: legal
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project: 2 curated, 0 failed — brief published
+[INTAKE] project/agreement.pdf: null statements from null sections
+[INTAKE] project/agreement.pdf: null statements from null sections
+[INTAKE] project: 2 curated, 0 failed — brief published
+[INTAKE] project/book.pdf: null statements from null sections
+[INTAKE] project: 1 curated, 0 failed — brief published
+[INTAKE] project/agreement.pdf FAILED: book.curate returned no receipt
+[INTAKE] project/agreement.pdf FAILED: Review-required curation must return unreviewed candidates
+[INTAKE] project/agreement.pdf FAILED: book.curate returned a different ontology
+[INTAKE] project/agreement.pdf FAILED: book.curate returned a different book
+[OROBOROS] project db unmounted: legal
+[INTAKE] project/first.pdf: null statements from null sections
+[INTAKE] project/second.pdf: null statements from null sections
+[INTAKE] project: 2 curated, 0 failed — brief published
+]]></system-err>
+</testsuite>

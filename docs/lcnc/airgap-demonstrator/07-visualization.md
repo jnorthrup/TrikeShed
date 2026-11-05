@@ -112,7 +112,7 @@ animation is idle. The real document's eight transfers reopen without LLVM;
 a 65-node native graph shows 19 evidenced transfers and explicit partial
 owner history. These are implemented bounds, not the full L0–L5 design.
 
-The larger run measured p95 33.4 ms and a 1,016.6 ms maximum external browser
+The larger run measured p95 33.3 ms and a 1,050.0 ms maximum external browser
 frame interval. The long gap keeps sustained human-rate rendering open.
 Profile receipt output projection, repeated definition checks, rich DOM
 expansion, collision layout and SVG redraw before attributing the stall.
