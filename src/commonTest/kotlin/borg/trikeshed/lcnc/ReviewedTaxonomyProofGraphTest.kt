@@ -49,7 +49,7 @@ internal class ReviewedTaxonomyProofGraphFixture(val texts: List<String>, val li
                         "begin" j 7, "end" j (7 + quote.length), "quote" j quote],
                     "declared" j _m["relation" j formula.name, "subjectIri" j (formula.arguments[0] as KifTerm.Constant).token,
                         "objectIri" j (formula.arguments[1] as KifTerm.Constant).token,
-                        "subjectSort" j (if (formula.name == "instance") "individual" else "class"), "objectSort" j "class"])
+                        "subjectSort" j (if (formula.name == "instance") "individual" else "class"), "objectSort" j "class"]]
             }
             result["englishOrigin"] = _m["translationDecisionCid" j declaration, "inspectionCid" j inspection,
                 "contextKey" j context, "contextIri" j "urn:proof:context", "witnesses" j witnesses,

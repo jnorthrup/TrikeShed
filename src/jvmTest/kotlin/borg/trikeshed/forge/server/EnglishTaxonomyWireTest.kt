@@ -147,7 +147,7 @@ class EnglishTaxonomyWireTest {
                 val sources = rows(paths["sources"]).associateBy { ReviewedTaxonomyProofGraph.sourceIri(q["graph"] as String, it["nodeId"] as String) }
                 for (row in found) {
                     assertEquals("uri", (row["source"] as Map<*, *>)["type"])
-                    val source = sources.getValue((row["source"] as Map<*, *>)["value"])
+                    val source = sources.getValue((row["source"] as Map<*, *>)["value"] as String)
                     val witness = rows(result["englishWitnesses"]).single { it["selectionId"] == source["selectionId"] }
                     assertEquals((witness["englishQuotation"] as Map<*, *>)["quote"], (row["englishQuote"] as Map<*, *>)["value"])
                     assertEquals((source["quotation"] as Map<*, *>)["quote"], (row["kifQuote"] as Map<*, *>)["value"])
