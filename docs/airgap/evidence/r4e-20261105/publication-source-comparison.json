@@ -1,0 +1,44 @@
+{
+  "integratedSourceCommit": "3314bad96b4977d83668eb4732bbbe0eba7d2f9b",
+  "remoteMaster": "fdfa355623f03958536089c81e87162e6c8313ff",
+  "recheckRecordedAt": "2026-11-05T05:42:19.295321+00:00",
+  "changedBuildAndSourcePaths": [
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt"
+  ],
+  "checks": {
+    "sourceCommit": "3314bad96b4977d83668eb4732bbbe0eba7d2f9b",
+    "packagedRuntimeSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+    "changedBuildAndSourcePaths": [
+      "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt"
+    ],
+    "command": [
+      "unshare",
+      "--user",
+      "--map-current-user",
+      "--net",
+      "--keep-caps",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "documents-check",
+      "./gradlew",
+      "--offline",
+      "--no-daemon",
+      "--max-workers=2",
+      "-PkotlinJsApps=documents",
+      "stageKotlinJs"
+    ],
+    "cwd": "/workspace/TrikeShed-target-checks",
+    "startedAt": "2026-11-05T05:43:50.300970+00:00",
+    "scope": "Documents guard-query table widths only; packaged runtime embeds only Spacegraph JS. All JVM/common/Spacegraph/runtime/build inputs are byte-identical to the tested runtime source.",
+    "exit": 0,
+    "finishedAt": "2026-11-05T05:44:47.915304+00:00",
+    "sourceSha256": {
+      "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt": "737cc87bd6a46128773ea6583f89d8dfdec4e2d34368867b8ce47116ae16d261"
+    }
+  },
+  "runtimeSourceUnchanged": true,
+  "runtimeScope": "All JVM, common, Spacegraph, native modules, entrypoint, release assets and build inputs are byte-identical to 2c6e55e25. The package web jar embeds only web/kotlin/spacegraph; Documents JS is outside this runtime.",
+  "sourceCompanionScope": "Corresponding source remains pinned to the tested runtime commit 2c6e55e25; clone the published master for the later Documents-only column-width change.",
+  "sourceHashMeaning": "sourceSha256 records the tested checkpoint inputs; publishedSourceSha256 records the selected current source files, with the sole Documents delta separately compiled."
+}

@@ -1,6 +1,6 @@
 {
   ".gitattributes": "e97602ab9cac70102245345c5ab0fc9830df8b17f1072b188265a662a3a547ae",
-  "README.md": "d4be4940ccba61d5b7439ee12a7f5ea433018573bd84fa985af2697d0b0222e1",
+  "README.md": "96393937b85c6b621cef576998cc2d7f0d77231cf63b52bf1c0d8fd16b57ec5e",
   "accepted/eio/arm-request.json": "a4f5c4624097485f7d99f55cf8dc7d502acd788923cc15a93103aac7dcc2ae5a",
   "accepted/eio/browser.json": "34e620c1b01d00e49f0906bf3a54e527758c609a65de7292bd8259b768772ca4",
   "accepted/eio/driver.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -683,6 +683,7 @@
   "baseline/classes/WalOwners.class": "051f1608a53d905afc8c9df67937b5994b20ac5db83e5f58d3cc8f3f89b051eb",
   "baseline/result.txt": "b66938b9cfbd49af822f8ea5320c589516f4f5f7f5ced3e02eaa342165210f61",
   "baseline/state/board.wal": "e0adda6b6c3bf3a22479a07ccf194c95c41dece773a306da800dd2e1f3ed6965",
+  "checks/documents-standing.json": "c19a668797433d0340b0ca48c8c90bb8ae3f9ac708cbf7529e23c0ccd4d5f764",
   "checks/junit/TEST-borg.trikeshed.forge.server.CurationIntakeEligibilityTest.xml": "4a35f93a6791c967fd0246d2476340df51e268c0025087b38040d3bffb824002",
   "checks/junit/TEST-borg.trikeshed.forge.server.CurationIntakeTest.xml": "57aa58b8e1175d5145601ce0fa72e6d18b3358727a2db6dd41673d2ef23bebd5",
   "checks/junit/TEST-borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest.xml": "0270cf48e27beb0c77197dbb03bf9099033a136c961f6b9a989d574479c259c6",
@@ -754,6 +755,8 @@
   "checks/r4e-d3m-publication-integrate02.txt": "30e3aa5c298c22fa89952241f678cf0803df4cd8f6883b96ca1f276d1ba5a01b",
   "checks/r4e-directory-negative-archive01.txt": "561eece8bcf353c34ad189c7fa72555e95b1f9f009ba6d4f206da575115e4420",
   "checks/r4e-directory-negative-archive02.txt": "561eece8bcf353c34ad189c7fa72555e95b1f9f009ba6d4f206da575115e4420",
+  "checks/r4e-documents-check.txt": "cce31f6a3e98ba682fde919fb2ed702d38ea7041a5438c55ea59ed4200cdfd43",
+  "checks/r4e-documents-controller.txt": "ba5757bb1de2f1e628a2072fb97b28c1ba03c888c6acca9318e171958f37e881",
   "checks/r4e-integrity.txt": "f6b1ac250face363465ac100e2f60eacdb7ade8927ea0ad91c7bc49e46667fa1",
   "checks/r4e-interruption-selection-archive01.txt": "0d6f33be572223f9899820a2219dc3bb7d27a4ea1c04a56b5b59e2f847063bfb",
   "checks/r4e-interruption-selection-archive02.txt": "282e394b01662a2154489bcc9602746141bd79c3534809fe23d186a14218fb1c",
@@ -833,6 +836,7 @@
   "harness/WalLease.java.txt": "dbb80038237ead696f8deff23d311d76630a9c2177ebcae28fcb141788b1f65a",
   "harness/assemble.py.txt": "74e0bc04c9117b4c252bf9792e812306a4d631b3b6f9566da5008ee134dd2a33",
   "harness/audit.py.txt": "e6ee42df4fd17bb93ddb1bc21238c771c33501650f7ad325a0a454657d544cd5",
+  "harness/check-documents.py.txt": "5b24cf507337c53958d93f859ee3b42750b2a95ad098c25a340ad29e2a97a245",
   "harness/check-targets.py.txt": "11b71078974d82f4b6d30839c5e299bf2b9d50df02713f0900f1a1de2929faf9",
   "harness/complete-checks.py.txt": "67a4dfa6a688a719bfba7f382b5f33f30daaf4bbd2ba2d2fe513748e99f52c99",
   "harness/complete-publication.py.txt": "d8c61d40aa5ccdb5ed1fde22dd010f33137bd7f7b7946c311ed2e7aa8672f7ba",
@@ -2292,6 +2296,7 @@
   "preliminary/trace-archive01/syscalls.txt": "47ef78868aeed110b2baf62d470b9e5295b29f5f2595f7d4e7a9d004ae192476",
   "preliminary/trace-archive01/trace.cjs.txt": "a7434165414201d573d09846ee03d287998c73bee2274cd136bd1f449ef25c3b",
   "preliminary/trace-archive01/trace.py.txt": "7959abcc08750d0a3c9eef40d9f1793f28b963674d8055454a4622162ff27028",
+  "publication-source-comparison.json": "75e92adc9e0f34be02d06784e2a25a3e68743ded1c7532cb0bf67ed5654ae2df",
   "recovery-negative/changed-admission-identity/cleanup-inspect.json": "a311988718ca6784aca9ff7f0103a0bbf80dd5bce9f77b7ca6a168ff09addfa4",
   "recovery-negative/changed-admission-identity/cleanup-recover.json": "a311988718ca6784aca9ff7f0103a0bbf80dd5bce9f77b7ca6a168ff09addfa4",
   "recovery-negative/changed-admission-identity/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811/bin/libtruffleattach.so": "3f5c8b78c04d0b7a08b91b21d71e0c8cd657e5fe1126fd840d27f2803e94525c",
@@ -2358,5 +2363,5 @@
   "recovery-negative/changed-admission-identity.txt": "41d24e4114b0e842535ab812b7c8beace5bbe5214d917594948ca49d14395856",
   "recovery-negative/empty-recovery.txt": "11e8261acd35f195c789bf6bcb6f98488d91a92d4395b501b66642fc0fa8707e",
   "recovery-negative/results.json": "4efbccee99629fded823623a63ab72f70f3a8fdfe35b1c8593ddaf2e2e98d4f6",
-  "verification.json": "99585a4bc0aa4430e9d25aea1930bea9827727021b99e99db36d75019e773c4b"
+  "verification.json": "4e8bede2fbdbec810401cd9d9ccf1347bf7c9dcb1013e8b55b7c6d8f7bf34af1"
 }

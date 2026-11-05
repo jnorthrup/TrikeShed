@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "3314bad96b4977d83668eb4732bbbe0eba7d2f9b",
+  "packagedRuntimeSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+  "changedBuildAndSourcePaths": [
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt"
+  ],
+  "command": [
+    "unshare",
+    "--user",
+    "--map-current-user",
+    "--net",
+    "--keep-caps",
+    "sh",
+    "-c",
+    "ip link set lo up && exec \"$@\"",
+    "documents-check",
+    "./gradlew",
+    "--offline",
+    "--no-daemon",
+    "--max-workers=2",
+    "-PkotlinJsApps=documents",
+    "stageKotlinJs"
+  ],
+  "cwd": "/workspace/TrikeShed-target-checks",
+  "startedAt": "2026-11-05T05:43:50.300970+00:00",
+  "scope": "Documents guard-query table widths only; packaged runtime embeds only Spacegraph JS. All JVM/common/Spacegraph/runtime/build inputs are byte-identical to the tested runtime source.",
+  "exit": 0,
+  "finishedAt": "2026-11-05T05:44:47.915304+00:00",
+  "sourceSha256": {
+    "src/jsDocuments/kotlin/borg/trikeshed/docs/DocumentsEnglish.kt": "737cc87bd6a46128773ea6583f89d8dfdec4e2d34368867b8ce47116ae16d261"
+  }
+}

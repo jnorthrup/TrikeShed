@@ -205,8 +205,13 @@ payloads refuse admission.
 
 The combined source passes 287 selected JVM checks with one conditional
 external-solver skip, fresh affected-target compilation and 21 browser cases.
-D3M retains 544 frozen refs through three merges with two preserved
+D3M retains 544 frozen refs through four merges with two preserved
 conflicts and intent resolutions. The [runbook](10-wal-ownership.md) separates
 historical-output inspection, fresh native execution and fault scope.
 Power-loss safety, cross-platform ownership proof and full vendor/native
 source rebuild closure remain open.
+
+The final R4e publication also retains a clean D3M merge of Documents-only
+query column widths, with fresh Documents compilation. The packaged runtime
+inputs and runtime/source archive identities are unchanged; the runbook
+records the separate publication-source comparison.

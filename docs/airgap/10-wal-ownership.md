@@ -193,7 +193,7 @@ three retained-store corruption refusals, two short-tail recoveries, and five
 package-integrity refusals plus a restored control. The syscall audit records
 91 new CAS shard directories and zero missing
 parent barriers. D3M retains 544 publication-cutoff refs through
-3 merges, including 2 conflicts with retained stages.
+4 merges, including 2 conflicts with retained stages.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -220,3 +220,16 @@ not imply that all vendor modifications have been reconstructed.
 The [machine-readable verification](evidence/r4e-20261105/verification.json)
 binds these observations to exact sources, archives and raw evidence. Work
 was performed in the cloud Linux checkout; Jim’s Mac was not changed.
+
+## Publication continuation
+
+The first publication preflight stopped before pushing because remote master
+advanced to `fdfa35562`. A fourth D3M merge, `3314bad96`, retains an 11-line
+Documents guard-query column-width correction without conflict. A fresh
+Documents production compile passes. Every JVM, common, Spacegraph, native
+module, entrypoint, release asset and build input remains byte-identical to
+tested runtime source `2c6e55e25`; the packaged web jar contains only Spacegraph
+pages. The runtime archive and its corresponding-source archive therefore
+retain the identities above. The wider published master includes the later
+Documents style change, identified separately in the verification record.
+No runtime re-execution is claimed for this unrelated presentation change.
