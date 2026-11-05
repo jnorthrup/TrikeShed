@@ -1,0 +1,3 @@
+100644 6a08aec2bfe3745bcefbec3e7671dd824edbc943 1	src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt
+100644 77925e8db0f57371a5a33ee8a33a7acce86951d0 2	src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt
+100644 d31afb7336ec5212efaf5c5c8a75c2a58462810d 3	src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt

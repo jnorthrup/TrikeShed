@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "37b1a8944ce6102f57b9e201be32fedbc78ab5a5",
+  "testSource": "src/jvmTest/kotlin/borg/trikeshed/kanban/BoardFileWalLeaseTest.kt",
+  "standing": "New current tests against published production source before lease fix",
+  "counts": {
+    "tests": 4,
+    "failures": 2,
+    "errors": 0,
+    "skipped": 0
+  }
+}

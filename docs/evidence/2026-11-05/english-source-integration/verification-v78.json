@@ -1,0 +1,1266 @@
+{
+  "source": "aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26",
+  "started": "2026-11-05T04:41:26.448872+00:00",
+  "result": "PASS",
+  "expectedSelectedTests": 489,
+  "preexistingCases": 480,
+  "newFocusedCases": {
+    "commonEnglishNalPreset": 2,
+    "registeredEnglishNalExecutionAndRetention": 6,
+    "structuredJsonSelectorBoundary": 1
+  },
+  "allFrozenTipsContained": true,
+  "frozenRefCount": 685,
+  "ordinaryMerges": [
+    {
+      "ref": "refs/heads/feat/retained-nal-lcnc-20261105",
+      "oid": "4c59f409b91e1d09c3a375f3b0d7ff6c1827ecc7",
+      "committerTimestamp": 1793852126,
+      "before": "21e70d7d65d29f633c0132e2e03e8716f93c42ae",
+      "code": 0,
+      "stdout": "Merge made by the 'ort' strategy.\n",
+      "stderr": "",
+      "after": "57bd6b62d22318583c19880be6a3e76444f302c2"
+    }
+  ],
+  "productionEditsFrozen": true,
+  "command": "./gradlew jsBrowserDocumentsDevelopmentWebpack jsBrowserSpacegraphDevelopmentWebpack jsBrowserPagesDevelopmentWebpack jvmTest -I /workspace/.trikeshed-cloud/resolve-jvm.init.gradle -PkotlinJsApps=documents,pages,spacegraph --daemon --configuration-cache --max-workers=4 -Ptrikeshed.native.mlnix=/workspace/library-files/mlnix-native-validation/build/bin/mlnix -Ptrikeshed.native.mlnix.sha256=97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5 -Ptrikeshed.native.adapter=/workspace/TrikeShed/utils/sumo-nix/run.nix -Ptrikeshed.native.datalog=/workspace/library-files/sumo-nix-proof/source --tests borg.trikeshed.nlp.EnglishInspectionTest --tests borg.trikeshed.graal.subvm.CoreNlpSourceTest --tests borg.trikeshed.narsese.NormClauseConditionsTest --tests borg.trikeshed.forge.server.DocumentEnglishWireTest --tests borg.trikeshed.narsese.ApplicabilityFactsTest --tests borg.trikeshed.narsese.ConstellationPremiseTest --tests borg.trikeshed.docs.DocumentSurfaceTest --tests borg.trikeshed.forge.server.PrimaryProjectCorpusTest --tests borg.trikeshed.forge.server.DocumentPdfLinksWireTest --tests borg.trikeshed.lcnc.CamelDispatchOwnershipTest --tests borg.trikeshed.graal.subvm.NlpNodeIdentityTest --tests borg.trikeshed.narsese.DependencyCopyInferenceTest --tests borg.trikeshed.nlp.EnglishLegalPatternsTest --tests borg.trikeshed.forge.server.EnglishLegalPatternsWireTest --tests borg.trikeshed.nlp.EnglishCorpusTest --tests borg.trikeshed.nlp.EnglishLdaTest --tests borg.trikeshed.forge.server.EnglishObservationWireTest --tests borg.trikeshed.forge.server.EnglishCorpusWireTest --tests borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest --tests borg.trikeshed.lcnc.PresetAssemblyTest --tests borg.trikeshed.forge.server.SparqlVisualBoundsTest --tests borg.trikeshed.forge.server.SparqlSourceWireTest --tests borg.trikeshed.narsese.KgRdfFidelityTest --tests borg.trikeshed.narsese.KgPropositionIdentityTest --tests borg.trikeshed.narsese.PropositionReadbackTest --tests borg.trikeshed.kif.KifSemanticTest --tests borg.trikeshed.narsese.BeliefAdmissionTest --tests borg.trikeshed.memory.HermesMemoryFeedbackTest --tests borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest --tests borg.trikeshed.hermes.HermesPenDelegatesTest.modelRefusalCarriesNegativeToolEvidence --tests borg.trikeshed.hermes.HermesPenDelegatesTest.negativeClaimIsNotARefusedOperation --tests borg.trikeshed.hermes.HermesPenDelegatesTest.everyCrossingLandsTwice --tests borg.trikeshed.hermes.HermesPenDelegatesTest.rejectedAssertionAdmissionIsNotSuccess --tests borg.trikeshed.narsese.KgRetentionTest --tests borg.trikeshed.litebike.KgHttpUtf8Test --tests borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest --tests borg.trikeshed.memory.ace.AceContextNodesTest --tests borg.trikeshed.memory.ace.BreadcrumbContextNodesTest --tests borg.trikeshed.docs.DocumentNavigationTest --tests borg.trikeshed.terminal.XtermTerminalEraseSavedTest --tests borg.trikeshed.terminal.XtermTerminalRowIdentityTest --tests borg.trikeshed.forge.server.CurationInstalledLinkTest --tests borg.trikeshed.forge.server.CurationIntakeTest --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest --tests borg.trikeshed.forge.server.LinkGrabRetryTest --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest --tests borg.trikeshed.forge.server.ProjectDbBindingTest --tests borg.trikeshed.job.PackCasVerifierTest --tests borg.trikeshed.narsese.BertPythonSleeveTest --tests borg.trikeshed.narsese.JevaWorkerProtocolTest --tests borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest --tests borg.trikeshed.narsese.KgPredicateNamespaceTest --tests borg.trikeshed.kif.KifTaxonomySnapshotTest --tests borg.trikeshed.nlp.EnglishCorpusViewTest --tests borg.trikeshed.narsese.KgRouteErrorTest --tests borg.trikeshed.lcnc.EnglishCopularPresetTest --tests borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest --tests borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest --tests borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest --tests borg.trikeshed.forge.server.EnglishTaxonomyWireTest --tests borg.trikeshed.lcnc.CurationReviewedReadTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyWireTest --tests borg.trikeshed.forge.server.ReviewedKifWireTest --tests borg.trikeshed.lcnc.ReviewedKifCancellationTest --tests borg.trikeshed.lcnc.LlvmScalarTest --tests borg.trikeshed.kanban.module.LlvmScalarRunTest --tests borg.trikeshed.lcnc.NativeHornProfileTest --tests borg.trikeshed.lcnc.LlvmConfixTest --tests borg.trikeshed.kanban.module.LlvmConfixRunTest --tests borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest --tests borg.trikeshed.narsese.PropositionAttentionTest --tests borg.trikeshed.lcnc.LcncConsumptionTest --tests borg.trikeshed.narsese.KgKifCommentTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest --tests borg.trikeshed.kif.KifActivationPlanTest --tests borg.trikeshed.kif.SumoNixBridgeTest --tests borg.trikeshed.lcnc.KifNodesTest --tests borg.trikeshed.forge.server.CurationIntakeEligibilityTest --tests borg.trikeshed.kanban.module.KanbanPinnedDispatchTest --tests borg.trikeshed.lcnc.DocumentSpansTest --tests borg.trikeshed.lcnc.FinanceKifPresetExecutionTest --tests borg.trikeshed.lcnc.LcncConfixSelectionTest --tests borg.trikeshed.lcnc.LcncPinnedBindingTest --tests borg.trikeshed.lcnc.WorkModelRouteTest --tests borg.trikeshed.lcnc.WorkSelectNodeTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsReadTest --tests borg.trikeshed.lcnc.LcncConfixPickPathContractTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyQueryViewTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest --tests borg.trikeshed.narsese.RetainedNalImplicationTest --tests borg.trikeshed.narsese.SyntheticNalExperimentCliTest --tests borg.trikeshed.lcnc.EnglishNalPresetTest --tests borg.trikeshed.forge.server.EnglishNalPresetExecutionTest",
+  "newFeatures": "One retained-English NAL inspection runner in existing owner queue, explicit current/snapshot checks, unchanged common report, all ordered quotations, invocation key, offered source-focus preset, actual Kotlin/native geometry label; real existing output retention.",
+  "guardProfile": "TRIKESHED_AIRGAP=1 remains active; no new provider/parser/HTTP/admission/framework cache behavior",
+  "cacheScope": "Fresh ordinary runs evaluate again; explicit pulse/completed-frame reuse remains historical/as-of, not fresh currentness. Missing/null required inputs skip before dispatch; direct owner rejects invalid supplied values.",
+  "actualFrozenNativeProof": "PASS: two real native browser runs; selected second capture independently audited and exact safe-extracted public replay passed",
+  "priorAttempt": "v78-attempt1/verification.json",
+  "selectorBoundaryFix": "String inputs preserve original bytes; non-string structured JSON is serialized with existing jsonOf before unchanged selector/native validation.",
+  "totals": {
+    "tests": 489,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "file": "TEST-borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest.xml",
+      "name": "BreadcrumbForegroundTest[jvm]",
+      "timestamp": "2026-11-05T04:48:37.209Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.docs.DocumentNavigationTest.xml",
+      "name": "DocumentNavigationTest[jvm]",
+      "timestamp": "2026-11-05T04:48:37.298Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.docs.DocumentSurfaceTest.xml",
+      "name": "DocumentSurfaceTest[jvm]",
+      "timestamp": "2026-11-05T04:48:37.316Z",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationInstalledLinkTest.xml",
+      "name": "CurationInstalledLinkTest[jvm]",
+      "timestamp": "2026-11-05T04:48:37.346Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationIntakeEligibilityTest.xml",
+      "name": "CurationIntakeEligibilityTest[jvm]",
+      "timestamp": "2026-11-05T04:48:37.847Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationIntakeTest.xml",
+      "name": "CurationIntakeTest[jvm]",
+      "timestamp": "2026-11-05T04:48:37.862Z",
+      "tests": "37",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.CurationRemovalOwnershipTest.xml",
+      "name": "CurationRemovalOwnershipTest[jvm]",
+      "timestamp": "2026-11-05T04:48:40.873Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest.xml",
+      "name": "DocumentEnglishRetainedWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:40.896Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.DocumentEnglishWireTest.xml",
+      "name": "DocumentEnglishWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:41.325Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.DocumentPdfLinksWireTest.xml",
+      "name": "DocumentPdfLinksWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:41.376Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishCorpusWireTest.xml",
+      "name": "EnglishCorpusWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:41.645Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishLegalPatternsWireTest.xml",
+      "name": "EnglishLegalPatternsWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:46.100Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishNalPresetExecutionTest.xml",
+      "name": "EnglishNalPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T04:48:35.965Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishObservationWireTest.xml",
+      "name": "EnglishObservationWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:47.436Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.EnglishTaxonomyWireTest.xml",
+      "name": "EnglishTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:48.012Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.LinkGrabRetryTest.xml",
+      "name": "LinkGrabRetryTest[jvm]",
+      "timestamp": "2026-11-05T04:48:48.919Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.PrimaryProjectCorpusTest.xml",
+      "name": "PrimaryProjectCorpusTest[jvm]",
+      "timestamp": "2026-11-05T04:48:49.144Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ProjectCorpusVisitTest.xml",
+      "name": "ProjectCorpusVisitTest[jvm]",
+      "timestamp": "2026-11-05T04:48:49.430Z",
+      "tests": "27",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ProjectDbBindingTest.xml",
+      "name": "ProjectDbBindingTest[jvm]",
+      "timestamp": "2026-11-05T04:48:49.600Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ReviewedKifWireTest.xml",
+      "name": "ReviewedKifWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:49.610Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest.xml",
+      "name": "ReviewedTaxonomyQuadQueryWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:53.483Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.ReviewedTaxonomyWireTest.xml",
+      "name": "ReviewedTaxonomyWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:53.719Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.SparqlSourceWireTest.xml",
+      "name": "SparqlSourceWireTest[jvm]",
+      "timestamp": "2026-11-05T04:48:54.062Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.forge.server.SparqlVisualBoundsTest.xml",
+      "name": "SparqlVisualBoundsTest[jvm]",
+      "timestamp": "2026-11-05T04:48:54.401Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.graal.subvm.CoreNlpSourceTest.xml",
+      "name": "CoreNlpSourceTest[jvm]",
+      "timestamp": "2026-11-05T04:48:54.455Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.graal.subvm.NlpNodeIdentityTest.xml",
+      "name": "NlpNodeIdentityTest[jvm]",
+      "timestamp": "2026-11-05T04:48:54.470Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.hermes.HermesPenDelegatesTest.xml",
+      "name": "HermesPenDelegatesTest[jvm]",
+      "timestamp": "2026-11-05T04:48:54.487Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.job.PackCasVerifierTest.xml",
+      "name": "PackCasVerifierTest[jvm]",
+      "timestamp": "2026-11-05T04:49:04.514Z",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kanban.module.KanbanPinnedDispatchTest.xml",
+      "name": "KanbanPinnedDispatchTest[jvm]",
+      "timestamp": "2026-11-05T04:49:04.782Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kanban.module.LlvmConfixRunTest.xml",
+      "name": "LlvmConfixRunTest[jvm]",
+      "timestamp": "2026-11-05T04:49:07.072Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kanban.module.LlvmScalarRunTest.xml",
+      "name": "LlvmScalarRunTest[jvm]",
+      "timestamp": "2026-11-05T04:49:11.977Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.KifActivationPlanTest.xml",
+      "name": "KifActivationPlanTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.551Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.KifSemanticTest.xml",
+      "name": "KifSemanticTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.563Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.KifTaxonomySnapshotTest.xml",
+      "name": "KifTaxonomySnapshotTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.605Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.kif.SumoNixBridgeTest.xml",
+      "name": "SumoNixBridgeTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.612Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.CamelDispatchOwnershipTest.xml",
+      "name": "CamelDispatchOwnershipTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.621Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.CurationReviewedReadTest.xml",
+      "name": "CurationReviewedReadTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.648Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.DocumentSpansTest.xml",
+      "name": "DocumentSpansTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.724Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest.xml",
+      "name": "EnglishCamelPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:13.743Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest.xml",
+      "name": "EnglishCopularPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.162Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishCopularPresetTest.xml",
+      "name": "EnglishCopularPresetTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.339Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishNalPresetTest.xml",
+      "name": "EnglishNalPresetTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.384Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest.xml",
+      "name": "EnglishTaxonomyCarrierTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.407Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest.xml",
+      "name": "EnglishTaxonomyExportGuardTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.596Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.FinanceKifPresetExecutionTest.xml",
+      "name": "FinanceKifPresetExecutionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.673Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.KifNodesTest.xml",
+      "name": "KifNodesTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.772Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncConfixPickPathContractTest.xml",
+      "name": "LcncConfixPickPathContractTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.786Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncConfixSelectionTest.xml",
+      "name": "LcncConfixSelectionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.939Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncConsumptionTest.xml",
+      "name": "LcncConsumptionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:14.989Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LcncPinnedBindingTest.xml",
+      "name": "LcncPinnedBindingTest[jvm]",
+      "timestamp": "2026-11-05T04:49:15.138Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LlvmConfixTest.xml",
+      "name": "LlvmConfixTest[jvm]",
+      "timestamp": "2026-11-05T04:49:15.151Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.LlvmScalarTest.xml",
+      "name": "LlvmScalarTest[jvm]",
+      "timestamp": "2026-11-05T04:49:15.467Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.NativeHornProfileTest.xml",
+      "name": "NativeHornProfileTest[jvm]",
+      "timestamp": "2026-11-05T04:49:15.657Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.PresetAssemblyTest.xml",
+      "name": "PresetAssemblyTest[jvm]",
+      "timestamp": "2026-11-05T04:49:15.665Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedKifCancellationTest.xml",
+      "name": "ReviewedKifCancellationTest[jvm]",
+      "timestamp": "2026-11-05T04:49:16.693Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest.xml",
+      "name": "ReviewedTaxonomyPlanPageTest[jvm]",
+      "timestamp": "2026-11-05T04:49:17.923Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest.xml",
+      "name": "ReviewedTaxonomyProofGraphTest[jvm]",
+      "timestamp": "2026-11-05T04:49:18.378Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsReadTest.xml",
+      "name": "ReviewedTaxonomyProofPathsReadTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.209Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsTest.xml",
+      "name": "ReviewedTaxonomyProofPathsTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.228Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.ReviewedTaxonomyQueryViewTest.xml",
+      "name": "ReviewedTaxonomyQueryViewTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.627Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.WorkModelRouteTest.xml",
+      "name": "WorkModelRouteTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.668Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.lcnc.WorkSelectNodeTest.xml",
+      "name": "WorkSelectNodeTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.713Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.litebike.KgHttpUtf8Test.xml",
+      "name": "KgHttpUtf8Test[jvm]",
+      "timestamp": "2026-11-05T04:49:19.747Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.memory.HermesMemoryFeedbackTest.xml",
+      "name": "HermesMemoryFeedbackTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.774Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.memory.ace.AceContextNodesTest.xml",
+      "name": "AceContextNodesTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.791Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.memory.ace.BreadcrumbContextNodesTest.xml",
+      "name": "BreadcrumbContextNodesTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.820Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.ApplicabilityFactsTest.xml",
+      "name": "ApplicabilityFactsTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.913Z",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.BeliefAdmissionTest.xml",
+      "name": "BeliefAdmissionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.922Z",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.BertPythonSleeveTest.xml",
+      "name": "BertPythonSleeveTest[jvm]",
+      "timestamp": "2026-11-05T04:49:19.994Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.ConstellationPremiseTest.xml",
+      "name": "ConstellationPremiseTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.619Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.DependencyCopyInferenceTest.xml",
+      "name": "DependencyCopyInferenceTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.631Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest.xml",
+      "name": "DocumentCuratorNlpRetentionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.661Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.JevaWorkerProtocolTest.xml",
+      "name": "JevaWorkerProtocolTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.694Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgKifCommentTest.xml",
+      "name": "KgKifCommentTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.728Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgPredicateNamespaceTest.xml",
+      "name": "KgPredicateNamespaceTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.757Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgPropositionIdentityTest.xml",
+      "name": "KgPropositionIdentityTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.766Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgRdfFidelityTest.xml",
+      "name": "KgRdfFidelityTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.794Z",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgRetentionTest.xml",
+      "name": "KgRetentionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.825Z",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.KgRouteErrorTest.xml",
+      "name": "KgRouteErrorTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.876Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest.xml",
+      "name": "LegalRequiredAnchorCoverageCliTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.897Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest.xml",
+      "name": "LegalRequiredAnchorCoverageTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.919Z",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.NormClauseConditionsTest.xml",
+      "name": "NormClauseConditionsTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.927Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.PropositionAttentionTest.xml",
+      "name": "PropositionAttentionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:27.935Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.PropositionReadbackTest.xml",
+      "name": "PropositionReadbackTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.140Z",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.RetainedNalImplicationTest.xml",
+      "name": "RetainedNalImplicationTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.150Z",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.narsese.SyntheticNalExperimentCliTest.xml",
+      "name": "SyntheticNalExperimentCliTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.314Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishCorpusTest.xml",
+      "name": "EnglishCorpusTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.333Z",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishCorpusViewTest.xml",
+      "name": "EnglishCorpusViewTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.397Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishInspectionTest.xml",
+      "name": "EnglishInspectionTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.407Z",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishLdaTest.xml",
+      "name": "EnglishLdaTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.423Z",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.nlp.EnglishLegalPatternsTest.xml",
+      "name": "EnglishLegalPatternsTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.627Z",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.terminal.XtermTerminalEraseSavedTest.xml",
+      "name": "XtermTerminalEraseSavedTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.731Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.terminal.XtermTerminalRowIdentityTest.xml",
+      "name": "XtermTerminalRowIdentityTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.739Z",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "file": "TEST-borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest.xml",
+      "name": "FileChannelDuplicateTest[jvm]",
+      "timestamp": "2026-11-05T04:49:28.744Z",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "allJvmTestSourcesCompiled": true,
+  "allThreeBrowserBuilds": "PASS",
+  "frozenSnapshot": "/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot",
+  "artifacts": {
+    "main.jar": "5370a549d963f871d8bdd81328bc28a3f00a064807334d3dabd47e95d6ddf036",
+    "documents.js": "f35b8b9991ffb58dba1962a0a021169965f0b560d7f5d1e327ae8e2b6be9639a",
+    "spacegraph.js": "fd19345d638b5542c9d36f5ccf1ea6887542368d35dd716984ff01bb23979c3a",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "dependencyJars": 119,
+  "totalClasspathJars": 120,
+  "buildLogSha256": "b4ba6f376e12eee07cb9ff071e7d6be16b9910f03737f92f0d8bff4ae1145ba7",
+  "buildFinished": "2026-11-05T04:49:58.949664+00:00",
+  "nativeSummary": {
+    "result": "NATIVE_AND_REOPEN_PASS_PENDING_INDEPENDENT_AUDIT",
+    "selectedAttempt": "native-attempt2",
+    "go": {
+      "rootGreen": true,
+      "sourceHead": "aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26",
+      "snapshot": "/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot",
+      "mainSha256": "5370a549d963f871d8bdd81328bc28a3f00a064807334d3dabd47e95d6ddf036",
+      "spacegraphSha256": "fd19345d638b5542c9d36f5ccf1ea6887542368d35dd716984ff01bb23979c3a",
+      "documentsSha256": "f35b8b9991ffb58dba1962a0a021169965f0b560d7f5d1e327ae8e2b6be9639a",
+      "pagesSha256": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5",
+      "totals": {
+        "tests": 489.0,
+        "failures": 0.0,
+        "errors": 0.0,
+        "skipped": 0.0
+      },
+      "dependencyJars": 119.0,
+      "totalClasspathJars": 120.0,
+      "issued": "2026-11-05T04:50:12.865413+00:00",
+      "scope": "Final-JAR real native retained NAL visual workflow only; exact production CouchWire/CouchWireRouter raw CAS alias; loopback-only network namespace; no fresh parser/provider/review/admission; real workflow Rete facts allowed and recorded."
+    },
+    "runs": [
+      {
+        "label": "S12-passage-0",
+        "httpStatus": 200,
+        "runId": "49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b",
+        "programCid": "sha256:5aa2c0f037bee137bb7402c925997f2b376fb1454c1f2076f75c3b38a1cc419d",
+        "receiptCid": "sha256:b014ae15e6034690cfc20f42c160dd28f57bdeabb013cf97a6a46a637eb1bbe5",
+        "invocationsCid": "sha256:e8bc9f46e387b4b34b576780d8800fcedeba9fbd12d425e7406d0727261c782f",
+        "status": "completed",
+        "outputCid": null,
+        "reportStatus": "EVALUATED",
+        "frameCid": "sha256:bb5ec0a36a32aa2c849bd19871a2c3dd5378d06702ed56d7253fc6897b5fcc7b",
+        "error": null
+      },
+      {
+        "label": "S12-passage-1",
+        "httpStatus": 200,
+        "runId": "ec2070e8-8f39-49d7-96be-0c5192f27b63",
+        "programCid": "sha256:1b85a28616b1b27181050c2c62ec3175d8e0284a2f0a1f829fd1c99dbeeecf19",
+        "receiptCid": "sha256:0bce1315362c9f6f7822f3d870b2fd35e422ef1934447ad0617d66a5ecbfbfbc",
+        "invocationsCid": "sha256:0413089b6a92f7ed967865605c936518071c18d942e48c05916c6a152e39daa3",
+        "status": "completed",
+        "outputCid": null,
+        "reportStatus": "EVALUATED",
+        "frameCid": "sha256:bb5ec0a36a32aa2c849bd19871a2c3dd5378d06702ed56d7253fc6897b5fcc7b",
+        "error": null
+      },
+      {
+        "label": "S12-passage-2",
+        "httpStatus": 200,
+        "runId": "02cd03cb-965d-4768-97f5-771b39122dd1",
+        "programCid": "sha256:4b17d6c94e8f9d788a3f41c30259d34d4dca61b779daf25cb834963e06ff173a",
+        "receiptCid": "sha256:db286b22515dba2ebb70db4942bd48ed498d9aeeacc873ba0d6283e968c7bdd7",
+        "invocationsCid": "sha256:f0e5783b18e8ff86a8ef510ec3b03925d8a34a7cd7a671656f05d3a82216ec7e",
+        "status": "completed",
+        "outputCid": null,
+        "reportStatus": "EVALUATED",
+        "frameCid": "sha256:bb5ec0a36a32aa2c849bd19871a2c3dd5378d06702ed56d7253fc6897b5fcc7b",
+        "error": null
+      },
+      {
+        "label": "S12-passage-3",
+        "httpStatus": 200,
+        "runId": "bf4e15fd-e655-4bac-9648-b2d44de4c9c5",
+        "programCid": "sha256:e930fc2b12da076d6606ef2b87718f14d175d3341af85e359663a0c2b400d14a",
+        "receiptCid": "sha256:4ca870bb54f8e595079cca9c64232e354bcd2a2e5c6b5b5e3a8818ca5835f2e9",
+        "invocationsCid": "sha256:f4600bfd3570c57ceb30db1985d39c2998879cb97625bc9064518a434432a624",
+        "status": "completed",
+        "outputCid": null,
+        "reportStatus": "EVALUATED",
+        "frameCid": "sha256:bb5ec0a36a32aa2c849bd19871a2c3dd5378d06702ed56d7253fc6897b5fcc7b",
+        "error": null
+      },
+      {
+        "label": "S12-passage-4",
+        "httpStatus": 200,
+        "runId": "64537f12-6e61-4a4c-bfca-3b1a88b50807",
+        "programCid": "sha256:b2aee4f42964b91180cbf93778e1bc756ed27d157f043ea9bf06b6d6473f10ab",
+        "receiptCid": "sha256:3036cb8a3089312bad17a4d1a225547f99b649f119e3dd5a38d5b854bf72af4a",
+        "invocationsCid": "sha256:c1a3baeed0d2136d55ed4f8c6edd250309febc788183ac3dee86596d54b3436b",
+        "status": "completed",
+        "outputCid": null,
+        "reportStatus": "EVALUATED",
+        "frameCid": "sha256:bb5ec0a36a32aa2c849bd19871a2c3dd5378d06702ed56d7253fc6897b5fcc7b",
+        "error": null
+      },
+      {
+        "label": "G03-whole-profile-guard",
+        "httpStatus": 200,
+        "runId": "8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f",
+        "programCid": "sha256:e8bf6064f0a11bef57f16efebd2ab5341d4e753d29b1495c6e66f1f36ec0d413",
+        "receiptCid": "sha256:525ee6d24bcddd903743a667071bd6fd28aea51d074f20d7971e1afb4551d9d8",
+        "invocationsCid": "sha256:2c56308a4b97183a4a23709dbaf35f47452d3d65b6bcf4c788d6e175e9a26aa5",
+        "status": "completed",
+        "outputCid": null,
+        "reportStatus": "UNSUPPORTED",
+        "frameCid": "sha256:da0cb39144f7c7ef705d27ff7894e70cb43500f60cdd079140cc38927cba0c81",
+        "error": null
+      },
+      {
+        "label": "S12-real-large-output",
+        "httpStatus": 200,
+        "runId": "e1d93820-bc8d-4604-88f3-a7d34f90aa86",
+        "programCid": "sha256:15d3029818ff2ba3223cd48c8dede335efe1b5f3ad7f30a197ef40bf664c08a2",
+        "receiptCid": "sha256:dbf7aee88c99ee2f56539772f4bca573cc16ae1e99ad6c67610c3ab0e75689a3",
+        "invocationsCid": "sha256:100f298fa32c1f38813ea205288b786a0af1435ac03c358d2905d6a63995d582",
+        "status": "completed",
+        "outputCid": "sha256:6f6a1ee1334cdc1163ee88c8ee78dbe181db3b49d64aa34e0f4963575ed65019",
+        "reportStatus": "EVALUATED",
+        "frameCid": "sha256:bb5ec0a36a32aa2c849bd19871a2c3dd5378d06702ed56d7253fc6897b5fcc7b",
+        "error": null
+      },
+      {
+        "label": "same-current-program-after-source-amendment",
+        "httpStatus": 400,
+        "runId": "acc1c68c-d682-4257-b698-0741cb7191b1",
+        "programCid": "sha256:5aa2c0f037bee137bb7402c925997f2b376fb1454c1f2076f75c3b38a1cc419d",
+        "receiptCid": "sha256:7b212600721c3d12608c60adf235df3a856dde732219da962245bf5aa6d3d0bd",
+        "invocationsCid": "sha256:db65c3745a76040995169abccdc23bbf52cb923d98b6957be7a7297f81e9fdf9",
+        "status": "failed",
+        "outputCid": null,
+        "reportStatus": null,
+        "frameCid": null,
+        "error": "English observation source snapshot is stale or unavailable"
+      }
+    ],
+    "publicSourceFocusCount": 5,
+    "sourceFocusGeometry": [
+      "kotlin",
+      "kotlin",
+      "kotlin",
+      "kotlin",
+      "kotlin"
+    ],
+    "nativeBrowserRequestCount": 68,
+    "currentnessOwnerReads": {
+      "beforeFreshRefusal": 14,
+      "afterFreshRefusal": 15
+    },
+    "largeContentReads": [
+      {
+        "cid": "sha256:6f6a1ee1334cdc1163ee88c8ee78dbe181db3b49d64aa34e0f4963575ed65019",
+        "lcncStatus": 413,
+        "lcncUrl": "http://127.0.0.1:18778/api/lcnc/content?cid=sha256%3A6f6a1ee1334cdc1163ee88c8ee78dbe181db3b49d64aa34e0f4963575ed65019",
+        "lcncRefusal": {
+          "error": "payload_limit"
+        },
+        "rawBlockStatus": 200,
+        "rawBlockUrl": "http://127.0.0.1:18778/api/v0/block/get?arg=sha256%3A6f6a1ee1334cdc1163ee88c8ee78dbe181db3b49d64aa34e0f4963575ed65019",
+        "bytes": 280607,
+        "sha256": "sha256:6f6a1ee1334cdc1163ee88c8ee78dbe181db3b49d64aa34e0f4963575ed65019"
+      }
+    ],
+    "sourceRetention": {
+      "initial": {
+        "bytes": 129885,
+        "sha256": "b7c78765e98c7cb656901d0ac035567b7a2a3ff15751ed9d584e1ced2f8ee957"
+      },
+      "afterVerificationPut": {
+        "bytes": 129885,
+        "sha256": "b7c78765e98c7cb656901d0ac035567b7a2a3ff15751ed9d584e1ced2f8ee957"
+      },
+      "historicalRefRecords": 17,
+      "activeRefDigests": 0,
+      "meaning": "All selected/all17 source digests were already BLOB-owned; verified puts were no-ops, no new promotion claimed"
+    },
+    "producerOriginalTreeUnchanged": true,
+    "writerCleanup": {
+      "pid": 129422,
+      "listenerJoined": true,
+      "moduleDrained": true,
+      "englishDrained": true,
+      "scopesDrained": true,
+      "ownerCompleted": true,
+      "remainingChildren": 0,
+      "casClosed": true,
+      "closedPack": {
+        "bytes": 2067301,
+        "sha256": "97c9dfc4e2a8b2f4aa1b7433f867d7688390b2ac87a285baa2828dbea6241911"
+      }
+    },
+    "reader": {
+      "pid": 129618,
+      "writerPid": 129422.0,
+      "packBeforeOpen": {
+        "bytes": 2067301,
+        "sha256": "97c9dfc4e2a8b2f4aa1b7433f867d7688390b2ac87a285baa2828dbea6241911"
+      },
+      "packAfterClose": {
+        "bytes": 2067301,
+        "sha256": "97c9dfc4e2a8b2f4aa1b7433f867d7688390b2ac87a285baa2828dbea6241911"
+      },
+      "ownerFilesBeforeOpen": {
+        "host/.kanban/board.wal": {
+          "bytes": 3336,
+          "sha256": "96827a9df4802e44838cdcbd7fb33af91e469041d71b19b81b18dc3c3e2ea0b9"
+        },
+        "host/.causal.wal": {
+          "bytes": 8,
+          "sha256": "2885a238aeb9e1a5cb5bf87e26995ed7530071c0451bd38eefe3a2d7f6a60592"
+        }
+      },
+      "ownerFilesAfterClose": {
+        "host/.kanban/board.wal": {
+          "bytes": 3336,
+          "sha256": "96827a9df4802e44838cdcbd7fb33af91e469041d71b19b81b18dc3c3e2ea0b9"
+        },
+        "host/.causal.wal": {
+          "bytes": 8,
+          "sha256": "2885a238aeb9e1a5cb5bf87e26995ed7530071c0451bd38eefe3a2d7f6a60592"
+        }
+      },
+      "jsonReadbacks": 25,
+      "historicalSourceAndInspectionReadbacks": [
+        {
+          "case": "S12",
+          "cid": "sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+          "bytes": 10469,
+          "sha256": "b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0"
+        },
+        {
+          "case": "S12",
+          "cid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "bytes": 105,
+          "sha256": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+        },
+        {
+          "case": "G03",
+          "cid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+          "bytes": 6003,
+          "sha256": "da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85"
+        },
+        {
+          "case": "G03",
+          "cid": "sha256:c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+          "bytes": 43,
+          "sha256": "c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b"
+        },
+        {
+          "case": "G04",
+          "cid": "sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+          "bytes": 6240,
+          "sha256": "f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec"
+        },
+        {
+          "case": "G04",
+          "cid": "sha256:873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+          "bytes": 47,
+          "sha256": "873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1"
+        }
+      ],
+      "actualAmendedRow": {
+        "project": "synthetic-guard-observations-v76",
+        "id": "S12.txt",
+        "cid": "sha256:f4ed16216f52737c132603a8451851c6e159f749944b375a98255d821d782e62",
+        "rev": "2-sha256:6108bf4535a2b3b656e17c3cb5c047c082fa5ecdebbdf56ea4c08e0f9c97e98d",
+        "seq": 17,
+        "length": 106,
+        "contentType": "text/plain"
+      },
+      "actualAmendedMirrorExport": "native-attempt2/after-close-readbacks/actual-amended-S12-source.txt"
+    },
+    "origins": {
+      "PackCasStore": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "EnglishObservationGraph": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "EnglishObservationWire": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "DocumentEnglishWire": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "JvmKanbanServer": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "KanbanModule": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "CouchWire": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "CouchWireRouter": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "EnglishNalPreset": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "LcncOutputReceipt": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "SyntheticNalExperiment": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "Nal": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "DerivationReceipt": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar",
+      "LcncRunService": "file:/workspace/library-files/retained-nal-lcnc-v78-proof/snapshot/main.jar"
+    },
+    "stateFactKinds": {
+      "card": 8,
+      "now": 1
+    },
+    "finalNullablePlanes": {
+      "beliefBagPresent": false,
+      "kifBankPresent": false,
+      "narsRetePresent": false,
+      "guestInstalled": [],
+      "guestMounted": [],
+      "configuredModelCount": 0,
+      "modelEndpointsPresent": false
+    },
+    "staleSourceCardCount": 0,
+    "screenshots": {
+      "native-genuine-guard-whole-profile-unsupported.png": {
+        "bytes": 193065,
+        "sha256": "505a05f9571500e4969fdf16218be858b51ba14809cfd0fda51de0e2c6b42119"
+      },
+      "native-inert-retained-nal-preset.png": {
+        "bytes": 200986,
+        "sha256": "79a4ee59b1242ff1c8c42656dc013379b8498ebea475d49ac6ca14a6613f3fb6"
+      },
+      "native-initial-fit-palette-occlusion.png": {
+        "bytes": 240982,
+        "sha256": "73b020022a740a99bd12cec10f336a95a867f582a56c124b46c67fa6f3526827"
+      },
+      "native-kotlin-geometry-verified-source-occurrence.png": {
+        "bytes": 91510,
+        "sha256": "f8928a11110223239c84db81fc55b514911720a3410cb6be26796ca86a127994"
+      },
+      "native-readable-retained-nal-source-workflow.png": {
+        "bytes": 198279,
+        "sha256": "2c7496937d2bc91e2cd65f9d696aaff758121f85b08be86610c052219c6ce878"
+      },
+      "native-real-retained-large-output-reference.png": {
+        "bytes": 173059,
+        "sha256": "6d1f241ecbdafe33ef3922a3ee190b9a7cc1d75856da5aa9d8461369f18ac20b"
+      },
+      "native-same-current-program-fresh-refusal.png": {
+        "bytes": 206302,
+        "sha256": "4638ef79ae545e611dc2d7f576beea8522bf1bf9b6b717e42b9b4b24155b8a91"
+      }
+    },
+    "captureHistory": {
+      "attempt1": "Original data PASS with all8runs/5focus, graceful writer/reader close; first source element screenshot obscured by facets/hover/activity and initial Fit by palette. Native records and exact preserved-protocol-attempt1 remain immutable.",
+      "attempt2": "Fresh producer copy, freshly compiled unchanged production-composition observers, same frozenmain/JS; complete8runs repeated. Only public Palette/Close facets/Hide activity/mouseout/wheel/canvas-pan actions improve presentation; no DOM/CSS edits, private state/result hydration or image editing.",
+      "acceptedVisualScope": "Complete505x878native elementshot is readable. Full1700x1050workflow view shows actual report/source/selector/cardbeginning; fullcard extends below viewport. Originalinitialpaletteocclusion remains a documentedv78limitation; later palette-awareFit product work is separate."
+    },
+    "scope": "Actual retained-English NAL hypotheses/commonreport and existing localvisualworkflow, not source authentication, English entailment, parser freshness, calibrated probabilities, livebag/ruleadmission, fullsealedR4filesystem, crash safety or a reviewed executionadapter."
+  },
+  "independentAuditManifest": {
+    "audit.py": "708ea90441ae151e1d8092ce92e37e68339b3440c18074ebfe78f606f400bf0e",
+    "visual_checks.py": "051115f91dfae0048e9be4e2ce1be2c25b502be42a3a1fcdd4d9a1c9c066832f",
+    "v77-audit.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763",
+    "README.txt": "dea369990219ab7ccafc58bda50888217d00bf3df952346da357abb50cf8d31e",
+    "final-strict/result.json": "862eeca8effbdcf79a9c4b0fad53038002cd59fbfe8a0e850b695fee8c34f442",
+    "final-strict/report.txt": "408a9e1951528c1f8fb014d65aefc39e20c371525f4b6ac2c8172264d411fdd8",
+    "final-recorded/result.json": "5e836454332dba4ded2d4863bbddd157424828892141d3487eb14977ed1f5f0b",
+    "final-recorded/report.txt": "16070f1129dfcf7c9228a13a43f46294ef36f1faf66171c0662b9632beed58e6"
+  },
+  "rootPublicReplay": {
+    "result": "PASS_EXACT_RECORDED_DATA_REPLAY",
+    "archiveSha256": "c474b1f42c695285c562e4ab914b68566d67c58eb1c29e6e71bce9d6051bde41",
+    "manifestSha256": "1e3589462b7deb1596fcac19d47281336284a1cb641196cd3bdb66f4c38a9f4b",
+    "resultSha256": "5e836454332dba4ded2d4863bbddd157424828892141d3487eb14977ed1f5f0b",
+    "files": 246,
+    "rawBytes": 109355038,
+    "scope": "Recorded bytes and identities only; no external binaries/full CAS/network/parser executed"
+  },
+  "publicEvidenceCommit": "1da36da7da14463347e93e1d61e34833c2d6f31a",
+  "screenshotsRootViewed": [
+    "attempt1 selected source card cramped",
+    "attempt1 inert full canvas palette overlap",
+    "attempt1 fresh stale-source refusal",
+    "attempt2 readable complete source card",
+    "attempt2 native workflow full canvas card extends below viewport"
+  ],
+  "limitations": [
+    "Atomic-symbol bounded NAL hypotheses, not legal accuracy; semantic16 seat remains missing",
+    "No new parser/model/review/admission/live belief bag/KIF/NarsRete; actual workflow Rete/blackboard changes recorded",
+    "Loopback namespace proof, not complete filesystem/R4 seal",
+    "17 historical REF entries, no active selected digest REF; omitted full CAS pack is not a portable runtime bundle",
+    "First cramped captures preserved; selected complete source card obtained through public controls"
+  ]
+}

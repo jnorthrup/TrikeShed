@@ -24,7 +24,7 @@ records 19 passing current regressions with external networking unavailable
 and compilation of all affected targets. This closes a bounded transport
 milestone; the full evaluator and visual acceptance gates remain as specified.
 
-The [airgap release index](../../airgap/README.md) now reaches R4d. R2 executes
+The [airgap release index](../../airgap/README.md) now reaches R4e. R2 executes
 the actual upstream Confix scanner with bounded native ownership; R3a adds
 observed wire sparks and native flyovers; R3b traverses a retained 12-page
 PDF and verifies an exact passage. R4a packages that path and verifies a
@@ -44,7 +44,11 @@ affected-target compilation, 21 browser cases and six startup refusals.
 barriers and selected WAL-fsync faults, with same-run inspection after an
 unacknowledged completion. Its combined source passes 264 tests with one
 conditional skip, fresh affected-target compilation and seventeen browser
-cases. These bounded milestones do not complete the whole programme. Dense
+cases. [R4e](../../airgap/10-wal-ownership.md) adds exclusive WAL ownership
+before recovery, separate-process contender refusals, crash/close release,
+and retained-store corruption/tail boundaries. Its combined source passes
+287 selected JVM checks with one conditional skip, affected-target
+compilation and 21 browser cases. These bounded milestones do not complete the whole programme. Dense
 recursive visualization, wider LCNC wizards, arbitrary-write crash recovery
 and vendor/native source-build reproducibility remain open; the original
 timeline and cost envelope are planning estimates, not measured totals.

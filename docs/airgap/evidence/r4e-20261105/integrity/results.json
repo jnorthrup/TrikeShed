@@ -1,0 +1,38 @@
+[
+  {
+    "case": "changed-jar",
+    "exit": 1,
+    "expectedAcceptance": false,
+    "result": "PASS"
+  },
+  {
+    "case": "changed-mode",
+    "exit": 1,
+    "expectedAcceptance": false,
+    "result": "PASS"
+  },
+  {
+    "case": "extra-file",
+    "exit": 1,
+    "expectedAcceptance": false,
+    "result": "PASS"
+  },
+  {
+    "case": "extra-directory",
+    "exit": 1,
+    "expectedAcceptance": false,
+    "result": "PASS"
+  },
+  {
+    "case": "changed-manifest",
+    "exit": 1,
+    "expectedAcceptance": false,
+    "result": "PASS"
+  },
+  {
+    "case": "restored",
+    "exit": 0,
+    "expectedAcceptance": true,
+    "result": "PASS"
+  }
+]

@@ -1,0 +1,2 @@
+Exception in thread "main" java.lang.IllegalArgumentException: run requires fresh state
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt.main(AirgapDocumentMain.kt:32)

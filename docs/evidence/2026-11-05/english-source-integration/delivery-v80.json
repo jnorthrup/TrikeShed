@@ -1,0 +1,23 @@
+{
+  "sourceMaster": "fdfa355623f03958536089c81e87162e6c8313ff",
+  "sourceChecks": 503,
+  "nativeDelivery": "PASS",
+  "guardRows": 6,
+  "freshRangeInspections": 2,
+  "concordanceCards": 5,
+  "inertHandoffs": 2,
+  "retainedReadbacks": 19,
+  "scope": "Observed language structure and exact source navigation; no legal-force interpretation/admission; semantic16 remains MISSING16/scored0",
+  "pcfg": {
+    "commit": "85d7f18cbc8420f409d1019f829d38645a447f26",
+    "archiveSha256": "7283b10dba8996aaceba6d40e4d622e6fa7485015edc07d31f619b0e5488378b",
+    "recordedResultSha256": "a1471769f91336372ad5ddb7b4f1bb7b6f3657d8bc52fa576c7af4c8e310757d",
+    "cases": 2,
+    "posDifferences": [
+      2,
+      3
+    ],
+    "outcome": "Coordination ambiguity not corrected; quote scope unresolved",
+    "scope": "External direct SDK comparator; application main not loaded, not a product parser recipe/Graal proof"
+  }
+}

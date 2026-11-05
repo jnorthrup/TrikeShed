@@ -1,0 +1,1 @@
+strace: Process 100110 attached with 33 threads

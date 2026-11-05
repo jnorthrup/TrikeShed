@@ -1,0 +1,9 @@
+TypeError("'int' object is not callable")
+Traceback (most recent call last):
+  File "/workspace/airgap-r4e-proof/owner.py", line 72, in <module>
+    if 'exit' not in r:finish(p,r)
+                       ^^^^^^^^^^^
+  File "/workspace/airgap-r4e-proof/owner.py", line 47, in finish
+    with http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3) as response:r['finishRequest']={'status':response.status(),'body':response.read().decode()}
+                                                                                                                                             ^^^^^^^^^^^^^^^^^
+TypeError: 'int' object is not callable

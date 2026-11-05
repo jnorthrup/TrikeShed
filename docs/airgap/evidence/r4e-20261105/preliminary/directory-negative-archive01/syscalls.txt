@@ -1,0 +1,50 @@
+96284 1793855939.116670 +++ exited with 0 +++
+96283 1793855939.116810 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=3, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96285 1793855939.118506 +++ exited with 0 +++
+96283 1793855939.118554 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=4, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96286 1793855939.119514 +++ exited with 0 +++
+96283 1793855939.119549 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=5, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96288 1793855939.121556 +++ exited with 0 +++
+96287 1793855939.121732 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=7, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96292 1793855939.127237 +++ exited with 0 +++
+96289 1793855939.127299 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=11, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96293 1793855939.130203 +++ exited with 0 +++
+96289 1793855939.130265 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=12, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96294 1793855939.131624 +++ exited with 0 +++
+96289 1793855939.131735 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=13, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96295 1793855939.134405 +++ exited with 0 +++
+96289 1793855939.134455 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=14, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96296 1793855939.137311 +++ exited with 0 +++
+96289 1793855939.137389 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=15, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96289 1793855939.137687 +++ exited with 0 +++
+96287 1793855939.137703 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=8, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96290 1793855939.137764 +++ exited with 0 +++
+96287 1793855939.137787 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=9, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96291 1793855939.137984 +++ exited with 0 +++
+96287 1793855939.137995 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=10, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96287 1793855939.138091 +++ exited with 0 +++
+96283 1793855939.138119 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=6, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+96297 1793855939.154319 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=NULL} ---
+96303 1793855939.177977 +++ exited with 0 +++
+96297 1793855939.629823 fsync(17</state/runtime/cas>) = -1 EIO (Input/output error) (INJECTED)
+96304 1793855939.643433 +++ exited with 0 +++
+96301 1793855939.643770 +++ exited with 0 +++
+96302 1793855939.643941 +++ exited with 0 +++
+96299 1793855939.644117 +++ exited with 0 +++
+96305 1793855939.644573 +++ exited with 0 +++
+96308 1793855939.644585 +++ exited with 0 +++
+96297 1793855939.644713 +++ exited with 0 +++
+96315 1793855939.644905 +++ exited with 1 +++
+96314 1793855939.644910 +++ exited with 1 +++
+96313 1793855939.644913 +++ exited with 1 +++
+96312 1793855939.644916 +++ exited with 1 +++
+96311 1793855939.644919 +++ exited with 1 +++
+96310 1793855939.644922 +++ exited with 1 +++
+96309 1793855939.644925 +++ exited with 1 +++
+96307 1793855939.644929 +++ exited with 1 +++
+96306 1793855939.644932 +++ exited with 1 +++
+96298 1793855939.644935 +++ exited with 1 +++
+96300 1793855939.649399 +++ exited with 1 +++
+96283 1793855939.649417 +++ exited with 1 +++
+96282 1793855939.649817 +++ exited with 1 +++
+96281 1793855939.649822 +++ exited with 1 +++

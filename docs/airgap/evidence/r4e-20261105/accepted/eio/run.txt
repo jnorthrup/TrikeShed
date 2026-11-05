@@ -1,0 +1,154 @@
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/opt/trikeshed/lib/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+Replayed 0 nodes into CausalGraphNodeIndex
+multicast join failed: No multicast-capable interface found
+multicast joined: 0 groups
+trikeshed-kanban: listening on :18764  donor=<none>
+Endpoints (CCEK): GET / (Forge PWA) /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor /api/invoke
+[KANBAN] forge shell prewarmed
+[BIND] accepted conn=1
+[BIND] conn=1 frame complete proto=Http bytes=132 seq-alloc
+[BIND] conn=1 accept ok=true
+[BIND] accepted conn=2
+[BIND] conn=2 frame complete proto=Http bytes=248 seq-alloc
+[BIND] conn=2 accept ok=true
+[BIND] accepted conn=3
+[BIND] conn=3 frame complete proto=Http bytes=663 seq-alloc
+[BIND] conn=3 accept ok=true
+[BIND] accepted conn=4
+[BIND] accepted conn=5
+[BIND] conn=4 frame complete proto=Http bytes=552 seq-alloc
+[BIND] conn=5 frame complete proto=Http bytes=557 seq-alloc
+[BIND] conn=4 accept ok=true
+[BIND] accepted conn=6
+[BIND] accepted conn=7
+[BIND] conn=6 frame complete proto=Http bytes=549 seq-alloc
+[BIND] conn=5 accept ok=true
+[BIND] accepted conn=8
+[BIND] conn=7 frame complete proto=Http bytes=554 seq-alloc
+[BIND] conn=6 accept ok=true
+[BIND] conn=8 frame complete proto=Http bytes=550 seq-alloc
+[BIND] conn=8 accept ok=true
+[BIND] conn=7 accept ok=true
+[BIND] accepted conn=9
+[BIND] conn=9 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=9 accept ok=true
+[BIND] accepted conn=10
+[BIND] conn=10 frame complete proto=Http bytes=588 seq-alloc
+[BIND] conn=10 accept ok=true
+[BIND] accepted conn=11
+[BIND] conn=11 frame complete proto=Http bytes=590 seq-alloc
+[BIND] conn=11 accept ok=true
+[BIND] accepted conn=12
+[BIND] conn=12 frame complete proto=Http bytes=534 seq-alloc
+[BIND] conn=12 accept ok=true
+[BIND] accepted conn=13
+[BIND] conn=13 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=13 accept ok=true
+[BIND] accepted conn=14
+[BIND] conn=14 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=14 accept ok=true
+[BIND] accepted conn=15
+[BIND] conn=15 frame complete proto=Http bytes=556 seq-alloc
+[BIND] conn=15 accept ok=true
+[BIND] accepted conn=16
+[BIND] conn=16 frame complete proto=Http bytes=525 seq-alloc
+[BIND] conn=16 accept ok=true
+[BIND] accepted conn=17
+[BIND] conn=17 frame complete proto=Http bytes=2793 seq-alloc
+[BIND] conn=17 accept ok=true
+[BIND] accepted conn=18
+[BIND] conn=18 frame complete proto=Http bytes=576 seq-alloc
+[BIND] conn=18 accept ok=true
+[BIND] accepted conn=19
+[BIND] conn=19 frame complete proto=Http bytes=576 seq-alloc
+[BIND] conn=19 accept ok=true
+[BIND] accepted conn=20
+[BIND] conn=20 frame complete proto=Http bytes=576 seq-alloc
+[BIND] conn=20 accept ok=true
+[BIND] accepted conn=21
+[BIND] conn=21 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=21 accept ok=true
+[BIND] accepted conn=22
+[BIND] conn=22 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=22 accept ok=true
+[BIND] accepted conn=23
+[BIND] conn=23 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=23 accept ok=true
+[BIND] accepted conn=24
+[BIND] conn=24 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=24 accept ok=true
+[BIND] accepted conn=25
+[BIND] conn=25 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=25 accept ok=true
+[BIND] accepted conn=26
+[BIND] conn=26 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=26 accept ok=true
+[BIND] accepted conn=27
+[BIND] conn=27 frame complete proto=Http bytes=805 seq-alloc
+[BIND] conn=27 accept ok=true
+[BIND] accepted conn=28
+[BIND] conn=28 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=28 accept ok=true
+[BIND] accepted conn=29
+[BIND] conn=29 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=29 accept ok=true
+[BIND] accepted conn=30
+[BIND] conn=30 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=30 accept ok=true
+[BIND] accepted conn=31
+[BIND] conn=31 frame complete proto=Http bytes=248 seq-alloc
+[BIND] conn=31 accept ok=true
+[BIND] accepted conn=32
+[BIND] conn=32 frame complete proto=Http bytes=132 seq-alloc
+[BIND] conn=32 accept ok=true
+[BIND] accepted conn=33
+[BIND] conn=33 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=33 accept ok=true
+[BIND] accepted conn=34
+[BIND] conn=34 frame complete proto=Http bytes=809 seq-alloc
+[BIND] conn=34 accept ok=true
+[BIND] accepted conn=35
+[BIND] conn=35 frame complete proto=Http bytes=682 seq-alloc
+[BIND] conn=35 accept ok=true
+[BIND] accepted conn=36
+[BIND] conn=36 frame complete proto=Http bytes=132 seq-alloc
+[BIND] conn=36 accept ok=true
+[BIND] accepted conn=37
+[BIND] conn=37 frame complete proto=Http bytes=202 seq-alloc
+[BIND] conn=37 accept ok=true
+Exception in thread "main" java.lang.IllegalStateException: Kanban module cleanup failed
+	at borg.trikeshed.kanban.module.KanbanModule$open$cleanup$2.invokeSuspend(KanbanModule.kt:116)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:278)
+	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:47)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt.main(AirgapDocumentMain.kt:36)
+Caused by: borg.trikeshed.userspace.nio.UringIOException: FSYNC failed: -5
+	at borg.trikeshed.userspace.nio.channels.UringFileChannel.execute(UringFileChannel.kt:44)
+	at borg.trikeshed.userspace.nio.channels.UringFileChannel.execute$default(UringFileChannel.kt:34)
+	at borg.trikeshed.userspace.nio.channels.UringFileChannel.force(UringFileChannel.kt:145)
+	at borg.trikeshed.kanban.BoardFileWal.flush(BoardFileWal.kt:99)
+	at borg.trikeshed.kanban.JvmBoardWal.flush(JvmBoardWal.kt)
+	at borg.trikeshed.kanban.BoardStoreElement$open$5$1.invokeSuspend(BoardStoreElement.kt:319)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.internal.DispatchedContinuationKt.resumeCancellableWithInternal(DispatchedContinuation.kt:384)
+	at kotlinx.coroutines.intrinsics.CancellableKt.startCoroutineCancellable(Cancellable.kt:26)
+	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:502)
+	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source)
+	at borg.trikeshed.kanban.BoardStoreElement$open$5.invokeSuspend(BoardStoreElement.kt:316)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:807)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)

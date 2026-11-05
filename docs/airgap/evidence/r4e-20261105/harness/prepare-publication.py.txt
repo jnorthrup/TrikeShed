@@ -1,0 +1,18 @@
+from pathlib import Path
+import shutil,json,hashlib,subprocess
+h=Path('/workspace/airgap-r4e-proof');r=Path('/workspace/TrikeShed');pre=h/'preliminary-package-identities'
+def sha(p):return hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+# Reclaim only a verified scratch extraction. Retain the unpublished candidate's exact manifests and proof states.
+root=h/'unpacked/airgap-document-rootfs';record=json.loads((root/'package-identity.json').read_text())
+assert record['sourceCommit']=='8a04bd4244951cb4056bd4c3413db80d5316312c'
+for row in record['files']:assert sha(root/row['path'])==row['sha256']
+(pre/'extraction-reclamation.json').write_text(json.dumps({'removedScratch':str(root),'sourceCommit':record['sourceCommit'],'verifiedFiles':len(record['files']),'retainedManifests':'preliminary-package-identities','reason':'Rebuild and re-extract after publication-cutoff source integration; earlier proof directories retained.'},indent=2)+'\n')
+shutil.rmtree(h/'unpacked')
+# The static source pool is hardlinked to earlier releases. Replace only R4e-owned Git archive and manifests.
+out=h/'corresponding-source';head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip()
+for p in out.glob('trikeshed-*.tar.gz'):p.unlink()
+p=out/'README.md';s=p.read_text().replace('8a04bd4244951cb4056bd4c3413db80d5316312c',head).replace('8a04bd424',head[:9]);p.unlink();p.write_text(s)
+subprocess.run(['git','archive','--format=tar.gz','--prefix=TrikeShed/','--output='+str(out/('trikeshed-'+head[:9]+'.tar.gz')),head],cwd=r,check=True)
+p=out/'SHA256.json';p.unlink();p.write_text(json.dumps({p.relative_to(out).as_posix():sha(p) for p in sorted(out.rglob('*')) if p.is_file() and p.name!='SHA256.json'},indent=2)+'\n')
+subprocess.run(['python3',str(h/'sources.py'),'archive'],check=True)
+p=h/'source-archive.json';d=json.loads(p.read_text());d['sourceCommit']=head;p.write_text(json.dumps(d,indent=2)+'\n')

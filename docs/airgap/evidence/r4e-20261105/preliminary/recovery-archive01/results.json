@@ -1,0 +1,53 @@
+[
+  {
+    "case": "short-header",
+    "exit": 0,
+    "expectedRefusal": null,
+    "reachedAdmission": true,
+    "finishRequest": {
+      "status": 200,
+      "body": "{\"finished\":true}"
+    },
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "case": "short-payload",
+    "exit": 0,
+    "expectedRefusal": null,
+    "reachedAdmission": true,
+    "finishRequest": {
+      "status": 200,
+      "body": "{\"finished\":true}"
+    },
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "case": "complete-crc-corruption",
+    "exit": 1,
+    "expectedRefusal": "Board WAL checksum mismatch",
+    "reachedAdmission": false,
+    "finishRequest": null,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "case": "missing-payload",
+    "exit": 1,
+    "expectedRefusal": "Missing board WAL payload",
+    "reachedAdmission": false,
+    "finishRequest": null,
+    "error": null,
+    "result": "PASS"
+  },
+  {
+    "case": "changed-payload",
+    "exit": 1,
+    "expectedRefusal": "Board WAL payload digest mismatch",
+    "reachedAdmission": false,
+    "finishRequest": null,
+    "error": "AssertionError()",
+    "result": "FAIL"
+  }
+]

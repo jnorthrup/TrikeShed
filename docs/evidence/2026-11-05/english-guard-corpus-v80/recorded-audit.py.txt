@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""Independent guard/corpus recorded data audit. No JVM, parser, engine or browser."""
+import argparse,base64,copy,hashlib,json,re
+from pathlib import Path
+from urllib.parse import urlsplit,unquote,urlunsplit,urlencode
+from checks import *
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+
+def stamp(path):
+    raw=path.read_bytes();return {'bytes':len(raw),'sha256':sha(raw)}
+
+def origins(values,main_path):
+    need(values and all(unquote(urlsplit(v).path)==str(main_path) for v in values.values()),'Actual production class sources use pinned main JAR')
+
+def artifact(attempt,go,args):
+    need(go['rootGreen'] is True and go['sourceHead']==args.source_head and go['mainSha256']==args.main_sha and go['spacegraphSha256']==args.panels_sha and go['documentsSha256']==args.documents_sha,'Explicit final frozen artifact GO/pins')
+    folder=attempt/'artifact-metadata' if args.recorded_only else Path(go['snapshot'])
+    manifest=load(folder/'sha256.json');need((folder/'source-head.txt').read_text().strip()==args.source_head and sha((folder/'source-head.txt').read_bytes())==manifest['source-head.txt'],'Frozen source metadata')
+    for name,wanted in [('main.jar',args.main_sha),('spacegraph.js',args.panels_sha),('documents.js',args.documents_sha)]:
+        need(manifest[name]==wanted,'Recorded final artifact hash metadata')
+        if not args.recorded_only:need(stamp(folder/name)['sha256']==wanted,'Actual frozen artifact bytes')
+    cp=load(attempt/'classpath.json')
+    need(cp['productionDependencyJars']==120 and cp['totalJarCount']==121 and cp['totalClasspathEntries']==122,'Explicit production JAR/observer/assets classpath scope')
+    need(set(cp['assetJar']['entries'])=={'web/kotlin/spacegraph/spacegraph.js','web/kotlin/documents/documents.js'} and cp['assetJar']['entries']['web/kotlin/spacegraph/spacegraph.js']['sha256']==args.panels_sha and cp['assetJar']['entries']['web/kotlin/documents/documents.js']['sha256']==args.documents_sha,'Asset-only browser entry manifest')
+    cp_rows=cp['productionClasspath'];paths=[r['path'] for r in cp_rows]
+    need(len(paths)==len(set(paths))==120 and paths[0]==str(Path(go['snapshot'])/'main.jar') and len(manifest['dependencies'])==119,'Complete actual production classpath path identities')
+    need((folder/'classpath.txt').read_text().strip().split(':')==paths,'Frozen classpath text matches actual command dependency list')
+    for row in cp_rows:
+        wanted=args.main_sha if row is cp_rows[0] else manifest['dependencies'][row['path']]
+        need(row['sha256']==wanted,'Every recorded production dependency hash matches frozen manifest')
+        if not args.recorded_only:need(stamp(Path(row['path']))['sha256']==wanted,'Actual production dependency JAR bytes')
+    for filename,main_class in [('writer-command.json','proof.guardcorpus.FixtureKt'),('reader-command.json','proof.guardcorpus.ReopenKt')]:
+        command=load(attempt/filename);position=command.index('-cp')
+        need(command[position+1].split(':')==[cp['observerClasses']]+paths+[cp['assetJar']['path']] and command[position+2]==main_class,'Actual observer entrypoint/production dependency/asset-only classpath command')
+    return Path(go['snapshot'])/'main.jar'
+
+def no_run(popup):
+    need(popup['runPosts']==popup['queryPosts']==0 and popup['parserPosts']==2 and popup['nodeCount']==10,'Native retained popup stays inert after two fresh parses')
+    need(popup['receiptControl']==popup['choice']['range']['receiptCid'] and popup['modeControl']=='current','Actual public offered-program receipt/mode prefill')
+    need(popup['scratchBefore']==popup['scratchAfter'] and popup['contextAttributes']['data-english-query-origin']=='1','Exact selected-origin context, no scratch overwrite')
+
+def stale_guard(refused,old):
+    need(refused['status']==409 and refused['rows']==refused['candidateCount']==0,'Fresh amended-source refusal clears candidate/rows')
+    need(refused['request']==old['queried']['request'] and set(refused['response'])=={'error'} and 'stale' in refused['response']['error'].lower(),'Same original current query refuses without borrowed results/fallback')
+
+DIAGNOSTIC_FILE_SHA256={'G03': 'd94a765aeb363487d79bc17964db64b1e6108c6a12ad47103d3d305435743577', 'G04': '7388961ad0a27cee4626d4b9b9d83461f4e073a1a90aa9f8e1f21db0cb12d215', 'G07': 'f479b277e73542710abadf1d009a1d693cdface7e657c67b948192de3dfb2caf', 'G13': '7388961ad0a27cee4626d4b9b9d83461f4e073a1a90aa9f8e1f21db0cb12d215'}
+ORIGINALS={'S12':'b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0','G03':'da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85','G04':'f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec','G07':'1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608','G13':'bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39'}
+def case_input(proof,key):
+    folder=proof/'inputs'/key;body=load(folder/'response.json');source=(folder/'source.txt').read_text();raw=(folder/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor')).read_bytes()
+    need(body['receiptCid']=='sha256:'+ORIGINALS[key],'Exact published original selected inspection CID')
+    if key in DIAGNOSTIC_FILE_SHA256:need(sha((folder/'condition-diagnostics.json').read_bytes())==DIAGNOSTIC_FILE_SHA256[key],'Original diagnostic file bytes, not independent legal gold')
+    receipt(body,raw,source);need((folder/'status.txt').read_text().strip()=='200','Genuine original retained producer status')
+    need(body['selection']=={k:load(folder/'request.json')[k] for k in ['project','id','cid','rev','seq']} and body['sourceSnapshots']==[load(folder/'source-row.json')],'Original selection/revision provenance unchanged')
+    return body,source
+
+def amendment(attempt,observed,key,old,reopened):
+    data=observed['guardSourceAmendment' if key=='G03' else 'sourceAmendment'];raw=base64.b64decode(data['requestBase64'],validate=True)
+    need(raw.decode('utf8')==data['requestUtf8']==old+'\n' and cid(raw)==data['requestCid'],'Exact real source upload preimage')
+    need((attempt/(key+'-actual-upload-request.txt')).read_bytes()==raw and (attempt/'after-close-readbacks'/('actual-amended-'+key+'-source.txt')).read_bytes()==raw,'Actual request and after-close amended mirror bytes')
+    before=data['before']['rows'][key];after=data['after']['rows'][key];need(after==reopened['currentRows'][key] and after['cid']==cid(raw) and after['cid']!=before['cid'] and after['rev']!=before['rev'] and after['seq']!=before['seq'],'Actual current physical head differs while old immutable receipt stays historical')
+
+def sdk(proof,states,recorded_only):
+    path=proof/'inputs/static-closure.json';need(sha(path.read_bytes())=='9424b0a673e7f9a0189d216304a7e38ebcbb76bf572e13188c11e51aad4574ab','Exact disclosed CoreNLP static closure metadata')
+    meta=load(path);entries=meta['closure']['files'];need(len(entries)==29 and sum(r['bytes'] for r in entries)==495986003,'Disclosed29file non-generative SDK including linguistic model JAR')
+    if not recorded_only:
+        origin=Path(meta['origin']['directory']);need({str(p.relative_to(origin)) for p in origin.rglob('*') if p.is_file()}=={r['relativePath'] for r in entries},'Exact actual29file SDK set, no extra artifacts')
+        for entry in entries:need(stamp(Path(entry['origin']))=={'bytes':entry['bytes'],'sha256':entry['sha256']},'Actual external static SDK file bytes')
+    for state in states:
+        need(state['guestInstalled']==['corenlp'] and state['guestMounted'] in [[],['corenlp']],'Observed corenlp-only SDK configuration, not v78 empty SDK')
+        need(state['beliefBagPresent'] is state['kifBankPresent'] is state['narsRetePresent'] is False and state['configuredModelCount']==0 and state['modelEndpointsPresent'] is False and all(v is False for v in state['intakeHooks'].values()),'No configured generative endpoints/bag/KIF/NARS/admission hooks')
+        for fact in state['reteFacts']:need(fact['partition']=='board' and fact['id']=='now' and fact['fields']['kind']=='now','Actual host clock fact, no English/NAL world observation admission')
+    return meta
+
+def table_views(observed):
+    views=observed.get('tableViews',[])
+    if not views:return {'measured':False,'scope':'Historical v79 functional data; query-table layout defect retained'}
+    need([v['id'] for v in views]==['G03','G04','G07','G13'],'All final query tables measured through public wheel actions')
+    for view,record in zip(views,observed['guardCases']):
+        left,right=view['left'],view['right'];need(left['scrollLeft']==0 and right['scrollLeft']>0 and left['scrollWidth']==right['scrollWidth'] and left['clientWidth']==right['clientWidth'] and right['scrollLeft']==right['scrollWidth']-right['clientWidth'],'Measured horizontal overflow and full native right scroll, not clipped three-character columns')
+        expected=[cell for row in record['rows'] for cell in row['cells']]
+        need(len(view['cells'])==len(expected) and all(cell['variable']==old['variable'] and cell['text']==old['text'] and cell['rect']['width']>=128 for cell,old in zip(view['cells'],expected)),'Actual measured cell content/width stays bound to typed rows')
+    return {'measured':True,'tables':len(views),'wrapperWidth':views[0]['left']['clientWidth'],'tableWidth':views[0]['left']['scrollWidth'],'scrollDelta':views[0]['right']['scrollLeft'],'scope':'Measured overflow wrapper and cells; all columns accessible by actual horizontal wheel; not all fit in one viewport'}
+
+def mutations(observed,cases,expected,document,diagnostics):
+    controls=[];guards=observed['guardCases']
+    def rejects(label,check):
+        try:check()
+        except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:controls.append({'mutation':label,'result':'REJECTED','reason':str(error)})
+        else:raise AuditError('Mutated copy accepted: '+label)
+    first=guards[0];bad=copy.deepcopy(first);binding=bad['queried']['response']['results']['results']['bindings'][0];binding['governor']=copy.deepcopy(binding['subordinate'])
+    rejects('wrong-governor-role-URI',lambda:typed_guard(bad,first['candidate']['response'],expected['G03']))
+    g7=guards[2]['candidate']['response'];base,source=cases['G07'];diag=diagnostics['G07']
+    inherited=copy.deepcopy(g7);inherited['guardAttachments']['sentences'][0]['attachments'][1]['markerBindingOrdinals']=copy.deepcopy(inherited['guardAttachments']['sentences'][0]['attachments'][0]['markerBindingOrdinals'])
+    rejects('inherited-marker-on-unmarked-G07-target',lambda:guard_candidate(inherited,base,source,diag))
+    dropped=copy.deepcopy(g7);dropped['guardAttachments']['sentences'][0]['attachments'].pop()
+    rejects('dropped-original-G07-target',lambda:guard_candidate(dropped,base,source,diag))
+    wrong=copy.deepcopy(first['candidate']['response']);wrong['originalCid']='sha256:'+'0'*64
+    rejects('wrong-original-source-CID',lambda:guard_candidate(wrong,*cases['G03'],diagnostics['G03']))
+    popup=observed['handoffOpens'][0];choice=popup['choice'];url=urlsplit(choice['href']);fields=dict(parse_qsl(url.query));fields['englishBegin']=str(choice['sentence']['begin']);fields['englishEnd']=str(choice['sentence']['end']);changed=urlunsplit((url.scheme,url.netloc,url.path,urlencode(fields),url.fragment))
+    rejects('sentence-bounds-as-inspection-range',lambda:handoff(changed,choice['sentence'],document))
+    fresh=copy.deepcopy(observed['freshInspections'][0]);fresh['response']['parser']['runtime']['parserInputCid']=cases['S12'][0]['originalCid']
+    rejects('full-source-hash-as-substring-parser-input',lambda:parser_range(fresh['response'],fresh['request'],cases['S12'][1]))
+    stale=copy.deepcopy(observed['guardRefusal']);stale['response']=copy.deepcopy(first['queried']['response']);stale['rows']=1;stale['candidateCount']=1
+    rejects('fresh-stale-refusal-reuses-old-rows',lambda:stale_guard(stale,first))
+    automatic=copy.deepcopy(popup);automatic['runPosts']=1
+    rejects('automatic-run-from-concordance-popup',lambda:no_run(automatic))
+    return controls
+
+def audit(proof,attempt,args):
+    for name in ['GO.json','browser-result.json','startup.json','cleanup.json','reopened.json']:
+        if not (attempt/name).is_file():return {'result':'PENDING','reason':'Actual closed native records required; no runtime launched by auditor'}
+    browser=load(attempt/'browser-result.json');o=browser['observed'];startup=load(attempt/'startup.json');go=load(attempt/'GO.json');cleanup=load(attempt/'cleanup.json');reopen=load(attempt/'reopened.json')
+    need(browser['result']=='PASS' and browser['errors']==browser['external']==[] and startup['go']==go,'Closed actual browser and exact frozen GO')
+    main=artifact(attempt,go,args);origins(startup['origins'],main);origins(reopen['codeSources'],main)
+    need({'CoreNlpRuntime','EnglishGuardAttachments','EnglishGuardQueryView','EnglishLegalGraph','EnglishCorpusWire','DocumentEnglishWire','CouchWire','CouchWireRouter','JvmKanbanServer'}.issubset(startup['origins']),'Actual production engine/owner/raw-route class provenance')
+    for name in ['browser.exit','writer.exit','reader.exit','namespace.exit']:need((attempt/name).read_text().strip()=='0','Actual process exited0 '+name)
+    cases={key:case_input(proof,key) for key in ['S12','G03','G04','G07','G13']}
+    need(cases['S12'][0]['receiptCid']=='sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0','Original full S12 receipt remains distinct from fresh ranges')
+    diagnostics={key:load(proof/'inputs'/key/'condition-diagnostics.json') for key in ['G03','G04','G07','G13']}
+    guards=o['guardCases'];need([r['id'] for r in guards]==['G03','G04','G07','G13'],'Four selected original retained guard cases')
+    summaries=[];expected_guards={}
+    for record in guards:
+        key=record['id'];base,source=cases[key];candidate=record['candidate']['response'];need(record['candidate']['status']==200 and record['candidate']['request']=={'receiptCid':base['receiptCid'],'mode':'current'},'Actual retained candidate request')
+        need(decode(raw_block(attempt,candidate['receiptCid']))=={k:v for k,v in candidate.items() if k!='receiptCid'},'Actual candidate canonical CBOR/CID')
+        opening=record['opened'];need(opening['status']==200 and opening['response']['receiptCid']==base['receiptCid'] and opening['response']['retrieval']=={'kind':'retained-current-inspection','parserExecuted':False,'modelCalled':False,'currentness':'checked-before-and-after-open'},'Guard opens original retained observation without parser execution')
+        expected=guard_candidate(candidate,base,source,diagnostics[key]);expected_guards[key]=expected;summaries.append(typed_guard(record,candidate,expected))
+    need([s['rows'] for s in summaries]==[1,1,2,2],'All six original direct targets retained, including unmarked and nested links')
+    stale_guard(o['guardRefusal'],guards[0]);amendment(attempt,o,'G03',cases['G03'][1],reopen)
+    fresh_records=o['freshInspections'];need(len(fresh_records)==2 and [(r['request']['begin'],r['request']['end']) for r in fresh_records]==[(0,40),(40,105)],'Exactly proposed two fresh source ranges')
+    fresh=[]
+    for row in fresh_records:
+        body=row['response'];need(row['status']==200 and body['receiptCid']!=cases['S12'][0]['receiptCid'],'Actual new range receipt, not sliced old full inspection')
+        receipt(body,raw_block(attempt,body['receiptCid']),cases['S12'][1]);subset=parser_range(body,row['request'],cases['S12'][1]);need((attempt/('requested-parser-subset-'+str(row['request']['begin'])+'-'+str(row['request']['end'])+'.txt')).read_bytes()==subset,'Actual parser request substring byte file')
+        need(row['before']['rows']['S12']==row['after']['rows']['S12']==cases['S12'][0]['sourceSnapshots'][0],'Fresh parser reads original unchanged physical source')
+        need(row['after']['guestMounted']==['corenlp'] and row['after']['mountedParserOrigins']['status']=='already-mounted-by-default-reader','Actual default reader mounted the configured parser')
+        fresh.append(body)
+    need(len({b['receiptCid'] for b in fresh})==2 and fresh_records[0]['before']['guestMounted']==[],'Two distinct real fresh inspections, retained guard phase did not mount parser')
+    builds=o['corpusBuilds'];need(len(builds)==1 and builds[0]['status']==200 and builds[0]['request']['topics'] is None,'Single explicit descriptive corpus build, no LDA')
+    response=builds[0]['response'];need(decode(raw_block(attempt,response['receiptCid']))=={k:v for k,v in response.items() if k!='receiptCid'} and decode(raw_block(attempt,response['matrixCid']))==response['matrix'],'Actual corpus envelope/matrix canonical blocks')
+    doc,sentences=corpus(response,fresh,cases['S12'][1]);need(set(builds[0]['request']['receiptCids'])=={b['receiptCid'] for b in fresh} and builds[0]['request']['mode']=='current','Actual only-two-range current corpus request')
+    core_fetched=any(r['cid']==response['corpusCid'] for r in o['casReads'])
+    if core_fetched:need(decode(raw_block(attempt,response['corpusCid']))=={k:response[k] for k in ['schema','reviewStatus','authority','legalMeaning','countsAreEvidenceConfidence','coverage','matrixCid','matrix','rawTokenCount','retrieval','terms','sentences','occurrences']},'Actual retained core corpus block supplied')
+    imply_ids={t['sentenceId'] for t in response['occurrences'] if t['included'] and t['term']=='imply'}
+    need({c['id'] for c in o['concordanceCards']}==imply_ids,'Imply concordance uses actual included lemma occurrences')
+    corpus_source=response['source'];need(corpus_source['mode']=='current' and corpus_source['historical'] is False and corpus_source['currentness']=='checked-before-and-after-build' and corpus_source['parserExecution']=='not-reverified' and {s['receiptCid'] for s in corpus_source['sources']}=={b['receiptCid'] for b in fresh},'Corpus current host envelope and exact selected fresh inspections')
+    need(len(o['concordanceCards'])==len(sentences)==5,'Five actual concordance sentence cards')
+    for card in o['concordanceCards']:
+        need(card['id'] in sentences and card['sentence']==sentences[card['id']] and card['quote']==card['sentence']['quote'],'Concordance displays actual returned sentence quote/identity');need(handoff(card['href'],card['sentence'],doc)==card['range'],'Navigation bound to original inspection range')
+    popups=o['handoffOpens'];need(len(popups)==2 and {p['choice']['range']['receiptCid'] for p in popups}=={b['receiptCid'] for b in fresh},'One actual popup per inspection range')
+    for popup in popups:
+        no_run(popup);selection=handoff(popup['choice']['href'],popup['choice']['sentence'],doc);opened=popup['opened'];need(opened['status']==200 and opened['request']['receiptCid']==selection['receiptCid'] and opened['request']['begin']==selection['begin'] and opened['request']['end']==selection['end'],'Actual retained open uses whole matching range')
+        need(opened['request']==dict(selection['selection'],receiptCid=selection['receiptCid'],begin=selection['begin'],end=selection['end']),'All eight actual popup source/range fields')
+        need(opened['response']['retrieval']=={'kind':'retained-current-inspection','parserExecuted':False,'modelCalled':False,'currentness':'checked-before-and-after-open'},'Retained reopen does not execute parser/provider')
+        need(selection['receiptCid'] in popup['contextText'],'Visible selected-origin context contains original inspection identity')
+    amendment(attempt,o,'S12',cases['S12'][1],reopen);need(len(o['refusedOpens'])==1 and o['refusedOpens'][0]['status']==409 and o['refusedOpens'][0]['originCount']==0 and o['refusedOpens'][0]['nodeCount']!=10,'Old concordance link refuses after actual source amendment; no old origin/program reuse')
+    posts=[r for r in browser['requests'] if r['method']=='POST'];need(sum(r['path']=='/api/documents/english' for r in posts)==2 and all(r['path'] not in ['/api/lcnc/run','/api/documents/english/query'] for r in posts) and o['explicitRuns']==[],'Actual no automatic LCNC/copular query execution; exactly two fresh parser POSTs')
+    need(sum(r['path']=='/api/documents/english/corpus' for r in posts)==1 and sum(r['path']=='/api/documents/english/legal-patterns/query' for r in posts)==5,'Only explicit corpus/guard queries captured, no automatic fallback')
+    fit=o['paletteFit'];need(fit['runPosts']==0 and fit['palette']['width']>0 and all(r['x']>=fit['palette']['x']+fit['palette']['width'] for r in fit['nodeRects'].values()),'Actual visible palette-aware Fit frames left controls beside palette')
+    network=load(attempt/'network.json');outside=load(attempt/'controller-before-netns.json')
+    need(network['networkNamespace']==startup['baseline']['networkNamespace'] and network['networkNamespace']!=outside['networkNamespace'] and {r['ifname'] for r in json.loads(network['interfaces'])}=={'lo'} and json.loads(network['routes'])==[] and network['externalTcp']['errno']==101,'Recorded actual loopback-only network namespace, not full rootfs seal')
+    states=[startup['baseline']]+[r['value'] for r in o['states']];closure=sdk(proof,states,args.recorded_only);need(all(s['blackboard']==startup['baseline']['blackboard'] for s in states),'No workflow/English report admission into blackboard')
+    index=o['casReads'];need(index==load(attempt/'readback-index.json') and len(index)==len(reopen['readbacks']),'All actual CAS readbacks checked after close')
+    for record,closed_row in zip(index,reopen['readbacks']):
+        raw=(attempt/record['file']).read_bytes();need(cid(raw)==record['cid']==record['sha256']==closed_row['cid'] and len(raw)==record['bytes']==closed_row['bytes'] and record['role']==closed_row['role'],'Exact supplied raw CAS content and after-close role binding')
+    need(cleanup['pid']==startup['baseline']['pid']==reopen['writerPid'] and reopen['readerPid']!=cleanup['pid'] and reopen['writerCleanup']==cleanup and cleanup['remainingChildren']==0,'Distinct actual writer/reader ownership and closure')
+    need(all(cleanup[k] is True for k in ['listenerJoined','moduleDrained','englishDrained','scopesDrained','ownerCompleted','casClosed','guestModulesClosed']) and cleanup['guestModulesMountedAfterClose']==[] and reopen['closed'] is True and reopen['guestModulesMountedAfterClose']==[] and reopen['guestModulesClosed'] is True,'Actual owners/parser loaders closed; after-close reader mounted no parser')
+    need(cleanup['closedPack']==reopen['packBeforeOpen']==reopen['packAfterClose'] and reopen['ownerFilesBeforeOpen']==reopen['ownerFilesAfterClose'],'Recorded CAS/owner-WAL bytes unchanged across separate reader')
+    if not args.recorded_only:
+        need(stamp(attempt/'runtime/cas/pack')==cleanup['closedPack'],'Actual local closed CAS pack bytes match reader record')
+        for name,value in reopen['ownerFilesAfterClose'].items():need(stamp(attempt/'runtime'/name)==value,'Actual local closed owner/WAL file bytes')
+    views=table_views(o)
+    for row in fresh_records:
+        parser_origin=row['after']['mountedParserOrigins'];need(parser_origin['processorPackageVersion']=='4.6.0','Actual mounted processor package version')
+        allowed={closure['moduleJar']['origin'],str(Path(go['sdkRoot'])/'corenlp'/closure['moduleJar']['relativePath'])}
+        need(unquote(urlsplit(parser_origin['processorCodeSource']).path) in allowed,'Actual processor CodeSource is the declared CoreNLP SDK JAR')
+        for resource,url in parser_origin['resolvedResourceUrls'].items():
+            if url is None:continue
+            model_path=unquote(urlsplit(url.removeprefix('jar:').split('!/',1)[0]).path)
+            need(model_path in {closure['modelJar']['origin'],str(Path(go['sdkRoot'])/'corenlp'/closure['modelJar']['relativePath'])},'Resolved linguistic-model resources belong to disclosed model JAR; availability is not a usage trace')
+        if views['measured']:need(all(url is not None for url in parser_origin['resolvedResourceUrls'].values()),'Actual corrected final resource probes report availability')
+    refused=o['refusedOpens'][0];prior=next(p for p in popups if p['choice']['range']['begin']==40)
+    need(refused['request']==prior['opened']['request'] and set(refused['response'])=={'error'} and 'changed' in refused['response']['error'].lower() and refused['nodeCount']==0,'Same original second-range open fails current source validation before any program clone')
+    controls=mutations(o,cases,expected_guards,doc,diagnostics)
+    records={n:sha((attempt/n).read_bytes()) for n in ['GO.json','startup.json','browser-result.json','cleanup.json','reopened.json','classpath.json','network.json','readback-index.json','writer-command.json','reader-command.json']}
+    sources={p.name:sha(p.read_bytes()) for p in (attempt/'observer-inputs').iterdir() if p.is_file()} if (attempt/'observer-inputs').is_dir() else {}
+    selected=[]
+    for key,(body,text) in cases.items():
+        folder=proof/'inputs'/key;selected += [folder/n for n in ['source.txt','request.json','response.json','source-row.json','status.txt']]
+        selected += [folder/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor'),folder/'cas-readbacks'/(body['extractedTextCid'][7:]+'.txt')]
+        if key!='S12':selected.append(folder/'condition-diagnostics.json')
+    selected.append(proof/'inputs/static-closure.json')
+    input_hashes={str(p.relative_to(proof)):sha(p.read_bytes()) for p in selected}
+    image_hashes={p.name:sha(p.read_bytes()) for p in sorted(attempt.glob('*.png'))}
+    return {'selectedInputSha256':input_hashes,'imageSha256':image_hashes,'recordSha256':records,'observerSourceSha256':sources,'mutatedCopyControls':controls,'tableViews':views,'result':'PASS_RECORDED_GUARD_CORPUS_LOGIC_CONSISTENCY','sourceHead':args.source_head,'mainSha256':args.main_sha,'documentsSha256':args.documents_sha,'panelsSha256':args.panels_sha,'writerPid':cleanup['pid'],'readerPid':reopen['readerPid'],'guardRows':summaries,'freshInspections':[{'receiptCid':b['receiptCid'],'range':b['range'],'parserInputCid':b['parser']['runtime']['parserInputCid']} for b in fresh],'casReadbacks':len(index),'corpusCoreBlockMaterialized':core_fetched,'paletteFit':fit,'artifactVerification':'recorded metadata only; external JAR/SDK/full-pack availability not checked' if args.recorded_only else 'actual frozen120JAR/browser/static29SDK bytes additionally rehashed','sdkProcessorOrigins':[r['after']['mountedParserOrigins'] for r in fresh_records],'scope':'Raw retained dependency/marker/quote/diagnostic and actual request/result/source/CID consistency only. Fresh parser provenance is captured default-owner/SDK execution, not independent output accuracy or producer authentication. Corpus counts/navigation are descriptive; no legal force, benchmark completeness, semantic entailment, independent evidence, review/admission, or full R4 rootfs claim. Omitted full pack/prefix/SDK bytes are not a portable CAS/model bundle. Measured final horizontal table/cell records are reported separately; historical v79 c929 records retain their query-table layout limitation.'}
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('proof',type=Path);parser.add_argument('attempt',type=Path);parser.add_argument('--out',type=Path,required=True)
+    for flag in ['source-head','main-sha','panels-sha','documents-sha']:parser.add_argument('--'+flag,required=True)
+    parser.add_argument('--recorded-only',action='store_true');args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    try:result=audit(args.proof,args.attempt,args)
+    except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:result={'result':'FAIL','error':str(error)}
+    result['auditScriptSha256']=sha(Path(__file__).read_bytes());result['supportScriptSha256']={n:sha(Path(__file__).with_name(n).read_bytes()) for n in ['checks.py','receipt-core.py.txt']}
+    (args.out/'result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
+    lines=['Independent guard/corpus recorded-data audit: '+result['result'],result.get('scope',result.get('error',result.get('reason','')))]
+    if result['result'].startswith('PASS'):
+        lines+=['Source: '+result['sourceHead']+'; main SHA256: '+result['mainSha256'],
+          'Four original retained guard cases preserve six direct advcl targets, exact marker ordinals/negative cues, source quotes and separate historical diagnostics. Typed URI/literal rows and all six native source focuses agree.',
+          'G07 keeps its unmarked Trustee target. G13 keeps nested if/without links, quote indicators and NEGATED diagnostic without inventing a direct negation marker or legal force.',
+          'Two actual fresh default CoreNLP4.6 requests use [0,40) and [40,105); their parser input hashes are exact substring hashes distinct from the whole source. No old receipt is sliced to create an inspection.',
+          'Actual descriptive corpus/matrix identities and token counts, five imply concordance cards, two inert current-mode popups and whole-inspection href ranges verified. No term/filter/program credentials or automatic Run/copular query.',
+          'Actual G03 and S12 uploads change physical heads; fresh current query/open refuse and clear old rows/context. Immutable old receipts remain historical/as-of.',
+          'After-close CAS readbacks: '+str(result['casReadbacks'])+'; core corpus block materialized: '+str(result['corpusCoreBlockMaterialized'])+'. Distinct closed writer/reader PIDs '+str(result['writerPid'])+'/'+str(result['readerPid'])+'; recorded pack/owner-WAL invariants preserved.',
+          'CoreNLP-only29file SDK and disclosed linguistic model/resource availability checked; generative provider endpoints and live admission remain absent in this configured host. No empty-SDK or separate model-I/O trace claim.',
+          'Eight proportional mutated copies rejected. Table/viewport scope: '+result['tableViews']['scope']+'. Artifact verification: '+result['artifactVerification']+'.']
+    (args.out/'report.txt').write_text('\n'.join(lines)+'\n');print(json.dumps({'result':result['result'],'out':str(args.out)}));raise SystemExit(0 if result['result'].startswith('PASS') else 2 if result['result']=='PENDING' else 1)

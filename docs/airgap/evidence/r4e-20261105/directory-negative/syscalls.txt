@@ -1,0 +1,49 @@
+101238 1793856954.738346 +++ exited with 0 +++
+101237 1793856954.738576 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=3, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101239 1793856954.753069 +++ exited with 0 +++
+101237 1793856954.753128 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=4, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101240 1793856954.755325 +++ exited with 0 +++
+101237 1793856954.755392 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=5, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101242 1793856954.765027 +++ exited with 0 +++
+101241 1793856954.765143 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=7, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101246 1793856954.777479 +++ exited with 0 +++
+101243 1793856954.777557 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=11, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101247 1793856954.784417 +++ exited with 0 +++
+101243 1793856954.784485 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=12, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101248 1793856954.788292 +++ exited with 0 +++
+101243 1793856954.788363 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=13, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101249 1793856954.791749 +++ exited with 0 +++
+101243 1793856954.791835 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=14, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101250 1793856954.793329 +++ exited with 0 +++
+101243 1793856954.793405 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=15, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101244 1793856954.793840 +++ exited with 0 +++
+101241 1793856954.793892 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=9, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101245 1793856954.794094 +++ exited with 0 +++
+101243 1793856954.794103 +++ exited with 0 +++
+101241 1793856954.794111 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=10, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101241 1793856954.794206 +++ exited with 0 +++
+101237 1793856954.794213 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=6, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+101251 1793856954.799671 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=NULL} ---
+101257 1793856954.838774 +++ exited with 0 +++
+101251 1793856955.827764 fsync(17</state/runtime/cas>) = -1 EIO (Input/output error) (INJECTED)
+101258 1793856955.865140 +++ exited with 0 +++
+101256 1793856955.865488 +++ exited with 0 +++
+101253 1793856955.865622 +++ exited with 0 +++
+101262 1793856955.866337 +++ exited with 0 +++
+101255 1793856955.866880 +++ exited with 0 +++
+101259 1793856955.867946 +++ exited with 0 +++
+101251 1793856955.868345 +++ exited with 0 +++
+101267 1793856955.868539 +++ exited with 1 +++
+101265 1793856955.868544 +++ exited with 1 +++
+101260 1793856955.868554 +++ exited with 1 +++
+101268 1793856955.868573 +++ exited with 1 +++
+101263 1793856955.868576 +++ exited with 1 +++
+101252 1793856955.868587 +++ exited with 1 +++
+101264 1793856955.868590 +++ exited with 1 +++
+101274 1793856955.868596 +++ exited with 1 +++
+101254 1793856955.868602 +++ exited with 1 +++
+101261 1793856955.868608 +++ exited with 1 +++
+101266 1793856955.872710 +++ exited with 1 +++
+101237 1793856955.872726 +++ exited with 1 +++
+101235 1793856955.873198 +++ exited with 1 +++
+101236 1793856955.873282 +++ exited with 1 +++

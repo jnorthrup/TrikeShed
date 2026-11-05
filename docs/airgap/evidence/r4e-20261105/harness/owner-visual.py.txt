@@ -1,0 +1,81 @@
+from pathlib import Path
+import os,sys,subprocess,time,json,socket,errno,urllib.request,hashlib,shutil,signal
+h=Path('/workspace/airgap-r4e-proof');root=Path(os.environ.get('TRIKESHED_PROOF_ROOT',str(h/'rootfs')));a=h/sys.argv[1];a.mkdir();state=a/'state';state.mkdir();seed=Path('/workspace/airgap-r4d-proof/storage-kill-archive01')
+shutil.copytree(seed/'state/runtime',state/'runtime');(a/'harness').mkdir()
+for n in ['owner-visual.py','owner-visual.cjs','WalLease.java']:shutil.copyfile(h/n,a/'harness'/(n+'.txt'))
+assert {p.name for p in (h/'probe-classes').iterdir()}=={'WalLease.class'}
+shutil.copyfile(h/'probe-classes/WalLease.class',a/'harness/WalLease.class.bin')
+base='http://127.0.0.1:18764';http=urllib.request.build_opener(urllib.request.ProxyHandler({}));processes=[];records=[];logs=[];probes=[];driver=None;error=None
+network={'namespace':os.readlink('/proc/self/ns/net'),'routes':json.loads(subprocess.check_output(['ip','-j','route'])),'addresses':json.loads(subprocess.check_output(['ip','-j','address']))}
+with socket.socket() as s:network['externalConnectErrno']=s.connect_ex(('1.1.1.1',443))
+assert not network['routes'] and all(x['ifname']=='lo' for x in network['addresses']) and network['externalConnectErrno']==errno.ENETUNREACH
+(a/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+cmd=json.loads((seed/'processes.json').read_text())['processes'][-1]['command'];cmd[cmd.index('--ro-bind')+1]=str(root);cmd[cmd.index('--bind')+1]=str(state);cmd[cmd.index('--hostname')+1]='airgap-r4e'
+def digest(p):return hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+wal=state/'runtime/.kanban/board.wal';initialWal=digest(wal)
+def get():
+ with http.open(base+'/__proof/state',timeout=3) as r:return json.load(r)
+def launch(label):
+ log=(a/(label+'.txt')).open('w');logs.append(log);p=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT);processes.append(p);record={'label':label,'command':cmd.copy(),'hostPid':p.pid,'started':time.monotonic()};records.append(record);deadline=time.monotonic()+90
+ while True:
+  assert p.poll() is None,('early exit',p.returncode)
+  try:ready=get();break
+  except OSError:assert time.monotonic()<deadline;time.sleep(.1)
+ record.update(boot=ready['boot'],readySeconds=time.monotonic()-record['started']);(a/(label+'-ready.json')).write_text(json.dumps(ready,indent=2)+'\n');return p,record,ready
+def probe(label,expected):
+ cut=cmd.index('/opt/trikeshed/bin/airgap-document');command=cmd[:cut]+['--ro-bind',str(h/'probe-classes'),'/tmp/wal-probe','/opt/trikeshed/jdk/bin/java','--enable-native-access=ALL-UNNAMED','-Xmx128m','-XX:ActiveProcessorCount=2','-cp','/tmp/wal-probe:/opt/trikeshed/lib/*','WalLease','/state/runtime/.kanban']
+ before=digest(wal);p=subprocess.run(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=30);(a/(label+'.txt')).write_text(p.stdout);record={'label':label,'command':command,'exit':p.returncode,'beforeWalSha256':before,'afterWalSha256':digest(wal)};probes.append(record)
+ assert p.returncode==expected and before==record['afterWalSha256'],record
+ assert ('LEASE_REFUSED:' if expected==42 else 'WAL_OPENED_AND_CLOSED') in p.stdout
+ return record
+def java_pid(parent):
+ children={};names={}
+ for p in Path('/proc').glob('[0-9]*'):
+  try:
+   fields=(p/'stat').read_text().rsplit(') ',1)[1].split();pid=int(p.name);children.setdefault(int(fields[1]),[]).append(pid);names[pid]=(p/'comm').read_text().strip()
+  except (OSError,ValueError,IndexError):pass
+ pending=[parent];found=[]
+ while pending:
+  pid=pending.pop();pending.extend(children.get(pid,[]))
+  if names.get(pid)=='java':found.append(pid)
+ assert len(found)==1
+ assert b'borg.trikeshed.lcnc.AirgapDocumentMainKt' in Path('/proc/'+str(found[0])+'/cmdline').read_bytes().split(b'\0')
+ return found[0]
+def finish(p,r):
+ if p.poll() is None:
+  try:
+   with http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3) as response:r['finishRequest']={'status':response.status,'body':response.read().decode()}
+  except OSError as e:r['finishRequest']={'transportError':repr(e)}
+  try:p.wait(timeout=30)
+  except subprocess.TimeoutExpired:p.terminate();p.wait(timeout=10);r['forcedTermination']=True
+ r.update(exit=p.returncode,elapsedSeconds=time.monotonic()-r['started'])
+try:
+ first,one,before=launch('first-inspector');assert before['mode']=='inspect' and not before['llvmInstalled'] and not before['minerInstalled'];assert len(before['runs'])==1 and next(iter(before['runs'].values()))['status']=='completed';assert digest(wal)==initialWal
+ env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright';log=(a/'driver.txt').open('w');logs.append(log);driver=subprocess.Popen(['node',str(h/'owner-visual.cjs'),str(a),base],env=env,stdout=log,stderr=subprocess.STDOUT);contended=False;restarted=False;deadline=time.monotonic()+180
+ while driver.poll() is None:
+  assert time.monotonic()<deadline,'browser deadline'
+  if (a/'contend-request.json').exists() and not contended:
+   record=probe('first-contender',42);assert get()['runs']==before['runs'];(a/'contend-ready.json').write_text(json.dumps(record)+'\n');contended=True
+  if (a/'restart-request.json').exists() and not restarted:
+   assert contended;sample=get();(a/'before-kill.json').write_text(json.dumps(sample,indent=2)+'\n');shutil.copyfile(state/'inspect-status.txt',a/'first-inspector-status.txt');pid=java_pid(first.pid);os.kill(pid,signal.SIGKILL);first.wait(timeout=15);assert first.returncode==137 and not Path('/proc/'+str(pid)).exists() and not (state/'cleanup-inspect.json').exists();one.update(exit=137,javaPid=pid,javaReaped=True,cleanupRan=False,expectedCrash=True,elapsedSeconds=time.monotonic()-one['started'])
+   second,two,after=launch('second-inspector');assert after['boot']!=before['boot'] and after['runs']==before['runs'] and after['documents']==before['documents'];probe('second-contender',42);(a/'restart-ready.json').write_text(json.dumps({'firstExit':137,'javaReaped':True,'cleanupRan':False,'secondBoot':after['boot'],'walSha256':digest(wal)})+'\n');restarted=True
+  time.sleep(.05)
+ assert driver.returncode==0 and restarted
+ finish(second,two);assert two['exit']==0 and not two.get('forcedTermination');assert all(json.loads((state/'cleanup-inspect.json').read_text()).values());probe('after-close',0);assert digest(wal)==initialWal
+except BaseException as e:
+ error=repr(e);(a/'controller-error.json').write_text(json.dumps({'error':error,'processes':records,'probes':probes},indent=2)+'\n');print(error,flush=True)
+finally:
+ if driver is not None and driver.poll() is None:
+  driver.terminate()
+  try:driver.wait(timeout=10)
+  except subprocess.TimeoutExpired:driver.kill();driver.wait(timeout=10)
+ for p,r in zip(processes,records):
+  if 'exit' not in r:
+   try:finish(p,r)
+   except BaseException as cleanup:
+    r['cleanupError']=repr(cleanup)
+    if error is None:error=repr(cleanup)
+ for log in logs:log.close()
+ result={'error':error,'driverExit':driver.returncode if driver else None,'processes':records,'probes':probes,'initialWalSha256':initialWal,'finalWalSha256':digest(wal),'probeClassSha256':digest(h/'probe-classes/WalLease.class'),'seedEvidence':str(seed),'seedSourceCommit':'8579dcad12d3b22c84ef3017157bf41e9a0fdbaf','scope':'New packaged owners reopen the completed R4d store; old scan outputs remain historical, with no miner, LLVM runner or new Run submission'};(a/'processes.json').write_text(json.dumps(result,indent=2)+'\n')
+assert error is None,error
+print('Owner contention, SIGKILL release and normal-close release PASS')

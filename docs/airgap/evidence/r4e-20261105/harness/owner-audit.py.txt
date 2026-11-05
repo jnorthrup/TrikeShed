@@ -1,0 +1,50 @@
+from pathlib import Path
+import json,hashlib,struct,sys
+from urllib.parse import urlsplit
+h=Path('/workspace/airgap-r4e-proof');a=h/sys.argv[1];cas=a/'state/runtime/cas/sha256'
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+def read(cid):
+ d=cid.removeprefix('sha256:');p=cas/d[0]/d[1]/d[2]/d[3]/d[4:];assert sha(p)==d;return p.read_bytes()
+def crc32c(b):
+ c=0xffffffff
+ for v in b:
+  c^=v
+  for _ in range(8):c=(c>>1)^(0x82f63b78 if c&1 else 0)
+ return c^0xffffffff
+n=0
+for p in cas.rglob('*'):
+ if p.is_file():
+  d=''.join(p.relative_to(cas).parts);assert len(d)==64 and sha(p)==d;n+=1
+wal=a/'state/runtime/.kanban/board.wal';data=wal.read_bytes();frames=[];i=0
+while i<len(data):
+ magic,version,seq,size=struct.unpack_from('>4sHQI',data,i);assert magic==b'WAL1' and version==1 and seq==len(frames)+1
+ end=i+18+size;assert end+4<=len(data) and crc32c(data[i:end])==struct.unpack_from('>I',data,end)[0]
+ job,cid=data[i+18:end].decode().rsplit('\t',1);cmd=json.loads(read(cid));assert cmd['jobId']==job
+ row=cmd['lcncRun'];frames.append({'sequence':seq,'jobId':job,'cid':cid,'status':row['status']})
+ if len(frames)>1:assert row['previousReceiptCid']==frames[-2]['cid']
+ i=end+4
+assert [r['status'] for r in frames]==['queued','running','completed'];assert len({r['jobId'] for r in frames})==1
+b=json.loads((a/'browser.json').read_text());p=json.loads((a/'processes.json').read_text());assert p['error'] is None and p['driverExit']==0 and not b['errors']
+assert len(b['cases'])==4 and all(c['result']=='PASS' for c in b['cases'].values())
+assert not [r for r in b['requests'] if urlsplit(r['url']).path=='/api/lcnc/run']
+first=json.loads((a/'first-inspector-ready.json').read_text());second=json.loads((a/'second-inspector-ready.json').read_text());final=json.loads((a/'state/state-inspect.json').read_text());beforekill=json.loads((a/'before-kill.json').read_text())
+assert first['boot']!=second['boot'];assert first['runs']==second['runs']==final['runs']==beforekill['runs'];assert first['documents']==second['documents']==final['documents'] and len(final['documents'])==6
+assert len(first['runs'])==1;row=next(iter(first['runs'].values()));assert row==b['original'] and row['receiptCid']==frames[-1]['cid']
+for s in [first,second,final]:
+ assert s['mode']=='inspect' and s['reopened'] and not any(s[k] for k in ['minerInstalled','llvmInstalled','workspaceVisible','gradleCacheVisible','assetsVisible','modulesVisible'])
+ assert s['classpath']==(h/'rootfs/opt/trikeshed/classpath.txt').read_text().strip()
+command=json.loads(read(row['receiptCid']))['lcncRun'];assert all(row[k]==v for k,v in command.items());assert command['status']=='completed' and command['ok']
+ledger=json.loads(read(row['invocationsCid']));assert ledger['runId']==row['runId'] and ledger['programCid']==row['programCid'];assert [x['wire']['index'] for x in ledger['observations'] if x['phase']=='consumed']==list(range(8))
+q=command['outputs']['selection']['value'];text=read(q['extractedTextCid']).decode().encode('utf-16-le');assert text[int(q['begin'])*2:int(q['end'])*2].decode('utf-16-le')==q['quote'];assert (q['begin'],q['end'])==(18477,18654)
+assert q['originalCid']=='sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f' and len(read(q['originalCid']))==111243
+assert [r['exit'] for r in p['processes']]==[137,0];assert p['processes'][0]['javaReaped'] and not p['processes'][0]['cleanupRan'];assert all(json.loads((a/'state/cleanup-inspect.json').read_text()).values())
+assert [r['exit'] for r in p['probes']]==[42,42,0]
+assert sha(wal)==p['initialWalSha256']==p['finalWalSha256']
+for r in p['probes']:
+ assert r['beforeWalSha256']==r['afterWalSha256']==sha(wal)
+ text=(a/(r['label']+'.txt')).read_text();assert ('LEASE_REFUSED' if r['exit']==42 else 'WAL_OPENED_AND_CLOSED') in text
+assert sha(h/'probe-classes/WalLease.class')==p['probeClassSha256'];assert sorted(x.name for x in (h/'probe-classes').iterdir())==['WalLease.class']
+seed=Path(p['seedEvidence']);assert (seed/'state/runtime/.kanban/board.wal').read_bytes()==data
+assert json.loads((seed/'browser.json').read_text())['recovered']==row
+result={'casObjectsVerified':n,'walBytes':len(data),'walSha256':sha(wal),'frames':frames,'allFrameCrc32cVerified':True,'receiptAndDocumentsUnchanged':True,'browserRunSubmissions':0,'exactQuotationVerified':True,'processExits':[137,0],'probeExits':[42,42,0],'crashedOwnerReapedWithoutCleanup':True,'normalOwnerCleanupVerified':True,'probeClassSha256':p['probeClassSha256'],'seedSourceCommit':p['seedSourceCommit'],'runtimeSourceCommit':json.loads((h/'rootfs/package-identity.json').read_text())['sourceCommit'],'scope':'Linux JVM ownership and inspection of completed R4d records. Historical native outputs are verified as retained bytes; new native execution is covered separately.'}
+(a/'independent-audit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({k:v for k,v in result.items() if k!='frames'},indent=2))

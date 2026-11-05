@@ -1,0 +1,142 @@
+from pathlib import Path
+import os,sys,subprocess,time,json,socket,errno,urllib.request,hashlib,resource,shutil,signal
+
+home=Path('/workspace/airgap-r4e-proof');root=Path(os.environ.get('TRIKESHED_PROOF_ROOT',str(home/'rootfs')))
+art=home/sys.argv[1];art.mkdir(exist_ok=False)
+crash=True
+stage=sys.argv[2] if len(sys.argv)>2 else 'selection'
+assert stage in ['document','scan','selection']
+(art/'harness').mkdir()
+for name in ['run.py','driver.cjs','assemble.py','package.py','negative.py']:
+    shutil.copyfile(home/name,art/'harness'/(name+'.txt'))
+state=art/'state';state.mkdir()
+network={'namespace':os.readlink('/proc/self/ns/net'),'addresses':json.loads(subprocess.check_output(['ip','-j','address'])),'routes':json.loads(subprocess.check_output(['ip','-j','route']))}
+assert not network['routes'] and all(x['ifname']=='lo' for x in network['addresses'])
+with socket.socket() as p:network['externalConnectErrno']=p.connect_ex(('1.1.1.1',443))
+assert network['externalConnectErrno']==errno.ENETUNREACH
+(art/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+port=18764;base=f'http://127.0.0.1:{port}'
+http=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+processes=[];logs=[];reports=[]
+def launch(mode):
+    cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--hostname','airgap-r4e','--die-with-parent',
+         '--ro-bind',str(root),'/', '--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv',
+         '--setenv','PATH','/opt/trikeshed/jdk/bin:/usr/bin:/bin','--setenv','JAVA_HOME','/opt/trikeshed/jdk','--setenv','HOME','/state/home','--setenv','LANG','C.UTF-8',
+         '--setenv','TRIKESHED_PDF_ROUTE','layer','--chdir','/state','--cap-drop','ALL']
+    if mode!='inspect':
+        for kind,name in [('SCALAR','add-mlir.bc'),('CONFIX','confix.bc')]:cmd+=['--setenv','TRIKESHED_LLVM_'+kind+'_PROFILE','/state/runtime/'+name+'.json']
+    if mode!='run':
+        paths=['/opt/trikeshed/assets']+(['/opt/trikeshed/modules'] if mode=='inspect' else [])
+        for path in paths:
+            cmd+=['--tmpfs',path,'--remount-ro',path]
+        for path in ['/usr/bin/pdfinfo','/usr/bin/pdftotext']:cmd+=['--ro-bind','/dev/null',path]
+    cmd+=['/opt/trikeshed/bin/airgap-document','/state','/opt/trikeshed',str(port),mode]
+    log=(art/(mode+'.txt')).open('w');logs.append(log)
+    started=time.monotonic();before=resource.getrusage(resource.RUSAGE_CHILDREN)
+    proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT);processes.append(proc)
+    report={'mode':mode,'hostPid':proc.pid,'command':cmd,'startedMonotonic':started,'resourceEvidence':'process-owned snapshot pending'}
+    reports.append(report)
+    return proc,report
+
+def sample(proc,report):
+    # A nested user namespace can conceal children from the host monitor.
+    # Measurements and mount tables come from the JVM itself, not bwrap RSS.
+    report['resourceEvidence']='state/'+report['mode']+'-status.txt; '+('state-before-crash.json' if crash and report['mode']=='run' else 'state/state-'+report['mode']+'.json')+' processCpuNanos'
+
+def ready(proc,report):
+    deadline=time.monotonic()+120
+    while time.monotonic()<deadline:
+        sample(proc,report)
+        if proc.poll() is not None:raise RuntimeError('Fixture exited: '+str(proc.returncode))
+        try:
+            with http.open(base+'/__proof/state',timeout=2) as r:result=json.load(r)
+            report['readySeconds']=time.monotonic()-report['startedMonotonic'];report['boot']=result['boot']
+            (art/(report['mode']+'-ready.json')).write_text(json.dumps(result,indent=2)+'\n')
+            return result
+        except OSError:time.sleep(.2)
+    raise RuntimeError('Not ready')
+
+def finish(proc,report):
+    if proc.poll() is None:
+        try:
+            with http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3) as reply: report['finishRequest']={'status':reply.status,'body':reply.read().decode()}
+        except OSError as failure:report['finishRequest']={'transportError':repr(failure),'standing':'Process exit and cleanup record determine shutdown completion'}
+        end=time.monotonic()+30
+        while proc.poll() is None and time.monotonic()<end:sample(proc,report);time.sleep(.1)
+        if proc.poll() is None:proc.terminate();proc.wait(timeout=10);report['forcedTermination']=True
+    report['exit']=proc.returncode;report['elapsedSeconds']=time.monotonic()-report['startedMonotonic']
+
+def crash_writer(proc,report):
+    with http.open(base+'/__proof/state',timeout=3) as response:before=json.load(response)
+    assert len(before['runs'])==1
+    row=next(iter(before['runs'].values()));request=json.loads((art/'restart-request.json').read_text())
+    assert row['status']=='running' and row['runId']==request['runId'] and request['before']==stage
+    assert row.get('invocationsCid') is None and row.get('outputs') is None
+    (art/'state-before-crash.json').write_text(json.dumps(before,indent=2)+'\n')
+    children={};names={}
+    for entry in Path('/proc').glob('[0-9]*'):
+        try:
+            tail=(entry/'stat').read_text().rsplit(') ',1)[1].split();pid=int(entry.name);ppid=int(tail[1])
+            children.setdefault(ppid,[]).append(pid);names[pid]=(entry/'comm').read_text().strip()
+        except (OSError,ValueError,IndexError):pass
+    pending=[proc.pid];descendants=[]
+    while pending:
+        pid=pending.pop();descendants.append(pid);pending.extend(children.get(pid,[]))
+    candidates=[pid for pid in descendants if names.get(pid)=='java']
+    assert len(candidates)==1,candidates
+    pid=candidates[0];command=Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0')
+    assert command[0]==b'/opt/trikeshed/jdk/bin/java' and b'borg.trikeshed.lcnc.AirgapDocumentMainKt' in command
+    os.kill(pid,signal.SIGKILL)
+    proc.wait(timeout=20)
+    assert proc.returncode==137,proc.returncode
+    assert not Path(f'/proc/{pid}').exists()
+    assert not (state/'cleanup-run.json').exists()
+    report.update(exit=proc.returncode,elapsedSeconds=time.monotonic()-report['startedMonotonic'],
+                  expectedCrash=True,signal='SIGKILL',javaHostPid=pid,javaReaped=True,cleanupRan=False,
+                  point='Paused before '+stage+'; direct run has no terminal receipt')
+
+driver=None;error=None
+try:
+    server,run=launch('run');seed=ready(server,run)
+    env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright';env['TRIKESHED_CRASH_BEFORE']=stage
+    log=(art/'driver.txt').open('w');logs.append(log)
+    driver=subprocess.Popen(['node',str(home/'driver.cjs'),str(art),base],env=env,stdout=log,stderr=subprocess.STDOUT)
+    deadline=time.monotonic()+300;restarted=False;inspected=False
+    while driver.poll() is None and time.monotonic()<deadline:
+        sample(server,reports[-1])
+        if (art/'restart-request.json').exists() and not restarted:
+            if crash:crash_writer(server,run)
+            else:finish(server,run);assert server.returncode==0
+            firstPid=server.pid
+            server,recovery=launch('recover');restored=ready(server,recovery)
+            assert restored['boot']!=seed['boot']
+            (art/'restart-ready.json').write_text(json.dumps({'firstExit':run['exit'],'firstHostPid':firstPid,'secondHostPid':server.pid,
+                'forcedJvmExit':crash,'javaReaped':run.get('javaReaped'),'cleanupRan':run.get('cleanupRan')})+'\n')
+            restarted=True
+        if (art/'inspection-request.json').exists() and not inspected:
+            finish(server,recovery);assert server.returncode==0
+            secondPid=server.pid
+            server,inspection=launch('inspect');last=ready(server,inspection)
+            assert last['boot'] not in [seed['boot'],restored['boot']]
+            (art/'inspection-ready.json').write_text(json.dumps({'secondExit':recovery['exit'],'secondHostPid':secondPid,'thirdHostPid':server.pid})+'\n')
+            inspected=True
+        if server.poll() is not None and not (state/'cleanup-inspect.json').exists():raise RuntimeError('Server exited unexpectedly')
+        time.sleep(.1)
+    if driver.poll() is None:driver.terminate();driver.wait(timeout=10);raise RuntimeError('Browser timed out')
+    assert driver.returncode==0 and restarted and inspected
+except BaseException as e:
+    error=repr(e)
+finally:
+    if driver is not None and driver.poll() is None:driver.terminate();driver.wait(timeout=10)
+    for proc,report in zip(processes,reports):
+        if 'exit' not in report:finish(proc,report)
+    for log in logs:log.close()
+    result={'driverExit':driver.returncode if driver else None,'error':error,'processes':reports}
+    (art/'processes.json').write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps({**result,'processes':[{k:v for k,v in x.items() if k!='command'} for x in reports]},indent=2))
+    if (art/'driver.txt').exists():print((art/'driver.txt').read_text()[-3000:])
+    for mode in ['run','recover','inspect']:
+        if (art/(mode+'.txt')).exists():print(mode,(art/(mode+'.txt')).read_text()[-3000:])
+if error or any(p.returncode!=0 and not r.get('expectedCrash') for p,r in zip(processes,reports)):raise SystemExit(1)
+
+assert not reports[-1].get('forcedTermination') and all(json.loads((state/'cleanup-inspect.json').read_text()).values())

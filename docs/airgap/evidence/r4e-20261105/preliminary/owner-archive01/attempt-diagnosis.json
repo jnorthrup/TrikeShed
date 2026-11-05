@@ -1,0 +1,7 @@
+{
+  "accepted": false,
+  "completedBrowserCases": 4,
+  "failure": "Controller called urllib response.status as a method; it is an integer property. The same mistake escaped cleanup before a process report could be written.",
+  "replacement": "Use status property and retain controller errors before cleanup. Rerun the full multi-process scenario with the same extracted archive.",
+  "processExitStanding": "No completed controller process report; do not infer missing exit results."
+}

@@ -1,0 +1,7 @@
+{
+  "failedCase": "changed-payload",
+  "expectedLayer": "BoardStoreElement",
+  "observedLayer": "FileCasStore.get",
+  "observation": "Process exited 1 before admission; altered payload was refused by the earlier CAS digest check. Runtime byte inventory unchanged.",
+  "correction": "Assert the actual earlier CAS digest refusal; retain all exit, admission and unchanged-byte assertions."
+}

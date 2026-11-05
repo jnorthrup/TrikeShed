@@ -1,0 +1,9 @@
+short-header PASS
+short-payload PASS
+complete-crc-corruption PASS
+missing-payload PASS
+Traceback (most recent call last):
+  File "/workspace/airgap-r4e-proof/recovery.py", line 50, in <module>
+    assert error is None,(name,error)
+           ^^^^^^^^^^^^^
+AssertionError: ('changed-payload', 'AssertionError()')

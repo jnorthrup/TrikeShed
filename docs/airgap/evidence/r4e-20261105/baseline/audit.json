@@ -1,0 +1,23 @@
+{
+  "publishedBaseline": "37b1a8944ce6102f57b9e201be32fedbc78ab5a5",
+  "testedSourceCommit": "8579dcad12d3b22c84ef3017157bf41e9a0fdbaf",
+  "walBytes": 83,
+  "sha256": "e0adda6b6c3bf3a22479a07ccf194c95c41dece773a306da800dd2e1f3ed6965",
+  "frames": [
+    {
+      "offset": 0,
+      "sequence": 1,
+      "payload": "retained-first-frame"
+    },
+    {
+      "offset": 42,
+      "sequence": 2,
+      "payload": "other-owner-flushed"
+    }
+  ],
+  "firstOwnersSecondRecordLost": true,
+  "scope": "Two direct production BoardFileWal owners, same JVM, isolated temporary path. Both flush methods returned; no HTTP or BoardStore acknowledgment claim.",
+  "allFrameCrc32cVerified": true,
+  "javaSourceSha256": "67899d140e499f7a51f974b76dd147f6d604f48519382b743d2eb08aa728ac81",
+  "publishedRuntimeSha256": "79a46f04b12ddcba0d5e89f9d9e4c43a4ffcde705ec89ab19a9fb5c9d917df86"
+}
