@@ -1,0 +1,35 @@
+from pathlib import Path
+import json,hashlib,math
+home=Path('/workspace/airgap-r4-proof');accepted=home/'cold-attempt05'
+cas=accepted/'state/runtime/cas/sha256';count=0
+for path in cas.rglob('*'):
+    if path.is_file():
+        claimed=''.join(path.relative_to(cas).parts)
+        assert hashlib.sha256(path.read_bytes()).hexdigest()==claimed
+        count+=1
+writer=json.loads((accepted/'state/state-run.json').read_text())
+reader=json.loads((accepted/'state/state-inspect.json').read_text())
+assert writer['runs']==reader['runs'] and len(writer['runs'])==1
+run=next(iter(writer['runs'].values()))
+def get(cid):
+    sha=cid.removeprefix('sha256:')
+    return (cas/('/'.join(sha[:4])+'/'+sha[4:])).read_bytes()
+def integer(value):
+    assert isinstance(value,(int,float)) and math.isfinite(value) and int(value)==value
+    return int(value)
+quote=run['outputs']['selection']['value'];text=get(quote['extractedTextCid']).decode('utf8')
+begin,end=integer(quote['begin']),integer(quote['end'])
+assert 0<=begin<=end<=len(text.encode('utf-16-le'))//2
+assert text.encode('utf-16-le')[begin*2:end*2].decode('utf-16-le')==quote['quote']
+assert len(get(quote['originalCid']))==111243 and any(a['page']==10 for a in quote['anchors'])
+ledger=json.loads(get(run['invocationsCid']))
+transfers=[r for r in ledger['observations'] if r['phase']=='consumed']
+assert [r['wire']['index'] for r in transfers]==list(range(8))
+assert run['outputs']['scan']['runtime']['liveBytesAfter']==0
+for name in ['programCid','receiptCid','invocationsCid','oroborosCid','rootStateCid']:
+    assert 'sha256:'+hashlib.sha256(get(run[name])).hexdigest()==run[name]
+record={'casObjectsVerified':count,'identicalRunRowsAcrossProcesses':True,'runs':1,'quoteMatchesUtf16Range':True,
+        'physicalPage':10,'consumedWires':8,'receiptCid':run['receiptCid'],'programCid':run['programCid'],
+        'invocationsCid':run['invocationsCid'],'nativeLiveBytesAfter':0}
+(home/'independent-cas-audit.json').write_text(json.dumps(record,indent=2)+'\n')
+print(json.dumps(record,indent=2))

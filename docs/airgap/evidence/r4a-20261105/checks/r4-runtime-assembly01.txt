@@ -1,0 +1,11 @@
+dpkg-query: no path found matching pattern /usr/share/fonts/openai-sans/OpenAISans-Bold.woff2
+Traceback (most recent call last):
+  File "/workspace/airgap-r4-proof/assemble.py", line 60, in <module>
+    query=subprocess.check_output(['dpkg-query','-S',str(path)],text=True)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 466, in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['dpkg-query', '-S', '/usr/share/fonts/openai-sans/OpenAISans-Bold.woff2']' returned non-zero exit status 1.

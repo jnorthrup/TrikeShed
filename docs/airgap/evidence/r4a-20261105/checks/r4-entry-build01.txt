@@ -1,0 +1,101 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: airgapDocumentEntryJar muxClasspath
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: file:///workspace/TrikeShed/build.gradle.kts:267:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:271:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:276:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:428:40: 'val foundation: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed/build.gradle.kts:429:40: 'val material3: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed/build.gradle.kts:430:40: 'val materialIconsExtended: String' is deprecated. This artifact is pinned to version 1.7.3 and will not receive updates. Either use this version explicitly or migrate to Material Symbols (vector resources). See https://kotlinlang.org/docs/multiplatform/whats-new-compose-180.html.
+w: file:///workspace/TrikeShed/build.gradle.kts:431:40: 'val ui: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed/build.gradle.kts:786:13: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:804:13: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :generateForgeAssets
+
+> Task :fetchSumoCorpus
+SUMO corpus @ 25bb366fdffd8769e741d2e22f215c2785bddce1 -> build/generated/sumo/resources/sumo (3/3 files; 0 fetched, 3 cached)
+
+> Task :jvmProcessResources
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources
+> Task :processJvmTestResources SKIPPED
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses
+> Task :jvmJar UP-TO-DATE
+> Task :muxClasspath
+
+> Task :compileTestKotlinJvm FAILED
+e: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt:34:12 Unresolved reference 'setProperty'.
+e: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt:99:45 Unresolved reference 'reifyMap' on receiver of type 'String'.
+e: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt:100:27 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt:110:47 Return type mismatch: expected 'Map<String, Any?>', actual 'String'.
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileTestKotlinJvm' (registered in build file 'build.gradle.kts').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Kotlin compiler: UNRESOLVED_REFERENCE
+       Kotlin compiler error
+         Unresolved reference 'setProperty'.
+         Location: /workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt:34
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 22s
+13 actionable tasks: 8 executed, 5 up-to-date
+Configuration cache entry stored.

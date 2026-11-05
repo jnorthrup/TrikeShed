@@ -1,0 +1,17 @@
+digraph G {
+ graph [rankdir=TB, bgcolor="white", pad="0.2", nodesep="0.35", ranksep="0.4"];
+ node [shape=box, style="rounded,filled", fillcolor="#edf3f8", color="#44617a", fontname="DejaVu Sans", fontsize=12, margin="0.15,0.1"];
+ edge [color="#44617a", fontname="DejaVu Sans", fontsize=10];
+ package [label="Read-only runtime\nJDK + application + tools + libraries"];
+ browser [label="External Chromium\nSame loopback-only network", fillcolor="#f6f0df"];
+ writer [label="1. Writer JVM\nRetain PDF, extract, run native graph"];
+ state [label="Writable /state\nCAS + Couch commit chains + Kanban WAL", fillcolor="#e7f3e7"];
+ inspector [label="2. New inspector JVM\nRecover exact revisions and receipt\nAssets, bitcode and PDF tools hidden"];
+ package -> writer;
+ writer -> state [label="drain and exit before restart"];
+ state -> inspector [label="production store replay"];
+ package -> inspector [style=dashed,label="same pinned runtime"];
+ browser -> writer [label="observed sparks and native evidence"];
+ browser -> inspector [label="read and replay; zero new runs"];
+ {rank=same;package;browser;}
+}

@@ -1,0 +1,21 @@
+{
+  "driverExit": null,
+  "error": "RuntimeError('Fixture exited: 1')",
+  "processes": [
+    {
+      "mode": "run",
+      "hostPid": 53689,
+      "startedMonotonic": 33575.221172589,
+      "maxRssKiB": 92,
+      "cpuTicks": 0,
+      "ticksPerSecond": 100,
+      "lastHostPids": [
+        53689
+      ],
+      "exit": 1,
+      "elapsedSeconds": 0.20248300499952165
+    }
+  ]
+}
+run bwrap: Unexpected capabilities but not setuid, old file caps config?
+
