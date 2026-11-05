@@ -1,0 +1,75 @@
+{
+  "source": "ddce0153ef4cb625b30b2cc5ca47cec98dddfa3e",
+  "command": "./gradlew jsBrowserDocumentsDevelopmentWebpack jsBrowserSpacegraphDevelopmentWebpack jsBrowserPagesDevelopmentWebpack jvmTest -I /workspace/.trikeshed-cloud/resolve-jvm.init.gradle -PkotlinJsApps=documents,pages,spacegraph --daemon --configuration-cache --max-workers=4 -Ptrikeshed.native.mlnix=/workspace/library-files/mlnix-native-validation/build/bin/mlnix -Ptrikeshed.native.mlnix.sha256=97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5 -Ptrikeshed.native.adapter=/workspace/TrikeShed/utils/sumo-nix/run.nix -Ptrikeshed.native.datalog=/workspace/library-files/sumo-nix-proof/source --tests borg.trikeshed.nlp.EnglishInspectionTest --tests borg.trikeshed.graal.subvm.CoreNlpSourceTest --tests borg.trikeshed.narsese.NormClauseConditionsTest --tests borg.trikeshed.forge.server.DocumentEnglishWireTest --tests borg.trikeshed.narsese.ApplicabilityFactsTest --tests borg.trikeshed.narsese.ConstellationPremiseTest --tests borg.trikeshed.docs.DocumentSurfaceTest --tests borg.trikeshed.forge.server.PrimaryProjectCorpusTest --tests borg.trikeshed.forge.server.DocumentPdfLinksWireTest --tests borg.trikeshed.lcnc.CamelDispatchOwnershipTest --tests borg.trikeshed.graal.subvm.NlpNodeIdentityTest --tests borg.trikeshed.narsese.DependencyCopyInferenceTest --tests borg.trikeshed.nlp.EnglishLegalPatternsTest --tests borg.trikeshed.forge.server.EnglishLegalPatternsWireTest --tests borg.trikeshed.nlp.EnglishCorpusTest --tests borg.trikeshed.nlp.EnglishLdaTest --tests borg.trikeshed.forge.server.EnglishObservationWireTest --tests borg.trikeshed.forge.server.EnglishCorpusWireTest --tests borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest --tests borg.trikeshed.lcnc.PresetAssemblyTest --tests borg.trikeshed.forge.server.SparqlVisualBoundsTest --tests borg.trikeshed.forge.server.SparqlSourceWireTest --tests borg.trikeshed.narsese.KgRdfFidelityTest --tests borg.trikeshed.narsese.KgPropositionIdentityTest --tests borg.trikeshed.narsese.PropositionReadbackTest --tests borg.trikeshed.kif.KifSemanticTest --tests borg.trikeshed.narsese.BeliefAdmissionTest --tests borg.trikeshed.memory.HermesMemoryFeedbackTest --tests borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest --tests borg.trikeshed.hermes.HermesPenDelegatesTest.modelRefusalCarriesNegativeToolEvidence --tests borg.trikeshed.hermes.HermesPenDelegatesTest.negativeClaimIsNotARefusedOperation --tests borg.trikeshed.hermes.HermesPenDelegatesTest.everyCrossingLandsTwice --tests borg.trikeshed.hermes.HermesPenDelegatesTest.rejectedAssertionAdmissionIsNotSuccess --tests borg.trikeshed.narsese.KgRetentionTest --tests borg.trikeshed.litebike.KgHttpUtf8Test --tests borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest --tests borg.trikeshed.memory.ace.AceContextNodesTest --tests borg.trikeshed.memory.ace.BreadcrumbContextNodesTest --tests borg.trikeshed.docs.DocumentNavigationTest --tests borg.trikeshed.terminal.XtermTerminalEraseSavedTest --tests borg.trikeshed.terminal.XtermTerminalRowIdentityTest --tests borg.trikeshed.forge.server.CurationInstalledLinkTest --tests borg.trikeshed.forge.server.CurationIntakeTest --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest --tests borg.trikeshed.forge.server.LinkGrabRetryTest --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest --tests borg.trikeshed.forge.server.ProjectDbBindingTest --tests borg.trikeshed.job.PackCasVerifierTest --tests borg.trikeshed.narsese.BertPythonSleeveTest --tests borg.trikeshed.narsese.JevaWorkerProtocolTest --tests borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest --tests borg.trikeshed.narsese.KgPredicateNamespaceTest --tests borg.trikeshed.kif.KifTaxonomySnapshotTest --tests borg.trikeshed.nlp.EnglishCorpusViewTest --tests borg.trikeshed.narsese.KgRouteErrorTest --tests borg.trikeshed.lcnc.EnglishCopularPresetTest --tests borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest --tests borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest --tests borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest --tests borg.trikeshed.forge.server.EnglishTaxonomyWireTest --tests borg.trikeshed.lcnc.CurationReviewedReadTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyWireTest --tests borg.trikeshed.forge.server.ReviewedKifWireTest --tests borg.trikeshed.lcnc.ReviewedKifCancellationTest --tests borg.trikeshed.lcnc.LlvmScalarTest --tests borg.trikeshed.kanban.module.LlvmScalarRunTest --tests borg.trikeshed.lcnc.NativeHornProfileTest --tests borg.trikeshed.lcnc.LlvmConfixTest --tests borg.trikeshed.kanban.module.LlvmConfixRunTest --tests borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest --tests borg.trikeshed.narsese.PropositionAttentionTest --tests borg.trikeshed.lcnc.LcncConsumptionTest --tests borg.trikeshed.narsese.KgKifCommentTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest --tests borg.trikeshed.kif.KifActivationPlanTest --tests borg.trikeshed.kif.SumoNixBridgeTest --tests borg.trikeshed.lcnc.KifNodesTest --tests borg.trikeshed.forge.server.CurationIntakeEligibilityTest --tests borg.trikeshed.kanban.module.KanbanPinnedDispatchTest --tests borg.trikeshed.lcnc.DocumentSpansTest --tests borg.trikeshed.lcnc.FinanceKifPresetExecutionTest --tests borg.trikeshed.lcnc.LcncConfixSelectionTest --tests borg.trikeshed.lcnc.LcncPinnedBindingTest --tests borg.trikeshed.lcnc.WorkModelRouteTest --tests borg.trikeshed.lcnc.WorkSelectNodeTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsReadTest --tests borg.trikeshed.lcnc.LcncConfixPickPathContractTest",
+  "expectedSelectedTests": 457,
+  "preexistingUnionCases": 448,
+  "newFocusedCases": {
+    "proofProjection": 6,
+    "confixDefaultContract": 3
+  },
+  "failedBuildAttempts": [
+    {
+      "attempt": 1,
+      "source": "83cddf9586a81743320356ec3e58475f8ed5ae09",
+      "result": "TEST_SOURCE_COMPILE_FAILURE",
+      "location": "LcncConfixPickPathContractTest.kt:12",
+      "reason": "Test called protected CasStore constructor directly; corrected test-only anonymous subclass",
+      "mainAndThreeJs": "PASS; tests not executed",
+      "log": "build-v74-attempt1.log"
+    },
+    {
+      "attempt": 2,
+      "source": "5be3bba84529226c697f1b62409aa80dcaa440af",
+      "result": "THREE_TEST_FAILURES",
+      "totals": {
+        "tests": 457,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0
+      },
+      "failures": [
+        {
+          "class": "borg.trikeshed.lcnc.WorkModelRouteTest",
+          "method": "selectedPaidModelDoesNotFallBackToAnotherAllowedRoute()[jvm]",
+          "message": "org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+        },
+        {
+          "class": "borg.trikeshed.lcnc.WorkModelRouteTest",
+          "method": "selectedLocalModelUsesOnlyItsExplicitKeylessRoute()[jvm]",
+          "message": "borg.trikeshed.agent.modelmux.Airgap$Rejection: airgap: remote model calls are disabled"
+        },
+        {
+          "class": "borg.trikeshed.forge.server.CurationIntakeTest",
+          "method": "ownerCancellationWhileGrabCapacityIsFullDoesNotDoubleCount()[jvm]",
+          "message": "org.opentest4j.AssertionFailedError: expected: <3> but was: <4>"
+        }
+      ],
+      "log": "build-v74-attempt2.log",
+      "xml": "/workspace/library-files/curation-next/build-v74-attempt2-test-results",
+      "diagnosis": "Curation owner/permit cancellation handoff race; two fake-HTTP route fixtures omitted process airgap policy expectations. No production guard relaxation."
+    }
+  ],
+  "scope": "Root build provenance as recorded before final evidence D3M; no new build executed by proof worker",
+  "logs": {
+    "build-v74-attempt1.log": {
+      "bytes": 243772,
+      "sha256": "1e27f2ecd1cf2bdd045b4d2b07b9da71bab7dca2d6091e725d8b46b8d9822e2c"
+    },
+    "build-v74-attempt2.log": {
+      "bytes": 145367,
+      "sha256": "e6804128a2552a08eabf1d1350b6640c343b5027ce866aa0b81b252a3ecb9f1f"
+    },
+    "build-v74-pre-label.log": {
+      "bytes": 116960,
+      "sha256": "62fa60345567d8702db8a7b922a70dfd80c9e953f73e79a3c0ad7b98fa55b56c"
+    },
+    "build-v74-targeted.log": {
+      "bytes": 6035,
+      "sha256": "1e98af4a6e1614327263002f3b406006dc8aec16bc51ad49af924a7c540046ab"
+    },
+    "build-v74.log": {
+      "bytes": 118345,
+      "sha256": "a735d4e4dcc7c3cdd3741324f8d6f1cb00277feaeea0203be03ee8fe4b2ebc2a"
+    }
+  }
+}

@@ -1,0 +1,715 @@
+{
+  "result": "PASS",
+  "selectedAttempt": "native-v74-attempt2",
+  "sourceHead": "ddce0153ef4cb625b30b2cc5ca47cec98dddfa3e",
+  "frozenArtifacts": {
+    "main.jar": "b8cfd4ac9b641df161c5aa8edc6f15c9dfde63f0dec12bdda6b4f5595fb64233",
+    "documents.js": "2ce1d1463fb7aedfe62e744f336e2ce0307c237463469c6b263459b60857c62f",
+    "spacegraph.js": "e70cf39ce3fbbd353774fea476a61c5ad512c684d8ad1b341c11f275e39825e6",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "rootBuild": {
+    "jvmTests": 457,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "allJvmTestSources": true,
+    "threeJsBundles": true,
+    "scope": "Root frozen artifact; full JVM tests re-executed after label resource change; observer does not rebuild product"
+  },
+  "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+  "source": {
+    "id": "synthetic taxonomy copular clauses.txt",
+    "text": "Tenant is a Person. A Person is an Agent.",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883"
+  },
+  "sourceRevision": {
+    "project": "english-taxonomy-fresh-profile-proof",
+    "id": "synthetic taxonomy copular clauses.txt",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+    "seq": 0,
+    "length": 41,
+    "contentType": "text/plain"
+  },
+  "review": {
+    "snapshotCid": "sha256:92153cf1d446e3e4ce31b5d95d3a4dd56cef8146b5d7e2517d99ff3a2d9bbc14",
+    "revision": 2,
+    "decisionCid": "sha256:6a8152fce87261269cc021e2597d6f3b0e451e5ad48f9c638903b2a50d02ca1c",
+    "reviewer": "synthetic:premise-path-pilot",
+    "synthetic": true,
+    "state": "approve",
+    "current": true
+  },
+  "derivedKifCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+  "translationCid": "sha256:3599f52c680e19d1fb1b6cd8ba2b299ed590e39790f505446c409bb07e332deb",
+  "curationReceiptCid": "sha256:e499e8b76113e9063d3a3c157c3afc61aea81da9354d70bb4f19d83d7d3c4843",
+  "contextIri": "urn:agreement:reviewed-premise-proof",
+  "protectedReads": {
+    "supported": {
+      "status": "SUPPORTED",
+      "goal": {
+        "predicate": "instance",
+        "subject": "urn:legal:Tenant",
+        "object": "urn:legal:Agent"
+      },
+      "proofs": [
+        {
+          "nodeId": "sha256:d9513ec00f6d189a6c093c0e1923f1cfe17bec8b40bbbbe8642adb11d297b3d7",
+          "premises": [
+            "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+            "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c"
+          ],
+          "rules": [
+            "kif-taxonomy/v1/instance-assertion",
+            "kif-taxonomy/v1/instance-subclass"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "nodeId": "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+          "assertionCid": "sha256:d344a734da5e849c53de0b14cd859e13dcb5144ce7bcc600213e3223077b9d54",
+          "selectionId": "kif:0:44",
+          "sourceCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+          "sourceRevision": "sha256:8fd1f99d0deecfcf29fad91cb83a73f13dd104b74a3e733a93ab2a880b6dfed8",
+          "review": "APPROVED",
+          "text": "(instance urn:legal:Tenant urn:legal:Person)",
+          "exclusion": null,
+          "quotation": {
+            "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "begin": 0,
+            "end": 44,
+            "quote": "(instance urn:legal:Tenant urn:legal:Person)"
+          }
+        },
+        {
+          "nodeId": "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+          "assertionCid": "sha256:c8fb5f069a7398f13d71bb29a3838609759ef93d5439b3a3522192556a23802a",
+          "selectionId": "kif:45:88",
+          "sourceCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+          "sourceRevision": "sha256:8fd1f99d0deecfcf29fad91cb83a73f13dd104b74a3e733a93ab2a880b6dfed8",
+          "review": "APPROVED",
+          "text": "(subclass urn:legal:Person urn:legal:Agent)",
+          "exclusion": null,
+          "quotation": {
+            "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "begin": 45,
+            "end": 88,
+            "quote": "(subclass urn:legal:Person urn:legal:Agent)"
+          }
+        }
+      ],
+      "exportCid": "sha256:9d9ac66a4a1b03aa6646f3c903b834aa3b417dcfcb059ffa0cbb6e292a24bdb1",
+      "truncated": false
+    },
+    "unknown": {
+      "status": "UNKNOWN",
+      "goal": {
+        "predicate": "subclass",
+        "subject": "urn:legal:Agent",
+        "object": "urn:legal:Person"
+      },
+      "proofs": [],
+      "sources": [
+        {
+          "nodeId": "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+          "assertionCid": "sha256:d344a734da5e849c53de0b14cd859e13dcb5144ce7bcc600213e3223077b9d54",
+          "selectionId": "kif:0:44",
+          "sourceCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+          "sourceRevision": "sha256:8fd1f99d0deecfcf29fad91cb83a73f13dd104b74a3e733a93ab2a880b6dfed8",
+          "review": "APPROVED",
+          "text": "(instance urn:legal:Tenant urn:legal:Person)",
+          "exclusion": null,
+          "quotation": {
+            "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "begin": 0,
+            "end": 44,
+            "quote": "(instance urn:legal:Tenant urn:legal:Person)"
+          }
+        },
+        {
+          "nodeId": "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+          "assertionCid": "sha256:c8fb5f069a7398f13d71bb29a3838609759ef93d5439b3a3522192556a23802a",
+          "selectionId": "kif:45:88",
+          "sourceCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+          "sourceRevision": "sha256:8fd1f99d0deecfcf29fad91cb83a73f13dd104b74a3e733a93ab2a880b6dfed8",
+          "review": "APPROVED",
+          "text": "(subclass urn:legal:Person urn:legal:Agent)",
+          "exclusion": null,
+          "quotation": {
+            "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "begin": 45,
+            "end": 88,
+            "quote": "(subclass urn:legal:Person urn:legal:Agent)"
+          }
+        }
+      ],
+      "exportCid": "sha256:8ddd74509d4b9b0a95133e731a4f5c2f2728dcd59f56453ffbf0280ded56aa57",
+      "truncated": false
+    },
+    "reflexive": {
+      "status": "SUPPORTED",
+      "goal": {
+        "predicate": "subclass",
+        "subject": "urn:legal:Person",
+        "object": "urn:legal:Person"
+      },
+      "proofs": [
+        {
+          "nodeId": "sha256:4fba66ffab2e2809bd2d4d65c64325c30bab2009f977d490aae36eb09142379c",
+          "premises": [
+            "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c"
+          ],
+          "rules": [
+            "kif-taxonomy/v1/class-reflexivity"
+          ]
+        },
+        {
+          "nodeId": "sha256:54b1ead0846768767e8a698cdbe20a73d91e6994e3f4783b51c184812531e1fd",
+          "premises": [
+            "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740"
+          ],
+          "rules": [
+            "kif-taxonomy/v1/class-reflexivity"
+          ]
+        }
+      ],
+      "sources": [
+        {
+          "nodeId": "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+          "assertionCid": "sha256:d344a734da5e849c53de0b14cd859e13dcb5144ce7bcc600213e3223077b9d54",
+          "selectionId": "kif:0:44",
+          "sourceCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+          "sourceRevision": "sha256:8fd1f99d0deecfcf29fad91cb83a73f13dd104b74a3e733a93ab2a880b6dfed8",
+          "review": "APPROVED",
+          "text": "(instance urn:legal:Tenant urn:legal:Person)",
+          "exclusion": null,
+          "quotation": {
+            "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "begin": 0,
+            "end": 44,
+            "quote": "(instance urn:legal:Tenant urn:legal:Person)"
+          }
+        },
+        {
+          "nodeId": "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+          "assertionCid": "sha256:c8fb5f069a7398f13d71bb29a3838609759ef93d5439b3a3522192556a23802a",
+          "selectionId": "kif:45:88",
+          "sourceCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+          "sourceRevision": "sha256:8fd1f99d0deecfcf29fad91cb83a73f13dd104b74a3e733a93ab2a880b6dfed8",
+          "review": "APPROVED",
+          "text": "(subclass urn:legal:Person urn:legal:Agent)",
+          "exclusion": null,
+          "quotation": {
+            "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+            "begin": 45,
+            "end": 88,
+            "quote": "(subclass urn:legal:Person urn:legal:Agent)"
+          }
+        }
+      ],
+      "exportCid": "sha256:0c963868c089d3e985f2fd599e6bda6e541881fc61d14d3ab5e19443e54ed45a",
+      "truncated": false
+    }
+  },
+  "nativeSourceBackreferences": [
+    {
+      "scope": "Native within-document English/KIF source-evidence card focus; no source/PDF page navigation",
+      "sourceNode": "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "selectionId": "kif:0:44",
+      "target": "taxonomy-source-e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "urlUnchanged": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "beforeUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "targetSourceNode": "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "targetSelectionId": "kif:0:44",
+      "targetRect": {
+        "top": 89.78125,
+        "bottom": 428.234375,
+        "viewportHeight": 1600
+      },
+      "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+      "englishQuotation": {
+        "originalCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "extractedTextCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "begin": 0,
+        "end": 19,
+        "quote": "Tenant is a Person.",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "document",
+        "provenance": {
+          "reviewStatus": "unreviewed",
+          "extractionKind": "identity-utf8"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "kifQuotation": {
+        "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "begin": 0,
+        "end": 44,
+        "quote": "(instance urn:legal:Tenant urn:legal:Person)",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "text",
+        "provenance": {
+          "englishTaxonomyDeclarationCid": "sha256:3599f52c680e19d1fb1b6cd8ba2b299ed590e39790f505446c409bb07e332deb",
+          "englishTaxonomyPolicy": "english-present-copula-taxonomy/1",
+          "englishInspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "sourceCardText": "Source witness used in returned paths\n\nEnglish source\n\nTenant is a Person.\n\nDeclared KIF translation\n\n(instance urn:legal:Tenant urn:legal:Person)\nExact source spans, declared mappings and full parser bindings\n\nEnglish original sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text UTF-16 [0, 19) · inspection sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d\n\nKIF source sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96 · UTF-16 [0, 44) · selection kif:0:44 · source node sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740"
+    },
+    {
+      "scope": "Native within-document English/KIF source-evidence card focus; no source/PDF page navigation",
+      "sourceNode": "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "selectionId": "kif:45:88",
+      "target": "taxonomy-source-8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "urlUnchanged": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "beforeUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "targetSourceNode": "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "targetSelectionId": "kif:45:88",
+      "targetRect": {
+        "top": 89.734375,
+        "bottom": 428.1875,
+        "viewportHeight": 1600
+      },
+      "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+      "englishQuotation": {
+        "originalCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "extractedTextCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "begin": 20,
+        "end": 41,
+        "quote": "A Person is an Agent.",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "document",
+        "provenance": {
+          "reviewStatus": "unreviewed",
+          "extractionKind": "identity-utf8"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "kifQuotation": {
+        "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "begin": 45,
+        "end": 88,
+        "quote": "(subclass urn:legal:Person urn:legal:Agent)",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "text",
+        "provenance": {
+          "englishTaxonomyDeclarationCid": "sha256:3599f52c680e19d1fb1b6cd8ba2b299ed590e39790f505446c409bb07e332deb",
+          "englishTaxonomyPolicy": "english-present-copula-taxonomy/1",
+          "englishInspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "sourceCardText": "Source witness used in returned paths\n\nEnglish source\n\nA Person is an Agent.\n\nDeclared KIF translation\n\n(subclass urn:legal:Person urn:legal:Agent)\nExact source spans, declared mappings and full parser bindings\n\nEnglish original sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text UTF-16 [20, 41) · inspection sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d\n\nKIF source sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96 · UTF-16 [45, 88) · selection kif:45:88 · source node sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c"
+    },
+    {
+      "scope": "Native within-document English/KIF source-evidence card focus; no source/PDF page navigation",
+      "sourceNode": "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "selectionId": "kif:45:88",
+      "target": "taxonomy-source-8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "urlUnchanged": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "beforeUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "targetSourceNode": "sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c",
+      "targetSelectionId": "kif:45:88",
+      "targetRect": {
+        "top": 90.328125,
+        "bottom": 428.78125,
+        "viewportHeight": 1600
+      },
+      "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+      "englishQuotation": {
+        "originalCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "extractedTextCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "begin": 20,
+        "end": 41,
+        "quote": "A Person is an Agent.",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "document",
+        "provenance": {
+          "reviewStatus": "unreviewed",
+          "extractionKind": "identity-utf8"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "kifQuotation": {
+        "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "begin": 45,
+        "end": 88,
+        "quote": "(subclass urn:legal:Person urn:legal:Agent)",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "text",
+        "provenance": {
+          "englishTaxonomyDeclarationCid": "sha256:3599f52c680e19d1fb1b6cd8ba2b299ed590e39790f505446c409bb07e332deb",
+          "englishTaxonomyPolicy": "english-present-copula-taxonomy/1",
+          "englishInspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "sourceCardText": "Source witness used in returned paths\n\nEnglish source\n\nA Person is an Agent.\n\nDeclared KIF translation\n\n(subclass urn:legal:Person urn:legal:Agent)\nExact source spans, declared mappings and full parser bindings\n\nEnglish original sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text UTF-16 [20, 41) · inspection sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d\n\nKIF source sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96 · UTF-16 [45, 88) · selection kif:45:88 · source node sha256:8eb4a3001f0207c315aa7b296fa7fc125ebb3db4d89fb3ae2229b3bb260aaa2c"
+    },
+    {
+      "scope": "Native within-document English/KIF source-evidence card focus; no source/PDF page navigation",
+      "sourceNode": "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "selectionId": "kif:0:44",
+      "target": "taxonomy-source-e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "urlUnchanged": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "beforeUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "targetSourceNode": "sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740",
+      "targetSelectionId": "kif:0:44",
+      "targetRect": {
+        "top": 90.375,
+        "bottom": 428.828125,
+        "viewportHeight": 1600
+      },
+      "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+      "englishQuotation": {
+        "originalCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "extractedTextCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+        "begin": 0,
+        "end": 19,
+        "quote": "Tenant is a Person.",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "document",
+        "provenance": {
+          "reviewStatus": "unreviewed",
+          "extractionKind": "identity-utf8"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "kifQuotation": {
+        "originalCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "extractedTextCid": "sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96",
+        "begin": 0,
+        "end": 44,
+        "quote": "(instance urn:legal:Tenant urn:legal:Person)",
+        "anchors": [],
+        "unresolved": [
+          "page",
+          "folio",
+          "section",
+          "table",
+          "diagram",
+          "coordinates"
+        ],
+        "category": "text",
+        "provenance": {
+          "englishTaxonomyDeclarationCid": "sha256:3599f52c680e19d1fb1b6cd8ba2b299ed590e39790f505446c409bb07e332deb",
+          "englishTaxonomyPolicy": "english-present-copula-taxonomy/1",
+          "englishInspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "sourceCardText": "Source witness used in returned paths\n\nEnglish source\n\nTenant is a Person.\n\nDeclared KIF translation\n\n(instance urn:legal:Tenant urn:legal:Person)\nExact source spans, declared mappings and full parser bindings\n\nEnglish original sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 · extracted text UTF-16 [0, 19) · inspection sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d\n\nKIF source sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96 · UTF-16 [0, 44) · selection kif:0:44 · source node sha256:e3fdaa9746277799354181c2b7125395abf7631fcf3d23152e400804ef765740"
+    }
+  ],
+  "readStates": [
+    {
+      "label": "Rejected authentication creates no review authority",
+      "reviewWal": {
+        "bytes": 8,
+        "sha256": "d3aee4628a1c3f8dfdac8cc06dadb0c45cb04fcc4123ce298a5bec5a0ab6fc55",
+        "base64": "RE9DLUxPRzE="
+      }
+    },
+    {
+      "label": "Native authentication and candidate inspection do not append review authority",
+      "reviewWal": {
+        "bytes": 8,
+        "sha256": "d3aee4628a1c3f8dfdac8cc06dadb0c45cb04fcc4123ce298a5bec5a0ab6fc55",
+        "base64": "RE9DLUxPRzE="
+      }
+    },
+    {
+      "label": "After native approval",
+      "reviewWal": {
+        "bytes": 194,
+        "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+        "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6OGJjZWRiZDE0NGQ5ZGE2NGM3ZDFlNjhmMzU2MDBiNDFlY2MyMTI4ODE4NjI4NGQwNGM1NDQ4YmU3NmFkMzBhOA3WE2xXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NmE4MTUyZmNlODcyNjEyNjljYzAyMWUyNTk3ZDZmM2IwZTQ1MWU1YWQ0OGY5YzYzODkwM2IyYTUwZDAyY2ExY/2M84s="
+      }
+    },
+    {
+      "label": "Positive proof read preserves exact approval WAL bytes",
+      "reviewWal": {
+        "bytes": 194,
+        "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+        "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6OGJjZWRiZDE0NGQ5ZGE2NGM3ZDFlNjhmMzU2MDBiNDFlY2MyMTI4ODE4NjI4NGQwNGM1NDQ4YmU3NmFkMzBhOA3WE2xXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NmE4MTUyZmNlODcyNjEyNjljYzAyMWUyNTk3ZDZmM2IwZTQ1MWU1YWQ0OGY5YzYzODkwM2IyYTUwZDAyY2ExY/2M84s="
+      }
+    },
+    {
+      "label": "UNKNOWN is a read, not a review change",
+      "reviewWal": {
+        "bytes": 194,
+        "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+        "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6OGJjZWRiZDE0NGQ5ZGE2NGM3ZDFlNjhmMzU2MDBiNDFlY2MyMTI4ODE4NjI4NGQwNGM1NDQ4YmU3NmFkMzBhOA3WE2xXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NmE4MTUyZmNlODcyNjEyNjljYzAyMWUyNTk3ZDZmM2IwZTQ1MWU1YWQ0OGY5YzYzODkwM2IyYTUwZDAyY2ExY/2M84s="
+      }
+    },
+    {
+      "label": "Source-backed reflexivity preserves exact approval WAL bytes",
+      "reviewWal": {
+        "bytes": 194,
+        "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+        "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6OGJjZWRiZDE0NGQ5ZGE2NGM3ZDFlNjhmMzU2MDBiNDFlY2MyMTI4ODE4NjI4NGQwNGM1NDQ4YmU3NmFkMzBhOA3WE2xXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NmE4MTUyZmNlODcyNjEyNjljYzAyMWUyNTk3ZDZmM2IwZTQ1MWU1YWQ0OGY5YzYzODkwM2IyYTUwZDAyY2ExY/2M84s="
+      }
+    },
+    {
+      "label": "Actual source amendment/stale refusal append no review decision",
+      "reviewWal": {
+        "bytes": 194,
+        "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+        "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6OGJjZWRiZDE0NGQ5ZGE2NGM3ZDFlNjhmMzU2MDBiNDFlY2MyMTI4ODE4NjI4NGQwNGM1NDQ4YmU3NmFkMzBhOA3WE2xXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NmE4MTUyZmNlODcyNjEyNjljYzAyMWUyNTk3ZDZmM2IwZTQ1MWU1YWQ0OGY5YzYzODkwM2IyYTUwZDAyY2ExY/2M84s="
+      }
+    }
+  ],
+  "staleDom": {
+    "sourceCurrentText": "Snapshot: sha256:92153cf1d446e3e4ce31b5d95d3a4dd56cef8146b5d7e2517d99ff3a2d9bbc14 · revision 2 · source current: unconfirmed",
+    "sourceCurrentLabelCount": 1,
+    "proofResultCount": 0,
+    "proofPathCount": 0,
+    "url": "http://127.0.0.1:46309/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+    "text": "Review taxonomy translation\n\nDeclare how selected sentences should be represented as classes and individuals. These are your explicit translation choices. No model is called and no world facts are published.\n\ninstance links an individual to a class; subclass links two classes. Use the same exact class IRI only when you intend the same class. Every relation and sort must be chosen explicitly.\n\nInspection: sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d\n\nReviewer credential\n\nSynthetic validation reviewer: synthetic:premise-path-pilot\n\nAuthenticate reviewer and inspect candidates\nForget credential\nDeclared context IRI\n\nEligibility: true · profile english-present-copula-taxonomy/1\n\nSource and eligibility reasons\nSentence 0\nTenant is a Person.\nSource quotation and full parser bindings\nSelect this translation\n\nSource subject: Tenant · nominal head: Person\n\nRelation for sentence:0\nChoose…\ninstance\nsubclass\nSubject sort for sentence:0\nChoose…\nindividual\nclass\nObject sort for sentence:0\nChoose…\nclass\nSubject IRI for sentence:0\nObject IRI for sentence:0\nSentence 1\nA Person is an Agent.\nSource quotation and full parser bindings\nSelect this translation\n\nSource subject: Person · nominal head: Agent\n\nRelation for sentence:1\nChoose…\ninstance\nsubclass\nSubject sort for sentence:1\nChoose…\nindividual\nclass\nObject sort for sentence:1\nChoose…\nclass\nSubject IRI for sentence:1\nObject IRI for sentence:1\nPrepare translation preview\n\nReviewed support is unavailable or stale. Refresh the review; this failure is not an UNKNOWN result.\n\nUnreviewed translation preview\n\nContext: urn:agreement:reviewed-premise-proof\nDeclaration: sha256:3599f52c680e19d1fb1b6cd8ba2b299ed590e39790f505446c409bb07e332deb\nDerived KIF: sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96\n\n(instance urn:legal:Tenant urn:legal:Person)\n(subclass urn:legal:Person urn:legal:Agent)\n\n\nEnglish source\n\nTenant is a Person.\n\nDeclared KIF translation\n\n(instance urn:legal:Tenant urn:legal:Person)\nExact source spans, declared mappings and full parser bindings\nFreeze this exact translation\n\nEnglish source\n\nA Person is an Agent.\n\nDeclared KIF translation\n\n(subclass urn:legal:Person urn:legal:Agent)\nExact source spans, declared mappings and full parser bindings\nFreeze this exact translation\nFreeze selected translations for review\nAnalyst review · approve\n\nReview or source status was not confirmed. Refresh before any further decision or query.\n\nSnapshot: sha256:92153cf1d446e3e4ce31b5d95d3a4dd56cef8146b5d7e2517d99ff3a2d9bbc14 · revision 2 · source current: unconfirmed\n\nFrozen source, declarations and evidence\nReview decision note\nSave draft\nApprove exact selection\nReject selection\nCorrect / withdraw approval\nRefresh review\n\nNo confirmed current approval; no positive support is displayed."
+  },
+  "sourceAmendment": {
+    "before": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+      "seq": 0,
+      "length": 41,
+      "contentType": "text/plain"
+    },
+    "after": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db",
+      "rev": "2-sha256:18c06fb3a81e4cec66d952d4f42f34ced73bc948090a279d25c0795241ad657e",
+      "seq": 1,
+      "length": 80,
+      "contentType": "text/plain"
+    },
+    "sourceHeadBeforeBase64": "o2RoZWFkeEdzaGEyNTY6ZDE3MGNmMDY5ZDhmMTMxMGMzZTZhNDk2ZTdkOWI3MDZmMTdjMDFhYjBkODIzNDJkZmUyZWY3MmYxN2U5NjhiOGVjb3VudAFmZm9ybWF0bWNvdWNoLXJvb3QtdjE=",
+    "sourceHeadAfterBase64": "o2RoZWFkeEdzaGEyNTY6YjA0Yzc1ZTU1NzMyNjU4YzcxZTk3YTc4YjU4MWIxMGE1OTU1OTlhODQ4ZTY5NGMwOTdhOTUzYTYzOTc4YzIwOGVjb3VudAJmZm9ybWF0bWNvdWNoLXJvb3QtdjE=",
+    "sourceMirrorBeforeBase64": "VGVuYW50IGlzIGEgUGVyc29uLiBBIFBlcnNvbiBpcyBhbiBBZ2VudC4=",
+    "sourceMirrorAfterBase64": "VGVuYW50IGlzIGEgUGVyc29uLiBBIFBlcnNvbiBpcyBhbiBBZ2VudC4KU291cmNlIGFtZW5kZWQgYWZ0ZXIgc3ludGhldGljIHJldmlldy4="
+  },
+  "reviewWal": {
+    "bytes": 194,
+    "cid": "sha256:3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+    "frames": [
+      {
+        "sequence": 1,
+        "eventCid": "sha256:8bcedbd144d9da64c7d1e68f35600b41ecc21288186284d04c5448be76ad30a8",
+        "event": {
+          "atMs": 123,
+          "kind": "curation-review-event",
+          "action": "snapshot",
+          "family": "taxonomy/english/sha256:c592d64c13b3e2c480f4a2e6bd7450fdb9444c7e5b80a4ac8f574690f98c6757",
+          "version": 1,
+          "revision": 1,
+          "previousCid": null,
+          "snapshotCid": "sha256:92153cf1d446e3e4ce31b5d95d3a4dd56cef8146b5d7e2517d99ff3a2d9bbc14",
+          "previousSnapshotCid": null
+        }
+      },
+      {
+        "sequence": 2,
+        "eventCid": "sha256:6a8152fce87261269cc021e2597d6f3b0e451e5ad48f9c638903b2a50d02ca1c",
+        "event": {
+          "atMs": 123,
+          "kind": "curation-review-event",
+          "note": "Synthetic validation reviewer only; manual declared translations, not human legal approval or world facts.",
+          "action": "approve",
+          "family": "taxonomy/english/sha256:c592d64c13b3e2c480f4a2e6bd7450fdb9444c7e5b80a4ac8f574690f98c6757",
+          "version": 1,
+          "reviewer": "synthetic:premise-path-pilot",
+          "revision": 2,
+          "synthetic": true,
+          "previousCid": "sha256:8bcedbd144d9da64c7d1e68f35600b41ecc21288186284d04c5448be76ad30a8",
+          "snapshotCid": "sha256:92153cf1d446e3e4ce31b5d95d3a4dd56cef8146b5d7e2517d99ff3a2d9bbc14"
+        }
+      }
+    ]
+  },
+  "reader": {
+    "writerPid": "99002",
+    "readerPid": "99285",
+    "readbackCount": 8,
+    "walBeforeOpen": {
+      "bytes": 194,
+      "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766"
+    },
+    "walAfterClose": {
+      "bytes": 194,
+      "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766"
+    },
+    "casPackBeforeRead": {
+      "bytes": 20860,
+      "sha256": "b8ca2ad77651a2c2a207a5100f3bebb7a65c901f7556c6cfb81761c13955a084"
+    },
+    "casPackAfterClose": {
+      "bytes": 20860,
+      "sha256": "b8ca2ad77651a2c2a207a5100f3bebb7a65c901f7556c6cfb81761c13955a084"
+    },
+    "sourceMirror": {
+      "bytes": 80,
+      "sha256": "aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db"
+    },
+    "sourceHead": {
+      "bytes": 107,
+      "sha256": "0ff695c2ff05c65f949d191ab06fd56442e6353da9d4c16302fd36fca13350e9"
+    },
+    "readerCasCloseReturned": true,
+    "readerWalCloseReturned": true
+  },
+  "safety": {
+    "inspectionPosts": 0,
+    "inspectionResponses": 0,
+    "parserObservability": "Actual empty SDK, zero fresh Inspect POSTs, unmodified default retained reader and stored actual CoreNLP4.6 receipt; no parser reauthentication claim",
+    "guestModules": {
+      "installed": [],
+      "mounted": []
+    },
+    "walBytes": 194,
+    "baselineWalBytes": 8,
+    "reviewWal": {
+      "bytes": 194,
+      "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+      "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6OGJjZWRiZDE0NGQ5ZGE2NGM3ZDFlNjhmMzU2MDBiNDFlY2MyMTI4ODE4NjI4NGQwNGM1NDQ4YmU3NmFkMzBhOA3WE2xXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NmE4MTUyZmNlODcyNjEyNjljYzAyMWUyNTk3ZDZmM2IwZTQ1MWU1YWQ0OGY5YzYzODkwM2IyYTUwZDAyY2ExY/2M84s="
+    },
+    "modelCalls": 0,
+    "configuredModelCount": 0,
+    "automaticIntake": 0,
+    "reviewIntakeCalls": 0,
+    "analysisReteFacts": 0,
+    "blackboardBaselineCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+    "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+    "blackboardUnchangedFromReadinessBaseline": true,
+    "readinessBaselineEntries": [
+      "lcnc/readiness/document.reviewDecision"
+    ],
+    "beliefBagPresent": false,
+    "nativeHornConfigured": false,
+    "syntheticReviewer": true
+  },
+  "cleanup": {
+    "reviewWireDrainedAndClosed": true,
+    "booksDrained": true,
+    "scopesDrained": true,
+    "writerPid": "99002",
+    "allSupervisorsCompleted": true,
+    "remainingChildren": 0,
+    "executorTerminated": true,
+    "casCloseReturned": true,
+    "reviewWalAfterClose": {
+      "bytes": 194,
+      "sha256": "3c70d2ace47443f22c923516240196b51d94047d1ab3d219c7437615b1881766",
+      "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6OGJjZWRiZDE0NGQ5ZGE2NGM3ZDFlNjhmMzU2MDBiNDFlY2MyMTI4ODE4NjI4NGQwNGM1NDQ4YmU3NmFkMzBhOA3WE2xXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NmE4MTUyZmNlODcyNjEyNjljYzAyMWUyNTk3ZDZmM2IwZTQ1MWU1YWQ0OGY5YzYzODkwM2IyYTUwZDAyY2ExY/2M84s="
+    },
+    "listenerStopped": true,
+    "inspectionPosts": 0,
+    "inspectionResponses": 0
+  },
+  "independentAudit": {
+    "result": "PASS",
+    "mutatedCopyControlsRejected": 14,
+    "scriptSha256": "5f8af53a0eca28f542bc63136b14e803bc6b17a8c0482dafd860ea71a1c38575"
+  },
+  "beforeLabelCorrection": {
+    "attempt": "native-v74-attempt1",
+    "sourceHead": "dc4686a399f606397fc8aa6221055f40f5272d41",
+    "documentsSha256": "db21e0de1aadd88cee1a226772cfc05c864e6e99aecb170156d7668158af4b00",
+    "scope": "Native path/WAL/CAS logic passed but source-current line stayed cached true after409. Preserved with old13-control audit; not the final corrected UI proof."
+  },
+  "preliminaryObserverCompile": "compile-v74-attempt1.log missing DocumentAppendLog import; observer-only correction, compile2 passed",
+  "limits": [
+    "Manual declared and synthetically approved translation assumptions, not independent English entailment or source authentication",
+    "Existing bounded host plan/canonical projection and provenance consistency, not independent proof validity or MLIR/native engine execution",
+    "Within-document English/KIF source-evidence cards, not original source/PDF-page navigation",
+    "Original retained parser metadata not newly executed or reauthenticated",
+    "Process-local outbound syscall denial, not global OS sandbox or permitted model-transport validation",
+    "Clean separate-process CAS/WAL close/reopen, not crash or power-loss recovery"
+  ]
+}
