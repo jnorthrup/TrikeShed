@@ -1,0 +1,5 @@
+Root independently joined the actual programs, raw canonical/visual reports, null outputs, three invalid-input refusals, canonical CBOR and full SHA256 digests from each after-close pack. Original payload manifest SHA256: 06b3af14309ae28b9f7e8f5ced7cc63d32338394fc7900a2833f267df2e971a0
+
+The original 41-byte source object is a PackREF to its retained original source path, not a BLOB embedded in the exported pack. The exact source copy is included in the original seven-file input archive. Replaying this CAS pack on another machine requires materializing or remapping that reference; this evidence package does not implement portable CAS export. Six other selected CAS objects are embedded BLOBs. The recorded subsequent bounded readers verified all seven objects on this machine.
+
+The first root record-check assumed file: URLs but the observer records resolved filesystem paths; the check was corrected to compare resolved paths. The next check exposed the actual PackREF source dependency; the root then verified its exact bytes/size/digest rather than treating it as an embedded BLOB. No production code or raw observations changed.

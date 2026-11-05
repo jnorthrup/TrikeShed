@@ -1,0 +1,17 @@
+{
+  "result": "PASS",
+  "scope": "Actual recorded program/response/CAS joins; canonical POST handler runs in process, no socket HTTP or fresh parser claim.",
+  "oldSource": "9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3",
+  "newSource": "0219223a3846887fe283b93598942de332214cd2",
+  "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+  "sourceCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+  "topicCid": "sha256:974a6278d9a14b49fec408f23fe5f5b57f8186fbe88af0f64cff17208e034090",
+  "corpusReceiptCid": "sha256:df26801c501f8a21c35ee726cda2669cfd995bf72236dc8acccd374cd9f76fbb",
+  "actualAliasBugReproduced": true,
+  "actualNewAliasConfigurationAndNullPrecedence": true,
+  "oldInvalidAliasesIgnored": 3,
+  "newInvalidAliasesRefused": 3,
+  "hashVerifiedCasObjectsPerReopen": 7,
+  "originalSourceStoredAs": "one verified PackREF to retained original source path; not a self-contained pack export",
+  "sourceBytes": 41
+}
