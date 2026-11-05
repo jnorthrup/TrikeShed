@@ -1,0 +1,45 @@
+{
+  "cutBytes": 137,
+  "walPrefixBytes": 278,
+  "finalFrameBytes": 139,
+  "observedBytesBeforeKill": 415,
+  "casObjectsVerified": 28,
+  "completedCommandCid": "sha256:32dc54cb97cc6de58488d3cd485a326665740ca21283fbf26a3e3805edd7bc19",
+  "completedCommandRetained": true,
+  "completedCommandReferencedByFinalWal": false,
+  "recoveredStatus": "interrupted",
+  "sameRun": true,
+  "newRunSubmissions": 0,
+  "receiptCid": "sha256:41d5660e84fbef2f5bc7deee3639829027eb347f4b12177b432eba06eb0d6c3b",
+  "runId": "74ee4657-aa7b-4220-b413-b83363289e91",
+  "programCid": "sha256:bb72ed674ac1d05517f174ed215e2586c790ea11f7fa2241899d55b4a48f0dbb",
+  "recoveryFrames": [
+    {
+      "sequence": 1,
+      "jobId": "lcnc/run/74ee4657-aa7b-4220-b413-b83363289e91",
+      "cid": "sha256:5776a7c65383bce0e0ed836e9e0bab87fc328962442838d133ce6e29c035d21d",
+      "status": "queued"
+    },
+    {
+      "sequence": 2,
+      "jobId": "lcnc/run/74ee4657-aa7b-4220-b413-b83363289e91",
+      "cid": "sha256:20e84eb18df8b0712bab57924396712731080673a871d07aa4037d32833d0bfb",
+      "status": "running"
+    },
+    {
+      "sequence": 3,
+      "jobId": "lcnc/run/74ee4657-aa7b-4220-b413-b83363289e91",
+      "cid": "sha256:41d5660e84fbef2f5bc7deee3639829027eb347f4b12177b432eba06eb0d6c3b",
+      "status": "interrupted"
+    }
+  ],
+  "previousFramesUnchanged": true,
+  "allCompleteFrameCrc32cVerified": true,
+  "finalWalFsyncDidNotComplete": true,
+  "allSixDocumentsUnchanged": true,
+  "completedCommandQuoteAndInvocationLedgerVerified": true,
+  "nativeLiveBytesAfter": 0,
+  "writerExit": 137,
+  "inspectorExit": 0,
+  "scope": "Real kernel WAL bytes constrained by a process file-size limit and owned JVM SIGKILL while syscall entry is delayed; surviving kernel and filesystem. The controller never edits the WAL. No arbitrary-write, power-loss or physical-media durability guarantee."
+}

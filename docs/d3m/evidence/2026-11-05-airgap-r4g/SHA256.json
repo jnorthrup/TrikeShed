@@ -1,0 +1,13 @@
+{
+  "fetch-publication.py.txt": "0dff865eb1069eba732c1db789cac3c120e4f98a8871c53273293b5953b795ff",
+  "fetch.json": "b9d060a5990576def80297e925bf65940ae41e0f4abbf185da5bebc259057a10",
+  "fetch.py.txt": "15aec2600732cc97656a83ae71426e51005442500c2646c4057fc91e98afa195",
+  "integrate-publication.py.txt": "86ffcbde400ba6a3613770247e1b009ab8edc463de230c669b5b4cc70228438d",
+  "integrate.py.txt": "02c7da41b3cdc2a718ef0257636ce26aa6f59e7765b83030712fbdc915ed259c",
+  "integration-inputs.json": "5e0fe954c6fc4cd253ab48d623917b7dea048227b868d8e3d7c2a09abdce084d",
+  "publication-fetch.json": "b9d060a5990576def80297e925bf65940ae41e0f4abbf185da5bebc259057a10",
+  "publication-inputs.json": "301c9b2e14deb417abd462d9139a8d0bd3c63e1a645965fce9237d882f583bcd",
+  "publication-remote-heads.json": "cea20b84a0e4ec106219fbbc90c6044a6d085f2ece0aa534d4aceacccf01a042",
+  "remote-heads.json": "cea20b84a0e4ec106219fbbc90c6044a6d085f2ece0aa534d4aceacccf01a042",
+  "manifest-files-matched-by-ignore-rules.json": "5696b5b3ac33d059aaccac90bd33beb179910e8c0e4ae9e067521588d4a57504"
+}

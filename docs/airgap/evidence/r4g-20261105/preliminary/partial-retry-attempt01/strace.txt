@@ -1,0 +1,5 @@
+strace: Process 117604 attached with 33 threads
+strace: Process 117883 attached
+strace: Process 117884 attached
+strace: Process 117885 attached
+strace: Process 117886 attached

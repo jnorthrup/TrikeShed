@@ -1,0 +1,8 @@
+{
+  "partial-header-attempt01": "Controller examined a still-temporary CAS file, whose pathname was not its final digest; assertion failed before RLIMIT was applied. Writer closed normally. Final CAS-only path filtering fixes the harness.",
+  "first-limited-attempts": "Exact partial/full frame and browser recovery checks passed, but independent audit found SIGXFSZ from JVM writes to its already-large redirected log. These four attempts remain preliminary. Accepted attempts pipe output to the external controller and require absence of SIGXFSZ/EFBIG.",
+  "partial-retry-attempt01": "Behavior and independent audit passed, but visual inspection found the expanded passage clipped and debugger/facets covering the graph. Accepted attempt02 uses ordinary Close/Fit actions and separately verifies and captures the retained quotation.",
+  "audit": "Final syscall parser joins unfinished/resumed calls before checking whether the final WAL fsync returned successfully; a split trace line cannot evade that assertion.",
+  "scope": "All original raw bytes and logs are retained. No WAL file is externally edited by the fault controller.",
+  "evidenceAssembly": "The first packet assembly read a verifier log before its process completed and stopped before committing. The verifier subsequently exited 0; assembly resumed only after awaiting completion and retained the original error log."
+}

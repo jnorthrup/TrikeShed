@@ -1,0 +1,16 @@
+122 39 0:27 /workspace/airgap-r4f-proof/rootfs / ro,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/lower-0,upperdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/upper,workdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/work,index=off,metacopy=off
+123 122 0:27 /workspace/airgap-r4g-proof/partial-payload-attempt01/state /state rw,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/lower-0,upperdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/upper,workdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/work,index=off,metacopy=off
+124 122 0:38 / /tmp rw,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+125 122 0:39 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+126 122 0:40 / /dev rw,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+127 126 0:31 /null /dev/null rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+128 126 0:31 /zero /dev/zero rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+129 126 0:31 /full /dev/full rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+130 126 0:31 /random /dev/random rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+132 126 0:31 /urandom /dev/urandom rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+133 126 0:31 /tty /dev/tty rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+134 126 0:46 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,mode=620,ptmxmode=666
+151 122 0:53 / /opt/trikeshed/assets ro,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+152 122 0:54 / /opt/trikeshed/modules ro,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+153 122 0:31 /null /usr/bin/pdfinfo ro,nosuid,nodev master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+154 122 0:31 /null /usr/bin/pdftotext ro,nosuid,nodev master:3 - tmpfs tmpfs rw,size=65536k,mode=755

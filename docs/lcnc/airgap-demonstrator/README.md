@@ -24,7 +24,7 @@ records 19 passing current regressions with external networking unavailable
 and compilation of all affected targets. This closes a bounded transport
 milestone; the full evaluator and visual acceptance gates remain as specified.
 
-The [airgap release index](../../airgap/README.md) now reaches R4f. R2 executes
+The [airgap release index](../../airgap/README.md) now reaches R4g. R2 executes
 the actual upstream Confix scanner with bounded native ownership; R3a adds
 observed wire sparks and native flyovers; R3b traverses a retained 12-page
 PDF and verifies an exact passage. R4a packages that path and verifies a
@@ -108,3 +108,10 @@ and rejects misconfigured argument decoding before state opens. The document
 engine remains JVM Polyglot/Sulong; the native executable is a separate
 storage verification caller. Its source update explicitly requires the
 immutable R4e source companion.
+
+[R4g](../../airgap/12-kernel-short-writes.md) measures actual partial kernel
+WAL writes, recovered interrupted/completed outcomes and successful short-write
+continuation. Five new packaged scenarios reuse the immutable R4f runtime;
+their byte-boundary diagram, recordings and independent audits preserve the
+difference between an uncommitted CAS command, a recoverable complete frame
+and an acknowledged receipt. Physical power-loss guarantees remain open.

@@ -1,0 +1,108 @@
+{
+  "fault": "kill",
+  "cases": {
+    "beforePublication": {
+      "result": "PASS",
+      "runId": "ef1f6763-f618-4453-840f-7ddacb4e4815",
+      "pausedBefore": "selection"
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:f5382ad55f6219326b95304914e9e485523aea0f6ea30c51d431d86f66189f4d\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:3041bb404d86715b9c2b87cced8aece11b61018ee4ccc0ec108476f9827a91e2\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:6d44a75e7f7e30784867f70506c7f87d558d643ea19ae555b9e5d4b564c780f8\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":264.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"inputs\":{},\"debugToken\":\"3d728f00-67c1-4c07-a782-d9ad51b36da4\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"3d728f00-67c1-4c07-a782-d9ad51b36da4\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"ef1f6763-f618-4453-840f-7ddacb4e4815\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"3d728f00-67c1-4c07-a782-d9ad51b36da4\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"ef1f6763-f618-4453-840f-7ddacb4e4815\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"3d728f00-67c1-4c07-a782-d9ad51b36da4\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"ef1f6763-f618-4453-840f-7ddacb4e4815\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"3d728f00-67c1-4c07-a782-d9ad51b36da4\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"ef1f6763-f618-4453-840f-7ddacb4e4815\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"3d728f00-67c1-4c07-a782-d9ad51b36da4\",\"ordinal\":5,\"action\":\"continue\",\"runId\":\"ef1f6763-f618-4453-840f-7ddacb4e4815\"}"
+    }
+  ],
+  "responses": [],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "running": {
+    "runId": "ef1f6763-f618-4453-840f-7ddacb4e4815",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:a6e92c3914011a0d99279d97f9aa2e38c8eae1c42cba7c0791d33304d332ae2e",
+    "inputs": {},
+    "status": "running",
+    "queuedAtMs": 1793860103280,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "3d728f00-67c1-4c07-a782-d9ad51b36da4",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/ef1f6763-f618-4453-840f-7ddacb4e4815",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/ef1f6763-f618-4453-840f-7ddacb4e4815",
+    "sequence": 2,
+    "timelineRevision": 2,
+    "receiptCid": "sha256:8fc1892ff6c85647bde6287eb5502d27147d77f7a9462e6f625aeea89145527b",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:a6e92c3914011a0d99279d97f9aa2e38c8eae1c42cba7c0791d33304d332ae2e",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:a6e92c3914011a0d99279d97f9aa2e38c8eae1c42cba7c0791d33304d332ae2e",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793860103645,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:2102027ccd34578571e82e6c6ffe6c117ad3e4454e7113109bd058069268ee90"
+  },
+  "injection": {
+    "javaPid": 114852,
+    "tracerPid": 115052,
+    "command": [
+      "strace",
+      "-f",
+      "-yy",
+      "-ttt",
+      "-s",
+      "160",
+      "-e",
+      "trace=io_uring_enter,fsync,prlimit64",
+      "--inject=io_uring_enter:delay_enter=500ms",
+      "--inject=fsync:delay_enter=500ms",
+      "-o",
+      "/workspace/airgap-r4g-proof/partial-header-attempt01/fault-syscalls.txt",
+      "-p",
+      "114852"
+    ],
+    "allObservedThreadsAttached": true,
+    "cutBytes": 9,
+    "mechanism": "RLIMIT_FSIZE applied after completed receipt CAS publication; delayed ring/fsync entry provides an observed kill interval. No direct WAL edit or fake successful write return."
+  },
+  "failure": "page.waitForFunction: Target page, context or browser has been closed\n    at /workspace/airgap-r4g-proof/partial.cjs:11:200"
+}

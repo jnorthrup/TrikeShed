@@ -1,0 +1,313 @@
+{
+  "runtimeTestedSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "testedSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "publicationSourceBeforeEvidence": "2b9e678222d9d0f83ce6423de97800ab14a4d802",
+  "sourceSha256": {
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "739b5cb6a03c4e9c1e10eb5d07b0e30fb4fb13c0858afb9b414346d65eac209b",
+    "src/commonMain/kotlin/borg/trikeshed/kanban/BoardFileWal.kt": "12d8c99dbe122e700d1c74274fbca74267fbbf3011d183cb8270c8b23a6c0db2",
+    "src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt": "e8e18efa04c6299999ab9b0a1eaa58b9bd6ba12718fd7950cc89c6e8287e7844",
+    "src/jvmMain/kotlin/borg/trikeshed/userspace/nio/file/spi/JvmFileOperations.kt": "0d2cea2e08b2105c1dd68aaf50979c2aa44ddefc738c6bd1bec463ec779abbbb",
+    "src/linuxMain/kotlin/borg/trikeshed/userspace/nio/file/spi/LinuxFileOperations.kt": "a7a65bc785be19178e6f211a2cd6a632b6b351aa8fa4b62c7b495d88cbbc3391",
+    "src/posixMain/kotlin/borg/trikeshed/userspace/nio/file/spi/PosixFileOperations.kt": "ab500f0ffdc131186acc55b81b4cc86b068e311f2f273fce36fa12b44810690d",
+    "src/posixMain/resources/META-INF/cinterop/posix_spawn.def": "c3bfeea4e60d398efcabbb201fe02771345fe2106648b32ead2e77462bea8f6d",
+    "release/airgap-document/README.md": "c3e4ca1db3af4a4fda1bf1deec036b38aca4c8fcc552b38f5f3d729756608bdd",
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "PRELOAD.md": "28b3044a14053b4755e48ce9284451e0c2868e21b3c8d78c5141bde5c25e33f1",
+    "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40"
+  },
+  "runtimeArchive": {
+    "file": "/workspace/library-files/airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+    "bytes": 460778817,
+    "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+  },
+  "sourceUpdate": {
+    "baseSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+    "targetSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "targetTree": "ef1b18f7a522f7e8f1abaed0e865437b5b3efd77",
+    "baseArchive": {
+      "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+    },
+    "patchSha256": "172ecb7fcd94ddd6f29a3307eca58b94a8f7f6ca1145bcee2739ce6d40b9f7f0",
+    "verifiedAppliedTreeMatches": true,
+    "dependencySources": "Retain all R4e source inputs; add exact libxcrypt 1:4.4.38-1 source archives. Locale and libutil correspond to glibc 2.41-12+deb13u4 already retained in the base.",
+    "limits": "Layered source update requires the immutable R4e source archive; vendor JDK patches and embedded native-resource reproducible build remain open.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+      "bytes": 46539769,
+      "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+    }
+  },
+  "nativeVerification": {
+    "compiler": "Kotlin/Native 2.4.21 linux_x64",
+    "projectLibrarySourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+    "runtimeTestedSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "nativeBinarySha256": "f289376cf6951279b5d2e95511e1588593146c08a628c136fb7924ca21b81d41",
+    "nativeSourceSha256": "7ffef5edf11d230c5b1928f6d25f715247934e7df1d1b2a0404477a52918fc48",
+    "scope": "External verification caller linked to the existing full project klib. It is not the native LCNC HTTP service or the JVM Sulong engine. Build/link commands and every klib input digest are retained; the supplied compiler source zip is not claimed to be the complete compiler source closure.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-r4f-native-verification-2026-11-05.tar.gz",
+      "bytes": 5261081,
+      "sha256": "0a556481cd93ec4b367f10c89c3169039ffce5a17c1fe232b84b70ef91519098"
+    }
+  },
+  "runtimeReuse": "Exact immutable R4f runtime, source update and required R4e source base. Native-verification archive is retained from R4f and is not used in these JVM/Sulong scenarios. No new application binary or source rebuild is claimed.",
+  "testTotals": {
+    "packagedScenarios": 5,
+    "browserCases": 20,
+    "forcedJvmExits": 4,
+    "normalJvmExits": 6,
+    "newJvmUnitTestRun": false
+  },
+  "retainedJvmStanding": {
+    "release": "R4f",
+    "tests": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "changedSourceAndBuildPaths": [],
+    "basis": "No application, entry, platform or build input changes since R4f; new evidence is real packaged execution with controlled kernel short writes. Earlier JVM checks remain identified as earlier execution."
+  },
+  "browser": {
+    "bundle": {
+      "sha256": "5f4223f7d482168e45bfe03b129a5ee2551c8be3f467514d415eee269114da35"
+    },
+    "scope": "Five actual fresh document executions and five fresh JVM inspectors, with four browser assertions per scenario; positive continuation includes existing Fit and exact quote verification."
+  },
+  "cases": {
+    "header": {
+      "cutBytes": 9,
+      "walPrefixBytes": 278,
+      "finalFrameBytes": 139,
+      "observedBytesBeforeKill": 287,
+      "casObjectsVerified": 28,
+      "completedCommandCid": "sha256:67c573c3b166775744cdef5bb89fe4984b0320aaac1546adc1294bd7a49c58b5",
+      "completedCommandRetained": true,
+      "completedCommandReferencedByFinalWal": false,
+      "recoveredStatus": "interrupted",
+      "sameRun": true,
+      "newRunSubmissions": 0,
+      "receiptCid": "sha256:49214ef8bc1cd2ea97c991a1bc393c99cdf254709564dce7132da54f3f55202f",
+      "runId": "3896bb1c-d3dd-413d-9828-d59235763910",
+      "programCid": "sha256:1c7db7c87387fdfbe3e27f31a2acfd670702f4cb5afb94df90a8878fa0148430",
+      "recoveryFrames": [
+        {
+          "sequence": 1,
+          "jobId": "lcnc/run/3896bb1c-d3dd-413d-9828-d59235763910",
+          "cid": "sha256:433afd4581cb0eb111d43b916e448f0b33588dfccf22061c8146b53a670dd4b4",
+          "status": "queued"
+        },
+        {
+          "sequence": 2,
+          "jobId": "lcnc/run/3896bb1c-d3dd-413d-9828-d59235763910",
+          "cid": "sha256:8183145564ea5072b605fd1edcccc1cfc50f93a1bba4337ce0a3c8857c1bc39e",
+          "status": "running"
+        },
+        {
+          "sequence": 3,
+          "jobId": "lcnc/run/3896bb1c-d3dd-413d-9828-d59235763910",
+          "cid": "sha256:49214ef8bc1cd2ea97c991a1bc393c99cdf254709564dce7132da54f3f55202f",
+          "status": "interrupted"
+        }
+      ],
+      "previousFramesUnchanged": true,
+      "allCompleteFrameCrc32cVerified": true,
+      "finalWalFsyncDidNotComplete": true,
+      "allSixDocumentsUnchanged": true,
+      "completedCommandQuoteAndInvocationLedgerVerified": true,
+      "nativeLiveBytesAfter": 0,
+      "writerExit": 137,
+      "inspectorExit": 0,
+      "scope": "Real kernel WAL bytes constrained by a process file-size limit and owned JVM SIGKILL while syscall entry is delayed; surviving kernel and filesystem. The controller never edits the WAL. No arbitrary-write, power-loss or physical-media durability guarantee."
+    },
+    "payload": {
+      "cutBytes": 48,
+      "walPrefixBytes": 278,
+      "finalFrameBytes": 139,
+      "observedBytesBeforeKill": 326,
+      "casObjectsVerified": 28,
+      "completedCommandCid": "sha256:151723ce96e74b3cfd01f2e403360693c19b3eb0136429ccfd5f56b97b12a566",
+      "completedCommandRetained": true,
+      "completedCommandReferencedByFinalWal": false,
+      "recoveredStatus": "interrupted",
+      "sameRun": true,
+      "newRunSubmissions": 0,
+      "receiptCid": "sha256:3592b3d552d476d5cc249617262cf61c7073a50cea7334ba9b397e50e640ce0c",
+      "runId": "6ba0cb26-4af2-4dd0-a6c7-c6f07ea46302",
+      "programCid": "sha256:dde88bcb4ca2df2677b736bd87a56babf552bfd1a4762a6514d074f2afd46301",
+      "recoveryFrames": [
+        {
+          "sequence": 1,
+          "jobId": "lcnc/run/6ba0cb26-4af2-4dd0-a6c7-c6f07ea46302",
+          "cid": "sha256:e5925e7d9740f62f2ce3fc5150f0807a35132f49090b63191ac22267b6716ed1",
+          "status": "queued"
+        },
+        {
+          "sequence": 2,
+          "jobId": "lcnc/run/6ba0cb26-4af2-4dd0-a6c7-c6f07ea46302",
+          "cid": "sha256:4044685fe61ceeef24070d913dcc04fe119b7a7299e48cbe89cc8b7ce9b9a156",
+          "status": "running"
+        },
+        {
+          "sequence": 3,
+          "jobId": "lcnc/run/6ba0cb26-4af2-4dd0-a6c7-c6f07ea46302",
+          "cid": "sha256:3592b3d552d476d5cc249617262cf61c7073a50cea7334ba9b397e50e640ce0c",
+          "status": "interrupted"
+        }
+      ],
+      "previousFramesUnchanged": true,
+      "allCompleteFrameCrc32cVerified": true,
+      "finalWalFsyncDidNotComplete": true,
+      "allSixDocumentsUnchanged": true,
+      "completedCommandQuoteAndInvocationLedgerVerified": true,
+      "nativeLiveBytesAfter": 0,
+      "writerExit": 137,
+      "inspectorExit": 0,
+      "scope": "Real kernel WAL bytes constrained by a process file-size limit and owned JVM SIGKILL while syscall entry is delayed; surviving kernel and filesystem. The controller never edits the WAL. No arbitrary-write, power-loss or physical-media durability guarantee."
+    },
+    "crc": {
+      "cutBytes": 137,
+      "walPrefixBytes": 278,
+      "finalFrameBytes": 139,
+      "observedBytesBeforeKill": 415,
+      "casObjectsVerified": 28,
+      "completedCommandCid": "sha256:32dc54cb97cc6de58488d3cd485a326665740ca21283fbf26a3e3805edd7bc19",
+      "completedCommandRetained": true,
+      "completedCommandReferencedByFinalWal": false,
+      "recoveredStatus": "interrupted",
+      "sameRun": true,
+      "newRunSubmissions": 0,
+      "receiptCid": "sha256:41d5660e84fbef2f5bc7deee3639829027eb347f4b12177b432eba06eb0d6c3b",
+      "runId": "74ee4657-aa7b-4220-b413-b83363289e91",
+      "programCid": "sha256:bb72ed674ac1d05517f174ed215e2586c790ea11f7fa2241899d55b4a48f0dbb",
+      "recoveryFrames": [
+        {
+          "sequence": 1,
+          "jobId": "lcnc/run/74ee4657-aa7b-4220-b413-b83363289e91",
+          "cid": "sha256:5776a7c65383bce0e0ed836e9e0bab87fc328962442838d133ce6e29c035d21d",
+          "status": "queued"
+        },
+        {
+          "sequence": 2,
+          "jobId": "lcnc/run/74ee4657-aa7b-4220-b413-b83363289e91",
+          "cid": "sha256:20e84eb18df8b0712bab57924396712731080673a871d07aa4037d32833d0bfb",
+          "status": "running"
+        },
+        {
+          "sequence": 3,
+          "jobId": "lcnc/run/74ee4657-aa7b-4220-b413-b83363289e91",
+          "cid": "sha256:41d5660e84fbef2f5bc7deee3639829027eb347f4b12177b432eba06eb0d6c3b",
+          "status": "interrupted"
+        }
+      ],
+      "previousFramesUnchanged": true,
+      "allCompleteFrameCrc32cVerified": true,
+      "finalWalFsyncDidNotComplete": true,
+      "allSixDocumentsUnchanged": true,
+      "completedCommandQuoteAndInvocationLedgerVerified": true,
+      "nativeLiveBytesAfter": 0,
+      "writerExit": 137,
+      "inspectorExit": 0,
+      "scope": "Real kernel WAL bytes constrained by a process file-size limit and owned JVM SIGKILL while syscall entry is delayed; surviving kernel and filesystem. The controller never edits the WAL. No arbitrary-write, power-loss or physical-media durability guarantee."
+    },
+    "complete": {
+      "cutBytes": 139,
+      "walPrefixBytes": 278,
+      "finalFrameBytes": 139,
+      "observedBytesBeforeKill": 417,
+      "casObjectsVerified": 27,
+      "completedCommandCid": "sha256:8e5379033a700897047315ffe10a4e75e26fff3b8912b470cdf1ae0bcd873a82",
+      "completedCommandRetained": true,
+      "completedCommandReferencedByFinalWal": true,
+      "recoveredStatus": "completed",
+      "sameRun": true,
+      "newRunSubmissions": 0,
+      "receiptCid": "sha256:8e5379033a700897047315ffe10a4e75e26fff3b8912b470cdf1ae0bcd873a82",
+      "runId": "5372e45e-d5d6-4709-b1e2-07144143f8b6",
+      "programCid": "sha256:22b618df432e44ab616e84442b594b54379886ed626c311ade1000e913ec5108",
+      "recoveryFrames": [
+        {
+          "sequence": 1,
+          "jobId": "lcnc/run/5372e45e-d5d6-4709-b1e2-07144143f8b6",
+          "cid": "sha256:d85f7db167a6e39c348525c370e41ee6ec87c18bb4c24b390b3e5214ef8f1a06",
+          "status": "queued"
+        },
+        {
+          "sequence": 2,
+          "jobId": "lcnc/run/5372e45e-d5d6-4709-b1e2-07144143f8b6",
+          "cid": "sha256:2201ecf9e9047fad9916cb55657be258428821bc058cd3a35e54b11278e8be93",
+          "status": "running"
+        },
+        {
+          "sequence": 3,
+          "jobId": "lcnc/run/5372e45e-d5d6-4709-b1e2-07144143f8b6",
+          "cid": "sha256:8e5379033a700897047315ffe10a4e75e26fff3b8912b470cdf1ae0bcd873a82",
+          "status": "completed"
+        }
+      ],
+      "previousFramesUnchanged": true,
+      "allCompleteFrameCrc32cVerified": true,
+      "finalWalFsyncDidNotComplete": true,
+      "allSixDocumentsUnchanged": true,
+      "completedCommandQuoteAndInvocationLedgerVerified": true,
+      "nativeLiveBytesAfter": 0,
+      "writerExit": 137,
+      "inspectorExit": 0,
+      "scope": "Real kernel WAL bytes constrained by a process file-size limit and owned JVM SIGKILL while syscall entry is delayed; surviving kernel and filesystem. The controller never edits the WAL. No arbitrary-write, power-loss or physical-media durability guarantee."
+    },
+    "continued": {
+      "cutBytes": 9,
+      "walPrefixBytes": 278,
+      "finalFrameBytes": 139,
+      "observedBytesBeforeLimitRestore": 287,
+      "casObjectsVerified": 27,
+      "completedCommandCid": "sha256:1ea89506f545853fd6f6f935bfca6992b346c1f2c49f97037045b950f39cd099",
+      "completedCommandRetained": true,
+      "completedCommandReferencedByFinalWal": true,
+      "recoveredStatus": "completed",
+      "sameRun": true,
+      "newRunSubmissions": 0,
+      "receiptCid": "sha256:1ea89506f545853fd6f6f935bfca6992b346c1f2c49f97037045b950f39cd099",
+      "runId": "9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+      "programCid": "sha256:02defa544e781c493aeffff0306744f76908be3512d25ebb319ca9d600f6c590",
+      "recoveryFrames": [
+        {
+          "sequence": 1,
+          "jobId": "lcnc/run/9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+          "cid": "sha256:7af2d0a82942f171228e178b27e2f5fef2ab35261006de1a7b8e514a003c42f3",
+          "status": "queued"
+        },
+        {
+          "sequence": 2,
+          "jobId": "lcnc/run/9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+          "cid": "sha256:1deee4512cf29354c142ae9a9dd94a140ad4beb0823b9523148f7867343ac896",
+          "status": "running"
+        },
+        {
+          "sequence": 3,
+          "jobId": "lcnc/run/9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+          "cid": "sha256:1ea89506f545853fd6f6f935bfca6992b346c1f2c49f97037045b950f39cd099",
+          "status": "completed"
+        }
+      ],
+      "previousFramesUnchanged": true,
+      "allCompleteFrameCrc32cVerified": true,
+      "finalWalFsyncCompletedAfterLimitRestored": true,
+      "allSixDocumentsUnchanged": true,
+      "completedCommandQuoteAndInvocationLedgerVerified": true,
+      "nativeLiveBytesAfter": 0,
+      "writerExit": 0,
+      "inspectorExit": 0,
+      "scope": "Real short kernel ring write followed by restoration of the file-size limit; the same append completes and flushes before one HTTP 200 receipt. Both JVMs close normally. No direct WAL edit, fabricated write result or repeated graph run."
+    }
+  },
+  "limits": [
+    "RLIMIT_FSIZE is process-wide; accepted JVM logging uses a pipe owned by the external controller. Accepted traces contain no SIGXFSZ or EFBIG.",
+    "The kernel and filesystem survive; delayed syscall entry and explicit SIGKILL are controlled test interventions, not natural failures or physical power loss.",
+    "Three incomplete prefix positions and one complete frame are measured, not every possible crash offset.",
+    "Native work executes inside JVM Polyglot/Sulong; this milestone does not run the Kotlin/Native storage probe.",
+    "Vendor/native rebuild closure and dense recursive LCNC visualization remain open."
+  ]
+}

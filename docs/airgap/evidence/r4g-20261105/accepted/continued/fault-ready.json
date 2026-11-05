@@ -1,0 +1,23 @@
+{
+  "javaPid": 118718,
+  "tracerPid": 118922,
+  "command": [
+    "strace",
+    "-f",
+    "-yy",
+    "-ttt",
+    "-s",
+    "160",
+    "-e",
+    "trace=io_uring_enter,fsync,prlimit64,write,writev,pwrite64,pwritev,pwritev2",
+    "--inject=io_uring_enter:delay_enter=500ms",
+    "--inject=fsync:delay_enter=200ms",
+    "-o",
+    "/workspace/airgap-r4g-proof/partial-retry-attempt02/fault-syscalls.txt",
+    "-p",
+    "118718"
+  ],
+  "allObservedThreadsAttached": true,
+  "cutBytes": 9,
+  "mechanism": "RLIMIT_FSIZE forces a real short ring write; restore the original limit while the next entry is delayed, allowing the same WAL append to complete. No direct WAL edit or fake successful write return."
+}

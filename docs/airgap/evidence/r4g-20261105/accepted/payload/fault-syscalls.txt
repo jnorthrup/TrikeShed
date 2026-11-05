@@ -1,0 +1,235 @@
+116779 1793860458.879313 write(2<pipe:[696512]>, "[BIND] accepted conn=38\n", 24) = 24
+116906 1793860458.885614 write(2<pipe:[696512]>, "[BIND] conn=38 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860458.886288 write(2<pipe:[696512]>, "[BIND] conn=38 accept ok=true\n", 30) = 30
+116907 1793860458.918139 write(45<TCPv6:[698013]>, "HTTP/1.1 200 OK\r\nContent-Length: 22540\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"paus"..., 22686) = 22686
+116780 1793860458.919572 write(43<pipe:[699419]>, "\0", 1) = 1
+116780 1793860459.191655 write(2<pipe:[696512]>, "[BIND] accepted conn=39\n", 24) = 24
+116907 1793860459.218848 write(2<pipe:[696512]>, "[BIND] conn=39 frame complete proto=Http bytes=809 seq-alloc\n", 61) = 61
+116907 1793860459.219627 write(2<pipe:[696512]>, "[BIND] conn=39 accept ok=true\n", 30) = 30
+116906 1793860459.227280 write(45<TCPv6:[698028]>, "HTTP/1.1 202 Accepted\r\nContent-Length: 59\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"ok\":true,"..., 208) = 208
+116794 1793860459.234350 write(2<pipe:[696512]>, "[BIND] accepted conn=40\n", 24) = 24
+116779 1793860459.236332 write(43<pipe:[699419]>, "\0", 1) = 1
+116907 1793860459.239232 write(2<pipe:[696512]>, "[BIND] conn=40 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860459.240256 write(2<pipe:[696512]>, "[BIND] conn=40 accept ok=true\n", 30) = 30
+116907 1793860459.243109 write(46<TCPv6:[698033]>, "HTTP/1.1 200 OK\r\nContent-Length: 27331\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"runn"..., 27477) = 27477
+116781 1793860459.243470 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860459.259056 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x14} ---
+116793 1793860459.475172 fsync(45</state/runtime/cas/sha256/6/5> <unfinished ...>
+116781 1793860459.571308 write(2<pipe:[696512]>, "[BIND] accepted conn=41\n", 24) = 24
+116906 1793860459.575058 write(2<pipe:[696512]>, "[BIND] conn=41 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860459.576094 write(2<pipe:[696512]>, "[BIND] conn=41 accept ok=true\n", 30) = 30
+116907 1793860459.591208 write(46<TCPv6:[698046]>, "HTTP/1.1 200 OK\r\nContent-Length: 28465\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"runn"..., 28611) = 28611
+116781 1793860459.591503 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860459.676995 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860459.677398 fsync(45</state/runtime/cas/sha256/6>) = 0 (DELAYED)
+116793 1793860459.880061 fsync(45</state/runtime/cas/sha256/6/5/c> <unfinished ...>
+116781 1793860459.935433 write(2<pipe:[696512]>, "[BIND] accepted conn=42\n", 24) = 24
+116907 1793860459.936067 write(2<pipe:[696512]>, "[BIND] conn=42 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860459.937981 write(2<pipe:[696512]>, "[BIND] conn=42 accept ok=true\n", 30) = 30
+116907 1793860459.939205 write(46<TCPv6:[698051]>, "HTTP/1.1 200 OK\r\nContent-Length: 28465\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"runn"..., 28611) = 28611
+116794 1793860459.950932 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860460.095775 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860460.096135 fsync(45</state/runtime/cas/sha256/6/5> <unfinished ...>
+116794 1793860460.263924 write(2<pipe:[696512]>, "[BIND] accepted conn=43\n", 24) = 24
+116907 1793860460.264697 write(2<pipe:[696512]>, "[BIND] conn=43 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860460.265129 write(2<pipe:[696512]>, "[BIND] conn=43 accept ok=true\n", 30) = 30
+116907 1793860460.269184 write(46<TCPv6:[698056]>, "HTTP/1.1 200 OK\r\nContent-Length: 28465\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"runn"..., 28611) = 28611
+116794 1793860460.277443 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860460.296815 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860460.297265 fsync(45</state/runtime/cas/sha256/6/5/c/c>) = 0 (DELAYED)
+116793 1793860460.525831 fsync(45</state/runtime/cas/sha256/6/5/c> <unfinished ...>
+116794 1793860460.580765 write(2<pipe:[696512]>, "[BIND] accepted conn=44\n", 24) = 24
+116906 1793860460.582062 write(2<pipe:[696512]>, "[BIND] conn=44 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860460.598219 write(2<pipe:[696512]>, "[BIND] conn=44 accept ok=true\n", 30) = 30
+116907 1793860460.599519 write(46<TCPv6:[698058]>, "HTTP/1.1 200 OK\r\nContent-Length: 28465\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"runn"..., 28611) = 28611
+116779 1793860460.599968 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860460.726072 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860460.731197 write(45</state/runtime/cas/sha256/6/5/c/c/.8f2395b57c4612917627cfeb9515ddb036ea3bf7eeb068ed64c2d64dfb36.9040926633744768071.tmp>, "\246dkindolcnc-root-stategorigins\243eterms\200gorigins\200hbindings\200goutputs\245dscan\252bok\365drows\230\227\245ctaghIoObjectdopen\0eclose\31\7\353edepth\0hchildren\230\32\1\2\3\4\5\6\7\10\t\n\v\f\r\16\17\20\21\22\23\24\25\26\27\30\30\30\31\30\32\245"..., 18909) = 18909
+116793 1793860460.731335 fsync(45</state/runtime/cas/sha256/6/5/c/c/.8f2395b57c4612917627cfeb9515ddb036ea3bf7eeb068ed64c2d64dfb36.9040926633744768071.tmp>) = 0 (DELAYED)
+116793 1793860460.934151 fsync(45</state/runtime/cas/sha256/6/5/c/c> <unfinished ...>
+116780 1793860460.935878 write(2<pipe:[696512]>, "[BIND] accepted conn=45\n", 24) = 24
+116906 1793860460.939433 write(2<pipe:[696512]>, "[BIND] conn=45 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860460.940051 write(2<pipe:[696512]>, "[BIND] conn=45 accept ok=true\n", 30) = 30
+116907 1793860460.942256 write(46<TCPv6:[698060]>, "HTTP/1.1 200 OK\r\nContent-Length: 28465\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"runn"..., 28611) = 28611
+116779 1793860460.943505 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860461.134744 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860461.139417 fsync(45</state/runtime/cas/sha256/b/4> <unfinished ...>
+116781 1793860461.253795 write(2<pipe:[696512]>, "[BIND] accepted conn=46\n", 24) = 24
+116906 1793860461.254657 write(2<pipe:[696512]>, "[BIND] conn=46 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860461.255581 write(2<pipe:[696512]>, "[BIND] conn=46 accept ok=true\n", 30) = 30
+116907 1793860461.259157 write(46<TCPv6:[701803]>, "HTTP/1.1 200 OK\r\nContent-Length: 28467\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 28613) = 28613
+116781 1793860461.259846 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860461.340320 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860461.340534 fsync(45</state/runtime/cas/sha256/b>) = 0 (DELAYED)
+116793 1793860461.541003 fsync(45</state/runtime/cas/sha256/b/4/f> <unfinished ...>
+116781 1793860461.567076 write(2<pipe:[696512]>, "[BIND] accepted conn=47\n", 24) = 24
+116907 1793860461.567857 write(2<pipe:[696512]>, "[BIND] conn=47 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860461.568331 write(2<pipe:[696512]>, "[BIND] conn=47 accept ok=true\n", 30) = 30
+116906 1793860461.574457 write(46<TCPv6:[701806]>, "HTTP/1.1 200 OK\r\nContent-Length: 28467\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 28613) = 28613
+116779 1793860461.575190 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860461.741542 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860461.741741 fsync(45</state/runtime/cas/sha256/b/4> <unfinished ...>
+116779 1793860461.887629 write(2<pipe:[696512]>, "[BIND] accepted conn=48\n", 24) = 24
+116907 1793860461.889133 write(2<pipe:[696512]>, "[BIND] conn=48 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860461.889831 write(2<pipe:[696512]>, "[BIND] conn=48 accept ok=true\n", 30) = 30
+116906 1793860461.893789 write(46<TCPv6:[699690]>, "HTTP/1.1 200 OK\r\nContent-Length: 28467\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 28613) = 28613
+116780 1793860461.898375 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860461.947388 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860461.951022 fsync(45</state/runtime/cas/sha256/b/4/f/c>) = 0 (DELAYED)
+116793 1793860462.152079 fsync(45</state/runtime/cas/sha256/b/4/f> <unfinished ...>
+116780 1793860462.203226 write(2<pipe:[696512]>, "[BIND] accepted conn=49\n", 24) = 24
+116907 1793860462.203847 write(2<pipe:[696512]>, "[BIND] conn=49 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860462.204480 write(2<pipe:[696512]>, "[BIND] conn=49 accept ok=true\n", 30) = 30
+116906 1793860462.207767 write(46<TCPv6:[699693]>, "HTTP/1.1 200 OK\r\nContent-Length: 28467\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 28613) = 28613
+116794 1793860462.208108 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860462.352645 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860462.359128 write(45</state/runtime/cas/sha256/b/4/f/c/.c65910f78382f9c7c1f8cbf49cd7e54eb77425eeb3bca3f0264b0c2392b2.8564245641082060594.tmp>, "{\"entries\":[{\"ordinal\":1, \"nodeId\":\"document\", \"type\":\"json.value\", \"path\":[], \"parent\":null, \"iteration\":null, \"status\":\"completed\", \"frameId\":0, \"documentName"..., 19192) = 19192
+116793 1793860462.359306 fsync(45</state/runtime/cas/sha256/b/4/f/c/.c65910f78382f9c7c1f8cbf49cd7e54eb77425eeb3bca3f0264b0c2392b2.8564245641082060594.tmp> <unfinished ...>
+116794 1793860462.515249 write(2<pipe:[696512]>, "[BIND] accepted conn=50\n", 24) = 24
+116907 1793860462.519138 write(2<pipe:[696512]>, "[BIND] conn=50 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860462.522778 write(2<pipe:[696512]>, "[BIND] conn=50 accept ok=true\n", 30) = 30
+116906 1793860462.530281 write(46<TCPv6:[699697]>, "HTTP/1.1 200 OK\r\nContent-Length: 28467\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 28613) = 28613
+116794 1793860462.531342 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860462.563324 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860462.563620 fsync(45</state/runtime/cas/sha256/b/4/f/c>) = 0 (DELAYED)
+116793 1793860462.775761 fsync(45</state/runtime/cas/sha256/9/8> <unfinished ...>
+116794 1793860462.838087 write(2<pipe:[696512]>, "[BIND] accepted conn=51\n", 24) = 24
+116907 1793860462.838699 write(2<pipe:[696512]>, "[BIND] conn=51 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860462.839109 write(2<pipe:[696512]>, "[BIND] conn=51 accept ok=true\n", 30) = 30
+116906 1793860462.840521 write(46<TCPv6:[699702]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116794 1793860462.846132 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860462.976523 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860462.976771 fsync(45</state/runtime/cas/sha256/9> <unfinished ...>
+116794 1793860463.146908 write(2<pipe:[696512]>, "[BIND] accepted conn=52\n", 24) = 24
+116907 1793860463.147596 write(2<pipe:[696512]>, "[BIND] conn=52 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860463.148168 write(2<pipe:[696512]>, "[BIND] conn=52 accept ok=true\n", 30) = 30
+116906 1793860463.149793 write(46<TCPv6:[699706]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116780 1793860463.150930 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860463.179265 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860463.179764 fsync(45</state/runtime/cas/sha256/9/8/b>) = 0 (DELAYED)
+116793 1793860463.380570 fsync(45</state/runtime/cas/sha256/9/8> <unfinished ...>
+116780 1793860463.455908 write(2<pipe:[696512]>, "[BIND] accepted conn=53\n", 24) = 24
+116907 1793860463.456535 write(2<pipe:[696512]>, "[BIND] conn=53 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860463.457408 write(2<pipe:[696512]>, "[BIND] conn=53 accept ok=true\n", 30) = 30
+116906 1793860463.464918 write(46<TCPv6:[700640]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116794 1793860463.466785 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860463.581098 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860463.581539 fsync(45</state/runtime/cas/sha256/9/8/b/2> <unfinished ...>
+116794 1793860463.772474 write(2<pipe:[696512]>, "[BIND] accepted conn=54\n", 24) = 24
+116907 1793860463.773078 write(2<pipe:[696512]>, "[BIND] conn=54 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860463.773750 write(2<pipe:[696512]>, "[BIND] conn=54 accept ok=true\n", 30) = 30
+116906 1793860463.777237 write(46<TCPv6:[700645]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116781 1793860463.780662 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860463.782198 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860463.782329 fsync(45</state/runtime/cas/sha256/9/8/b>) = 0 (DELAYED)
+116793 1793860463.983416 write(45</state/runtime/cas/sha256/9/8/b/2/.18998f11f08dc6df675b0b587424a5a88954bfb001daa96ecd7562a0c7a2.11142476771124567801.tmp>, "{\"kind\":\"oroboros-debug\", \"runId\":\"6ba0cb26-4af2-4dd0-a6c7-c6f07ea46302\", \"programCid\":\"sha256:dde88bcb4ca2df2677b736bd87a56babf552bfd1a4762a6514d074f2afd46301\""..., 29026) = 29026
+116793 1793860463.984424 fsync(45</state/runtime/cas/sha256/9/8/b/2/.18998f11f08dc6df675b0b587424a5a88954bfb001daa96ecd7562a0c7a2.11142476771124567801.tmp> <unfinished ...>
+116781 1793860464.084726 write(2<pipe:[696512]>, "[BIND] accepted conn=55\n", 24) = 24
+116907 1793860464.086183 write(2<pipe:[696512]>, "[BIND] conn=55 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860464.086798 write(2<pipe:[696512]>, "[BIND] conn=55 accept ok=true\n", 30) = 30
+116906 1793860464.089763 write(46<TCPv6:[700651]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116779 1793860464.090561 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860464.185215 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860464.185551 fsync(45</state/runtime/cas/sha256/9/8/b/2>) = 0 (DELAYED)
+116793 1793860464.396417 fsync(45</state/runtime/cas/sha256/1> <unfinished ...>
+116781 1793860464.406082 write(2<pipe:[696512]>, "[BIND] accepted conn=56\n", 24) = 24
+116907 1793860464.407071 write(2<pipe:[696512]>, "[BIND] conn=56 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860464.407606 write(2<pipe:[696512]>, "[BIND] conn=56 accept ok=true\n", 30) = 30
+116906 1793860464.409118 write(46<TCPv6:[699725]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116779 1793860464.409371 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860464.597105 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860464.597381 fsync(45</state/runtime/cas/sha256> <unfinished ...>
+116779 1793860464.721637 write(2<pipe:[696512]>, "[BIND] accepted conn=57\n", 24) = 24
+116906 1793860464.722153 write(2<pipe:[696512]>, "[BIND] conn=57 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860464.722545 write(2<pipe:[696512]>, "[BIND] conn=57 accept ok=true\n", 30) = 30
+116907 1793860464.729050 write(46<TCPv6:[699284]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116781 1793860464.730340 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860464.797650 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860464.798021 fsync(45</state/runtime/cas/sha256/1/5>) = 0 (DELAYED)
+116793 1793860465.000723 fsync(45</state/runtime/cas/sha256/1> <unfinished ...>
+116781 1793860465.033902 write(2<pipe:[696512]>, "[BIND] accepted conn=58\n", 24) = 24
+116906 1793860465.034665 write(2<pipe:[696512]>, "[BIND] conn=58 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860465.035330 write(2<pipe:[696512]>, "[BIND] conn=58 accept ok=true\n", 30) = 30
+116907 1793860465.037898 write(46<TCPv6:[699286]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116781 1793860465.038969 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860465.201013 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860465.201447 fsync(45</state/runtime/cas/sha256/1/5/1> <unfinished ...>
+116781 1793860465.344333 write(2<pipe:[696512]>, "[BIND] accepted conn=59\n", 24) = 24
+116906 1793860465.345193 write(2<pipe:[696512]>, "[BIND] conn=59 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860465.346706 write(2<pipe:[696512]>, "[BIND] conn=59 accept ok=true\n", 30) = 30
+116907 1793860465.348403 write(46<TCPv6:[698086]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116794 1793860465.351161 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860465.403335 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860465.403639 fsync(45</state/runtime/cas/sha256/1/5>) = 0 (DELAYED)
+116793 1793860465.604277 fsync(45</state/runtime/cas/sha256/1/5/1/7> <unfinished ...>
+116794 1793860465.655271 write(2<pipe:[696512]>, "[BIND] accepted conn=60\n", 24) = 24
+116906 1793860465.655847 write(2<pipe:[696512]>, "[BIND] conn=60 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860465.656293 write(2<pipe:[696512]>, "[BIND] conn=60 accept ok=true\n", 30) = 30
+116907 1793860465.659238 write(46<TCPv6:[699288]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116780 1793860465.660267 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860465.805014 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860465.805269 fsync(45</state/runtime/cas/sha256/1/5/1> <unfinished ...>
+116780 1793860465.965650 write(2<pipe:[696512]>, "[BIND] accepted conn=61\n", 24) = 24
+116906 1793860465.966549 write(2<pipe:[696512]>, "[BIND] conn=61 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860465.967240 write(2<pipe:[696512]>, "[BIND] conn=61 accept ok=true\n", 30) = 30
+116907 1793860465.969275 write(46<TCPv6:[699291]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116794 1793860465.971075 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860466.005569 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860466.011029 write(45</state/runtime/cas/sha256/1/5/1/7/.23ce96e74b3cfd01f2e403360693c19b3eb0136429ccfd5f56b97b12a566.9780182928718614592.tmp>, "{\"type\":\"complete\", \"jobId\":\"lcnc/run/6ba0cb26-4af2-4dd0-a6c7-c6f07ea46302\", \"expectedRevision\":2, \"idempotencyKey\":\"lcnc/run/6ba0cb26-4af2-4dd0-a6c7-c6f07ea463"..., 27623) = 27623
+116793 1793860466.011252 fsync(45</state/runtime/cas/sha256/1/5/1/7/.23ce96e74b3cfd01f2e403360693c19b3eb0136429ccfd5f56b97b12a566.9780182928718614592.tmp>) = 0 (DELAYED)
+116793 1793860466.212315 fsync(45</state/runtime/cas/sha256/1/5/1/7> <unfinished ...>
+116794 1793860466.276211 write(2<pipe:[696512]>, "[BIND] accepted conn=62\n", 24) = 24
+116907 1793860466.278095 write(2<pipe:[696512]>, "[BIND] conn=62 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860466.278509 write(2<pipe:[696512]>, "[BIND] conn=62 accept ok=true\n", 30) = 30
+116906 1793860466.279857 write(46<TCPv6:[699294]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116781 1793860466.280812 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860466.415613 <... fsync resumed>) = 0 (DELAYED)
+116793 1793860466.416994 io_uring_enter(36<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0 <unfinished ...>
+116781 1793860466.590596 write(2<pipe:[696512]>, "[BIND] accepted conn=63\n", 24) = 24
+116906 1793860466.591294 write(2<pipe:[696512]>, "[BIND] conn=63 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116906 1793860466.591770 write(2<pipe:[696512]>, "[BIND] conn=63 accept ok=true\n", 30) = 30
+116907 1793860466.598913 write(45<TCPv6:[699297]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116781 1793860466.601500 write(43<pipe:[699419]>, "\0", 1) = 1
+116781 1793860466.911115 write(2<pipe:[696512]>, "[BIND] accepted conn=64\n", 24) = 24
+116907 1793860466.911767 write(2<pipe:[696512]>, "[BIND] conn=64 frame complete proto=Http bytes=682 seq-alloc\n", 61) = 61
+116907 1793860466.912174 write(2<pipe:[696512]>, "[BIND] conn=64 accept ok=true\n", 30) = 30
+116793 1793860466.918108 <... io_uring_enter resumed>) = 1 (DELAYED)
+116793 1793860466.918697 io_uring_enter(36<anon_inode:[io_uring]>, 1, 0, 0, NULL, 0 <unfinished ...>
+116906 1793860466.918876 write(45<TCPv6:[700661]>, "HTTP/1.1 200 OK\r\nContent-Length: 28857\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-cache\r\nAccess-Control-Allow-Origin: *\r\n\r\n{\"state\":\"comp"..., 29003) = 29003
+116779 1793860466.919246 write(43<pipe:[699419]>, "\0", 1) = 1
+116793 1793860466.925533 <... io_uring_enter resumed>) = ?
+117329 1793860466.925667 +++ killed by SIGKILL +++
+117326 1793860466.925707 +++ killed by SIGKILL +++
+116900 1793860466.925711 +++ killed by SIGKILL +++
+116898 1793860466.925714 +++ killed by SIGKILL +++
+116890 1793860466.925717 +++ killed by SIGKILL +++
+116799 1793860466.925720 +++ killed by SIGKILL +++
+116773 1793860466.925723 +++ killed by SIGKILL +++
+116759 1793860466.925727 +++ killed by SIGKILL +++
+116758 1793860466.925730 +++ killed by SIGKILL +++
+116757 1793860466.925733 +++ killed by SIGKILL +++
+116772 1793860466.925736 +++ killed by SIGKILL +++
+116756 1793860466.925739 +++ killed by SIGKILL +++
+116776 1793860466.925742 +++ killed by SIGKILL +++
+116755 1793860466.925746 +++ killed by SIGKILL +++
+116741 1793860466.925749 +++ killed by SIGKILL +++
+116738 1793860466.925752 +++ killed by SIGKILL +++
+116729 1793860466.925755 +++ killed by SIGKILL +++
+116725 1793860466.925758 +++ killed by SIGKILL +++
+117332 1793860466.925800 +++ killed by SIGKILL +++
+116826 1793860466.925803 +++ killed by SIGKILL +++
+116783 1793860466.925806 +++ killed by SIGKILL +++
+116754 1793860466.925810 +++ killed by SIGKILL +++
+116728 1793860466.925813 +++ killed by SIGKILL +++
+116906 1793860466.925833 +++ killed by SIGKILL +++
+116907 1793860466.925850 +++ killed by SIGKILL +++
+116794 1793860466.925872 +++ killed by SIGKILL +++
+116781 1793860466.925888 +++ killed by SIGKILL +++
+116780 1793860466.925909 +++ killed by SIGKILL +++
+116779 1793860466.925925 +++ killed by SIGKILL +++
+116760 1793860466.925939 +++ killed by SIGKILL +++
+116732 1793860466.925957 +++ killed by SIGKILL +++
+116731 1793860466.925978 +++ killed by SIGKILL +++
+116727 1793860466.925992 +++ killed by SIGKILL +++
+116793 1793860467.446689 +++ killed by SIGKILL +++
+116688 1793860467.446745 +++ killed by SIGKILL +++
