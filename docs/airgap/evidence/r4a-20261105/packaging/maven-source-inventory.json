@@ -1,0 +1,1067 @@
+[
+  {
+    "group": "org.jetbrains.compose.material3",
+    "name": "material3-desktop",
+    "version": "1.9.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/material3/material3-desktop/1.9.0/material3-desktop-1.9.0-sources.jar",
+    "file": "org.jetbrains.compose.material3__material3-desktop-1.9.0-sources.jar",
+    "bytes": 815807,
+    "sha256": "343fffb5881a3b173235dda4f256264617141fa67ebaca3027a5cd8c8e4cc54b"
+  },
+  {
+    "group": "org.jetbrains.compose.desktop",
+    "name": "desktop-jvm",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/desktop/desktop-jvm/1.12.2/desktop-jvm-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.desktop__desktop-jvm-1.12.2-sources.jar",
+    "bytes": 6246,
+    "sha256": "bf79a95fb181f13ab62b9a778d5135737b6903c24b0945f1c26751182f420f56"
+  },
+  {
+    "group": "org.jetbrains.compose.material",
+    "name": "material-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/material/material-desktop/1.12.2/material-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.material__material-desktop-1.12.2-sources.jar",
+    "bytes": 332183,
+    "sha256": "984bfdad3ef46ef736dfc7c959e5fad353a0712d226fff6eca6f04c8fcff4e6a"
+  },
+  {
+    "group": "org.jetbrains.compose.animation",
+    "name": "animation-core-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/animation/animation-core-desktop/1.12.2/animation-core-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.animation__animation-core-desktop-1.12.2-sources.jar",
+    "bytes": 120198,
+    "sha256": "2dce6e464f06890c0e75f4e007b176411b818d90a7d09fd11441e74dec141f2c"
+  },
+  {
+    "group": "org.jetbrains.compose.material",
+    "name": "material-ripple-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/material/material-ripple-desktop/1.12.2/material-ripple-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.material__material-ripple-desktop-1.12.2-sources.jar",
+    "bytes": 19758,
+    "sha256": "c5808a38f92dd8732c75c33614b2d2832d5c7bdb881f5ac6ab0c62794d47c13b"
+  },
+  {
+    "group": "org.jetbrains.compose.animation",
+    "name": "animation-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/animation/animation-desktop/1.12.2/animation-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.animation__animation-desktop-1.12.2-sources.jar",
+    "bytes": 122662,
+    "sha256": "4588561eb7bea59fdab2de778d4e1bd8b9f44da22718f92b2214d573f850e563"
+  },
+  {
+    "group": "org.jetbrains.compose.foundation",
+    "name": "foundation-layout-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/foundation/foundation-layout-desktop/1.12.2/foundation-layout-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.foundation__foundation-layout-desktop-1.12.2-sources.jar",
+    "bytes": 144419,
+    "sha256": "835161a06df5151665b7710a1709e7070082996ae2d7756d86cfd92a33c0edba"
+  },
+  {
+    "group": "org.jetbrains.compose.foundation",
+    "name": "foundation-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/foundation/foundation-desktop/1.12.2/foundation-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.foundation__foundation-desktop-1.12.2-sources.jar",
+    "bytes": 1245733,
+    "sha256": "4cf66b89391b97240506365499b9524af55cf0fabf33674894b3e599feff938e"
+  },
+  {
+    "group": "org.jetbrains.compose.material",
+    "name": "material-icons-extended-desktop",
+    "version": "1.7.3",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/material/material-icons-extended-desktop/1.7.3/material-icons-extended-desktop-1.7.3-sources.jar",
+    "file": "org.jetbrains.compose.material__material-icons-extended-desktop-1.7.3-sources.jar",
+    "bytes": 12085967,
+    "sha256": "4e23237644f7da35c391cc4c0263b95248605f499ab46f6d2c92d4fe48793d5a"
+  },
+  {
+    "group": "org.jetbrains.compose.material",
+    "name": "material-icons-core-desktop",
+    "version": "1.7.3",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/material/material-icons-core-desktop/1.7.3/material-icons-core-desktop-1.7.3-sources.jar",
+    "file": "org.jetbrains.compose.material__material-icons-core-desktop-1.7.3-sources.jar",
+    "bytes": 284048,
+    "sha256": "b3f1be7fda4d13a6d938bb918275ddc143e9d6a2007727f284778480526f5f16"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-tooling-preview-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-tooling-preview-desktop/1.12.2/ui-tooling-preview-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-tooling-preview-desktop-1.12.2-sources.jar",
+    "bytes": 23168,
+    "sha256": "ea33b8d25889aca661c88926e4d9f2b3383f987340454f1e6d19e519270c58c5"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-unit-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-unit-desktop/1.12.2/ui-unit-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-unit-desktop-1.12.2-sources.jar",
+    "bytes": 39021,
+    "sha256": "0acba1d10bb8c342ec0f42e1614f82315b6bc1a924536b235c54248281934246"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-geometry-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-geometry-desktop/1.12.2/ui-geometry-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-geometry-desktop-1.12.2-sources.jar",
+    "bytes": 25756,
+    "sha256": "8d155f4336b651706aa2ff9fd67e59f4c2c833dd8a0deef5c033298bc01fc8c9"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-backhandler-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-backhandler-desktop/1.12.2/ui-backhandler-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-backhandler-desktop-1.12.2-sources.jar",
+    "bytes": 11542,
+    "sha256": "ee868b8264ee0950e49e4f546c447b8220daff0bb055548de911382fcd1b10e5"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-graphics-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-graphics-desktop/1.12.2/ui-graphics-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-graphics-desktop-1.12.2-sources.jar",
+    "bytes": 262164,
+    "sha256": "0ea400f9ebc1f4299075b9519d9c7411cbfaceff876ae7f5f01ddca22cf06c81"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-util-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-util-desktop/1.12.2/ui-util-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-util-desktop-1.12.2-sources.jar",
+    "bytes": 20477,
+    "sha256": "17fdc82101ab5b723405d71ad0056c20a6459089a52c75d484ccb22580d24c5d"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-text-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-text-desktop/1.12.2/ui-text-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-text-desktop-1.12.2-sources.jar",
+    "bytes": 261933,
+    "sha256": "937ef4aa07ca3293fc8c217a5af52b4edda2ee1f6669b82095fc77efc192eeb2"
+  },
+  {
+    "group": "org.jetbrains.compose.ui",
+    "name": "ui-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/ui/ui-desktop/1.12.2/ui-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.ui__ui-desktop-1.12.2-sources.jar",
+    "bytes": 1092868,
+    "sha256": "ae1ccb98d6d7335c7e2d0ec5024e6cda800d1737bab3477f81c45914e27b786e"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-scripting-jvm-host",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-scripting-jvm-host/2.4.21/kotlin-scripting-jvm-host-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-scripting-jvm-host-2.4.21-sources.jar",
+    "bytes": 28485,
+    "sha256": "37b54ca43a2ea84a3228d2848ca94299f7209b096a427941133e46e03c015920"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-scripting-compiler-embeddable",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-scripting-compiler-embeddable/2.4.21/kotlin-scripting-compiler-embeddable-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-scripting-compiler-embeddable-2.4.21-sources.jar",
+    "bytes": 168042,
+    "sha256": "2c7849f4d8684a5bcc1edc9bf6437fedff24e2982308df968dfae7136c4138ae"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-scripting-compiler-impl-embeddable",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-scripting-compiler-impl-embeddable/2.4.21/kotlin-scripting-compiler-impl-embeddable-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-scripting-compiler-impl-embeddable-2.4.21-sources.jar",
+    "bytes": 43463,
+    "sha256": "2c4fd3f6ba9b87cdc85c4e3439f2c749d3d716b35c5df0850a338acdac9227d3"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-scripting-jvm",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-scripting-jvm/2.4.21/kotlin-scripting-jvm-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-scripting-jvm-2.4.21-sources.jar",
+    "bytes": 27130,
+    "sha256": "6b4f184ecd3b7a772bc5822c6f43e78b49c53a0fee840f15734a7ded0dc095e1"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-scripting-common",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-scripting-common/2.4.21/kotlin-scripting-common-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-scripting-common-2.4.21-sources.jar",
+    "bytes": 34471,
+    "sha256": "aedeed28584af314c5b9536b33f1d56d655cbc80e954cc07120cd81cd246606a"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "atomicfu-jvm",
+    "version": "0.33.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/atomicfu-jvm/0.33.0/atomicfu-jvm-0.33.0-sources.jar",
+    "file": "org.jetbrains.kotlinx__atomicfu-jvm-0.33.0-sources.jar",
+    "bytes": 21222,
+    "sha256": "09e8719c35c3491633ea8d0dfb2a0f1769dfff5a6bbaf55ee5412a6221331215"
+  },
+  {
+    "group": "org.jetbrains.skiko",
+    "name": "skiko-awt-runtime-linux-x64",
+    "version": "0.150.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/skiko/skiko-awt-runtime-linux-x64/0.150.2/skiko-awt-runtime-linux-x64-0.150.2-sources.jar",
+    "file": "org.jetbrains.skiko__skiko-awt-runtime-linux-x64-0.150.2-sources.jar",
+    "bytes": 261,
+    "sha256": "c6deada2fac53b8ea6523dbda77597b128006674616f140f04df23264c6d1aa3"
+  },
+  {
+    "group": "org.jetbrains.skiko",
+    "name": "skiko-awt",
+    "version": "0.150.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/skiko/skiko-awt/0.150.2/skiko-awt-0.150.2-sources.jar",
+    "file": "org.jetbrains.skiko__skiko-awt-0.150.2-sources.jar",
+    "bytes": 334240,
+    "sha256": "7a10e5e7ec5363ed6ea3b089fd5d619d0088e9e6c05459a33da256a95f9b1d4b"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "name": "lifecycle-viewmodel-desktop",
+    "version": "2.11.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-desktop/2.11.0/lifecycle-viewmodel-desktop-2.11.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/lifecycle/lifecycle-viewmodel-desktop/2.11.0/lifecycle-viewmodel-desktop-2.11.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.lifecycle__lifecycle-viewmodel-desktop-2.11.0-sources.jar",
+    "bytes": 39569,
+    "sha256": "3777a09f7c721cc678f0de86aca0a4539d2b97bf160cbe53585263b156b997ce"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "name": "lifecycle-runtime-compose-desktop",
+    "version": "2.11.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.11.0/lifecycle-runtime-compose-desktop-2.11.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.11.0/lifecycle-runtime-compose-desktop-2.11.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.lifecycle__lifecycle-runtime-compose-desktop-2.11.0-sources.jar",
+    "bytes": 15732,
+    "sha256": "9e8e899d788422b2fd8b0d54120900474a7d3e61cfd6b65fb557858c330e5af2"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "name": "lifecycle-runtime-desktop",
+    "version": "2.11.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-desktop/2.11.0/lifecycle-runtime-desktop-2.11.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/lifecycle/lifecycle-runtime-desktop/2.11.0/lifecycle-runtime-desktop-2.11.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.lifecycle__lifecycle-runtime-desktop-2.11.0-sources.jar",
+    "bytes": 23432,
+    "sha256": "78def2a2d5f523f60c654162221469915abdb4bdda4d316ad21cbc729cfd72a8"
+  },
+  {
+    "group": "org.jetbrains.androidx.savedstate",
+    "name": "savedstate-compose-desktop",
+    "version": "1.3.6",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/androidx/savedstate/savedstate-compose-desktop/1.3.6/savedstate-compose-desktop-1.3.6-sources.jar",
+    "file": "org.jetbrains.androidx.savedstate__savedstate-compose-desktop-1.3.6-sources.jar",
+    "bytes": 1141,
+    "sha256": "6f27472e1e5fe26259f156b498f6745feb57b651b673d65fe9938a7fec2d9065"
+  },
+  {
+    "group": "androidx.savedstate",
+    "name": "savedstate-compose-desktop",
+    "version": "1.4.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-desktop/1.4.0/savedstate-compose-desktop-1.4.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/savedstate/savedstate-compose-desktop/1.4.0/savedstate-compose-desktop-1.4.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.savedstate__savedstate-compose-desktop-1.4.0-sources.jar",
+    "bytes": 11485,
+    "sha256": "5b5a5b73a418badb5b2e6a24284c4c3e00e216b1cb5b9ef7cbf5f147b0f54d21"
+  },
+  {
+    "group": "androidx.savedstate",
+    "name": "savedstate-desktop",
+    "version": "1.4.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-desktop/1.4.0/savedstate-desktop-1.4.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/savedstate/savedstate-desktop/1.4.0/savedstate-desktop-1.4.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.savedstate__savedstate-desktop-1.4.0-sources.jar",
+    "bytes": 46343,
+    "sha256": "cb7c40701e747069e2626a8283b5c977ecf258f44f6a6e1e80352ea2eacfb0a2"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "name": "lifecycle-common-jvm",
+    "version": "2.11.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.11.0/lifecycle-common-jvm-2.11.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/lifecycle/lifecycle-common-jvm/2.11.0/lifecycle-common-jvm-2.11.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.lifecycle__lifecycle-common-jvm-2.11.0-sources.jar",
+    "bytes": 33095,
+    "sha256": "5865f0584cd7b3d5769a46b4d0ad2486a73ca681450997cea45a574dae5865fc"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "name": "lifecycle-viewmodel-savedstate-desktop",
+    "version": "2.11.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-desktop/2.11.0/lifecycle-viewmodel-savedstate-desktop-2.11.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-desktop/2.11.0/lifecycle-viewmodel-savedstate-desktop-2.11.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.lifecycle__lifecycle-viewmodel-savedstate-desktop-2.11.0-sources.jar",
+    "bytes": 29992,
+    "sha256": "0f2314d274c05ca14c371c02597e9693ceebd00c25111e4fa9a2aa373bdb3d54"
+  },
+  {
+    "group": "androidx.lifecycle",
+    "name": "lifecycle-viewmodel-compose-desktop",
+    "version": "2.11.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-desktop/2.11.0/lifecycle-viewmodel-compose-desktop-2.11.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/lifecycle/lifecycle-viewmodel-compose-desktop/2.11.0/lifecycle-viewmodel-compose-desktop-2.11.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.lifecycle__lifecycle-viewmodel-compose-desktop-2.11.0-sources.jar",
+    "bytes": 20023,
+    "sha256": "b66aa6d385f0f267d6affbc1597c03614217202fb46c2d614def56d6b69e67cb"
+  },
+  {
+    "group": "org.jetbrains.androidx.navigationevent",
+    "name": "navigationevent-compose-desktop",
+    "version": "1.1.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/androidx/navigationevent/navigationevent-compose-desktop/1.1.0/navigationevent-compose-desktop-1.1.0-sources.jar",
+    "file": "org.jetbrains.androidx.navigationevent__navigationevent-compose-desktop-1.1.0-sources.jar",
+    "bytes": 5371,
+    "sha256": "025b645bc83f18a699e005e04804121ce44a39a3837620b76795bc2ddb4e54e8"
+  },
+  {
+    "group": "androidx.navigationevent",
+    "name": "navigationevent-compose-desktop",
+    "version": "1.1.1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-desktop/1.1.1/navigationevent-compose-desktop-1.1.1-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/navigationevent/navigationevent-compose-desktop/1.1.1/navigationevent-compose-desktop-1.1.1-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.navigationevent__navigationevent-compose-desktop-1.1.1-sources.jar",
+    "bytes": 14636,
+    "sha256": "25e36c0afa796e71ea2979ae37fff10db56bc3154df0bd90a0f3f1a19693ccaa"
+  },
+  {
+    "group": "androidx.navigationevent",
+    "name": "navigationevent-desktop",
+    "version": "1.1.1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-desktop/1.1.1/navigationevent-desktop-1.1.1-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/navigationevent/navigationevent-desktop/1.1.1/navigationevent-desktop-1.1.1-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.navigationevent__navigationevent-desktop-1.1.1-sources.jar",
+    "bytes": 38040,
+    "sha256": "6a3cf49ac803b119155c79e96b1db8dd6dba816e463ce6722d855641e1e408db"
+  },
+  {
+    "group": "androidx.compose.runtime",
+    "name": "runtime-annotation-jvm",
+    "version": "1.12.1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-jvm/1.12.1/runtime-annotation-jvm-1.12.1-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/compose/runtime/runtime-annotation-jvm/1.12.1/runtime-annotation-jvm-1.12.1-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.compose.runtime__runtime-annotation-jvm-1.12.1-sources.jar",
+    "bytes": 12735,
+    "sha256": "272b2b47cf1d938a66fa4c92e73ab8820c91f9c0d07208050aa5986988bc73b9"
+  },
+  {
+    "group": "androidx.compose.runtime",
+    "name": "runtime-saveable-desktop",
+    "version": "1.12.1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-desktop/1.12.1/runtime-saveable-desktop-1.12.1-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/compose/runtime/runtime-saveable-desktop/1.12.1/runtime-saveable-desktop-1.12.1-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.compose.runtime__runtime-saveable-desktop-1.12.1-sources.jar",
+    "bytes": 22187,
+    "sha256": "2efde23b7ed4dd4927cdb8bea40d288f3df888b81e5c3f66a1387d61cbaba06c"
+  },
+  {
+    "group": "org.jetbrains.compose.runtime",
+    "name": "runtime-saveable-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/runtime/runtime-saveable-desktop/1.12.2/runtime-saveable-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.runtime__runtime-saveable-desktop-1.12.2-sources.jar",
+    "bytes": 5100,
+    "sha256": "4961dd05125e7d92d25097be935d3fb75cb94bb51017cb52ee60e206254345f0"
+  },
+  {
+    "group": "org.jetbrains.androidx.lifecycle",
+    "name": "lifecycle-runtime-compose-desktop",
+    "version": "2.9.6",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/androidx/lifecycle/lifecycle-runtime-compose-desktop/2.9.6/lifecycle-runtime-compose-desktop-2.9.6-sources.jar",
+    "file": "org.jetbrains.androidx.lifecycle__lifecycle-runtime-compose-desktop-2.9.6-sources.jar",
+    "bytes": 1141,
+    "sha256": "6f27472e1e5fe26259f156b498f6745feb57b651b673d65fe9938a7fec2d9065"
+  },
+  {
+    "group": "org.jetbrains.compose.runtime",
+    "name": "runtime-desktop",
+    "version": "1.12.2",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/compose/runtime/runtime-desktop/1.12.2/runtime-desktop-1.12.2-sources.jar",
+    "file": "org.jetbrains.compose.runtime__runtime-desktop-1.12.2-sources.jar",
+    "bytes": 5057,
+    "sha256": "9da34b7f9e6cc6e69f61df43c47661a06d0476e813693dcb424d4c8bd331dc30"
+  },
+  {
+    "group": "androidx.compose.runtime",
+    "name": "runtime-desktop",
+    "version": "1.12.1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-desktop/1.12.1/runtime-desktop-1.12.1-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/compose/runtime/runtime-desktop/1.12.1/runtime-desktop-1.12.1-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.compose.runtime__runtime-desktop-1.12.1-sources.jar",
+    "bytes": 580590,
+    "sha256": "45f2757069be7d7f99cf4692bac068ef23a0e84a7a27d28fc9c12b8610c4ccdd"
+  },
+  {
+    "group": "androidx.compose.runtime",
+    "name": "runtime-retain-desktop",
+    "version": "1.12.1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-desktop/1.12.1/runtime-retain-desktop-1.12.1-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/compose/runtime/runtime-retain-desktop/1.12.1/runtime-retain-desktop-1.12.1-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.compose.runtime__runtime-retain-desktop-1.12.1-sources.jar",
+    "bytes": 31633,
+    "sha256": "9a80feee1db395d07f25d26d816fa351a6bb1308b9ebe6c8d14b59c0aa617f41"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-compiler-embeddable",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.4.21/kotlin-compiler-embeddable-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-compiler-embeddable-2.4.21-sources.jar",
+    "bytes": 11392094,
+    "sha256": "c7d2fe069589de7cefdc9aaea962b12ee0b61022749dee15e64ff809f2cd6c0e"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "kotlinx-coroutines-core-jvm",
+    "version": "1.11.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0-sources.jar",
+    "file": "org.jetbrains.kotlinx__kotlinx-coroutines-core-jvm-1.11.0-sources.jar",
+    "bytes": 438533,
+    "sha256": "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "kotlinx-serialization-core-jvm",
+    "version": "1.12.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0/kotlinx-serialization-core-jvm-1.12.0-sources.jar",
+    "file": "org.jetbrains.kotlinx__kotlinx-serialization-core-jvm-1.12.0-sources.jar",
+    "bytes": 112959,
+    "sha256": "b62fb8059123c43a72ddbe4aeaa8c92c8313d822c128ca2f861e3d91e35e5070"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "kotlinx-datetime-jvm",
+    "version": "0.8.0-0.6.x-compat",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-jvm/0.8.0-0.6.x-compat/kotlinx-datetime-jvm-0.8.0-0.6.x-compat-sources.jar",
+    "file": "org.jetbrains.kotlinx__kotlinx-datetime-jvm-0.8.0-0.6.x-compat-sources.jar",
+    "bytes": 164093,
+    "sha256": "d2d3e8cf389ab0f162c61a2cfdaec488fca766ee16b8da12ac81bd5d53500de2"
+  },
+  {
+    "group": "androidx.collection",
+    "name": "collection-jvm",
+    "version": "1.5.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-jvm/1.5.0/collection-jvm-1.5.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/collection/collection-jvm/1.5.0/collection-jvm-1.5.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.collection__collection-jvm-1.5.0-sources.jar",
+    "bytes": 288386,
+    "sha256": "bcc6197ec5fb349e86ae3ba6c94b164d3a9ac5a03d9f9c235d7c4eb24e5878b3"
+  },
+  {
+    "group": "androidx.arch.core",
+    "name": "core-common",
+    "version": "2.2.0",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-common/2.2.0/core-common-2.2.0-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/arch/core/core-common/2.2.0/core-common-2.2.0-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.arch.core__core-common-2.2.0-sources.jar",
+    "bytes": 5684,
+    "sha256": "563d430880d847890029234386ef03adb95403c34f3c9dec3a7002e2f4007ae4"
+  },
+  {
+    "group": "androidx.annotation",
+    "name": "annotation-jvm",
+    "version": "1.9.1",
+    "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.9.1/annotation-jvm-1.9.1-sources.jar",
+    "attempts": [
+      {
+        "url": "https://repo.maven.apache.org/maven2/androidx/annotation/annotation-jvm/1.9.1/annotation-jvm-1.9.1-sources.jar",
+        "error": "HTTP Error 404: Not Found"
+      }
+    ],
+    "file": "androidx.annotation__annotation-jvm-1.9.1-sources.jar",
+    "bytes": 71470,
+    "sha256": "c6ae897fbfb73ca09d4ae31a24bfff85c652097ad10644cdbb738488728cb39b"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-stdlib",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.21/kotlin-stdlib-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-stdlib-2.4.21-sources.jar",
+    "bytes": 767009,
+    "sha256": "1e29c0668b0aa555e7b154e5da2e8094e1b755cfee25737839195bbbdad8a4a2"
+  },
+  {
+    "group": "org.gwtproject.web.bindery",
+    "name": "requestfactory-client",
+    "version": "2.13.1",
+    "url": "https://repo.maven.apache.org/maven2/org/gwtproject/web/bindery/requestfactory-client/2.13.1/requestfactory-client-2.13.1-sources.jar",
+    "file": "org.gwtproject.web.bindery__requestfactory-client-2.13.1-sources.jar",
+    "bytes": 192252,
+    "sha256": "d3e4ca4b403296cc0baefe4e2527b10b5e64502c8d832c95e946e62633550a03"
+  },
+  {
+    "group": "org.openjdk.jmh",
+    "name": "jmh-generator-annprocess",
+    "version": "1.37",
+    "url": "https://repo.maven.apache.org/maven2/org/openjdk/jmh/jmh-generator-annprocess/1.37/jmh-generator-annprocess-1.37-sources.jar",
+    "file": "org.openjdk.jmh__jmh-generator-annprocess-1.37-sources.jar",
+    "bytes": 29528,
+    "sha256": "cc1b661fb209ae1a433e331e8e78bab680674153b0a6ac69d47d11c60fb5e47e"
+  },
+  {
+    "group": "org.openjdk.jmh",
+    "name": "jmh-core",
+    "version": "1.37",
+    "url": "https://repo.maven.apache.org/maven2/org/openjdk/jmh/jmh-core/1.37/jmh-core-1.37-sources.jar",
+    "file": "org.openjdk.jmh__jmh-core-1.37-sources.jar",
+    "bytes": 416281,
+    "sha256": "fd4beda07b3b94cd0e32199401bbb2d9ed3371a770c8c320761b9442ff3e8e05"
+  },
+  {
+    "group": "org.ow2.asm",
+    "name": "asm-tree",
+    "version": "9.11.1",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm-tree/9.11.1/asm-tree-9.11.1-sources.jar",
+    "file": "org.ow2.asm__asm-tree-9.11.1-sources.jar",
+    "bytes": 76684,
+    "sha256": "203604136ea5f116a261aa10a415d25a8e74897749c128e532853ec4a748c572"
+  },
+  {
+    "group": "org.ow2.asm",
+    "name": "asm",
+    "version": "9.11.1",
+    "url": "https://repo.maven.apache.org/maven2/org/ow2/asm/asm/9.11.1/asm-9.11.1-sources.jar",
+    "file": "org.ow2.asm__asm-9.11.1-sources.jar",
+    "bytes": 193283,
+    "sha256": "3cfc56ad047260d8ccff50cd55af8922a9c9e2b0439c6eba801dbfaf0870a3ae"
+  },
+  {
+    "group": "org.graalvm.python",
+    "name": "python-bouncycastle-support",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/python/python-bouncycastle-support/25.3.4.1/python-bouncycastle-support-25.3.4.1-sources.jar",
+    "file": "org.graalvm.python__python-bouncycastle-support-25.3.4.1-sources.jar",
+    "bytes": 3765,
+    "sha256": "cd38dac1898ffe6b1ce5e80156a42e88c9092007f515d1364de554091d0f17d3"
+  },
+  {
+    "group": "org.graalvm.python",
+    "name": "python-resources",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/python/python-resources/25.3.4.1/python-resources-25.3.4.1-sources.jar",
+    "file": "org.graalvm.python__python-resources-25.3.4.1-sources.jar",
+    "bytes": 6368,
+    "sha256": "0cbc3221910fb82a83e6c8224aab68d223a95c5a4028d387574259a0382471f3"
+  },
+  {
+    "group": "org.graalvm.python",
+    "name": "python-language",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/python/python-language/25.3.4.1/python-language-25.3.4.1-sources.jar",
+    "file": "org.graalvm.python__python-language-25.3.4.1-sources.jar",
+    "bytes": 9632269,
+    "sha256": "8641fe261493b2d5e6b1ec435995f1a4ef732ff74271bcc94690d488572cdb86"
+  },
+  {
+    "group": "org.graalvm.tools",
+    "name": "profiler-tool",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/tools/profiler-tool/25.3.4.1/profiler-tool-25.3.4.1-sources.jar",
+    "file": "org.graalvm.tools__profiler-tool-25.3.4.1-sources.jar",
+    "bytes": 93853,
+    "sha256": "c5f51d0720f39736cbf8f22d76f2943ffb7a16b628dfc7b71ef67f8be99cb8d5"
+  },
+  {
+    "group": "dev.truffleruby.internal",
+    "name": "runtime",
+    "version": "40.0.0",
+    "url": "https://repo.maven.apache.org/maven2/dev/truffleruby/internal/runtime/40.0.0/runtime-40.0.0-sources.jar",
+    "file": "dev.truffleruby.internal__runtime-40.0.0-sources.jar",
+    "bytes": 3166565,
+    "sha256": "bb1c03588f9da73cab4f26f74bfd66de06ac4dfad62ae421334271a986cd0c0c"
+  },
+  {
+    "group": "org.graalvm.js",
+    "name": "js-language",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/js/js-language/25.3.4.1/js-language-25.3.4.1-sources.jar",
+    "file": "org.graalvm.js__js-language-25.3.4.1-sources.jar",
+    "bytes": 5057774,
+    "sha256": "640e3854991c39e1b4debd2f3943779c01eda13368a621feff457d561c7940eb"
+  },
+  {
+    "group": "org.graalvm.regex",
+    "name": "regex",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/regex/regex/25.3.4.1/regex-25.3.4.1-sources.jar",
+    "file": "org.graalvm.regex__regex-25.3.4.1-sources.jar",
+    "bytes": 1057772,
+    "sha256": "f61170df2914105adcfc29db69d330e691a5c1c667741bad30cfb229c10816f4"
+  },
+  {
+    "group": "dev.truffleruby.internal",
+    "name": "resources",
+    "version": "40.0.0",
+    "url": "https://repo.maven.apache.org/maven2/dev/truffleruby/internal/resources/40.0.0/resources-40.0.0-sources.jar",
+    "file": "dev.truffleruby.internal__resources-40.0.0-sources.jar",
+    "bytes": 1350,
+    "sha256": "7d402c1acb1136a8086e06bc9a7aa0359108082b6a807b11321713d4163cd47e"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-runtime",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-runtime/25.3.4.1/truffle-runtime-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-runtime-25.3.4.1-sources.jar",
+    "bytes": 307035,
+    "sha256": "bc365db6f4765d57bc4779508dbe0fcdd2c379b4027eb954fd5b0c9e55c8a519"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language-native",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language-native/25.3.4.1/llvm-language-native-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-native-25.3.4.1-sources.jar",
+    "bytes": 24853,
+    "sha256": "4750d7a649d9326422ebcd8d592c4473abf9eb530f3dc3afa37592bfd1833c08"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-nfi-libffi",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-nfi-libffi/25.3.4.1/truffle-nfi-libffi-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-nfi-libffi-25.3.4.1-sources.jar",
+    "bytes": 101552,
+    "sha256": "b14b8c43f10450cac8b2c8af2d785e43fd22808a6505e0f7d571b2c26bc09f5c"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-nfi-panama",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-nfi-panama/25.3.4.1/truffle-nfi-panama-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-nfi-panama-25.3.4.1-sources.jar",
+    "bytes": 81782,
+    "sha256": "edec614bf9554c81685a6a8636c5352109234f9984a983dc3ea449a209368c24"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language-nfi",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language-nfi/25.3.4.1/llvm-language-nfi-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-nfi-25.3.4.1-sources.jar",
+    "bytes": 13462,
+    "sha256": "f25574a58c939d63a64bb232f672cb276b726cad6ea2b48a407276bc391b2638"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language/25.3.4.1/llvm-language-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-25.3.4.1-sources.jar",
+    "bytes": 3340392,
+    "sha256": "716562a9c6cbe9201f53bc972d9eafbb1a692a9d9aebb9f177a541c5e0913f66"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-nfi",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-nfi/25.3.4.1/truffle-nfi-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-nfi-25.3.4.1-sources.jar",
+    "bytes": 185599,
+    "sha256": "0a5352ff42259c9fd0930cdfb9bc2579dcdf85b5388c877d302e67185c4d4e41"
+  },
+  {
+    "group": "dev.truffleruby.shadowed",
+    "name": "joni",
+    "version": "40.0.0",
+    "url": "https://repo.maven.apache.org/maven2/dev/truffleruby/shadowed/joni/40.0.0/joni-40.0.0-sources.jar",
+    "file": "dev.truffleruby.shadowed__joni-40.0.0-sources.jar",
+    "bytes": 167405,
+    "sha256": "833ce7c8e3e0399cc3fe2d887e7af49d48b554d7bf680145f1d1be33f7c35e8a"
+  },
+  {
+    "group": "org.graalvm.shadowed",
+    "name": "jcodings",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/shadowed/jcodings/25.3.4.1/jcodings-25.3.4.1-sources.jar",
+    "file": "org.graalvm.shadowed__jcodings-25.3.4.1-sources.jar",
+    "bytes": 260335,
+    "sha256": "878f839002628b7e4945665f6ba0f73d7942ad4451f4caaf7cdd45a7278c829d"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language-native-resources",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language-native-resources/25.3.4.1/llvm-language-native-resources-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-native-resources-25.3.4.1-sources.jar",
+    "bytes": 4816,
+    "sha256": "1efc1ae1a952bacae491d594a1d41ed13e82a49ec47f8411d718be7726ab3ef5"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-api",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-api/25.3.4.1/llvm-api-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-api-25.3.4.1-sources.jar",
+    "bytes": 9226,
+    "sha256": "c5cb69dcbc32e57c9f740ac94216aec88b8673e1a790b42367c42289d49ce922"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-api",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-api/25.3.4.1/truffle-api-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-api-25.3.4.1-sources.jar",
+    "bytes": 3382580,
+    "sha256": "19b6c77ad407ca062d4334040177847e322d52ed2f04804953d54dd366579064"
+  },
+  {
+    "group": "dev.truffleruby.internal",
+    "name": "shared",
+    "version": "40.0.0",
+    "url": "https://repo.maven.apache.org/maven2/dev/truffleruby/internal/shared/40.0.0/shared-40.0.0-sources.jar",
+    "file": "dev.truffleruby.internal__shared-40.0.0-sources.jar",
+    "bytes": 21775,
+    "sha256": "d7f39cece75576924e74532009f75d5fc162b4c13804f28e29fd828949fdcd83"
+  },
+  {
+    "group": "org.graalvm.polyglot",
+    "name": "polyglot",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/polyglot/polyglot/25.3.4.1/polyglot-25.3.4.1-sources.jar",
+    "file": "org.graalvm.polyglot__polyglot-25.3.4.1-sources.jar",
+    "bytes": 239457,
+    "sha256": "fc796799f60b9463ea082ec8c8a9eed4b5d629035123933beec76e58c6cef28e"
+  },
+  {
+    "group": "org.gwtproject.web.bindery",
+    "name": "requestfactory-server",
+    "version": "2.13.1",
+    "url": "https://repo.maven.apache.org/maven2/org/gwtproject/web/bindery/requestfactory-server/2.13.1/requestfactory-server-2.13.1-sources.jar",
+    "file": "org.gwtproject.web.bindery__requestfactory-server-2.13.1-sources.jar",
+    "bytes": 250421,
+    "sha256": "14ed4cd5208ed186b329574cbea160a778c82eda160897fed9143d0786c39bf4"
+  },
+  {
+    "group": "org.xerial",
+    "name": "sqlite-jdbc",
+    "version": "3.53.4.0",
+    "url": "https://repo.maven.apache.org/maven2/org/xerial/sqlite-jdbc/3.53.4.0/sqlite-jdbc-3.53.4.0-sources.jar",
+    "file": "org.xerial__sqlite-jdbc-3.53.4.0-sources.jar",
+    "bytes": 14557234,
+    "sha256": "6f3fca1257fd02891e9b17b296b4e888cdd6af6d3e077ff7e50991657d69ed46"
+  },
+  {
+    "group": "org.slf4j",
+    "name": "slf4j-api",
+    "version": "2.0.20",
+    "url": "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.20/slf4j-api-2.0.20-sources.jar",
+    "file": "org.slf4j__slf4j-api-2.0.20-sources.jar",
+    "bytes": 77456,
+    "sha256": "565e509928d095e20c5d93ca5e3a528e98fc7410c3ca4e84b05ccfadf21b40ba"
+  },
+  {
+    "group": "com.github.luben",
+    "name": "zstd-jni",
+    "version": "1.5.7-24",
+    "url": "https://repo.maven.apache.org/maven2/com/github/luben/zstd-jni/1.5.7-24/zstd-jni-1.5.7-24-sources.jar",
+    "file": "com.github.luben__zstd-jni-1.5.7-24-sources.jar",
+    "bytes": 104485,
+    "sha256": "4c8c6420a5c7a03a230d0f2856b7fa96cba868ac44a2967c9cfaa7ebd5adb68f"
+  },
+  {
+    "group": "org.jetbrains",
+    "name": "annotations",
+    "version": "23.0.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0-sources.jar",
+    "file": "org.jetbrains__annotations-23.0.0-sources.jar",
+    "bytes": 37462,
+    "sha256": "ff2309b42f7584520497bb48bc609aca04c9886cf48708f14be83f00423ec144"
+  },
+  {
+    "group": "javax.validation",
+    "name": "validation-api",
+    "version": "1.0.0.GA",
+    "url": "https://repo.maven.apache.org/maven2/javax/validation/validation-api/1.0.0.GA/validation-api-1.0.0.GA-sources.jar",
+    "file": "javax.validation__validation-api-1.0.0.GA-sources.jar",
+    "bytes": 65220,
+    "sha256": "a394d52a9b7fe2bb14f0718d2b3c8308ffe8f37e911956012398d55c9f9f9b54"
+  },
+  {
+    "group": "net.sf.jopt-simple",
+    "name": "jopt-simple",
+    "version": "5.0.4",
+    "url": "https://repo.maven.apache.org/maven2/net/sf/jopt-simple/jopt-simple/5.0.4/jopt-simple-5.0.4-sources.jar",
+    "file": "net.sf.jopt-simple__jopt-simple-5.0.4-sources.jar",
+    "bytes": 85484,
+    "sha256": "06b283801a5a94ef697b7f2c79a048c4e2f848b3daddda61cab74d882bdd97a5"
+  },
+  {
+    "group": "org.apache.commons",
+    "name": "commons-math3",
+    "version": "3.6.1",
+    "url": "https://repo.maven.apache.org/maven2/org/apache/commons/commons-math3/3.6.1/commons-math3-3.6.1-sources.jar",
+    "file": "org.apache.commons__commons-math3-3.6.1-sources.jar",
+    "bytes": 2514690,
+    "sha256": "e2ff85a3c360d56c51a7021614a194f3fbaf224054642ac535016f118322934d"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "jniutils",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/jniutils/25.3.4.1/jniutils-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__jniutils-25.3.4.1-sources.jar",
+    "bytes": 36924,
+    "sha256": "b631b01238d9f090857d2c3b8124f037a420c0049efc87e7eba53434454ccc0e"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "collections",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/collections/25.3.4.1/collections-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__collections-25.3.4.1-sources.jar",
+    "bytes": 51027,
+    "sha256": "df2e466ad9dce602da3f77a0eee7a0b76eb7f72b9b07dc99ebb6b5cfbd8474be"
+  },
+  {
+    "group": "org.graalvm.shadowed",
+    "name": "icu4j",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/shadowed/icu4j/25.3.4.1/icu4j-25.3.4.1-sources.jar",
+    "file": "org.graalvm.shadowed__icu4j-25.3.4.1-sources.jar",
+    "bytes": 2856615,
+    "sha256": "82fbc8ede15ef0117134c17fbb072bae9b1c8e2f1d9f3d6e799377dd53fc8618"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "nativeimage",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/nativeimage/25.3.4.1/nativeimage-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__nativeimage-25.3.4.1-sources.jar",
+    "bytes": 255293,
+    "sha256": "75c753c6811f070a7ecf9cac7b8372a51fff5c4df5361bf28590994fb47d983c"
+  },
+  {
+    "group": "org.graalvm.shadowed",
+    "name": "xz",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/shadowed/xz/25.3.4.1/xz-25.3.4.1-sources.jar",
+    "file": "org.graalvm.shadowed__xz-25.3.4.1-sources.jar",
+    "bytes": 158791,
+    "sha256": "25c3b4445fc1682579a8de1fe3133e26abc8b8a96877c6eec341ff143edc5668"
+  },
+  {
+    "group": "org.bouncycastle",
+    "name": "bcpkix-jdk18on",
+    "version": "1.85",
+    "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcpkix-jdk18on/1.85/bcpkix-jdk18on-1.85-sources.jar",
+    "file": "org.bouncycastle__bcpkix-jdk18on-1.85-sources.jar",
+    "bytes": 928504,
+    "sha256": "e5331f467331aba29bda6ddfb0df0da6d568928e29c2b0f20ea2fe123d802d20"
+  },
+  {
+    "group": "org.bouncycastle",
+    "name": "bcutil-jdk18on",
+    "version": "1.85",
+    "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcutil-jdk18on/1.85/bcutil-jdk18on-1.85-sources.jar",
+    "file": "org.bouncycastle__bcutil-jdk18on-1.85-sources.jar",
+    "bytes": 534652,
+    "sha256": "b470a692878f92abf00b9c3af9147a45453250a80930df8f23f1d092c55e2d5e"
+  },
+  {
+    "group": "org.bouncycastle",
+    "name": "bcprov-jdk18on",
+    "version": "1.85",
+    "url": "https://repo.maven.apache.org/maven2/org/bouncycastle/bcprov-jdk18on/1.85/bcprov-jdk18on-1.85-sources.jar",
+    "file": "org.bouncycastle__bcprov-jdk18on-1.85-sources.jar",
+    "bytes": 5940653,
+    "sha256": "fa5a81c8b91f299712edcf917788f6293482240a46ec6d095ac6512ae257f007"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-script-runtime",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-script-runtime/2.4.21/kotlin-script-runtime-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-script-runtime-2.4.21-sources.jar",
+    "bytes": 9933,
+    "sha256": "275d90c0c92e9680aff9c013394f3f395bc46dc23762107c4fdccd9887a58561"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "word",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/word/25.3.4.1/word-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__word-25.3.4.1-sources.jar",
+    "bytes": 31150,
+    "sha256": "2410996d807d8af10ec86e5c3ced95946c28003c944a22568cd3f1d87e2311f1"
+  },
+  {
+    "group": "org.graalvm.shadowed",
+    "name": "json",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/shadowed/json/25.3.4.1/json-25.3.4.1-sources.jar",
+    "file": "org.graalvm.shadowed__json-25.3.4.1-sources.jar",
+    "bytes": 80472,
+    "sha256": "3be61c823262c23aac08615670c09451e2cff7ab7a63b8b484f0481fbebb03ab"
+  },
+  {
+    "group": "dev.truffleruby.internal",
+    "name": "annotations",
+    "version": "40.0.0",
+    "url": "https://repo.maven.apache.org/maven2/dev/truffleruby/internal/annotations/40.0.0/annotations-40.0.0-sources.jar",
+    "file": "dev.truffleruby.internal__annotations-40.0.0-sources.jar",
+    "bytes": 6882,
+    "sha256": "52cf8ad2deb4bcdf8514e9863aa151762e39edbb586ea88fe69d04fc834b07b1"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-compiler",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-compiler/25.3.4.1/truffle-compiler-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-compiler-25.3.4.1-sources.jar",
+    "bytes": 36054,
+    "sha256": "12ac8500adf8679e4959866f9f89be1a65c96cc544334cd4ac6e3c6bfd571230"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-build-tools-api",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-build-tools-api/2.4.21/kotlin-build-tools-api-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-build-tools-api-2.4.21-sources.jar",
+    "bytes": 146352,
+    "sha256": "fc58107718f670025aa4cf1b0bc32ba3b1daeb65afa4f948359b280309a79328"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-reflect",
+    "version": "1.6.10",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-reflect/1.6.10/kotlin-reflect-1.6.10-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-reflect-1.6.10-sources.jar",
+    "bytes": 698088,
+    "sha256": "39242dd149249c66edda7aa9822947e62aeff6194326039d4e8b5d528db5f006"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-daemon-embeddable",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-daemon-embeddable/2.4.21/kotlin-daemon-embeddable-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-daemon-embeddable-2.4.21-sources.jar",
+    "bytes": 40963,
+    "sha256": "523c72352fcc9b77eb479f87a5a59c6747072570738d85b9aadd429c8a02e2a7"
+  },
+  {
+    "group": "org.jetbrains.runtime",
+    "name": "jbr-api",
+    "version": "1.9.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/runtime/jbr-api/1.9.0/jbr-api-1.9.0-sources.jar",
+    "file": "org.jetbrains.runtime__jbr-api-1.9.0-sources.jar",
+    "bytes": 43296,
+    "sha256": "70381d761a95c275eb9c09ab0dbf506d07f1ae61ece96a013219da19cbba80b8"
+  },
+  {
+    "group": "org.graalvm.shadowed",
+    "name": "antlr4",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/shadowed/antlr4/25.3.4.1/antlr4-25.3.4.1-sources.jar",
+    "file": "org.graalvm.shadowed__antlr4-25.3.4.1-sources.jar",
+    "bytes": 308871,
+    "sha256": "3addb63be2b9b7ec40892ee3bb3620eb1980454e32b2bd9e85d798442a8b392d"
+  },
+  {
+    "group": "org.jspecify",
+    "name": "jspecify",
+    "version": "1.0.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar",
+    "file": "org.jspecify__jspecify-1.0.0-sources.jar",
+    "bytes": 11996,
+    "sha256": "adf0898191d55937fb3192ba971826f4f294292c4a960740f3c27310e7b70296"
+  }
+]

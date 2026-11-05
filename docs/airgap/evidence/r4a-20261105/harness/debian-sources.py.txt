@@ -1,0 +1,45 @@
+from pathlib import Path
+import urllib.request,urllib.parse,json,concurrent.futures,hashlib,re
+home=Path('/workspace/airgap-r4-proof');out=home/'corresponding-source/debian';out.mkdir(parents=True,exist_ok=True)
+rows=json.loads((home/'rootfs/opt/trikeshed/legal/debian/packages.json').read_text())
+sources=sorted({(r['source'],r['sourceVersion']) for r in rows})
+previous=json.loads((home/'debian-source-inventory.json').read_text()) if (home/'debian-source-inventory.json').exists() else []
+retained={(r['source'],r['version']):r for r in previous if r.get('complete')}
+def get(url):
+    with urllib.request.urlopen(url,timeout=25) as response:return response.read()
+def download(item):
+    if item in retained:
+        record=retained[item]
+        for f in record['files']:
+            data=(out/f['file']).read_bytes()
+            assert len(data)==f['bytes'] and hashlib.sha256(data).hexdigest()==f['sha256']
+        return record
+    name,version=item;filename=name+'_'+version.split(':')[-1]+'.dsc'
+    prefix=name[:4] if name.startswith('lib') else name[0]
+    paths=['https://deb.debian.org/debian/pool/main/'+prefix+'/'+name+'/', 'https://security.debian.org/debian-security/pool/updates/main/'+prefix+'/'+name+'/']
+    record={'source':name,'version':version,'files':[],'errors':[]}
+    for base in paths:
+        try:dsc=get(base+filename);break
+        except Exception as e:record['errors'].append({'url':base+filename,'error':str(e)})
+    else:return record
+    dest=out/name;dest.mkdir(exist_ok=True);(dest/filename).write_bytes(dsc)
+    record['files'].append({'file':str((dest/filename).relative_to(out)),'url':base+filename,'sha256':hashlib.sha256(dsc).hexdigest(),'bytes':len(dsc),'verification':'DSC from HTTPS; no signature authentication claim'})
+    content=dsc.decode();section=content.split('Checksums-Sha256:\n',1)[1].split('\nFiles:',1)[0]
+    for line in section.splitlines():
+        match=re.fullmatch(r' ([0-9a-f]{64}) (\d+) (\S+)',line)
+        if not match:break
+        digest,size,archive=match.groups()
+        try:
+            data=get(base+archive)
+            assert len(data)==int(size) and hashlib.sha256(data).hexdigest()==digest
+            (dest/archive).write_bytes(data)
+            record['files'].append({'file':str((dest/archive).relative_to(out)),'url':base+archive,'sha256':digest,'bytes':int(size),'verification':'SHA-256 and length from DSC'})
+        except Exception as e:record['errors'].append({'url':base+archive,'error':str(e)})
+    record['complete']=len(record['files'])==1+len(re.findall(r'^ [0-9a-f]{64} ',section,re.M))
+    return record
+results=[]
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+    for result in pool.map(download,sources):
+        results.append(result);print(result['source'],result.get('complete',False),flush=True)
+        (home/'debian-source-inventory.json').write_text(json.dumps(results,indent=2)+'\n')
+print('complete',sum(bool(r.get('complete')) for r in results),'of',len(sources))

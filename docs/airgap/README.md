@@ -11,7 +11,8 @@ and D3M integration record. A planned gate is not a completed release.
 | R2: owned Confix scanning | Execute the real pinned upstream JSON/CBOR/YAML scanner, copy bounded rows, release native buffers, compare Kotlin results, retain a whole-program LCNC receipt | [Verified runbook](02-confix.md), [exact evidence](evidence/r2-20261104/verification.json), [D3M record](../d3m/2026-11-04-airgap-r2.md) |
 | R3a: observed transfers | Actual selected-wire sparks, recorded LLVM flyovers, reduced motion and immutable receipt playback | [Implemented contract and evidence](04-observed-transfers.md); bounded precursor to full R3 |
 | R3b: retained document traversal | Real 12-page PDF, production extraction, bounded passage, LLVM geometry selection, verified source/quotation and reopening without LLVM | [Verified increment](05-document-traversal.md), [final combined evidence](evidence/r3b-cutoff-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r3b.md); dense recursive visualization remains open |
-| R4: offline release closure | Reproducible packaged runtime, verified dependency closure and clean-machine startup without external networking | Planned; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
+| R4a: packaged offline runtime | Generated launcher, sealed server filesystem, real PDF traversal and recovery in a second JVM without source assets or LLVM | [Verified increment](06-offline-runtime.md), [219 regressions and packaged proof](evidence/r4a-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4a.md) |
+| R4b: wider release closure | Minimal runtime profile, complete vendor/native rebuild provenance, crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
 verifies the native inert Documents-to-Panels handoff, ten URL/ownership guards,
@@ -82,8 +83,9 @@ the final D3M audit (501 refs including origin/HEAD). No conflicts occurred and
 no branches were deleted in that R2 publication. [R3a](04-observed-transfers.md)
 adds measured wire activity and native inspection. [R3b](05-document-traversal.md)
 now verifies a bounded passage from a real retained PDF through that path.
-Dense recursive visualization and R4's sealed runtime/clean-machine closure
-remain open.
+R4a now verifies a bounded sealed filesystem and fresh-process restart.
+Dense recursive visualization, complete source-build closure and wider
+deployment environments remain open.
 
 
 ## R3b acceptance
@@ -100,3 +102,23 @@ The frozen D3M inventory contains 511 remote branches and nine local branches
 plus origin/HEAD; no conflict or branch deletion occurred. Reopening without
 LLVM happens within one JVM. The evidence does not claim clean-machine closure,
 general Nix evaluation, legal adjudication or exhaustive all-page processing.
+
+## R4a acceptance
+
+The same document path runs from a packaged JDK, application and system-tool
+closure with no workspace or build cache mounted. A second JVM reopens the
+same receipt and six document revisions with installation assets, native
+modules and PDF tools hidden. Ten browser cases, four startup refusals and
+five integrity refusals pass; an independent audit verifies all 27 retained
+CAS objects. The generated launcher and a freshly extracted archive are
+both exercised. Two archives assembled from the pinned files are identical.
+
+The combined source passes 219 selected JVM regressions and the listed
+platform compiles. The frozen D3M cutoff contains 519 remote heads, nine local
+branches and origin/HEAD; nine sequential merges required no conflict
+resolution. Runtime and source companion hashes, process measurements,
+failed attempts and limits are in the [R4a runbook](06-offline-runtime.md).
+This is a Linux filesystem-namespace proof on the existing host kernel;
+the browser remains an external verification input. It does not establish
+bare-metal installation, power-loss recovery or a fully reproducible source
+build of the vendor JDK and every native dependency.

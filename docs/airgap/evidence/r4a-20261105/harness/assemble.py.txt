@@ -1,0 +1,92 @@
+from pathlib import Path
+import os, shutil, subprocess, json, re, hashlib, sys
+
+home=Path('/workspace/airgap-r4-proof')
+root=home/'rootfs'
+jdk=Path('/workspace/toolchains/graalvm-community-25.3.4.1+1.1')
+root.mkdir(exist_ok=True)
+def copy(src,dest=None):
+    src=Path(src); dest=root/str(dest or src).lstrip('/')
+    dest.parent.mkdir(parents=True,exist_ok=True)
+    if src.is_dir(): shutil.copytree(src,dest,dirs_exist_ok=True,symlinks=False)
+    else: shutil.copy2(src.resolve(),dest)
+    return dest
+
+if sys.argv[1]=='runtime':
+    copy(jdk,'/opt/trikeshed/jdk')
+    if (root/'usr/share/fonts').exists():shutil.rmtree(root/'usr/share/fonts')
+    for directory in ['/usr/share/poppler','/usr/share/fonts/truetype/dejavu','/etc/fonts']:
+        copy(directory)
+    for directory in ['state','tmp','proc','dev','home','var/cache/fontconfig']:
+        (root/directory).mkdir(parents=True,exist_ok=True)
+    (root/'etc/passwd').write_text('demo:x:0:0:Offline demonstration:/state/home:/bin/false\n')
+    (root/'etc/group').write_text('demo:x:0:\n')
+    (root/'etc/nsswitch.conf').write_text('passwd: files\ngroup: files\nhosts: files\n')
+    (root/'etc/hosts').write_text('127.0.0.1 localhost\n::1 localhost\n')
+    copy('/etc/os-release')
+    binaries=[Path(p) for p in ['/usr/bin/pdfinfo','/usr/bin/pdftotext','/bin/sh','/usr/bin/ls',
+        '/usr/bin/uname','/usr/bin/tr','/usr/bin/sed','/usr/bin/xargs','/usr/bin/echo']]
+    for p in binaries: copy(p)
+    elf=[]
+    for p in jdk.rglob('*'):
+        if p.is_file():
+            with p.open('rb') as f:
+                if f.read(4)==b'\x7fELF':elf.append(p)
+    needed=set();records=[]
+    env=os.environ.copy();env['LD_LIBRARY_PATH']=str(jdk/'lib')+':'+str(jdk/'lib/server')+':'+str(jdk/'lib/jli')
+    for binary in binaries+elf:
+        proc=subprocess.run(['ldd',str(binary)],env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+        if 'not a dynamic executable' in proc.stdout or 'statically linked' in proc.stdout:continue
+        if proc.returncode!=0 or 'not found' in proc.stdout:raise RuntimeError(str(binary)+'\n'+proc.stdout)
+        dependencies=[]
+        for line in proc.stdout.splitlines():
+            match=re.search(r'(?:=>\s+)?(/\S+)\s+\(',line)
+            if match:
+                path=Path(match[1]);dependencies.append(str(path))
+                if not path.is_relative_to(jdk):needed.add(path)
+        records.append({'binary':str(binary),'dependencies':dependencies})
+    for path in sorted(needed):copy(path)
+    # fontconfig and Poppler data packages participate in the provenance closure too.
+    packages=set()
+    for path in sorted(needed|set(binaries)|{Path('/etc/fonts/fonts.conf'),Path('/usr/share/poppler/cMap/Adobe-Japan1/UniJIS-UTF16-H')}):
+        found=False
+        for candidate in dict.fromkeys([str(path),str(path.resolve())]):
+            query=subprocess.run(['dpkg-query','-S',candidate],text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
+            if query.returncode==0:
+                for line in query.stdout.splitlines():
+                    if not line.startswith('diversion '):packages.add(line.split(': /')[0])
+                found=True;break
+        if not found:raise RuntimeError('No Debian owner: '+str(path))
+    # All copied fonts, not just whichever one happens to be used by this PDF.
+    for path in Path('/usr/share/fonts/truetype/dejavu').rglob('*'):
+        if path.is_file():
+            query=subprocess.check_output(['dpkg-query','-S',str(path)],text=True)
+            for line in query.splitlines():packages.add(line.split(': /')[0])
+    metadata=[]
+    legal=root/'opt/trikeshed/legal/debian';legal.mkdir(parents=True,exist_ok=True)
+    for package in sorted(packages):
+        row=subprocess.check_output(['dpkg-query','-W','-f=${binary:Package}\t${Version}\t${source:Package}\t${source:Version}\n',package],text=True).strip().split('\t')
+        name,version,source,source_version=row
+        copyright=Path('/usr/share/doc')/name.split(':')[0]/'copyright'
+        if not copyright.exists():raise RuntimeError('Missing copyright: '+name)
+        shutil.copyfile(copyright,legal/(name.replace(':','_')+'.copyright'))
+        metadata.append(dict(package=name,version=version,source=source,sourceVersion=source_version))
+    (home/'elf-closure.json').write_text(json.dumps(records,indent=2)+'\n')
+    (legal/'packages.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    for name in ['GPL','GPL-2','GPL-3','LGPL-2','LGPL-2.1','LGPL-3','Apache-2.0','Artistic','BSD','GFDL','GFDL-1.2','GFDL-1.3','MPL-1.1','MPL-2.0']:
+        p=Path('/usr/share/common-licenses')/name
+        if p.exists():copy(p)
+    print('Runtime staged',len(elf),'JDK ELF files,',len(needed),'system libraries,',len(metadata),'Debian packages')
+elif sys.argv[1]=='application':
+    staged=Path('/workspace/TrikeShed/build/install/airgap-document')
+    assert staged.is_dir()
+    copy(staged,'/opt/trikeshed')
+    libs=sorted((root/'opt/trikeshed/lib').glob('*.jar'))
+    assert not any('junit' in p.name for p in libs)
+    script=(root/'opt/trikeshed/bin/airgap-document').read_text()
+    declared=next(line.removeprefix('CLASSPATH=') for line in script.splitlines() if line.startswith('CLASSPATH='))
+    classpath=declared.replace('$APP_HOME','/opt/trikeshed')
+    assert set(classpath.split(':'))=={'/opt/trikeshed/lib/'+p.name for p in libs}
+    (root/'opt/trikeshed/classpath.txt').write_text(classpath+'\n')
+    print('Application staged',len(libs),'jars')
+else:raise SystemExit('runtime|application')

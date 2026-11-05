@@ -1,0 +1,98 @@
+from pathlib import Path
+import os,sys,subprocess,time,json,socket,errno,urllib.request,hashlib,resource,shutil
+
+home=Path('/workspace/airgap-r4-proof');root=home/'rootfs'
+art=home/sys.argv[1];art.mkdir(exist_ok=False)
+(art/'harness').mkdir()
+for name in ['run.py','driver.cjs','assemble.py','package.py','negative.py','verify.py']:
+    shutil.copyfile(home/name,art/'harness'/(name+'.txt'))
+state=art/'state';state.mkdir()
+network={'namespace':os.readlink('/proc/self/ns/net'),'addresses':json.loads(subprocess.check_output(['ip','-j','address'])),'routes':json.loads(subprocess.check_output(['ip','-j','route']))}
+assert not network['routes'] and all(x['ifname']=='lo' for x in network['addresses'])
+with socket.socket() as p:network['externalConnectErrno']=p.connect_ex(('1.1.1.1',443))
+assert network['externalConnectErrno']==errno.ENETUNREACH
+(art/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+port=18764;base=f'http://127.0.0.1:{port}'
+http=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+cp=(root/'opt/trikeshed/classpath.txt').read_text().strip()
+processes=[];logs=[];reports=[]
+def launch(mode):
+    cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--hostname','airgap-r4','--die-with-parent',
+         '--ro-bind',str(root),'/', '--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv',
+         '--setenv','PATH','/opt/trikeshed/jdk/bin:/usr/bin:/bin','--setenv','JAVA_HOME','/opt/trikeshed/jdk','--setenv','HOME','/state/home','--setenv','LANG','C.UTF-8',
+         '--setenv','TRIKESHED_PDF_ROUTE','layer','--chdir','/state','--cap-drop','ALL']
+    if mode=='run':
+        for kind,name in [('SCALAR','add-mlir.bc'),('CONFIX','confix.bc')]:cmd+=['--setenv','TRIKESHED_LLVM_'+kind+'_PROFILE','/state/runtime/'+name+'.json']
+    else:
+        for path in ['/opt/trikeshed/modules','/opt/trikeshed/assets']:
+            cmd+=['--tmpfs',path,'--remount-ro',path]
+        for path in ['/usr/bin/pdfinfo','/usr/bin/pdftotext']:cmd+=['--ro-bind','/dev/null',path]
+    cmd+=['/opt/trikeshed/bin/airgap-document','/state','/opt/trikeshed',str(port),mode]
+    log=(art/(mode+'.txt')).open('w');logs.append(log)
+    started=time.monotonic();before=resource.getrusage(resource.RUSAGE_CHILDREN)
+    proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT);processes.append(proc)
+    report={'mode':mode,'hostPid':proc.pid,'command':cmd,'startedMonotonic':started,'resourceEvidence':'process-owned snapshot pending'}
+    reports.append(report)
+    return proc,report
+
+def sample(proc,report):
+    # A nested user namespace can conceal children from the host monitor.
+    # Measurements and mount tables come from the JVM itself, not bwrap RSS.
+    report['resourceEvidence']='state/'+report['mode']+'-status.txt; state-'+report['mode']+'.json processCpuNanos'
+
+def ready(proc,report):
+    deadline=time.monotonic()+120
+    while time.monotonic()<deadline:
+        sample(proc,report)
+        if proc.poll() is not None:raise RuntimeError('Fixture exited: '+str(proc.returncode))
+        try:
+            with http.open(base+'/__proof/state',timeout=2) as r:result=json.load(r)
+            report['readySeconds']=time.monotonic()-report['startedMonotonic'];report['boot']=result['boot']
+            (art/(report['mode']+'-ready.json')).write_text(json.dumps(result,indent=2)+'\n')
+            return result
+        except OSError:time.sleep(.2)
+    raise RuntimeError('Not ready')
+
+def finish(proc,report):
+    if proc.poll() is None:
+        try:http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3).read()
+        except OSError:pass
+        end=time.monotonic()+30
+        while proc.poll() is None and time.monotonic()<end:sample(proc,report);time.sleep(.1)
+        if proc.poll() is None:proc.terminate();proc.wait(timeout=10);report['forcedTermination']=True
+    report['exit']=proc.returncode;report['elapsedSeconds']=time.monotonic()-report['startedMonotonic']
+
+driver=None;error=None
+try:
+    server,run=launch('run');seed=ready(server,run)
+    env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright'
+    log=(art/'driver.txt').open('w');logs.append(log)
+    driver=subprocess.Popen(['node',str(home/'driver.cjs'),str(art),base],env=env,stdout=log,stderr=subprocess.STDOUT)
+    deadline=time.monotonic()+300;restarted=False
+    while driver.poll() is None and time.monotonic()<deadline:
+        sample(server,reports[-1])
+        if (art/'restart-request.json').exists() and not restarted:
+            finish(server,run);assert server.returncode==0
+            firstPid=server.pid
+            server,inspection=launch('inspect');restored=ready(server,inspection)
+            assert restored['boot']!=seed['boot']
+            (art/'restart-ready.json').write_text(json.dumps({'firstExit':run['exit'],'firstHostPid':firstPid,'secondHostPid':server.pid})+'\n')
+            restarted=True
+        if server.poll() is not None and not (state/'cleanup-inspect.json').exists():raise RuntimeError('Server exited unexpectedly')
+        time.sleep(.1)
+    if driver.poll() is None:driver.terminate();driver.wait(timeout=10);raise RuntimeError('Browser timed out')
+    assert driver.returncode==0 and restarted
+except BaseException as e:
+    error=repr(e)
+finally:
+    if driver is not None and driver.poll() is None:driver.terminate();driver.wait(timeout=10)
+    for proc,report in zip(processes,reports):
+        if 'exit' not in report:finish(proc,report)
+    for log in logs:log.close()
+    result={'driverExit':driver.returncode if driver else None,'error':error,'processes':reports}
+    (art/'processes.json').write_text(json.dumps(result,indent=2)+'\n')
+    print(json.dumps({**result,'processes':[{k:v for k,v in x.items() if k!='command'} for x in reports]},indent=2))
+    if (art/'driver.txt').exists():print((art/'driver.txt').read_text()[-3000:])
+    for mode in ['run','inspect']:
+        if (art/(mode+'.txt')).exists():print(mode,(art/(mode+'.txt')).read_text()[-3000:])
+if error or any(x.returncode!=0 for x in processes):raise SystemExit(1)

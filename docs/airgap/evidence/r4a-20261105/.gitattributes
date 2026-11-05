@@ -1,0 +1,2 @@
+# Raw process output and retained evidence keep their exact bytes.
+* -text -whitespace
