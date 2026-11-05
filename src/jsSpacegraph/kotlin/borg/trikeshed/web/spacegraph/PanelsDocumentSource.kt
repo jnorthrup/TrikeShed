@@ -38,7 +38,7 @@ fun Panels.renderDocumentSource(n: dynamic, out: dynamic) {
         element.textContent = value; element.style.margin = "6px 0"; card.appendChild(element)
         return element
     }
-    text("strong", if (selected) "Selected passage · native JSON geometry" else str(source.name ?: "Retained document"))
+    text("strong", if (selected) "Selected passage · " + str(out.geometry ?: "unreported") + " JSON geometry" else str(source.name ?: "Retained document"))
     text("p", "Extracted text is a derivative. Original bytes and extracted text have separate content identities.")
     if (selected) {
         text("blockquote", str(source.quote)).style.cssText = "margin:10px 0;padding:10px;border-left:3px solid var(--wire);white-space:pre-wrap"
