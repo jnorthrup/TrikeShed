@@ -61,5 +61,15 @@
     "Connect genuine retained atomic implication candidates to existing bounded NAL deduction/induction primitives, retaining source/context identities and separating weak induction from supported derivations.",
     "Compose existing sealed runtime bootstrap with Documents, English/review owners and explicit context/session/tool boundaries."
   ],
-  "publication": "PENDING final all-ref D3M"
+  "publication": "Ready for ordinary master push; combined v75/v76 source-specific checkpoints retained.",
+  "publicationRefFreeze": {
+    "refs": 670,
+    "uniqueTips": 524,
+    "ordinaryThreeWayMerges": 1,
+    "allContained": true,
+    "inventorySha256": "59f323593452c38c647059dc870bbb75f0ef00bb6da19e4c268eb1ea8441987a",
+    "tieOrder": "committertimestamp,commitOID,refname",
+    "headAfterEvidenceMerge": "409763272751e4498ed816e42b05ef54dcbe82cc"
+  },
+  "productionChangesAfterFinalTestedV76Source": []
 }

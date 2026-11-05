@@ -307,5 +307,15 @@
     "Actual direct401/405/400/413 tests do not establish all native controller-error paths or every size bound.",
     "Clean-close reopen is not crash recovery. This v75 proof does not itself establish OS containment; concurrently preserved R4a is a separate, narrower packaged document/native-LCNC checkpoint."
   ],
-  "publication": "PENDING final all-ref D3M; source-specific proof is not relabeled to the later LDA artifact."
+  "publication": "Ready for ordinary master push; combined v75/v76 source-specific checkpoints retained.",
+  "publicationRefFreeze": {
+    "refs": 670,
+    "uniqueTips": 524,
+    "ordinaryThreeWayMerges": 1,
+    "allContained": true,
+    "inventorySha256": "59f323593452c38c647059dc870bbb75f0ef00bb6da19e4c268eb1ea8441987a",
+    "tieOrder": "committertimestamp,commitOID,refname",
+    "headAfterEvidenceMerge": "409763272751e4498ed816e42b05ef54dcbe82cc"
+  },
+  "productionChangesAfterFinalTestedV76Source": []
 }
