@@ -25,11 +25,12 @@ class KgKifCommentTest {
         "; header\r\n(pays Tenant Landlord) (pays ?tenant Landlord)",
         "; header\r\n(pays Tenant Landlord) (pays (agentOf Tenant) Landlord)",
         "; header\r\n(pays Tenant Landlord) (transfers Tenant Landlord Dollar)",
+        "# RDF comment is not KIF trivia\r\n(pays Tenant Landlord)",
     ]
 
     @Test fun leadingAndTrailingCommentsUseTheStrictKifCrossing() {
         for (eol in s_["\n", "\r", "\r\n"].view) {
-            val input = " \t$eol; header ) \" @prefix <urn:>$eol; second line$eol$form; trailing (not a form)"
+            val input = " \t\u2003$eol; header ) \" @prefix <urn:>$eol; second line$eol$form; trailing (not a form)"
             assertEquals(KgFormat.KIF, KgNalBridge.sniff(input))
             val mapped = KgNalBridge.bridge(input).single()
             assertEquals(KgTriplet("Tenant", "labels", "\"notice; (exact) 📚\""), mapped.triplet)
@@ -40,11 +41,9 @@ class KgKifCommentTest {
     }
 
     @Test fun commentsDoNotTurnMalformedMixedOrUnsupportedTailsIntoFacts() {
-        for (input in refused.view) {
-            if (KgNalBridge.sniff(input) == KgFormat.KIF) {
-                assertFailsWith<IllegalArgumentException>(input) { KgNalBridge.bridge(input) }
-                assertFailsWith<IllegalArgumentException>(input) { KgNalBridge.bridgeToRules(input) }
-            }
+        for (input in refused[2 until refused.size].view) {
+            assertFailsWith<IllegalArgumentException>(input) { KgNalBridge.bridge(input) }
+            assertFailsWith<IllegalArgumentException>(input) { KgNalBridge.bridgeToRules(input) }
         }
     }
 
@@ -58,7 +57,7 @@ class KgKifCommentTest {
 
     @Test fun wireRetainsExactCommentedSourceAndItsDefinitionWithoutNormalizing(): Unit = runBlocking {
         withTimeout(10_000) {
-            val input = " \t\r\n; header ) \"\r\n; source 📚\r\n$form; trailing comment\r\n"
+            val input = "\u2003; manual π\r\n; second\r\n$form\r\n; tail β\r\n"
             val bytes = input.encodeToByteArray()
             val source = ContentId.of(bytes)
             owner { cas, bag, wire ->

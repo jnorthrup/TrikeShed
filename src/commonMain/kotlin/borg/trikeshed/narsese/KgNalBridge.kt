@@ -210,6 +210,11 @@ object KgNalBridge {
     // ── format sniff ──────────────────────────────────────────────────
 
     fun sniff(text: String): KgFormat? {
+        // Select KIF with the same leading trivia as its tokenizer, without stripping
+        // comments from the complete input subsequently parsed and retained by intake.
+        val kifOffset = kifTriviaEnd(text)
+        if (kifOffset == text.length) return null
+        if (text[kifOffset] == '(') return KgFormat.KIF
         var offset = 0
         while (offset < text.length) {
             while (offset < text.length && text[offset].isWhitespace()) offset++
