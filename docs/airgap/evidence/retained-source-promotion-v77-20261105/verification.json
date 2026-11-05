@@ -1,0 +1,16 @@
+{
+  "result": "PASS",
+  "scope": "Recorded exact-pack/source/receipt/row, child mount/PID/origin and after-close checks. No new runtime, dependency rehash, sealed network or parser/authority claim.",
+  "sourceHead": "0219223a3846887fe283b93598942de332214cd2",
+  "mainSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+  "pids": {
+    "before": 113594,
+    "promote": 113620,
+    "after": 113650
+  },
+  "originalPrefixBytes": 7666,
+  "finalPack": {
+    "bytes": 7744,
+    "sha256": "c7ed80dcca429efb78cf36ca2fd5134773639549d2bf227ead1a36f82a205c7c"
+  }
+}
