@@ -24,19 +24,21 @@ records 19 passing current regressions with external networking unavailable
 and compilation of all affected targets. This closes a bounded transport
 milestone; the full evaluator and visual acceptance gates remain as specified.
 
-The [airgap release index](../../airgap/README.md) now reaches R4a. R2 executes
+The [airgap release index](../../airgap/README.md) now reaches R4b. R2 executes
 the actual upstream Confix scanner with bounded native ownership; R3a adds
 observed wire sparks and native flyovers; R3b traverses a retained 12-page
-PDF and verifies an exact passage. [R4a](../../airgap/06-offline-runtime.md)
-packages that path and verifies a new JVM recovering its receipt without
-source assets, extraction tools or LLVM runners, inside a fresh filesystem
-with no external networking. Its [combined-source evidence](../../airgap/evidence/r4a-20261105/verification.json)
-records 219 selected JVM regressions, affected-target compilation, ten browser
-cases, startup/integrity refusals and identical archives from pinned bytes.
-These bounded milestones do not complete the whole programme. Dense recursive
-visualization, wider LCNC wizards, crash recovery and vendor/native
-source-build reproducibility remain open; the original timeline and cost
-envelope are planning estimates, not measured totals for these increments.
+PDF and verifies an exact passage. R4a packages that path and verifies a
+second JVM recovering the receipt inside a sealed filesystem.
+[R4b](../../airgap/07-runtime-profile-recovery.md) narrows the application to
+23 dependency jars, loads its graph through an inert named preset, and
+recovers the same receipt after SIGKILL at a completed receipt response.
+Its [combined-source evidence](../../airgap/evidence/r4b-20261105/verification.json)
+records 237 selected JVM regressions, affected-target compilation, eleven
+browser cases, startup/integrity refusals and identical archives from pinned
+bytes. These bounded milestones do not complete the whole programme. Dense
+recursive visualization, wider LCNC wizards, arbitrary-write crash recovery
+and vendor/native source-build reproducibility remain open; the original
+timeline and cost envelope are planning estimates, not measured totals.
 
 | Reader or decision | Read first |
 |---|---|

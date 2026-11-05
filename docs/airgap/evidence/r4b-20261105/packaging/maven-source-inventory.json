@@ -1,0 +1,209 @@
+[
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "atomicfu-jvm",
+    "version": "0.33.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/atomicfu-jvm/0.33.0/atomicfu-jvm-0.33.0-sources.jar",
+    "file": "org.jetbrains.kotlinx__atomicfu-jvm-0.33.0-sources.jar",
+    "bytes": 21222,
+    "sha256": "09e8719c35c3491633ea8d0dfb2a0f1769dfff5a6bbaf55ee5412a6221331215"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "kotlinx-coroutines-core-jvm",
+    "version": "1.11.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0-sources.jar",
+    "file": "org.jetbrains.kotlinx__kotlinx-coroutines-core-jvm-1.11.0-sources.jar",
+    "bytes": 438533,
+    "sha256": "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "kotlinx-serialization-core-jvm",
+    "version": "1.12.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.12.0/kotlinx-serialization-core-jvm-1.12.0-sources.jar",
+    "file": "org.jetbrains.kotlinx__kotlinx-serialization-core-jvm-1.12.0-sources.jar",
+    "bytes": 112959,
+    "sha256": "b62fb8059123c43a72ddbe4aeaa8c92c8313d822c128ca2f861e3d91e35e5070"
+  },
+  {
+    "group": "org.jetbrains.kotlinx",
+    "name": "kotlinx-datetime-jvm",
+    "version": "0.8.0-0.6.x-compat",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-datetime-jvm/0.8.0-0.6.x-compat/kotlinx-datetime-jvm-0.8.0-0.6.x-compat-sources.jar",
+    "file": "org.jetbrains.kotlinx__kotlinx-datetime-jvm-0.8.0-0.6.x-compat-sources.jar",
+    "bytes": 164093,
+    "sha256": "d2d3e8cf389ab0f162c61a2cfdaec488fca766ee16b8da12ac81bd5d53500de2"
+  },
+  {
+    "group": "org.jetbrains.kotlin",
+    "name": "kotlin-stdlib",
+    "version": "2.4.21",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.21/kotlin-stdlib-2.4.21-sources.jar",
+    "file": "org.jetbrains.kotlin__kotlin-stdlib-2.4.21-sources.jar",
+    "bytes": 767009,
+    "sha256": "1e29c0668b0aa555e7b154e5da2e8094e1b755cfee25737839195bbbdad8a4a2"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-runtime",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-runtime/25.3.4.1/truffle-runtime-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-runtime-25.3.4.1-sources.jar",
+    "bytes": 307035,
+    "sha256": "bc365db6f4765d57bc4779508dbe0fcdd2c379b4027eb954fd5b0c9e55c8a519"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language-native",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language-native/25.3.4.1/llvm-language-native-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-native-25.3.4.1-sources.jar",
+    "bytes": 24853,
+    "sha256": "4750d7a649d9326422ebcd8d592c4473abf9eb530f3dc3afa37592bfd1833c08"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-nfi-libffi",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-nfi-libffi/25.3.4.1/truffle-nfi-libffi-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-nfi-libffi-25.3.4.1-sources.jar",
+    "bytes": 101552,
+    "sha256": "b14b8c43f10450cac8b2c8af2d785e43fd22808a6505e0f7d571b2c26bc09f5c"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-nfi-panama",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-nfi-panama/25.3.4.1/truffle-nfi-panama-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-nfi-panama-25.3.4.1-sources.jar",
+    "bytes": 81782,
+    "sha256": "edec614bf9554c81685a6a8636c5352109234f9984a983dc3ea449a209368c24"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language-nfi",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language-nfi/25.3.4.1/llvm-language-nfi-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-nfi-25.3.4.1-sources.jar",
+    "bytes": 13462,
+    "sha256": "f25574a58c939d63a64bb232f672cb276b726cad6ea2b48a407276bc391b2638"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language/25.3.4.1/llvm-language-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-25.3.4.1-sources.jar",
+    "bytes": 3340392,
+    "sha256": "716562a9c6cbe9201f53bc972d9eafbb1a692a9d9aebb9f177a541c5e0913f66"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-nfi",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-nfi/25.3.4.1/truffle-nfi-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-nfi-25.3.4.1-sources.jar",
+    "bytes": 185599,
+    "sha256": "0a5352ff42259c9fd0930cdfb9bc2579dcdf85b5388c877d302e67185c4d4e41"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-language-native-resources",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-language-native-resources/25.3.4.1/llvm-language-native-resources-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-language-native-resources-25.3.4.1-sources.jar",
+    "bytes": 4816,
+    "sha256": "1efc1ae1a952bacae491d594a1d41ed13e82a49ec47f8411d718be7726ab3ef5"
+  },
+  {
+    "group": "org.graalvm.llvm",
+    "name": "llvm-api",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/llvm/llvm-api/25.3.4.1/llvm-api-25.3.4.1-sources.jar",
+    "file": "org.graalvm.llvm__llvm-api-25.3.4.1-sources.jar",
+    "bytes": 9226,
+    "sha256": "c5cb69dcbc32e57c9f740ac94216aec88b8673e1a790b42367c42289d49ce922"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-api",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-api/25.3.4.1/truffle-api-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-api-25.3.4.1-sources.jar",
+    "bytes": 3382580,
+    "sha256": "19b6c77ad407ca062d4334040177847e322d52ed2f04804953d54dd366579064"
+  },
+  {
+    "group": "org.graalvm.polyglot",
+    "name": "polyglot",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/polyglot/polyglot/25.3.4.1/polyglot-25.3.4.1-sources.jar",
+    "file": "org.graalvm.polyglot__polyglot-25.3.4.1-sources.jar",
+    "bytes": 239457,
+    "sha256": "fc796799f60b9463ea082ec8c8a9eed4b5d629035123933beec76e58c6cef28e"
+  },
+  {
+    "group": "org.jetbrains",
+    "name": "annotations",
+    "version": "23.0.0",
+    "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0-sources.jar",
+    "file": "org.jetbrains__annotations-23.0.0-sources.jar",
+    "bytes": 37462,
+    "sha256": "ff2309b42f7584520497bb48bc609aca04c9886cf48708f14be83f00423ec144"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "jniutils",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/jniutils/25.3.4.1/jniutils-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__jniutils-25.3.4.1-sources.jar",
+    "bytes": 36924,
+    "sha256": "b631b01238d9f090857d2c3b8124f037a420c0049efc87e7eba53434454ccc0e"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "collections",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/collections/25.3.4.1/collections-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__collections-25.3.4.1-sources.jar",
+    "bytes": 51027,
+    "sha256": "df2e466ad9dce602da3f77a0eee7a0b76eb7f72b9b07dc99ebb6b5cfbd8474be"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "nativeimage",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/nativeimage/25.3.4.1/nativeimage-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__nativeimage-25.3.4.1-sources.jar",
+    "bytes": 255293,
+    "sha256": "75c753c6811f070a7ecf9cac7b8372a51fff5c4df5361bf28590994fb47d983c"
+  },
+  {
+    "group": "org.graalvm.sdk",
+    "name": "word",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/sdk/word/25.3.4.1/word-25.3.4.1-sources.jar",
+    "file": "org.graalvm.sdk__word-25.3.4.1-sources.jar",
+    "bytes": 31150,
+    "sha256": "2410996d807d8af10ec86e5c3ced95946c28003c944a22568cd3f1d87e2311f1"
+  },
+  {
+    "group": "org.graalvm.truffle",
+    "name": "truffle-compiler",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/truffle/truffle-compiler/25.3.4.1/truffle-compiler-25.3.4.1-sources.jar",
+    "file": "org.graalvm.truffle__truffle-compiler-25.3.4.1-sources.jar",
+    "bytes": 36054,
+    "sha256": "12ac8500adf8679e4959866f9f89be1a65c96cc544334cd4ac6e3c6bfd571230"
+  },
+  {
+    "group": "org.graalvm.shadowed",
+    "name": "antlr4",
+    "version": "25.3.4.1",
+    "url": "https://repo.maven.apache.org/maven2/org/graalvm/shadowed/antlr4/25.3.4.1/antlr4-25.3.4.1-sources.jar",
+    "file": "org.graalvm.shadowed__antlr4-25.3.4.1-sources.jar",
+    "bytes": 308871,
+    "sha256": "3addb63be2b9b7ec40892ee3bb3620eb1980454e32b2bd9e85d798442a8b392d"
+  }
+]

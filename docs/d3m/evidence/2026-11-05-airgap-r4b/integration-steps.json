@@ -1,0 +1,47 @@
+[
+  {
+    "ref": "refs/remotes/origin/codex/reviewed-taxonomy-proof-graph-20261105",
+    "commit": "c296541a99333c76ead691b951548f987f005483",
+    "time": 1793844605,
+    "before": "2f6171d982b2b14676388bb292802fc2db25cfe3",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../trikeshed/lcnc/ReviewedTaxonomyProofGraph.kt   | 190 +++++++++++++++++++++\n .../lcnc/ReviewedTaxonomyProofGraphTest.kt         | 180 +++++++++++++++++++\n 2 files changed, 370 insertions(+)\n create mode 100644 src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyProofGraph.kt\n create mode 100644 src/commonTest/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyProofGraphTest.kt\n",
+    "after": "f61c8bbf7f2bb55955c904b55387886d60e3d31c"
+  },
+  {
+    "ref": "refs/remotes/origin/codex/reviewed-taxonomy-query-ui-20261105",
+    "commit": "fafd6b229c67c591e7c61bcdc4832b15a662b206",
+    "time": 1793844680,
+    "before": "f61c8bbf7f2bb55955c904b55387886d60e3d31c",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../trikeshed/lcnc/ReviewedTaxonomyQueryView.kt    | 122 ++++++++++++++++++++\n .../lcnc/ReviewedTaxonomyQueryViewTest.kt          |  96 ++++++++++++++++\n .../trikeshed/docs/DocumentsEnglishTaxonomy.kt     | 123 +++++++++++++++++++--\n 3 files changed, 330 insertions(+), 11 deletions(-)\n create mode 100644 src/commonMain/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyQueryView.kt\n create mode 100644 src/commonTest/kotlin/borg/trikeshed/lcnc/ReviewedTaxonomyQueryViewTest.kt\n",
+    "after": "444c70c75a2a68d0842ad51d135487e36650eeec"
+  },
+  {
+    "ref": "refs/remotes/origin/feat/reviewed-proof-query-owner-20261105",
+    "commit": "3731108cb81a8c9342bff3f02080facbcd90b9d3",
+    "time": 1793844928,
+    "before": "444c70c75a2a68d0842ad51d135487e36650eeec",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../trikeshed/forge/server/DocumentReviewWire.kt   | 101 ++++++++-\n .../forge/server/EnglishTaxonomyWireTest.kt        |  45 ++++\n .../server/ReviewedTaxonomyQuadQueryWireTest.kt    | 249 +++++++++++++++++++++\n .../forge/server/ReviewedTaxonomyWireTest.kt       |  11 +\n 4 files changed, 404 insertions(+), 2 deletions(-)\n create mode 100644 src/jvmTest/kotlin/borg/trikeshed/forge/server/ReviewedTaxonomyQuadQueryWireTest.kt\n",
+    "after": "57873edd6b157e5dc59145f166a5a552b4b53d6a"
+  },
+  {
+    "ref": "refs/remotes/origin/codex/english-corpus-topics-port-20261105",
+    "commit": "3a4363bfee31e948b279265e7c172cc9ffd955a3",
+    "time": 1793846032,
+    "before": "57873edd6b157e5dc59145f166a5a552b4b53d6a",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../lcnc/ReviewedTaxonomyProofGraphTest.kt         |  2 +-\n .../trikeshed/forge/server/EnglishCorpusWire.kt    |  3 +-\n .../forge/server/EnglishCorpusWireTest.kt          | 48 ++++++++++++++++++++++\n .../forge/server/EnglishTaxonomyWireTest.kt        |  2 +-\n .../forge/server/ReviewedTaxonomyWireTest.kt       |  8 ++--\n 5 files changed, 56 insertions(+), 7 deletions(-)\n",
+    "after": "6ad341bbc8c5a3f70391dac78a417c60f51ca785"
+  },
+  {
+    "ref": "refs/remotes/origin/codex/reviewed-proof-query-integration-20261105",
+    "commit": "0219223a3846887fe283b93598942de332214cd2",
+    "time": 1793846181,
+    "before": "6ad341bbc8c5a3f70391dac78a417c60f51ca785",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n",
+    "after": "b61a25cd119bee4b2261bf4bdf9d1b0668098c89"
+  }
+]

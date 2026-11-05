@@ -1,0 +1,143 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as configuration cache cannot be reused because file 'build.gradle.kts' has changed.
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: file:///workspace/TrikeShed/build.gradle.kts:267:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:271:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:276:25: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:428:40: 'val foundation: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed/build.gradle.kts:429:40: 'val material3: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed/build.gradle.kts:430:40: 'val materialIconsExtended: String' is deprecated. This artifact is pinned to version 1.7.3 and will not receive updates. Either use this version explicitly or migrate to Material Symbols (vector resources). See https://kotlinlang.org/docs/multiplatform/whats-new-compose-180.html.
+w: file:///workspace/TrikeShed/build.gradle.kts:431:40: 'val ui: String' is deprecated. Specify dependency directly.
+w: file:///workspace/TrikeShed/build.gradle.kts:799:13: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: file:///workspace/TrikeShed/build.gradle.kts:817:13: 'var defFile: File' is deprecated. Deprecated because it is a non-lazy property.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateComposeResClass SKIPPED
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :generateForgeAssets
+
+> Task :fetchSumoCorpus
+SUMO corpus @ 25bb366fdffd8769e741d2e22f215c2785bddce1 -> build/generated/sumo/resources/sumo (3/3 files; 0 fetched, 3 cached)
+
+> Task :jvmProcessResources
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+> Task :kotlinKotlinNpmCachesSetup
+> Task :kotlinNodeJsSetup UP-TO-DATE
+> Task :kotlinRestoreYarnLock UP-TO-DATE
+> Task :kotlinYarnSetup UP-TO-DATE
+> Task :jsBenchPackageJson UP-TO-DATE
+> Task :jsDocumentsPackageJson UP-TO-DATE
+> Task :jsForgePackageJson UP-TO-DATE
+> Task :jsGraalPackageJson UP-TO-DATE
+> Task :jsHarnessPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPackageJson UP-TO-DATE
+> Task :jsPackageJson UP-TO-DATE
+> Task :jsPagesPackageJson UP-TO-DATE
+> Task :jsSpacegraphPackageJson UP-TO-DATE
+> Task :jsTestPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPackageJson UP-TO-DATE
+> Task :jsViewserverPackageJson UP-TO-DATE
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :jsBenchPublicPackageJson UP-TO-DATE
+> Task :jsDocumentsPublicPackageJson UP-TO-DATE
+> Task :jsForgePublicPackageJson UP-TO-DATE
+> Task :jsGraalPublicPackageJson UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses
+> Task :jsHarnessPublicPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsPagesPublicPackageJson UP-TO-DATE
+> Task :jvmJar UP-TO-DATE
+> Task :jsPublicPackageJson UP-TO-DATE
+> Task :jsSpacegraphPublicPackageJson UP-TO-DATE
+> Task :jsTestPublicPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsViewserverPublicPackageJson UP-TO-DATE
+> Task :kotlinPackageJsonUmbrella UP-TO-DATE
+> Task :rootPackageJson UP-TO-DATE
+> Task :kotlinNpmInstall UP-TO-DATE
+> Task :convertXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsSpacegraph NO-SOURCE
+> Task :assembleJsSpacegraphResources UP-TO-DATE
+> Task :unpackSkikoWasmRuntime SKIPPED
+> Task :jsSpacegraphProcessResources UP-TO-DATE
+> Task :checkJsMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForJsMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsMain NO-SOURCE
+> Task :generateResourceAccessorsForJsMain SKIPPED
+> Task :generateActualResourceCollectorsForJsMain SKIPPED
+> Task :compileKotlinJs UP-TO-DATE
+> Task :checkJsSpacegraphComposeLibrariesCompatibility
+> Task :generateResourceAccessorsForJsSpacegraph SKIPPED
+> Task :jsResolveResourcesFromDependencies UP-TO-DATE
+> Task :assembleJsMainResources UP-TO-DATE
+> Task :jsResolveSelfResourcesCopyHierarchicalMultiplatformResources UP-TO-DATE
+> Task :jsAggregateResources UP-TO-DATE
+> Task :jsProcessResources UP-TO-DATE
+> Task :jsMainClasses UP-TO-DATE
+> Task :compileTestKotlinJvm UP-TO-DATE
+> Task :compileSpacegraphKotlinJs UP-TO-DATE
+> Task :jsSpacegraphClasses UP-TO-DATE
+> Task :compileJvmTestJava NO-SOURCE
+> Task :jvmTestClasses UP-TO-DATE
+> Task :compileSpacegraphProductionExecutableKotlinJs UP-TO-DATE
+> Task :airgapDocumentEntryJar UP-TO-DATE
+> Task :kotlinStoreYarnLock UP-TO-DATE
+> Task :jsSpacegraphSpacegraphProductionExecutableCompileSync UP-TO-DATE
+> Task :jsBrowserSpacegraphProductionWebpack UP-TO-DATE
+> Task :airgapDocumentPagesJar UP-TO-DATE
+> Task :airgapDocumentStartScripts
+> Task :airgapDocumentInstall
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 17s
+61 actionable tasks: 10 executed, 51 up-to-date
+Configuration cache entry stored.

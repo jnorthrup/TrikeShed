@@ -105,13 +105,35 @@ fun main(args: Array<String>) {
                 val bytes = checkNotNull(corpus.bytes(project, expected.id))
                 check(ContentId.of(bytes).value == expected.cid) { "Retained source differs: ${expected.id}" }
             }
+            fun node(id: String, type: String, x: Int, y: Int, params: Map<String, String>) =
+                _m["id" j id, "type" j type, "x" j x, "y" j y, "params" j params]
+            fun wire(from: String, output: String, to: String, input: String) =
+                _m["from" j _l[from, output], "to" j _l[to, input]]
+            // The ordinary named-preset link is ephemeral: the browser's saved scratch is untouched.
+            val canvas = _m["nodes" j _l[
+                node("document", "json.value", 30, 800, _m["value" j jsonOf(seed["sourceReference"])]),
+                node("source", DocumentCurationLegos.SOURCE, 30, 60, _m["view" j "reference"]),
+                node("passages", DocumentSpans.TYPE, 460, 60, _m["offset" j (seed["passageOffset"] as Number).toInt().toString(),
+                    "count" j "1", "spanChars" j "200", "maxBytes" j "8192"]),
+                node("scan", LlvmConfixContract.TYPE, 890, 60, _m["format" j "JSON"]),
+                node("selection", "confix.pickPath", 1320, 60, _m["path" j "spans.0.quotation", "geometry" j "native"])],
+                "wires" j (_l[wire("document", "value", "source", "source?"), wire("source", "source", "passages", "source"),
+                    wire("passages", "data", "scan", "data?"), wire("passages", "data", "selection", "data?")] +
+                    (s_["rows", "sourceCid", "ok", "format"] α {
+                        _m["from" j _l["scan", it], "to" j _l["selection", "$it?"]]
+                    }).toList()),
+                "seq" j 1, "view" j _m["x" j 245, "y" j 20, "z" j 0.8]]
+            val presets = _m["presets" j _l[_m["name" j "preset-airgap-document", "document" j canvas,
+                "title" j "Coinbase opinion · retained passage", "does" j "Select a retained passage through native Confix geometry",
+                "needs" j "Packaged text-layer opinion and native scanner", "see" j "Verified quotation, observed wires and native measurements",
+                "tweakFirst" j "Change the passage offset or width; Run creates a new receipt"]]]
             handle = KanbanModule().open(ctx)
             val finish = CompletableDeferred<Unit>()
             val boot = java.util.UUID.randomUUID().toString()
             fun report(): Map<String, Any?> {
                 for (name in s_["status", "maps", "mountinfo"].view)
                     File(root, "$mode-$name.txt").writeText(File("/proc/self/$name").readText())
-                return seed + _m[
+                return seed + _m["canvas" j canvas,
                 "mode" j mode, "boot" j boot, "pid" j ProcessHandle.current().pid(),
                 "reopened" j (mode == "inspect"), "llvmInstalled" j (LlvmConfixContract.TYPE in ctx.lcncRunners),
                 "runs" j ctx.blackboard.snapshot().values.filterKeys { it.startsWith("lcnc/run/") },
@@ -125,6 +147,8 @@ fun main(args: Array<String>) {
             }
             val control: ExtraRoute = { method, path, body, _ ->
                 when {
+                    path == "/api/panels/presets" && method == "GET" -> JvmKanbanServer.HttpResponse(200, jsonOf(presets))
+                    path == "/api/panels" && method == "GET" -> JvmKanbanServer.HttpResponse(200, "{\"panels\":[]}")
                     path == "/__proof/state" && method == "GET" -> JvmKanbanServer.HttpResponse(200, jsonOf(report()))
                     path == "/__proof/finish" && method == "POST" -> {
                         File(root, "state-$mode.json").writeText(jsonOf(report()))
