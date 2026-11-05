@@ -915,6 +915,7 @@
   "harness/document.py.txt": "83c148f1a285a678922b4ba6b0dcfaf6335c926a037262b63076c5cf63e3bd4e",
   "harness/fetch-publication.py.txt": "7e4a8a1e1d121e34a722175a8cf24680a493feff45c3010af861310f701db1a5",
   "harness/fetch.py.txt": "f49b91f3d3056a02ab8e2fd95c6056f8431ef4ca7258f4041609073c2d97cf4b",
+  "harness/finalize.py.txt": "657d28f1216a7b181d6e199f691d7edcccfce446d098f7f6ba06768d9b71a2a2",
   "harness/geometry.cjs.txt": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
   "harness/integrate-publication.py.txt": "a3ebe6f1cab0d93b7262b3220c3c0d89b560c9c5b71b2c093cb922f29aba7cca",
   "harness/integrate.py.txt": "6d65160795a75884436a963410c09d20df332ecd88b26663ab55ee30a8c0dcb8",
@@ -939,6 +940,7 @@
   "harness/update-release.py.txt": "59a664f38e5c4876884e7b4c34b3cd2afa62d4f15b59e592d067e130575ed206",
   "harness/update.py.txt": "630bb02fe341dd46de2e499ed712d1b6c23e7cf636468b0baded1f1487a3043d",
   "harness/verify-combined.py.txt": "581ca741e4964e0561da5d2954d27128b76790904f4138bc4c1cac246ce09318",
+  "harness/verify-staged.py.txt": "9b059a58f9beb3f758adf449bc52d9e3b7ff6f97104587696c8d44c84fe10e44",
   "initial-source-patch-reclamation.json": "dc54696d63f160db439b1d9db42b3bee2ca80c5b5414eb6ca7166ef6511aae65",
   "integrated-jvm-results/TEST-borg.trikeshed.collections.LinearArrayMapTest.xml": "b9c0fd2b6feda51495fada8b4b710949bc96de6f42105593cad8f1b4667ffaa8",
   "integrated-jvm-results/TEST-borg.trikeshed.forge.server.CurationIntakeEligibilityTest.xml": "e33ed54745504901feb3d4f93b5ab858f5a0cc7b5cdacd9018ccfe45def2185a",
@@ -1493,6 +1495,8 @@
   "preliminary/scale257-pilot/state/state-run.json": "f9aaed53aa205f6b51860b5eaa99107692d29ff47edc197f2bda5b0bd938fd3b",
   "preliminary/scale257-pilot/videos/page@decfe2312cb6ad09706e19bee0ec1403.webm": "80f1db71b6f65f9c9b95421022ebaca0d2b699e348b7540ff22264d4529545f7",
   "publication/PRELOAD.md": "b22263223fab951ebaba75d80802944e4559ae2531b05ac3c7313f0d870a5646",
+  "publication-source-continuity.json": "c8eb7f0c6e5315619b3c0117e5cf820b3b834f8da60a2bf4b14542c077c74002",
+  "publication-verification-notes.json": "fbe6204a67d41d82a47f5a9b0e18b539cdd7eced48478ae6d745ce708f830486",
   "r4f-source-patch-reclamation.json": "5711bcfbc4bd333478c4a6fda189976c6f27450b7bfbcb88f462190c09f6a7ca",
   "reference-host.json": "05671bf9fa17a4f2710e7baca6b6e51d70f87b22ef7649dbbaa3c96aa82b530d",
   "release-aggregate-run.txt": "15cd000f16f1fed08652ec085db6e185b7422ab425b68f58654ceaf7af1ee142",
@@ -1649,5 +1653,5 @@
   "source-update/SHA256.json": "008eb7fe58c9b707052087444aa3319e401ec4922a99349b84e57a9e3ea36af8",
   "source-update/source-update.json": "60df874544352242df53c66fd624bc3d7dd49f4528eee742de948ddcb5f45a33",
   "target-source-continuity.json": "e14e9a2a0618091d1e0d0ea43c88fa6ee343ad16dc1fdb33272da53f405b156e",
-  "verification.json": "507b9788a11e373982663e4a1edcd62c462172e505ebaa7e71d80cc731f89042"
+  "verification.json": "c974afe312f078901b15ea6e501bcacfe394ac2ad508efb50cc07d431e83f89f"
 }
