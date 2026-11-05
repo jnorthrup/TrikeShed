@@ -1,0 +1,46 @@
+{
+  "result": "PASS",
+  "scope": "Independent root recorded-public-data/hash/quote/denominator audit; no new CLI or predictor/reasoner execution",
+  "at": "2026-11-05T00:45:45.802792+00:00",
+  "publicFilesVerified": 9,
+  "actualRecordedCliCommands": 20,
+  "exitZero": 16,
+  "expectedRefusals": 4,
+  "mutatedInputBytesVerified": 11,
+  "frozenJarsVerified": 120,
+  "sourceCases": 16,
+  "exactUtf16Spans": 30,
+  "emptySeat": {
+    "missing": 16,
+    "scored": 0,
+    "explicitUnknown": 0,
+    "requiredAnchorCases": 6,
+    "comparable": 0,
+    "rate": null
+  },
+  "controls": {
+    "extended-partial": {
+      "S2Grounded": true,
+      "required": 2,
+      "matched": 1,
+      "complete": false,
+      "missingAnchors": [
+        {
+          "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+          "begin": 21,
+          "end": 43,
+          "quote": "An Agent is an Entity.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    "extended-full": {
+      "S2Grounded": true,
+      "required": 2,
+      "matched": 2,
+      "complete": true,
+      "missingAnchors": []
+    }
+  },
+  "manifestSha256": "9a8445d0efba7beeab64e7b28cafe360ca2c1ab107be3ed38fb4f79be0a7c567"
+}
