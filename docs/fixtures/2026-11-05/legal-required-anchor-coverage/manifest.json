@@ -1,0 +1,451 @@
+{
+  "kind": "provisional-legal-eval/1",
+  "scope": "public invented assumptions; no expert legal ground truth; original and excerpt are the same authored UTF-8 artifact",
+  "cases": [
+    {
+      "name": "S1",
+      "proposition": "The declared fixture makes Mira an instance of Tenant.",
+      "originalCid": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+      "excerptCid": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S1.txt",
+      "expected": "SUPPORTED",
+      "anchors": [
+        {
+          "excerptCid": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+          "begin": 0,
+          "end": 17,
+          "quote": "Mira is a Tenant.",
+          "role": "SUPPORTS"
+        }
+      ],
+      "requiredAnchors": [
+        {
+          "excerptCid": "sha256:c339c84a6bdaab34e9fd31f7a1cfd78c47c36af72e21f164f2f1e12606fe0816",
+          "begin": 0,
+          "end": 17,
+          "quote": "Mira is a Tenant.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "name": "S2",
+      "proposition": "The declared fixture supports Finch as a subclass of Entity.",
+      "originalCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+      "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S2.txt",
+      "expected": "SUPPORTED",
+      "anchors": [
+        {
+          "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+          "begin": 0,
+          "end": 20,
+          "quote": "A Finch is an Agent.",
+          "role": "SUPPORTS"
+        },
+        {
+          "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+          "begin": 21,
+          "end": 43,
+          "quote": "An Agent is an Entity.",
+          "role": "SUPPORTS"
+        }
+      ],
+      "requiredAnchors": [
+        {
+          "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+          "begin": 0,
+          "end": 20,
+          "quote": "A Finch is an Agent.",
+          "role": "SUPPORTS"
+        },
+        {
+          "excerptCid": "sha256:e682e51eecb06c859961159251332cff6cd578d37e2a9c8fb61630b74042c18d",
+          "begin": 21,
+          "end": 43,
+          "quote": "An Agent is an Entity.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "name": "S3",
+      "proposition": "The declared fixture supports Mira as an instance of Agent.",
+      "originalCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+      "excerptCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S3.txt",
+      "expected": "SUPPORTED",
+      "anchors": [
+        {
+          "excerptCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+          "begin": 0,
+          "end": 17,
+          "quote": "Mira is a Tenant.",
+          "role": "SUPPORTS"
+        },
+        {
+          "excerptCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+          "begin": 18,
+          "end": 39,
+          "quote": "A Tenant is an Agent.",
+          "role": "SUPPORTS"
+        }
+      ],
+      "requiredAnchors": [
+        {
+          "excerptCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+          "begin": 0,
+          "end": 17,
+          "quote": "Mira is a Tenant.",
+          "role": "SUPPORTS"
+        },
+        {
+          "excerptCid": "sha256:ae954b1b108347ac2aeae3140ac90c9ec81fafe112095b0157afb4206fcc4534",
+          "begin": 18,
+          "end": 39,
+          "quote": "A Tenant is an Agent.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "name": "S4",
+      "proposition": "The declared fixture makes Beacon a subclass of Device.",
+      "originalCid": "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd",
+      "excerptCid": "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S4.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:25c1ec739ff5e3b4d4bd3d56c8908af1648d65315cebff326f5785c628128ddd",
+          "begin": 0,
+          "end": 19,
+          "quote": "Beacon is a Device.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "S5",
+      "proposition": "The declared records support Lark reading Harbor.",
+      "originalCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+      "excerptCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S5.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+          "begin": 0,
+          "end": 58,
+          "quote": "An authorized operator assigned to a resource may read it.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+          "begin": 59,
+          "end": 102,
+          "quote": "The ordered assignment is Harbor then Lark.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:c9d234f188559318b301907cece77817244e92d43a075f82a5187c9c3bce8b20",
+          "begin": 103,
+          "end": 133,
+          "quote": "Lark is authorized for Access.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "S6",
+      "proposition": "The declared records support Lark reading Harbor.",
+      "originalCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+      "excerptCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S6.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+          "begin": 0,
+          "end": 58,
+          "quote": "An authorized operator assigned to a resource may read it.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:ec3fc28ab9d7e6c1663033bc8497af7d6c0dd54aa1468591e8a9830eaa416158",
+          "begin": 59,
+          "end": 86,
+          "quote": "Lark is assigned to Harbor.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "S7",
+      "proposition": "Clerk has an unconditional duty to file Report.",
+      "originalCid": "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc",
+      "excerptCid": "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S7.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:c1fabac4c2144343f09f088003f7dd9373e6514d0a42c9add979f015601dd7fc",
+          "begin": 0,
+          "end": 49,
+          "quote": "If Clerk receives Report, Clerk must file Report.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "S8",
+      "proposition": "The excerpt establishes that Clerk may read Record now.",
+      "originalCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+      "excerptCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S8.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+          "begin": 0,
+          "end": 46,
+          "quote": "Clerk may read Record unless Record is sealed.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:f77f02d2e5543796f6330a73ff17de0a8495c31f0c1c577c2bba5a060f64f91d",
+          "begin": 47,
+          "end": 69,
+          "quote": "Clerk requests Record.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "S9",
+      "proposition": "The excerpt declares Device to be an Agent.",
+      "originalCid": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+      "excerptCid": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S9.txt",
+      "expected": "REFUTED",
+      "anchors": [
+        {
+          "excerptCid": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+          "begin": 0,
+          "end": 23,
+          "quote": "Device is not an Agent.",
+          "role": "REFUTES"
+        }
+      ],
+      "requiredAnchors": [
+        {
+          "excerptCid": "sha256:44ce046af016ebecda4e6803359f58d10a21f7ed2db44a1090947e6b000c3700",
+          "begin": 0,
+          "end": 23,
+          "quote": "Device is not an Agent.",
+          "role": "REFUTES"
+        }
+      ]
+    },
+    {
+      "name": "S10",
+      "proposition": "Agreement A alone supports Finch as a subclass of Entity.",
+      "originalCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+      "excerptCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S10.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+          "begin": 0,
+          "end": 37,
+          "quote": "Agreement A says a Finch is an Agent.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:1f8124dbd83e864873ca46ee2b5d28cbc38c824090b3940b8c0e622f81d50715",
+          "begin": 38,
+          "end": 77,
+          "quote": "Agreement B says an Agent is an Entity.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "S11",
+      "proposition": "An approved source establishes consideration as FinancialTransaction.",
+      "originalCid": "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44",
+      "excerptCid": "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S11.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:36c87a04d6881926e833869aca6656307db89b8d2f7e4ff1e7344e6b44b90a44",
+          "begin": 0,
+          "end": 65,
+          "quote": "A suggestion maps the word consideration to FinancialTransaction.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "S12",
+      "proposition": "DELTA implies GAMMA as a held-out theorem.",
+      "originalCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+      "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/S12.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "begin": 0,
+          "end": 19,
+          "quote": "ALPHA implies BETA.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "begin": 20,
+          "end": 39,
+          "quote": "BETA implies GAMMA.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "begin": 40,
+          "end": 62,
+          "quote": "EPSILON implies GAMMA.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "begin": 63,
+          "end": 85,
+          "quote": "EPSILON implies DELTA.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+          "begin": 86,
+          "end": 105,
+          "quote": "ALPHA implies BETA.",
+          "role": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "name": "C1",
+      "proposition": "The declared excerpt supports Finch as a subclass of Agent.",
+      "originalCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+      "excerptCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/C1.txt",
+      "expected": "SUPPORTED",
+      "anchors": [
+        {
+          "excerptCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+          "begin": 0,
+          "end": 20,
+          "quote": "A Finch is an Agent.",
+          "role": "SUPPORTS"
+        },
+        {
+          "excerptCid": "sha256:14cd1e8658c8d55ed46c43c1bac6c3f81d556130df599c39eb6f62c61af72877",
+          "begin": 21,
+          "end": 41,
+          "quote": "A Finch is an Agent.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "name": "C2",
+      "proposition": "The declared excerpt records Tenant paying Landlord.",
+      "originalCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+      "excerptCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/C2.txt",
+      "expected": "SUPPORTED",
+      "anchors": [
+        {
+          "excerptCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+          "begin": 0,
+          "end": 21,
+          "quote": "Tenant pays Landlord.",
+          "role": "SUPPORTS"
+        }
+      ],
+      "requiredAnchors": [
+        {
+          "excerptCid": "sha256:d3640f803a73a0b9f7903b149f2ee215db09339f04e43d1db45ff78a65bbada1",
+          "begin": 0,
+          "end": 21,
+          "quote": "Tenant pays Landlord.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "name": "C3",
+      "proposition": "The explicitly combined manual premises support Finch as a subclass of Entity.",
+      "originalCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+      "excerptCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/C3.txt",
+      "expected": "SUPPORTED",
+      "anchors": [
+        {
+          "excerptCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+          "begin": 99,
+          "end": 119,
+          "quote": "A Finch is an Agent.",
+          "role": "SUPPORTS"
+        },
+        {
+          "excerptCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+          "begin": 120,
+          "end": 142,
+          "quote": "An Agent is an Entity.",
+          "role": "SUPPORTS"
+        }
+      ],
+      "requiredAnchors": [
+        {
+          "excerptCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+          "begin": 99,
+          "end": 119,
+          "quote": "A Finch is an Agent.",
+          "role": "SUPPORTS"
+        },
+        {
+          "excerptCid": "sha256:163e00c15f627cc41425a30243bb0055dc497529f172e7042a4e70bedc72e8c7",
+          "begin": 120,
+          "end": 142,
+          "quote": "An Agent is an Entity.",
+          "role": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "name": "C4",
+      "proposition": "The old approved read remains current after the source correction.",
+      "originalCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+      "excerptCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+      "excerptPath": "docs/fixtures/2026-11-04/english-symbol-corpus/english/C4.txt",
+      "expected": "UNKNOWN",
+      "anchors": [
+        {
+          "excerptCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+          "begin": 0,
+          "end": 38,
+          "quote": "Revision one says a Finch is an Agent.",
+          "role": "CONTEXT"
+        },
+        {
+          "excerptCid": "sha256:4c918fd49b18ff6b210fee50ba5fe7a9a6a7ca3aa2a9d92ebe0898813d1e3d74",
+          "begin": 39,
+          "end": 97,
+          "quote": "Revision two replaces that claim with a Finch is a Device.",
+          "role": "CONTEXT"
+        }
+      ]
+    }
+  ]
+}

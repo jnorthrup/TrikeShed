@@ -13,7 +13,9 @@ data class LegalEvalWitness(val excerptCid: ContentId, val begin: Int, val end: 
 
 /** Expected labels and anchors are provisional human annotations, not authenticated authority. */
 data class LegalEvalCase(val name: String, val proposition: String, val claimedOriginalCid: ContentId,
-    val excerptCid: ContentId, val expected: LegalEvalLabel, val anchors: List<LegalEvalWitness>) {
+    val excerptCid: ContentId, val expected: LegalEvalLabel, val anchors: List<LegalEvalWitness>,
+    /** Optional nonempty conjunction of exact annotated anchors; absent means no coverage metric. */
+    val requiredAnchors: List<LegalEvalWitness>? = null) {
     /** Source-scoped identity does not include the expected answer or human witness annotations. */
     val propositionCid: ContentId get() = ContentId.of(CanonicalCbor.encodeMap(mapOf(
         "kind" to "legal-eval-proposition/1", "original" to claimedOriginalCid.value,
@@ -25,11 +27,22 @@ data class LegalEvalPrediction(val propositionCid: ContentId, val label: LegalEv
     val witnesses: List<LegalEvalWitness>)
 
 enum class LegalEvalStatus { MISSING, INVALID_FIXTURE, INVALID_PREDICTION, SCORED }
+/**
+ * Annotation coverage only, not proof validity or label agreement. matchedCount, missingAnchors
+ * and complete remain null without one prediction containing only exact, distinct, annotated quotes. In that prediction,
+ * acceptedQuotes is true even for an empty list; nonempty requirements prevent vacuous coverage.
+ */
+data class LegalEvalAnchorCoverage(val requiredCount: Int, val acceptedQuotes: Boolean? = null,
+    val matchedCount: Int? = null, val missingAnchors: List<LegalEvalWitness>? = null,
+    val complete: Boolean? = null)
 data class LegalEvalRow(val name: String, val status: LegalEvalStatus, val predicted: LegalEvalLabel? = null,
     val labelAgrees: Boolean? = null, val witnessIntegrity: Boolean? = null,
-    val acceptedWitness: Boolean? = null, val groundedAgreement: Boolean? = null)
+    val acceptedWitness: Boolean? = null, val groundedAgreement: Boolean? = null,
+    val requiredAnchorCoverage: LegalEvalAnchorCoverage? = null)
 data class LegalEvalReport(val rows: List<LegalEvalRow>, val missing: Int, val invalidFixtures: Int,
-    val invalidPredictions: Int, val scored: Int, val labelAgreements: Int, val groundedAgreements: Int)
+    val invalidPredictions: Int, val scored: Int, val labelAgreements: Int, val groundedAgreements: Int,
+    val requiredAnchorCases: Int = 0, val requiredAnchorComparableCases: Int = 0,
+    val completeRequiredAnchorCoverageCases: Int = 0)
 
 /**
  * Offline comparison of supplied answers to provisional annotations. Exact text only verifies
@@ -84,15 +97,20 @@ object LegalNarsEvaluation {
         val rows = cases.map { c ->
             val content = text(c.excerptCid)
             if (content == null || c.anchors.size > MAX_WITNESSES || c.anchors.distinct().size != c.anchors.size ||
-                !c.anchors.all { exact(it, c.excerptCid, content) } || !sufficient(c.expected, c.anchors)) {
+                !c.anchors.all { exact(it, c.excerptCid, content) } || !sufficient(c.expected, c.anchors) ||
+                c.requiredAnchors?.let { required -> required.isEmpty() || required.size > MAX_WITNESSES ||
+                    required.distinct().size != required.size || !required.all { it in c.anchors } } == true) {
                 LegalEvalRow(c.name, LegalEvalStatus.INVALID_FIXTURE)
             } else {
+                val requiredCoverage = c.requiredAnchors?.let { LegalEvalAnchorCoverage(it.size) }
                 val entries = submitted[c.propositionCid].orEmpty()
                 when {
-                    entries.isEmpty() -> LegalEvalRow(c.name, LegalEvalStatus.MISSING)
+                    entries.isEmpty() -> LegalEvalRow(c.name, LegalEvalStatus.MISSING,
+                        requiredAnchorCoverage = requiredCoverage)
                     entries.size != 1 -> {
                         invalidPredictions += entries.size
-                        LegalEvalRow(c.name, LegalEvalStatus.INVALID_PREDICTION)
+                        LegalEvalRow(c.name, LegalEvalStatus.INVALID_PREDICTION,
+                            requiredAnchorCoverage = requiredCoverage)
                     }
                     else -> {
                         val p = entries.single()
@@ -102,7 +120,19 @@ object LegalNarsEvaluation {
                         // anchor is a separate test from whether the excerpt substring is exact.
                         val accepted = integrity && sufficient(p.label, p.witnesses) && p.witnesses.all { it in c.anchors }
                         val agrees = p.label == c.expected
-                        LegalEvalRow(c.name, LegalEvalStatus.SCORED, p.label, agrees, integrity, accepted, agrees && accepted)
+                        val coverage = c.requiredAnchors?.let { required ->
+                            // A spurious/incorrect-role quote invalidates the whole coverage comparison.
+                            // The label is deliberately independent: covering annotations is not agreeing with them.
+                            val acceptedQuotes = integrity && p.witnesses.all { it in c.anchors }
+                            if (!acceptedQuotes) LegalEvalAnchorCoverage(required.size, false)
+                            else {
+                                val missing = required.filter { it !in p.witnesses }
+                                LegalEvalAnchorCoverage(required.size, true, required.size - missing.size,
+                                    missing, missing.isEmpty())
+                            }
+                        }
+                        LegalEvalRow(c.name, LegalEvalStatus.SCORED, p.label, agrees, integrity, accepted, agrees && accepted,
+                            coverage)
                     }
                 }
             }
@@ -110,6 +140,8 @@ object LegalNarsEvaluation {
         return LegalEvalReport(rows, rows.count { it.status == LegalEvalStatus.MISSING },
             rows.count { it.status == LegalEvalStatus.INVALID_FIXTURE }, invalidPredictions,
             rows.count { it.status == LegalEvalStatus.SCORED }, rows.count { it.labelAgrees == true },
-            rows.count { it.groundedAgreement == true })
+            rows.count { it.groundedAgreement == true }, rows.count { it.requiredAnchorCoverage != null },
+            rows.count { it.requiredAnchorCoverage?.acceptedQuotes == true },
+            rows.count { it.requiredAnchorCoverage?.complete == true })
     }
 }
