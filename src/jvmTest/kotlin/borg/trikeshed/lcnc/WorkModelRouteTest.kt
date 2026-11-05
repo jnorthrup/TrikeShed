@@ -11,6 +11,7 @@ import kotlin.test.*
 
 class WorkModelRouteTest {
     @Test fun selectedPaidModelDoesNotFallBackToAnotherAllowedRoute() = runBlocking {
+        val policyActive = Airgap.active()
         val keys = KeyMux {
             bind("llm.one.key", TestKeySource(value = "one"))
             bind("llm.two.key", TestKeySource(value = "two"))
@@ -36,17 +37,28 @@ class WorkModelRouteTest {
             "models" j """[{"key":"one","model":"model-one"},{"key":"two","model":"model-two"}]"""])
         val selection = _m["kind" j "model", "endpoint" j "one", "model" j "model-one"]
         try {
-            assertFailsWith<IllegalStateException> { withContext(htx) {
+            val failure = assertFailsWith<IllegalStateException> { withContext(htx) {
                 TribunalNodes.registry(modelMuxDialog(brain, EmptyCoroutineContext)).getValue(WorkSelectNode.MODEL)
                     .run(node, _m["selection" j selection])
             } }
-            assertEquals(1, requests.size)
-            assertEquals("one.invalid", requests.single().target.host)
-            assertEquals("Bearer one", requests.single().headers.view.first { it.a == "Authorization" }.b)
+            if (policyActive) {
+                assertIs<Airgap.Rejection>(failure)
+                assertEquals(0, requests.size, "Airgap admission must refuse before the fixture transport")
+            } else {
+                assertFalse(failure is Airgap.Rejection)
+                assertEquals(1, requests.size)
+                assertEquals("one.invalid", requests.single().target.host)
+                assertEquals("Bearer one", requests.single().headers.view.first { it.a == "Authorization" }.b)
+            }
+            println("WorkModelRouteTest paid: mode=" +
+                (if (policyActive) "airgap-refusal" else "pinned-fixture-503") + "; fakeHtxCalls=" + requests.size)
         } finally { htx.close() }
     }
 
     @Test fun selectedLocalModelUsesOnlyItsExplicitKeylessRoute() = runBlocking {
+        // A keyless HTTP endpoint remains networked; it is not in-process Kotlin inference.
+        val policyActive = Airgap.active()
+        val expectedRequests = if (policyActive) 0 else 1
         val keys = KeyMux { bind("llm.default.key", TestKeySource(value = "must-not-be-sent")) }
         val mux = ModelMux(keys) {
             model("local-model", caps = _s["chat"], baseUrl = "http://local.invalid/v1", provider = "local",
@@ -76,17 +88,22 @@ class WorkModelRouteTest {
             LcncWire("source", "currency", "select", "currency"), LcncWire("source", "ceilingMicros", "select", "ceilingMicros"),
             LcncWire("select", "selection", "chat", "selection")])
         try {
-            val result = withContext(htx) { LcncRunner(registry).runAll(program) }
-            assertEquals("ok", result.getValue("chat")["content"])
-            assertEquals(1, requests.size)
-            assertEquals("local.invalid", requests.single().target.host)
-            assertFalse(requests.single().headers.view.any { it.a.equals("Authorization", ignoreCase = true) })
-            assertContains(requests.single().body.toArray().decodeToString(), "\"model\":\"local-model\"")
+            if (policyActive) {
+                assertFailsWith<Airgap.Rejection> { withContext(htx) { LcncRunner(registry).runAll(program) } }
+            } else {
+                val result = withContext(htx) { LcncRunner(registry).runAll(program) }
+                assertEquals("ok", result.getValue("chat")["content"])
+                assertEquals(1, requests.size)
+                assertEquals("local.invalid", requests.single().target.host)
+                assertFalse(requests.single().headers.view.any { it.a.equals("Authorization", ignoreCase = true) })
+                assertContains(requests.single().body.toArray().decodeToString(), "\"model\":\"local-model\"")
+            }
+            assertEquals(expectedRequests, requests.size)
 
             val emptySource = LcncNodeRunner { _, _ -> _m["offers" j emptyList<Any?>(), "feature" j "classify",
                 "currency" j "USD", "ceilingMicros" j "0"] }
             withContext(htx) { LcncRunner(registry + _m["test.source" j emptySource]).runAll(program) }
-            assertEquals(1, requests.size)
+            assertEquals(expectedRequests, requests.size)
 
             val node = registry.getValue(WorkSelectNode.MODEL)
             val selection = _m["kind" j "model", "endpoint" j "local", "model" j "other"]
@@ -106,7 +123,10 @@ class WorkModelRouteTest {
                 TribunalNodes.registry(modelMuxDialog(duplicate, EmptyCoroutineContext)).getValue(WorkSelectNode.MODEL)
                     .run(chat, _m["selection" j _m["kind" j "model", "endpoint" j "local", "model" j "local-model"]])
             } }
-            assertEquals(1, requests.size)
+            assertEquals(expectedRequests, requests.size)
+            println("WorkModelRouteTest keyless HTTP: mode=" +
+                (if (policyActive) "airgap-refusal" else "pinned-fixture-success") + "; fakeHtxCalls=" + requests.size +
+                "; empty-offer-and-invalid-selection-checks=executed")
         } finally { htx.close() }
     }
 }
