@@ -1,0 +1,16 @@
+from pathlib import Path
+import subprocess,os,json,datetime,hashlib
+h=Path('/workspace/airgap-r4f-proof');target=Path('/workspace/TrikeShed-target-checks');base=target/'build/classes/kotlin/linuxX64/main';cache=Path('/workspace/gradle-offline-cache/caches/modules-2/files-2.1')
+libraries=[base/'klib/TrikeShed',base/'cinterop/TrikeShed-cinterop-posixSpawn',base/'cinterop/TrikeShed-cinterop-zlinux_uring']
+for group,name,version in [('org.jetbrains.kotlinx','atomicfu-linuxx64','0.33.0'),('org.jetbrains.kotlinx','kotlinx-coroutines-core-linuxx64','1.11.0'),('org.jetbrains.kotlinx','kotlinx-datetime-linuxx64','0.8.0-0.6.x-compat'),('org.jetbrains.kotlinx','kotlinx-serialization-core-linuxx64','1.12.0')]:libraries+=sorted((cache/group/name/version).glob('*/*.klib'))
+assert len(libraries)==8,len(libraries)
+args=['/home/agent/.konan/kotlin-native-prebuilt-linux-x86_64-2.4.21/bin/kotlinc-native',str(h/'WalOwner.kt'),'-target','linux_x64','-g','-o',str(h/'wal-native')]
+for p in libraries:args+=['-library',str(p)]
+args=['unshare','--user','--map-current-user','--net','--keep-caps','sh','-c','ip link set lo up && exec "$@"','native-link']+args
+record={'librarySourceCommit':'2c6e55e25dbe8b38355f045a46cc6a91c378787b','workingTreeHead':subprocess.check_output(['git','rev-parse','HEAD'],cwd=target,text=True).strip(),'command':args,'startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'sourceSha256':hashlib.sha256((h/'WalOwner.kt').read_bytes()).hexdigest(),'libraries':[]}
+for p in libraries:
+ files=sorted(x for x in p.rglob('*') if x.is_file()) if p.is_dir() else [p]
+ record['libraries'].append({'path':str(p),'files':{str(x.relative_to(p) if p.is_dir() else x.name):hashlib.file_digest(x.open('rb'),'sha256').hexdigest() for x in files}})
+env=os.environ.copy();env['JAVA_HOME']='/workspace/toolchains/graalvm-community-25.3.4.1+1.1';env['JAVA_OPTS']='-Xmx4g'
+with (h/'native-link02.txt').open('w') as log:p=subprocess.run(args,env=env,stdout=log,stderr=subprocess.STDOUT)
+record.update(exit=p.returncode,finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat());(h/'native-link02.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps({k:v for k,v in record.items() if k!='libraries'},indent=2));raise SystemExit(p.returncode)

@@ -1,0 +1,7 @@
+{
+  "observation": "JVM UTF-8 argv alpha became two U+FFFD replacements before WAL append; native beta remained unchanged. CRC frames were valid.",
+  "nativeEncodingBefore": "ANSI_X3.4-1968",
+  "fileEncodingBefore": "UTF-8",
+  "cause": "LANG=C.UTF-8 was set but the sealed root omitted glibc C.utf8 locale data.",
+  "correction": "Include the actual C.utf8 files, retain exact package/source provenance and exercise a Unicode path and payload. Do not bypass argv with a different transport."
+}

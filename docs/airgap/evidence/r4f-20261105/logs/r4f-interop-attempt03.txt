@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4f-proof/interop.py", line 54, in <module>
+    label=runtime+'-'+ending;directory=state/label;shutil.copytree(seed,directory);(state/(label+'-alias')).symlink_to(label,target_is_directory=True);wal=directory/'board.wal';p,row,err=owner(runtime,'/state/'+label,label+'-owner')
+                                                                                                                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/airgap-r4f-proof/interop.py", line 40, in owner
+    assert len(candidates)==1,(label,candidates);row['ownerPid']=candidates[0]
+           ^^^^^^^^^^^^^^^^^^
+AssertionError: ('jvm-close-owner', [])

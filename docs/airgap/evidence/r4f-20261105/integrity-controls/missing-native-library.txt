@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4f-proof/package.py", line 28, in <module>
+    assert inventory()==record['files'],'Package membership, bytes or mode differ'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Package membership, bytes or mode differ

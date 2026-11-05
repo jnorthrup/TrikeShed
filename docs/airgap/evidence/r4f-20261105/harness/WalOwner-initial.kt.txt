@@ -1,0 +1,33 @@
+import borg.trikeshed.kanban.BoardFileWal
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.userspace.nio.file.spi.LinuxFileOperations
+import kotlinx.coroutines.runBlocking
+import kotlin.system.exitProcess
+
+fun main(args: Array<String>): Unit = runBlocking {
+    require(args.size >= 2)
+    val wal = try { BoardFileWal(LinuxFileOperations(), args[1]) }
+    catch (failure: IllegalStateException) {
+        if (!failure.message.orEmpty().contains("lease", ignoreCase = true)) throw failure
+        println(jsonOf(_m["phase" j "lease-refused", "message" j failure.message]))
+        exitProcess(42)
+    }
+    try {
+        val rows = mutableListOf<Map<String, Any?>>()
+        wal.replay { sequence, payload -> rows.add(_m["sequence" j sequence, "payload" j payload.decodeToString()]) }
+        println(jsonOf(_m["phase" j "opened", "records" j rows]))
+        when (args[0]) {
+            "hold" -> check(readln() == "close")
+            "append" -> {
+                require(args.size == 3)
+                val sequence = wal.append(args[2].encodeToByteArray())
+                wal.flush()
+                println(jsonOf(_m["phase" j "flushed", "sequence" j sequence]))
+            }
+            "inspect" -> Unit
+            else -> error("Unknown probe operation")
+        }
+    } finally { wal.close() }
+    println(jsonOf(_m["phase" j "closed"]))
+}

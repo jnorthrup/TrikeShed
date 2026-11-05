@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4f-proof/locale.py", line 2, in <module>
+    import subprocess,shutil,json,hashlib
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 46, in <module>
+    import locale
+  File "/workspace/airgap-r4f-proof/locale.py", line 6, in <module>
+    before=run('before');assert 'native.encoding = ANSI_X3.4-1968' in before
+           ^^^^^^^^^^^^^
+  File "/workspace/airgap-r4f-proof/locale.py", line 5, in run
+    p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,timeout=20);(report/(name+'.txt')).write_text(p.stdout);assert p.returncode==0;return p.stdout
+      ^^^^^^^^^^^^^^
+AttributeError: partially initialized module 'subprocess' has no attribute 'run' (most likely due to a circular import)

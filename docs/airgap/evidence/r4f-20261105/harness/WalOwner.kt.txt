@@ -1,0 +1,67 @@
+import borg.trikeshed.kanban.BoardFileWal
+import borg.trikeshed.kanban.BoardStoreElement
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.util.oroboros.FileCasStore
+import borg.trikeshed.parse.reifyStrict
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.userspace.nio.file.spi.LinuxFileOperations
+import kotlinx.coroutines.runBlocking
+import kotlin.system.exitProcess
+
+fun main(args: Array<String>): Unit = runBlocking {
+    require(args.size >= 2)
+    val wal = try { BoardFileWal(LinuxFileOperations(), args[1]) }
+    catch (failure: IllegalStateException) {
+        if (!failure.message.orEmpty().contains("lease", ignoreCase = true)) throw failure
+        println(jsonOf(_m["phase" j "lease-refused", "message" j failure.message]))
+        exitProcess(42)
+    }
+    try {
+        val rows = mutableListOf<Map<String, Any?>>()
+        wal.replay { sequence, payload -> rows.add(_m["sequence" j sequence, "payload" j payload.decodeToString()]) }
+        println(jsonOf(_m["phase" j "opened", "records" j rows]))
+        when (args[0]) {
+            "hold" -> {
+                val refused = runCatching { BoardFileWal(LinuxFileOperations(), args[1]).close() }.exceptionOrNull()
+                check(refused is IllegalStateException && refused.message.orEmpty().contains("lease", ignoreCase = true))
+                println(jsonOf(_m["phase" j "self-contender-refused"]))
+                check(readln() == "close")
+            }
+            "inspect-store" -> {
+                require(args.size == 3)
+                val cas = FileCasStore(LinuxFileOperations(), args[2])
+                val board = BoardStoreElement(wal, cas, parentJob = coroutineContext[kotlinx.coroutines.Job])
+                try {
+                    board.open()
+                    val cards = board.cards().toSeries() α { card ->
+                        val cid = requireNotNull(card.commandCid)
+                        val command = reifyStrict(requireNotNull(cas.get(cid)).decodeToString()) as Map<*, *>
+                        val run = command["lcncRun"] as Map<*, *>
+                        val outputs = run["outputs"] as Map<*, *>
+                        val quote = (outputs["selection"] as Map<*, *>)["value"] as Map<*, *>
+                        val text = requireNotNull(cas.get(ContentId(quote["extractedTextCid"] as String))).decodeToString()
+                        val begin = (quote["begin"] as Number).toInt()
+                        val end = (quote["end"] as Number).toInt()
+                        check(text.substring(begin, end) == quote["quote"])
+                        _m["jobId" j card.jobId, "sequence" j card.lastSequence,
+                            "receiptCid" j cid.value, "runId" j run["runId"],
+                            "programCid" j run["programCid"], "status" j run["status"],
+                            "quotation" j quote["quote"], "begin" j begin, "end" j end]
+                    }
+                    println(jsonOf(_m["phase" j "store-replayed", "sequence" j board.lastSequence,
+                        "cards" j cards.view.toList()]))
+                } finally { board.close() }
+            }
+            "append" -> {
+                require(args.size == 3)
+                val sequence = wal.append(args[2].encodeToByteArray())
+                wal.flush()
+                println(jsonOf(_m["phase" j "flushed", "sequence" j sequence]))
+            }
+            "inspect" -> Unit
+            else -> error("Unknown probe operation")
+        }
+    } finally { wal.close() }
+    println(jsonOf(_m["phase" j "closed"]))
+}

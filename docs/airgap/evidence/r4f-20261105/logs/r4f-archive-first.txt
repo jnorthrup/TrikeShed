@@ -1,0 +1,1 @@
+{"file": "/workspace/library-files/airgap-document-r4f-linux-x64-2026-11-05.tar.gz", "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58", "bytes": 460778817}

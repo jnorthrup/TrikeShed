@@ -1,0 +1,24 @@
+from pathlib import Path
+import shutil,json,hashlib,tarfile,gzip,subprocess
+h=Path('/workspace/airgap-r4f-proof');out=h/'native-verification';out.mkdir();compiler=Path('/home/agent/.konan/kotlin-native-prebuilt-linux-x86_64-2.4.21')
+def sha(p):return hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+for name in ['wal-native.kexe','WalOwner.kt','WalOwner.java','link02.py','native-link02.json','native-root-extension.json','interop.py']:shutil.copy2(h/name,out/name)
+shutil.copytree(h/'jvm-probe',out/'jvm-probe');shutil.copytree(compiler/'licenses',out/'kotlin-native-licenses');shutil.copytree(compiler/'sources',out/'kotlin-native-distributed-sources')
+for name in ['libcrypt1_amd64.copyright','libc6_amd64.copyright','libc-bin.copyright']:
+ p=h/'rootfs/opt/trikeshed/legal/debian'/name
+ if p.exists():shutil.copy2(p,out/name)
+for name,cmd in [('elf-needed.txt',['readelf','-d',str(h/'wal-native.kexe')]),('host-ldd.txt',['ldd',str(h/'wal-native.kexe')])]:
+ p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,check=True);(out/name).write_text(p.stdout)
+record={'compiler':'Kotlin/Native 2.4.21 linux_x64','projectLibrarySourceCommit':'2c6e55e25dbe8b38355f045a46cc6a91c378787b','runtimeTestedSourceCommit':'4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab','nativeBinarySha256':sha(h/'wal-native.kexe'),'nativeSourceSha256':sha(h/'WalOwner.kt'),'scope':'External verification caller linked to the existing full project klib. It is not the native LCNC HTTP service or the JVM Sulong engine. Build/link commands and every klib input digest are retained; the supplied compiler source zip is not claimed to be the complete compiler source closure.'}
+(out/'verification-inputs.json').write_text(json.dumps(record,indent=2)+'\n');(out/'README.md').write_text('''# R4f native verification inputs\n\nUse alongside the R4f Linux runtime, the retained evidence packet and the R4e source companion plus R4f source update. wal-native.kexe invokes the actual BoardFileWal and BoardStoreElement from the full Linux project klib. It is an external verification input, with deliberately writable WAL operations; use only on copied test state. The Java caller adds no substitute application classes.\n\nThe retained interop controller documents the exact read-only-root, no-egress and hidden-JDK mounts. Its /workspace paths name the original verification workspace and must be mapped to your corresponding artifacts. link02.py retains the full compiler command and pinned library input hashes; compiler/project klibs are external build inputs. Kotlin/Native distributed notices and source zip are included here, without a claim that that zip closes every compiler dependency.\n\nThis separate probe does not change the demonstrator architecture: actual MLIR/LLVM work continues inside the JVM through Polyglot/Sulong with explicit native-memory ownership.\n''')
+(out/'SHA256.json').write_text(json.dumps({p.relative_to(out).as_posix():sha(p) for p in sorted(out.rglob('*')) if p.is_file()},indent=2)+'\n')
+dest=Path('/workspace/library-files/airgap-r4f-native-verification-2026-11-05.tar.gz');assert not dest.exists()
+with dest.open('wb') as raw,gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0,compresslevel=6) as compressed,tarfile.open(fileobj=compressed,mode='w|',format=tarfile.PAX_FORMAT) as tar:
+ for p in [out]+sorted(out.rglob('*')):
+  info=tar.gettarinfo(str(p),arcname='native-verification'+('/'+p.relative_to(out).as_posix() if p!=out else ''));info.uid=info.gid=0;info.uname=info.gname='';info.mtime=0;info.pax_headers={}
+  if p.is_file():
+   with p.open('rb') as stream:tar.addfile(info,stream)
+  else:tar.addfile(info)
+with tarfile.open(dest,'r:gz') as tar:
+ for name,digest in json.loads((out/'SHA256.json').read_text()).items():assert hashlib.sha256(tar.extractfile('native-verification/'+name).read()).hexdigest()==digest
+record['archive']={'file':str(dest),'bytes':dest.stat().st_size,'sha256':sha(dest)};(h/'native-verification.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record,indent=2))

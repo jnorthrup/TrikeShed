@@ -1,0 +1,56 @@
+Property settings:
+    file.encoding = UTF-8
+    file.separator = /
+    java.class.path = 
+    java.class.version = 69.0
+    java.home = /opt/trikeshed/jdk
+    java.io.tmpdir = /tmp
+    java.library.path = /usr/java/packages/lib
+        /usr/lib64
+        /lib64
+        /lib
+        /usr/lib
+    java.runtime.name = OpenJDK Runtime Environment
+    java.runtime.version = 25.0.4.1+1-jvmci-25.3-b22
+    java.specification.name = Java Platform API Specification
+    java.specification.vendor = Oracle Corporation
+    java.specification.version = 25
+    java.vendor = GraalVM Community
+    java.vendor.url = https://www.graalvm.org/
+    java.vendor.url.bug = https://github.com/oracle/graal/issues
+    java.vendor.version = GraalVM CE 25.3.4.1+1.1
+    java.version = 25.0.4.1
+    java.version.date = 2026-08-18
+    java.vm.compressedOopsMode = Zero based
+    java.vm.info = mixed mode, sharing
+    java.vm.name = OpenJDK 64-Bit Server VM
+    java.vm.specification.name = Java Virtual Machine Specification
+    java.vm.specification.vendor = Oracle Corporation
+    java.vm.specification.version = 25
+    java.vm.vendor = GraalVM Community
+    java.vm.version = 25.0.4.1+1-jvmci-25.3-b22
+    jdk.debug = release
+    line.separator = \n 
+    native.encoding = UTF-8
+    os.arch = amd64
+    os.name = Linux
+    os.version = 6.18.57
+    path.separator = :
+    stderr.encoding = UTF-8
+    stdin.encoding = UTF-8
+    stdout.encoding = UTF-8
+    sun.arch.data.model = 64
+    sun.boot.library.path = /opt/trikeshed/jdk/lib
+    sun.cpu.endian = little
+    sun.io.unicode.encoding = UnicodeLittle
+    sun.java.launcher = SUN_STANDARD
+    sun.jnu.encoding = UTF-8
+    sun.management.compiler = HotSpot 64-Bit Tiered Compilers
+    user.dir = /
+    user.home = /state/home
+    user.language = en
+    user.name = demo
+
+openjdk version "25.0.4.1" 2026-08-18
+OpenJDK Runtime Environment GraalVM CE 25.3.4.1+1.1 (build 25.0.4.1+1-jvmci-25.3-b22)
+OpenJDK 64-Bit Server VM GraalVM CE 25.3.4.1+1.1 (build 25.0.4.1+1-jvmci-25.3-b22, mixed mode, sharing)

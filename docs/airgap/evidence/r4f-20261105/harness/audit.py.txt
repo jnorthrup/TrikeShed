@@ -1,0 +1,20 @@
+from pathlib import Path
+import json,hashlib,struct
+h=Path('/workspace/airgap-r4f-proof');a=h/'unicode-traversal-archive01';runtime=a/'state/δοκιμή-α/runtime';cas={}
+for p in (runtime/'cas/sha256').rglob('*'):
+ if p.is_file():
+  data=p.read_bytes();digest=hashlib.sha256(data).hexdigest();assert ''.join(p.relative_to(runtime/'cas/sha256').parts)==digest;cas['sha256:'+digest]=data
+wal=(runtime/'.kanban/board.wal').read_bytes();i=0;frames=[]
+while i<len(wal):
+ magic,version,seq,n=struct.unpack_from('>4sHQI',wal,i);assert magic==b'WAL1' and version==1 and seq==len(frames)+1;end=i+18+n;assert end+4<=len(wal);crc=0xffffffff
+ for b in wal[i:end]:
+  crc^=b
+  for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+ assert crc^0xffffffff==struct.unpack_from('>I',wal,end)[0];job,cid=wal[i+18:end].decode().split('\t');command=json.loads(cas[cid]);assert command['jobId']==job;frames.append({'sequence':seq,'cid':cid,'command':command});i=end+4
+receipt=json.loads((a/'browser.json').read_text())['receipt'];assert len(frames)==3;assert [x['command']['lcncRun']['status'] for x in frames]==['queued','running','completed'];assert frames[-1]['cid']==receipt['receiptCid'];run=frames[-1]['command']['lcncRun'];assert run['runId']==receipt['runId'] and run['programCid']==receipt['programCid']
+quote=run['outputs']['selection']['value'];assert int(quote['begin'])==quote['begin'] and int(quote['end'])==quote['end'];text=cas[quote['extractedTextCid']].decode();assert text.encode('utf-16-le')[int(quote['begin'])*2:int(quote['end'])*2].decode('utf-16-le')==quote['quote'];assert quote['begin']==18477 and quote['end']==18654
+scan=run['outputs']['scan'];assert scan['rowCount']==151 and scan['sourceBytes']==2028 and scan['ok'];assert len(cas[quote['originalCid']])==111243
+report=json.loads((a/'state/δοκιμή-α/state-run.json').read_text());assert report['nativeEncoding']=='UTF-8' and report['llvmInstalled'] and report['minerInstalled'] and len(report['documents'])==6
+assert all(json.loads((a/'state/δοκιμή-α/cleanup-run.json').read_text()).get(k) is True for k in ['moduleOwnerCompleted','nativeRootDrained','listenerJoined'])
+result={'casObjects':len(cas),'walFrames':len(frames),'receiptCid':receipt['receiptCid'],'runId':run['runId'],'programCid':run['programCid'],'originalPdfBytes':111243,'nativeRows':151,'nativeInputBytes':2028,'quotationUtf16':[quote['begin'],quote['end']],'quotation':quote['quote'],'nativeEncoding':report['nativeEncoding'],'runtimePath':'/state/δοκιμή-α/runtime','normalClose':True,'scope':'Fresh packaged JVM/Sulong document traversal under a Unicode state path; independent CAS, CRC32C, receipt and exact UTF-16 quote audit.'}
+(a/'audit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,ensure_ascii=False,indent=2))

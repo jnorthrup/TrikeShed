@@ -1,0 +1,2161 @@
+[
+  {
+    "source": "acl",
+    "version": "2.3.2-2",
+    "files": [
+      {
+        "file": "acl/acl_2.3.2-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/a/acl/acl_2.3.2-2.dsc",
+        "sha256": "1f42130ccb5442fe2db2aee1dcc03c51a31512dd2519a38e8fc9270c5abbc807",
+        "bytes": 2604,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "acl/acl_2.3.2.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/a/acl/acl_2.3.2.orig.tar.xz",
+        "sha256": "97203a72cae99ab89a067fe2210c1cbf052bc492b479eca7d226d9830883b0bd",
+        "bytes": 371680,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "acl/acl_2.3.2.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/a/acl/acl_2.3.2.orig.tar.xz.asc",
+        "sha256": "184c6a903490885a096095db67b433a04542c6569f167cbe8115268c0f227273",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "acl/acl_2.3.2-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/a/acl/acl_2.3.2-2.debian.tar.xz",
+        "sha256": "e27b6e194c0a7554595d76f96acdceb800631bdc46c36457b73bc7e4a0c5f2ee",
+        "bytes": 24296,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "alsa-lib",
+    "version": "1.2.14-1+deb13u1",
+    "files": [
+      {
+        "file": "alsa-lib/alsa-lib_1.2.14-1+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/a/alsa-lib/alsa-lib_1.2.14-1+deb13u1.dsc",
+        "sha256": "45f15d45b0329394de2e59c85052d0ac084e4e0ac215346ac5299a09432f515e",
+        "bytes": 2951,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "alsa-lib/alsa-lib_1.2.14.orig.tar.bz2",
+        "url": "https://deb.debian.org/debian/pool/main/a/alsa-lib/alsa-lib_1.2.14.orig.tar.bz2",
+        "sha256": "be9c88a0b3604367dd74167a2b754a35e142f670292ae47a2fdef27a2ee97a32",
+        "bytes": 1115517,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "alsa-lib/alsa-lib_1.2.14.orig.tar.bz2.asc",
+        "url": "https://deb.debian.org/debian/pool/main/a/alsa-lib/alsa-lib_1.2.14.orig.tar.bz2.asc",
+        "sha256": "d4d73561754d9e0956a77aa5edf9c7120f80129bda6832257d98c2010915b3e8",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "alsa-lib/alsa-lib_1.2.14-1+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/a/alsa-lib/alsa-lib_1.2.14-1+deb13u1.debian.tar.xz",
+        "sha256": "8c04f2d76c4566f21d044ea52eed39d97bdbf5a5a9cb21582662dd76f2dad38e",
+        "bytes": 34100,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "brotli",
+    "version": "1.1.0-2",
+    "files": [
+      {
+        "file": "brotli/brotli_1.1.0-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/b/brotli/brotli_1.1.0-2.dsc",
+        "sha256": "39b06802a852629132d549a7f7449dee7f435e801706714a4bc2ea2f15b28f36",
+        "bytes": 2261,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "brotli/brotli_1.1.0.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/b/brotli/brotli_1.1.0.orig.tar.gz",
+        "sha256": "10973f4b4199eafa1d5735ef661ddb2ec2f97319ee9fd1824d4aabe08cff5265",
+        "bytes": 512036,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "brotli/brotli_1.1.0-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/b/brotli/brotli_1.1.0-2.debian.tar.xz",
+        "sha256": "3d913a3740bcad9a294007575a6beb1846beadbd62b44fb2bf9fdaeddea3236f",
+        "bytes": 5480,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "bzip2",
+    "version": "1.0.8-6",
+    "files": [
+      {
+        "file": "bzip2/bzip2_1.0.8-6.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/b/bzip2/bzip2_1.0.8-6.dsc",
+        "sha256": "cd3bfd77254a6b5ef1be144bdc90a0dd374bc8206afd98ba4abf828741b79820",
+        "bytes": 1604,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "bzip2/bzip2_1.0.8.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/b/bzip2/bzip2_1.0.8.orig.tar.gz",
+        "sha256": "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269",
+        "bytes": 810029,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "bzip2/bzip2_1.0.8-6.debian.tar.bz2",
+        "url": "https://deb.debian.org/debian/pool/main/b/bzip2/bzip2_1.0.8-6.debian.tar.bz2",
+        "sha256": "648ed0dac9a041ba6951e0cca521628aa39947cefee78139f7b934a5dc502095",
+        "bytes": 26991,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "coreutils",
+    "version": "9.7-3",
+    "files": [
+      {
+        "file": "coreutils/coreutils_9.7-3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3.dsc",
+        "sha256": "c3a207e3aaad165765c7a6fab89045f5fd20035fea6830b9f9ebbb92ebfbff89",
+        "bytes": 2122,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "coreutils/coreutils_9.7.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7.orig.tar.xz",
+        "sha256": "e8bb26ad0293f9b5a1fc43fb42ba970e312c66ce92c1b0b16713d7500db251bf",
+        "bytes": 6158960,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "coreutils/coreutils_9.7.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7.orig.tar.xz.asc",
+        "sha256": "5070e9428bd372a7fa1f66b395b81092bb40c98f9f56a2e2bc55c47fd387e901",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "coreutils/coreutils_9.7-3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3.debian.tar.xz",
+        "sha256": "483f77876a080577f63da1d004cc1cf17d16df65d6925aefdd3294c6101eccfb",
+        "bytes": 26820,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "curl",
+    "version": "8.14.1-2+deb13u5",
+    "files": [
+      {
+        "file": "curl/curl_8.14.1-2+deb13u5.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/c/curl/curl_8.14.1-2+deb13u5.dsc",
+        "sha256": "9a9a2c95cdc8b5d76892c70858f25eaf2dc0b0a475a1e43e0b4ad428414752df",
+        "bytes": 3263,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "curl/curl_8.14.1.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/c/curl/curl_8.14.1.orig.tar.gz",
+        "sha256": "6766ada7101d292b42b8b15681120acd68effa4a9660935853cf6d61f0d984d4",
+        "bytes": 4250332,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "curl/curl_8.14.1.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/c/curl/curl_8.14.1.orig.tar.gz.asc",
+        "sha256": "39cc2ec8ddc39d04e3e7101bbed46d858d0875cbb297a6bfa20959fa2bc7d5c7",
+        "bytes": 488,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "curl/curl_8.14.1-2+deb13u5.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/c/curl/curl_8.14.1-2+deb13u5.debian.tar.xz",
+        "sha256": "ebdfcfab1c2001c7a539fe2a4044dbf666a544393f191bedce9ee2d07c4ea925",
+        "bytes": 72312,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "cyrus-sasl2",
+    "version": "2.1.28+dfsg1-9",
+    "files": [
+      {
+        "file": "cyrus-sasl2/cyrus-sasl2_2.1.28+dfsg1-9.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/c/cyrus-sasl2/cyrus-sasl2_2.1.28+dfsg1-9.dsc",
+        "sha256": "179cda376ee9f9a54098f902174299dd183ae78c703f72b86bd4c3297db4c153",
+        "bytes": 3306,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "cyrus-sasl2/cyrus-sasl2_2.1.28+dfsg1.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/c/cyrus-sasl2/cyrus-sasl2_2.1.28+dfsg1.orig.tar.xz",
+        "sha256": "e796a5d85d1a85e1b433d43504e467f9075c7ebc0b45730a3996cf11b1deada4",
+        "bytes": 794540,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "cyrus-sasl2/cyrus-sasl2_2.1.28+dfsg1-9.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/c/cyrus-sasl2/cyrus-sasl2_2.1.28+dfsg1-9.debian.tar.xz",
+        "sha256": "8215afa01ee2907da0a650bfa6b9cf0fae12f2611a098eedd853b5e71adf6623",
+        "bytes": 99180,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "dash",
+    "version": "0.5.12-12",
+    "files": [
+      {
+        "file": "dash/dash_0.5.12-12.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/d/dash/dash_0.5.12-12.dsc",
+        "sha256": "589efc4d87a4ae4745c273bdb33198d7c4f28a71736a8ece81d3677cf9c6e5ce",
+        "bytes": 1460,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "dash/dash_0.5.12.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/d/dash/dash_0.5.12.orig.tar.gz",
+        "sha256": "6a474ac46e8b0b32916c4c60df694c82058d3297d8b385b74508030ca4a8f28a",
+        "bytes": 246054,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "dash/dash_0.5.12-12.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/d/dash/dash_0.5.12-12.debian.tar.xz",
+        "sha256": "a278acb5d9a1f5d9a086d36a547287cbf3105b8f33c0e62d86d264decf5ba1ad",
+        "bytes": 47300,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "e2fsprogs",
+    "version": "1.47.2-3",
+    "files": [
+      {
+        "file": "e2fsprogs/e2fsprogs_1.47.2-3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/e2fsprogs_1.47.2-3.dsc",
+        "sha256": "860abb653ecbe01a11bb7e41c9e09a45e83847bffa585f7a3d3c0f9401c9d4bb",
+        "bytes": 3035,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "e2fsprogs/e2fsprogs_1.47.2.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/e2fsprogs_1.47.2.orig.tar.gz",
+        "sha256": "6dcd67ff9d8b13274ba3f088e4318be4f5b71412cd863524423fc49d39a6371f",
+        "bytes": 9996725,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "e2fsprogs/e2fsprogs_1.47.2.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/e2fsprogs_1.47.2.orig.tar.gz.asc",
+        "sha256": "2063f62a198dd3df21f789c990c2cf9b4a5de24ed55f0b78d86e97e98daffc9d",
+        "bytes": 488,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "e2fsprogs/e2fsprogs_1.47.2-3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/e/e2fsprogs/e2fsprogs_1.47.2-3.debian.tar.xz",
+        "sha256": "5517aae5ce5196e49fa314492f0639ad7a1692c9521d703b6c81acff77a1564e",
+        "bytes": 103684,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "expat",
+    "version": "2.8.3-1~deb13u1",
+    "files": [
+      {
+        "file": "expat/expat_2.8.3-1~deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/e/expat/expat_2.8.3-1~deb13u1.dsc",
+        "sha256": "d17f15fe413a553c72185d2d00448b87db72354e0d8fa6099ad19ee19e7117af",
+        "bytes": 1638,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "expat/expat_2.8.3.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/e/expat/expat_2.8.3.orig.tar.gz",
+        "sha256": "533659a16e0184035a99fd8e783f1ad61a887a7bf8586a8681740b9d7ed42389",
+        "bytes": 8464226,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "expat/expat_2.8.3-1~deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/e/expat/expat_2.8.3-1~deb13u1.debian.tar.xz",
+        "sha256": "4bf2c5c2f189673c66f79f2f8a8727cd8c08636d46b648c896e1c73673562c7b",
+        "bytes": 14116,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "findutils",
+    "version": "4.10.0-3",
+    "files": [
+      {
+        "file": "findutils/findutils_4.10.0-3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/f/findutils/findutils_4.10.0-3.dsc",
+        "sha256": "fa6b67056d9e5b4d8edbfc8ab95ac15ac769b140284426973f6a1ef07a4594ec",
+        "bytes": 2291,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "findutils/findutils_4.10.0.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/findutils/findutils_4.10.0.orig.tar.xz",
+        "sha256": "1387e0b67ff247d2abde998f90dfbf70c1491391a59ddfecb8ae698789f0a4f5",
+        "bytes": 2240712,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "findutils/findutils_4.10.0.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/f/findutils/findutils_4.10.0.orig.tar.xz.asc",
+        "sha256": "7f53670eea6bd114e014571221eb652855c1129a3ed99f2a9257c2a313cc216f",
+        "bytes": 488,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "findutils/findutils_4.10.0-3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/findutils/findutils_4.10.0-3.debian.tar.xz",
+        "sha256": "7d19668508523a6fcfb7731f5646305a8b1a00a3105ee3f0a5f167adf93a8a46",
+        "bytes": 33364,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "fontconfig",
+    "version": "2.15.0-2.3",
+    "files": [
+      {
+        "file": "fontconfig/fontconfig_2.15.0-2.3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/f/fontconfig/fontconfig_2.15.0-2.3.dsc",
+        "sha256": "d5c3b910e470fdd00048813863f2e25e330c61b5cb3c795edf30cb3c52a657d0",
+        "bytes": 2673,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "fontconfig/fontconfig_2.15.0.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/fontconfig/fontconfig_2.15.0.orig.tar.xz",
+        "sha256": "63a0658d0e06e0fa886106452b58ef04f21f58202ea02a94c39de0d3335d7c0e",
+        "bytes": 1447820,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "fontconfig/fontconfig_2.15.0-2.3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/fontconfig/fontconfig_2.15.0-2.3.debian.tar.xz",
+        "sha256": "af8e98e3801427f8957f86dc18303fcfbae329c0fab5bc06b5d5a0d26a53295f",
+        "bytes": 59516,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "fonts-dejavu",
+    "version": "2.37-8",
+    "files": [
+      {
+        "file": "fonts-dejavu/fonts-dejavu_2.37-8.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/f/fonts-dejavu/fonts-dejavu_2.37-8.dsc",
+        "sha256": "219f7f8fba98827caaa296520730171ec230d3090ed8b6d663edb66839b48847",
+        "bytes": 2156,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "fonts-dejavu/fonts-dejavu_2.37.orig.tar.bz2",
+        "url": "https://deb.debian.org/debian/pool/main/f/fonts-dejavu/fonts-dejavu_2.37.orig.tar.bz2",
+        "sha256": "4b21c5203f792343d5e90ab1cb0cf07e99887218abe3d83cd9a98cea9085e799",
+        "bytes": 12050109,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "fonts-dejavu/fonts-dejavu_2.37-8.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/fonts-dejavu/fonts-dejavu_2.37-8.debian.tar.xz",
+        "sha256": "2401402245dec8a59fc5f0f8eff76d203a38440797f7f223e1d044e07c2d41fb",
+        "bytes": 13176,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "freetype",
+    "version": "2.13.3+dfsg-1+deb13u1",
+    "files": [
+      {
+        "file": "freetype/freetype_2.13.3+dfsg-1+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/f/freetype/freetype_2.13.3+dfsg-1+deb13u1.dsc",
+        "sha256": "8aa6e936f4b8ce5b1ac530d3c1bc7c5c36e6432ef81385c29ce649a3ed79e8cd",
+        "bytes": 3691,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "freetype/freetype_2.13.3+dfsg.orig-ft2demos.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/freetype/freetype_2.13.3+dfsg.orig-ft2demos.tar.xz",
+        "sha256": "8775e5ffded1a885ba2ccb3ea0e82c73306a03b764080c3e4c79da15b5c9a28a",
+        "bytes": 342404,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "freetype/freetype_2.13.3+dfsg.orig-ft2demos.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/f/freetype/freetype_2.13.3+dfsg.orig-ft2demos.tar.xz.asc",
+        "sha256": "931bfa17e59c0ec7db391160f43977e0907f36ea3c39d7e6063731cd4612dd51",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "freetype/freetype_2.13.3+dfsg.orig-ft2docs.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/freetype/freetype_2.13.3+dfsg.orig-ft2docs.tar.xz",
+        "sha256": "b7b66149bea769e226fd3d6d1eee6160e5b6beb4249b088071434fbe85fd1070",
+        "bytes": 2173852,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "freetype/freetype_2.13.3+dfsg.orig-ft2docs.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/f/freetype/freetype_2.13.3+dfsg.orig-ft2docs.tar.xz.asc",
+        "sha256": "65c66aec6244d247540430b21d3e80b677f1361906347a5be7fad371d46655da",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "freetype/freetype_2.13.3+dfsg.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/freetype/freetype_2.13.3+dfsg.orig.tar.xz",
+        "sha256": "686ec73cbf6783b245dd068a09ce807b729ac0f8a46dd70f7867923c32fdf4de",
+        "bytes": 2201416,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "freetype/freetype_2.13.3+dfsg-1+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/f/freetype/freetype_2.13.3+dfsg-1+deb13u1.debian.tar.xz",
+        "sha256": "e7a07cad1b9c803457ec310bc87132429f52171c89f9126c09eb62e203c8c84b",
+        "bytes": 44488,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "gcc-14",
+    "version": "14.2.0-19",
+    "files": [
+      {
+        "file": "gcc-14/gcc-14_14.2.0-19.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/gcc-14_14.2.0-19.dsc",
+        "sha256": "7db1e202cce66617e9134a662c877a3a773de5b612fd52179815877e0ecfb847",
+        "bytes": 47347,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "gcc-14/gcc-14_14.2.0.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/gcc-14_14.2.0.orig.tar.gz",
+        "sha256": "e162a5ef3f0077ecae598c6556908d2ab80841532df3398072a96a6df6e6aa29",
+        "bytes": 94299633,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "gcc-14/gcc-14_14.2.0-19.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/gcc-14/gcc-14_14.2.0-19.debian.tar.xz",
+        "sha256": "31cbab4bafa48aa1c540497bd8098cbcf98e673778f927651ed944709f687781",
+        "bytes": 2577016,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "glibc",
+    "version": "2.41-12+deb13u4",
+    "files": [
+      {
+        "file": "glibc/glibc_2.41-12+deb13u4.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/glibc_2.41-12+deb13u4.dsc",
+        "sha256": "0915324aa646bb99abfaa9aa6ecb734b30babd28454a3e51f3152912370fbd3e",
+        "bytes": 7576,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "glibc/glibc_2.41.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/glibc_2.41.orig.tar.xz",
+        "sha256": "f24aa441021121a79266f0d75242706cab8843a47901fefe74527491807f1998",
+        "bytes": 20323540,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "glibc/glibc_2.41-12+deb13u4.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/glibc_2.41-12+deb13u4.debian.tar.xz",
+        "sha256": "dda4153511bfd543502d18e5bc9323110996fe9c531f14ae3fad6eb17f027c7d",
+        "bytes": 499524,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "gmp",
+    "version": "2:6.3.0+dfsg-3",
+    "files": [
+      {
+        "file": "gmp/gmp_6.3.0+dfsg-3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/g/gmp/gmp_6.3.0+dfsg-3.dsc",
+        "sha256": "f7b64af28f52b7346bb8581e01d3c19daf769639345f234f8ae1e29c42171443",
+        "bytes": 2251,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "gmp/gmp_6.3.0+dfsg.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/gmp/gmp_6.3.0+dfsg.orig.tar.xz",
+        "sha256": "bd2966e6d277f79328e894a5a9f3ba3fbf2ed2be81def5f48623e30c23fb1572",
+        "bytes": 1870556,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "gmp/gmp_6.3.0+dfsg-3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/gmp/gmp_6.3.0+dfsg-3.debian.tar.xz",
+        "sha256": "1d890bbe25dd649d2ddba1926483176520e50f22115a00566f250b613b8c20ad",
+        "bytes": 19912,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "gnutls28",
+    "version": "3.8.9-3+deb13u4",
+    "files": [
+      {
+        "file": "gnutls28/gnutls28_3.8.9-3+deb13u4.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/g/gnutls28/gnutls28_3.8.9-3+deb13u4.dsc",
+        "sha256": "f1153e91212bdf60acf66cb62713ad4ed577f2e85f578a04df31a5619624c1e1",
+        "bytes": 3271,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "gnutls28/gnutls28_3.8.9.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/gnutls28/gnutls28_3.8.9.orig.tar.xz",
+        "sha256": "69e113d802d1670c4d5ac1b99040b1f2d5c7c05daec5003813c049b5184820ed",
+        "bytes": 6847364,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "gnutls28/gnutls28_3.8.9.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/g/gnutls28/gnutls28_3.8.9.orig.tar.xz.asc",
+        "sha256": "7631d47762865d4ef494492cca794cf0fe6a8be892a4aa02f362ae29006d3054",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "gnutls28/gnutls28_3.8.9-3+deb13u4.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/gnutls28/gnutls28_3.8.9-3+deb13u4.debian.tar.xz",
+        "sha256": "f0b9c7d182072f0bbdb281304686aa6e2bfd343dadefa432ec4dab4893e9841f",
+        "bytes": 140880,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "gpgme1.0",
+    "version": "1.24.2-3",
+    "files": [
+      {
+        "file": "gpgme1.0/gpgme1.0_1.24.2-3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/g/gpgme1.0/gpgme1.0_1.24.2-3.dsc",
+        "sha256": "822672941458bfd0953527b53899fd88e38f84b16220bbade2bab598f8435d46",
+        "bytes": 3255,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "gpgme1.0/gpgme1.0_1.24.2.orig.tar.bz2",
+        "url": "https://deb.debian.org/debian/pool/main/g/gpgme1.0/gpgme1.0_1.24.2.orig.tar.bz2",
+        "sha256": "e11b1a0e361777e9e55f48a03d89096e2abf08c63d84b7017cfe1dce06639581",
+        "bytes": 1891804,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "gpgme1.0/gpgme1.0_1.24.2.orig.tar.bz2.asc",
+        "url": "https://deb.debian.org/debian/pool/main/g/gpgme1.0/gpgme1.0_1.24.2.orig.tar.bz2.asc",
+        "sha256": "15aa105622d8ea60a205c5b07a346f87e30acc8fe2fcffa1889912e6f0d8edae",
+        "bytes": 228,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "gpgme1.0/gpgme1.0_1.24.2-3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/g/gpgme1.0/gpgme1.0_1.24.2-3.debian.tar.xz",
+        "sha256": "c4afd253b39b51cf8af26d6a87e18017ef79a27d4c02048f66b572c6dcb2fe11",
+        "bytes": 27984,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "jbigkit",
+    "version": "2.1-6.1",
+    "files": [
+      {
+        "file": "jbigkit/jbigkit_2.1-6.1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/j/jbigkit/jbigkit_2.1-6.1.dsc",
+        "sha256": "8dea586c47cb4b2436f77fd33ef4a702b9da936d74de8332a72a8ddbe8124e09",
+        "bytes": 2089,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "jbigkit/jbigkit_2.1.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/j/jbigkit/jbigkit_2.1.orig.tar.gz",
+        "sha256": "de7106b6bfaf495d6865c7dd7ac6ca1381bd12e0d81405ea81e7f2167263d932",
+        "bytes": 438710,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "jbigkit/jbigkit_2.1-6.1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/j/jbigkit/jbigkit_2.1-6.1.debian.tar.xz",
+        "sha256": "c9ba99e84d18b1affdc97b26b625721ed06b41a92996d9b426b62c0dbe3868cd",
+        "bytes": 9244,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "keyutils",
+    "version": "1.6.3-6",
+    "files": [
+      {
+        "file": "keyutils/keyutils_1.6.3-6.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/k/keyutils/keyutils_1.6.3-6.dsc",
+        "sha256": "e63869474c390d5d5bdee8492f7b2f4d6034ff10d8190da18593620c0f35fbf8",
+        "bytes": 2100,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "keyutils/keyutils_1.6.3.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/k/keyutils/keyutils_1.6.3.orig.tar.gz",
+        "sha256": "a61d5706136ae4c05bd48f86186bcfdbd88dd8bd5107e3e195c924cfc1b39bb4",
+        "bytes": 137022,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "keyutils/keyutils_1.6.3-6.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/k/keyutils/keyutils_1.6.3-6.debian.tar.xz",
+        "sha256": "6fc3c1217b8e92df9dff73e4919c45dff4ada5fd414ab57329af487f4476466a",
+        "bytes": 16588,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "krb5",
+    "version": "1.21.3-5+deb13u1",
+    "files": [
+      {
+        "file": "krb5/krb5_1.21.3-5+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/k/krb5/krb5_1.21.3-5+deb13u1.dsc",
+        "sha256": "d17d2840bc97fea2c2375245569ca67838a2b557ee083c6cbe42b129a317212c",
+        "bytes": 4189,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "krb5/krb5_1.21.3.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/k/krb5/krb5_1.21.3.orig.tar.gz",
+        "sha256": "b7a4cd5ead67fb08b980b21abd150ff7217e85ea320c9ed0c6dadd304840ad35",
+        "bytes": 9136145,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "krb5/krb5_1.21.3.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/k/krb5/krb5_1.21.3.orig.tar.gz.asc",
+        "sha256": "85047c935fe949ef2e275885451b168557b923dd13a5aab0ef8fe6acd27b94d7",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "krb5/krb5_1.21.3-5+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/k/krb5/krb5_1.21.3-5+deb13u1.debian.tar.xz",
+        "sha256": "02b873b239fbe7ddf016dfe44deba4130673f4606c18c93da0622e2bc8500fb4",
+        "bytes": 105252,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "lcms2",
+    "version": "2.16-2+deb13u2",
+    "files": [
+      {
+        "file": "lcms2/lcms2_2.16-2+deb13u2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/l/lcms2/lcms2_2.16-2+deb13u2.dsc",
+        "sha256": "8ff22453843eed5ef7bfb76b4cb2cfe490613337cb197141db658e5195ead9fc",
+        "bytes": 2004,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "lcms2/lcms2_2.16.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/l/lcms2/lcms2_2.16.orig.tar.gz",
+        "sha256": "d873d34ad8b9b4cea010631f1a6228d2087475e4dc5e763eb81acc23d9d45a51",
+        "bytes": 7632822,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "lcms2/lcms2_2.16-2+deb13u2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/l/lcms2/lcms2_2.16-2+deb13u2.debian.tar.xz",
+        "sha256": "bb72de5dc4164e1023a6d124c57789b6abee866d3b76c878d0771b86fb720de9",
+        "bytes": 12744,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "lerc",
+    "version": "4.0.0+ds-5",
+    "files": [
+      {
+        "file": "lerc/lerc_4.0.0+ds-5.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/l/lerc/lerc_4.0.0+ds-5.dsc",
+        "sha256": "84de8dac3dd5f5edc005c5c02be58c1f549f9365ad4147c138c85e07d624cc12",
+        "bytes": 2673,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "lerc/lerc_4.0.0+ds.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/l/lerc/lerc_4.0.0+ds.orig.tar.xz",
+        "sha256": "acf855502fd3b950ee78f0b67bc9e9b39316b3526fbf6d8b8b1a9482fb756723",
+        "bytes": 348140,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "lerc/lerc_4.0.0+ds-5.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/l/lerc/lerc_4.0.0+ds-5.debian.tar.xz",
+        "sha256": "28ab2b1c19c845cd493e804bb9c43b47f72d5852281ebf832ed68a7576afbf6d",
+        "bytes": 8576,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libassuan",
+    "version": "3.0.2-2",
+    "files": [
+      {
+        "file": "libassuan/libassuan_3.0.2-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/liba/libassuan/libassuan_3.0.2-2.dsc",
+        "sha256": "4c6b68814cef421d1768628b401a62176c579dc8e1e3026348d7ec159943f0c7",
+        "bytes": 2682,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libassuan/libassuan_3.0.2.orig.tar.bz2",
+        "url": "https://deb.debian.org/debian/pool/main/liba/libassuan/libassuan_3.0.2.orig.tar.bz2",
+        "sha256": "d2931cdad266e633510f9970e1a2f346055e351bb19f9b78912475b8074c36f6",
+        "bytes": 593917,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libassuan/libassuan_3.0.2.orig.tar.bz2.asc",
+        "url": "https://deb.debian.org/debian/pool/main/liba/libassuan/libassuan_3.0.2.orig.tar.bz2.asc",
+        "sha256": "3799b287fd7d48f750597bd9104621d2cbafd508de83303b1a5f5eef08f06072",
+        "bytes": 228,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libassuan/libassuan_3.0.2-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/liba/libassuan/libassuan_3.0.2-2.debian.tar.xz",
+        "sha256": "05566fa4ac35ad6af7214ce01beeaffcc2ce1c13d20daac4cf86949c5fad25fc",
+        "bytes": 17536,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libcap2",
+    "version": "1:2.75-10+deb13u1",
+    "files": [
+      {
+        "file": "libcap2/libcap2_2.75-10+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libc/libcap2/libcap2_2.75-10+deb13u1.dsc",
+        "sha256": "cb6af220de216655ec55bb1f5abf3fa8f03e82c9956f120b313056e895c02ea6",
+        "bytes": 2714,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libcap2/libcap2_2.75.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libc/libcap2/libcap2_2.75.orig.tar.xz",
+        "sha256": "de4e7e064c9ba451d5234dd46e897d7c71c96a9ebf9a0c445bc04f4742d83632",
+        "bytes": 197868,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libcap2/libcap2_2.75.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libc/libcap2/libcap2_2.75.orig.tar.xz.asc",
+        "sha256": "c71b593e7c3160fd7f406641074d93462bbc4906c9243937a0e232f42d5c54d2",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libcap2/libcap2_2.75-10+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libc/libcap2/libcap2_2.75-10+deb13u1.debian.tar.xz",
+        "sha256": "d375de2f743f112835fc0eef2a9c305c1109371954cf53e109b7f046fe58c1bc",
+        "bytes": 24628,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libdeflate",
+    "version": "1.23-2",
+    "files": [
+      {
+        "file": "libdeflate/libdeflate_1.23-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libd/libdeflate/libdeflate_1.23-2.dsc",
+        "sha256": "fbec7154ffff5193ef71c196e1e7348a154b1ed35c2a9ce3ece5fcc947303d77",
+        "bytes": 1743,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libdeflate/libdeflate_1.23.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libd/libdeflate/libdeflate_1.23.orig.tar.gz",
+        "sha256": "1ab18349b9fb0ce8a0ca4116bded725be7dcbfa709e19f6f983d99df1fb8b25f",
+        "bytes": 197519,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libdeflate/libdeflate_1.23-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libd/libdeflate/libdeflate_1.23-2.debian.tar.xz",
+        "sha256": "6d3101de26f30c25e4900fecc3b6da34543771d6014767af29850bc3ff3cbd09",
+        "bytes": 5624,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libffi",
+    "version": "3.4.8-2",
+    "files": [
+      {
+        "file": "libffi/libffi_3.4.8-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libf/libffi/libffi_3.4.8-2.dsc",
+        "sha256": "4424defe3f37c0084f062e03330b2ba3d3f927367c33be455cfacf7f85a78161",
+        "bytes": 1948,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libffi/libffi_3.4.8.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libf/libffi/libffi_3.4.8.orig.tar.gz",
+        "sha256": "cbb7f0b3b095dc506387ec1e35b891bfb4891d05b90a495bc69a10f2293f80ff",
+        "bytes": 595051,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libffi/libffi_3.4.8-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libf/libffi/libffi_3.4.8-2.debian.tar.xz",
+        "sha256": "f23ac79a19895ebb6bbb539263d0d945ebc2d3e91217a597f5819777f08b401c",
+        "bytes": 11220,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libgpg-error",
+    "version": "1.51-4",
+    "files": [
+      {
+        "file": "libgpg-error/libgpg-error_1.51-4.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libg/libgpg-error/libgpg-error_1.51-4.dsc",
+        "sha256": "fecb803e22016cbf46b7c0a0d5c23f8a45a2f70fa10d3b3b67b10be917987410",
+        "bytes": 2956,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libgpg-error/libgpg-error_1.51.orig.tar.bz2",
+        "url": "https://deb.debian.org/debian/pool/main/libg/libgpg-error/libgpg-error_1.51.orig.tar.bz2",
+        "sha256": "be0f1b2db6b93eed55369cdf79f19f72750c8c7c39fc20b577e724545427e6b2",
+        "bytes": 1085510,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libgpg-error/libgpg-error_1.51.orig.tar.bz2.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libg/libgpg-error/libgpg-error_1.51.orig.tar.bz2.asc",
+        "sha256": "5e8c9179635b3105f4c07d09168fda9ce039607e926628aec6a06134908be918",
+        "bytes": 228,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libgpg-error/libgpg-error_1.51-4.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libg/libgpg-error/libgpg-error_1.51-4.debian.tar.xz",
+        "sha256": "9d1edd110f540c9f7163035f352836dd968ca38977f31adb073b99b9a05f8c4d",
+        "bytes": 22332,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libidn2",
+    "version": "2.3.8-2",
+    "files": [
+      {
+        "file": "libidn2/libidn2_2.3.8-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libi/libidn2/libidn2_2.3.8-2.dsc",
+        "sha256": "af3327227dbbf12fff281f71b7feb90371d2dbe597f3129e38b93c3faadcea61",
+        "bytes": 2961,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libidn2/libidn2_2.3.8.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libi/libidn2/libidn2_2.3.8.orig.tar.gz",
+        "sha256": "bbad1678d35d28e2c62e6a2577083829461402d9e47b908791c55314a5cb5e04",
+        "bytes": 718637,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libidn2/libidn2_2.3.8.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libi/libidn2/libidn2_2.3.8.orig.tar.gz.asc",
+        "sha256": "8995cab7db361d9d6989eab26d9b521c74236960a5d78250121c8d369b013bd8",
+        "bytes": 1223,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libidn2/libidn2_2.3.8-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libi/libidn2/libidn2_2.3.8-2.debian.tar.xz",
+        "sha256": "ab95c2bab110557505ba437bc162f67a5a85fa9d8a2e55501245dc7f0fe2e412",
+        "bytes": 17532,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libjpeg-turbo",
+    "version": "1:2.1.5-4",
+    "files": [
+      {
+        "file": "libjpeg-turbo/libjpeg-turbo_2.1.5-4.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg-turbo_2.1.5-4.dsc",
+        "sha256": "26cbf22aa3b3e327df072513f14a5ddfb4a7b9a3d78c46a5dccfd711c13ac743",
+        "bytes": 2508,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libjpeg-turbo/libjpeg-turbo_2.1.5.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg-turbo_2.1.5.orig.tar.gz",
+        "sha256": "254f3642b04e309fee775123133c6464181addc150499561020312ec61c1bf7c",
+        "bytes": 2264471,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libjpeg-turbo/libjpeg-turbo_2.1.5-4.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg-turbo_2.1.5-4.debian.tar.xz",
+        "sha256": "739e7dc22904dccdc5ab105de57a6e4c1515c0e841e68226e6410ff4976e0e91",
+        "bytes": 108128,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libpng1.6",
+    "version": "1.6.48-1+deb13u5",
+    "files": [
+      {
+        "file": "libpng1.6/libpng1.6_1.6.48-1+deb13u5.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libp/libpng1.6/libpng1.6_1.6.48-1+deb13u5.dsc",
+        "sha256": "746ec351ac044becb16725b903aee2c53815da9f89630767b6edbb317a50f98e",
+        "bytes": 2305,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libpng1.6/libpng1.6_1.6.48.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libp/libpng1.6/libpng1.6_1.6.48.orig.tar.gz",
+        "sha256": "b17e99026055727e8cba99160c3a9a7f9af788e9f786daeadded5a42243f1dd0",
+        "bytes": 1572923,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libpng1.6/libpng1.6_1.6.48-1+deb13u5.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libp/libpng1.6/libpng1.6_1.6.48-1+deb13u5.debian.tar.xz",
+        "sha256": "b38d5929b9a6139f2ce02a0e831d0f3f5365410b050dc429ea079a73253fe97a",
+        "bytes": 52468,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libpsl",
+    "version": "0.21.2-1.1",
+    "files": [
+      {
+        "file": "libpsl/libpsl_0.21.2-1.1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libp/libpsl/libpsl_0.21.2-1.1.dsc",
+        "sha256": "b9b5496ca2bffb827cb0b2d997469908a2b7a7475c20a11c02f9dcd1ed2a0cc9",
+        "bytes": 2285,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libpsl/libpsl_0.21.2.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libp/libpsl/libpsl_0.21.2.orig.tar.xz",
+        "sha256": "11e34380f2c81d6e72c710464aae3b680df4ddcc1007826c630fb03c7ca6aa54",
+        "bytes": 1870352,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libpsl/libpsl_0.21.2-1.1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libp/libpsl/libpsl_0.21.2-1.1.debian.tar.xz",
+        "sha256": "0eccab147b6dfbfb7f5ad40fb5bd9f888d72a0fe44e7d1801811c34a9acad1a7",
+        "bytes": 12120,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libselinux",
+    "version": "3.8.1-1",
+    "files": [
+      {
+        "file": "libselinux/libselinux_3.8.1-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libselinux/libselinux_3.8.1-1.dsc",
+        "sha256": "e430b782a396e266f86c32fa779efadebfd40e6a0d10ddbd786fc47905f723b9",
+        "bytes": 3013,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libselinux/libselinux_3.8.1.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libselinux/libselinux_3.8.1.orig.tar.gz",
+        "sha256": "ec2d2789f931152d21c1db1eb4bc202ce4eccede34d9be9e360e3b45243cee2c",
+        "bytes": 204411,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libselinux/libselinux_3.8.1.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libselinux/libselinux_3.8.1.orig.tar.gz.asc",
+        "sha256": "7f983714a780d89f7677e7ba140ce29974022b8ba225f60246b6c33de1477dd6",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libselinux/libselinux_3.8.1-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libselinux/libselinux_3.8.1-1.debian.tar.xz",
+        "sha256": "1af25952374f083cf3d6d0edd5beb938f2e53c30eb404afa1e32fcd1cb127db7",
+        "bytes": 37812,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libssh2",
+    "version": "1.11.1-1+deb13u2",
+    "files": [
+      {
+        "file": "libssh2/libssh2_1.11.1-1+deb13u2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libssh2/libssh2_1.11.1-1+deb13u2.dsc",
+        "sha256": "f584c22bccd948a432cc56f64adb896af2cb26d9b38bcaac13cdc7907e766599",
+        "bytes": 2351,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libssh2/libssh2_1.11.1.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libssh2/libssh2_1.11.1.orig.tar.gz",
+        "sha256": "d9ec76cbe34db98eec3539fe2c899d26b0c837cb3eb466a56b0f109cabf658f7",
+        "bytes": 1093012,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libssh2/libssh2_1.11.1.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libssh2/libssh2_1.11.1.orig.tar.gz.asc",
+        "sha256": "f5618c9356a1d5a8059d6cf64015d86547f06b2b8b1f542fbbaf381a736c8075",
+        "bytes": 488,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libssh2/libssh2_1.11.1-1+deb13u2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libs/libssh2/libssh2_1.11.1-1+deb13u2.debian.tar.xz",
+        "sha256": "ee81e3ea0d65fdbc979c50f1433966d0139e33ac09242d7dc7c83567139126a7",
+        "bytes": 20956,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libtasn1-6",
+    "version": "4.20.0-2+deb13u1",
+    "files": [
+      {
+        "file": "libtasn1-6/libtasn1-6_4.20.0-2+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libt/libtasn1-6/libtasn1-6_4.20.0-2+deb13u1.dsc",
+        "sha256": "3f8b0e7ddd5325278b1164f260e45e785e5907309d76b703c8716d068f9cd7e9",
+        "bytes": 2697,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libtasn1-6/libtasn1-6_4.20.0.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libt/libtasn1-6/libtasn1-6_4.20.0.orig.tar.gz",
+        "sha256": "92e0e3bd4c02d4aeee76036b2ddd83f0c732ba4cda5cb71d583272b23587a76c",
+        "bytes": 1783873,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libtasn1-6/libtasn1-6_4.20.0.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libt/libtasn1-6/libtasn1-6_4.20.0.orig.tar.gz.asc",
+        "sha256": "0faa628b6a3e4bb84ca5f00f127c6dfa1fc96a7ad88030dd7aa048753cf4b201",
+        "bytes": 1223,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libtasn1-6/libtasn1-6_4.20.0-2+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libt/libtasn1-6/libtasn1-6_4.20.0-2+deb13u1.debian.tar.xz",
+        "sha256": "c1ba650436b6a9fc5fac5ea494ab20caf7adb29a3713067e8b665d2f2f325cb1",
+        "bytes": 19196,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libunistring",
+    "version": "1.3-2",
+    "files": [
+      {
+        "file": "libunistring/libunistring_1.3-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libu/libunistring/libunistring_1.3-2.dsc",
+        "sha256": "0c09938cace7fbbf36c73af8bc2243fd2f70d3fe336539e8d4c10d0e61742571",
+        "bytes": 2215,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libunistring/libunistring_1.3.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libu/libunistring/libunistring_1.3.orig.tar.xz",
+        "sha256": "f245786c831d25150f3dfb4317cda1acc5e3f79a5da4ad073ddca58886569527",
+        "bytes": 2753448,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libunistring/libunistring_1.3.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libu/libunistring/libunistring_1.3.orig.tar.xz.asc",
+        "sha256": "62201b5b7ce9c0b033c50cefa5d7769dff4b7cee8205572e0cf917653cae9e33",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libunistring/libunistring_1.3-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libu/libunistring/libunistring_1.3-2.debian.tar.xz",
+        "sha256": "feaf9761d365430178ea46feefeb602b435c21acf5924918e2257238e0378fc9",
+        "bytes": 28480,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libwebp",
+    "version": "1.5.0-0.1",
+    "files": [
+      {
+        "file": "libwebp/libwebp_1.5.0-0.1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebp_1.5.0-0.1.dsc",
+        "sha256": "2e7be6f202ebfaac738278bebc10b151768aef60857e63734018ced4d59b9c9a",
+        "bytes": 2865,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libwebp/libwebp_1.5.0.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebp_1.5.0.orig.tar.gz",
+        "sha256": "7d6fab70cf844bf6769077bd5d7a74893f8ffd4dfb42861745750c63c2a5c92c",
+        "bytes": 4267494,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libwebp/libwebp_1.5.0.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebp_1.5.0.orig.tar.gz.asc",
+        "sha256": "1383ff0b093f57d65f5a902e1bc51c550795ce4713b38712c60bb9151e15dcd6",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libwebp/libwebp_1.5.0-0.1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libw/libwebp/libwebp_1.5.0-0.1.debian.tar.xz",
+        "sha256": "0dc0e727dc5f5e04ddd41b482f964626e92658099981b57ddd156b530ae01826",
+        "bytes": 11284,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libx11",
+    "version": "2:1.8.12-1",
+    "files": [
+      {
+        "file": "libx11/libx11_1.8.12-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libx11/libx11_1.8.12-1.dsc",
+        "sha256": "745fb04a4b0f8942183f6ac84ebd9e2dae1416c37f90abeaacabb57dc11286f5",
+        "bytes": 2490,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libx11/libx11_1.8.12.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libx11/libx11_1.8.12.orig.tar.gz",
+        "sha256": "220fbcf54b6e4d8dc40076ff4ab87954358019982490b33c7802190b62d89ce1",
+        "bytes": 3215077,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libx11/libx11_1.8.12.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libx11/libx11_1.8.12.orig.tar.gz.asc",
+        "sha256": "c3d177c8efcef9d3a1963956de0edc56ef2dd63d13dc39d3d7473dc9011fca65",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libx11/libx11_1.8.12-1.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libx11/libx11_1.8.12-1.diff.gz",
+        "sha256": "2231b0ec8ce2eb380256b67eb30c05d90b0e92d75dd583c24e0bf640b3078977",
+        "bytes": 74466,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxau",
+    "version": "1:1.0.11-1",
+    "files": [
+      {
+        "file": "libxau/libxau_1.0.11-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxau/libxau_1.0.11-1.dsc",
+        "sha256": "6058ab58b243ae2b175eee067b868f37b74cd4e8cc40b90607ce6d9ee99c50f9",
+        "bytes": 2213,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxau/libxau_1.0.11.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxau/libxau_1.0.11.orig.tar.gz",
+        "sha256": "3a321aaceb803577a4776a5efe78836eb095a9e44bbc7a465d29463e1a14f189",
+        "bytes": 404973,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxau/libxau_1.0.11.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxau/libxau_1.0.11.orig.tar.gz.asc",
+        "sha256": "72320a0c036cc2d36bebdd7d279c402620e2f3553f639581dfb23736803ce258",
+        "bytes": 358,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxau/libxau_1.0.11-1.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxau/libxau_1.0.11-1.diff.gz",
+        "sha256": "0af3f94102f73c585c48a6b17f54c92e154f6b560a061871d437bd720edd5314",
+        "bytes": 22671,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxcb",
+    "version": "1.17.0-2",
+    "files": [
+      {
+        "file": "libxcb/libxcb_1.17.0-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb_1.17.0-2.dsc",
+        "sha256": "b2728d156f79d2e757e7378cfcefca52bd570739d2efffa87e1aaeaf4f21de3a",
+        "bytes": 5318,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxcb/libxcb_1.17.0.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb_1.17.0.orig.tar.gz",
+        "sha256": "2c69287424c9e2128cb47ffe92171e10417041ec2963bceafb65cb3fcf8f0b85",
+        "bytes": 661593,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxcb/libxcb_1.17.0-2.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcb/libxcb_1.17.0-2.diff.gz",
+        "sha256": "c5b33b67a61d0d1c1b624bf88a8150f4be1ba9b46e855e38f03a8f73858af558",
+        "bytes": 28069,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxdmcp",
+    "version": "1:1.1.5-1",
+    "files": [
+      {
+        "file": "libxdmcp/libxdmcp_1.1.5-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxdmcp/libxdmcp_1.1.5-1.dsc",
+        "sha256": "d4a124405528eba3cf8794cc4fb8c4339ad74e79dd916fc0565b3a30c9fc1fe3",
+        "bytes": 2331,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxdmcp/libxdmcp_1.1.5.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxdmcp/libxdmcp_1.1.5.orig.tar.gz",
+        "sha256": "31a7abc4f129dcf6f27ae912c3eedcb94d25ad2e8f317f69df6eda0bc4e4f2f3",
+        "bytes": 442597,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxdmcp/libxdmcp_1.1.5.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxdmcp/libxdmcp_1.1.5.orig.tar.gz.asc",
+        "sha256": "0c7666da02d66ab785584cd16a6f9324f0d949555734e70b3b1385e525c7860b",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxdmcp/libxdmcp_1.1.5-1.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxdmcp/libxdmcp_1.1.5-1.diff.gz",
+        "sha256": "7ec2e7da28c38723aa115ce2bd18389f7d73e716b0f50bec9e6e0d1b24f19954",
+        "bytes": 9764,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxext",
+    "version": "2:1.3.4-1",
+    "files": [
+      {
+        "file": "libxext/libxext_1.3.4-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxext/libxext_1.3.4-1.dsc",
+        "sha256": "25024f57d955739c6b858822bf93ec3c71400b56fc0d666826f440e3661fd7c0",
+        "bytes": 2118,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxext/libxext_1.3.4.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxext/libxext_1.3.4.orig.tar.gz",
+        "sha256": "8ef0789f282826661ff40a8eef22430378516ac580167da35cc948be9041aac1",
+        "bytes": 494434,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxext/libxext_1.3.4-1.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxext/libxext_1.3.4-1.diff.gz",
+        "sha256": "b975870d6a7b791ffbe2d57efdf6e20c250c5e76d12e45b04c8655f593bb8337",
+        "bytes": 12509,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxi",
+    "version": "2:1.8.2-1",
+    "files": [
+      {
+        "file": "libxi/libxi_1.8.2-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxi/libxi_1.8.2-1.dsc",
+        "sha256": "06669e65a5a382b97c6c1bf886dca7b6da0ebbcda17862243e53fee700195bb8",
+        "bytes": 2286,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxi/libxi_1.8.2.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxi/libxi_1.8.2.orig.tar.gz",
+        "sha256": "5542daec66febfeb6f51d57abfa915826efe2e3af57534f4105b82240ea3188d",
+        "bytes": 611246,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxi/libxi_1.8.2.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxi/libxi_1.8.2.orig.tar.gz.asc",
+        "sha256": "acfaf42beee3690980632c5ec4d9948276da969f07beea6bd09312d63fa7fb45",
+        "bytes": 195,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxi/libxi_1.8.2-1.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxi/libxi_1.8.2-1.diff.gz",
+        "sha256": "f7a6b01f918159bc19570470ee315ea32284ae88a9cde269954e5086537716f8",
+        "bytes": 27701,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxrender",
+    "version": "1:0.9.12-1",
+    "files": [
+      {
+        "file": "libxrender/libxrender_0.9.12-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxrender/libxrender_0.9.12-1.dsc",
+        "sha256": "2980c127d296455f4e9bcaf5ba114284fa0735ce3ef5b613dbe99d854bc87ca3",
+        "bytes": 2258,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxrender/libxrender_0.9.12.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxrender/libxrender_0.9.12.orig.tar.gz",
+        "sha256": "0fff64125819c02d1102b6236f3d7d861a07b5216d8eea336c3811d31494ecf7",
+        "bytes": 450034,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxrender/libxrender_0.9.12.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxrender/libxrender_0.9.12.orig.tar.gz.asc",
+        "sha256": "0bbd310ac3974ef398cf4d8a4b362b0b4d60ceb43e6eba393c3cc740b03816fc",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxrender/libxrender_0.9.12-1.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxrender/libxrender_0.9.12-1.diff.gz",
+        "sha256": "c0d3e91a3aa474772c242dcbb997504dff4c28e177d9b7fbb70c50ce7bf56fc5",
+        "bytes": 21464,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxtst",
+    "version": "2:1.2.5-1",
+    "files": [
+      {
+        "file": "libxtst/libxtst_1.2.5-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxtst/libxtst_1.2.5-1.dsc",
+        "sha256": "31d3770c5888a2dd22c48f1f110c5932d487466850b5edd38a8a6319ec357c8a",
+        "bytes": 2333,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxtst/libxtst_1.2.5.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxtst/libxtst_1.2.5.orig.tar.gz",
+        "sha256": "244ba6e1c5ffa44f1ba251affdfa984d55d99c94bb925a342657e5e7aaf6d39c",
+        "bytes": 441257,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxtst/libxtst_1.2.5.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxtst/libxtst_1.2.5.orig.tar.gz.asc",
+        "sha256": "d2d8a029e6fbe2c1ebacafd6ee78bc2f41ea04440327011891145a088e0bc64e",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxtst/libxtst_1.2.5-1.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxtst/libxtst_1.2.5-1.diff.gz",
+        "sha256": "e184a1eaf71546957de912fa69f73e35c8524689d8a84e328fef72e9273aac19",
+        "bytes": 16695,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libzstd",
+    "version": "1.5.7+dfsg-1",
+    "files": [
+      {
+        "file": "libzstd/libzstd_1.5.7+dfsg-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libz/libzstd/libzstd_1.5.7+dfsg-1.dsc",
+        "sha256": "8f6ab97fa772d921334e50fa5756a0951e23c718dc913e43a228f28c1a23adf9",
+        "bytes": 2371,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libzstd/libzstd_1.5.7+dfsg.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libz/libzstd/libzstd_1.5.7+dfsg.orig.tar.xz",
+        "sha256": "0c092ef267edce57ba7f3f2645c861f72eaf5e76273c6c3632869423464b90a5",
+        "bytes": 1834780,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libzstd/libzstd_1.5.7+dfsg-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libz/libzstd/libzstd_1.5.7+dfsg-1.debian.tar.xz",
+        "sha256": "5e88424d919941291f79e1bfada6cb1a6f748671d9de7d4b7d931f361f183a15",
+        "bytes": 23036,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "nettle",
+    "version": "3.10.1-1",
+    "files": [
+      {
+        "file": "nettle/nettle_3.10.1-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/n/nettle/nettle_3.10.1-1.dsc",
+        "sha256": "7b440850ce04b341363f3f5e23dfb9f96ebf7d52e0ef7ba2d07120c90ca61b3c",
+        "bytes": 2053,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "nettle/nettle_3.10.1.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nettle/nettle_3.10.1.orig.tar.gz",
+        "sha256": "b0fcdd7fc0cdea6e80dcf1dd85ba794af0d5b4a57e26397eee3bc193272d9132",
+        "bytes": 2643267,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "nettle/nettle_3.10.1-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nettle/nettle_3.10.1-1.debian.tar.xz",
+        "sha256": "2d40d02ddac5985d8833532a17a0ef96cb685ee0547ee9617ec13793b22e34c6",
+        "bytes": 25036,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "nghttp2",
+    "version": "1.64.0-1.1+deb13u1",
+    "files": [
+      {
+        "file": "nghttp2/nghttp2_1.64.0-1.1+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/n/nghttp2/nghttp2_1.64.0-1.1+deb13u1.dsc",
+        "sha256": "11f4603a9f417bc3d195be36cb462bb9df0657f52b72dd9276453a31bc0227c7",
+        "bytes": 2201,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "nghttp2/nghttp2_1.64.0.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nghttp2/nghttp2_1.64.0.orig.tar.gz",
+        "sha256": "b452dc69a1fcbc9375389b8b154175d8b7b125cdd713fc426774c2b79a1ebd77",
+        "bytes": 1069782,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "nghttp2/nghttp2_1.64.0-1.1+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nghttp2/nghttp2_1.64.0-1.1+deb13u1.debian.tar.xz",
+        "sha256": "e16478701c5c007aa8761dc30c01090b2217199558bd1017b1d237db463d758c",
+        "bytes": 42120,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "nghttp3",
+    "version": "1.8.0-1",
+    "files": [
+      {
+        "file": "nghttp3/nghttp3_1.8.0-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/n/nghttp3/nghttp3_1.8.0-1.dsc",
+        "sha256": "ffc623e78be62361a82f0a2e7b9a19ff0bcdfc371b8bcc1842039499a12adba2",
+        "bytes": 1603,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "nghttp3/nghttp3_1.8.0.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nghttp3/nghttp3_1.8.0.orig.tar.xz",
+        "sha256": "a9dd28970977e6802a3eaf2cfaeae6d0fae60c8d2c0f2c4ce600036a7998ee9a",
+        "bytes": 398640,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "nghttp3/nghttp3_1.8.0.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/n/nghttp3/nghttp3_1.8.0.orig.tar.xz.asc",
+        "sha256": "c2549dd50a5ad392610d108244357c1cc750fd5bf4a5ef91de1d94d11c49b0cf",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "nghttp3/nghttp3_1.8.0-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nghttp3/nghttp3_1.8.0-1.debian.tar.xz",
+        "sha256": "fc0cfa954de5b8fef85bd13e1edcbfccb463ce211905e925921b608390c840c9",
+        "bytes": 8228,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "ngtcp2",
+    "version": "1.11.0-1+deb13u1",
+    "files": [
+      {
+        "file": "ngtcp2/ngtcp2_1.11.0-1+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/n/ngtcp2/ngtcp2_1.11.0-1+deb13u1.dsc",
+        "sha256": "f14f724e9031e0565be0d75b8bb3b693887f5111e1901ed32401eb860e3ac004",
+        "bytes": 2609,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "ngtcp2/ngtcp2_1.11.0.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/ngtcp2/ngtcp2_1.11.0.orig.tar.xz",
+        "sha256": "382c15bf66b630f26021631b25b7eb1feac42c67c1d6826189d61091dfaa4d09",
+        "bytes": 652904,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "ngtcp2/ngtcp2_1.11.0.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/n/ngtcp2/ngtcp2_1.11.0.orig.tar.xz.asc",
+        "sha256": "56193493ac1e2a05dbf48d7b4480a2590d7fbdb2439475fd7c5087bc31cb988d",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "ngtcp2/ngtcp2_1.11.0-1+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/ngtcp2/ngtcp2_1.11.0-1+deb13u1.debian.tar.xz",
+        "sha256": "5d45f3e07ebaf4fff773d6ec32eee78c8514e17bac67dee8e268fa97af440854",
+        "bytes": 10324,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "nspr",
+    "version": "2:4.36-1",
+    "files": [
+      {
+        "file": "nspr/nspr_4.36-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/n/nspr/nspr_4.36-1.dsc",
+        "sha256": "0654be27e3cbe2ccc704b293effc12d05c6bbcb2c3da90de5c5ebf53734e6064",
+        "bytes": 2000,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "nspr/nspr_4.36.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nspr/nspr_4.36.orig.tar.gz",
+        "sha256": "55dec317f1401cd2e5dba844d340b930ab7547f818179a4002bce62e6f1c6895",
+        "bytes": 1036274,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "nspr/nspr_4.36-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nspr/nspr_4.36-1.debian.tar.xz",
+        "sha256": "f48d96dc446d689aaee085e827d7ef08d5cea850d4eea98080910f378880eeed",
+        "bytes": 11264,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "nss",
+    "version": "2:3.110-1+deb13u4",
+    "files": [
+      {
+        "file": "nss/nss_3.110-1+deb13u4.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/n/nss/nss_3.110-1+deb13u4.dsc",
+        "sha256": "45c3eeae75c94da73f8f38630a73fc20673296cd3d689df416a8d4658c1a8d96",
+        "bytes": 2350,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "nss/nss_3.110.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nss/nss_3.110.orig.tar.gz",
+        "sha256": "9cd610c40422a07771b9b45166be2d052ea2f00b605a7928129e1f2071b3ae27",
+        "bytes": 76616684,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "nss/nss_3.110-1+deb13u4.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/n/nss/nss_3.110-1+deb13u4.debian.tar.xz",
+        "sha256": "29d935bca3ea867383004f7e0abfcc92a5e956e8c405e4994631e4a7f92a6062",
+        "bytes": 26148,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "openjpeg2",
+    "version": "2.5.3-2.1~deb13u2",
+    "files": [
+      {
+        "file": "openjpeg2/openjpeg2_2.5.3-2.1~deb13u2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/o/openjpeg2/openjpeg2_2.5.3-2.1~deb13u2.dsc",
+        "sha256": "7c4f7083a180f1c509c87b39dd017b857468819c7a37d188b9d269624547f58f",
+        "bytes": 2603,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "openjpeg2/openjpeg2_2.5.3.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/o/openjpeg2/openjpeg2_2.5.3.orig.tar.xz",
+        "sha256": "3100f0316e922630112cf6d72c0c20776896e64ad7eab72c2f713c460287eb92",
+        "bytes": 1393716,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "openjpeg2/openjpeg2_2.5.3-2.1~deb13u2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/o/openjpeg2/openjpeg2_2.5.3-2.1~deb13u2.debian.tar.xz",
+        "sha256": "a9d861cd8f22249876a589b56ebcceed101a0ea17155258f3d778de13b619441",
+        "bytes": 16136,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "openldap",
+    "version": "2.6.10+dfsg-1",
+    "files": [
+      {
+        "file": "openldap/openldap_2.6.10+dfsg-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/o/openldap/openldap_2.6.10+dfsg-1.dsc",
+        "sha256": "05cdd431ef995904f094f4464ca78d5d3b2abdbe4eefacd72446ff8443a2ffac",
+        "bytes": 3285,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "openldap/openldap_2.6.10+dfsg.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/o/openldap/openldap_2.6.10+dfsg.orig.tar.xz",
+        "sha256": "e871102bda1e42155fd4d6be4825a297e1c593cb0907b84fc7dde888dc847877",
+        "bytes": 3754560,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "openldap/openldap_2.6.10+dfsg-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/o/openldap/openldap_2.6.10+dfsg-1.debian.tar.xz",
+        "sha256": "2dc95ade5655d67c9043e45b5601734fdb7f668267682d087b595a80de24a500",
+        "bytes": 170112,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "openssl",
+    "version": "3.5.7-1~deb13u2",
+    "files": [
+      {
+        "file": "openssl/openssl_3.5.7-1~deb13u2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/o/openssl/openssl_3.5.7-1~deb13u2.dsc",
+        "sha256": "25904642004d30c5c3da4642a72a7d09f8d9eb6e5ce62dab53c0371114faf8f2",
+        "bytes": 2707,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "openssl/openssl_3.5.7.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/o/openssl/openssl_3.5.7.orig.tar.gz",
+        "sha256": "a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8",
+        "bytes": 53153930,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "openssl/openssl_3.5.7.orig.tar.gz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/o/openssl/openssl_3.5.7.orig.tar.gz.asc",
+        "sha256": "d3d082bee3f658c31db53af625eceecf29d777c7010394bed5787ebcc98abdf2",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "openssl/openssl_3.5.7-1~deb13u2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/o/openssl/openssl_3.5.7-1~deb13u2.debian.tar.xz",
+        "sha256": "593a47654ead460a3b609503733f80bef552ff0802799d3b47784faacc50809f",
+        "bytes": 74836,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "p11-kit",
+    "version": "0.25.5-3",
+    "files": [
+      {
+        "file": "p11-kit/p11-kit_0.25.5-3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/p/p11-kit/p11-kit_0.25.5-3.dsc",
+        "sha256": "65e21a68dd942741bba82f5bf20901f616b64de91a976d92a54a0cb314896544",
+        "bytes": 2538,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "p11-kit/p11-kit_0.25.5.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/p/p11-kit/p11-kit_0.25.5.orig.tar.xz",
+        "sha256": "04d0a86450cdb1be018f26af6699857171a188ac6d5b8c90786a60854e1198e5",
+        "bytes": 1002056,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "p11-kit/p11-kit_0.25.5.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/p/p11-kit/p11-kit_0.25.5.orig.tar.xz.asc",
+        "sha256": "066c92b9d2accb2fda6a2f71e676fb6526fcc153051b1f04ee7d7c8c96a09989",
+        "bytes": 228,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "p11-kit/p11-kit_0.25.5-3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/p/p11-kit/p11-kit_0.25.5-3.debian.tar.xz",
+        "sha256": "3800ea81e4615898813f533834ad37ec270f6f7d4c9413c84e712075a197849c",
+        "bytes": 24184,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "pcre2",
+    "version": "10.46-1~deb13u2",
+    "files": [
+      {
+        "file": "pcre2/pcre2_10.46-1~deb13u2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/p/pcre2/pcre2_10.46-1~deb13u2.dsc",
+        "sha256": "4eac7bfc4d11259da7d299f90b6c74b359d7cbb3be2f017e039b02524f30d2e6",
+        "bytes": 2380,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "pcre2/pcre2_10.46.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/p/pcre2/pcre2_10.46.orig.tar.gz",
+        "sha256": "8d28d7f2c3b970c3a4bf3776bcbb5adfc923183ce74bc8df1ebaad8c1985bd07",
+        "bytes": 2718545,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "pcre2/pcre2_10.46-1~deb13u2.diff.gz",
+        "url": "https://deb.debian.org/debian/pool/main/p/pcre2/pcre2_10.46-1~deb13u2.diff.gz",
+        "sha256": "4523b65a28a1fc9c418be7e70af68a354ae128d541243b1e1ea5c03a9e542236",
+        "bytes": 19569,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "poppler",
+    "version": "25.03.0-5+deb13u4",
+    "files": [
+      {
+        "file": "poppler/poppler_25.03.0-5+deb13u4.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler/poppler_25.03.0-5+deb13u4.dsc",
+        "sha256": "b895e1e28568a486523f93dd5a8707ecb16767c5f134a6e23510b0597114c628",
+        "bytes": 3966,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "poppler/poppler_25.03.0.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler/poppler_25.03.0.orig.tar.xz",
+        "sha256": "97da4ff88517a6bbd729529f195f85c8d7a0c3bb4a3d57cb0c685cbb052fe837",
+        "bytes": 1954516,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "poppler/poppler_25.03.0-5+deb13u4.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler/poppler_25.03.0-5+deb13u4.debian.tar.xz",
+        "sha256": "2605b5d7e6ce17a307d067048386deedfc41fdac6f75f81ad76050f517fc0de4",
+        "bytes": 44732,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "poppler-data",
+    "version": "0.4.12-1",
+    "files": [
+      {
+        "file": "poppler-data/poppler-data_0.4.12-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler-data/poppler-data_0.4.12-1.dsc",
+        "sha256": "91c5aa0420409a5e5eb450a98e6bc3aa2318ee7e9066c218aca595bd9fc499fb",
+        "bytes": 2446,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "poppler-data/poppler-data_0.4.12.orig-ai0.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler-data/poppler-data_0.4.12.orig-ai0.tar.gz",
+        "sha256": "755a3a7cec6019b7cb6a7ac89828820e90d5105e66ebc2a7aacecacfb3ed4f1d",
+        "bytes": 3515,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "poppler-data/poppler-data_0.4.12.orig-from-ghostscript.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler-data/poppler-data_0.4.12.orig-from-ghostscript.tar.xz",
+        "sha256": "5070e1f3645080c809d80c42ee2e736648fe37bc2a68c3f54d1f9fce01086215",
+        "bytes": 2320,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "poppler-data/poppler-data_0.4.12.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler-data/poppler-data_0.4.12.orig.tar.gz",
+        "sha256": "c835b640a40ce357e1b83666aabd95edffa24ddddd49b8daff63adb851cdab74",
+        "bytes": 4504754,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "poppler-data/poppler-data_0.4.12-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/p/poppler-data/poppler-data_0.4.12-1.debian.tar.xz",
+        "sha256": "14a2c2ab3483e8aca6c9e5950195e32a82ec16f1bb196257b8eea5462a8ec514",
+        "bytes": 19596,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "rtmpdump",
+    "version": "2.4+20151223.gitfa8646d.1-2",
+    "files": [
+      {
+        "file": "rtmpdump/rtmpdump_2.4+20151223.gitfa8646d.1-2.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/r/rtmpdump/rtmpdump_2.4+20151223.gitfa8646d.1-2.dsc",
+        "sha256": "a296819cd2ab5880b67ad963ef0867cb10e462f4403e52565aa863eb05bb1370",
+        "bytes": 2299,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "rtmpdump/rtmpdump_2.4+20151223.gitfa8646d.1.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/r/rtmpdump/rtmpdump_2.4+20151223.gitfa8646d.1.orig.tar.gz",
+        "sha256": "5c032f5c8cc2937eb55a81a94effdfed3b0a0304b6376147b86f951e225e3ab5",
+        "bytes": 142213,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "rtmpdump/rtmpdump_2.4+20151223.gitfa8646d.1-2.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/r/rtmpdump/rtmpdump_2.4+20151223.gitfa8646d.1-2.debian.tar.xz",
+        "sha256": "26d47de07d16285e4ca55b0828cbbf1ba35e671f9b3500a87e301fe755d26882",
+        "bytes": 8096,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "sed",
+    "version": "4.9-2+deb13u1",
+    "files": [
+      {
+        "file": "sed/sed_4.9-2+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/s/sed/sed_4.9-2+deb13u1.dsc",
+        "sha256": "9fcc5dffe5e712b4631757c057228ae57919aec1cca1c91a80e76719167f443b",
+        "bytes": 2047,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "sed/sed_4.9.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/s/sed/sed_4.9.orig.tar.xz",
+        "sha256": "6e226b732e1cd739464ad6862bd1a1aba42d7982922da7a53519631d24975181",
+        "bytes": 1397092,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "sed/sed_4.9-2+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/s/sed/sed_4.9-2+deb13u1.debian.tar.xz",
+        "sha256": "9c9aacda91e02802f33fb6a1a6e86f80be1bc67b92a4dae009e78f77e26e130a",
+        "bytes": 63644,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "tiff",
+    "version": "4.7.0-3+deb13u3",
+    "files": [
+      {
+        "file": "tiff/tiff_4.7.0-3+deb13u3.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/t/tiff/tiff_4.7.0-3+deb13u3.dsc",
+        "sha256": "51cdbd32322b5d35ef35677ace1cb7cd6591325da4ecd470ec6ccefab47d6a29",
+        "bytes": 2442,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "tiff/tiff_4.7.0.orig.tar.bz2",
+        "url": "https://deb.debian.org/debian/pool/main/t/tiff/tiff_4.7.0.orig.tar.bz2",
+        "sha256": "2b8b5c4e79cb2a4651796602e45d6179b7f18bc283feab417b8e881ef7e81862",
+        "bytes": 2111254,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "tiff/tiff_4.7.0-3+deb13u3.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/t/tiff/tiff_4.7.0-3+deb13u3.debian.tar.xz",
+        "sha256": "c0cbcb717e20a69964bfa7471cbb0137dd39a451434932972bc7fbcdb86345f8",
+        "bytes": 28212,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "xz-utils",
+    "version": "5.8.1-1+deb13u1",
+    "files": [
+      {
+        "file": "xz-utils/xz-utils_5.8.1-1+deb13u1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/x/xz-utils/xz-utils_5.8.1-1+deb13u1.dsc",
+        "sha256": "ddadd9d9f7c4bb80b08f9f17409e2701a29a4cf8fe25e15d19605e5281c1fc1b",
+        "bytes": 2736,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "xz-utils/xz-utils_5.8.1.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/x/xz-utils/xz-utils_5.8.1.orig.tar.xz",
+        "sha256": "0b54f79df85912504de0b14aec7971e3f964491af1812d83447005807513cd9e",
+        "bytes": 1461872,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "xz-utils/xz-utils_5.8.1.orig.tar.xz.asc",
+        "url": "https://deb.debian.org/debian/pool/main/x/xz-utils/xz-utils_5.8.1.orig.tar.xz.asc",
+        "sha256": "4138f4ceca1aa7fd2085fb15a23f6d495d27bca6d3c49c429a8520ea622c27ae",
+        "bytes": 833,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "xz-utils/xz-utils_5.8.1-1+deb13u1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/x/xz-utils/xz-utils_5.8.1-1+deb13u1.debian.tar.xz",
+        "sha256": "0e48427971a9ce674ddbba26e34ac1dd009c683f3816ce17852d99dc7b0a8e46",
+        "bytes": 25696,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "zlib",
+    "version": "1:1.3.dfsg+really1.3.1-1",
+    "files": [
+      {
+        "file": "zlib/zlib_1.3.dfsg+really1.3.1-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/z/zlib/zlib_1.3.dfsg+really1.3.1-1.dsc",
+        "sha256": "ede2791e29c1d3b422f9208bdd7edf040c20445ea1e7453a72037576e64fa197",
+        "bytes": 2637,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "zlib/zlib_1.3.dfsg+really1.3.1.orig.tar.gz",
+        "url": "https://deb.debian.org/debian/pool/main/z/zlib/zlib_1.3.dfsg+really1.3.1.orig.tar.gz",
+        "sha256": "60dd315c07f616887caa029408308a018ace66e3d142726a97db164b3b8f69fb",
+        "bytes": 1325737,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "zlib/zlib_1.3.dfsg+really1.3.1-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/z/zlib/zlib_1.3.dfsg+really1.3.1-1.debian.tar.xz",
+        "sha256": "9ed525955ce9fb0c1b39be8ff98f73450dbfc6305a9a27e6149c8972d38a0a9e",
+        "bytes": 16576,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  },
+  {
+    "source": "libxcrypt",
+    "version": "1:4.4.38-1",
+    "files": [
+      {
+        "file": "libxcrypt/libxcrypt_4.4.38-1.dsc",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libxcrypt_4.4.38-1.dsc",
+        "sha256": "feba1874a84616791c1c17f9a290c9e97562b2904b3b0200edc82a2db54f3f07",
+        "bytes": 1573,
+        "verification": "DSC from HTTPS; no signature authentication claim"
+      },
+      {
+        "file": "libxcrypt/libxcrypt_4.4.38.orig.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libxcrypt_4.4.38.orig.tar.xz",
+        "sha256": "6a275a356622c64ba9f693892215dbb399c003a7a4afeed9c4c74070eaab20f4",
+        "bytes": 394216,
+        "verification": "SHA-256 and length from DSC"
+      },
+      {
+        "file": "libxcrypt/libxcrypt_4.4.38-1.debian.tar.xz",
+        "url": "https://deb.debian.org/debian/pool/main/libx/libxcrypt/libxcrypt_4.4.38-1.debian.tar.xz",
+        "sha256": "6b87bcb5325e417ab3f4c01c364233444b4c9008a69ec1d6fababb3f6e693a5e",
+        "bytes": 8512,
+        "verification": "SHA-256 and length from DSC"
+      }
+    ],
+    "errors": [],
+    "complete": true
+  }
+]

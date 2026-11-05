@@ -1,0 +1,18 @@
+{
+  "baseSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+  "targetSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "targetTree": "ef1b18f7a522f7e8f1abaed0e865437b5b3efd77",
+  "baseArchive": {
+    "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+    "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+  },
+  "patchSha256": "172ecb7fcd94ddd6f29a3307eca58b94a8f7f6ca1145bcee2739ce6d40b9f7f0",
+  "verifiedAppliedTreeMatches": true,
+  "dependencySources": "Retain all R4e source inputs; add exact libxcrypt 1:4.4.38-1 source archives. Locale and libutil correspond to glibc 2.41-12+deb13u4 already retained in the base.",
+  "limits": "Layered source update requires the immutable R4e source archive; vendor JDK patches and embedded native-resource reproducible build remain open.",
+  "archive": {
+    "file": "/workspace/library-files/airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+    "bytes": 46539769,
+    "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+  }
+}

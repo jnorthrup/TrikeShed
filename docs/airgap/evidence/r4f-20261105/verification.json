@@ -1,0 +1,555 @@
+{
+  "testedSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "sourceSha256": {
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "739b5cb6a03c4e9c1e10eb5d07b0e30fb4fb13c0858afb9b414346d65eac209b",
+    "src/commonMain/kotlin/borg/trikeshed/kanban/BoardFileWal.kt": "12d8c99dbe122e700d1c74274fbca74267fbbf3011d183cb8270c8b23a6c0db2",
+    "src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt": "e8e18efa04c6299999ab9b0a1eaa58b9bd6ba12718fd7950cc89c6e8287e7844",
+    "src/jvmMain/kotlin/borg/trikeshed/userspace/nio/file/spi/JvmFileOperations.kt": "0d2cea2e08b2105c1dd68aaf50979c2aa44ddefc738c6bd1bec463ec779abbbb",
+    "src/linuxMain/kotlin/borg/trikeshed/userspace/nio/file/spi/LinuxFileOperations.kt": "a7a65bc785be19178e6f211a2cd6a632b6b351aa8fa4b62c7b495d88cbbc3391",
+    "src/posixMain/kotlin/borg/trikeshed/userspace/nio/file/spi/PosixFileOperations.kt": "ab500f0ffdc131186acc55b81b4cc86b068e311f2f273fce36fa12b44810690d",
+    "src/posixMain/resources/META-INF/cinterop/posix_spawn.def": "c3bfeea4e60d398efcabbb201fe02771345fe2106648b32ead2e77462bea8f6d",
+    "release/airgap-document/README.md": "c3e4ca1db3af4a4fda1bf1deec036b38aca4c8fcc552b38f5f3d729756608bdd",
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "PRELOAD.md": "28b3044a14053b4755e48ce9284451e0c2868e21b3c8d78c5141bde5c25e33f1",
+    "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40"
+  },
+  "testTotals": {
+    "tests": 22,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "tests": [
+    {
+      "name": "LlvmConfixRunTest[jvm]",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "LcncConfixSelectionTest[jvm]",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "DocumentSpansTest[jvm]",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "BoardFileWalLeaseTest[jvm]",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "LlvmConfixTest[jvm]",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "targetStanding": {
+    "previousPublishedCommit": "04fdbe85a9a3c3c769a048f50703a335e717ec17",
+    "currentSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "changedSourceAndBuildPaths": [
+      "release/airgap-document/README.md",
+      "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt"
+    ],
+    "nativeProjectLibrarySourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+    "nativeLibraryWorkingTreeHead": "3314bad96b4977d83668eb4732bbbe0eba7d2f9b",
+    "basis": "Fresh JVM entry/all test-source compilation and 22 focused regressions. Common/native/Linux/JVM production and all browser/build inputs are unchanged since R4e; no new cross-target compile is claimed. Existing native full-project klib linked twice offline into the external probe; current native-relevant inputs are unchanged."
+  },
+  "runtimeArchive": {
+    "file": "/workspace/library-files/airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+    "bytes": 460778817,
+    "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+  },
+  "sourceUpdate": {
+    "baseSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+    "targetSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "targetTree": "ef1b18f7a522f7e8f1abaed0e865437b5b3efd77",
+    "baseArchive": {
+      "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+    },
+    "patchSha256": "172ecb7fcd94ddd6f29a3307eca58b94a8f7f6ca1145bcee2739ce6d40b9f7f0",
+    "verifiedAppliedTreeMatches": true,
+    "dependencySources": "Retain all R4e source inputs; add exact libxcrypt 1:4.4.38-1 source archives. Locale and libutil correspond to glibc 2.41-12+deb13u4 already retained in the base.",
+    "limits": "Layered source update requires the immutable R4e source archive; vendor JDK patches and embedded native-resource reproducible build remain open.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+      "bytes": 46539769,
+      "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+    }
+  },
+  "nativeVerification": {
+    "compiler": "Kotlin/Native 2.4.21 linux_x64",
+    "projectLibrarySourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+    "runtimeTestedSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "nativeBinarySha256": "f289376cf6951279b5d2e95511e1588593146c08a628c136fb7924ca21b81d41",
+    "nativeSourceSha256": "7ffef5edf11d230c5b1928f6d25f715247934e7df1d1b2a0404477a52918fc48",
+    "scope": "External verification caller linked to the existing full project klib. It is not the native LCNC HTTP service or the JVM Sulong engine. Build/link commands and every klib input digest are retained; the supplied compiler source zip is not claimed to be the complete compiler source closure.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-r4f-native-verification-2026-11-05.tar.gz",
+      "bytes": 5261081,
+      "sha256": "0a556481cd93ec4b367f10c89c3169039ffce5a17c1fe232b84b70ef91519098"
+    }
+  },
+  "interoperability": {
+    "cases": [
+      {
+        "case": "jvm-close",
+        "contender": "native",
+        "refusals": 2,
+        "ownerExit": 0,
+        "ownerReaped": true,
+        "samePrefixRecovered": true,
+        "nextSequence": 4,
+        "result": "PASS"
+      },
+      {
+        "case": "jvm-kill",
+        "contender": "native",
+        "refusals": 2,
+        "ownerExit": 137,
+        "ownerReaped": true,
+        "samePrefixRecovered": true,
+        "nextSequence": 4,
+        "result": "PASS"
+      },
+      {
+        "case": "native-close",
+        "contender": "jvm",
+        "refusals": 2,
+        "ownerExit": 0,
+        "ownerReaped": true,
+        "samePrefixRecovered": true,
+        "nextSequence": 4,
+        "result": "PASS"
+      },
+      {
+        "case": "native-kill",
+        "contender": "jvm",
+        "refusals": 2,
+        "ownerExit": 137,
+        "ownerReaped": true,
+        "samePrefixRecovered": true,
+        "nextSequence": 4,
+        "result": "PASS"
+      }
+    ],
+    "seedRecords": [
+      {
+        "sequence": 1,
+        "payload": "JVM \u03b1 first\nline two"
+      },
+      {
+        "sequence": 2,
+        "payload": "native \u03b2 second"
+      },
+      {
+        "sequence": 3,
+        "payload": "JVM third"
+      }
+    ],
+    "retainedStore": {
+      "phase": "store-replayed",
+      "sequence": 3,
+      "cards": [
+        {
+          "jobId": "lcnc/run/c36f2613-536c-4820-be23-b7445269aa0a",
+          "sequence": 3,
+          "receiptCid": "sha256:13d9525cbede42d5455f6bfb9104bf43f6a0c9fc24778a09f964b831a55c9943",
+          "runId": "c36f2613-536c-4820-be23-b7445269aa0a",
+          "programCid": "sha256:90970614b8508ef10a809c7067d2b286b039288a348d01571aea134603e5622d",
+          "status": "completed",
+          "quotation": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+          "begin": 18477,
+          "end": 18654
+        }
+      ]
+    },
+    "retainedRuntimeBytesUnchanged": true,
+    "nativeSourceSha256": "7ffef5edf11d230c5b1928f6d25f715247934e7df1d1b2a0404477a52918fc48",
+    "nativeBinarySha256": "f289376cf6951279b5d2e95511e1588593146c08a628c136fb7924ca21b81d41",
+    "jvmProbeSha256": "62c3a999e4e23786e16c5f5ed3ad9df7d2e3c38082066ca553277f67750a3144",
+    "runtimeBaseSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+    "scope": "Actual BoardFileWal owners and native BoardStoreElement replay; constructed short tails, no power-loss claim. Native process runs with the JDK hidden."
+  },
+  "encoding": {
+    "network": {
+      "namespace": "net:[4026532728]",
+      "routes": []
+    },
+    "cases": [
+      {
+        "case": "locale-hidden",
+        "command": [
+          "bwrap",
+          "--unshare-user",
+          "--uid",
+          "0",
+          "--gid",
+          "0",
+          "--unshare-pid",
+          "--unshare-ipc",
+          "--unshare-uts",
+          "--die-with-parent",
+          "--ro-bind",
+          "/workspace/airgap-r4f-proof/unpacked/airgap-document-rootfs",
+          "/",
+          "--bind",
+          "/workspace/airgap-r4f-proof/encoding-archive01/state",
+          "/state",
+          "--tmpfs",
+          "/tmp",
+          "--proc",
+          "/proc",
+          "--dev",
+          "/dev",
+          "--clearenv",
+          "--setenv",
+          "PATH",
+          "/opt/trikeshed/jdk/bin:/usr/bin:/bin",
+          "--setenv",
+          "JAVA_HOME",
+          "/opt/trikeshed/jdk",
+          "--setenv",
+          "LANG",
+          "C.UTF-8",
+          "--setenv",
+          "JAVA_OPTS",
+          "-Dfile.encoding=UTF-8",
+          "--chdir",
+          "/state",
+          "--cap-drop",
+          "ALL",
+          "--tmpfs",
+          "/opt/trikeshed/assets",
+          "--remount-ro",
+          "/opt/trikeshed/assets",
+          "--tmpfs",
+          "/opt/trikeshed/modules",
+          "--remount-ro",
+          "/opt/trikeshed/modules",
+          "--tmpfs",
+          "/usr/lib/locale",
+          "--remount-ro",
+          "/usr/lib/locale",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdfinfo",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdftotext",
+          "/opt/trikeshed/bin/airgap-document",
+          "/state/locale-hidden-\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae-\u03b1",
+          "/opt/trikeshed",
+          "18764",
+          "inspect"
+        ],
+        "allStateFileBytesUnchanged": true,
+        "exit": 1,
+        "result": "PASS"
+      },
+      {
+        "case": "ascii-locale",
+        "command": [
+          "bwrap",
+          "--unshare-user",
+          "--uid",
+          "0",
+          "--gid",
+          "0",
+          "--unshare-pid",
+          "--unshare-ipc",
+          "--unshare-uts",
+          "--die-with-parent",
+          "--ro-bind",
+          "/workspace/airgap-r4f-proof/unpacked/airgap-document-rootfs",
+          "/",
+          "--bind",
+          "/workspace/airgap-r4f-proof/encoding-archive01/state",
+          "/state",
+          "--tmpfs",
+          "/tmp",
+          "--proc",
+          "/proc",
+          "--dev",
+          "/dev",
+          "--clearenv",
+          "--setenv",
+          "PATH",
+          "/opt/trikeshed/jdk/bin:/usr/bin:/bin",
+          "--setenv",
+          "JAVA_HOME",
+          "/opt/trikeshed/jdk",
+          "--setenv",
+          "LANG",
+          "C",
+          "--setenv",
+          "JAVA_OPTS",
+          "-Dfile.encoding=UTF-8",
+          "--chdir",
+          "/state",
+          "--cap-drop",
+          "ALL",
+          "--tmpfs",
+          "/opt/trikeshed/assets",
+          "--remount-ro",
+          "/opt/trikeshed/assets",
+          "--tmpfs",
+          "/opt/trikeshed/modules",
+          "--remount-ro",
+          "/opt/trikeshed/modules",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdfinfo",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdftotext",
+          "/opt/trikeshed/bin/airgap-document",
+          "/state/ascii-locale-\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae-\u03b1",
+          "/opt/trikeshed",
+          "18764",
+          "inspect"
+        ],
+        "allStateFileBytesUnchanged": true,
+        "exit": 1,
+        "result": "PASS"
+      },
+      {
+        "case": "unknown-locale",
+        "command": [
+          "bwrap",
+          "--unshare-user",
+          "--uid",
+          "0",
+          "--gid",
+          "0",
+          "--unshare-pid",
+          "--unshare-ipc",
+          "--unshare-uts",
+          "--die-with-parent",
+          "--ro-bind",
+          "/workspace/airgap-r4f-proof/unpacked/airgap-document-rootfs",
+          "/",
+          "--bind",
+          "/workspace/airgap-r4f-proof/encoding-archive01/state",
+          "/state",
+          "--tmpfs",
+          "/tmp",
+          "--proc",
+          "/proc",
+          "--dev",
+          "/dev",
+          "--clearenv",
+          "--setenv",
+          "PATH",
+          "/opt/trikeshed/jdk/bin:/usr/bin:/bin",
+          "--setenv",
+          "JAVA_HOME",
+          "/opt/trikeshed/jdk",
+          "--setenv",
+          "LANG",
+          "unavailable.UTF-8",
+          "--setenv",
+          "JAVA_OPTS",
+          "-Dfile.encoding=UTF-8",
+          "--chdir",
+          "/state",
+          "--cap-drop",
+          "ALL",
+          "--tmpfs",
+          "/opt/trikeshed/assets",
+          "--remount-ro",
+          "/opt/trikeshed/assets",
+          "--tmpfs",
+          "/opt/trikeshed/modules",
+          "--remount-ro",
+          "/opt/trikeshed/modules",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdfinfo",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdftotext",
+          "/opt/trikeshed/bin/airgap-document",
+          "/state/unknown-locale-\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae-\u03b1",
+          "/opt/trikeshed",
+          "18764",
+          "inspect"
+        ],
+        "allStateFileBytesUnchanged": true,
+        "exit": 1,
+        "result": "PASS"
+      },
+      {
+        "case": "utf8-control",
+        "command": [
+          "bwrap",
+          "--unshare-user",
+          "--uid",
+          "0",
+          "--gid",
+          "0",
+          "--unshare-pid",
+          "--unshare-ipc",
+          "--unshare-uts",
+          "--die-with-parent",
+          "--ro-bind",
+          "/workspace/airgap-r4f-proof/unpacked/airgap-document-rootfs",
+          "/",
+          "--bind",
+          "/workspace/airgap-r4f-proof/encoding-archive01/state",
+          "/state",
+          "--tmpfs",
+          "/tmp",
+          "--proc",
+          "/proc",
+          "--dev",
+          "/dev",
+          "--clearenv",
+          "--setenv",
+          "PATH",
+          "/opt/trikeshed/jdk/bin:/usr/bin:/bin",
+          "--setenv",
+          "JAVA_HOME",
+          "/opt/trikeshed/jdk",
+          "--setenv",
+          "LANG",
+          "C.UTF-8",
+          "--setenv",
+          "JAVA_OPTS",
+          "-Dfile.encoding=UTF-8",
+          "--chdir",
+          "/state",
+          "--cap-drop",
+          "ALL",
+          "--tmpfs",
+          "/opt/trikeshed/assets",
+          "--remount-ro",
+          "/opt/trikeshed/assets",
+          "--tmpfs",
+          "/opt/trikeshed/modules",
+          "--remount-ro",
+          "/opt/trikeshed/modules",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdfinfo",
+          "--ro-bind",
+          "/dev/null",
+          "/usr/bin/pdftotext",
+          "/opt/trikeshed/bin/airgap-document",
+          "/state/utf8-control-\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae-\u03b1",
+          "/opt/trikeshed",
+          "18764",
+          "inspect"
+        ],
+        "runId": "c36f2613-536c-4820-be23-b7445269aa0a",
+        "nativeEncoding": "UTF-8",
+        "finishStatus": 200,
+        "runtimeBytesUnchanged": true,
+        "exit": 0,
+        "result": "PASS"
+      }
+    ]
+  },
+  "freshTraversal": {
+    "casObjects": 27,
+    "walFrames": 3,
+    "receiptCid": "sha256:4a6026c082ea9d89d6e201099a2bfa1ac169564e58f716cf3ac3f94e2e674737",
+    "runId": "64aab747-ffa0-442d-9497-a3c95387eb1f",
+    "programCid": "sha256:3e1890547b279c83294cae205b8e47228dccbbfa72bd63dd7568bd1a78b0c369",
+    "originalPdfBytes": 111243,
+    "nativeRows": 151,
+    "nativeInputBytes": 2028,
+    "quotationUtf16": [
+      18477.0,
+      18654.0
+    ],
+    "quotation": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+    "nativeEncoding": "UTF-8",
+    "runtimePath": "/state/\u03b4\u03bf\u03ba\u03b9\u03bc\u03ae-\u03b1/runtime",
+    "normalClose": true,
+    "scope": "Fresh packaged JVM/Sulong document traversal under a Unicode state path; independent CAS, CRC32C, receipt and exact UTF-16 quote audit."
+  },
+  "directorySync": {
+    "newCasShardDirectories": 93,
+    "parentsSyncedBeforeDescendantPublication": 93,
+    "missingParentSyncs": 0,
+    "kernelRingSetupObserved": true,
+    "scope": "Observed syscall order in a completed packaged traversal; no power-loss or vendor filesystem guarantee"
+  },
+  "integrityControls": [
+    {
+      "case": "changed-jar",
+      "exit": 1,
+      "expectedAcceptance": false,
+      "result": "PASS"
+    },
+    {
+      "case": "changed-mode",
+      "exit": 1,
+      "expectedAcceptance": false,
+      "result": "PASS"
+    },
+    {
+      "case": "extra-file",
+      "exit": 1,
+      "expectedAcceptance": false,
+      "result": "PASS"
+    },
+    {
+      "case": "extra-directory",
+      "exit": 1,
+      "expectedAcceptance": false,
+      "result": "PASS"
+    },
+    {
+      "case": "changed-manifest",
+      "exit": 1,
+      "expectedAcceptance": false,
+      "result": "PASS"
+    },
+    {
+      "case": "missing-locale",
+      "exit": 1,
+      "expectedAcceptance": false,
+      "result": "PASS"
+    },
+    {
+      "case": "missing-native-library",
+      "exit": 1,
+      "expectedAcceptance": false,
+      "result": "PASS"
+    },
+    {
+      "case": "restored",
+      "exit": 0,
+      "expectedAcceptance": true,
+      "result": "PASS"
+    }
+  ],
+  "browser": {
+    "bundle": {
+      "sha256": "5f4223f7d482168e45bfe03b129a5ee2551c8be3f467514d415eee269114da35"
+    },
+    "scope": "One completed fresh document traversal from a Unicode state path. No new animation or dense-graph usability coverage claimed."
+  },
+  "limits": [
+    "Linux x86-64 local filesystem only; no macOS or remote filesystem ownership proof",
+    "Constructed short tails and process death preserve a running kernel; no arbitrary-write/power-loss guarantee",
+    "Native probe replays the existing BoardStoreElement, not a full native HTTP service",
+    "No general Nix evaluator, unified JVM/native GC, zero-copy or performance advantage claim",
+    "Complete vendor patches/native-resource source rebuild remains open"
+  ]
+}

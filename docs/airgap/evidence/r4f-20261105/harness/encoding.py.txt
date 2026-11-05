@@ -1,0 +1,36 @@
+from pathlib import Path
+import subprocess,os,json,hashlib,shutil,urllib.request,time,sys
+h=Path('/workspace/airgap-r4f-proof');root=Path(os.environ['TRIKESHED_PROOF_ROOT']);a=h/sys.argv[1];a.mkdir();state=a/'state';state.mkdir();reports=[]
+http=urllib.request.build_opener(urllib.request.ProxyHandler({}));base='http://127.0.0.1:18764'
+def inventory(p):return {x.relative_to(p).as_posix():hashlib.file_digest(x.open('rb'),'sha256').hexdigest() for x in sorted(p.rglob('*')) if x.is_file()}
+network={'namespace':os.readlink('/proc/self/ns/net'),'routes':json.loads(subprocess.check_output(['ip','-j','route']))};assert not network['routes']
+for label,lang,hide in [('locale-hidden','C.UTF-8',True),('ascii-locale','C',False),('unknown-locale','unavailable.UTF-8',False),('utf8-control','C.UTF-8',False)]:
+ folder=state/(label+'-δοκιμή-α');folder.mkdir();shutil.copytree('/workspace/airgap-r4e-proof/storage-kill-archive02/state/runtime',folder/'runtime');before=inventory(state);prefix='/state/'+folder.name
+ cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--die-with-parent','--ro-bind',str(root),'/','--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv','--setenv','PATH','/opt/trikeshed/jdk/bin:/usr/bin:/bin','--setenv','JAVA_HOME','/opt/trikeshed/jdk','--setenv','LANG',lang,'--setenv','JAVA_OPTS','-Dfile.encoding=UTF-8','--chdir','/state','--cap-drop','ALL']
+ for path in ['/opt/trikeshed/assets','/opt/trikeshed/modules']+(['/usr/lib/locale'] if hide else []):cmd+=['--tmpfs',path,'--remount-ro',path]
+ for path in ['/usr/bin/pdfinfo','/usr/bin/pdftotext']:cmd+=['--ro-bind','/dev/null',path]
+ cmd+=['/opt/trikeshed/bin/airgap-document',prefix,'/opt/trikeshed','18764','inspect'];row={'case':label,'command':cmd};log=(a/(label+'.txt')).open('w');p=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT)
+ try:
+  if label!='utf8-control':
+   p.wait(timeout=25);assert p.returncode!=0;log.flush();assert 'UTF-8 native encoding required' in (a/(label+'.txt')).read_text();assert inventory(state)==before;row['allStateFileBytesUnchanged']=True
+  else:
+   deadline=time.monotonic()+60
+   while True:
+    assert p.poll() is None,('early exit',p.returncode)
+    try:
+     with http.open(base+'/__proof/state',timeout=2) as response:report=json.load(response)
+     break
+    except OSError:
+     assert time.monotonic()<deadline;time.sleep(.2)
+   assert report['nativeEncoding']=='UTF-8' and report['reopened'] and not report['llvmInstalled'] and not report['minerInstalled']
+   assert len(report['documents'])==6;assert len(report['runs'])==1
+   recovered=next(iter(report['runs'].values()));assert recovered['status']=='completed';row['runId']=recovered['runId'];row['nativeEncoding']=report['nativeEncoding'];(a/'control-state.json').write_text(json.dumps(report,indent=2)+'\n')
+   try:
+    with http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=4) as reply:row['finishStatus']=reply.status
+   except OSError as failure:row['finishTransportError']=repr(failure)
+   p.wait(timeout=30);assert p.returncode==0;assert all(json.loads((folder/'cleanup-inspect.json').read_text()).get(k) is True for k in ['moduleOwnerCompleted','nativeRootDrained','listenerJoined'])
+   after=inventory(folder/'runtime');expected={k.removeprefix(folder.name+'/runtime/'):v for k,v in before.items() if k.startswith(folder.name+'/runtime/')};assert after==expected;row['runtimeBytesUnchanged']=True
+  row['exit']=p.returncode;row['result']='PASS';print(label,'PASS',flush=True)
+ finally:
+  if p.poll() is None:p.terminate();p.wait(timeout=15)
+  log.close();reports.append(row);(a/'verification.json').write_text(json.dumps({'network':network,'cases':reports},indent=2)+'\n')

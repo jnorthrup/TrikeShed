@@ -1,0 +1,5 @@
+from pathlib import Path
+import subprocess,json,os,hashlib
+h=Path('/workspace/airgap-r4f-proof');out=h/'native-smoke02';out.mkdir();state=out/'state';state.mkdir();root=h/'rootfs';cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--hostname','airgap-native','--die-with-parent','--ro-bind',str(root),'/','--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv','--setenv','LANG','C.UTF-8','--chdir','/state','--cap-drop','ALL','--ro-bind',str(h/'wal-native.kexe'),'/tmp/wal-native','/tmp/wal-native','append','/state/wal','native-first']
+assert json.loads(subprocess.check_output(['ip','-j','route']))==[]
+p=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=40);(out/'stdout.txt').write_text(p.stdout);(out/'stderr.txt').write_text(p.stderr);(out/'result.json').write_text(json.dumps({'command':cmd,'exit':p.returncode,'nativeSha256':hashlib.file_digest((h/'wal-native.kexe').open('rb'),'sha256').hexdigest()},indent=2)+'\n');print('exit',p.returncode);print(p.stdout);print(p.stderr);assert p.returncode==0
