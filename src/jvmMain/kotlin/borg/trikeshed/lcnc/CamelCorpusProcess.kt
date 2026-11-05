@@ -117,9 +117,25 @@ class CamelCorpusProcess private constructor(
         const val PROTOCOL = "english-corpus-camel-worker/1"
         const val PREFIX = "CAMEL_CORPUS_ROUTE/1 "
         const val JSON_LIMIT = 65_536
+        internal const val MANIFEST_LIMIT = 2 * 1024 * 1024
         const val OUTPUT_LIMIT = 131_072
         const val WALL_MILLIS = 10_000L
         private const val WORKER = "borg.trikeshed.lcnc.CamelCorpusWorker"
+
+        /** Whole leading manifest: signed deployments can carry many per-entry digests. */
+        internal fun checkJarManifest(bytes: ByteArray) {
+            ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+                var entry = zip.nextEntry
+                if (entry?.name == "META-INF/") entry = zip.nextEntry
+                require(entry?.name == "META-INF/MANIFEST.MF") { "Deployment JAR requires a leading bounded manifest" }
+                val manifest = zip.readNBytes(MANIFEST_LIMIT + 1)
+                require(manifest.size <= MANIFEST_LIMIT) { "Deployment JAR manifest exceeds 2MiB" }
+                manifest.decodeToString(throwOnInvalidSequence = true)
+                require(Manifest(ByteArrayInputStream(manifest)).mainAttributes.getValue("Class-Path").isNullOrBlank()) {
+                    "Transitive JAR manifest Class-Path is refused; deploy explicit pinned JARs"
+                }
+            }
+        }
 
         /** Production refuses loose main/dependency classes. This is not the native OWN adapter. */
         fun packaged(files: FileOperations): CamelCorpusProcess {
@@ -161,15 +177,7 @@ class CamelCorpusProcess private constructor(
             fun file(path: String, limit: Int = 256 * 1024 * 1024) {
                 require(files.canonicalPath(path) == path && files.isFile(path)) { "Deployment file is absent or changed" }
                 val bytes = NativeHornProfile.boundedRead(files, path, limit)
-                if (path.endsWith(".jar")) ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
-                    var entry = zip.nextEntry
-                    if (entry?.name == "META-INF/") entry = zip.nextEntry
-                    require(entry?.name == "META-INF/MANIFEST.MF") { "Deployment JAR requires a leading bounded manifest" }
-                    val manifest = zip.readNBytes(65_537)
-                    require(manifest.size <= 65_536 && Manifest(ByteArrayInputStream(manifest)).mainAttributes.getValue("Class-Path").isNullOrBlank()) {
-                        "Transitive JAR manifest Class-Path is refused; deploy explicit pinned JARs"
-                    }
-                }
+                if (path.endsWith(".jar")) checkJarManifest(bytes)
                 pins[path] = ContentId.of(bytes).value.removePrefix("sha256:")
             }
             file(java)
