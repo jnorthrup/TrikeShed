@@ -1,6 +1,10 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.kif.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.*
 import borg.trikeshed.docs.ReviewQuoteSpan
 import borg.trikeshed.docs.reviewQuoteSpan
 import kotlinx.browser.document
@@ -29,6 +33,70 @@ private class ConditionEditorRow(
     var unsupportedSpans: Boolean = false,
 )
 
+private class DocumentReviewRequestRefused(val status: Int, val value: dynamic, message: String) : IllegalArgumentException(message)
+
+private fun nativeMap(value: Any?): Map<*, *> = value as? Map<*, *> ?: error("Native inspection record required")
+private fun nativeText(value: Any?): String = value as? String ?: error("Native inspection text required")
+private fun nativeRows(value: Any?, limit: Int): List<Map<*, *>> {
+    val rows = value as? List<*> ?: error("Native inspection rows required")
+    require(rows.size <= limit) { "Native inspection row limit" }
+    return rows.map(::nativeMap)
+}
+private fun nativeWhole(value: Any?): Double {
+    val number = (value as? Number)?.toDouble() ?: error("Native inspection integer required")
+    require(number.isFinite() && number in 0.0..9_007_199_254_740_991.0 && number % 1.0 == 0.0)
+    return number
+}
+
+/** Cross-bind the host report to the entire displayed approved selection before offering its graph. */
+private fun nativeProjection(report: Map<*, *>, approved: Map<*, *>, goal: Map<*, *>): NativeHornProofGraph.Projection {
+    require(approved["state"] == "approve" && approved["current"] == true &&
+        report["snapshotCid"] == approved["snapshotCid"] && nativeWhole(report["revision"]) == nativeWhole(approved["revision"]) &&
+        report["approvalCid"] == approved["decisionCid"] && report["decisionCid"] == approved["decisionCid"] &&
+        report["reviewer"] == approved["reviewer"] && report["synthetic"] == approved["synthetic"] &&
+        report["query"] == _l[goal["predicate"], goal["subject"], goal["object"]]) { "Native result differs from the approved review and goal" }
+    nativeWhole(report["asOf"])
+    val checked = report["checkedProof"]?.let(::nativeMap)
+    val proof = report["proof"]?.let(::nativeMap)
+    require(report["status"] in _s["SUPPORTED", "UNKNOWN"] && (report["status"] == "UNKNOWN") == (proof == null) &&
+        (proof == null) == (checked == null)) { "Native proof status and certificate differ" }
+    if (checked != null) {
+        require(checked["kind"] == "native-horn-checked-proof/1" && checked["firstProofOnly"] == true &&
+            checked["verification"] == "supplied-native-certificate-only-not-independent-inference" &&
+            checked["referenceMode"] == "normalized-export-atoms-and-rule-scoped-variables-not-source-spans" &&
+            checked["mlirNixRevision"] == SumoNixBridge.MLIR_REVISION && report["sumoNixRevision"] == SumoNixBridge.SUMO_REVISION)
+        for (key in s_["inputCid", "frameId", "query", "semantics", "sumoNixRevision"].view)
+            require(checked[key] == report[key]) { "Native checked frame differs" }
+        require((checked["steps"] as? List<*>)?.isNotEmpty() == true) { "Native checked steps required" }
+    }
+    val selected = nativeRows(nativeMap(approved["snapshot"])["selections"], 123)
+    val selections = selected.associateBy { nativeText(it["id"]) }
+    require(selected.isNotEmpty() && selected.size == selections.size) { "Distinct frozen native selections required" }
+    val evidence = nativeMap(report["sourceEvidence"]).values.map(::nativeMap)
+    require(selections.size == evidence.size && evidence.map { it["selectionId"] }.toSet() == selections.keys) { "Native selected evidence differs" }
+    for (item in evidence) {
+        val quote = nativeMap(selections.getValue(nativeText(item["selectionId"]))["quotation"])
+        require(item["originalCid"] == quote["originalCid"] && item["textCid"] == quote["extractedTextCid"] &&
+            nativeWhole(item["begin"]) == nativeWhole(quote["begin"]) && nativeWhole(item["end"]) == nativeWhole(quote["end"]) &&
+            item["quote"] == quote["quote"]) { "Native quotation differs from the frozen source witness" }
+    }
+    report["checkedProof"]?.let { raw ->
+        val sourceRevision = nativeText(nativeMap(approved["snapshot"])["sourceRevision"])
+        for (source in nativeMap(nativeMap(raw)["sources"]).values.map(::nativeMap))
+            if (!nativeText(source["id"]).startsWith("host-rule:"))
+                require(source["sourceRevision"] == sourceRevision) { "Native source revision differs from the frozen review" }
+    }
+    return NativeHornProofGraph.project(report)
+}
+
+private fun nativeElement(parent: dynamic, tag: String, value: String, attribute: String? = null): dynamic {
+    val element = document.createElement(tag).asDynamic()
+    element.textContent = value
+    if (attribute != null) element.setAttribute(attribute, "")
+    parent.appendChild(element)
+    return element
+}
+
 private suspend fun reviewRequest(path: String, body: dynamic = null, authenticated: Boolean = false): dynamic {
     val init = objOf {
         it.method = if (body == null) "GET" else "POST"
@@ -41,7 +109,8 @@ private suspend fun reviewRequest(path: String, body: dynamic = null, authentica
     }
     val response = fetchJs("/api/documents/review" + path, init)
     val result = JSON.parse<dynamic>(PatchRead.text(response))
-    require(truthy(response.ok)) { str(result?.detail ?: result?.error ?: "Review request failed") }
+    if (!truthy(response.ok)) throw DocumentReviewRequestRefused(num(response.status).toInt(), result,
+        str(result?.detail ?: result?.error ?: "Review request failed"))
     return result
 }
 
@@ -93,6 +162,8 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
         var conditionFields: dynamic = null
         var approvalButton: dynamic = null
         var taxonomyResult: dynamic = null
+        var nativeQueryEpoch = 0
+        var nativeCurrencyUnconfirmed = false
         var savedAssessmentInspectable = false
         fun forgetSavedAssessment() {
             savedAssessment = null
@@ -150,8 +221,15 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
         credentialChanged = {
             reviewerSession = null
             forgetSavedAssessment()
-            taxonomyResult?.remove()
-            identity.textContent = "Reviewer credential changed; authenticate and reload the assessment."
+            val nativeResult = taxonomyResult?.hasAttribute("data-taxonomy-native-result") == true
+            if (nativeResult) nativeCurrencyUnconfirmed = true
+            nativeQueryEpoch++; taxonomyResult?.remove(); taxonomyResult = null
+            val nativeRun = box.querySelector("[data-native-run]")
+            if (nativeResult && nativeRun != null) nativeRun.disabled = true
+            val taxonomyInspect = box.querySelector("[data-taxonomy-inspect]")
+            if (nativeResult && taxonomyInspect != null) taxonomyInspect.disabled = true
+            identity.textContent = if (nativeResult) "Reviewer credential changed; native currency is unconfirmed. Authenticate and refresh the review."
+                else "Reviewer credential changed; authenticate and reload the assessment."
         }
         val credential = document.createElement("input").asDynamic()
         credential.type = "password"; credential.autocomplete = "off"
@@ -535,12 +613,12 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
                 option.value = size.toString(); option.textContent = "$size per page"; pageSize.appendChild(option)
             }
             pageSize.value = "16"; taxonomy.appendChild(pageSize)
-            fun clearTaxonomy() { taxonomyResult?.remove(); taxonomyResult = null }
+            fun clearTaxonomy() { nativeQueryEpoch++; taxonomyResult?.remove(); taxonomyResult = null }
             for (field in arrayOf(predicate, subject, obj, pageSize)) on(field, "input", { _ -> clearTaxonomy() })
             val inspect = document.createElement("button").asDynamic()
-            inspect.textContent = "Inspect reviewed selection"; taxonomy.appendChild(inspect)
+            inspect.textContent = "Inspect reviewed selection"; inspect.setAttribute("data-taxonomy-inspect", ""); taxonomy.appendChild(inspect)
             fun inspectPage(offset: Int) {
-                if (busy) return
+                if (busy || nativeCurrencyUnconfirmed) return
                 clearTaxonomy()
                 busy = true; inspect.disabled = true
                 val requestEpoch = documentReviewCredentialEpoch
@@ -614,53 +692,223 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
                 val nativeHelp = document.createElement("p")
                 nativeHelp.textContent = "Runs only on request against the current approved KIF selection, with at most 123 assertions. A timeout or solver failure is not an UNKNOWN result."
                 taxonomy.appendChild(nativeHelp)
+                native.setAttribute("data-native-run", "")
+                fun markNativeUnconfirmed(message: String) {
+                    nativeCurrencyUnconfirmed = true; clearTaxonomy()
+                    native.disabled = true; inspect.disabled = true
+                    nativeHelp.textContent = "Native review currency is unconfirmed. Refresh the review before inspecting again. $message"
+                    nativeHelp.setAttribute("data-native-currentness-unconfirmed", "")
+                }
+                fun inspectNativeResult(result: dynamic, report: Map<*, *>, projection: NativeHornProofGraph.Projection,
+                                        approved: Map<*, *>, originalRequest: dynamic, requestEpoch: Int) {
+                    val checked = nativeMap(report["checkedProof"])
+                    val goalFields = nativeMap(reifyStrict(JSON.stringify(originalRequest.goal)))
+                    val derived = nativeRows(checked["steps"], 4096).filter { it["kind"] == "derived" }
+                    if (derived.isEmpty()) {
+                        nativeElement(result, "p", "This proof is asserted directly; it has no derived substitution step.")
+                        return
+                    }
+                    fun approvedCurrent() = present() && !nativeCurrencyUnconfirmed && requestEpoch == documentReviewCredentialEpoch &&
+                        review.state == "approve" && review.current == true && review.snapshotCid == originalRequest.snapshotCid &&
+                        review.revision == originalRequest.expectedRevision && review.decisionCid == approved["decisionCid"]
+                    fun owned() = approvedCurrent() && taxonomyResult === result && truthy(result.isConnected) &&
+                        str(predicate.value) == originalRequest.goal.predicate &&
+                        str(subject.value).trim() == originalRequest.goal.subject && str(obj.value).trim() == originalRequest.goal.`object`
+                    val controls = nativeElement(result, "section", "", "data-native-inspection")
+                    controls.style.cssText = "min-width:0;overflow-wrap:anywhere"
+                    nativeElement(controls, "h4", "Inspect this native proof")
+                    nativeElement(controls, "p", "Choose a derived step, then inspect its substitutions or premise sources. These rows inspect the first proof; source alternatives are not additional required premises or independent evidence.")
+                    nativeElement(controls, "p", "Projection ${projection.projectionCid.value} · graph ${projection.graph}", "data-native-projection")
+                    val selector = nativeElement(controls, "select", "", "data-native-step")
+                    selector.setAttribute("aria-label", "Native derived proof step")
+                    val paths = derived.map { step -> (step["path"] as List<*>).map { nativeWhole(it).toInt() } }
+                    for ((index, step) in derived.withIndex()) {
+                        val path = paths[index]; val label = if (path.isEmpty()) "root" else path.joinToString(".")
+                        val option = nativeElement(selector, "option", "$label · ${nativeText(step["normalForm"])}")
+                        option.value = index.toString()
+                    }
+                    selector.value = "0"; selector.style.cssText = "max-width:100%;display:block;margin:10px 0"
+                    val substitutions = nativeElement(controls, "button", "Inspect substitutions", "data-native-bindings")
+                    val premises = nativeElement(controls, "button", "Inspect premise sources", "data-native-premises")
+                    substitutions.type = "button"; premises.type = "button"
+                    val notice = nativeElement(controls, "p", "", "data-native-inspection-status")
+                    notice.setAttribute("role", "status")
+                    val output = nativeElement(controls, "div", "", "data-native-inspection-output")
+                    fun clearInspection() { nativeQueryEpoch++; output.textContent = ""; output.removeAttribute("data-native-query-profile"); notice.textContent = "" }
+                    on(selector, "change", { event -> event.stopPropagation(); if (owned()) clearInspection() })
+                    fun uncertain(message: String) {
+                        if (!owned()) return
+                        markNativeUnconfirmed(message)
+                    }
+                    fun show(answer: NativeHornQueryView.Answer, starter: NativeHornQueryView.Starter) {
+                        val value = answer.value; val provenance = nativeMap(value["provenance"])
+                        output.setAttribute("data-native-query-profile", if (starter.bindings) "bindings" else "premises")
+                        nativeElement(output, "p", "Current approved selection · first proof only · step " +
+                            (if (starter.path.isEmpty()) "root" else starter.path.joinToString(".")), "data-native-query-step")
+                        nativeElement(output, "p", "Read ${provenance["readCid"]} · approval ${provenance["approvalCid"]} · snapshot ${provenance["snapshotCid"]} · revision ${provenance["revision"]} · checked as of ${provenance["checkedAsOf"]}", "data-native-query-provenance")
+                        nativeElement(output, "p", (if (provenance["synthetic"] == true) "Synthetic approval reviewer: " else "Approval reviewer: ") + nativeText(provenance["reviewer"]), "data-native-query-reviewer")
+                        nativeElement(output, "p", "Request-local graph ${nativeText(value["graph"])}. The host binds it to the checked review; the physical quad source reports raw matched data without review authority.")
+                        val program = nativeElement(output, "details", "", "data-native-query-program")
+                        nativeElement(program, "summary", "Inspection-only LCNC program and SPARQL")
+                        nativeElement(program, "pre", LcncProgramConfix.toJson(starter.program) + "\n\n" + starter.query).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto"
+                        val catalog = nativeMap(checked["sources"]); val evidence = nativeMap(report["sourceEvidence"])
+                        val cards = mutableMapOf<String, dynamic>()
+                        val sourceCards = document.createElement("section").asDynamic()
+                        sourceCards.setAttribute("data-native-source-cards", "")
+                        nativeElement(sourceCards, "h5", "Proof source references")
+                        for ((key, raw) in catalog) {
+                            val id = nativeText(key); val source = nativeMap(raw)
+                            val sourceIri = NativeHornProofGraph.sourceIri(projection.graph, id)
+                            val card = nativeElement(sourceCards, "article", "", "data-native-source-card")
+                            card.setAttribute("data-native-source-node", id); card.setAttribute("data-native-source-iri", sourceIri)
+                            card.setAttribute("tabindex", "-1"); cards[sourceIri] = card
+                            if (nativeText(source["id"]).startsWith("host-rule:")) {
+                                card.setAttribute("data-native-reference-mode", "host-rule-normalized-form")
+                                nativeElement(card, "h6", "Normalized host rule · ${nativeText(source["id"])}")
+                                nativeElement(card, "pre", nativeText(source["text"])).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"
+                                nativeElement(card, "p", "Rule content ${source["sourceCid"]} · policy ${source["sourceRevision"]}. This normalized rule has no document quotation offsets.")
+                            } else {
+                                card.setAttribute("data-native-reference-mode", "reviewed-kif-exact-quotation")
+                                val quote = nativeMap(evidence[source["id"]])
+                                nativeElement(card, "h6", "Exact reviewed KIF quotation · ${nativeText(quote["selectionId"])}")
+                                nativeElement(card, "blockquote", nativeText(quote["quote"]), "data-native-source-quote").style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"
+                                nativeElement(card, "p", "Original ${quote["originalCid"]} · extracted text ${quote["textCid"]} · UTF-16 [${quote["begin"]}, ${quote["end"]}) · revision ${source["sourceRevision"]}")
+                            }
+                            nativeElement(card, "p", "Source node $id · $sourceIri")
+                        }
+                        val scroll = nativeElement(output, "div", "")
+                        scroll.style.cssText = "overflow:auto;max-width:100%"
+                        val table = nativeElement(scroll, "table", "", "data-native-query-table")
+                        table.style.cssText = "border-collapse:collapse;min-width:1680px;width:100%;table-layout:fixed;font-size:13px"
+                        val head = nativeElement(nativeElement(table, "thead", ""), "tr", "")
+                        for (name in starter.variables) {
+                            val th = nativeElement(head, "th", name)
+                            val width = when (name) { "form", "childForm" -> 360; "binding", "use", "child", "source", "sourceCid" -> 240; "value" -> 180; else -> 130 }
+                            th.style.cssText = "padding:8px;text-align:left;border-bottom:1px solid var(--rule);width:${width}px"
+                        }
+                        val body = nativeElement(table, "tbody", "")
+                        for (row in answer.rows) {
+                            val tr = nativeElement(body, "tr", "", "data-native-query-row")
+                            for (name in starter.variables) {
+                                val term = nativeMap(row[name]); val cell = nativeElement(tr, "td", "")
+                                cell.setAttribute("data-native-query-variable", name); cell.setAttribute("data-rdf-kind", nativeText(term["type"]))
+                                term["datatype"]?.let { cell.setAttribute("data-rdf-datatype", nativeText(it)) }
+                                cell.style.cssText = "padding:8px;vertical-align:top;border-bottom:1px solid var(--rule);overflow-wrap:anywhere"
+                                nativeElement(cell, "p", nativeText(term["type"]) + (term["datatype"]?.let { " · ${nativeText(it)}" } ?: ""))
+                                nativeElement(cell, "pre", nativeText(term["value"])).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;font:inherit"
+                                if (name == "source") {
+                                    val uri = nativeText(term["value"]); val card = cards[uri] ?: error("Native source focus target is unavailable")
+                                    val focus = nativeElement(cell, "button", "Inspect this source reference", "data-native-source-focus")
+                                    focus.type = "button"; focus.setAttribute("data-native-source-target", uri)
+                                    on(focus, "click", { event -> event.stopPropagation(); if (owned() && truthy(card.isConnected)) { card.scrollIntoView(); card.focus() } })
+                                }
+                            }
+                        }
+                        output.appendChild(sourceCards)
+                        val raw = nativeElement(output, "details", "")
+                        nativeElement(raw, "summary", "Typed results, physical source and host provenance")
+                        nativeElement(raw, "pre", jsonOf(value)).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto"
+                    }
+                    fun query(bindings: Boolean) {
+                        if (busy || !owned()) return
+                        clearInspection(); val ticket = nativeQueryEpoch
+                        val index = str(selector.value).toIntOrNull() ?: return
+                        if (index !in paths.indices) return
+                        val starter = NativeHornQueryView.starter(report, paths[index], bindings)
+                        val request = objOf {
+                            it.snapshotCid = originalRequest.snapshotCid; it.expectedRevision = originalRequest.expectedRevision; it.goal = originalRequest.goal
+                            it.program = JSON.parse<dynamic>(LcncProgramConfix.toJson(starter.program))
+                        }
+                        busy = true; substitutions.disabled = true; premises.disabled = true; native.disabled = true; inspect.disabled = true
+                        notice.textContent = "Checking the current approved proof and its source rows…"
+                        launchJs {
+                            try {
+                                val response = reviewRequest("/taxonomy-query", request, authenticated = true)
+                                if (!owned() || ticket != nativeQueryEpoch) return@launchJs
+                                val actual = reifyStrict(JSON.stringify(response)) as? Map<*, *> ?: error("Native query response required")
+                                nativeProjection(actual, approved, goalFields)
+                                val answer = NativeHornQueryView.answer(report, actual, starter)
+                                show(answer, starter); notice.textContent = "${answer.rows.size} typed source rows. Row count does not change native support."
+                            } catch (cancelled: CancellationException) { throw cancelled }
+                            catch (refused: DocumentReviewRequestRefused) {
+                                if (owned() && ticket == nativeQueryEpoch) {
+                                    val error = refused.value
+                                    if (refused.status in _s[400, 413] && error != null && typeOf(error) == "object" &&
+                                        error.error == "reviewed_taxonomy_query_refused" && typeOf(error.queryStatus) == "number" &&
+                                        num(error.queryStatus) == refused.status.toDouble() && typeOf(error.code) == "string" && typeOf(error.reason) == "string")
+                                        notice.textContent = "Inspection refused (${refused.status}, ${str(error.code)}): ${str(error.reason)}. Native proof status is unchanged."
+                                    else uncertain(failureText(refused))
+                                }
+                            } catch (error: dynamic) { if (owned() && ticket == nativeQueryEpoch) uncertain(failureText(error)) }
+                            finally {
+                                busy = false
+                                if (approvedCurrent()) {
+                                    native.disabled = false; inspect.disabled = false
+                                    if (taxonomyResult === result && truthy(result.isConnected)) { substitutions.disabled = false; premises.disabled = false }
+                                }
+                            }
+                        }
+                    }
+                    on(substitutions, "click", { event -> event.stopPropagation(); query(true) })
+                    on(premises, "click", { event -> event.stopPropagation(); query(false) })
+                }
                 on(native, "click", { event ->
                     event.stopPropagation()
-                    if (!busy) {
+                    if (!busy && !nativeCurrencyUnconfirmed) {
                         clearTaxonomy()
+                        val ticket = nativeQueryEpoch
                         busy = true; native.disabled = true; inspect.disabled = true
+                        taxonomyResult = nativeElement(taxonomy, "section", "Checking the current approved native proof…", "data-taxonomy-native-result")
                         val requestEpoch = documentReviewCredentialEpoch
+                        val approved = nativeMap(reifyStrict(JSON.stringify(review)))
                         val goal = objOf { it.predicate = str(predicate.value); it.subject = str(subject.value).trim(); it.`object` = str(obj.value).trim() }
+                        val goalFields = nativeMap(reifyStrict(JSON.stringify(goal)))
                         val request = objOf { it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision; it.goal = goal }
                         launchJs {
                             try {
                                 require(present()) { "The source result or review changed; reopen its current review" }
                                 val report = reviewRequest("/taxonomy-query", request, authenticated = true)
-                                require(present() && requestEpoch == documentReviewCredentialEpoch &&
-                                    str(predicate.value) == goal.predicate && str(subject.value).trim() == goal.subject &&
-                                    str(obj.value).trim() == goal.`object`) { "The review, credential or goal changed while running; inspect again" }
+                                if (!present() || ticket != nativeQueryEpoch || requestEpoch != documentReviewCredentialEpoch) return@launchJs
+                                require(str(predicate.value) == goal.predicate && str(subject.value).trim() == goal.subject &&
+                                    str(obj.value).trim() == goal.`object`) { "The review or goal changed while running; inspect again" }
                                 val unavailable = report.status == "UNAVAILABLE"
-                                if (!unavailable) {
-                                    val query = arr(report.query)
-                                    require(report.kind == "reviewed-kif-native-result/1" && report.snapshotCid == review.snapshotCid &&
-                                        report.revision == review.revision && report.status in arrayOf("SUPPORTED", "UNKNOWN") &&
-                                        query.size == 3 && query[0] == goal.predicate && query[1] == goal.subject && query[2] == goal.`object`) {
-                                        "Native result does not match the current review and goal"
+                                var profileFailure: String? = null
+                                val fields = if (unavailable) null else nativeMap(reifyStrict(JSON.stringify(report)))
+                                val projection = if (fields == null) null else try { nativeProjection(fields, approved, goalFields) }
+                                    catch (_: NativeHornProofGraph.ProfileRefused) {
+                                        profileFailure = "The raw native response remains visible below; optional visual validation exceeds this profile."
+                                        null
                                     }
-                                }
-                                val result = document.createElement("section").asDynamic()
-                                result.setAttribute("data-taxonomy-native-result", "")
-                                taxonomyResult = result; taxonomy.appendChild(result)
-                                val summary = document.createElement("p")
-                                summary.textContent = if (unavailable) "Native query unavailable: " + str(report.reason)
+                                taxonomyResult?.remove()
+                                val result = nativeElement(taxonomy, "section", "", "data-taxonomy-native-result")
+                                taxonomyResult = result
+                                nativeElement(result, "p", if (unavailable) "Native query unavailable: " + str(report.reason)
+                                    else if (profileFailure != null) "Native report received; proof status is unvalidated in this view."
                                     else "Native proof status: " + str(report.status) + " · approved assertions: " +
-                                        str(report.selectionCount) + " / " + str(report.selectionLimit)
-                                result.appendChild(summary)
+                                        str(report.selectionCount) + " / " + str(report.selectionLimit))
                                 if (!unavailable) {
-                                    val scope = document.createElement("p")
-                                    scope.textContent = "Positive support over this approved selection only; UNKNOWN is not a refutation. The solver returns its first proof and does not publish facts or consume a review permit."
-                                    result.appendChild(scope)
-                                    val evidence = document.createElement("pre")
-                                    evidence.textContent = JSON.stringify(objOf {
-                                        it.proof = report.proof; it.sourceEvidence = report.sourceEvidence; it.hostRules = report.hostRules
-                                        it.inputCid = report.inputCid; it.frameId = report.frameId; it.asOf = report.asOf
-                                    }, null, 2)
-                                    evidence.asDynamic().style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"
-                                    result.appendChild(evidence)
+                                    nativeElement(result, "p", if (profileFailure == null)
+                                        "Positive support over this approved selection only; UNKNOWN is not a refutation. The solver returns its first proof and does not publish facts or consume a review permit."
+                                        else "This raw response is shown for inspection; its proof did not pass the optional bounded projection in this view.")
+                                    nativeElement(result, "p", "Read ${str(report.readCid)} · approval ${str(report.approvalCid)} · revision ${str(report.revision)} · checked as of ${str(report.asOf)}")
+                                    nativeElement(result, "p", (if (report.synthetic == true) "Synthetic approval reviewer: " else "Approval reviewer: ") + str(report.reviewer))
+                                    if (projection != null && report.status == "SUPPORTED")
+                                        inspectNativeResult(result, requireNotNull(fields), projection, approved, request, requestEpoch)
+                                    profileFailure?.let { nativeElement(result, "p", it, "data-native-inspection-limit") }
+                                    val evidence = nativeElement(result, "details", "")
+                                    nativeElement(evidence, "summary", "Native result, proof and selected evidence")
+                                    nativeElement(evidence, "pre", JSON.stringify(report, null, 2)).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto"
                                 }
                             } catch (cancelled: CancellationException) { throw cancelled }
-                            catch (error: dynamic) { status("Native taxonomy query failed: " + failureText(error)) }
-                            finally { busy = false; native.disabled = false; inspect.disabled = false }
+                            catch (error: dynamic) {
+                                if (present() && ticket == nativeQueryEpoch && requestEpoch == documentReviewCredentialEpoch) {
+                                    markNativeUnconfirmed(failureText(error))
+                                    status("Native taxonomy query failed: " + failureText(error))
+                                }
+                            } finally {
+                                busy = false
+                                if (present() && !nativeCurrencyUnconfirmed) { native.disabled = false; inspect.disabled = false }
+                            }
                         }
                     }
                 })
