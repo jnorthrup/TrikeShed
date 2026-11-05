@@ -1,7 +1,6 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.parse.reify
-import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.forge.sheet.SheetSeed
 import borg.trikeshed.forge.sheet.confixSheets
@@ -248,20 +247,7 @@ class LcncKanbanExperience(
                 val path = required(node, "path")
                 if (node.params["geometry"] == "native" || inputs.keys.any { it.removeSuffix("?") in _s["rows", "sourceCid", "ok", "format"] })
                     return@LcncNodeRunner LcncConfixSelection.select(json, path, input("rows"), input("sourceCid"), input("ok"), input("format"))
-                val selected = resolveJsonPath(reify(json), path)
-                if (selected == null) {
-                    mapOf("found" to false, "path" to path, "sheets" to emptyList<Any?>(), "sheet" to null)
-                } else {
-                    // A scalar still needs a visible Confix row, while objects/arrays retain their native nesting.
-                    val shown = if (selected is Map<*, *> || selected is List<*>) selected else mapOf("value" to selected)
-                    val family = confixSheets("confix/$path", path, confixDoc(jsonOf(shown)))
-                    mapOf(
-                        "found" to true,
-                        "path" to path,
-                        "sheets" to family.map(SheetSeed::toLcncMap),
-                        "sheet" to family.firstOrNull()?.toLcncMap(),
-                    )
-                }
+                LcncConfixSelection.select(json, path)
             },
         )
 
@@ -306,19 +292,4 @@ class LcncKanbanExperience(
             ?.mapNotNull { it?.toString()?.trim()?.takeIf(String::isNotEmpty) }
             ?.takeIf { it.isNotEmpty() }
 
-    /** No stale parent-port preview: only the requested JSON path is projectable. */
-    private fun resolveJsonPath(root: Any?, rawPath: String): Any? {
-        var value = root
-        val path = rawPath.trim().removePrefix("/")
-        if (path.isEmpty()) return value
-        for (segment in path.replace('/', '.').split('.')) {
-            if (segment.isEmpty()) continue
-            value = when (value) {
-                is Map<*, *> -> value[segment]
-                is List<*> -> value.getOrNull(segment.toIntOrNull() ?: return null)
-                else -> return null
-            } ?: return null
-        }
-        return value
-    }
 }
