@@ -51,7 +51,7 @@ internal fun nativeHornGraphFixture(subject: String = "Tenant", repeat: Boolean 
         "bindings" j _l["?x" j subject, "?y" j "Person", "?z" j "Agent"].map { (variable, token) ->
             _m["variable" j variable, "rule" j ruleId, "ruleSourceNodeIds" j ruleSources,
                 "originalVariableSourceNodeIds" j ruleSources, "term" j constant(token)]
-        })
+        }]
     val proof = _m["fact" j "(instance $subject Agent)", "rule" j ruleId, "sources" j _l[rule], "from" j _l[leaf(0), leaf(1)]]
     val checked = _m["kind" j "native-horn-checked-proof/1", "inputCid" j export.inputCid.value, "frameId" j export.frameId.value,
         "query" j input["query"], "semantics" j input["semantics"], "sumoNixRevision" j SumoNixBridge.SUMO_REVISION,
@@ -142,7 +142,7 @@ class NativeHornQueryViewTest {
         for (badSteps in s_[steps.drop(1), steps + steps[0], steps.dropLast(1) + (steps.last() + _m["path" j _l[7]])].view)
             assertFails { NativeHornProofGraph.project(report + _m["checkedProof" j (checked + _m["steps" j badSteps])]) }
         val first = steps[0] + _m["arguments" j _l[_m["kind" j "literal", "spelling" j "\"Tenant\""], _m["kind" j "constant", "token" j "Person"]]]
-        assertFails { NativeHornProofGraph.project(report + _m["checkedProof" j (checked + _m["steps" j (_l[first] + steps.drop(1)))]) }
+        assertFails { NativeHornProofGraph.project(report + _m["checkedProof" j (checked + _m["steps" j (_l[first] + steps.drop(1))])]) }
         val unknown = report + _m["status" j "UNKNOWN", "proof" j null, "checkedProof" j null]
         assertNotNull(NativeHornProofGraph.project(unknown))
         assertFails { NativeHornQueryView.starter(unknown, bindings = true) }
