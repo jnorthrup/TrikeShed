@@ -1,0 +1,470 @@
+#!/usr/bin/env python3
+"""Read recorded handoff proof only. Python standard library; no runtime or network.
+
+Usage: python3 audit.py NATIVE_DIR SNAPSHOT_DIR [--out OUTPUT_DIR]
+The CanonicalCbor check uses recursively sorted encoded string keys, definite
+lengths, minimal integer widths, and the application's binary64 float encoding.
+"""
+import argparse
+import copy
+import hashlib
+import json
+import re
+import struct
+import sys
+import tarfile
+from pathlib import Path
+from urllib.parse import parse_qsl, urlsplit
+
+SOURCE_HEAD = 'c8b7f5e8a5d0dad8e6352d2fc1c733df7d69e563'
+INSPECTION = 'sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d'
+SOURCE = 'sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883'
+SOURCE_TEXT = 'Tenant is a Person. A Person is an Agent.'
+ARCHIVE_SHA = '51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc'
+FROZEN = {
+    'main.jar': 'b4744105e462d94767f84edf23b89f703ec517435f32bbcd8dd7c9090e819797',
+    'documents.js': '4cd75fd35ef2a3e1aea3c4ac099c74c05ae9dba429371ca20eddede53c5a2ee9',
+    'spacegraph.js': '3b0a85c42b978f81b5043ed4b2cee10c835e7715683d4448a90e922aaf50fbac',
+    'pages.js': 'd9098c8cd7158f10edf295d246a88061d6c5f1ef000f41f6a412b759e4ef9103',
+}
+GUARDS = [
+    'fully-percent-encoded-33rd-field', 'fully-percent-encoded-over-16384-budget',
+    'decoded-duplicate-alias', 'malformed-UTF8', 'actual-same-bytes-other-document-409',
+    'INJECTED-wrong-response-receipt-and-source-scope',
+    'actual-catalog200-held-across-native-add-note',
+    'actual-retained200-held-across-native-Documents-navigation',
+    'native-receipt-edit-restore-does-not-reauthorize-origin',
+    'native-mode-edit-restore-does-not-reauthorize-origin',
+]
+REQUIRED = ['browser-result.json', 'fixture-evidence.json', 'cleanup.json',
+            'native-reopened-cas.json', 'fixture-attempt1.exit', 'startup-evidence.json',
+            'expected-inspection.json', 'setup.json', 'archive-manifest-before.json']
+
+class AuditError(Exception):
+    pass
+
+def need(condition, message):
+    if not condition:
+        raise AuditError(message)
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+def cid(data):
+    return 'sha256:' + digest(data)
+
+def strict_json(data):
+    def pairs(rows):
+        result = {}
+        for k, v in rows:
+            need(k not in result, 'duplicate JSON key: ' + k)
+            result[k] = v
+        return result
+    return json.loads(data, object_pairs_hook=pairs,
+                      parse_constant=lambda value: (_ for _ in ()).throw(AuditError('nonfinite JSON number')))
+
+def load(path):
+    return strict_json(path.read_bytes().decode('utf-8', errors='strict'))
+
+def cbor_head(major, value):
+    if value < 24:
+        return bytes([(major << 5) | value])
+    for width, ai in [(1, 24), (2, 25), (4, 26), (8, 27)]:
+        if value < 1 << (8 * width):
+            return bytes([(major << 5) | ai]) + value.to_bytes(width, 'big')
+    raise AuditError('CBOR integer exceeds 64 bits')
+
+def cbor_encode(value):
+    if value is None:
+        return b'\xf6'
+    if isinstance(value, bool):
+        return b'\xf5' if value else b'\xf4'
+    if isinstance(value, int):
+        return cbor_head(0, value) if value >= 0 else cbor_head(1, -1 - value)
+    if isinstance(value, str):
+        b = value.encode('utf-8', errors='strict')
+        return cbor_head(3, len(b)) + b
+    if isinstance(value, bytes):
+        return cbor_head(2, len(value)) + value
+    if isinstance(value, list):
+        return cbor_head(4, len(value)) + b''.join(cbor_encode(v) for v in value)
+    if isinstance(value, dict):
+        need(all(isinstance(k, str) for k in value), 'CBOR map keys must be strings')
+        return cbor_head(5, len(value)) + b''.join(cbor_encode(k) + cbor_encode(value[k]) for k in sorted(value, key=cbor_encode))
+    if isinstance(value, float):
+        return b'\xfb' + struct.pack('>d', value)
+    raise AuditError('unsupported CBOR value')
+
+def cbor_decode(data):
+    at = 0
+    def read(n):
+        nonlocal at
+        need(at + n <= len(data), 'truncated CBOR')
+        out = data[at:at+n]
+        at += n
+        return out
+    def item(depth=0):
+        need(depth <= 64, 'CBOR depth')
+        tag = read(1)[0]
+        major, ai = tag >> 5, tag & 31
+        if major == 7:
+            if ai in [20, 21, 22]:
+                return {20: False, 21: True, 22: None}[ai]
+            if ai == 27:
+                return struct.unpack('>d', read(8))[0]
+            raise AuditError('unsupported CBOR simple/float')
+        need(ai < 28, 'indefinite/reserved CBOR length')
+        size = ai if ai < 24 else int.from_bytes(read({24: 1, 25: 2, 26: 4, 27: 8}[ai]), 'big')
+        if major == 0:
+            return size
+        if major == 1:
+            return -1 - size
+        if major == 2:
+            return read(size)
+        if major == 3:
+            return read(size).decode('utf-8', errors='strict')
+        if major == 4:
+            return [item(depth+1) for _ in range(size)]
+        if major == 5:
+            out = {}
+            for _ in range(size):
+                k, v = item(depth+1), item(depth+1)
+                need(isinstance(k, str) and k not in out, 'CBOR duplicate/nontext map key')
+                out[k] = v
+            return out
+        raise AuditError('unsupported CBOR major type')
+    out = item()
+    need(at == len(data), 'CBOR trailing bytes')
+    need(cbor_encode(out) == data, 'CBOR differs from recursive encoded-key canonical encoding')
+    return out
+
+def zero_counts(row, label, runs=0):
+    for key in ['freshInspectionPosts', 'modelCalls', 'automaticIntake', 'reviewIntakeCalls', 'analysisReteFacts']:
+        need(row[key] == 0, label + ': unexpected ' + key)
+    need(row['authoredRunPosts'] == runs and row['queryCalls'] == runs, label + ': run/query count')
+    need(row['configuredModelCount'] == 0 and row['guestModules'] == {'installed': [], 'mounted': []}, label + ': configured modules/providers')
+    need(row['blackboardUnchangedFromReadinessBaseline'] is True, label + ': analysis blackboard changed')
+
+def validate_query(run, inspection, source_text):
+    need(run['ok'] is True and run['status'] == 'completed', 'run did not complete')
+    q = run['outputs']['query']
+    need(q['dataset'] == 'english-receipt-observations', 'wrong query dataset')
+    src = q['source']
+    expected = {'receiptCid': INSPECTION, 'originalCid': SOURCE, 'extractedTextCid': SOURCE,
+                'mode': 'current', 'currentness': 'checked-before-and-after-query',
+                'historical': False, 'reviewStatus': 'unreviewed',
+                'semanticAuthority': 'not-established', 'producerAuthority': 'not-established',
+                'parserExecution': 'not-reverified', 'namedGraph': 'urn:trikeshed:english:' + INSPECTION[7:]}
+    for k, v in expected.items():
+        need(src[k] == v, 'query source ' + k)
+    rows = q['results']['results']['bindings']
+    need(len(rows) == 2, 'query must return exactly two syntax rows')
+    need(sorted((r['subjectWord']['value'], r['predicateWord']['value']) for r in rows) ==
+         [('Person', 'Agent'), ('Tenant', 'Person')], 'source-cased syntax words')
+    for row in rows:
+        need('quote' not in row, 'word result falsely labelled quotation')
+        nodes, sentence_id = {}, None
+        for key in ['head', 'subject', 'copula']:
+            term = row[key]
+            need(term['type'] == 'uri', 'query node is not a receipt URI')
+            prefix = src['namedGraph'] + '/sentence/'
+            need(term['value'].startswith(prefix), 'node belongs to another receipt')
+            match = re.fullmatch(r'(\d+)/node/(.+)', term['value'][len(prefix):])
+            need(match is not None, 'query node URI shape')
+            sid, node_id = int(match[1]), match[2]
+            need(sentence_id in [None, sid], 'binding crosses source sentences')
+            sentence_id = sid
+            sentence = next((s for s in inspection['sentences'] if s['index'] == sid), None)
+            need(sentence is not None, 'unknown source sentence')
+            nodes[key] = next((n for n in sentence['nodes'] if n['id'] == node_id), None)
+            need(nodes[key] is not None, 'unknown full parser node identity')
+        need(sentence['quote'] == source_text[sentence['begin']:sentence['end']], 'source quotation mismatch')
+        need(nodes['head']['word'] == row['predicateWord']['value'] and
+             nodes['subject']['word'] == row['subjectWord']['value'], 'binding differs from source node words')
+        for relation, target in [('cop', 'copula'), ('nsubj', 'subject')]:
+            need(any(e['relation'] == relation and e['governorNode'] == nodes['head']['id'] and
+                     e['dependentNode'] == nodes[target]['id'] for e in sentence['dependencies']), 'binding lacks recorded parser edge')
+    need(run['outputs']['bindings']['x'] == q['results'] and run['outputs']['source']['x'] == src, 'display outputs mismatch query')
+
+def validate_ledger(inv, run, program):
+    need(inv['kind'] == 'lcnc-invocations' and inv['runId'] == run['runId'] and
+         inv['programCid'] == run['programCid'], 'ledger run/program identity')
+    need(inv['observationSchema'] == 'lcnc-observations/1' and 0 < len(inv['observations']) <= 128, 'ledger observations absent/oversized')
+    previous, consumed = 0, 0
+    entries = {e['ordinal']: e for e in inv['entries']}
+    for e in inv['observations']:
+        need(isinstance(e['sequence'], int) and e['sequence'] > previous, 'observation ordering')
+        previous = e['sequence']
+        if e['phase'] != 'consumed' or not e.get('wire'):
+            continue
+        consumed += 1
+        need(e['documentCid'] == run['programCid'] and e['status'] == 'delivered' and e['origin'] == 'wire', 'consumed observation identity')
+        need(e['evidence'] == {'status': 'unavailable', 'reason': 'value_identity_not_recorded'}, 'consumed metadata falsely claims value identity')
+        w = e['wire']
+        need(0 <= w['index'] < len(program['wires']), 'consumed wire index')
+        actual = program['wires'][w['index']]
+        need(actual['from'] == [w['fromNode'], w['fromPort']] and actual['to'] == [w['toNode'], w['toPort']], 'consumed wire differs from program')
+        producer = e['producer']
+        need(producer['documentCid'] == run['programCid'] and producer['nodeId'] == w['fromNode'] and e['nodeId'] == w['toNode'], 'producer/consumer frame ownership')
+        need(entries[e['invocationOrdinal']]['nodeId'] == e['nodeId'] and
+             entries[producer['invocationOrdinal']]['nodeId'] == producer['nodeId'], 'observation invocation binding')
+    need(consumed > 0, 'no actual consumed wire observations')
+
+def validate_browser(b):
+    need(b['result'] == 'PASS', 'browser record not PASS')
+    m, o = b['meta'], b['observed']
+    need(m['frozenSourceHead'] == SOURCE_HEAD and m['inspectionCid'] == INSPECTION and m['source']['cid'] == SOURCE, 'frozen source/inspection identity')
+    need(m['source']['text'] == SOURCE_TEXT and cid(m['source']['text'].encode()) == SOURCE, 'original source bytes')
+    need(m['sourceCurrent'] is True and m['guestModules'] == {'installed': [], 'mounted': []}, 'original currentness/module state')
+    need(all(v == m['finalJar'] for v in m['classCodeSources'].values()) and len(m['classCodeSources']) >= 9, 'production code sources')
+    inspection = o['inspection']
+    need(inspection['receiptCid'] == INSPECTION and inspection['originalCid'] == SOURCE and inspection['selection'] == m['sourceRevision'], 'retained selection scope')
+    need(inspection['retrieval'] == {'kind': 'retained-current-inspection', 'parserExecuted': False,
+         'modelCalled': False, 'currentness': 'checked-before-and-after-open'}, 'retained read provenance')
+    for sentence in inspection['sentences']:
+        need(sentence['quote'] == SOURCE_TEXT[sentence['begin']:sentence['end']], 'source quotation mismatch')
+    h = o['handoff']
+    need(h['typedFields'] is True and h['validatedAndLoadedWithoutRun'] is True, 'handoff was not recorded inertly')
+    u = urlsplit(h['href'])
+    need(u.scheme == 'http' and u.hostname == '127.0.0.1' and u.path == '/panels' and not u.fragment, 'same-origin Panels action')
+    expected = {'load': 'preset-english-copular-query', 'englishReceipt': INSPECTION,
+        'englishProject': m['sourceRevision']['project'], 'englishDocument': m['sourceRevision']['id'],
+        'englishCid': SOURCE, 'englishRev': m['sourceRevision']['rev'],
+        'englishSeq': str(m['sourceRevision']['seq']), 'englishBegin': '0', 'englishEnd': '41'}
+    fields = parse_qsl(u.query, keep_blank_values=True, strict_parsing=True, encoding='utf-8', errors='strict')
+    need(len(fields) == 9 and dict(fields) == expected, 'exact eight English fields plus fixed offered preset')
+    for value in [m['sourceRevision']['project'], m['sourceRevision']['id'], m['sourceRevision']['rev'],
+                  INSPECTION, SOURCE, 'range [0, 41)', 'Navigation context only', 'not a query result or review authority']:
+        need(value in h['sourceContext'], 'source context metadata missing: ' + value)
+    zero_counts(o['initialCounters'], 'initial')
+    g = o['negativeGuards']
+    need(g['status'] == 'PASS' and [c['case'] for c in g['checks']] == GUARDS, 'ten labelled guard cases')
+    for i, c in enumerate(g['checks']):
+        need(c['scratchUnchanged'] is True, 'negative scratch mutation')
+        if i < 6:
+            need(c['result'] == 'REFUSED_INERTLY' and 'English inspection handoff unavailable' in c['refusal'], 'negative refusal state')
+    wrong = g['checks'][4]['actual']
+    need(wrong['status'] == 409 and wrong['negativeIdentity']['cid'] == SOURCE and wrong['negativeIdentity']['id'] != m['source']['id'], 'actual cross-document 409')
+    injected = g['checks'][5]['injection']
+    need(injected['actualStatus'] == 200 and injected['actualReceipt'] == INSPECTION and 'LABELLED' in injected['scope'], 'response injection not labelled')
+    need(g['checks'][6]['releasedUnchanged'] is True and g['checks'][6]['editedCanvasPreserved'] is True and
+         g['checks'][7]['lateHandoffAbsent'] is True, 'late handoff owns another canvas/page')
+    need(all(c['originPermanentlyCleared'] is True for c in g['checks'][8:]), 'edited/restored source origin remained authorized')
+    zero_counts(g['counters'], 'negative guards')
+    need(set(o['runs']) == {'B', 'A_success', 'A_failure'}, 'three actual completed runs absent')
+    runs = o['runs']
+    need(len({v['run']['programCid'] for v in runs.values()}) == 1, 'three authored program CIDs differ')
+    need(len({v['run']['runId'] for v in runs.values()}) == 3, 'run IDs not distinct')
+    for label, v in runs.items():
+        run, program = v['run'], v['program']
+        validate_query(run, inspection, SOURCE_TEXT)
+        need(v['durable']['lcncRun']['runId'] == run['runId'] and v['durable']['lcncRun']['programCid'] == run['programCid'] and
+             v['durable']['lcncRun']['outputs'] == run['outputs'] and v['durable']['lcncRun']['status'] == 'completed', 'durable receipt binding ' + label)
+        nodes = {n['id']: n for n in program['nodes']}
+        need(len(nodes) == 10 and nodes['receipt']['params']['default'] == INSPECTION and nodes['mode']['params']['value'] == 'current', 'offered construction receipt/current prefill')
+        validate_ledger(v['invocations'], run, program)
+    need([h['case'] for h in b['holds']] == ['A_success', 'A_failure'], 'two older-A hold controls absent')
+    B = runs['B']['run']
+    for hold in b['holds']:
+        A = runs[hold['case']]['run']
+        need(hold['actualStatus'] == 200 and hold['cid'] == A['invocationsCid'] and hold['actualResponse'] == runs[hold['case']]['invocations'], 'held actual A response binding')
+        need(hold['sha256'] == hold['cid'] and hold['newerBActivityAndEvidencePreserved'] is True, 'held bytes/ownership assertion')
+        for state in [hold['before'], hold['after']]:
+            need(B['runId'] in state['banner'] and A['runId'] not in state['banner'] and
+                 'Recorded playback · no execution' in state['banner'] and 'unavailable' not in state['banner'] and
+                 state['selectedReceipt'] == B['receiptCid'], 'B activity/Evidence owner replaced by A')
+        if hold['case'] == 'A_success':
+            need(hold['outcome'] == 'original-200-body-delivered-unchanged', 'actual A200 not delivered unchanged')
+        else:
+            need(hold['outcome'] == 'labelled-transport-503-delivered' and '503' in hold['scope'] and 'not an engine/run failure' in hold['scope'], 'injected A503 mislabelled')
+    zero_counts(o['finalCounters'], 'final', runs=3)
+    requests = b['requests']
+    actual = [r for r in requests if r['method'] == 'POST' and r['path'] == '/api/lcnc/run']
+    need(len(actual) == 3, 'automatic/additional run request')
+    need(all(r['body']['document'] == actual[0]['body']['document'] and r['body']['name'] == actual[0]['body']['name']
+             for r in actual), 'three captured authored request documents differ')
+    restores = o['handoffRestorations']
+    need([r['before'] for r in restores] == ['A_success', 'A_failure'], 'native Import/Fit restoration controls absent')
+    for restoration in restores:
+        need(restoration['automaticRuns'] == 0 and restoration['targetProgramCid'] == B['programCid'] and
+             'Native file import' in restoration['scope'] and 'native Fit' in restoration['scope'], 'Import/Fit automatically executed or changed program target')
+    need(not any(r['path'] in ['/api/documents/english', '/api/documents/english/query'] or
+                 re.search(r'review/(decision|snapshot)|model|provider', r['path']) for r in requests), 'fresh NLP/direct query/review/provider request')
+    need(b['browserErrors'] == [] and b['externalBrowserRequests'] == [], 'recorded browser errors/external requests')
+
+def mutation_controls(browser):
+    mutations = {
+        'wrong-inspection-I': lambda b: b['observed']['runs']['B']['run']['outputs']['query']['source'].__setitem__('receiptCid', SOURCE),
+        'wrong-source-quotation': lambda b: b['observed']['inspection']['sentences'][0].__setitem__('quote', 'Invented source quotation'),
+        'wrong-program-CID': lambda b: b['observed']['runs']['A_success']['run'].__setitem__('programCid', SOURCE),
+        'wrong-run-ID': lambda b: b['observed']['runs']['A_success']['invocations'].__setitem__('runId', b['observed']['runs']['B']['run']['runId']),
+        'wrong-activity-owner': lambda b: b['holds'][0]['after'].__setitem__('banner', 'Recorded playback · no execution ' + b['observed']['runs']['A_success']['run']['runId']),
+        'automatic-run-before-explicit-Run': lambda b: b['observed']['negativeGuards']['counters'].__setitem__('authoredRunPosts', 1),
+        'false-consumed-value-authority': lambda b: next(e for e in b['observed']['runs']['B']['invocations']['observations'] if e['phase'] == 'consumed' and e.get('wire'))['evidence'].__setitem__('status', 'verified'),
+        'automatic-run-on-Import-Fit': lambda b: b['observed']['handoffRestorations'][0].__setitem__('automaticRuns', 1),
+    }
+    results = []
+    for name, mutate in mutations.items():
+        value = copy.deepcopy(browser)
+        mutate(value)
+        try:
+            validate_browser(value)
+        except AuditError as error:
+            results.append({'mutation': name, 'result': 'REJECTED', 'reason': str(error)})
+        else:
+            raise AuditError('mutated-copy control accepted: ' + name)
+    return results
+
+def audit(native, snapshot, archive):
+    checks, artifacts = [], {}
+    def checked(name):
+        checks.append(name)
+    def file_bytes(path):
+        data = path.read_bytes()
+        artifacts[str(path)] = {'bytes': len(data), 'sha256': digest(data)}
+        return data
+    missing = [str(native / f) for f in REQUIRED if not (native / f).is_file()]
+    if missing:
+        return {'result': 'PENDING', 'missing': missing, 'checks': [], 'mutatedCopyControls': []}
+    b, e, cleanup, reopened, startup, expected, setup, before = [load(native / f) for f in
+        ['browser-result.json', 'fixture-evidence.json', 'cleanup.json', 'native-reopened-cas.json',
+         'startup-evidence.json', 'expected-inspection.json', 'setup.json', 'archive-manifest-before.json']]
+    for name, sha in FROZEN.items():
+        need(digest(file_bytes(snapshot / name)) == sha, 'frozen artifact changed: ' + name)
+    need((snapshot / 'source-head.txt').read_text().strip() == SOURCE_HEAD, 'frozen source head')
+    declared = load(snapshot / 'sha256.json')
+    for name, sha in declared.items():
+        if name == 'dependencies':
+            continue
+        need(digest(file_bytes(snapshot / name)) == sha, 'snapshot hash manifest: ' + name)
+    checked('Frozen source, main JAR, three JS artifacts and static snapshot hash manifest')
+    validate_browser(b)
+    checked('Exact eight-field action, inert offered current construction/context, ten labelled native negatives, three actual same-program runs, two held A/B ownership controls')
+    need(cid(file_bytes(archive)) == 'sha256:' + ARCHIVE_SHA, 'original archive SHA256')
+    need(before['archiveSha256'] == ARCHIVE_SHA and setup['sourceArchiveSha256'] == ARCHIVE_SHA, 'archive provenance manifest')
+    with tarfile.open(archive) as tar:
+        archived = {m.name: tar.extractfile(m).read() for m in tar.getmembers() if m.isfile()}
+    for row in before['originalFiles']:
+        data = archived[row['path']]
+        need(len(data) == row['bytes'] and digest(data) == row['sha256'], 'original archive file manifest')
+    need(len(archived) == 7, 'original archive file count')
+    project, document = setup['selection']['project'], setup['selection']['id']
+    protected = {'project-couch/' + project + '/HEAD', 'project-manifests/' + project + '.tsv',
+                 'project-intake-policy/' + project + '.guard', 'files/' + project + '/' + document}
+    need({row['path'] for row in e['originalArchiveHeadsAndSource']} == protected and
+         len(e['originalArchiveHeadsAndSource']) == 4, 'four original source/head/manifest/guard bindings required')
+    for row in e['originalArchiveHeadsAndSource']:
+        relative = 'runtime/' + row['path']
+        data = file_bytes(native / relative)
+        need(data == archived[relative] and row['unchanged'] is True and row['sha256'] == cid(data) and row['bytes'] == len(data), 'original source/head/manifest/guard changed')
+    pack = file_bytes(native / 'runtime/cas/pack')
+    need(pack.startswith(archived['runtime/cas/pack']), 'original CAS pack prefix changed')
+    checked('Original seven-file archive identity; protected source/head/manifest/guard and CAS pack prefix preserved')
+    blocks = {}
+    for row in e['retainedReadbacks']:
+        identity = row['cid']
+        need(re.fullmatch(r'sha256:[0-9a-f]{64}', identity) is not None, 'invalid readback CID')
+        data = file_bytes(native / 'cas-readbacks' / (identity[7:] + '.' + row['encoding']))
+        need(cid(data) == identity and len(data) == row['bytes'], 'retained block identity/size')
+        need(identity not in blocks, 'duplicate retained block')
+        blocks[identity] = (row['encoding'], data)
+    need(blocks[SOURCE] == ('txt', SOURCE_TEXT.encode()), 'original source block')
+    need(blocks[INSPECTION][0] == 'cbor', 'original inspection encoding')
+    original = cbor_decode(blocks[INSPECTION][1])
+    need(blocks[INSPECTION][1] in archived['runtime/cas/pack'], 'original receipt absent from archived CAS pack')
+    need({**original, 'receiptCid': INSPECTION} == expected, 'CBOR receipt differs from exported original inspection')
+    need({k: v for k, v in b['observed']['inspection'].items() if k != 'retrieval'} == expected, 'opened inspection differs from original receipt')
+    need(original['sourceSnapshots'] == e['retainedSourceSnapshots'] == startup['retainedSourceSnapshots'] == reopened['recordedSourceSnapshots'], 'source snapshot identity')
+    need(e['sourceCurrent'] is True and startup['sourceCurrent'] is True and e['sourceRevision']['cid'] == SOURCE, 'source currentness records')
+    for key, value in setup['selection'].items():
+        need(b['meta']['sourceRevision'][key] == e['sourceRevision'][key] == startup['sourceRevision'][key] == value, 'source revision binding: ' + key)
+    checked('Original 3f958 canonical CBOR round trip, source CID/quotations and retained source snapshots')
+    expected_retained = set(blocks)
+    for label, record in b['observed']['runs'].items():
+        run = record['run']
+        for field, key in [('receiptCid', 'durable'), ('programCid', 'program'), ('invocationsCid', 'invocations')]:
+            identity = run[field]
+            need(identity in blocks and blocks[identity][0] == 'json', 'run block absent from actual CAS exports')
+            raw = file_bytes(native / 'durable-readbacks' / (identity[7:] + '.json'))
+            need(raw == blocks[identity][1] and strict_json(raw.decode('utf-8')) == record[key], 'durable/CAS/browser block mismatch: ' + label + '/' + field)
+    for hold in b['holds']:
+        raw = file_bytes(native / 'held-responses' / (hold['cid'][7:] + '.json'))
+        need(cid(raw) == hold['sha256'] == hold['cid'] and len(raw) == hold['bytes'] and
+             raw == blocks[hold['cid']][1] and strict_json(raw.decode('utf-8')) == hold['actualResponse'], 'held A original bytes changed')
+    imported = file_bytes(native / 'native-imports/actual-B-admitted-document.json')
+    run_requests = [r for r in b['requests'] if r['path'] == '/api/lcnc/run' and r['method'] == 'POST']
+    need(strict_json(imported.decode('utf-8')) == run_requests[0]['body']['document'], 'native import differs from actual B admitted document')
+    need(all(r['admittedDocumentSha256'] == cid(imported) for r in b['observed']['handoffRestorations']), 'native Import/Fit document byte identity')
+    checked('Every run receipt/program/ledger and both held actual A200 byte bodies match content-addressed CAS exports')
+    need(b['evidence'] == e, 'browser and final fixture evidence differ')
+    actual_requests = [r for r in e['requests'] if r['method'] == 'POST' and r['path'] == '/api/lcnc/run']
+    need(len(actual_requests) == 3 and all(r['status'] == 200 for r in actual_requests), 'fixture real run request count/status')
+    browser_runs = {v['run']['runId']: v['run'] for v in b['observed']['runs'].values()}
+    need({r['response']['runId'] for r in actual_requests} == set(browser_runs), 'browser/fixture run IDs differ')
+    for request in actual_requests:
+        need(request['response'] == browser_runs[request['response']['runId']], 'fixture/browser completed run response differs')
+    zero_counts(e['safety'], 'fixture final safety', runs=3)
+    need(startup['guestModules'] == cleanup['guestModules'] == {'installed': [], 'mounted': []}, 'SDK/module lifecycle state')
+    need(Path(startup['emptySubvmHome']).name == 'empty-subvm', 'recorded empty SDK root identity')
+    empty = native / 'empty-subvm'
+    need(empty.is_dir() and not list(empty.iterdir()), 'SDK root no longer empty')
+    for field in ['allSupervisorsCompleted', 'listenerStopped', 'modulesDrained', 'reviewClosed', 'booksDrained', 'scopesDrained']:
+        need(cleanup[field] is True, 'cleanup owner incomplete: ' + field)
+    need(cleanup['freshInspectionPosts'] == 0 and cleanup['authoredRunPosts'] == cleanup['queryCalls'] == 3, 'cleanup execution counters')
+    need((native / 'fixture-attempt1.exit').read_text().strip() == '0', 'fixture exit not zero')
+    need(reopened['result'] == 'PASS' and reopened['frozenSourceHead'] == SOURCE_HEAD and reopened['inspectionCid'] == INSPECTION and
+         reopened['originalSourceCid'] == SOURCE and reopened['finalJar'] == startup['finalJar'] == b['meta']['finalJar'] and
+         reopened['EnglishObservationGraphCodeSource'] == reopened['finalJar'], 'after-close production reader identity')
+    need(set(r['cid'] for r in reopened['retainedBlocks']) == expected_retained and
+         all(r['unchangedAfterClose'] is True and r['bytes'] == len(blocks[r['cid']][1]) and
+             r['encoding'] == blocks[r['cid']][0] for r in reopened['retainedBlocks']), 'after-close retained block binding')
+    reopened_runs = {r['runId']: r for r in reopened['runs']}
+    need(len(reopened_runs) == 3, 'after-close run count')
+    for record in b['observed']['runs'].values():
+        run = record['run']
+        rr = reopened_runs[run['runId']]
+        for field in ['receiptCid', 'programCid', 'invocationsCid']:
+            need(rr[field] == run[field], 'after-close run/CID binding')
+        need(rr['observationSchema'] == 'lcnc-observations/1' and rr['observationSummary'] == record['invocations']['observationSummary'], 'after-close observation summary')
+    checked('Three run records, empty SDK/no fresh NLP or provider, original source currentness, drained owners and production after-close retained-reader bindings')
+    for f in REQUIRED:
+        file_bytes(native / f)
+    for name in ['Fixture.kt', 'NativeReopen.kt', 'driver.cjs', 'deny-egress.py', 'compile.sh', 'run-fixture.sh']:
+        file_bytes(native.parent / name)
+    controls = mutation_controls(b)
+    checked('Eight mutated-copy controls rejected by the same verifier')
+    return {'result': 'PASS', 'scope': 'Recorded-data audit of one explicitly selected closed native attempt; source/canonical receipt/CAS identity, exact inert handoff, syntax-only query rows and activity/Evidence ownership. No semantic entailment, producer authentication, fresh parser validation or global airgap claim.',
+            'nativeDirectory': str(native), 'snapshotDirectory': str(snapshot), 'frozenSourceHead': SOURCE_HEAD,
+            'inspectionCid': INSPECTION, 'sourceCid': SOURCE, 'checks': checks,
+            'runIds': sorted(reopened_runs), 'programCid': next(iter(b['observed']['runs'].values()))['run']['programCid'],
+            'retainedBlocks': len(blocks), 'mutatedCopyControls': controls, 'artifactHashes': artifacts}
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument('native', type=Path)
+    p.add_argument('snapshot', type=Path)
+    p.add_argument('--archive', type=Path, default=Path('/workspace/library-files/english-retained-opener-inputs/positive-unmutated-runtime.tar.gz'))
+    p.add_argument('--out', type=Path, default=Path(__file__).resolve().parent)
+    args = p.parse_args()
+    args.out.mkdir(parents=True, exist_ok=True)
+    try:
+        result = audit(args.native.resolve(), args.snapshot.resolve(), args.archive.resolve())
+    except (AuditError, KeyError, ValueError, OSError, TypeError, IndexError, StopIteration) as error:
+        result = {'result': 'FAIL', 'error': str(error), 'nativeDirectory': str(args.native.resolve())}
+    result['auditScriptSha256'] = digest(Path(__file__).read_bytes())
+    (args.out / 'audit-result.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n')
+    lines = ['Independent recorded-data audit: ' + result['result'], '',
+             'Selected records: ' + str(args.native.resolve()), '']
+    lines += [('- ' + item) for item in result.get('checks', [])]
+    if result.get('missing'):
+        lines += ['', 'Required final records are absent; no final PASS is issued.'] + result['missing']
+    if result.get('error'):
+        lines += ['', result['error']]
+    lines += ['', 'This audits recorded evidence only. It does not claim semantic entailment, producer authentication, fresh parser validation or a global airgap.']
+    (args.out / 'report.txt').write_text('\n'.join(lines) + '\n')
+    print(json.dumps({'result': result['result'], 'checks': len(result.get('checks', [])),
+                      'mutatedCopyControls': len(result.get('mutatedCopyControls', [])), 'report': str(args.out / 'audit-result.json')}))
+    return {'PASS': 0, 'PENDING': 2, 'FAIL': 1}[result['result']]
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,0 +1,382 @@
+{
+  "result": "PASS",
+  "scope": "Recorded-data audit of one explicitly selected closed native attempt; source/canonical receipt/CAS identity, exact inert handoff, syntax-only query rows and activity/Evidence ownership. No semantic entailment, producer authentication, fresh parser validation or global airgap claim.",
+  "nativeDirectory": "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4",
+  "snapshotDirectory": "/workspace/library-files/english-query-handoff-v72-proof/snapshot",
+  "frozenSourceHead": "c8b7f5e8a5d0dad8e6352d2fc1c733df7d69e563",
+  "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+  "sourceCid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+  "checks": [
+    "Frozen source, main JAR, three JS artifacts and static snapshot hash manifest",
+    "Exact eight-field action, inert offered current construction/context, ten labelled native negatives, three actual same-program runs, two held A/B ownership controls",
+    "Original seven-file archive identity; protected source/head/manifest/guard and CAS pack prefix preserved",
+    "Original 3f958 canonical CBOR round trip, source CID/quotations and retained source snapshots",
+    "Every run receipt/program/ledger and both held actual A200 byte bodies match content-addressed CAS exports",
+    "Three run records, empty SDK/no fresh NLP or provider, original source currentness, drained owners and production after-close retained-reader bindings",
+    "Eight mutated-copy controls rejected by the same verifier"
+  ],
+  "runIds": [
+    "1123e90f-00b1-45d7-903f-18b07686d76f",
+    "a161edfc-9fef-4f47-bdc8-9ed10b4a6bc1",
+    "ec977ff1-deec-46eb-a223-f8651665e830"
+  ],
+  "programCid": "sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30",
+  "retainedBlocks": 9,
+  "mutatedCopyControls": [
+    {
+      "mutation": "wrong-inspection-I",
+      "result": "REJECTED",
+      "reason": "query source receiptCid"
+    },
+    {
+      "mutation": "wrong-source-quotation",
+      "result": "REJECTED",
+      "reason": "source quotation mismatch"
+    },
+    {
+      "mutation": "wrong-program-CID",
+      "result": "REJECTED",
+      "reason": "three authored program CIDs differ"
+    },
+    {
+      "mutation": "wrong-run-ID",
+      "result": "REJECTED",
+      "reason": "ledger run/program identity"
+    },
+    {
+      "mutation": "wrong-activity-owner",
+      "result": "REJECTED",
+      "reason": "B activity/Evidence owner replaced by A"
+    },
+    {
+      "mutation": "automatic-run-before-explicit-Run",
+      "result": "REJECTED",
+      "reason": "negative guards: run/query count"
+    },
+    {
+      "mutation": "false-consumed-value-authority",
+      "result": "REJECTED",
+      "reason": "consumed metadata falsely claims value identity"
+    },
+    {
+      "mutation": "automatic-run-on-Import-Fit",
+      "result": "REJECTED",
+      "reason": "Import/Fit automatically executed or changed program target"
+    }
+  ],
+  "artifactHashes": {
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/main.jar": {
+      "bytes": 36004279,
+      "sha256": "b4744105e462d94767f84edf23b89f703ec517435f32bbcd8dd7c9090e819797"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/documents.js": {
+      "bytes": 9904307,
+      "sha256": "4cd75fd35ef2a3e1aea3c4ac099c74c05ae9dba429371ca20eddede53c5a2ee9"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/spacegraph.js": {
+      "bytes": 38571274,
+      "sha256": "3b0a85c42b978f81b5043ed4b2cee10c835e7715683d4448a90e922aaf50fbac"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/pages.js": {
+      "bytes": 18048549,
+      "sha256": "d9098c8cd7158f10edf295d246a88061d6c5f1ef000f41f6a412b759e4ef9103"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/source-head.txt": {
+      "bytes": 41,
+      "sha256": "c902e36b634baf7e717b5380dc739edc25c4485149460385745d33715ab29265"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/passing-build.log": {
+      "bytes": 347161,
+      "sha256": "0de7ace1fee5384dcf8dfd14be4292c15251afc5c9c2090f57f9eb3a5b0b1b38"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/classpath.txt": {
+      "bytes": 21453,
+      "sha256": "1149849d73a288ff1ee4c95fc037cc6191cca4fbc4d3238ae1a65c68a0fb865b"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/harness.css": {
+      "bytes": 17268,
+      "sha256": "866c281025750ae454a672c30ec71f3f82beb8294ae516f9618f1f1a46012e41"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/vm-terminal.html": {
+      "bytes": 4165,
+      "sha256": "69feef2dded55e63647be81b7fd884ff78deefd30b3ad2a6b821c3b1e3ccf7a4"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/index.html": {
+      "bytes": 9237,
+      "sha256": "b4f2c96f65b56b9325fa05960c79fefd5ca37828150c995b4e4bef29f2f4c373"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/pi.html": {
+      "bytes": 4270,
+      "sha256": "d731ee0571b69825908213bcab118323e0e991e81c8716e1d0b2a1f5200d93df"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/futon.html": {
+      "bytes": 6933,
+      "sha256": "2b96c33ee59abbda987b76fe5a68a5e754e6bdb02ce9497e529654327f6a155e"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/panels.html": {
+      "bytes": 33595,
+      "sha256": "c1a5d76d0e69a9b5014941ffa0931b59ef764de4a898576a097df6573696b17d"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/wiki.css": {
+      "bytes": 5272,
+      "sha256": "2cb8090df776501ee3016831bc65f1cbbd99b7b586421a044e7e243fdf6cda88"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/documents.html": {
+      "bytes": 14300,
+      "sha256": "48033445b618647ab69f8a5c01b683638ab33d57b87a5be965b558d215654e78"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/hermes-xterm.html": {
+      "bytes": 6135,
+      "sha256": "076a541b4bc7b57792a35a8d95a80771e43c4a135522c8fe4746e5db457f1cf7"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/patch.css": {
+      "bytes": 28244,
+      "sha256": "59baff85709e7cebb8bc310ecb90336e969f2e03b3dd7623114a46aea3b46877"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/kanban.html": {
+      "bytes": 11525,
+      "sha256": "230730ba8bbc52de20b3dccad7371ca99f9e6e39bfaf7eb3a325ed11577981bf"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/harness.html": {
+      "bytes": 10358,
+      "sha256": "b3dbdf1747e7ecf0f767b8667317ab3e38dd12d0ba96616a9de3f9986caa118b"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/mux.css": {
+      "bytes": 23225,
+      "sha256": "bed29d7c723da5198ccf4bd4b3ed9900e15e9d1067461ef68ec813ea2896f8f9"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/mux.html": {
+      "bytes": 19167,
+      "sha256": "608bc4d4baeae6a2f091d517a1045e1e2167c4aa69e21f27858955a06693572a"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/spacegraph-shadow.css": {
+      "bytes": 7939,
+      "sha256": "0c453b82b7356dc6f428d845630c3f2716058e69a886f739aead72dcf42c28e5"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/archive.css": {
+      "bytes": 4042,
+      "sha256": "bd2b42b91a138cc24fe379ec2879e2c777ffa3ef0219586a8e0db4f1b3cc722d"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/application-nav.css": {
+      "bytes": 4629,
+      "sha256": "3b8633f8336e147a009adc4435a87dcbd79dec4ab89aabbbe3d5c81da1790a71"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/curator.html": {
+      "bytes": 8579,
+      "sha256": "ab687ee7cf05b947a27250dd71a1efb58421a8031639cbeb65d55a62b76d190e"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/graal.html": {
+      "bytes": 29285,
+      "sha256": "0269950d4c1958ca4af117f41e52d83be3941a2583fd0bd32ef269ce6de74cc6"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/headhunter.css": {
+      "bytes": 8900,
+      "sha256": "3096d9cdb8477b355214ec9e9499b9ebd9b705c47958abd4e97b4715c7a48021"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/headhunter.html": {
+      "bytes": 17246,
+      "sha256": "b70bcbeeaac87bf58b3f1fa409e2bddfda28bcfc55f2a6d56b82ec90166ce220"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/manifest.webmanifest": {
+      "bytes": 649,
+      "sha256": "1bf99f6ab7cf2288ddb89025b57c0441bd28c37aacbedff929940b9d752de55a"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/allocation-inspector.css": {
+      "bytes": 3406,
+      "sha256": "655a215c145230997e03f382368f906378280ce333c96b2a5471b8e79f54f718"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/styles.css": {
+      "bytes": 24082,
+      "sha256": "f07410b38961c6ef8bcffe709c38d4e251aeeed4b0ae793f874b73daeadea427"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/patch-camera.css": {
+      "bytes": 4709,
+      "sha256": "65d0c85979f810f765edcd8e08840d9ed8988afce19386c70dd24b639f8f5506"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/vendor/d3-quadtree-LICENSE.txt": {
+      "bytes": 731,
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/vendor/d3-dispatch-LICENSE.txt": {
+      "bytes": 731,
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/vendor/lucide-LICENSE.txt": {
+      "bytes": 880,
+      "sha256": "1e7290b35280a048667bbf0ebabac1c7fd52a75300e8b2946ac165715997f2bc"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/vendor/d3-force-LICENSE.txt": {
+      "bytes": 731,
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/vendor/fflate-LICENSE.txt": {
+      "bytes": 1069,
+      "sha256": "805f6cb28bb8b6d3a0badd83c93bccd9671fa01a3b4b92b7042b0743325ac243"
+    },
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/web/vendor/d3-timer-LICENSE.txt": {
+      "bytes": 731,
+      "sha256": "e008c5e25a6be382593089c29bfabbc553c6378eee02895aec46ce396cc404ee"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/source/positive-unmutated-runtime.tar.gz": {
+      "bytes": 2828,
+      "sha256": "51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/runtime/project-couch/english-taxonomy-fresh-profile-proof/HEAD": {
+      "bytes": 107,
+      "sha256": "42c214d75cb1cf24c02a73ecc7d3d040380d169a04a25ca76a2b463591e42e9c"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/runtime/project-manifests/english-taxonomy-fresh-profile-proof.tsv": {
+      "bytes": 114,
+      "sha256": "311e47263ef040fe1db194cbad68efc1d921592130e878154f8898e98b7f9a66"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/runtime/project-intake-policy/english-taxonomy-fresh-profile-proof.guard": {
+      "bytes": 78,
+      "sha256": "ea6faf550466382954e93ee1604d23e3e9db4dd1cf730d538433181e10eb6a84"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/runtime/files/english-taxonomy-fresh-profile-proof/synthetic taxonomy copular clauses.txt": {
+      "bytes": 41,
+      "sha256": "efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/runtime/cas/pack": {
+      "bytes": 242712,
+      "sha256": "d3fe7c0f4217096246987da24f927dd3837d90abb9e04ffe2b51700b9715d941"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/0127d77fea91f65ef4150d7b3a3622ffd1c3054ae145556046891d28af9d1a0a.json": {
+      "bytes": 23804,
+      "sha256": "0127d77fea91f65ef4150d7b3a3622ffd1c3054ae145556046891d28af9d1a0a"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/2cbf098d8edce48cffd4400d7d460f8095c5a8c0de55d488cea9995a679d94be.json": {
+      "bytes": 13612,
+      "sha256": "2cbf098d8edce48cffd4400d7d460f8095c5a8c0de55d488cea9995a679d94be"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/2e357aa528d17d07315efe54eb331de7b08206e60a78edd297eb760364fa8df1.json": {
+      "bytes": 23804,
+      "sha256": "2e357aa528d17d07315efe54eb331de7b08206e60a78edd297eb760364fa8df1"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d.cbor": {
+      "bytes": 6838,
+      "sha256": "3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/424dd41ae1d59fddae8f1e94449303a9806bf89efa358e086b392c87d25471b4.json": {
+      "bytes": 23832,
+      "sha256": "424dd41ae1d59fddae8f1e94449303a9806bf89efa358e086b392c87d25471b4"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/438e9e52fcffc0a647f0a2b50a0d159c9d983abe725c08d68e25edff14aa3548.json": {
+      "bytes": 13612,
+      "sha256": "438e9e52fcffc0a647f0a2b50a0d159c9d983abe725c08d68e25edff14aa3548"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30.json": {
+      "bytes": 7473,
+      "sha256": "7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/cff82581d3ff8f4e2078643e76d968d53323e695e03bfa7008e6a5a7bb0485cc.json": {
+      "bytes": 13612,
+      "sha256": "cff82581d3ff8f4e2078643e76d968d53323e695e03bfa7008e6a5a7bb0485cc"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cas-readbacks/efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883.txt": {
+      "bytes": 41,
+      "sha256": "efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/durable-readbacks/2cbf098d8edce48cffd4400d7d460f8095c5a8c0de55d488cea9995a679d94be.json": {
+      "bytes": 13612,
+      "sha256": "2cbf098d8edce48cffd4400d7d460f8095c5a8c0de55d488cea9995a679d94be"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/durable-readbacks/7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30.json": {
+      "bytes": 7473,
+      "sha256": "7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/durable-readbacks/424dd41ae1d59fddae8f1e94449303a9806bf89efa358e086b392c87d25471b4.json": {
+      "bytes": 23832,
+      "sha256": "424dd41ae1d59fddae8f1e94449303a9806bf89efa358e086b392c87d25471b4"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/durable-readbacks/438e9e52fcffc0a647f0a2b50a0d159c9d983abe725c08d68e25edff14aa3548.json": {
+      "bytes": 13612,
+      "sha256": "438e9e52fcffc0a647f0a2b50a0d159c9d983abe725c08d68e25edff14aa3548"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/durable-readbacks/2e357aa528d17d07315efe54eb331de7b08206e60a78edd297eb760364fa8df1.json": {
+      "bytes": 23804,
+      "sha256": "2e357aa528d17d07315efe54eb331de7b08206e60a78edd297eb760364fa8df1"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/durable-readbacks/cff82581d3ff8f4e2078643e76d968d53323e695e03bfa7008e6a5a7bb0485cc.json": {
+      "bytes": 13612,
+      "sha256": "cff82581d3ff8f4e2078643e76d968d53323e695e03bfa7008e6a5a7bb0485cc"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/durable-readbacks/0127d77fea91f65ef4150d7b3a3622ffd1c3054ae145556046891d28af9d1a0a.json": {
+      "bytes": 23804,
+      "sha256": "0127d77fea91f65ef4150d7b3a3622ffd1c3054ae145556046891d28af9d1a0a"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/held-responses/2e357aa528d17d07315efe54eb331de7b08206e60a78edd297eb760364fa8df1.json": {
+      "bytes": 23804,
+      "sha256": "2e357aa528d17d07315efe54eb331de7b08206e60a78edd297eb760364fa8df1"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/held-responses/0127d77fea91f65ef4150d7b3a3622ffd1c3054ae145556046891d28af9d1a0a.json": {
+      "bytes": 23804,
+      "sha256": "0127d77fea91f65ef4150d7b3a3622ffd1c3054ae145556046891d28af9d1a0a"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/native-imports/actual-B-admitted-document.json": {
+      "bytes": 6707,
+      "sha256": "3d7c9d05adb444a09f07c97e8ed1bc8dad46e89401dc3c01e4faf8b02c271380"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/browser-result.json": {
+      "bytes": 4080272,
+      "sha256": "793fe3a71fb3372629e1853f9773293ec8dd682dc88bcddf80c004da1e40fd4b"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/fixture-evidence.json": {
+      "bytes": 1831776,
+      "sha256": "f6ce55f33a886063d089d6fe4b11bcd43e9c206975c31a68689e16116b319a8c"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/cleanup.json": {
+      "bytes": 277,
+      "sha256": "80f6b6466f78f2b4568da81dee2daf503854929ced705fad60f423681a39354c"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/native-reopened-cas.json": {
+      "bytes": 4055,
+      "sha256": "0f79425182ab2f56b82a559c7a79cb068d5f3c3194077b902e912e3184c0f9ce"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/fixture-attempt1.exit": {
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/startup-evidence.json": {
+      "bytes": 2132,
+      "sha256": "1d477db491e16f45bdfa79ca55135a50c2a757c969561e937f2c6e37693c9b30"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/expected-inspection.json": {
+      "bytes": 8782,
+      "sha256": "e2d568504f0405d9a0c61e722ecb6823f97c4f837c2ccdf52d991413fac725ba"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/setup.json": {
+      "bytes": 749,
+      "sha256": "9590471e13b3dd80238a253c44a7eca7f20c06b34327b8ae0656f3604ded72b8"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/native-attempt4/archive-manifest-before.json": {
+      "bytes": 1580,
+      "sha256": "cc5181b99b4f96e0f108dfcb8ca8e64de71d3f28ad54338d18f0f7fef8ae48bc"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/Fixture.kt": {
+      "bytes": 20132,
+      "sha256": "d922c9be59ad62ac434895422bfee008b2b9c16fcb691521da4a265a5cea55e9"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/NativeReopen.kt": {
+      "bytes": 5533,
+      "sha256": "048ad393490e4503ccbf1b40d049c293050410252acb4c0abf914496a2e61d77"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/driver.cjs": {
+      "bytes": 28510,
+      "sha256": "d6f3a36e3203031da382b62f0f71e89c97ea08269cb423d142479e6b249a982e"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/deny-egress.py": {
+      "bytes": 3121,
+      "sha256": "e049c06e6df72f4ad0a8304f7738ed3b5c74af9ba0c0c0f37dc1ad41c74d2f84"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/compile.sh": {
+      "bytes": 784,
+      "sha256": "78339bd70258d07ed144b72926058a7ed1c678a8d45fafa857ed7af9df49b372"
+    },
+    "/workspace/library-files/english-query-handoff-final-proof/package-check2/proof/run-fixture.sh": {
+      "bytes": 724,
+      "sha256": "784fb1d16d86138877382a20f86eff6f7888fb6fe5368955c27f2de14400c7dd"
+    }
+  },
+  "auditScriptSha256": "ea9671f8fd2c40fd064af8b1ca3b91bd733d17671929340a5423123ea55c1a2c"
+}

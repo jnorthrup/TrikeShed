@@ -1,0 +1,211 @@
+{
+  "result": "PASS",
+  "selectedAttempt": "native-attempt4",
+  "frozenSourceHead": "c8b7f5e8a5d0dad8e6352d2fc1c733df7d69e563",
+  "frozenArtifactSha256": {
+    "main.jar": "b4744105e462d94767f84edf23b89f703ec517435f32bbcd8dd7c9090e819797",
+    "documents.js": "4cd75fd35ef2a3e1aea3c4ac099c74c05ae9dba429371ca20eddede53c5a2ee9",
+    "spacegraph.js": "3b0a85c42b978f81b5043ed4b2cee10c835e7715683d4448a90e922aaf50fbac",
+    "pages.js": "d9098c8cd7158f10edf295d246a88061d6c5f1ef000f41f6a412b759e4ef9103"
+  },
+  "build": {
+    "jvmTests": 400,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "browserBundles": [
+      "documents",
+      "spacegraph",
+      "pages"
+    ],
+    "scope": "Root GREEN/frozen build handoff; runtime proof does not rebuild product",
+    "passingBuildLogSha256": "0de7ace1fee5384dcf8dfd14be4292c15251afc5c9c2090f57f9eb3a5b0b1b38"
+  },
+  "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+  "source": {
+    "id": "synthetic taxonomy copular clauses.txt",
+    "text": "Tenant is a Person. A Person is an Agent.",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883"
+  },
+  "sourceRevision": {
+    "project": "english-taxonomy-fresh-profile-proof",
+    "id": "synthetic taxonomy copular clauses.txt",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+    "seq": 0
+  },
+  "programCid": "sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30",
+  "runs": {
+    "B": {
+      "runId": "ec977ff1-deec-46eb-a223-f8651665e830",
+      "receiptCid": "sha256:2cbf098d8edce48cffd4400d7d460f8095c5a8c0de55d488cea9995a679d94be",
+      "programCid": "sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30",
+      "invocationsCid": "sha256:424dd41ae1d59fddae8f1e94449303a9806bf89efa358e086b392c87d25471b4",
+      "syntaxRows": 2,
+      "observations": {
+        "observations": 27,
+        "consumed": 8,
+        "ownerOmissions": 0
+      }
+    },
+    "A_success": {
+      "runId": "a161edfc-9fef-4f47-bdc8-9ed10b4a6bc1",
+      "receiptCid": "sha256:438e9e52fcffc0a647f0a2b50a0d159c9d983abe725c08d68e25edff14aa3548",
+      "programCid": "sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30",
+      "invocationsCid": "sha256:2e357aa528d17d07315efe54eb331de7b08206e60a78edd297eb760364fa8df1",
+      "syntaxRows": 2,
+      "observations": {
+        "observations": 27,
+        "consumed": 8,
+        "ownerOmissions": 0
+      }
+    },
+    "A_failure": {
+      "runId": "1123e90f-00b1-45d7-903f-18b07686d76f",
+      "receiptCid": "sha256:cff82581d3ff8f4e2078643e76d968d53323e695e03bfa7008e6a5a7bb0485cc",
+      "programCid": "sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30",
+      "invocationsCid": "sha256:0127d77fea91f65ef4150d7b3a3622ffd1c3054ae145556046891d28af9d1a0a",
+      "syntaxRows": 2,
+      "observations": {
+        "observations": 27,
+        "consumed": 8,
+        "ownerOmissions": 0
+      }
+    }
+  },
+  "negativeGuards": [
+    "fully-percent-encoded-33rd-field",
+    "fully-percent-encoded-over-16384-budget",
+    "decoded-duplicate-alias",
+    "malformed-UTF8",
+    "actual-same-bytes-other-document-409",
+    "INJECTED-wrong-response-receipt-and-source-scope",
+    "actual-catalog200-held-across-native-add-note",
+    "actual-retained200-held-across-native-Documents-navigation",
+    "native-receipt-edit-restore-does-not-reauthorize-origin",
+    "native-mode-edit-restore-does-not-reauthorize-origin"
+  ],
+  "activityOwnershipControls": [
+    {
+      "case": "A_success",
+      "scope": "Actual old automatic invocation response200 released unchanged after native B Replay",
+      "actualStatus": 200,
+      "outcome": "original-200-body-delivered-unchanged",
+      "newerBActivityAndEvidencePreserved": true
+    },
+    {
+      "case": "A_failure",
+      "scope": "Actual old automatic invocation response200 read and retained; browser transport alone then injects labelled503, not an engine/run failure",
+      "actualStatus": 200,
+      "outcome": "labelled-transport-503-delivered",
+      "newerBActivityAndEvidencePreserved": true
+    }
+  ],
+  "nativeExactProgramRestorations": [
+    {
+      "before": "A_success",
+      "scope": "Native file import of the exact recorded B Run document restores presentation changed by output sizing; native Fit recomputes its camera without floating-point restore drift. No query or execution on import/Fit.",
+      "admittedDocumentSha256": "sha256:3d7c9d05adb444a09f07c97e8ed1bc8dad46e89401dc3c01e4faf8b02c271380",
+      "targetProgramCid": "sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30",
+      "automaticRuns": 0
+    },
+    {
+      "before": "A_failure",
+      "scope": "Native file import of the exact recorded B Run document restores presentation changed by output sizing; native Fit recomputes its camera without floating-point restore drift. No query or execution on import/Fit.",
+      "admittedDocumentSha256": "sha256:3d7c9d05adb444a09f07c97e8ed1bc8dad46e89401dc3c01e4faf8b02c271380",
+      "targetProgramCid": "sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30",
+      "automaticRuns": 0
+    }
+  ],
+  "safety": {
+    "freshInspectionPosts": 0,
+    "retainedOpenPosts": 8,
+    "authoredRunPosts": 3,
+    "queryCalls": 3,
+    "guestModules": {
+      "installed": [],
+      "mounted": []
+    },
+    "parserExecutionBoundary": "Actual empty SDK root, installed/mounted modules empty, no fresh Inspect POST and production retrieval flags; not an invented global parser counter",
+    "modelCalls": 0,
+    "configuredModelCount": 0,
+    "automaticIntake": 0,
+    "reviewIntakeCalls": 0,
+    "analysisReteFacts": 0,
+    "blackboardUnchangedFromReadinessBaseline": true,
+    "operationalBoardReteFacts": 4,
+    "operationalBoardBlackboardEntries": 13,
+    "operationalScope": "Explicit query/run records only, separate from linguistic observations and world facts"
+  },
+  "protectedOriginalFiles": [
+    {
+      "path": "project-couch/english-taxonomy-fresh-profile-proof/HEAD",
+      "bytes": 107,
+      "sha256": "sha256:42c214d75cb1cf24c02a73ecc7d3d040380d169a04a25ca76a2b463591e42e9c",
+      "unchanged": true
+    },
+    {
+      "path": "project-manifests/english-taxonomy-fresh-profile-proof.tsv",
+      "bytes": 114,
+      "sha256": "sha256:311e47263ef040fe1db194cbad68efc1d921592130e878154f8898e98b7f9a66",
+      "unchanged": true
+    },
+    {
+      "path": "project-intake-policy/english-taxonomy-fresh-profile-proof.guard",
+      "bytes": 78,
+      "sha256": "sha256:ea6faf550466382954e93ee1604d23e3e9db4dd1cf730d538433181e10eb6a84",
+      "unchanged": true
+    },
+    {
+      "path": "files/english-taxonomy-fresh-profile-proof/synthetic taxonomy copular clauses.txt",
+      "bytes": 41,
+      "sha256": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "unchanged": true
+    }
+  ],
+  "afterClose": {
+    "result": "PASS",
+    "retainedBlocks": 9,
+    "runs": 3,
+    "finalJarOnly": true
+  },
+  "independentRecordedDataAudit": {
+    "result": "PASS",
+    "checks": 7,
+    "mutatedCopyControlsRejected": 8,
+    "scriptSha256": "ea9671f8fd2c40fd064af8b1ca3b91bd733d17671929340a5423123ea55c1a2c"
+  },
+  "preservedAttempts": [
+    {
+      "attempt": "native",
+      "result": "INCOMPLETE",
+      "actualRunPosts": 0,
+      "reason": "Proof selector incorrectly assumed #application-primary; visible Documents link corrected in harness only"
+    },
+    {
+      "attempt": "native-attempt2",
+      "result": "INCOMPLETE",
+      "actualRunPosts": 2,
+      "reason": "Output expansion changed only node x coordinates and therefore exact program CID"
+    },
+    {
+      "attempt": "native-attempt3",
+      "result": "INCOMPLETE",
+      "actualRunPosts": 2,
+      "reason": "Native Import restored nodes; camera restore changed view.x3.211786372007367 to3.2117863720073956; exact CID assertion correctly stopped"
+    },
+    {
+      "attempt": "native-attempt4",
+      "result": "PASS",
+      "actualRunPosts": 3,
+      "reason": "Native Import of actual B admitted document plus native Fit restored literal identity without automatic execution"
+    }
+  ],
+  "limits": [
+    "Syntax observations only; no semantic entailment or NARS world-fact admission",
+    "Original retained parser metadata is not new parser execution or producer authentication",
+    "Injected HTTP503 is browser transport only after actual completed A and actual200invocation body",
+    "Seccomp denies outbound connects/sends in fixture/reader processes, not a global OS sandbox claim",
+    "Earlier attempts preserve four additional actual completed exploratory runs; final selected attempt contains exactly three"
+  ]
+}
