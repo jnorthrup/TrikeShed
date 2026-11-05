@@ -32,7 +32,7 @@ class LegalRequiredAnchorCoverageCliTest {
         assertEquals("An Agent is an Entity.", ((a["missingAnchors"] as List<*>).single() as Map<*, *>)["quote"])
         assertEquals(true, b["complete"])
         assertEquals(2, b["matchedCount"])
-        assertEquals(emptyList(), b["missingAnchors"])
+        assertEquals(emptyList<Any?>(), b["missingAnchors"])
         assertEquals(0.0, partial["completeRequiredAnchorCoverageRate"])
         assertEquals(1.0, full["completeRequiredAnchorCoverageRate"])
     }
