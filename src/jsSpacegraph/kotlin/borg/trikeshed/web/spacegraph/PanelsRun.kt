@@ -128,9 +128,7 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
                 ". Inspect run records before retrying; no automatic retry.")
         } finally {
             programRunning = false
-            byId("runBtn").disabled = truthy(graph.controls?.inspectionOnly)
-            byId("liveBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
-            byId("debugBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
+            constructionControls()
             if (debug) debugger.finish()
         }
         return null
@@ -415,9 +413,7 @@ fun Panels.load(data: dynamic): Boolean {
     val g = obj(); g.nodes = jsArray(); g.wires = jsArray(); g.seq = if (truthy(data.seq)) data.seq else 1
     g.controls = if (truthy(data.controls)) spread(data.controls) else undefined
     graph = g
-    byId("runBtn").disabled = programRunning || truthy(graph.controls?.inspectionOnly)
-    byId("liveBtn")?.disabled = programRunning || truthy(graph.controls?.inspectionOnly)
-    byId("debugBtn")?.disabled = programRunning || truthy(graph.controls?.inspectionOnly)
+    constructionControls()
     val savedCamera = data.view
     // three passes: CLONE the tree (children stay the SAME objects flattened into G.nodes), BUILD, MOUNT
     fun cloneNode(sn: dynamic): dynamic {
