@@ -17,6 +17,12 @@ fun Panels.renderDocumentSource(n: dynamic, out: dynamic) {
     val cidPattern = Regex("^sha256:[0-9a-f]{64}$")
     if (!cidPattern.matches(original) || !cidPattern.matches(extracted)) return
     val target = n.el.querySelector(".result") ?: return
+    target.style.cssText = "width:360px;max-width:none;max-height:none;overflow:visible;white-space:normal;font:14px/1.5 var(--mono);color:var(--ink);resize:none"
+    val fields = document.createElement("details").asDynamic()
+    val summary = document.createElement("summary").asDynamic()
+    summary.textContent = "Retained output fields"; fields.appendChild(summary)
+    while (target.firstChild != null) fields.appendChild(target.firstChild)
+    target.appendChild(fields)
     val canvas = graph
     val definition = LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, JSON.stringify(toConfix()))
     val card = document.createElement("section").asDynamic()
@@ -60,7 +66,7 @@ fun Panels.renderDocumentSource(n: dynamic, out: dynamic) {
     message.setAttribute("role", "status")
     val body = text("pre", "")
     body.setAttribute("aria-label", if (selected) "Verified passage context" else "Retained extracted text")
-    body.style.cssText = "white-space:pre-wrap;max-height:300px;overflow:auto;font:12px/1.6 var(--mono);margin:10px 0"
+    body.style.cssText = "white-space:pre-wrap;max-height:240px;overflow:auto;font:14px/1.6 var(--mono);margin:10px 0"
     page.on(button, "click", { event ->
         event.stopPropagation()
         if (current()) {
@@ -90,6 +96,7 @@ fun Panels.renderDocumentSource(n: dynamic, out: dynamic) {
                         message.textContent = "SHA-256 verified · " + retained.length + " UTF-16 units" +
                             if (retained.length > 65536) " · display limited to first 65536; download retains the full text." else " · full extraction shown."
                     }
+                    growRingWorldFor(n); resolveTopLevelOverlaps(); redraw()
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (failure: dynamic) { if (current()) message.textContent = "Source inspection refused: " + failureText(failure) }
                 finally { if (current()) button.disabled = false }
