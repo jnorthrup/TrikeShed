@@ -169,7 +169,7 @@ object SyntheticNalExperiment {
         if (sentences.size == 0) return report(RetainedNalStatus.UNSUPPORTED, s_[RetainedNalIssue("empty-frame")])
         val copied = sentences.view.filter { s -> s.dependencies.view.any { it.governorCopy != 0 || it.dependentCopy != 0 } }
         if (copied.isNotEmpty()) return report(RetainedNalStatus.UNSUPPORTED,
-            copied.toSeries() α { RetainedNalIssue("copied-node", it.index) })
+            copied α { RetainedNalIssue("copied-node", it.index) })
         val recognized = NlpcoreAxiomatics.recognize(snapshot.parsed, source.extractedTextCid.value)
         val bySentence = recognized.view.groupBy { it.sentenceIndex }
         val issues = mutableListOf<RetainedNalIssue>()
