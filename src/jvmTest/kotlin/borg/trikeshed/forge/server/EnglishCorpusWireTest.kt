@@ -318,14 +318,15 @@ class EnglishCorpusWireTest {
             val a = _m["terms" j _l["not"], "limit" j 8]; val b = _m["terms" j _l["unless"], "limit" j 1]
             suspend fun wired(inputs: Map<String, Any?>, params: Map<String, String> = emptyMap()): Map<String, Any?> {
                 val nodes = mutableListOf(LcncNode("ids", "json.value", _m["value" j jsonOf(ids)]),
-                    LcncNode("mode", "text.value", _m["value" j "current"]), LcncNode("corpus", EnglishCorpusWire.TYPE, params),
-                    LcncNode("result", LcncContracts.SCOPE_OUT, _m["name" j "search", "kind" j "json"]))
+                    LcncNode("mode", "text.value", _m["value" j "current"]))
                 val wires = mutableListOf(LcncWire("ids", "value", "corpus", "receiptCids"), LcncWire("mode", "value", "corpus", "mode"),
                     LcncWire("corpus", "search", "result", "value"))
                 for ((i, input) in inputs.entries.withIndex()) {
                     nodes.add(LcncNode("input-$i", "json.value", _m["value" j jsonOf(input.value)]))
                     wires.add(LcncWire("input-$i", "value", "corpus", input.key))
                 }
+                nodes.add(LcncNode("corpus", EnglishCorpusWire.TYPE, params))
+                nodes.add(LcncNode("result", LcncContracts.SCOPE_OUT, _m["name" j "search", "kind" j "json"]))
                 val output = LcncRunner(PureNodes.registry { 123L } + f.ctx.lcncRunners)
                     .runProcedure(LcncProgram("corpus-query-ports", nodes.toSeries(), wires.toSeries()))
                 val result = output.nodeOutputs.getValue("corpus")
@@ -435,7 +436,9 @@ class EnglishCorpusWireTest {
             val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
             val program = EnglishCorpusPreset.build(ids, "current", _l["not"], 8)
             assertTrue(LcncTypeCheck.check(program, LcncContracts.all().associateBy { it.type }, strict = true).isEmpty())
-            val result = LcncRunner(PureNodes.registry { 123L } + f.ctx.lcncRunners).runProcedure(program)
+            val registry = PureNodes.registry { 123L } + f.ctx.lcncRunners +
+                TribunalNodes.registry(TribunalDialog { _, _, _ -> error("Local corpus preset must not call a model") }).filterKeys { it == "display" }
+            val result = LcncRunner(registry).runProcedure(program)
             val output = result.nodeOutputs.getValue("corpus")
             assertEquals(output["search"], result.returns["search"]); assertEquals(output["receiptCid"], result.returns["receiptCid"])
             assertEquals(output["terms"], result.returns["terms"]); assertEquals(output["source"], result.returns["source"])
