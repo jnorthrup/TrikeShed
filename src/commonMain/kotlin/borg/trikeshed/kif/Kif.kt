@@ -3,6 +3,19 @@ package borg.trikeshed.kif
 import borg.trikeshed.collections.associative.LinkedLinearHashMap
 import borg.trikeshed.lib.*
 
+/** Lexical trivia advances an offset only; the original source remains intact for decoding and identity. */
+internal fun kifTriviaEnd(text: String, from: Int = 0): Int {
+    var offset = from
+    while (offset < text.length) {
+        when {
+            text[offset].isWhitespace() -> offset++
+            text[offset] == ';' -> while (offset < text.length && text[offset] != '\n' && text[offset] != '\r') offset++
+            else -> return offset
+        }
+    }
+    return offset
+}
+
 /**
  * SUO-KIF — Standard Upper Ontology Knowledge Interchange Format (LISP-like S-expressions)
  *
@@ -57,8 +70,9 @@ sealed class KifExpr {
             val out = mutableListOf<String>()
             var i = 0
             while (i < s.length) {
+                i = kifTriviaEnd(s, i)
+                if (i == s.length) break
                 when (val c = s[i]) {
-                    ' ', '\n', '\r', '\t' -> i++
                     '(' , ')' -> { out.add(c.toString()); i++ }
                     '\'' -> { out.add("'"); i++ }
                     '"' -> {
@@ -76,9 +90,7 @@ sealed class KifExpr {
                         require(!strict || closed) { "Unterminated KIF string at character $start" }
                         out.add(sb.toString())
                     }
-                    ';' -> { while (i < s.length && s[i] != '\n' && s[i] != '\r') i++ } // comment to EOL
                     else -> {
-                        if (c.isWhitespace()) { i++; continue }
                         val sb = StringBuilder()
                         while (i < s.length && !isDelimiter(s[i])) { sb.append(s[i]); i++ }
                         if (sb.isNotEmpty()) out.add(sb.toString())
