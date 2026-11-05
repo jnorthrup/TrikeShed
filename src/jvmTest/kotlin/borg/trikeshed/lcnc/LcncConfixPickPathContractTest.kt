@@ -9,7 +9,7 @@ import kotlin.test.*
 
 class LcncConfixPickPathContractTest {
     private suspend fun registry(body: suspend (Map<String, LcncNodeRunner>) -> Unit) {
-        val store = BoardStoreElement(null, CasStore(), parentJob = currentCoroutineContext()[Job])
+        val store = BoardStoreElement(null, object : CasStore() {}, parentJob = currentCoroutineContext()[Job])
         store.open()
         try { body(PureNodes.registry { 0L } + LcncKanbanExperience(store).registry()) }
         finally { store.drain(); assertTrue(store.supervisor.isCompleted) }
