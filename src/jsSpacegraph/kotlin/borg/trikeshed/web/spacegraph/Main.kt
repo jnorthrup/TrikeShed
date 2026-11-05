@@ -223,6 +223,15 @@ private fun seedOpsBoard(p: Panels): Boolean {
 /** every control on the bar, the canvas gestures, keys */
 private fun wire(p: Panels) {
     val vp = p.viewport
+    p.page.on(p.wiresSvg, "pointerdown", { e ->
+        val path = if (e.target.closest != null) e.target.closest("path[data-wire-index]") else null
+        val index = if (path != null) str(path.getAttribute("data-wire-index")).toIntOrNull() else null
+        if (index != null && p.wiresSvg.contains(path) && index in arr(p.graph.wires).indices) {
+            e.stopPropagation()
+            p.graph.wires.splice(index, 1)
+            p.redraw(); p.save()
+        }
+    })
     p.page.on(p.world, "pointerdown", { e ->
         val hitEl = if (e.target.closest != null) e.target.closest(".node") else undefined
         val picked = p.nodes().firstOrNull { it.el === hitEl }
