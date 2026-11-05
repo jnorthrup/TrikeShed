@@ -202,7 +202,7 @@ suspend fun Panels.buildPalette() {
                 d.title = str(c.title) + "\nin   " + kin.ifEmpty { "—" } + "\nout  " + kout.ifEmpty { "—" }
                 d.innerHTML = t + "<i>" + str(c.title) + "</i>"
                 val readiness = c.context?.readiness
-                if (readiness != null && readiness.available == false) {
+                if (t != "note" && readiness != null && readiness.available == false) {
                     val note = document.createElement("small").asDynamic()
                     note.textContent = "Unavailable: " + str(readiness.reason ?: "No runtime owner is bound")
                     d.appendChild(note)

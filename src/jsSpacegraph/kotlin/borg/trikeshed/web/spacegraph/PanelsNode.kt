@@ -76,7 +76,7 @@ fun Panels.buildNode(n: dynamic) {
         label.textContent = "Query syntax · Inspection only"
         label.style.cssText = "font-size:10px;padding:4px 8px;color:var(--dim)"
         el.appendChild(label)
-    } else if (readiness != null && readiness.available == false) {
+    } else if (str(n.type) != "note" && readiness != null && readiness.available == false) {
         val unavailable = document.createElement("div").asDynamic()
         unavailable.className = "runtime-status"
         unavailable.textContent = "Unavailable: " + str(readiness.reason ?: "No runtime owner is bound")
