@@ -1,0 +1,23 @@
+{
+  "sourceMaster": "87e7bb3e945546137c595ff5aaf53781f4168275",
+  "sourceChecks": 514,
+  "nativeDelivery": "PASS",
+  "nativeRuns": 14,
+  "nativeCompleted": 11,
+  "nativeFailedExpected": 3,
+  "primitiveBoundaries": 16,
+  "readbacks": 117,
+  "uniqueReadbacks": 113,
+  "controlledDefinitions": 65,
+  "recoveredCards": 14,
+  "independentMutationsRejected": 6,
+  "publicEvidence": "../nars-exact-role-v83/README.md",
+  "publicArchiveSha256": "08846d45aec42e6bf9d1d4bf89e838bc5a68b2a9e72213f2ef0cecfbaaa27822",
+  "rootFreshRecordedReplay": "PASS",
+  "recordedResultSha256": "b6327dbe331dd4ff5b9d56d02f98811d67a89887b713add4fc0bf3dbc695a516",
+  "documentationMerge": "743a7b5a656d1f951d195b5785749d4d58983c9c",
+  "frozenPublicationRefs": 705,
+  "frozenPublicationUniqueTips": 545,
+  "productionDifferenceFromSource": [],
+  "scope": "Exact source-scoped lexical role selection; typed unique documentary/resident IDs; separate explicit attention changes budget only. No English parse, legal inference or truth promotion. Source KIF is decoded; no English/CoreNLP model runs. Semantic16 remains MISSING16/scored0. Relocated replay-data experiment is separate v84 work."
+}
