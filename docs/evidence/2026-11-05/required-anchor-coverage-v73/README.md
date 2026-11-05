@@ -55,9 +55,12 @@ The records are compact archives of the actual attempt:
   UTF-8 contents, original paths and hashes.
 - `verification.json`: all 166 checks and references/hashes for the raw attempt.
 - `fixture-origins.json`: unmodified source and fixture origins/hashes.
-- `verifier-reference.json`: external verifier SHA-256 and replay invocation.
-  The verifier remains outside Git under PRELOAD's no-scripts rule. Reconstruct
-  commands using its documented classpath and argument encoding.
+- `verify.py.txt`: exact already-executed verifier bytes, archived as a
+  non-executable documentation artifact. Its SHA-256 is
+  `6cc9fc74c915fb33fe4d601f73eca907adb07c1b33d8fe142f921898edd89e07`.
+- `verifier-reference.json`: original external verifier identity and actual
+  invocation, plus an archive replay command. Reconstruct individual CLI commands
+  using its documented classpath and argument encoding.
 - `build-provenance.json`: root's build command, artifact hashes, selected 426
   JVM tests with zero failures/errors/skips, all JVM test sources compiled, and
   all three browser builds passed. This evidence agent ran no builds.
@@ -67,6 +70,19 @@ compile the CLI test's untyped `emptyList()` assertion. No tests ran in that
 attempt. Root retained the failure log and committed the test-only explicit
 element type in `08dd94f6c`; the subsequent run passed. The failed attempt and
 both log hashes remain recorded; no production change was made to force success.
+
+For an authorized replay, copy the archived verifier outside the checkout first
+so its fresh attempt directories remain outside Git, then use the same frozen
+snapshot. From the repository root:
+
+```sh
+mkdir -p /workspace/library-files/required-anchor-coverage-v73-replay
+cp docs/evidence/2026-11-05/required-anchor-coverage-v73/verify.py.txt /workspace/library-files/required-anchor-coverage-v73-replay/verify.py
+python3 /workspace/library-files/required-anchor-coverage-v73-replay/verify.py --snapshot /workspace/library-files/english-inference-coverage-v73-proof/snapshot --repo /workspace/TrikeShed --root-go 'new-authorized-replay-identifier'
+```
+
+The identifier argument records the handoff; it does not provide authorization.
+Archiving the verifier did not rerun the CLI or change the original run evidence.
 
 The complete raw attempt and executable verifier are retained at
 `/workspace/library-files/required-anchor-coverage-v73-proof/attempt-20261105T003944.144996Z`
