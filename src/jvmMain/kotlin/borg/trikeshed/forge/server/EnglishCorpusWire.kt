@@ -16,7 +16,8 @@ class EnglishCorpusWire(private val ctx: ModuleContext, private val corpus: Proj
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext.minusKey(Job) + fileIoContext))
     private val runner = LcncNodeRunner { node, inputs ->
         fun parameter(key: String): Any? = if (key == "view") lcncInputValue(node, inputs, key)
-        else if (key in inputs) inputs[key] else node.params[key]?.let { raw ->
+        else if (key in inputs) inputs[key]
+        else if (key == "topics" && "topics?" in inputs) inputs["topics?"] else node.params[key]?.let { raw ->
             if (key == "mode") raw else {
                 require(raw.encodeToByteArray().size <= 65_536) { "English corpus parameter limit" }; reifyStrict(raw)
             }
