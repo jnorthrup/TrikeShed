@@ -92,19 +92,7 @@ object NativeHornQueryView {
         }
         val result = map(value["results"])
         require(map(result["head"])["vars"] == starter.variables)
-        val returned = rows(map(result["results"])["bindings"], 20_000).map { raw ->
-            val row = map(raw)
-            // Reified LinearArrayMap entries do not supply structural hashes. Copy BOTH
-            // levels before hashed coverage/order checks, retaining every exact field.
-            val copy = row.entries.associate { field ->
-                val term = map(field.value)
-                val fields = term.entries.associate { (text(it.key) j text(it.value)).pair }
-                require(fields.size == term.size) { "Repeated native RDF term field" }
-                (text(field.key) j fields).pair
-            }
-            require(copy.size == row.size) { "Repeated native query row field" }
-            copy
-        }
+        val returned = rows(map(result["results"])["bindings"], 20_000).map(::map)
         val order: Map<Map<*, *>, Int> = expectedRows.withIndex().associate { (it.value j it.index).pair }
         require(order.size == expectedRows.size && returned.size == expectedRows.size && returned.toSet() == expectedRows.toSet()) {
             "Native query omitted, repeated or substituted a typed projection row"

@@ -1,0 +1,6 @@
+{
+  "rawField": "controlProbe.events[].handlerToFrame",
+  "definition": "requestAnimationFrame callback timestamp minus performance.now() recorded in the keyboard event handler",
+  "limitation": "The callback timestamp denotes the start of its frame, which can precede the handler. Negative values are retained and cannot be interpreted as elapsed latency. This field is excluded from the control-latency table. A future callback-wait measurement must record performance.now() inside the callback, separately from the frame timestamp.",
+  "acceptedControlMeasurement": "receiptControlTimings contains actual Chromium Event Timing entries matched to the four probe keyboard events. Durations are quantized and thresholded. Node/CDP round-trip is separately labeled. Neither establishes physical-input latency or response to input queued before receipt delivery."
+}

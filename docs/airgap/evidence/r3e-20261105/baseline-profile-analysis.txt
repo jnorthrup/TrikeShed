@@ -1,0 +1,42 @@
+selfSamples
+1876.266 (idle)  
+772.068 (program)  
+28.428 webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt 192 fun resolveTopLevelOverlaps() {
+26.644 getTotalLength  
+21.604 requestAnimationFrame  
+20.387 getBoundingClientRect  
+14.844 getAttribute  
+13.794 dispatchEvent  
+11.765 query  
+10.906 requestAnimationFrame  
+10.501   
+8.371 elementsFromPoint  
+7.995 match  
+7.22 getTextAlternativeInternal  
+7.064 computeAriaRole  
+7.028 getElementLabels  
+6.534 getAriaRole  
+5.914 query  
+5.474 TH  
+4.569 isElementHiddenForAria  
+inclusiveSamples
+3012.876 (root)  
+1876.266 (idle)  
+772.068 (program)  
+161.589 evaluate  
+161.589   
+135.786 callMatchedElements  
+124.463 webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/common/src/internal/DispatchedTask.kt 77 
+124.463 webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/web/src/internal/JSDispatcher.kt 122 
+124.463 webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/js/src/JSDispatcher.kt 55 
+123.408 webpack:///NATIVE_IMPLEMENTATIONS.kt/ 1 
+123.408 webpack:///NATIVE_IMPLEMENTATIONS.kt/ 1 
+116.108 webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt 40 internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynamic {
+115.805 _queryEngineAll  
+115.805 querySelectorAll  
+99.726 queryRole  
+99.726 queryAll  
+97.118 query  
+93.613 webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt 141 suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {
+92.527 webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt 141 suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {
+84.264 match  

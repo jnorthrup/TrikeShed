@@ -1,0 +1,999 @@
+{
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/panels",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/application-nav.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/allocation-inspector.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/patch-camera.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/spacegraph-shadow.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/kotlin/spacegraph/spacegraph.js",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/contracts",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/blackboard/facts",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/concentric",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/panels/presets",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/panels",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "method": "POST",
+      "body": "{\"name\":\"retained-json-seed\",\"document\":{\"name\":\"retained-json-seed\",\"nodes\":[{\"id\":\"literal\",\"type\":\"json.value\",\"x\":450,\"y\":250,\"params\":{\"value\":\"0\"},\"collapsed\":false}],\"wires\":[],\"view\":{\"x\":260,\"y\":30,\"z\":0.6}},\"inputs\":{}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3Ab820140ee4e68b9d523e7233676e601d795330f0e9f2c8bc3558be615088d4e6",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/panels",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/application-nav.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/allocation-inspector.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/patch-camera.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/spacegraph-shadow.css",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/kotlin/spacegraph/spacegraph.js",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/contracts",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/blackboard/facts",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/concentric",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/panels/presets",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/panels",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "method": "POST",
+      "body": "{\"name\":\"retained-reference-owner\",\"document\":{\"name\":\"retained-reference-owner\",\"nodes\":[{\"id\":\"literal\",\"type\":\"json.value\",\"x\":450,\"y\":250,\"params\":{\"value\":\"{\\\"previewOnly\\\":true,\\\"retainedCid\\\":\\\"sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951\\\"}\"},\"collapsed\":false}],\"wires\":[],\"view\":{\"x\":260,\"y\":30,\"z\":0.6}},\"inputs\":{}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3Abd3b4331915ddbca237a9e4eccc9b1916fcfeb7a79af7fe997768ebc22358a76",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"retained-reference-owner\",\"document\":{\"name\":\"retained-reference-owner\",\"nodes\":[{\"id\":\"literal\",\"type\":\"json.value\",\"x\":450,\"y\":250,\"params\":{\"value\":\"{\\\"previewOnly\\\":true,\\\"retainedCid\\\":\\\"sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951\\\"}\"},\"collapsed\":false}],\"wires\":[],\"view\":{\"x\":260,\"y\":30,\"z\":0.6}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"retained-reference-owner\",\"document\":{\"name\":\"retained-reference-owner\",\"nodes\":[{\"id\":\"literal\",\"type\":\"json.value\",\"x\":450,\"y\":250,\"params\":{\"value\":\"{\\\"previewOnly\\\":true,\\\"retainedCid\\\":\\\"sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951\\\"}\"},\"collapsed\":false}],\"wires\":[],\"view\":{\"x\":260,\"y\":30,\"z\":0.6}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3A1b09cda2ceb68799967a19ec37229392692095b32c17cc42ab5f01dac0d1597e",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3A1b09cda2ceb68799967a19ec37229392692095b32c17cc42ab5f01dac0d1597e",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/content?cid=sha256%3A34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/v0/block/get?arg=sha256%3A1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/v0/block/get?arg=sha256%3A1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/v0/block/get?arg=sha256%3A1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+      "method": "GET",
+      "body": null
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/v0/block/get?arg=sha256%3A1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+      "method": "GET",
+      "body": null
+    }
+  ],
+  "errors": [],
+  "cases": {
+    "recordedReference": {
+      "result": "PASS",
+      "sameProgramCid": "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+      "reads": 1,
+      "noExecution": true
+    },
+    "layoutChange": {
+      "result": "PASS",
+      "reads": 2,
+      "presentationOnly": true
+    },
+    "changedDuringRead": {
+      "result": "PASS",
+      "reads": 3,
+      "returnedSha256": "1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+      "returnedProgramCid": "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+      "mechanism": "Delay only the real GET request until an ordinary parameter edit. Continue the unchanged request to the real server; no synthetic response.",
+      "reservedOwnerHasNoTraceDefinition": true
+    },
+    "restoredDefinition": {
+      "result": "PASS",
+      "reads": 4,
+      "matchingDefinition": true
+    }
+  },
+  "browser": "154.0.8037.57",
+  "before": {
+    "document": {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf",
+      "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "rev": "1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d",
+      "seq": 0,
+      "length": 111243,
+      "contentType": "application/pdf"
+    },
+    "documents": [
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "rev": "1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d",
+        "seq": 0,
+        "length": 111243,
+        "contentType": "application/pdf"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "rev": "1-sha256:5e2ebe2cbd0dcf70cf73e66ba8fbf76b8dda58562fd2f76711483f8b7020b9ad",
+        "seq": 3,
+        "length": 23021,
+        "contentType": "text/markdown"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.json",
+        "cid": "sha256:da5ae96c76477abb1534147bcadeb391d5f3263dc2864156f50808cdcf0dbee0",
+        "rev": "1-sha256:98efd699039b0c349ba1c9b6cce2dcdb4965585f390d164f7b8ae8e098ca472a",
+        "seq": 5,
+        "length": 97806,
+        "contentType": "application/json"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract-origin.tsv",
+        "cid": "sha256:a5c0c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52",
+        "rev": "1-sha256:1ab4373da645eb7669123d804a60b9dbf274435c5c8e8f56d2cced6366b5bf90",
+        "seq": 4,
+        "length": 143,
+        "contentType": "application/octet-stream"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.notes.md",
+        "cid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+        "rev": "1-sha256:9c362a4ad6b82d704fcab55c7b010c9d2592b974fa6c82e789ef720edee08a72",
+        "seq": 1,
+        "length": 95,
+        "contentType": "text/markdown"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.footnotes.tsv",
+        "cid": "sha256:ff7919835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101",
+        "rev": "1-sha256:d3c14840d026cc81f8dede82061f2d0db9e2a9b8e7348d9eb2062864e05fcd51",
+        "seq": 2,
+        "length": 1082,
+        "contentType": "application/octet-stream"
+      }
+    ],
+    "sourceReference": {
+      "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+      "name": "coinbase-suski.pdf",
+      "mediaType": "application/pdf",
+      "category": "document",
+      "project": {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "rev": "1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d",
+        "seq": 0
+      },
+      "extraction": {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "rev": "1-sha256:5e2ebe2cbd0dcf70cf73e66ba8fbf76b8dda58562fd2f76711483f8b7020b9ad",
+        "seq": 3
+      },
+      "sourceCid": "sha256:785e7eb65631bedf4b117ee6003062902dc21f0c0e837265949436b35843287f"
+    },
+    "passageOffset": 18477,
+    "ingestion": {
+      "verdict": "ingested",
+      "id": "coinbase-suski.pdf",
+      "chars": 22686,
+      "route": "pdf pages (layer)",
+      "ms": 735
+    },
+    "canvas": {
+      "nodes": [
+        {
+          "id": "document",
+          "type": "json.value",
+          "x": 30,
+          "y": 800,
+          "params": {
+            "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d\", \"seq\":0.0}, \"extraction\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf.extract.md\", \"cid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"rev\":\"1-sha256:5e2ebe2cbd0dcf70cf73e66ba8fbf76b8dda58562fd2f76711483f8b7020b9ad\", \"seq\":3.0}, \"sourceCid\":\"sha256:785e7eb65631bedf4b117ee6003062902dc21f0c0e837265949436b35843287f\"}"
+          }
+        },
+        {
+          "id": "source",
+          "type": "document.source",
+          "x": 30,
+          "y": 60,
+          "params": {
+            "view": "reference"
+          }
+        },
+        {
+          "id": "passages",
+          "type": "document.spans",
+          "x": 460,
+          "y": 60,
+          "params": {
+            "offset": "18477",
+            "count": "1",
+            "spanChars": "200",
+            "maxBytes": "8192"
+          }
+        },
+        {
+          "id": "scan",
+          "type": "vm.llvm.confix",
+          "x": 890,
+          "y": 60,
+          "params": {
+            "format": "JSON"
+          }
+        },
+        {
+          "id": "selection",
+          "type": "confix.pickPath",
+          "x": 1320,
+          "y": 60,
+          "params": {
+            "path": "spans.0.quotation",
+            "geometry": "native"
+          }
+        }
+      ],
+      "wires": [
+        {
+          "from": [
+            "document",
+            "value"
+          ],
+          "to": [
+            "source",
+            "source?"
+          ]
+        },
+        {
+          "from": [
+            "source",
+            "source"
+          ],
+          "to": [
+            "passages",
+            "source"
+          ]
+        },
+        {
+          "from": [
+            "passages",
+            "data"
+          ],
+          "to": [
+            "scan",
+            "data?"
+          ]
+        },
+        {
+          "from": [
+            "passages",
+            "data"
+          ],
+          "to": [
+            "selection",
+            "data?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "rows"
+          ],
+          "to": [
+            "selection",
+            "rows?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "sourceCid"
+          ],
+          "to": [
+            "selection",
+            "sourceCid?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "ok"
+          ],
+          "to": [
+            "selection",
+            "ok?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "format"
+          ],
+          "to": [
+            "selection",
+            "format?"
+          ]
+        }
+      ],
+      "seq": 1,
+      "view": {
+        "x": 245,
+        "y": 20,
+        "z": 0.8
+      }
+    },
+    "mode": "run",
+    "boot": "ec3eb0f9-7aef-4eb5-92f9-4b6db07f78ac",
+    "pid": 2,
+    "reopened": false,
+    "minerInstalled": true,
+    "llvmInstalled": true,
+    "runs": {},
+    "javaHome": "/opt/trikeshed/jdk",
+    "classpath": "/opt/trikeshed/lib/TrikeShed-jvm-0.1.0-SNAPSHOT.jar:/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-entry.jar:/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar:/opt/trikeshed/lib/kotlinx-coroutines-core-jvm-1.11.0.jar:/opt/trikeshed/lib/atomicfu-jvm-0.33.0.jar:/opt/trikeshed/lib/kotlinx-serialization-core-jvm-1.12.0.jar:/opt/trikeshed/lib/kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar:/opt/trikeshed/lib/kotlin-stdlib-2.4.21.jar:/opt/trikeshed/lib/llvm-language-native-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-nfi-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-native-resources-25.3.4.1.jar:/opt/trikeshed/lib/truffle-runtime-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-libffi-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-panama-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-25.3.4.1.jar:/opt/trikeshed/lib/llvm-api-25.3.4.1.jar:/opt/trikeshed/lib/truffle-api-25.3.4.1.jar:/opt/trikeshed/lib/polyglot-25.3.4.1.jar:/opt/trikeshed/lib/annotations-23.0.0.jar:/opt/trikeshed/lib/jniutils-25.3.4.1.jar:/opt/trikeshed/lib/collections-25.3.4.1.jar:/opt/trikeshed/lib/nativeimage-25.3.4.1.jar:/opt/trikeshed/lib/word-25.3.4.1.jar:/opt/trikeshed/lib/antlr4-25.3.4.1.jar:/opt/trikeshed/lib/truffle-compiler-25.3.4.1.jar",
+    "nativeEncoding": "UTF-8",
+    "workspaceVisible": false,
+    "gradleCacheVisible": false,
+    "modulesVisible": true,
+    "assetsVisible": true,
+    "processors": 2,
+    "maxHeap": 805306368,
+    "processCpuNanos": 7550000000,
+    "uptimeMs": 7581
+  },
+  "bundleSha256": "03068e6f0c7dafe81e02410be253246ca4f80d246c5234fa840dadf09664074d",
+  "seedReceipt": {
+    "runId": "906a7421-999a-43fe-858c-fba19d31c783",
+    "program": "retained-json-seed",
+    "programKey": null,
+    "programCid": "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+    "inputs": {},
+    "status": "completed",
+    "queuedAtMs": 1793872632987,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/906a7421-999a-43fe-858c-fba19d31c783",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/906a7421-999a-43fe-858c-fba19d31c783",
+    "sequence": 3,
+    "timelineRevision": 3,
+    "receiptCid": "sha256:7d84b0d8f392b34687e223878959cf3ccc085e7afa7b731c0d86af506719e5cc",
+    "workgroup": "lcnc/program/retained-json-seed@sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/retained-json-seed@sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793872633359,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:a5395f7e966d1ef63d074d1c76eb59bf0be17eb8e5b9325ea4ea90e74aac465d",
+    "returns": {},
+    "outputs": {
+      "literal": {
+        "value": 0
+      }
+    },
+    "bindings": [],
+    "bindingsTruncated": false,
+    "promptVersions": {},
+    "consumed": [],
+    "consumedTruncated": false,
+    "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rootStateCid": "sha256:47e207f126f7ad9554422ee2cb9e8af12a32388f285135da1924d8e9034e16d0",
+    "rootStateFormat": "cbor",
+    "ok": true,
+    "finishedAtMs": 1793872633410,
+    "invocationsCid": "sha256:b820140ee4e68b9d523e7233676e601d795330f0e9f2c8bc3558be615088d4e6",
+    "oroborosCid": "sha256:a5e8984f523978e9764009aced184e71fdc48daa7df587da1596aeee36efc7dd",
+    "invocationsAttempted": 1,
+    "invocationsDropped": 0
+  },
+  "receipt": {
+    "runId": "faf9a622-9e47-4a8e-bbf3-f1f45d57af7c",
+    "program": "retained-reference-owner",
+    "programKey": null,
+    "programCid": "sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b",
+    "inputs": {},
+    "status": "completed",
+    "queuedAtMs": 1793872634592,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/faf9a622-9e47-4a8e-bbf3-f1f45d57af7c",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/faf9a622-9e47-4a8e-bbf3-f1f45d57af7c",
+    "sequence": 6,
+    "timelineRevision": 3,
+    "receiptCid": "sha256:1b09cda2ceb68799967a19ec37229392692095b32c17cc42ab5f01dac0d1597e",
+    "workgroup": "lcnc/program/retained-reference-owner@sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b",
+    "claimId": 2,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/retained-reference-owner@sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b",
+        "claimId": 2
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793872634806,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:6b98ddd689d90d2cb79ba4391951d69ae0b8a0d908d336ab7e33335ac15003ed",
+    "returns": {},
+    "outputs": {
+      "literal": {
+        "value": {
+          "previewOnly": true,
+          "retainedCid": "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951"
+        }
+      }
+    },
+    "bindings": [],
+    "bindingsTruncated": false,
+    "promptVersions": {},
+    "consumed": [],
+    "consumedTruncated": false,
+    "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rootStateCid": "sha256:87372310adc40cabd653814d060147286643603f3f8943882d87f72e23105d01",
+    "rootStateFormat": "cbor",
+    "ok": true,
+    "finishedAtMs": 1793872634845,
+    "invocationsCid": "sha256:bd3b4331915ddbca237a9e4eccc9b1916fcfeb7a79af7fe997768ebc22358a76",
+    "oroborosCid": "sha256:e461b985c9bea46f01140c4a300bc5cc87805f085a3a5d225ec5dd3be6795991",
+    "invocationsAttempted": 1,
+    "invocationsDropped": 0
+  },
+  "after": {
+    "document": {
+      "project": "coinbase-suski",
+      "id": "coinbase-suski.pdf",
+      "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "rev": "1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d",
+      "seq": 0,
+      "length": 111243,
+      "contentType": "application/pdf"
+    },
+    "documents": [
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "rev": "1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d",
+        "seq": 0,
+        "length": 111243,
+        "contentType": "application/pdf"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "rev": "1-sha256:5e2ebe2cbd0dcf70cf73e66ba8fbf76b8dda58562fd2f76711483f8b7020b9ad",
+        "seq": 3,
+        "length": 23021,
+        "contentType": "text/markdown"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.json",
+        "cid": "sha256:da5ae96c76477abb1534147bcadeb391d5f3263dc2864156f50808cdcf0dbee0",
+        "rev": "1-sha256:98efd699039b0c349ba1c9b6cce2dcdb4965585f390d164f7b8ae8e098ca472a",
+        "seq": 5,
+        "length": 97806,
+        "contentType": "application/json"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract-origin.tsv",
+        "cid": "sha256:a5c0c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52",
+        "rev": "1-sha256:1ab4373da645eb7669123d804a60b9dbf274435c5c8e8f56d2cced6366b5bf90",
+        "seq": 4,
+        "length": 143,
+        "contentType": "application/octet-stream"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.notes.md",
+        "cid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+        "rev": "1-sha256:9c362a4ad6b82d704fcab55c7b010c9d2592b974fa6c82e789ef720edee08a72",
+        "seq": 1,
+        "length": 95,
+        "contentType": "text/markdown"
+      },
+      {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.footnotes.tsv",
+        "cid": "sha256:ff7919835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101",
+        "rev": "1-sha256:d3c14840d026cc81f8dede82061f2d0db9e2a9b8e7348d9eb2062864e05fcd51",
+        "seq": 2,
+        "length": 1082,
+        "contentType": "application/octet-stream"
+      }
+    ],
+    "sourceReference": {
+      "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+      "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+      "name": "coinbase-suski.pdf",
+      "mediaType": "application/pdf",
+      "category": "document",
+      "project": {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "rev": "1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d",
+        "seq": 0
+      },
+      "extraction": {
+        "project": "coinbase-suski",
+        "id": "coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "rev": "1-sha256:5e2ebe2cbd0dcf70cf73e66ba8fbf76b8dda58562fd2f76711483f8b7020b9ad",
+        "seq": 3
+      },
+      "sourceCid": "sha256:785e7eb65631bedf4b117ee6003062902dc21f0c0e837265949436b35843287f"
+    },
+    "passageOffset": 18477,
+    "ingestion": {
+      "verdict": "ingested",
+      "id": "coinbase-suski.pdf",
+      "chars": 22686,
+      "route": "pdf pages (layer)",
+      "ms": 735
+    },
+    "canvas": {
+      "nodes": [
+        {
+          "id": "document",
+          "type": "json.value",
+          "x": 30,
+          "y": 800,
+          "params": {
+            "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:73c33e7df82c95e1c0dd4811ec307d1933ceddbd959021d75517e42f2f0b657d\", \"seq\":0.0}, \"extraction\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf.extract.md\", \"cid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"rev\":\"1-sha256:5e2ebe2cbd0dcf70cf73e66ba8fbf76b8dda58562fd2f76711483f8b7020b9ad\", \"seq\":3.0}, \"sourceCid\":\"sha256:785e7eb65631bedf4b117ee6003062902dc21f0c0e837265949436b35843287f\"}"
+          }
+        },
+        {
+          "id": "source",
+          "type": "document.source",
+          "x": 30,
+          "y": 60,
+          "params": {
+            "view": "reference"
+          }
+        },
+        {
+          "id": "passages",
+          "type": "document.spans",
+          "x": 460,
+          "y": 60,
+          "params": {
+            "offset": "18477",
+            "count": "1",
+            "spanChars": "200",
+            "maxBytes": "8192"
+          }
+        },
+        {
+          "id": "scan",
+          "type": "vm.llvm.confix",
+          "x": 890,
+          "y": 60,
+          "params": {
+            "format": "JSON"
+          }
+        },
+        {
+          "id": "selection",
+          "type": "confix.pickPath",
+          "x": 1320,
+          "y": 60,
+          "params": {
+            "path": "spans.0.quotation",
+            "geometry": "native"
+          }
+        }
+      ],
+      "wires": [
+        {
+          "from": [
+            "document",
+            "value"
+          ],
+          "to": [
+            "source",
+            "source?"
+          ]
+        },
+        {
+          "from": [
+            "source",
+            "source"
+          ],
+          "to": [
+            "passages",
+            "source"
+          ]
+        },
+        {
+          "from": [
+            "passages",
+            "data"
+          ],
+          "to": [
+            "scan",
+            "data?"
+          ]
+        },
+        {
+          "from": [
+            "passages",
+            "data"
+          ],
+          "to": [
+            "selection",
+            "data?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "rows"
+          ],
+          "to": [
+            "selection",
+            "rows?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "sourceCid"
+          ],
+          "to": [
+            "selection",
+            "sourceCid?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "ok"
+          ],
+          "to": [
+            "selection",
+            "ok?"
+          ]
+        },
+        {
+          "from": [
+            "scan",
+            "format"
+          ],
+          "to": [
+            "selection",
+            "format?"
+          ]
+        }
+      ],
+      "seq": 1,
+      "view": {
+        "x": 245,
+        "y": 20,
+        "z": 0.8
+      }
+    },
+    "mode": "run",
+    "boot": "ec3eb0f9-7aef-4eb5-92f9-4b6db07f78ac",
+    "pid": 2,
+    "reopened": false,
+    "minerInstalled": true,
+    "llvmInstalled": true,
+    "runs": {
+      "lcnc/run/906a7421-999a-43fe-858c-fba19d31c783": {
+        "runId": "906a7421-999a-43fe-858c-fba19d31c783",
+        "program": "retained-json-seed",
+        "programKey": null,
+        "programCid": "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+        "inputs": {},
+        "status": "completed",
+        "queuedAtMs": 1793872632987,
+        "queueNamed": false,
+        "queueDeclaredSubnet": null,
+        "queueRequest": {
+          "timeoutMs": 120000,
+          "maxNodes": 10000,
+          "subnet": "local"
+        },
+        "queueDurability": "DURABLE",
+        "executionFamily": "lcnc/run/906a7421-999a-43fe-858c-fba19d31c783",
+        "parentRunId": null,
+        "versionPolicy": "root-at-queue,subprogram-at-first-use",
+        "budgets": {
+          "timeoutMs": 120000,
+          "maxNodes": 10000,
+          "maxPayloadChars": 131072
+        },
+        "jobId": "lcnc/run/906a7421-999a-43fe-858c-fba19d31c783",
+        "sequence": 3,
+        "timelineRevision": 3,
+        "receiptCid": "sha256:7d84b0d8f392b34687e223878959cf3ccc085e7afa7b731c0d86af506719e5cc",
+        "workgroup": "lcnc/program/retained-json-seed@sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+        "claimId": 1,
+        "subnet": "local",
+        "claimedAtSubnet": "local",
+        "claimLineage": [
+          {
+            "workgroup": "lcnc/program/retained-json-seed@sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+            "claimId": 1
+          }
+        ],
+        "parentWorkgroup": null,
+        "parentClaimId": null,
+        "startedAtMs": 1793872633359,
+        "programVersions": {},
+        "previousReceiptCid": "sha256:a5395f7e966d1ef63d074d1c76eb59bf0be17eb8e5b9325ea4ea90e74aac465d",
+        "returns": {},
+        "outputs": {
+          "literal": {
+            "value": 0
+          }
+        },
+        "bindings": [],
+        "bindingsTruncated": false,
+        "promptVersions": {},
+        "consumed": [],
+        "consumedTruncated": false,
+        "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rootStateCid": "sha256:47e207f126f7ad9554422ee2cb9e8af12a32388f285135da1924d8e9034e16d0",
+        "rootStateFormat": "cbor",
+        "ok": true,
+        "finishedAtMs": 1793872633410,
+        "invocationsCid": "sha256:b820140ee4e68b9d523e7233676e601d795330f0e9f2c8bc3558be615088d4e6",
+        "oroborosCid": "sha256:a5e8984f523978e9764009aced184e71fdc48daa7df587da1596aeee36efc7dd",
+        "invocationsAttempted": 1,
+        "invocationsDropped": 0
+      },
+      "lcnc/run/faf9a622-9e47-4a8e-bbf3-f1f45d57af7c": {
+        "runId": "faf9a622-9e47-4a8e-bbf3-f1f45d57af7c",
+        "program": "retained-reference-owner",
+        "programKey": null,
+        "programCid": "sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b",
+        "inputs": {},
+        "status": "completed",
+        "queuedAtMs": 1793872634592,
+        "queueNamed": false,
+        "queueDeclaredSubnet": null,
+        "queueRequest": {
+          "timeoutMs": 120000,
+          "maxNodes": 10000,
+          "subnet": "local"
+        },
+        "queueDurability": "DURABLE",
+        "executionFamily": "lcnc/run/faf9a622-9e47-4a8e-bbf3-f1f45d57af7c",
+        "parentRunId": null,
+        "versionPolicy": "root-at-queue,subprogram-at-first-use",
+        "budgets": {
+          "timeoutMs": 120000,
+          "maxNodes": 10000,
+          "maxPayloadChars": 131072
+        },
+        "jobId": "lcnc/run/faf9a622-9e47-4a8e-bbf3-f1f45d57af7c",
+        "sequence": 6,
+        "timelineRevision": 3,
+        "receiptCid": "sha256:1b09cda2ceb68799967a19ec37229392692095b32c17cc42ab5f01dac0d1597e",
+        "workgroup": "lcnc/program/retained-reference-owner@sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b",
+        "claimId": 2,
+        "subnet": "local",
+        "claimedAtSubnet": "local",
+        "claimLineage": [
+          {
+            "workgroup": "lcnc/program/retained-reference-owner@sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b",
+            "claimId": 2
+          }
+        ],
+        "parentWorkgroup": null,
+        "parentClaimId": null,
+        "startedAtMs": 1793872634806,
+        "programVersions": {},
+        "previousReceiptCid": "sha256:6b98ddd689d90d2cb79ba4391951d69ae0b8a0d908d336ab7e33335ac15003ed",
+        "returns": {},
+        "outputs": {
+          "literal": {
+            "value": {
+              "previewOnly": true,
+              "retainedCid": "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951"
+            }
+          }
+        },
+        "bindings": [],
+        "bindingsTruncated": false,
+        "promptVersions": {},
+        "consumed": [],
+        "consumedTruncated": false,
+        "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rootStateCid": "sha256:87372310adc40cabd653814d060147286643603f3f8943882d87f72e23105d01",
+        "rootStateFormat": "cbor",
+        "ok": true,
+        "finishedAtMs": 1793872634845,
+        "invocationsCid": "sha256:bd3b4331915ddbca237a9e4eccc9b1916fcfeb7a79af7fe997768ebc22358a76",
+        "oroborosCid": "sha256:e461b985c9bea46f01140c4a300bc5cc87805f085a3a5d225ec5dd3be6795991",
+        "invocationsAttempted": 1,
+        "invocationsDropped": 0
+      }
+    },
+    "javaHome": "/opt/trikeshed/jdk",
+    "classpath": "/opt/trikeshed/lib/TrikeShed-jvm-0.1.0-SNAPSHOT.jar:/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-entry.jar:/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar:/opt/trikeshed/lib/kotlinx-coroutines-core-jvm-1.11.0.jar:/opt/trikeshed/lib/atomicfu-jvm-0.33.0.jar:/opt/trikeshed/lib/kotlinx-serialization-core-jvm-1.12.0.jar:/opt/trikeshed/lib/kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar:/opt/trikeshed/lib/kotlin-stdlib-2.4.21.jar:/opt/trikeshed/lib/llvm-language-native-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-nfi-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-25.3.4.1.jar:/opt/trikeshed/lib/llvm-language-native-resources-25.3.4.1.jar:/opt/trikeshed/lib/truffle-runtime-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-libffi-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-panama-25.3.4.1.jar:/opt/trikeshed/lib/truffle-nfi-25.3.4.1.jar:/opt/trikeshed/lib/llvm-api-25.3.4.1.jar:/opt/trikeshed/lib/truffle-api-25.3.4.1.jar:/opt/trikeshed/lib/polyglot-25.3.4.1.jar:/opt/trikeshed/lib/annotations-23.0.0.jar:/opt/trikeshed/lib/jniutils-25.3.4.1.jar:/opt/trikeshed/lib/collections-25.3.4.1.jar:/opt/trikeshed/lib/nativeimage-25.3.4.1.jar:/opt/trikeshed/lib/word-25.3.4.1.jar:/opt/trikeshed/lib/antlr4-25.3.4.1.jar:/opt/trikeshed/lib/truffle-compiler-25.3.4.1.jar",
+    "nativeEncoding": "UTF-8",
+    "workspaceVisible": false,
+    "gradleCacheVisible": false,
+    "modulesVisible": true,
+    "assetsVisible": true,
+    "processors": 2,
+    "maxHeap": 805306368,
+    "processCpuNanos": 10960000000,
+    "uptimeMs": 12965
+  },
+  "video": "page@0f99eb1a7f25e7d5f1cddf1a996e9363.webm"
+}

@@ -1,0 +1,43 @@
+from pathlib import Path
+import json,hashlib,tarfile,gzip,sys,stat,shutil,subprocess,os
+home=Path('/workspace/airgap-r3e-proof');root=Path(os.environ.get('TRIKESHED_PROOF_ROOT',str(home/'combined-rootfs')))
+def digest(path):
+    with path.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def inventory():
+    rows=[]
+    for p in sorted(root.rglob('*')):
+        assert not p.is_symlink(),str(p)
+        if not p.is_file() or p in [root/'SHA256SUMS',root/'package-identity.json']:continue
+        rows.append({'path':p.relative_to(root).as_posix(),'bytes':p.stat().st_size,'mode':stat.S_IMODE(p.stat().st_mode),'sha256':digest(p)})
+    return rows
+def directories():
+    return [{'path':p.relative_to(root).as_posix(),'mode':stat.S_IMODE(p.stat().st_mode)} for p in sorted(root.rglob('*')) if p.is_dir()]
+if sys.argv[1]=='manifest':
+    rows=inventory()
+    record={'profile':'Linux x86-64 bounded document demonstration','sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd='/workspace/TrikeShed',text=True).strip(),
+            'files':rows,'directories':directories(),'totalBytes':sum(r['bytes'] for r in rows),'limits':['Linux host kernel, bwrap and browser are external test-host inputs','Pinned-byte packaging reproducibility is separate from source build reproducibility','Vendor JDK SOURCE contains +; corresponding vendor patch audit remains open']}
+    (root/'package-identity.json').write_text(json.dumps(record,indent=2)+'\n')
+    lines=[r['sha256']+'  '+r['path'] for r in rows]+[digest(root/'package-identity.json')+'  package-identity.json']
+    (root/'SHA256SUMS').write_text('\n'.join(lines)+'\n')
+    (home/'combined-package-digests.json').write_text(json.dumps({name:digest(root/name) for name in ['package-identity.json','SHA256SUMS']},indent=2)+'\n')
+    print('manifest',len(rows),'files',record['totalBytes'],'bytes')
+elif sys.argv[1]=='verify':
+    expected=json.loads((home/'combined-package-digests.json').read_text())
+    for name,sha in expected.items():assert digest(root/name)==sha,'Release manifest digest differs: '+name
+    record=json.loads((root/'package-identity.json').read_text())
+    assert inventory()==record['files'],'Package membership, bytes or mode differ'
+    assert directories()==record['directories'],'Package directory membership or mode differs'
+    subprocess.run(['sha256sum','--check','--quiet','SHA256SUMS'],cwd=root,check=True)
+    print('package membership, modes and SHA-256 verified')
+elif sys.argv[1]=='archive':
+    dest=Path(sys.argv[2]);dest.parent.mkdir(parents=True,exist_ok=True)
+    with dest.open('wb') as raw,gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0,compresslevel=6) as compressed,tarfile.open(fileobj=compressed,mode='w|',format=tarfile.PAX_FORMAT) as tar:
+        for path in [root]+sorted(root.rglob('*')):
+            assert not path.is_symlink()
+            info=tar.gettarinfo(str(path),arcname='airgap-document-rootfs'+('/'+path.relative_to(root).as_posix() if path!=root else ''))
+            info.uid=info.gid=0;info.uname=info.gname='';info.mtime=0;info.pax_headers={}
+            if path.is_file():
+                with path.open('rb') as stream:tar.addfile(info,stream)
+            else:tar.addfile(info)
+    print(json.dumps({'file':str(dest),'sha256':digest(dest),'bytes':dest.stat().st_size}))
+else:raise SystemExit('manifest|verify|archive')

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="NativeHornQueryViewTest[jvm]" tests="3" skipped="0" failures="2" errors="0" timestamp="2026-11-05T09:36:24.758Z" hostname="0d6dfba25614" time="0.044">
+  <properties/>
+  <testcase name="integerAndJsonNumberDomainsKeepTheSameGraphAndBothEightPatternPrograms()[jvm]" classname="borg.trikeshed.lcnc.NativeHornQueryViewTest" time="0.027">
+    <failure message="java.lang.IllegalArgumentException: Native query omitted, repeated or substituted a typed projection row" type="java.lang.IllegalArgumentException">java.lang.IllegalArgumentException: Native query omitted, repeated or substituted a typed projection row
+	at borg.trikeshed.lcnc.NativeHornQueryView.answer(NativeHornQueryView.kt:97)
+	at borg.trikeshed.lcnc.NativeHornQueryViewTest.execute(NativeHornQueryViewTest.kt:89)
+	at borg.trikeshed.lcnc.NativeHornQueryViewTest.integerAndJsonNumberDomainsKeepTheSameGraphAndBothEightPatternPrograms(NativeHornQueryViewTest.kt:98)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="completeSourceContextAndProjectionBoundsRefuseWithoutPartialGraphs()[jvm]" classname="borg.trikeshed.lcnc.NativeHornQueryViewTest" time="0.004"/>
+  <testcase name="typedSourceRowsMissingPremisesAndChangedFramesCannotBecomeAnswers()[jvm]" classname="borg.trikeshed.lcnc.NativeHornQueryViewTest" time="0.013">
+    <failure message="java.lang.IllegalArgumentException: Native query omitted, repeated or substituted a typed projection row" type="java.lang.IllegalArgumentException">java.lang.IllegalArgumentException: Native query omitted, repeated or substituted a typed projection row
+	at borg.trikeshed.lcnc.NativeHornQueryView.answer(NativeHornQueryView.kt:97)
+	at borg.trikeshed.lcnc.NativeHornQueryViewTest.execute(NativeHornQueryViewTest.kt:89)
+	at borg.trikeshed.lcnc.NativeHornQueryViewTest.typedSourceRowsMissingPremisesAndChangedFramesCannotBecomeAnswers(NativeHornQueryViewTest.kt:131)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

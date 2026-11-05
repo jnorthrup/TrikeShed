@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishCorpusWireTest[jvm]" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:03:57.599Z" hostname="0d6dfba25614" time="6.604">
+  <properties/>
+  <testcase name="optionalSearchPreservesLegacyBytesAndBindsOnlyItsQueryReceipt()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.172"/>
+  <testcase name="offeredLocalCorpusPresetRunsTheRegisteredOwnerAndReturnsStatisticsWithSearch()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.109"/>
+  <testcase name="wiredOptionalTopicsReachTheRegisteredCorpusRunnerWithPresencePrecedence()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.141"/>
+  <testcase name="twoVerifiedReceiptsProduceExactConcordanceAndOptionalReproducibleTopics()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.083"/>
+  <testcase name="overlapsDuplicatesStaleSourcesAndInvalidTopicRequestsRefuse()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.024"/>
+  <testcase name="samplerWorkAndFullResponseBoundsRefuseWithoutPublishingPartialDerivedReceipts()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="3.729"/>
+  <testcase name="malformedAndOversizedSearchesRefuseWithoutPartialHitsOrNewDerivedReceipts()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="2.16"/>
+  <testcase name="searchUsesTheSamePolicyAndExplicitNoMatchDatasetWithoutChangingTopics()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.037"/>
+  <testcase name="currentSearchChecksBeforeAfterWorkAndAfterRetentionWhileSnapshotsStayHistorical()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.032"/>
+  <testcase name="actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.072"/>
+  <testcase name="optionalViewPreservesLegacyRequestsAndHttpAndLcncRefuseExplicitNullOrUnknown()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.033"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

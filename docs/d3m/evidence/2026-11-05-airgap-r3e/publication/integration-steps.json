@@ -1,0 +1,29 @@
+[
+  {
+    "ref": "refs/remotes/origin/HEAD",
+    "commit": "add7ee8cf4b032c959e0f712a3d7219ee836c89a",
+    "time": 1793870415,
+    "before": "d1e5d413259e191a9aa6cff15998f6df2b50aa38",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n docs/english-corpus-inference.txt                  |   28 +\n .../english-source-integration/delivery-v86.json   |   48 +\n .../verification-v86.json                          | 1194 ++++++++++++++++++++\n 3 files changed, 1270 insertions(+)\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/delivery-v86.json\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/verification-v86.json\n",
+    "after": "4afe629950d3129e62b8bc73580e5e087885503e"
+  },
+  {
+    "ref": "refs/remotes/origin/codex/native-horn-query-visual-integration-20261105",
+    "commit": "be91a554107854c9954c44848102828924d60c49",
+    "time": 1793871061,
+    "before": "4afe629950d3129e62b8bc73580e5e087885503e",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n",
+    "after": "6f3052c5bbea974524061900c4452680299d4da8"
+  },
+  {
+    "ref": "refs/remotes/origin/codex/native-horn-proof-quads-20261105",
+    "commit": "173cb2de7b1c825a70b67a84f96c93e5bbe3d658",
+    "time": 1793871807,
+    "before": "6f3052c5bbea974524061900c4452680299d4da8",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n",
+    "after": "12db9aa42d2c9ea43215f3c189b7ab5e1011d415"
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "error": "AssertionError(('driver', 1))",
+  "driverExit": 1,
+  "exits": [
+    0
+  ]
+}
+Traceback (most recent call last):
+  File "/workspace/airgap-r3e-proof/run.py", line 51, in <module>
+    assert error is None,error
+           ^^^^^^^^^^^^^
+AssertionError: AssertionError(('driver', 1))

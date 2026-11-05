@@ -1,0 +1,6 @@
+{
+  "standing": "Harness development only; excluded from accepted performance comparison.",
+  "runtime": "Immutable R3d extracted update",
+  "interference": "Runs concurrently with the combined-source Gradle compilation. No timing target is asserted.",
+  "purpose": "Exercise trusted display-control inputs, record Event Timing availability, validate wire endpoints after fit/zoom/resize and trusted wire deletion."
+}

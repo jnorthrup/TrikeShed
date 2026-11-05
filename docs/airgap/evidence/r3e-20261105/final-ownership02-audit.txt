@@ -1,0 +1,47 @@
+{
+  "kind": "retained-reference-ownership",
+  "casObjectsVerified": 33,
+  "walFramesVerified": [
+    {
+      "cid": "sha256:b867b706142d8d4ade200f82e25ce180123330903d72c0e06d198edd72679051",
+      "status": "queued"
+    },
+    {
+      "cid": "sha256:dc4cc65f2e2b28aa1c1e39042a66748d05995ed8bcc45426bc7a18a36f6f58b9",
+      "status": "running"
+    },
+    {
+      "cid": "sha256:47a52eadd7a8a173fc26fad626726b0efe53cee993248e09ce663e081a6e2a73",
+      "status": "completed"
+    },
+    {
+      "cid": "sha256:64314bb13d7231585e571010964174a37472c8a7fe5370abf277cb7219819a63",
+      "status": "queued"
+    },
+    {
+      "cid": "sha256:8a88fc0aff7fd6b03e558d46db1d639960568cd6cf12501bf5e34dc33c71f4fc",
+      "status": "running"
+    },
+    {
+      "cid": "sha256:654562016221129df511b079393fec0b98639b290a149e57595a41ae5e0033cf",
+      "status": "completed"
+    }
+  ],
+  "runIds": [
+    "78e12692-539f-47ed-9bd6-7dfa4725876c",
+    "be2a6755-ad71-495e-87db-e053dfabd869"
+  ],
+  "programCids": [
+    "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+    "sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b"
+  ],
+  "sourceReadSha256": "1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "runSubmissions": 2,
+  "retainedReads": 4,
+  "bundleSha256": "622a0d3f5d54d54e6b30c031426e2f22d7af9b019290d38611f7b87b2ff02de9",
+  "scope": "Two real commonMain JSON literal runs and four actual CAS GET requests. The third request is delayed, then continued unchanged, to edit the canvas during an awaited read. No response fabrication or additional execution."
+}

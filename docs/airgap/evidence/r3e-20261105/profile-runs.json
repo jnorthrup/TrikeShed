@@ -1,0 +1,42 @@
+[
+  {
+    "case": "baseline-profile",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "baseline-profile",
+      "profile"
+    ],
+    "startedAt": "2026-11-05T10:09:38.355216+00:00",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:09:51.585502+00:00"
+  },
+  {
+    "case": "final-profile",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3e",
+      "python3",
+      "/workspace/airgap-r3e-proof/run.py",
+      "final-profile",
+      "profile"
+    ],
+    "startedAt": "2026-11-05T10:09:52.361899+00:00",
+    "exit": 0,
+    "finishedAt": "2026-11-05T10:10:05.385476+00:00"
+  }
+]

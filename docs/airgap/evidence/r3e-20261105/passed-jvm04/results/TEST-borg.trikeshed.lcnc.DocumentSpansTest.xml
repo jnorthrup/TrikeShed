@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="DocumentSpansTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T09:50:09.850Z" hostname="0d6dfba25614" time="0.011">
+  <properties/>
+  <testcase name="compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm]" classname="borg.trikeshed.lcnc.DocumentSpansTest" time="0.003"/>
+  <testcase name="oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm]" classname="borg.trikeshed.lcnc.DocumentSpansTest" time="0.0"/>
+  <testcase name="continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm]" classname="borg.trikeshed.lcnc.DocumentSpansTest" time="0.003"/>
+  <testcase name="pausedReferenceCannotConsumeARevisedProjectDocument()[jvm]" classname="borg.trikeshed.lcnc.DocumentSpansTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

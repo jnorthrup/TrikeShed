@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="PropositionAttentionTest[jvm]" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:04:17.011Z" hostname="0d6dfba25614" time="0.193">
+  <properties/>
+  <testcase name="mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers()[jvm]" classname="borg.trikeshed.narsese.PropositionAttentionTest" time="0.003"/>
+  <testcase name="lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity()[jvm]" classname="borg.trikeshed.narsese.PropositionAttentionTest" time="0.013"/>
+  <testcase name="httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409()[jvm]" classname="borg.trikeshed.narsese.PropositionAttentionTest" time="0.009"/>
+  <testcase name="exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes()[jvm]" classname="borg.trikeshed.narsese.PropositionAttentionTest" time="0.003"/>
+  <testcase name="sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer()[jvm]" classname="borg.trikeshed.narsese.PropositionAttentionTest" time="0.148"/>
+  <testcase name="productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence()[jvm]" classname="borg.trikeshed.narsese.PropositionAttentionTest" time="0.016"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

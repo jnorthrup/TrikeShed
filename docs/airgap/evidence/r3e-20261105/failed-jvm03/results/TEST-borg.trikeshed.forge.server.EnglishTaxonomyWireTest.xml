@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishTaxonomyWireTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T09:36:16.348Z" hostname="0d6dfba25614" time="0.688">
+  <properties/>
+  <testcase name="authenticatedTranslationUsesTheRealReceiptAndLedgerWithTwoExactWitnesses()[jvm]" classname="borg.trikeshed.forge.server.EnglishTaxonomyWireTest" time="0.305"/>
+  <testcase name="staleEnglishRefusesAnExistingCarrierAtFreezeApprovalAndQuery()[jvm]" classname="borg.trikeshed.forge.server.EnglishTaxonomyWireTest" time="0.09"/>
+  <testcase name="protectedQuadQueryReturnsBothEnglishAndKifWitnessesWithoutNewAuthority()[jvm]" classname="borg.trikeshed.forge.server.EnglishTaxonomyWireTest" time="0.107"/>
+  <testcase name="prepareDoesNotSupersedeApprovalButSameContextFreezeDoesAndOtherContextsStaySeparate()[jvm]" classname="borg.trikeshed.forge.server.EnglishTaxonomyWireTest" time="0.184"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

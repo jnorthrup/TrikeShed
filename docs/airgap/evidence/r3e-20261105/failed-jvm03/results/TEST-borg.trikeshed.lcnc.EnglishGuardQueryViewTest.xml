@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishGuardQueryViewTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T09:36:23.513Z" hostname="0d6dfba25614" time="0.029">
+  <properties/>
+  <testcase name="absentSectionIsLegacyWhileUnknownOmittedDuplicateOrUnboundTypedRowsRefuse()[jvm]" classname="borg.trikeshed.lcnc.EnglishGuardQueryViewTest" time="0.014"/>
+  <testcase name="matrixAndSubordinateCuesAndQuotationIndicatorsRemainSeparateFromNormDiagnostics()[jvm]" classname="borg.trikeshed.lcnc.EnglishGuardQueryViewTest" time="0.011"/>
+  <testcase name="eightPatternTypedRowsPreserveTheUnmarkedCoordinatedTargetAndFullSourceIdentity()[jvm]" classname="borg.trikeshed.lcnc.EnglishGuardQueryViewTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,55 @@
+commit 42ebeb85705acc259a34b0f19fd23cafbc5a527f
+Author:     Jim N <73514+jnorthrup@users.noreply.github.com>
+AuthorDate: Thu Nov 5 10:00:13 2026 +0000
+Commit:     Jim N <73514+jnorthrup@users.noreply.github.com>
+CommitDate: Thu Nov 5 10:00:13 2026 +0000
+
+    Preserve strict Horn query rows with structural map hashes
+
+diff --git a/src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornQueryView.kt b/src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornQueryView.kt
+index 8859553a9..d348c77b6 100644
+--- a/src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornQueryView.kt
++++ b/src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornQueryView.kt
+@@ -92,7 +92,19 @@ object NativeHornQueryView {
+         }
+         val result = map(value["results"])
+         require(map(result["head"])["vars"] == starter.variables)
+-        val returned = rows(map(result["results"])["bindings"], 20_000).map(::map)
++        val returned = rows(map(result["results"])["bindings"], 20_000).map { raw ->
++            val row = map(raw)
++            // Reified LinearArrayMap entries do not supply structural hashes. Copy BOTH
++            // levels before hashed coverage/order checks, retaining every exact field.
++            val copy = row.entries.associate { field ->
++                val term = map(field.value)
++                val fields = term.entries.associate { (text(it.key) j text(it.value)).pair }
++                require(fields.size == term.size) { "Repeated native RDF term field" }
++                (text(field.key) j fields).pair
++            }
++            require(copy.size == row.size) { "Repeated native query row field" }
++            copy
++        }
+         val order: Map<Map<*, *>, Int> = expectedRows.withIndex().associate { (it.value j it.index).pair }
+         require(order.size == expectedRows.size && returned.size == expectedRows.size && returned.toSet() == expectedRows.toSet()) {
+             "Native query omitted, repeated or substituted a typed projection row"
+diff --git a/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt b/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt
+index f84eb0ef7..1ed814cbf 100644
+--- a/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt
++++ b/src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt
+@@ -137,6 +137,17 @@ class NativeHornQueryViewTest {
+         assertFails { NativeHornQueryView.answer(report, withRows(_l[answers[0], answers[0]]), starter) }
+         val bad = answers[0] + _m["source" j (map(answers[0]["source"]) + _m["type" j "literal"])]
+         assertFails { NativeHornQueryView.answer(report, withRows(_l[bad, answers[1]]), starter) }
++        val extraRowField = answers[0] + _m["unexpected" j _m["type" j "literal", "value" j "preserve-and-refuse"]]
++        val extraTermField = answers[0] + _m["source" j (map(answers[0]["source"]) + _m["unexpected" j "preserve-and-refuse"])]
++        val nonStringValue = answers[0] + _m["ordinal" j (map(answers[0]["ordinal"]) + _m["value" j 0])]
++        for (changed in s_[extraRowField, extraTermField, nonStringValue].view)
++            assertFails { NativeHornQueryView.answer(report, withRows(_l[changed, answers[1]]), starter) }
++        val sourceJson = jsonOf(answers[0]["source"])
++        val duplicateTerm = reifyMap(sourceJson.dropLast(1) + ",\"value\":" + jsonOf(map(answers[0]["source"])["value"]) + "}")
++        val rowJson = jsonOf(answers[0])
++        val duplicateRow = reifyMap(rowJson.dropLast(1) + ",\"source\":" + sourceJson + "}")
++        for (changed in s_[answers[0] + _m["source" j duplicateTerm], duplicateRow].view)
++            assertFails { NativeHornQueryView.answer(report, withRows(_l[changed, answers[1]]), starter) }
+         assertFails { NativeHornQueryView.answer(report, response + _m["synthetic" j false], starter) }
+         val checked = map(report["checkedProof"]); val steps = rows(checked["steps"])
+         for (badSteps in s_[steps.drop(1), steps + steps[0], steps.dropLast(1) + (steps.last() + _m["path" j _l[7]])].view)

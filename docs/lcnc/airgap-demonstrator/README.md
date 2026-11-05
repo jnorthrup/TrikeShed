@@ -30,7 +30,11 @@ and [R3d receipt rendering](../../airgap/14-receipt-rendering.md). R3c adds a
 continuous display clock and pinned transfer table. R3d reduces repeated
 graph comparisons and layout work: the matched 65-node runs record maximum
 frame gaps of 983–1,050 ms before and 117–150 ms after, with stale-read
-refusal preserved. Sustained frame performance remains open. R2 executes
+refusal preserved. [R3e](../../airgap/15-wire-geometry.md) batches wire geometry and fixes common
+map-entry hashes used by exact Horn query rows. Its 35 final browser checks
+include fit/zoom/resize alignment, actual wire editing and keyboard controls.
+Matched frame/control timings overlap the baseline; no broad speedup is claimed.
+Sustained frame performance remains open. R2 executes
 the actual upstream Confix scanner with bounded native ownership; R3a adds
 observed wire sparks and native flyovers; R3b traverses a retained 12-page
 PDF and verifies an exact passage. R4a packages that path and verifies a

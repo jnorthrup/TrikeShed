@@ -1,0 +1,14 @@
+{
+  "finalSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+  "targetCompilationCommit": "d1e5d413259e191a9aa6cff15998f6df2b50aa38",
+  "changedPathsSinceTargetCompilation": [
+    "docs/english-corpus-inference.txt",
+    "docs/evidence/2026-11-05/english-source-integration/delivery-v86.json",
+    "docs/evidence/2026-11-05/english-source-integration/verification-v86.json",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt"
+  ],
+  "onlyChangedRuntimeSource": [
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt"
+  ],
+  "targetCoverage": "The one changed file belongs only to Spacegraph. Final JVM application installation rebuilds that production bundle; common, JS main, Documents, Wasm-JS, Wasm-WASI and Linux x64 source/build inputs are identical to the successful target build."
+}

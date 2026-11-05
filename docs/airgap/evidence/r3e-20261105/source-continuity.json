@@ -1,0 +1,10 @@
+{
+  "testedCommit": "d1e5d413259e191a9aa6cff15998f6df2b50aa38",
+  "packageSourceCommit": "12db9aa42d2c9ea43215f3c189b7ab5e1011d415",
+  "changedPaths": [
+    "docs/english-corpus-inference.txt",
+    "docs/evidence/2026-11-05/english-source-integration/delivery-v86.json",
+    "docs/evidence/2026-11-05/english-source-integration/verification-v86.json"
+  ],
+  "runtimeSourceAndBuildInputsUnchanged": true
+}
