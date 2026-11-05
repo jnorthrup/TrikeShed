@@ -2,6 +2,8 @@ package borg.trikeshed.docs
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lcnc.ReviewedTaxonomyProofPaths
+import borg.trikeshed.lcnc.ReviewedTaxonomyQueryView
+import borg.trikeshed.lcnc.LcncProgramConfix
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import kotlinx.browser.document
@@ -35,6 +37,9 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
     private var review: Map<*, *>? = null
     private var reviewUncertain = false
     private var report: Map<*, *>? = null
+    private var queryStarter: ReviewedTaxonomyQueryView.Starter? = null
+    private var queryAnswer: ReviewedTaxonomyQueryView.Answer? = null
+    private var queryFailure: String? = null
     private var note = ""
     private var goalPredicate = ""
     private var goalSubject = ""
@@ -130,12 +135,15 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
         field.value = value; field.disabled = pending; field.setAttribute("aria-label", label); holder.appendChild(field)
         field.addEventListener("change", { if (present()) change(field.value) })
     }
+    private fun clearQuery() { queryStarter = null; queryAnswer = null; queryFailure = null }
     private fun invalidate() {
+        clearQuery()
         epoch++; abort?.abort(); abort = null; pending = false
         prepared = null; selectedKif.clear(); review = null; reviewUncertain = false; report = null
         message = "No approved support · UNKNOWN. Prepare and review the edited declarations."
         results?.let { renderResults(it) }
     }
+    private class ReviewRequestRefused(val status: Int, val value: Map<*, *>) : Exception("Review request refused")
     private suspend fun request(suffix: String, body: Map<*, *>?, ticket: Int): Map<*, *> {
         check(active(ticket) && credential.isNotBlank())
         abort = js("new AbortController()")
@@ -146,16 +154,17 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
         val bodyText = response.text().await()
         require(active(ticket) && bodyText.length <= 4 * 1024 * 1024 && bodyText.encodeToByteArray().size <= 4 * 1024 * 1024)
         val value = reifyStrict(bodyText) as? Map<*, *> ?: error("Invalid review response")
-        require(response.ok && value["error"] == null)
+        if (!response.ok || value["error"] != null) throw ReviewRequestRefused(response.status.toInt(), value)
         return value
     }
     private fun run(failure: String, operation: suspend (Int) -> Unit) {
         if (!present() || pending) return
+        clearQuery()
         val ticket = ++epoch; pending = true; message = null; render()
         scope.launch {
             try { operation(ticket) }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Throwable) { if (active(ticket)) { report = null; reviewUncertain = review != null; message = failure } }
+            catch (_: Throwable) { if (active(ticket)) { clearQuery(); report = null; reviewUncertain = review != null; message = failure } }
             finally { if (active(ticket)) { abort = null; pending = false; render() } }
         }
     }
@@ -275,6 +284,13 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
         val frozen = requireNotNull(review); require(!reviewUncertain && frozen["state"] == "approve" && frozen["current"] == true)
         val goal = _m["predicate" j goalPredicate, "subject" j goalSubject, "object" j goalObject]
         val value = request("/taxonomy-plan", _m["snapshotCid" j frozen["snapshotCid"], "expectedRevision" j frozen["revision"], "goal" j goal], ticket)
+        validateReport(value, frozen)
+        report = value
+        }
+    }
+
+    private fun validateReport(value: Map<*, *>, frozen: Map<*, *>) {
+        val goal = _m["predicate" j goalPredicate, "subject" j goalSubject, "object" j goalObject]
         require(value["snapshotCid"] == frozen["snapshotCid"] && value["revision"] == frozen["revision"] && value["goal"] == goal)
         require(value["status"] in _s["SUPPORTED", "UNKNOWN", "BOUNDED", "UNAVAILABLE"])
         if (value["status"] != "UNAVAILABLE") {
@@ -322,8 +338,90 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
                 verifyOrigin((selection["value"] as Map<*, *>)["englishOrigin"])
             }
         }
-        report = value
+    }
+
+    private fun queryEvidence(proofId: String, english: Boolean) {
+        val expected = report ?: return
+        run("Evidence query or source currentness was not confirmed. Refresh the review; this failure is not an UNKNOWN result.") { ticket ->
+            val frozen = requireNotNull(review)
+            require(!reviewUncertain && frozen["state"] == "approve" && frozen["current"] == true)
+            val starter = ReviewedTaxonomyQueryView.starter(expected, proofId, english)
+            queryStarter = starter
+            val page = expected["page"] as Map<*, *>
+            val program = reifyStrict(LcncProgramConfix.toJson(starter.program)) as Map<*, *>
+            val value = try {
+                request("/taxonomy-plan", _m["snapshotCid" j frozen["snapshotCid"], "expectedRevision" j frozen["revision"],
+                    "goal" j expected["goal"], "offset" j page["offset"], "limit" j page["limit"], "program" j program], ticket)
+            } catch (refused: ReviewRequestRefused) {
+                val error = refused.value
+                if (refused.status in _s[400, 413] && error["error"] == "reviewed_taxonomy_query_refused" &&
+                    integer(error["queryStatus"]) == refused.status && error["code"] is String && error["reason"] is String) {
+                    queryFailure = "Evidence query refused (${refused.status}, ${error["code"]}): ${error["reason"]}. Reviewed goal status is unchanged."
+                    return@run
+                }
+                throw refused
+            }
+            validateReport(value, frozen)
+            queryAnswer = ReviewedTaxonomyQueryView.answer(expected, value, starter)
+            report = value - "quadQuery"
         }
+    }
+
+    private fun sourceAnchor(node: String) = "taxonomy-source-" + node.removePrefix("sha256:")
+    private fun focusSource(node: String) {
+        (document.getElementById(sourceAnchor(node)) as? HTMLElement)?.let { card -> card.scrollIntoView(); card.focus() }
+    }
+
+    private fun renderQuery(parent: HTMLElement) {
+        val starter = queryStarter ?: return
+        val section = text(parent, "section", "", "data-taxonomy-evidence-query")
+        section.setAttribute("data-proof-node", starter.proofId)
+        section.setAttribute("data-query-profile", if (starter.english) "english-kif" else "kif")
+        section.className = "ds-curate-proposal"; section.style.cssText = "margin-top:20px;padding:16px;min-width:0"
+        text(section, "h5", if (starter.english) "English and KIF evidence query" else "KIF evidence query").className = "ds-curate-h3"
+        text(section, "p", "Returned proof: ${starter.proofId}").className = "ds-cid"
+        text(section, "p", "This query inspects evidence for the returned proof. Row counts do not change goal support or establish English entailment. Rows are displayed in numeric premise order; the query has no ORDER BY.").className = "ds-curate-dest"
+        queryFailure?.let { text(section, "p", it, "data-taxonomy-evidence-error").className = "ds-curate-warn" }
+        evidence(section, "Inspection-only LCNC query program", reifyStrict(LcncProgramConfix.toJson(starter.program)))
+        val queryText = text(section, "details", "")
+        text(queryText, "summary", "SPARQL query text")
+        code(queryText, starter.query)
+        val answer = queryAnswer ?: return
+        val provenance = answer.value["provenance"] as Map<*, *>
+        text(section, "p", "Request-local graph: ${answer.value["graph"]}", "data-taxonomy-evidence-graph").className = "ds-cid"
+        text(section, "p", "Approval: ${provenance["approvalCid"]} · revision ${provenance["revision"]} · currentness checked as of ${provenance["checkedAsOf"]}",
+            "data-taxonomy-evidence-approval").className = "ds-cid"
+        text(section, "p", (if (provenance["synthetic"] == true) "Synthetic approval reviewer: " else "Approval reviewer: ") + provenance["reviewer"],
+            "data-taxonomy-evidence-reviewer").className = "ds-curate-status"
+        text(section, "p", "The host binds this request-local projection to the current reviewed read. The physical quad engine reports raw matched data with no review authority of its own.",
+            "data-taxonomy-evidence-authority").className = "ds-curate-dest"
+        val scroll = text(section, "div", ""); scroll.style.cssText = "overflow:auto;max-width:100%"
+        val table = text(scroll, "table", "", "data-taxonomy-evidence-table")
+        table.style.cssText = "border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed"
+        val header = text(text(table, "thead", ""), "tr", "")
+        for (name in starter.variables) text(header, "th", name).style.cssText = "padding:8px;text-align:left;border-bottom:1px solid var(--rule)"
+        val body = text(table, "tbody", "")
+        for (row in answer.rows) {
+            val tr = text(body, "tr", "", "data-taxonomy-evidence-row")
+            tr.setAttribute("data-premise-ordinal", row.ordinal.toString())
+            tr.setAttribute("data-source-node", row.sourceNodeId)
+            for (name in starter.variables) {
+                val term = row.bindings[name] as Map<*, *>
+                val cell = text(tr, "td", "")
+                cell.setAttribute("data-query-variable", name)
+                cell.style.cssText = "padding:8px;vertical-align:top;border-bottom:1px solid var(--rule);overflow-wrap:anywhere"
+                val kind = term["type"] as String
+                cell.setAttribute("data-rdf-kind", kind)
+                term["datatype"]?.let { cell.setAttribute("data-rdf-datatype", it as String) }
+                text(cell, "p", kind + (term["datatype"]?.let { " · $it" } ?: ""), "data-taxonomy-evidence-term-kind").className = "ds-curate-label"
+                text(cell, "pre", term["value"] as String, "data-taxonomy-evidence-value").style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;margin:8px 0"
+                if (name == "source") button(cell, "Inspect this source witness") { focusSource(row.sourceNodeId) }.also {
+                    it.setAttribute("data-taxonomy-query-source-target", sourceAnchor(row.sourceNodeId))
+                    it.setAttribute("aria-controls", sourceAnchor(row.sourceNodeId))
+                }
+            }
+        }
+        evidence(section, "Typed bindings, physical source and reviewed provenance", answer.value)
     }
 
     private fun proofPaths(parent: HTMLElement, value: Map<*, *>) {
@@ -337,7 +435,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
             "${value["status"]} · Search bounds were reached. Returned paths are incomplete; other support may exist.",
             "data-taxonomy-proof-incomplete").className = "ds-curate-warn"
         if (proofs.isEmpty()) text(parent, "p", "No positive proof path was returned for this goal.").className = "ds-curate-status"
-        fun anchor(source: Map<*, *>) = "taxonomy-source-" + (source["nodeId"] as String).removePrefix("sha256:")
+        fun anchor(source: Map<*, *>) = sourceAnchor(source["nodeId"] as String)
         fun rule(raw: Any?) = when (raw) {
             "kif-taxonomy/v1/instance-assertion" -> "Instance assertion"
             "kif-taxonomy/v1/subclass-assertion" -> "Subclass assertion"
@@ -350,6 +448,12 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
             val path = text(parent, "section", "", "data-taxonomy-proof-path")
             path.setAttribute("data-proof-node", proof["nodeId"] as String)
             text(path, "h5", "Support path ${index + 1}").className = "ds-curate-h3"
+            val queries = actions(path)
+            button(queries, "Query KIF evidence") { queryEvidence(proof["nodeId"] as String, false) }
+                .setAttribute("data-taxonomy-query-kif", proof["nodeId"] as String)
+            if (value["englishOrigin"] is Map<*, *> && value["englishWitnesses"] is List<*>)
+                button(queries, "Query English and KIF evidence") { queryEvidence(proof["nodeId"] as String, true) }
+                    .setAttribute("data-taxonomy-query-english", proof["nodeId"] as String)
             val ordered = text(path, "ol", "")
             val premises = proof["premises"] as List<*>
             val rules = proof["rules"] as List<*>
@@ -364,11 +468,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
                     it.className = "ds-curate-quote"; it.style.whiteSpace = "pre-wrap"
                 }
                 code(item, source["text"] as String)
-                button(item, "Inspect this source witness") {
-                    (document.getElementById(anchor(source)) as? HTMLElement)?.let { card ->
-                        card.scrollIntoView(); card.focus()
-                    }
-                }.also { control ->
+                button(item, "Inspect this source witness") { focusSource(source["nodeId"] as String) }.also { control ->
                     // This local scroll action must never replace the Documents route hash.
                     control.setAttribute("data-taxonomy-source-target", anchor(source))
                     control.setAttribute("aria-controls", anchor(source))
@@ -471,7 +571,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
             checkbox.addEventListener("change", {
                 if (present() && !pending) {
                     if (checkbox.checked) selectedKif.add(id) else selectedKif.remove(id)
-                    review = null; reviewUncertain = false; report = null; renderResults(parent)
+                    clearQuery(); review = null; reviewUncertain = false; report = null; renderResults(parent)
                 }
             })
         }
@@ -492,7 +592,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
             button(decisions, label, reviewer == null || reviewUncertain || frozen["current"] != true) { decide(action) }
         button(decisions, "Refresh review", reviewer == null) { refresh() }
         if (reviewUncertain || frozen["state"] != "approve" || frozen["current"] != true) { text(parent, "p", "No confirmed current approval; no positive support is displayed.").className = "ds-curate-status"; return }
-        fun goalChanged() { epoch++; abort?.abort(); pending = false; report = null; parent.querySelector("[data-taxonomy-query-result]")?.remove() }
+        fun goalChanged() { clearQuery(); epoch++; abort?.abort(); pending = false; report = null; parent.querySelector("[data-taxonomy-query-result]")?.remove() }
         text(parent, "h4", "Read reviewed support").className = "ds-curate-h3"
         choice(fields(parent), "Goal predicate", goalPredicate, s_["instance", "subclass"]) { goalPredicate = it; goalChanged() }
         val goalTerms = fields(parent)
@@ -511,6 +611,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
             if (value["status"] != "UNAVAILABLE") {
                 text(result, "p", "Context: $contextIri · approval ${value["approvalCid"]}").className = "ds-cid"
                 proofPaths(result, value)
+                renderQuery(result)
             }
             evidence(result, "Approval, context, English/KIF witnesses and proof", value)
         }
