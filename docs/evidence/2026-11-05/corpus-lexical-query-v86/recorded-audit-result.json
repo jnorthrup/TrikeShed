@@ -1,0 +1,152 @@
+{
+  "result": "PASS_RECORDED_CORPUS_LEXICAL_QUERY_CONSISTENCY",
+  "sourceHead": "1aa29894aeeb290a5644b3370fd895f261f576d2",
+  "mainSha256": "e4fa6c396fbff190d160c084df0ac6991ab35ebac44149c4736a18c59165382a",
+  "documentsSha256": "4afe537ee61120cca73a57edf28904c20311b417313ea7b75de7a3cc3444e2b1",
+  "panelsSha256": "9218cc3f29024ff003973ee70b3654937e09d3bd9e784eab8fbeac79651193aa",
+  "writerPid": 163060,
+  "readerPid": 163277,
+  "genuineInspectionCids": [
+    "sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824",
+    "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a"
+  ],
+  "legacyReceiptCid": "sha256:0e4682987e9d093233fd26f50c8435b3287a6e3ff0b7eec6a7d4dbb1e6d5f38c",
+  "corpusCid": "sha256:b83b2616d8b433e50e184a208c73822fa09fc10f67ab9f466ffde998bb90867e",
+  "matrixCid": "sha256:20b16662f8ce8c402d1a79114d35141de0bbc2fe19a52226f8b6321c5d52faa2",
+  "queryReceiptCids": {
+    "current": "sha256:84ccb4b5c91bf40a76c65bf3913b8545b4663a3336c00a65fa929fccd44b5492",
+    "topics": "sha256:b8d91f92d94a062e92a54c918a711610469af0d7735b8a716f7dd85fe77296eb",
+    "noMatch": "sha256:57cb27f6e5363a91b7eb3bdf3a5669b41b53632a2681dc9950f0eb3cbed82a99",
+    "snapshot": "sha256:143a575a04d474ab0f9c872252f1920164e058313ff7c58ed53a6d17b156fbb7"
+  },
+  "searchChecks": {
+    "current": {
+      "hits": 5,
+      "sentencePostings": 5,
+      "queryTerms": [
+        "imply"
+      ],
+      "idfUnit": "included lexical sentences, distinct from corpus source-document frequency"
+    },
+    "topics": {
+      "hits": 5,
+      "sentencePostings": 5,
+      "queryTerms": [
+        "imply"
+      ],
+      "idfUnit": "included lexical sentences, distinct from corpus source-document frequency"
+    },
+    "noMatch": {
+      "hits": 0,
+      "sentencePostings": 5,
+      "queryTerms": [
+        "NOT_REPORTED_V86"
+      ],
+      "idfUnit": "included lexical sentences, distinct from corpus source-document frequency"
+    },
+    "snapshot": {
+      "hits": 5,
+      "sentencePostings": 5,
+      "queryTerms": [
+        "imply"
+      ],
+      "idfUnit": "included lexical sentences, distinct from corpus source-document frequency"
+    }
+  },
+  "topicChecks": {
+    "topicCid": "sha256:fc55c024a60c5103570c2a37619d754a0fcf01c35602a5a6dc914d24be6f273b",
+    "config": {
+      "beta": 0.01,
+      "seed": 7,
+      "alpha": 0.1,
+      "topics": 2,
+      "iterations": 8
+    },
+    "tokenCount": 15,
+    "verification": "captured-count/posterior/CID consistency only; no Gibbs sampler replay"
+  },
+  "readbacks": 28,
+  "uniqueReadbacks": 18,
+  "boardFrames": 6,
+  "currentSourceCid": "sha256:9375a3f3d5c24b0137c978f4e5dadc68457aa9894520749418784973e0813399",
+  "currentPackREF": {
+    "offset": 381096,
+    "kind": "REF",
+    "payloadBytes": 140,
+    "cid": "sha256:9375a3f3d5c24b0137c978f4e5dadc68457aa9894520749418784973e0813399",
+    "reference": {
+      "bytes": 134,
+      "mtime": 1793868513865,
+      "path": "/workspace/library-files/corpus-lcnc-v86-native-proof/native-attempt1/runtime/files/synthetic-guard-observations-v76/S12.txt"
+    }
+  },
+  "packHistoryKinds": {
+    "BLOB": 94,
+    "REF": 18
+  },
+  "mutatedCopyControls": [
+    {
+      "mutation": "substituted-original-token-span",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "wrong-selected-query-dataset",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "BM25-score-as-arbitrary-confidence",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "snapshot-relabelled-current",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "different-seed-with-same-topic-ID",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "stale-source-reuses-old-hits",
+      "result": "REJECTED"
+    }
+  ],
+  "recordSha256": {
+    "GO.json": "8b6804b1af68209b839c4181027aa6e7fc81eb08773b306f3f9f219c1941299f",
+    "startup.json": "403a75d662c69692473f15fcfc10a06045661532184039b4fb20b320145d602e",
+    "browser-result.json": "616b572671b8d52df051b4ddabaaad281e6df44ade943c3ed8b189b7f28af9ca",
+    "cleanup.json": "5c6217c6e7b430c85cbf6ae6f95cbb3a3158962239cda6abbdc9035d1dbf0fa0",
+    "reopened.json": "5c9d3a18e1073889b22748918aeb1cefbf14857888e49372bb1efcf0fd7a6c45",
+    "readback-index.json": "47cc2a9dd38b4807c9610d9e74217574a05d64431a2c04d5fb45206c40d32d18",
+    "classpath.json": "6fd85a1791cc9ed8cf8a863dc7b5b8e109d68b9769803092d1f0f43137470187",
+    "network.json": "3a20637cc9ac3566e2c8902fb5c9feae39730c2fd3d4a0273b71c9179611c57b",
+    "writer-command.json": "a1486c718700e0899702b30450b6d4b2cce7ae0ddf3379df6e9d481c7d97a2bb",
+    "reader-command.json": "fdd6315c3c049ae8555c06e8d658580de21bbbc6b084d48b8d8f6eaf22fedc0b",
+    "native-summary.json": "778fb02907debeb8c1762f1f0d3d02e96bab257291df12405875ba12ae742de5",
+    "closed-pack-inventory.json": "7322ae6d260c8a97e725b62313d6780751efbaac58a065d8a6d19a9da0354082"
+  },
+  "observerSourceSha256": {
+    "Fixture.kt": "c606955e86dee14b171141048fe56633afa635d58af874ee0e77d293d7a6db40",
+    "Reopen.kt": "14ebdf3a8e9a9400c6eb237dff5a5653c67b0818f746d2738be863b2c735cd79",
+    "compile.sh": "1367361f9541d9a37821cea7ecf8957f651315887f235c180d2c74cb78337789",
+    "corpus-inputs.json": "b24263eba625f5d124724d3ea0e36878b5e22850271329f2ec84df7b03255d5f",
+    "driver.cjs": "de2523e53cc899cd80aab852166833cfeca002cf536f9fa1fc97a06805896b97",
+    "preparation.json": "fb8332c1e20e9c715e879c7d0c09bf11bbddb0862c5afecd4dbc85f807fa505e",
+    "protocol.txt": "9551ed23822446f775c6aa69d8d3dd3fce8facc3fb260b7cd9a54bbfbe00df55",
+    "run-proof.py": "5c20b545c3e1ff2e2419922207b47572a1c9653f5ec0b427436b6416638f4a10"
+  },
+  "imageSha256": {
+    "native-current-preset-query.png": "9e841477e2baeabc884cba03277b7fc87c0d1b8623527b930746f2a79161a103",
+    "native-current-source-refusal.png": "aaa37e5eef757adddc0055a3ce9c547011b6bcb3571fd70979d9443cc40e4043",
+    "native-explicit-snapshot-preset-query.png": "34a972ca978c4cee0dc3fb9f66606f4239f2a2eceaf7fbe486b794d50dbfc30b",
+    "native-matching-source-sentence.png": "4b9df11fae4679138aea0d6c87d04a72af828b30c6652ee3e3188912c91afc3c",
+    "native-original-inspection-source-context.png": "b724eedc95a1e46a2aea0bcff121075f9affc40720784b226d9a68035e1a2ac1",
+    "native-retained-corpus-wordcloud.png": "2d308b51e1492bd3c8b7b4a1b897bdcf3fd75fa5d1f9d24ae290d6c62d342ba1"
+  },
+  "externalArtifactVerification": "recorded artifact/inventory metadata only; external JAR/full-pack/REFpath availability not checked",
+  "scope": "Supplied genuine retained CoreNLP4.6 annotations and actual selected corpus lexical retrieval/statistical topic record consistency. BM25 arithmetic checked on five sentence postings, not one corpus source-document frequency; no LDA sampler replay. Old parser provenance is not re-executed/authenticated. Explicit snapshot after actual current-source refusal is historical, not current fallback. Operational workflow writes are expected; no English/NLP/model/provider/Camel/NARS admission or legal/semantic authority upgrade. Full pack omitted and actual amended-source current REF remains external; no portable-pack/fullrootfs claim. Root accepted actual presentation roughness: overview clips right scope-outs and static annotation shows unavailable badge despite completed runs; no cosmetic rerun.",
+  "auditScriptSha256": "38cc2e318afc081f9c5d01098e518dc8b39895a5e2006a7d2737bbe1d507b6c1",
+  "supportSha256": {
+    "checks.py": "92c7f323e741b4a2c78af3fe78c8903695ced954f6e33ff9f52848fd6b31f74c",
+    "receipt-core.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+  }
+}
