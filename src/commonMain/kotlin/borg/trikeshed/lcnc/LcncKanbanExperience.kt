@@ -241,12 +241,13 @@ class LcncKanbanExperience(
                 )
             },
             "confix.pickPath" to LcncNodeRunner { node, inputs ->
-                val json = (inputs["data"] ?: inputs["json"] ?: node.params["json"])
+                fun input(port: String): Any? = inputs[port] ?: inputs["$port?"]
+                val json = (input("data") ?: input("json") ?: node.params["json"])
                     ?.toString()
                     ?: error("confix.pickPath: json input or param required")
                 val path = required(node, "path")
-                if (node.params["geometry"] == "native" || inputs.keys.any { it in _s["rows", "sourceCid", "ok", "format"] })
-                    return@LcncNodeRunner LcncConfixSelection.select(json, path, inputs["rows"], inputs["sourceCid"], inputs["ok"], inputs["format"])
+                if (node.params["geometry"] == "native" || inputs.keys.any { it.removeSuffix("?") in _s["rows", "sourceCid", "ok", "format"] })
+                    return@LcncNodeRunner LcncConfixSelection.select(json, path, input("rows"), input("sourceCid"), input("ok"), input("format"))
                 val selected = resolveJsonPath(reify(json), path)
                 if (selected == null) {
                     mapOf("found" to false, "path" to path, "sheets" to emptyList<Any?>(), "sheet" to null)
