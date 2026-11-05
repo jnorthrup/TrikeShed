@@ -1,13 +1,66 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.PackCasStore
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.channels.FileChannel
+import borg.trikeshed.userspace.nio.file.StandardOpenOption
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import java.nio.file.Files
+import java.nio.file.Path
 
-/** Prints only results of the offline, hand-authored synthetic NAL experiment. */
+/** Offline experiment output: the fixed synthetic example, or an explicitly selected historical inspection. */
 object SyntheticNalExperimentCli {
     @JvmStatic
     fun main(args: Array<String>) {
-        require(args.isEmpty()) { "SyntheticNalExperimentCli takes no arguments" }
-        println(jsonOf(payload(SyntheticNalExperiment.run())))
+        println(jsonOf(report(args)))
+    }
+
+    /** No input text, parser, source-currentness check, admission or report fallback is supplied by this CLI. */
+    fun report(args: Array<String>): Map<String, Any?> {
+        if (args.isEmpty()) return payload(SyntheticNalExperiment.run())
+        require(args.size == 4 && _s[args[0], args[2]] == _s["--cas", "--inspection"]) {
+            "Usage: SyntheticNalExperimentCli [--cas <existing-pack-directory> --inspection <sha256:inspection-cid>]"
+        }
+        val casPath = args[if (args[0] == "--cas") 1 else 3]
+        val inspection = ContentId(args[if (args[0] == "--inspection") 1 else 3])
+        require(casPath.isNotBlank() && casPath.length <= 4096) { "Existing CAS directory required" }
+        casPath.encodeToByteArray(throwOnInvalidSequence = true)
+        val path = Path.of(casPath).toAbsolutePath().normalize()
+        require(Files.isDirectory(path) && Files.isRegularFile(path.resolve("pack")) && Files.isReadable(path.resolve("pack"))) {
+            "Existing readable CAS pack required"
+        }
+        completePack(path.resolve("pack"))
+        return PackCasStore(JvmFileOperations(), path.toString()).use { cas ->
+            SyntheticNalExperiment.run(EnglishObservationGraph.read(cas, inspection)).toMap()
+        }
+    }
+
+    /** Require a quiescent pack: this framing check is not atomic against a concurrent writer or path replacement. */
+    private fun completePack(path: Path) {
+        FileChannel.open(path.toString(), StandardOpenOption.READ).use { channel ->
+            val size = channel.size()
+            val header = ByteBuffer.allocate(PackCasStore.HEADER)
+            var at = 0L
+            while (at < size) {
+                require(size - at >= PackCasStore.HEADER) { "Historical CAS pack has a torn header" }
+                header.clear()
+                var read = 0
+                while (read < PackCasStore.HEADER) {
+                    val n = channel.read(header, at + read)
+                    require(n > 0) { "Historical CAS pack changed or has an incomplete header" }
+                    read += n
+                }
+                val kind = header.get(0); val length = header.getInt(1)
+                require((kind == PackCasStore.BLOB || kind == PackCasStore.REF) && length >= 0 &&
+                    length.toLong() <= size - at - PackCasStore.HEADER) { "Historical CAS pack has an invalid or torn record" }
+                at += PackCasStore.HEADER.toLong() + length
+            }
+            require(channel.size() == size && Files.size(path) == size) { "Historical CAS pack changed during its framing check" }
+        }
     }
 
     /** Render the entire reproducible artifact without relying on mutable standard output. */
