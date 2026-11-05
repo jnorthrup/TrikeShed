@@ -1,0 +1,28 @@
+{
+  "baseSourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+  "targetSourceCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+  "targetTree": "91b659d5921b932d7eda47bca6c90b6beab24d46",
+  "requiredSourceChain": [
+    {
+      "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+    },
+    {
+      "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+      "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+    },
+    {
+      "file": "airgap-document-r3c-final-sources-update-2026-11-05.tar.gz",
+      "sha256": "dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f"
+    }
+  ],
+  "patchSha256": "fc6d1917d9b2ce6226d2ecb2c7cb759b3adc758f88d3ec89f666f27c93fa6de4",
+  "verifiedAppliedTreeMatches": true,
+  "dependencyChanges": [],
+  "scope": "Apply after the R3c final source update, itself applied after R4f on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+  "archive": {
+    "file": "/workspace/library-files/airgap-document-r3d-final-sources-update-2026-11-05.tar.gz",
+    "bytes": 12680655,
+    "sha256": "a57105c0fbf9fea0f2d9b3a0bfbc566eeeaf531df75d52b7e1ef543c566ce1c6"
+  }
+}

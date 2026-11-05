@@ -1,0 +1,6 @@
+{
+  "publishedSource": "e15683f3564fae72cb975af452c0ae0171c07e77",
+  "runtimeTestedSource": "792a14c3b982956df3a139661797e171cba9b963",
+  "runtime": "/workspace/airgap-r3c-proof/installed-final/airgap-document-rootfs",
+  "purpose": "Attribute the actual final R3c 65-node UI stall before changing source."
+}

@@ -1,0 +1,55 @@
+from pathlib import Path
+import json,hashlib,subprocess,shutil,os,datetime,zipfile
+h=Path('/workspace/airgap-r3d-proof');repo=Path('/workspace/TrikeShed');out=repo/'docs/airgap/evidence/r3d-20261105';out.mkdir();d3=repo/'docs/d3m/evidence/2026-11-05-airgap-r3d';d3.mkdir()
+def sha(p):
+ with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
+def save(p,v):p.write_text(json.dumps(v,indent=2)+'\n')
+def git(*args):return subprocess.check_output(['git',*args],cwd=repo,text=True).strip()
+def copy(p,q):q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
+accepted=['final-fanout01','final-fanout02','final-fanout03','final-document','final-ownership'];baseline=['baseline-fanout01','baseline-fanout02','baseline-fanout03'];preliminary=[]
+for p in sorted(h.iterdir()):
+ if p.is_dir() and (p/'processes.json').exists():
+  category='accepted' if p.name in accepted else 'baseline' if p.name in baseline else 'preliminary'
+  if category=='preliminary':preliminary.append(p.name)
+  shutil.copytree(p,out/category/p.name)
+shutil.copytree(h/'failed-combined-0a0c46',out/'failed-combined-0a0c46');shutil.copytree(h/'final-jvm-results',out/'final-jvm-results')
+for p in sorted(h.iterdir()):
+ if p.is_file() and p.suffix in ['.json','.txt','.svg','.png','.pdf']:copy(p,out/p.name)
+ if p.is_file() and p.suffix in ['.py','.cjs']:copy(p,out/'harness'/(p.name+'.txt'))
+for name in ['package-identity.json','SHA256SUMS']:copy(h/'installed-combined/airgap-document-rootfs'/name,out/'package'/name)
+for name in ['README.md','UPDATE.json']:copy(h/'runtime-combined-update'/name,out/'package'/name)
+for name in ['README.md','source-update.json','SHA256.json']:copy(h/'source-final-update'/name,out/'source-update'/name)
+# Snapshot only selected relevant sources; the full binary patch is delivered separately.
+source=set(json.loads((repo/'docs/airgap/evidence/r3c-20261105/verification.json').read_text())['sourceSha256'])
+source.update(git('diff','--name-only','792a14c3b982956df3a139661797e171cba9b963','81438b129','--','src').splitlines())
+source.update(['AGENTS.md','PRELOAD.md','build.gradle.kts','settings.gradle.kts','gradle.properties'])
+source_hash={}
+for name in sorted(source):
+ p=repo/name
+ if p.is_file():
+  q=out/'source'/name;q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(subprocess.check_output(['git','show','81438b129:'+name],cwd=repo));source_hash[name]=sha(q)
+# Preserve exact typed stage blobs and the marked conflict before resolution.
+for name,label in [('airgap-receipt-rendering-20261105','initial'),('airgap-receipt-rendering-publication-20261105','publication'),('airgap-receipt-rendering-final-20261105','final')]:shutil.copytree(repo/'.git/d3m'/name,d3/label)
+for name in ['fetch.py','fetch-publication.py','fetch-final.py','integrate.py','integrate-publication.py','integrate-final.py']:copy(h/name,d3/(name+'.txt'))
+for name in ['integration-inputs.json','fetch.json','remote-heads.json','publication-inputs.json','publication-fetch.json','publication-remote-heads.json','final-inputs.json','final-fetch.json','final-remote-heads.json']:copy(h/name,d3/name)
+refs=[]
+for name in ['integration-inputs.json','publication-inputs.json','final-inputs.json']:refs+=json.loads((h/name).read_text())['refs']
+ancestors=set(git('rev-list','HEAD').splitlines());assert all(r['commit'] in ancestors for r in refs)
+assert git('rev-parse','81438b129^{tree}')==git('rev-parse','36cc2535d^{tree}')
+assert not git('diff','81438b129','HEAD','--','src','build.gradle.kts','settings.gradle.kts','gradle.properties','release','gradle','gradlew','gradlew.bat')
+steps=[]
+for label in ['initial','publication','final']:steps+=json.loads((d3/label/'integration-steps.json').read_text())
+d3record={'integratedCommit':git('rev-parse','HEAD'),'testedCommit':git('rev-parse','81438b129'),'integratedTreeMatchesTestedTree':True,'frozenRefCounts':[549,551,553],'merges':len(steps),'conflictedFiles':1,'conflictedHunks':1,'allFrozenTipsAreAncestors':True,'conflictResolution':'final/resolution.json','localMachine':'Cloud checkout /workspace/TrikeShed; Jim Mac unchanged','pushPolicy':'Ordinary master push; no force, pruning, or branch deletion. Final remote readback recorded separately.'};save(d3/'verification.json',d3record)
+browser={};passes=0;recorded=0
+for case in accepted:
+ b=json.loads((h/case/'browser.json').read_text());a=json.loads((h/case/'independent-audit.json').read_text());cases={k:v['result'] for k,v in b['cases'].items()};passes+=sum(v=='PASS' for v in cases.values());recorded+=sum(v=='RECORDED' for v in cases.values());assert not b['errors'] and all(v in ['PASS','RECORDED'] for v in cases.values())
+ browser[case]={'cases':cases,'audit':a,'evidence':'accepted/'+case}
+assert passes==26 and recorded==3
+ru=json.loads((h/'runtime-combined-update.json').read_text());su=json.loads((h/'source-final-update.json').read_text())
+limits=['Final maximum frame gaps of 116.7–150.1 ms remain; sustained frame-rate/control-latency acceptance is open.','Full canvas serialization on each validity check and pairwise quadratic layout remain.','65-node fixture only; no dense recursive or 10k/50k graph acceptance.','Final live table is a bounded received-event projection; missing observations are not fabricated.','Six external native Horn checks skipped; incoming evidence keeps its original scope.','Pinned-byte packaging does not close full vendor/native source rebuild provenance or machine power-loss durability.']
+record={'release':'R3d receipt rendering','createdAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'testedSourceCommit':git('rev-parse','81438b129'),'testedSourceTree':git('rev-parse','81438b129^{tree}'),'integration':d3record,'sourceSha256':source_hash,'testTotals':json.loads((h/'final-jvm-totals.json').read_text()),'browser':{'passed':passes,'frameMeasurementsRecorded':recorded,'bundleSha256':browser['final-fanout01']['audit']['bundleSha256'],'cases':browser},'comparison':json.loads((h/'comparison-runs.json').read_text()),'preliminaryRuns':preliminary,'runtimeUpdate':ru,'sourceUpdate':su,'limits':limits,'reproduction':'../../14-receipt-rendering.md','evidenceStanding':'Original logs/state/profile bytes retained. Preliminary, baseline and accepted scopes are separate. Authored whitespace checks exclude raw evidence; SHA256.json verifies its bytes.'};save(out/'verification.json',record)
+host={'recordedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'kernel':subprocess.check_output(['uname','-srm'],text=True).strip(),'cpu':json.loads(subprocess.check_output(['lscpu','-J'],text=True)),'cpuMax':Path('/sys/fs/cgroup/cpu.max').read_text().strip(),'memoryMax':Path('/sys/fs/cgroup/memory.max').read_text().strip(),'browser':json.loads((h/'final-fanout01/browser.json').read_text())['browser'],'benchmarkInterference':'No Gradle build, CPU profile or archive compression during alternating comparison; document and ownership functional cases run concurrently only afterward.'};save(out/'reference-host.json',host)
+(out/'README.md').write_text('# R3d evidence\n\nSee verification.json for exact tested code, extracted runtime, 26 final passing browser checks, three recorded frame measurements and limits. Baselines, preliminary candidates and the first failed JVM attempt are separate. Raw logs, CAS/WAL state, profiler data and conflict evidence retain their bytes. Reproduction scripts are inert .txt copies; paths describe this cloud host. Earlier release archives and this release runtime/source overlays are separate artifacts named and hashed in the packet.\n')
+save(out/'visual-review.json',{'inspected':['accepted/final-fanout01/fanout-observation-coverage.png','accepted/final-document/transfer-table.png','accepted/final-ownership/changed-reference-refused.png'],'findings':['Final fanout shows separate nodes, source wires and explicit 165 owner omissions; many nodes extend beyond the current viewport.','Document screenshot shows eight observed transfers and keyboard selection.','Ownership screenshot shows an edited parameter and changed-source refusal in the status bar; a fitted one-node view is heavily zoomed. It is not a claim of large-graph navigability.'],'figure':'frame-comparison.png: legend repositioned above bars to preserve all measured labels.'})
+for root in [out,d3]:save(root/'SHA256.json',{p.relative_to(root).as_posix():sha(p) for p in sorted(root.rglob('*')) if p.is_file() and p!=root/'SHA256.json'})
+print(json.dumps({'evidence':str(out),'acceptedBrowserPasses':passes,'recordedFrames':recorded,'files':len(list(out.rglob('*'))),'d3m':d3record},indent=2))

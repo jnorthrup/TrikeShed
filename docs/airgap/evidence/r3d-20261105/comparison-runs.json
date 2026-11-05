@@ -1,0 +1,218 @@
+[
+  {
+    "case": "baseline-fanout01",
+    "kind": "baseline",
+    "startedAt": "2026-11-05T09:01:56.080337+00:00",
+    "finishedAt": "2026-11-05T09:02:07.527503+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3d",
+      "python3",
+      "/workspace/airgap-r3d-proof/run.py",
+      "baseline-fanout01",
+      "fanout"
+    ],
+    "exit": 0,
+    "frames": {
+      "unit": "ms",
+      "samples": 110,
+      "p50": 16.699999999999818,
+      "p95": 33.30000000000018,
+      "maximum": 1049.9000000000005,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "frameMeasurement": "RECORDED"
+    }
+  },
+  {
+    "case": "final-fanout01",
+    "kind": "final",
+    "startedAt": "2026-11-05T09:02:07.562826+00:00",
+    "finishedAt": "2026-11-05T09:02:19.176149+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3d",
+      "python3",
+      "/workspace/airgap-r3d-proof/run.py",
+      "final-fanout01",
+      "fanout"
+    ],
+    "exit": 0,
+    "frames": {
+      "unit": "ms",
+      "samples": 166,
+      "p50": 16.699999999999818,
+      "p95": 16.800000000000182,
+      "maximum": 150,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "frameMeasurement": "RECORDED"
+    }
+  },
+  {
+    "case": "final-fanout02",
+    "kind": "final",
+    "startedAt": "2026-11-05T09:02:19.213237+00:00",
+    "finishedAt": "2026-11-05T09:02:30.724959+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3d",
+      "python3",
+      "/workspace/airgap-r3d-proof/run.py",
+      "final-fanout02",
+      "fanout"
+    ],
+    "exit": 0,
+    "frames": {
+      "unit": "ms",
+      "samples": 163,
+      "p50": 16.699999999999818,
+      "p95": 33.30000000000018,
+      "maximum": 150.10000000000036,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "frameMeasurement": "RECORDED"
+    }
+  },
+  {
+    "case": "baseline-fanout02",
+    "kind": "baseline",
+    "startedAt": "2026-11-05T09:02:30.761449+00:00",
+    "finishedAt": "2026-11-05T09:02:42.176023+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3d",
+      "python3",
+      "/workspace/airgap-r3d-proof/run.py",
+      "baseline-fanout02",
+      "fanout"
+    ],
+    "exit": 0,
+    "frames": {
+      "unit": "ms",
+      "samples": 111,
+      "p50": 16.699999999999818,
+      "p95": 33.399999999999636,
+      "maximum": 1000,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "frameMeasurement": "RECORDED"
+    }
+  },
+  {
+    "case": "baseline-fanout03",
+    "kind": "baseline",
+    "startedAt": "2026-11-05T09:02:42.211451+00:00",
+    "finishedAt": "2026-11-05T09:02:53.579756+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3d",
+      "python3",
+      "/workspace/airgap-r3d-proof/run.py",
+      "baseline-fanout03",
+      "fanout"
+    ],
+    "exit": 0,
+    "frames": {
+      "unit": "ms",
+      "samples": 112,
+      "p50": 16.699999999999818,
+      "p95": 33.399999999999636,
+      "maximum": 983.3000000000002,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "frameMeasurement": "RECORDED"
+    }
+  },
+  {
+    "case": "final-fanout03",
+    "kind": "final",
+    "startedAt": "2026-11-05T09:02:53.617060+00:00",
+    "finishedAt": "2026-11-05T09:03:05.738736+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-root-user",
+      "--net",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-r3d",
+      "python3",
+      "/workspace/airgap-r3d-proof/run.py",
+      "final-fanout03",
+      "fanout"
+    ],
+    "exit": 0,
+    "frames": {
+      "unit": "ms",
+      "samples": 168,
+      "p50": 16.699999999999818,
+      "p95": 16.800000000000182,
+      "maximum": 116.70000000000073,
+      "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+    },
+    "checks": {
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "frameMeasurement": "RECORDED"
+    }
+  }
+]

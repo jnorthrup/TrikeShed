@@ -1,0 +1,1763 @@
+package borg.trikeshed.lcnc
+
+import borg.trikeshed.lib.*
+import borg.trikeshed.kanban.KanbanCondition
+import borg.trikeshed.kanban.KanbanEdge
+import borg.trikeshed.kanban.KanbanEdgeMode
+import borg.trikeshed.kanban.KanbanGraph
+import borg.trikeshed.kanban.KanbanLane
+
+/**
+ * W6.2: a composition IS a stored program. These are the pre-assembled
+ * orchestrations, authored once in Kotlin and OFFERED as Confix documents —
+ * PRESETS ARE NEVER INSTALLED. The live forge home (`~/.local/forge`) is
+ * production; a preset reaches execution only through the stored-program
+ * resolver (ModuleContext.programLoader → /api/lcnc/run).
+ *
+ * Every node type here exists in [LcncContracts.all()] — the presets gate
+ * guards this file's vocabulary against the one author.
+ */
+/**
+ * What a person needs before a prefab is adoptable — authored in plain words,
+ * beside the document it describes.
+ *
+ * The note nodes inside the presets are written for whoever wrote them
+ * (`brief → argue ⇄ rebut (LOOP ≤3)`, `teach via POST /api/beliefs/teach`), and
+ * two presets carried no note at all. A person opening the gallery needs four
+ * things instead: what this does, what it needs before it will work, what
+ * they will see, and the one knob to turn first. No arrows, no route paths,
+ * no phase numbers — [LcncPresetCatalogTest] holds that line.
+ */
+data class LcncPresetInfo(
+    val name: String,
+    /** Plain-language name — what a person would call it. */
+    val title: String,
+    /** One sentence: what it does. */
+    val does: String,
+    /** What must already be true, or "nothing — it runs as it is". */
+    val needs: String,
+    /** What appears when it runs. */
+    val see: String,
+    /** The first thing worth changing, named as it appears on the canvas. */
+    val tweakFirst: String,
+)
+
+object LcncPresets {
+
+    /** The offered prefabs, described for the person adopting them. */
+    fun catalog(): List<LcncPresetInfo> = listOf(
+        LcncPresetInfo(
+            "preset-finance-reconcile", "Compare financial records",
+            does = "Compares signed amounts in two project documents and flags exact or uncertain counterparts.",
+            needs = "A mounted project with bank and expenditure tables, a declared account, currency and decimal precision.",
+            see = "Exact totals, review candidates and the original cells supporting each result.",
+            tweakFirst = "The mounted project on each document reader, then the account identifier.",
+        ),
+        LcncPresetInfo(
+            "preset-kif-structure", "Inspect formula structure",
+            does = "Shows the nesting and variable scope of a symbolic expression without asserting it as a fact.",
+            needs = "Nothing; a sample expression is included.",
+            see = "A structured expression, bound variables and any constructs without an execution backend.",
+            tweakFirst = "The expression text.",
+        ),
+        LcncPresetInfo(
+            "preset-sparql-quad", "Explore quads with SPARQL",
+            does = "Draws a read-only graph pattern for subjects, predicates and objects.",
+            needs = "A selected local query dataset; an empty dataset returns no rows.",
+            see = "An editable SELECT diagram. Its default pattern searches the union of graphs.",
+            tweakFirst = "A graph-pattern term to narrow the results.",
+        ),
+        LcncPresetInfo(
+            "preset-sql-quad", "Explore the quad store",
+            does = "Draws a read-only view of subjects, predicates and objects from the local quad store.",
+            needs = "A local quad store; an empty store returns no rows.",
+            see = "A typed query diagram that can be edited and queried separately from program execution.",
+            tweakFirst = "A projected column, or add a simple comparison to narrow the results.",
+        ),
+        LcncPresetInfo(
+            LcncShakeDemo.NAME, "Shake Demo",
+            does = "Places every node type beside typed input and output counterparts, with no cables installed.",
+            needs = "Nothing for wiring and inspection. Execution is disabled for this specimen.",
+            see = "The complete node palette, empty sockets, and eight nested scopes carrying the same named value.",
+            tweakFirst = "A counterpart's position, then compare the connection results.",
+        ),
+        LcncPresetInfo(
+            "preset-describe", "Describe it",
+            does = "Learns class rules from plain sentences, answers for unseen SUMO classes with the path it inherited through, " +
+                "and models Hermes' skill curation beside it — both told to the shared bank as tuples.",
+            needs = "Nothing — SUMO, WordNet and CoreNLP ship inside; no model calls.",
+            see = "The rules learned, each answer with its via-class and truth, and each skill's clock vs modelled state.",
+            tweakFirst = "The sentences: add \"Lions do not cause allergies.\" twice and watch Lion's answer revise.",
+        ),
+        LcncPresetInfo(
+            "preset-hermes", "Board at a glance",
+            does = "Reads the kanban board every 15 seconds and lays its cards out in columns by status.",
+            needs = "Nothing — it runs as it is.",
+            see = "Your board's cards, grouped into draggable columns.",
+            tweakFirst = "The timer's seconds, to poll faster or slower.",
+        ),
+        LcncPresetInfo(
+            "preset-norms", "Review repeated obligations",
+            does = "Compares obligations across text sections and revises their standing as statements recur or conflict.",
+            needs = "The shared language parser and belief bank; no model provider key.",
+            see = "The obligations extracted from the sample and their revised evidence.",
+            tweakFirst = "The sample paragraphs, then the promotion threshold.",
+        ),
+        LcncPresetInfo(
+            "preset-constellation", "Compare related records",
+            does = "Curates related editions and wiki records together, follows unresolved premises, and routes resulting tasks onto the board.",
+            needs = "The document curator, shared belief bank, wiki and board services; the proposal branch also needs a model provider key.",
+            see = "Shared and conflicting obligations, inherited answers, task changes and a proposal when questions remain open.",
+            tweakFirst = "The source records and named collections. Inspect the task and proposal branches before running.",
+        ),
+        LcncPresetInfo(
+            "preset-tribunal", "Three-model debate",
+            does = "One model argues a motion, a second rebuts it, a third weighs the record and rules.",
+            needs = "A model provider key.",
+            see = "Each model's turn in order, then the ruling as structured facts.",
+            tweakFirst = "The system prompt on the first chat node — that sets what is being argued.",
+        ),
+        LcncPresetInfo(
+            "preset-tribunal-case", "One counsel stage",
+            does = "Retains a matter and runs its first counsel stage when the caller requests that transition.",
+            needs = "An explicit case request, a brief and a model provider key for counsel.",
+            see = "The retained matter and counsel's actual response. Further stages remain unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
+        ),
+        LcncPresetInfo(
+            "preset-tribunal-case-v2", "Bounded counsel case",
+            does = "Keeps the first argument and later counsel turns in separate scopes.",
+            needs = "An explicit case request, a brief and a model provider key.",
+            see = "Each admitted counsel turn and its retained evidence. Terminal settlement remains unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
+        ),
+        LcncPresetInfo(
+            "preset-curator", "Belief review loop",
+            does = "Every minute it reads what the belief store currently holds and runs a review pass over it.",
+            needs = "Nothing — it runs as it is.",
+            see = "The belief store's current field, and what the review pass landed.",
+            tweakFirst = "The timer's seconds.",
+        ),
+        LcncPresetInfo(
+            "preset-breadcrumb-context", "Recall local source evidence",
+            does = "Projects matching source passages and expands their retained original through a local breadcrumb context.",
+            needs = "Nothing — it runs as it is without a model provider.",
+            see = "The exact recalled source, its content identity and the retained passage ranges.",
+            tweakFirst = "The source text and question.",
+        ),
+        LcncPresetInfo(
+            "preset-context", "Context assembly",
+            does = "Folds a list of notes into one stable playbook, then builds the reusable context chain from it.",
+            needs = "Nothing — it runs as it is.",
+            see = "The folded playbook text and the chain identity it produced.",
+            tweakFirst = "The bullets input on the fold node.",
+        ),
+        LcncPresetInfo(
+            "preset-kanban", "The board, built from parts",
+            does = "Rebuilds the whole board experience out of generic parts, so every step is visible and changeable.",
+            needs = "Nothing — it runs as it is.",
+            see = "The same board as the built-in one, with every step of its assembly on the canvas.",
+            tweakFirst = "The group-by key, to column the cards by something other than status.",
+        ),
+        LcncPresetInfo(
+            "preset-ccek", "The engine, driven",
+            does = "Starts a live engine node, sends it a message, listens to it as an agent, and replays what it recorded.",
+            needs = "Nothing — it runs as it is.",
+            see = "The message reaching the engine, the agent receiving it, and the running record.",
+            tweakFirst = "The signal node's verb and text.",
+        ),
+        LcncPresetInfo(
+            "preset-scope", "Rings inside rings",
+            does = "Builds an argument map, patches scope inputs, and passes a named value through nested rings.",
+            needs = "Nothing — it runs as it is.",
+            see = "Connected args and text inputs, their frame bindings, and the result coming back out.",
+            tweakFirst = "The default value on the outer ring's parameter.",
+        ),
+        LcncPresetInfo(
+            "preset-scope-inner", "A ring body to reuse",
+            does = "A small named body other programs can call as a ring, taking one value and returning one.",
+            needs = "Nothing — it runs as it is.",
+            see = "Little on its own; it is meant to be called from another program.",
+            tweakFirst = "The parameter name, which is how callers address it.",
+        ),
+        LcncPresetInfo(
+            "preset-pairs", "Editable list of pairs",
+            does = "Keeps rows of name-and-model pairs you can add to, remove and edit in place, and sends one to a model.",
+            needs = "A model provider key for the chat node.",
+            see = "An editable table of rows and the model's answer.",
+            tweakFirst = "The rows themselves — add one with the plus button.",
+        ),
+        LcncPresetInfo(
+            "preset-brain-mux", "Bring your own key",
+            does = "Finds which provider keys are already available to this machine, sends a prompt with the one that resolves, and shows the modelmux's strategy, last selection and quota standings.",
+            needs = "At least one provider key present in the environment, hermes .env, or saved credentials — nothing needs to be entered when one resolves.",
+            see = "Which providers are reachable, the answer to your prompt, and the mux's live meta (strategy, last selection, quota).",
+            tweakFirst = "The stored prompt named hello, on the prompt node.",
+        ),
+        LcncPresetInfo(
+            "preset-prompt", "Save a prompt",
+            does = "Saves the text you write as a named prompt that other programs read by name, and keeps every version.",
+            needs = "Nothing — it runs as it is.",
+            see = "The saved prompt's identity in the result card, and the prompt listed for the ask nodes to pick.",
+            tweakFirst = "The text, then the name on the save node.",
+        ),
+        LcncPresetInfo(
+            "preset-corpus", "Corpus digest",
+            does = "Reads every matching document in a mounted folder, asks a model to summarise each one, and lists the answers.",
+            needs = "A folder mounted as a project and named in the run's inputs, and a model that can answer here.",
+            see = "One summary per document in the result card, and the run record naming which documents were read.",
+            tweakFirst = "The glob on the documents node, then the stored prompt named summarize.",
+        ),
+        LcncPresetInfo(
+            "preset-ccek-mux", "Hermes CCEK Orchestration",
+            does = "Resolves available provider keys through KeyMux, prompts the Hermes model via ModelMux, choreographs the resulting action into a CCEK reactor hub with fact assertions, and displays both the live projection and router meta.",
+            needs = "A provider key (OpenAI/Anthropic/OpenRouter/NVIDIA/local) or saved credentials. Defaults to Hermes 3.",
+            see = "Key status, Hermes chat output, CCEK articulated node markdown projection, causal fact count, and router telemetry.",
+            tweakFirst = "The prompt in the chat node.",
+        ),
+        LcncPresetInfo(
+            "preset-media", "Media player from parts",
+            does = "Drives a player from separate buttons and a slider, so the controls are ordinary parts on wires.",
+            needs = "A browser — media.player is a real <video> element, so this one " +
+                "cannot run headless. A media address to play.",
+            see = "A player responding to the buttons and slider beside it.",
+            tweakFirst = "The address in the text node feeding the player.",
+        ),
+        LcncPresetInfo(
+            "preset-hermes-train", "Learning from past sessions",
+            does = "On a timer, feeds recorded sessions through review and lets a proposer suggest what to keep.",
+            needs = "A model provider key — read.construct asks a model to propose — " +
+                "and a recorded session profile on this machine.",
+            see = "What each pass reviewed and which proposals passed the gate.",
+            tweakFirst = "The timer's seconds.",
+        ),
+        LcncPresetInfo(
+            "preset-legal-tribunal", "Grounded legal review",
+            does = "Takes in a document, checks its claims against stored evidence, then argues and rules on it.",
+            needs = "A model provider key and a document to review.",
+            see = "The evidence gathered for the document, the argument, and the ruling.",
+            tweakFirst = "The document text on the intake node.",
+        ),
+        LcncPresetInfo(
+            "preset-legal-tribunal-case", "One grounded counsel stage",
+            does = "Retains a legal matter and gathers its evidence inside the explicitly requested counsel stage.",
+            needs = "An explicit case request, a brief, document curation and a model provider key.",
+            see = "The retained matter, grounded evidence and counsel's actual response. Further stages remain unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
+        ),
+        LcncPresetInfo(
+            "preset-legal-tribunal-case-v2", "Bounded grounded counsel case",
+            does = "Curates the first argument's sources and keeps later counsel turns in separate scopes.",
+            needs = "An explicit case request, a brief, the document curator, belief bank and a model provider key.",
+            see = "The original grounded argument and later counsel turns with retained evidence. Terminal settlement remains unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
+        ),
+        LcncPresetInfo(
+            "preset-state-freeze", "Snapshot everything",
+            does = "Every five minutes it writes the current beliefs and knowledge to permanent storage and reports the receipt.",
+            needs = "Nothing — it runs as it is.",
+            see = "A receipt naming exactly what was stored.",
+            tweakFirst = "The timer's seconds, to snapshot more or less often.",
+        ),
+        LcncPresetInfo(
+            "preset-council", "Full council",
+            does = "Runs three panels of five experts over two rounds, then records one ruling with the whole transcript.",
+            needs = "A model provider key — this one makes many calls.",
+            see = "Each panel's round, the final ruling, and a stored record of both.",
+            tweakFirst = "The convene settings, to change how many panels, experts and rounds.",
+        ),
+        LcncPresetInfo(
+            "preset-bughunter", "Bug hunt squad",
+            does = "Seats all sixteen worker personas — eight hunt lenses and eight review lenses — across three panels (failures, surface, record) over two rounds, then rules.",
+            needs = "A model provider key — this one makes many calls, one per seat.",
+            see = "Each panel's rounds with the persona named on every seat, the ruling, and the full record.",
+            tweakFirst = "The panels' persona lists, to seat a smaller wave of the squad.",
+        ),
+        LcncPresetInfo(
+            "preset-turbohaul", "Turbohaul, as an org chart (STRAWMAN)",
+            does = "Draws the turbohaul manager's pipeline as rings — requests are admitted, staged by " +
+                "role, then handed to a resident — with modelmux standing in for the engine processes " +
+                "and keymux as the gate that admits them.",
+            needs = "Nothing to look at it. A provider key only if you run the resident seat at the end.",
+            see = "A wave of requests admitted, grouped by role into staging lanes, and the resident set " +
+                "modelmux will actually route to — the org chart and the real roster side by side.",
+            tweakFirst = "The request list: add a role, or a model nobody has a key for, and watch where it stalls.",
+        ),
+        LcncPresetInfo(
+            "preset-subvm-audit", "Supply-chain audit",
+            does = "Re-checks every library on the mounted sandboxes against what was recorded, and reports anything that differs.",
+            needs = "At least one mounted sandbox module.",
+            see = "A per-module verdict, and the mismatches if there are any.",
+            tweakFirst = "Nothing — read it first; it only reports.",
+        ),
+    ) + LcncWorkspacePresets.catalog + EnglishLcncPreset.info + EnglishLcncPreset.copularInfo + EnglishLcncPreset.copularPatternInfo + EnglishNalPreset.info + EnglishCorpusPreset.info
+
+    /**
+     * TURBOHAUL, AS AN ORG CHART — a STRAWMAN, not a release.
+     *
+     * `../turbohaul-manager` is a Python/asyncio admission controller in front
+     * of supervised llama.cpp sidecars: an acceptance buffer, a staging queue
+     * with role affinity, a resident dispatcher doing VRAM admission and LRU,
+     * and a KV cache that migrates VRAM → tmpfs → SSD. The organisational
+     * cosplay is the interesting part — admission, grace, tenancy, eviction,
+     * quarantine, three strikes — and it is all schedule, none of it model.
+     *
+     * So this draws the org chart in LCNC and puts the REAL roster beside it:
+     * keymux says who may be admitted, modelmux says which residents can
+     * actually be routed to. No llama.cpp, no GraalPy, no sidecar supervision —
+     * where turbohaul spawns a process, this asks modelmux. What the two have
+     * in common is the shape of the queue, and that is the whole claim.
+     *
+     * NOT a port, NOT a release, and it schedules nothing: it is a drawing you
+     * can run, so the shape can be argued with.
+     */
+    private fun turbohaul(): String {
+        val program = LcncProgram(
+            name = "preset-turbohaul",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "30"), x = 30.0, y = 60.0),
+                // the acceptance buffer, hand-authored: thread_id + role + model
+                LcncNode("n2", "json.value", params = mapOf("value" to
+                    """[{"id":"t-1","role":"planner","model":"glm-5.2","status":"admitted"}, """ +
+                    """{"id":"t-2","role":"worker","model":"glm-5.2","status":"admitted"}, """ +
+                    """{"id":"t-3","role":"worker","model":"deepseek-v4-pro","status":"staged"}, """ +
+                    """{"id":"t-4","role":"scribe","model":"glm-5.2","status":"staged"}, """ +
+                    """{"id":"t-5","role":"planner","model":"a-model-nobody-has","status":"stalled"}]"""),
+                    x = 30.0, y = 220.0),
+                // ADMISSION ring: the buffer enters, affinity grouping leaves.
+                LcncNode("r1", LcncContracts.SCOPE, x = 300.0, y = 60.0,
+                    children = listOf(
+                        LcncNode("in1", LcncContracts.SCOPE_IN,
+                            params = mapOf("name" to "requests", "kind" to "json"), x = 40.0, y = 40.0),
+                        LcncNode("g1", "list.groupBy", params = mapOf("key" to "role"), x = 260.0, y = 40.0),
+                        LcncNode("out1", LcncContracts.SCOPE_OUT,
+                            params = mapOf("name" to "staged", "kind" to "json"), x = 500.0, y = 40.0),
+                    ).toSeries()),
+                LcncNode("n4", "json.value", params = mapOf("value" to
+                    """[{"id":"planner","name":"Planner"}, {"id":"worker","name":"Worker"}, """ +
+                    """{"id":"scribe","name":"Scribe"}]"""),
+                    x = 700.0, y = 300.0),
+                // the staging board — the org chart, literally
+                LcncNode("n3", "dom.board",
+                    params = mapOf("idField" to "id", "titleField" to "role", "subtitleField" to "model", "badgeField" to "status"),
+                    x = 700.0, y = 60.0),
+                LcncNode("n5", "display", x = 980.0, y = 60.0),
+                // THE SIGNAL SPLITTER. turbohaul's dispatcher takes one admitted
+                // wave and fans it to per-model residents; here one grouped wave
+                // splits into one tap per role. It is not a node — it is three
+                // picks off the same output, which is what a splitter IS in a
+                // patch panel. Add a role to the request list, add a tap here,
+                // and the lane exists; nothing else changes.
+                LcncNode("s1", "pick", params = mapOf("path" to "planner"), x = 980.0, y = 200.0),
+                LcncNode("s2", "pick", params = mapOf("path" to "worker"), x = 980.0, y = 300.0),
+                LcncNode("s3", "pick", params = mapOf("path" to "scribe"), x = 980.0, y = 400.0),
+                LcncNode("d1", "display", x = 1220.0, y = 200.0),
+                LcncNode("d2", "display", x = 1220.0, y = 300.0),
+                LcncNode("d3", "display", x = 1220.0, y = 400.0),
+                // THE ROSTER, beside the drawing: who may be admitted (keymux)
+                // and who can actually be routed to (modelmux). Where turbohaul
+                // would probe VRAM and spawn a sidecar, this asks the mux.
+                LcncNode("n6", "keys.status", x = 300.0, y = 420.0),
+                LcncNode("n7", "display", x = 560.0, y = 420.0),
+                LcncNode("n8", "mux.models", x = 300.0, y = 560.0),
+                LcncNode("n9", "display", x = 560.0, y = 560.0),
+                LcncNode("n10", "mux.meta", x = 300.0, y = 700.0),
+                LcncNode("n11", "display", x = 560.0, y = 700.0),
+                // one resident actually doing work — the only node that needs a key
+                LcncNode("n12", "text.value",
+                    params = mapOf("value" to "You are the resident for role=worker. Acknowledge the wave in one line."),
+                    x = 840.0, y = 700.0),
+                LcncNode("n13", "mux.chat",
+                    params = mapOf("system" to "You are a turbohaul resident.", "maxTokens" to "120"),
+                    x = 1080.0, y = 700.0),
+                LcncNode("n14", "result.confirm", x = 1340.0, y = 700.0),
+                LcncNode("n15", "note", params = mapOf("text" to
+                    "TURBOHAUL AS AN ORG CHART — STRAWMAN, not a release.\n\n" +
+                    "../turbohaul-manager admits requests, buffers them,\nstages them by role affinity, and dispatches to\nresident llama.cpp sidecars under VRAM admission.\n\n" +
+                    "Here the shape is the same and the engine is not:\nkeymux is the admission gate, modelmux is the\nresident set. No sidecar, no VRAM probe, no GraalPy.\n\n" +
+                    "It schedules NOTHING. It is a drawing you can run,\nso the shape can be argued with."),
+                    x = 980.0, y = 300.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n2", "value", "r1", "requests"),
+                LcncWire("in1", "value", "g1", "x"),
+                LcncWire("g1", "groups", "out1", "value"),
+                LcncWire("r1", "staged", "n3", "groups"),
+                LcncWire("n4", "value", "n3", "columns?"),
+                LcncWire("n3", "move", "n5", "x"),
+                LcncWire("r1", "staged", "s1", "x"),
+                LcncWire("r1", "staged", "s2", "x"),
+                LcncWire("r1", "staged", "s3", "x"),
+                LcncWire("s1", "y", "d1", "x"),
+                LcncWire("s2", "y", "d2", "x"),
+                LcncWire("s3", "y", "d3", "x"),
+                LcncWire("n1", "tick", "n6", "trigger?"),
+                LcncWire("n6", "roster", "n7", "x"),
+                LcncWire("n1", "tick", "n8", "trigger?"),
+                LcncWire("n8", "models", "n9", "x"),
+                LcncWire("n1", "tick", "n10", "trigger?"),
+                LcncWire("n10", "meta", "n11", "x"),
+                LcncWire("n12", "value", "n13", "prompt?"),
+                LcncWire("n13", "content", "n14", "content"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.7),
+            seq = 15,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    /** The description for [name], or null when the prefab carries none. */
+    fun info(name: String): LcncPresetInfo? = catalog().firstOrNull { it.name == name }
+
+
+    /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
+    fun all(): Map<String, String> = linkedMapOf(
+        (EnglishNalPreset.NAME j LcncProgramConfix.toJson(EnglishNalPreset.build())).pair,
+        (EnglishCorpusPreset.NAME j LcncProgramConfix.toJson(EnglishCorpusPreset.build())).pair,
+        EnglishLcncPreset.NAME to LcncProgramConfix.toJson(EnglishLcncPreset.build()),
+        (EnglishLcncPreset.COPULAR_NAME j LcncProgramConfix.toJson(EnglishLcncPreset.buildCopular())).pair,
+        (EnglishLcncPreset.COPULAR_PATTERN_NAME j LcncProgramConfix.toJson(EnglishLcncPreset.copularPattern())).pair,
+        "preset-finance-reconcile" to financeReconcile(),
+        "preset-kif-structure" to kifStructure(),
+        "preset-sparql-quad" to LcncProgramConfix.toJson(LcncProgram("sparql-quad", _l[
+            LcncNode("select", SparqlGraph.SELECT, x = 560.0, y = 160.0),
+            LcncNode("subject", SparqlGraph.VARIABLE, _m["name" j "?subject", "ord" j "0"], x = 40.0, y = 40.0),
+            LcncNode("predicate", SparqlGraph.VARIABLE, _m["name" j "?predicate", "ord" j "1"], x = 40.0, y = 180.0),
+            LcncNode("object", SparqlGraph.VARIABLE, _m["name" j "?object", "ord" j "2"], x = 40.0, y = 320.0),
+            LcncNode("pattern", SparqlGraph.PATTERN, _m["subject" j "?subject", "predicate" j "?predicate", "object" j "?object"], x = 280.0, y = 460.0),
+        ].toSeries(), _l[
+            LcncWire("subject", "variable", "select", "variables"),
+            LcncWire("predicate", "variable", "select", "variables"),
+            LcncWire("object", "variable", "select", "variables"),
+            LcncWire("pattern", "pattern", "select", "patterns"),
+        ].toSeries(), controls = LcncConfixControls(inspectionOnly = true), seq = 6)),
+        "preset-sql-quad" to LcncProgramConfix.toJson(SqlGraph.parse("SELECT S, P, O FROM DB.DBA.RDF_QUAD", "sql-quad")),
+        LcncShakeDemo.NAME to LcncProgramConfix.toJson(LcncShakeDemo.build().program),
+        "preset-describe" to describe(),
+        "preset-norms" to norms(),
+        "preset-constellation" to constellation(),
+        "preset-hermes" to hermes(),
+        "preset-tribunal" to tribunal(),
+        "preset-tribunal-case" to tribunal(caseMode = true),
+        "preset-tribunal-case-v2" to tribunal(caseMode = true, repeatArgue = true),
+        "preset-curator" to curator(),
+        "preset-context" to context(),
+        "preset-breadcrumb-context" to breadcrumbContext(),
+        "preset-kanban" to kanban(),
+        "preset-ccek" to ccek(),
+        "preset-scope" to scopeDemo(),
+        "preset-scope-inner" to scopeInner(),
+        "preset-pairs" to pairsDemo(),
+        "preset-brain-mux" to brainMux(),
+        "preset-prompt" to promptEditor(),
+        "preset-corpus" to corpusDigest(),
+        "preset-ccek-mux" to ccekMux(),
+        "preset-media" to mediaDemo(),
+        "preset-hermes-train" to hermesTrain(),
+        "preset-legal-tribunal" to legalTribunal(),
+        "preset-legal-tribunal-case" to legalTribunal(caseMode = true),
+        "preset-legal-tribunal-case-v2" to legalTribunal(caseMode = true, repeatArgue = true),
+        "preset-state-freeze" to stateFreeze(),
+        "preset-council" to council(),
+        "preset-bughunter" to bughunter(),
+        "preset-subvm-audit" to subvmAudit(),
+        "preset-turbohaul" to turbohaul(),
+    ) + LcncWorkspacePresets.documents()
+
+    // ── legal council: the default 3x5 convening, fully drawn ────────────
+    // The can and the atoms are the same substance: this preset IS
+    // CouncilProgram.build(DEFAULT_3x5) verbatim — byte-identical to what
+    // the pure council.convene node emits for an empty config
+    // (CouncilPresetIdentityTest pins the identity in both directions).
+    private fun financeReconcile(): String = LcncProgramConfix.toJson(LcncProgram(
+        name = "preset-finance-reconcile",
+        nodes = s_[
+            LcncNode("instructions", "note", _m["text" j
+                "Choose the same mounted project on both readers. Files require id, account, reference, currency, date and amount columns. Amounts are signed decimal strings; no sign conversion or currency exchange is performed. Results are candidates for review."], x = 40.0, y = 40.0),
+            LcncNode("bank", ProjectNodes.READ, _m["project" j "", "id" j "bank.csv", "maxChars" j "1048576"], x = 40.0, y = 260.0),
+            LcncNode("expenditure", ProjectNodes.READ, _m["project" j "", "id" j "expenditure.csv", "maxChars" j "1048576"], x = 400.0, y = 260.0),
+            LcncNode("compare", FinanceNodes.RECONCILE, _m["currency" j "USD", "scale" j "2", "accountScope" j "operating",
+                "includeDate" j "true", "policyId" j "finance.exact.v1"], x = 780.0, y = 260.0),
+            LcncNode("result", "display", x = 1160.0, y = 260.0),
+        ],
+        wires = s_[LcncWire("bank", "doc", "compare", "bank"), LcncWire("expenditure", "doc", "compare", "expenditure"),
+            LcncWire("compare", "report", "result", "x")],
+        view = LcncView(x = 20.0, y = 20.0, zoom = 0.8), seq = 6,
+    ))
+
+    private fun kifStructure(): String = LcncProgramConfix.toJson(LcncProgram(
+        name = "preset-kif-structure",
+        nodes = s_[
+            LcncNode("expression", "text.value", _m["value" j "(forall (?x) (=> (instance ?x Human) (instance ?x Mammal)))"], x = 40.0, y = 80.0),
+            LcncNode("inspect", KifNodes.INSPECT, x = 430.0, y = 80.0),
+            LcncNode("result", "display", x = 830.0, y = 80.0),
+        ],
+        wires = s_[LcncWire("expression", "value", "inspect", "text?"), LcncWire("inspect", "formula", "result", "x")],
+        view = LcncView(x = 20.0, y = 20.0, zoom = 1.0), seq = 4,
+    ))
+
+    private fun council(): String =
+        LcncProgramConfix.toJson(CouncilProgram.build(CouncilConfig.DEFAULT_3x5))
+
+    // ── bug hunt squad: all 16 worker cosplays seated ────────────────────
+    // Same builder, different data: the convening IS
+    // BughunterSquad.convening() verbatim, so the panel persona lists and
+    // the council.seat system prompts carry the cosplay text on every seat.
+    private fun bughunter(): String =
+        LcncProgramConfix.toJson(CouncilProgram.build(BughunterSquad.convening()))
+
+    // ── The sub-VM supply chain, made answerable on the surface.
+    //
+    // A daemon that mounts guest classpaths executes code from them. Until this preset the only
+    // account of WHICH classpaths, and whether their bytes still matched what was resolved, lived
+    // in a KDoc — an operator could read the comment, not the machine. Here the audit and the work
+    // sit on one canvas: vm.modules reports the mounted classpaths and re-hashes them against
+    // MANIFEST.tsv, and vm.corenlp.extract does real extraction out of the very module that was
+    // just verified.
+    //
+    // The security property is the composition, not a check inside either node. vm.modules
+    // declares NO inputs and cannot mount, unmount or install — there is no port through which
+    // that could be expressed — so an audit cannot be steered into becoming an action. The
+    // extractor reaches CoreNLP only through a mounted module whose loader is parented to the
+    // platform loader, so it cannot name borg.trikeshed.* even at OWN trust. Neither property is a
+    // promise in a comment; both are consequences of what LcncContracts declares.
+    private fun subvmAudit(): String {
+        val program = LcncProgram(
+            name = "preset-subvm-audit",
+            nodes = listOf(
+                LcncNode("audit", SubVm.LEGO_PREFIX + "modules",
+                    params = mapOf("verify" to "true"), x = 40.0, y = 60.0),
+                LcncNode("report", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "supply-chain"), x = 320.0, y = 60.0),
+                LcncNode("extract", SubVm.LEGO_PREFIX + "corenlp.extract",
+                    params = mapOf(
+                        "text" to "Stanford CoreNLP runs in a mounted guest module. TrikeShed never links it.",
+                    ), x = 40.0, y = 220.0),
+                LcncNode("facts", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "extracted"), x = 320.0, y = 220.0),
+                LcncNode("note", "note",
+                    params = mapOf("text" to
+                        "the sub-VM supply chain, answerable.\n\n" +
+                        "vm.modules (verify=true) re-hashes every jar on every mounted\n" +
+                        "classpath against the MANIFEST.tsv it was resolved from, and\n" +
+                        "reports root, mount lifecycle, drift. it declares NO inputs and\n" +
+                        "no mutating output: an audit that cannot be steered into an action.\n\n" +
+                        "vm.corenlp.extract then works out of that same verified module.\n" +
+                        "CoreNLP is NOT on this daemon's classpath — 472MB of GPL v3 that\n" +
+                        "src/ never calls. it is mounted per-guest, parented to the platform\n" +
+                        "loader, so the guest can name edu.stanford.nlp.* and java.* and\n" +
+                        "cannot name borg.trikeshed.* even at OWN trust.\n\n" +
+                        "crack the can: both nodes are legos in the drawer, and the whole\n" +
+                        "capability of each is its row in LcncContracts."),
+                    x = 40.0, y = 400.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("audit", "modules", "report", "value"),
+                LcncWire("extract", "sentences", "facts", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 1.0),
+            seq = 11,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // Scope machinery supplies the argument map as a return value: no literal
+    // runner is needed. Both map binding and named binding are visible cables.
+
+    private fun scopeDemo(): String {
+        val program = LcncProgram(
+            name = "preset-scope",
+            nodes = listOf(
+                LcncNode("n0", LcncContracts.SCOPE_IN,
+                    params = mapOf("name" to "text", "default" to "hello"), x = 40.0, y = 60.0),
+                LcncNode("args", LcncContracts.SCOPE, x = 260.0, y = 40.0,
+                    children = listOf(
+                        LcncNode("seed", LcncContracts.SCOPE_IN,
+                            params = mapOf("name" to "text"), x = 40.0, y = 40.0),
+                        LcncNode("argYield", LcncContracts.SCOPE_OUT,
+                            params = mapOf("name" to "text"), x = 260.0, y = 40.0),
+                    ).toSeries()),
+                LcncNode("r1", LcncContracts.SCOPE, x = 620.0, y = 40.0,
+                    children = listOf(
+                        LcncNode("a", LcncContracts.SCOPE_IN,
+                            params = mapOf("name" to "text"), x = 40.0, y = 40.0),
+                        LcncNode("r2", LcncContracts.SCOPE, x = 40.0, y = 40.0,
+                            children = listOf(
+                                LcncNode("b", LcncContracts.SCOPE_IN,
+                                    params = mapOf("name" to "text"), x = 40.0, y = 40.0),
+                                LcncNode("p", LcncContracts.SCOPE_OUT,
+                                    params = mapOf("name" to "result"), x = 40.0, y = 40.0),
+                            ).toSeries()),
+                        LcncNode("q", LcncContracts.SCOPE_OUT,
+                            params = mapOf("name" to "result"), x = 260.0, y = 40.0),
+                    ).toSeries()),
+                LcncNode("out", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "result"), x = 980.0, y = 60.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n0", "value", "args", "text"),
+                LcncWire("seed", "value", "argYield", "value"),
+                LcncWire("args", "returns", "r1", "args?"),
+                LcncWire("args", "returns", "r2", "args?"),
+                LcncWire("a", "value", "r2", "text"),
+                LcncWire("b", "value", "p", "value"),
+                LcncWire("r2", "result", "q", "value"),
+                LcncWire("r1", "result", "out", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 1.0),
+            seq = 7,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── the LIST widget demo: key/model pairs authored in rows, emitted as
+    // json; a mux.chat seat beside it carries the same widget on its own
+    // `models` param — the lawyer/agent/worker/scribe/curator seats all do.
+    private fun pairsDemo(): String {
+        val program = LcncProgram(
+            name = "preset-pairs",
+            nodes = listOf(
+                LcncNode("n1", "list.pairs",
+                    params = mapOf("pairs" to
+                        """[{"key":"nv-deepseek-v4-pro","model":"deepseek-ai/deepseek-v4-pro-0813"},{"key":"zai","model":"glm-5.2"}]"""),
+                    x = 40.0, y = 60.0),
+                LcncNode("n2", "display", x = 340.0, y = 60.0),
+                // The seat had a system prompt and no user prompt: nothing to send.
+                LcncNode("n5", "text.value",
+                    params = mapOf("value" to "Summarise the difference between the two models above in one sentence."),
+                    x = 340.0, y = 300.0),
+                LcncNode("n3", "mux.chat",
+                    params = mapOf("system" to "You are counsel.", "maxTokens" to "400",
+                        "models" to """[{"key":"nv-glm-52","model":"z-ai/glm-5.2"}]"""),
+                    x = 40.0, y = 420.0),
+                LcncNode("n4", "note",
+                    params = mapOf("text" to "list widgets: rows of key/model pairs.\n＋ row adds, ✕ removes, fields edit inline;\ndrag any value out of a result tree and\ndrop it on the list (or any param) to fill.\nthe mux.chat seat carries the same widget\non its models param — every seat does."),
+                    x = 340.0, y = 420.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "pairs", "n2", "x"),
+                LcncWire("n5", "value", "n3", "prompt?"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
+            seq = 5,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    private fun scopeInner(): String {
+        val program = LcncProgram(
+            name = "preset-scope-inner",
+            nodes = listOf(
+                LcncNode("p1", LcncContracts.SCOPE_IN,
+                    params = mapOf("name" to "text", "default" to "hello"), x = 40.0, y = 60.0),
+                LcncNode("p2", LcncContracts.SCOPE_OUT,
+                    params = mapOf("name" to "result"), x = 320.0, y = 60.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("p1", "value", "p2", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 1.0),
+            seq = 3,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // Command meanings live in the authored expression. DOM widgets only emit gestures.
+    private fun kanban(): String {
+        val program = LcncProgram(
+            name = "preset-kanban",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "5"), x = 30.0, y = 60.0),
+                LcncNode("events", "dom.events", x = 30.0, y = 280.0),
+                LcncNode("n8", "js", params = mapOf("expr" to """
+                    [x.kind === 'create'
+                      ? {type:'submit',jobId:'panel-'+x.id,idempotencyKey:x.id,...x.fields,priority:Number(x.fields.priority)}
+                      : x.kind === 'edit'
+                        ? {type:'update',jobId:x.item.id,expectedRevision:x.item.revision,idempotencyKey:x.id,...x.fields}
+                        : {type:'move',jobId:x.itemId,expectedRevision:x.item.revision,idempotencyKey:x.id,toColumn:x.to,beforeJobId:x.beforeJobId}]
+                """.trimIndent()), x = 260.0, y = 280.0),
+                LcncNode("n9", "job.batch", x = 500.0, y = 280.0),
+                // Authored order: command verdict first, fresh projection next, display last.
+                LcncNode("n2", "kanban.activeSheets", x = 760.0, y = 60.0),
+                LcncNode("n3", "sheet.concentric", x = 1020.0, y = 30.0),
+                LcncNode("n4", "pick", params = mapOf("path" to "items"), x = 760.0, y = 420.0),
+                LcncNode("n5", "pick", params = mapOf("path" to "columns"), x = 760.0, y = 560.0),
+                LcncNode("n6", "list.groupBy", params = mapOf("key" to "status"), x = 1020.0, y = 420.0),
+                LcncNode("fields", "json.value", params = mapOf("value" to
+                    """{"title":{"ph":"Title"},"priority":{"v":"2","opts":["0","1","2"],"ph":"Priority"}}"""),
+                    x = 1020.0, y = 650.0),
+                LcncNode("n7", "dom.board",
+                    params = mapOf("idField" to "id", "titleField" to "title", "subtitleField" to "id", "badgeField" to "priority"),
+                    x = 1300.0, y = 450.0),
+                LcncNode("n11", "note", params = mapOf("text" to
+                    "Run reads the board. Create submits a new item; double-click edits metadata; drag moves. " +
+                    "The form schema and event expression are editable nodes. Each gesture uses one retained pulse. " +
+                    "Command verdict precedes the fresh projection; an edit uses the revision captured when its form opened."),
+                    x = 30.0, y = 560.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("events", "event", "n8", "x"),
+                LcncWire("n8", "y", "n9", "commands"),
+                LcncWire("n9", "results", "n2", "after?"),
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n2", "board", "n3", "board"),
+                LcncWire("n2", "byStatus", "n3", "byStatus?"),
+                LcncWire("n2", "byPriority", "n3", "byPriority?"),
+                LcncWire("n2", "orchestration", "n3", "orchestration?"),
+                LcncWire("n2", "boardView", "n4", "x"),
+                LcncWire("n2", "boardView", "n5", "x"),
+                LcncWire("n4", "y", "n6", "x"),
+                LcncWire("n6", "groups", "n7", "groups"),
+                LcncWire("n5", "y", "n7", "columns?"),
+                LcncWire("events", "source", "n7", "events?"),
+                LcncWire("fields", "value", "n7", "fields?"),
+                LcncWire("n9", "results", "n7", "result?"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
+            seq = 12,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── W6.4 hermes: bone stock, pure lanes ──────────────────────────────
+
+    private fun hermes(): String {
+        val program = LcncProgram(
+            name = "preset-hermes",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "15"), x = 30.0, y = 60.0),
+                LcncNode("n2", "board.get", x = 250.0, y = 60.0),
+                LcncNode("n3", "pick", params = mapOf("path" to "items"), x = 470.0, y = 60.0),
+                LcncNode("n4", "list.groupBy", params = mapOf("key" to "status"), x = 690.0, y = 60.0),
+                // The lanes. Without this the board grouped cards by status and
+                // then had no column order to lay them out in — edit the list to
+                // re-order the board, or drop a column to hide it.
+                LcncNode("n7", "json.value", params = mapOf("value" to
+                    """[{"id":"triage","name":"Triage"}, {"id":"todo","name":"Todo"}, """ +
+                    """{"id":"ready","name":"Ready"}, {"id":"running","name":"Running"}, """ +
+                    """{"id":"blocked","name":"Blocked"}, {"id":"done","name":"Done"}]"""),
+                    x = 690.0, y = 240.0),
+                LcncNode("n5", "dom.board",
+                    params = mapOf("idField" to "id", "titleField" to "title", "subtitleField" to "id", "badgeField" to "priority"),
+                    x = 910.0, y = 60.0),
+                LcncNode("n6", "display", x = 1170.0, y = 60.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n2", "json", "n3", "x"),
+                LcncWire("n3", "y", "n4", "x"),
+                LcncWire("n4", "groups", "n5", "groups"),
+                LcncWire("n7", "value", "n5", "columns?"),
+                LcncWire("n5", "move", "n6", "x"),
+            ).toSeries(),
+            view = LcncView(x = 40.0, y = 20.0, zoom = 0.85),
+            seq = 7,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── W6.5 tribunal: proof the substrate is general ────────────────────
+
+    private fun tribunal(caseMode: Boolean = false, repeatArgue: Boolean = false): String {
+        val kanban = KanbanGraph(
+            boardId = "tribunal",
+            lanes = listOf(
+                KanbanLane("brief", "Brief of the matter", 0, "legal", outputs = mapOf("brief" to "work")),
+                KanbanLane("argue", "Argue for the motion", 1, "legal", inputs = mapOf("brief" to "work", "work" to "work", "result" to "result"), outputs = mapOf("result" to "result")),
+                KanbanLane("rebut", "Rebut the argument", 2, "opposing", inputs = mapOf("result" to "result"), outputs = mapOf("result" to "result")),
+                KanbanLane("deliberate", "Deliberate on the record", 3, "judge", inputs = mapOf("result" to "result")),
+                KanbanLane("mistrial", "Terminal — proceedings void", 4, "judge"),
+            ).toSeries(),
+            edges = listOf(
+                KanbanEdge("brief-argue", "brief", "argue"),
+                // The argue⇄rebut LOOP: counsel advances the argument, opposing
+                // counsel advances the rebuttal, and the LOOP edge closes the
+                // cycle (bounded, opt-in — Phase 4).
+                KanbanEdge("argue-rebut", "argue", "rebut"),
+                KanbanEdge("rebut-argue", "rebut", "argue", mode = KanbanEdgeMode.LOOP, maxIterations = 3),
+                KanbanEdge("join-deliberate", "rebut", "deliberate", mode = KanbanEdgeMode.JOIN, group = "record", requiredBranches = 2),
+                KanbanEdge("argue-joins-record", "argue", "deliberate", mode = KanbanEdgeMode.JOIN, group = "record", requiredBranches = 2),
+                // The unguarded escape: any state → mistrial.
+                KanbanEdge("abort-mistrial", "argue", "mistrial", mode = KanbanEdgeMode.ABORT),
+                // The judge's clarification escape: bounded at 1 (a single
+                // extra round, distinct from the counsel-level rebut-argue
+                // bound), guarded by TribunalPredicates.NEEDS_CLARIFICATION
+                // so it only fires when the verdict says the record is
+                // insufficient — silent no-op otherwise.
+                KanbanEdge(
+                    "deliberate-clarify", "deliberate", "argue",
+                    mode = KanbanEdgeMode.LOOP, maxIterations = 1,
+                    condition = KanbanCondition(TribunalPredicates.NEEDS_CLARIFICATION),
+                ),
+            ).toSeries(),
+        )
+        val program = LcncProgram(
+            name = "preset-tribunal",
+            nodes = listOf(
+                // `brief="brief"` reads a frame binding a caller supplies; with no
+                // caller and an empty prompt, counsel had nothing to argue and the
+                // whole tribunal refused. The prompt is the motion it argues when
+                // nobody binds one — replace it, or bind `brief` at run time.
+                LcncNode("n2", "mux.chat", params = mapOf("job" to "argue",
+                    "prompt" to "Motion: the limitation of liability clause in section 7.2 bars " +
+                        "consequential damages. Argue for the motion in under 150 words.",
+                    "brief" to "brief", "system" to "You are counsel for the motion. Argue briefly.",
+                    "maxTokens" to "400"), x = 250.0, y = 80.0),
+                LcncNode("n3", "mux.chat", params = mapOf("job" to "rebut", "prompt" to "", "system" to "You are opposing counsel. Rebut point by point.", "maxTokens" to "400"), x = 490.0, y = 200.0),
+                LcncNode("n4", "mux.chat", params = mapOf("job" to "deliberate", "prompt" to "", "system" to "You are the judge. Weigh the record and rule.", "maxTokens" to "600"), x = 730.0, y = 120.0),
+                LcncNode("n5", "tribunal.record", x = 910.0, y = 120.0),
+                LcncNode("n6", "display", x = 1130.0, y = 120.0),
+                LcncNode("n7", "note", params = mapOf("text" to "tribunal preset\nbrief → argue ⇄ rebut (LOOP ≤3)\n→ deliberate (JOIN) → rule.\nABORT edge = mistrial."), x = 490.0, y = 380.0),
+            ).toSeries(),
+            wires = listOf(
+                // Human oversight starts the brief; no timer drives counsel.
+                LcncWire("n2", "content", "n3", "prompt?"),
+                LcncWire("n3", "content", "n4", "prompt?"),
+                // Prose is retained as a verdict, not interpreted as KG assertions.
+                LcncWire("n4", "content", "n5", "text?"),
+                LcncWire("n5", "report", "n6", "x"),
+            ).toSeries(),
+            controls = LcncConfixControls(humanOversight = true),
+            kanban = kanban,
+            view = LcncView(x = 20.0, y = 10.0, zoom = 0.8),
+            seq = 8,
+        )
+        val authored = tribunal(program)
+        return LcncProgramConfix.toJson(if (caseMode) LcncCaseProgram.authored(authored,
+            if (repeatArgue) "preset-tribunal-case-v2" else "preset-tribunal-case", repeatArgue) else authored)
+    }
+
+    /** One actual LCNC clarification round; the separate Kanban graph does not drive this walk. */
+    private fun tribunal(program: LcncProgram): LcncProgram {
+        val seats = program.nodes.view.associateBy { it.id }
+        val judge = seats.getValue("n4").let { node -> node.copy(params = node.params + (
+            "system" to node.params["system"].orEmpty() +
+                " End with a JSON object containing disposition, needsClarification (boolean), " +
+                "clarificationQuestion (string), and mistrial (boolean). " +
+                "Set needsClarification only when the record needs a specific answer; mistrial is terminal."
+        )) }
+        val clarify = LcncNode("clarify", "scope", x = 910.0, y = 340.0, children = listOf(
+            LcncNode("cl.in.record", "scope.in", params = mapOf("name" to "record", "kind" to "text")),
+            LcncNode("cl.in.question", "scope.in", params = mapOf("name" to "question", "kind" to "text")),
+            LcncNode("cl.fold.argue", "text.fold", params = mapOf("label" to "Clarification requested by the judge")),
+            seats.getValue("n2").copy(id = "cl.argue", x = 260.0, y = 0.0),
+            LcncNode("cl.fold.rebut", "text.fold", params = mapOf("label" to "Clarification record and counsel's answer")),
+            seats.getValue("n3").copy(id = "cl.rebut", x = 520.0, y = 0.0),
+            LcncNode("cl.fold.deliberate", "text.fold", params = mapOf("label" to
+                "Final clarification round: rule from the full record, or explicitly retain the unresolved request. No further round is available.")),
+            judge.copy(id = "cl.deliberate", x = 780.0, y = 0.0),
+            LcncNode("cl.out.text", "scope.out", params = mapOf("name" to "text", "kind" to "text")),
+        ).toSeries())
+        val nodes = ArrayList<LcncNode>()
+        for (node in program.nodes.view) {
+            if (node.id == "n5") {
+                nodes.add(LcncNode("fold.record", "text.fold", params = mapOf(
+                    "label" to "Initial record: actual brief, argue, rebut, deliberate"), x = 730.0, y = 340.0))
+                nodes.add(LcncNode("parse", "ruling.parse", x = 910.0, y = 120.0))
+                nodes.add(clarify)
+                nodes.add(LcncNode("pick.text", "coalesce", x = 1130.0, y = 340.0))
+            }
+            nodes.add(when (node.id) {
+                "n4" -> judge
+                "n7" -> node.copy(params = node.params + ("text" to node.params["text"].orEmpty() +
+                    "\nLCNC runs argue -> rebut -> judge, then at most one structured clarification round.\n" +
+                    "The separate Kanban counsel LOOP <=3, JOIN2, and ABORT graph is not execution orchestration."))
+                else -> node
+            })
+        }
+        val wires = ArrayList<LcncWire>()
+        for (wire in program.wires.view) if (wire.toNode != "n5") wires.add(wire)
+        wires.addAll(listOf(
+            LcncWire("n2", "prompt", "fold.record", "brief?"),
+            LcncWire("n2", "content", "fold.record", "parts"),
+            LcncWire("n3", "content", "fold.record", "parts"),
+            LcncWire("n4", "content", "fold.record", "parts"),
+            LcncWire("n4", "content", "parse", "text"),
+            LcncWire("parse", "needsClarification", "clarify", "when?"),
+            LcncWire("parse", "clarificationQuestion", "clarify", "question"),
+            LcncWire("fold.record", "text", "clarify", "record"),
+            LcncWire("cl.in.record", "value", "cl.fold.argue", "brief?"),
+            LcncWire("cl.in.question", "value", "cl.fold.argue", "parts"),
+            LcncWire("cl.fold.argue", "text", "cl.argue", "prompt?"),
+            LcncWire("cl.fold.argue", "text", "cl.fold.rebut", "brief?"),
+            LcncWire("cl.argue", "content", "cl.fold.rebut", "parts"),
+            LcncWire("cl.fold.rebut", "text", "cl.rebut", "prompt?"),
+            LcncWire("cl.fold.rebut", "text", "cl.fold.deliberate", "brief?"),
+            LcncWire("cl.rebut", "content", "cl.fold.deliberate", "parts"),
+            LcncWire("cl.fold.deliberate", "text", "cl.deliberate", "prompt?"),
+            LcncWire("cl.deliberate", "content", "cl.out.text", "value"),
+            LcncWire("clarify", "text", "pick.text", "a?"),
+            LcncWire("n4", "content", "pick.text", "b"),
+            LcncWire("pick.text", "value", "n5", "text?"),
+        ))
+        return program.copy(nodes = nodes.toSeries(), wires = wires.toSeries())
+    }
+
+    // ── Step K: the context policy as an auditable program ───────────────
+    // Frames in change-frequency order; the fold is deterministic code (LLM
+    // proposes bullets, never rewrites the base); running assemble mints
+    // context-receipt/<chainHead> — the blackboard chunk pane's data.
+
+    fun breadcrumbContext(): String = LcncProgramConfix.toJson(LcncProgram(
+        name = "preset-breadcrumb-context",
+        nodes = s_[
+            LcncNode("source", "text.value", _m["value" j "Source receipts retain the exact original passage.\nA summary can omit context.\nRecall expands the original passage and preserves its content identity."], x = 30.0, y = 40.0),
+            LcncNode("question", "text.value", _m["value" j "original passage"], x = 30.0, y = 220.0),
+            LcncNode("context", "text.value", _m["value" j "offline-context"], x = 30.0, y = 400.0),
+            LcncNode("project", borg.trikeshed.memory.ace.BreadcrumbContextNodes.PROJECT, x = 350.0, y = 40.0),
+            LcncNode("recall", borg.trikeshed.memory.ace.BreadcrumbContextNodes.RECALL, x = 700.0, y = 40.0),
+            LcncNode("display", "display", x = 1050.0, y = 40.0),
+        ],
+        wires = s_[
+            LcncWire("source", "value", "project", "source"),
+            LcncWire("question", "value", "project", "question"),
+            LcncWire("context", "value", "project", "context"),
+            LcncWire("project", "sourceRef", "recall", "ref"),
+            LcncWire("project", "sourceCid", "recall", "cid"),
+            LcncWire("project", "context", "recall", "context"),
+            LcncWire("recall", "recall", "display", "x"),
+        ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.8), seq = 6,
+    ))
+
+    private fun context(): String {
+        val program = LcncProgram(
+            name = "preset-context",
+            nodes = listOf(
+                // The bullets the fold folds. This socket shipped EMPTY, so the
+                // "folded playbook text" the card promises never existed — the
+                // chain downstream was assembled over nothing. Edit these and
+                // re-run to watch the playbook and the chainHead both change.
+                LcncNode("n0", "json.value", params = mapOf("value" to
+                    """[{"id":1,"content":"Prefer the smallest change that closes the gap."}, """ +
+                    """{"id":2,"content":"Name the file and the line, never a vague area."}, """ +
+                    """{"id":3,"content":"If a claim was not run, mark it unverified."}]"""),
+                    x = 30.0, y = 60.0),
+                LcncNode("n1", "context.fold", x = 300.0, y = 60.0),
+                // The three frames in change-frequency order: tools change least,
+                // the tail most. Filled so the chain identity is built from a
+                // real prefix rather than three empty strings.
+                LcncNode("n5", "text.value", params = mapOf("value" to
+                    "You have: read_file, write_file, run_tests."), x = 300.0, y = 300.0),
+                LcncNode("n6", "text.value", params = mapOf("value" to
+                    "Repository: TrikeShed. Branch: master."), x = 300.0, y = 400.0),
+                LcncNode("n7", "text.value", params = mapOf("value" to
+                    "Current turn: the operator asked why the fold was empty."), x = 300.0, y = 500.0),
+                LcncNode("n2", "context.assemble",
+                    params = mapOf("model" to "", "effort" to "medium", "tools" to ""),
+                    x = 620.0, y = 60.0),
+                LcncNode("n3", "display", x = 900.0, y = 60.0),
+                // …and the folded playbook itself, which nothing ever showed.
+                // result.confirm, not display: playbook is TEXT and display.x
+                // wants json — the daemon's type check refuses that wire, which
+                // is how this got caught rather than shipped.
+                LcncNode("n8", "result.confirm", x = 620.0, y = 620.0),
+                LcncNode("n4", "note", params = mapOf("text" to "adaptive context preset\nbullets → fold (deterministic merge)\n→ assemble (rolling cache-identity chain)\nchainHead = provable cache prefix.\ncounters live in the belief bag, never in frame bytes.\n\nEdit the json.value bullets, or any frame,\nand the chainHead changes: that is the point."), x = 900.0, y = 300.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n0", "value", "n1", "bullets"),
+                LcncWire("n1", "playbook", "n2", "playbook?"),
+                LcncWire("n1", "playbook", "n8", "content"),
+                LcncWire("n5", "value", "n2", "toolsSystem?"),
+                LcncWire("n6", "value", "n2", "envelope?"),
+                LcncWire("n7", "value", "n2", "tail?"),
+                LcncWire("n2", "chain", "n3", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
+            seq = 5,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── CCEK itself, programmed: the substrate as a first-class program ──
+    // Every other preset drives a PROJECTION of CCEK (a board, a council, a
+    // case). This one drives the engine: incarnate a node, signal it, host an
+    // agent on its bounded fan-out, read its live projection, replay its
+    // recording, watch its status, and fork the context lineage beside it.
+
+    private fun ccek(): String {
+        val program = LcncProgram(
+            name = "preset-ccek",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "5"), x = 30.0, y = 200.0),
+                LcncNode("n2", "ccek.incarnate",
+                    params = mapOf("title" to "showcase", "record" to "true", "maxConcurrency" to "4"),
+                    x = 250.0, y = 200.0),
+                // fields? is the signal's free-form payload; empty, the signal
+                // carried a verb and nothing about itself.
+                LcncNode("f1", "json.value",
+                    params = mapOf("value" to """{"origin":"preset-ccek","wave":"showcase"}"""),
+                    x = 300.0, y = 30.0),
+                LcncNode("n3", "ccek.signal",
+                    params = mapOf("verb" to "append", "blockKind" to "TEXT", "text" to "a tick reached the engine"),
+                    x = 520.0, y = 30.0),
+                LcncNode("n4", "ccek.agent", params = mapOf("name" to "watcher"), x = 520.0, y = 200.0),
+                LcncNode("n5", "ccek.projection", params = mapOf("kind" to "markdown"), x = 520.0, y = 370.0),
+                LcncNode("n6", "ccek.recording", x = 520.0, y = 540.0),
+                LcncNode("n7", "ccek.status", x = 520.0, y = 700.0),
+                LcncNode("n8", "display", x = 800.0, y = 200.0),
+                LcncNode("n9", "display", x = 800.0, y = 370.0),
+                LcncNode("n10", "display", x = 800.0, y = 540.0),
+                LcncNode("n11", "display", x = 800.0, y = 700.0),
+                LcncNode("n12", "ccek.context", params = mapOf("role" to "operator"), x = 250.0, y = 880.0),
+                LcncNode("f2", "json.value",
+                    params = mapOf("value" to """{"observed":"a tick reached the engine","by":"preset-ccek"}"""),
+                    x = 300.0, y = 1000.0),
+                LcncNode("n13", "ccek.fact", params = mapOf("kind" to "observation"), x = 520.0, y = 880.0),
+                LcncNode("n14", "display", x = 800.0, y = 880.0),
+                LcncNode("n15", "note", params = mapOf("text" to "CCEK, programmed.\nincarnate (idempotent by title) → signal\n(all ten ForgeSignal verbs) → this program\nsubscribes as an AGENT on the bounded\nfan-out, reads the live projection, replays\nthe recording, and watches Started/Completed.\nBelow: the context lineage the facts land in."), x = 250.0, y = 480.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n2", "handle", "n3", "handle"),
+                LcncWire("n2", "handle", "n4", "handle"),
+                LcncWire("n2", "handle", "n5", "handle"),
+                LcncWire("n2", "handle", "n6", "handle"),
+                LcncWire("n2", "handle", "n7", "handle"),
+                LcncWire("n4", "signals", "n8", "x"),
+                LcncWire("n5", "projection", "n9", "x"),
+                LcncWire("n6", "signals", "n10", "x"),
+                LcncWire("n7", "events", "n11", "x"),
+                LcncWire("f1", "value", "n3", "fields?"),
+                LcncWire("f2", "value", "n13", "fields?"),
+                LcncWire("n12", "contextId", "n13", "contextId"),
+                LcncWire("n13", "factCount", "n14", "x"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.75),
+            seq = 16,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── W6.3 curator: the pre-assembled curation loop ────────────────────
+
+    // ── describe it: sentences → class rules → answers; curation modelled beside ──
+    private fun describe(): String {
+        val program = LcncProgram(
+            name = "preset-describe",
+            nodes = listOf(
+                LcncNode("n1", "text.value", params = mapOf("value" to
+                    "Mammals cause allergies.\nMammals cause allergies.\nMammals cause allergies.\n" +
+                    "Vehicles cause emissions.\nVehicles cause emissions.\nVehicles cause emissions.\n" +
+                    "Lions do not cause allergies.\nLions do not cause allergies.\nLions do not cause allergies."),
+                    x = 30.0, y = 60.0),
+                LcncNode("n2", "text.value", params = mapOf("value" to "DomesticDog Lion Tiger Helicopter Parrot"),
+                    x = 30.0, y = 260.0),
+                LcncNode("n3", "nl.rules", params = mapOf("promote" to "0.7"), x = 300.0, y = 120.0),
+                LcncNode("n4", "display", x = 580.0, y = 40.0),
+                LcncNode("n5", "display", x = 580.0, y = 200.0),
+                LcncNode("n6", "skill.curate", params = mapOf("daysAhead" to "0"), x = 300.0, y = 380.0),
+                LcncNode("n7", "display", x = 580.0, y = 380.0),
+                LcncNode("n9", "skill.overlap", params = mapOf("min" to "0.2", "common" to "0.25"), x = 300.0, y = 540.0),
+                LcncNode("n10", "display", x = 580.0, y = 540.0),
+                LcncNode("n8", "note", params = mapOf("text" to
+                    "describe it — no model calls.\n" +
+                    "sentences → CoreNLP → unreviewed candidate readings;\n" +
+                    "class answers are deferred until reviewed evidence is admitted.\n" +
+                    "skill.curate models Hermes' .usage.json beside it; skill.overlap proposes consolidations.\n" +
+                    "query the bank: (skillModelled ?s ?v) (skillOverlap ?a ?b ?f ?c)"),
+                    x = 820.0, y = 120.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "value", "n3", "text?"),
+                LcncWire("n2", "value", "n3", "ask?"),
+                LcncWire("n3", "candidates", "n4", "x"),
+                LcncWire("n3", "answerStatus", "n5", "x"),
+                LcncWire("n6", "skills", "n7", "x"),
+                LcncWire("n9", "pairs", "n10", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
+            seq = 11,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── norms: text → unreviewed clause readings by section ──
+    private fun norms(): String {
+        val program = LcncProgram(
+            name = "preset-norms",
+            nodes = listOf(
+                LcncNode("n1", "text.value", params = mapOf("value" to
+                    "A tenant must pay rent when it is due.\n\nThe landlord must repair the roof.\n\n" +
+                    "A tenant must pay rent on time.\n\nNo tenant may sublet without consent.\n\n" +
+                    "A tenant must pay rent before the fifth day.\n\nNo tenant may sublet without written consent."),
+                    x = 30.0, y = 60.0),
+                LcncNode("n2", "norm.clauses", params = mapOf("promote" to "0.6"), x = 330.0, y = 60.0),
+                LcncNode("n3", "display", x = 630.0, y = 60.0),
+                LcncNode("n4", "note", params = mapOf("text" to
+                    "norms: text is split into sections and parsed into clause readings.\n" +
+                    "Readings are unreviewed; conditions and modality remain visible.\n" +
+                    "The parser does not publish these readings to the bank."), x = 330.0, y = 260.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "value", "n2", "text"),
+                LcncWire("n2", "candidates", "n3", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
+            seq = 5,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    private fun constellation(): String {
+        val program = LcncProgram(
+            name = "preset-constellation",
+            nodes = listOf(
+                LcncNode("n1", "text.value", params = mapOf("value" to
+                    "A tenant must pay rent when it is due.\n\nThe landlord must repair the roof.\n\n" +
+                    "No tenant may sublet the premises.\n\nA court may dismiss the bill."),
+                    x = 30.0, y = 60.0),
+                LcncNode("n2", "text.value", params = mapOf("value" to
+                    "A tenant must pay rent when it is due.\n\nThe landlord must repair the roof.\n\n" +
+                    "A tenant may sublet the premises.\n\nA judge must hear the witness."),
+                    x = 30.0, y = 260.0),
+                LcncNode("n3", "book.curate", params = mapOf("book" to "first", "work" to "lease", "date" to "1"), x = 330.0, y = 60.0),
+                LcncNode("n5", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 60.0),
+                // The second edition reads its words in the senses the first one's bearers resolved to.
+                LcncNode("n4", "book.curate", params = mapOf("book" to "second", "work" to "lease", "date" to "2", "constellation" to "leases"), x = 330.0, y = 260.0),
+                LcncNode("n6", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 260.0),
+                LcncNode("n7", "display", x = 930.0, y = 260.0),
+                LcncNode("n9", "constellation.render", params = mapOf("constellation" to "leases"), x = 930.0, y = 60.0),
+                // while (text changes) { text = render(parse(text)) }: the atoms go back through the parser
+                // until parse ∘ render is idempotent.
+                LcncNode("n10", LcncContracts.SCOPE, params = mapOf("carry" to "true", "limit" to "8"), x = 1230.0, y = 60.0,
+                    children = listOf(
+                        LcncNode("n11", LcncContracts.SCOPE_IN, params = mapOf("name" to "text")),
+                        LcncNode("n12", "constellation.render"),
+                        LcncNode("n13", LcncContracts.SCOPE_OUT, params = mapOf("name" to "text")),
+                        LcncNode("n14", LcncContracts.SCOPE_OUT, params = mapOf("name" to "drift")),
+                    ).toSeries()),
+                LcncNode("n15", "display", x = 1530.0, y = 60.0),
+                // for (command in tasks) { kanban.submit(command) }: conflicts and widely restated norms become cards.
+                LcncNode("n16", LcncContracts.SCOPE, params = mapOf("item" to "command"), x = 930.0, y = 460.0,
+                    children = listOf(
+                        LcncNode("n17", LcncContracts.SCOPE_IN, params = mapOf("name" to "command")),
+                        LcncNode("n18", "kanban.submit"),
+                        LcncNode("n19", LcncContracts.SCOPE_OUT, params = mapOf("name" to "card")),
+                    ).toSeries()),
+                LcncNode("n20", "display", x = 1230.0, y = 460.0),
+                // The wiki comes back as a book: its pages are sections, and it joins the same constellation.
+                LcncNode("n21", "wiki.read", x = 30.0, y = 660.0),
+                LcncNode("n22", "book.curate", params = mapOf("book" to "wiki", "work" to "wiki", "date" to "3"), x = 330.0, y = 660.0),
+                LcncNode("n23", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 660.0),
+                LcncNode("n24", "display", x = 930.0, y = 660.0),
+                // Norms inherit down SUMO: what a vehicle must do, a car and a truck must do, unless their own
+                // sections say otherwise (a truck's own exception revises the inherited default).
+                LcncNode("n25", "text.value", params = mapOf("value" to
+                    "A vehicle must stop at the crossing.\n\nA vehicle must carry a light.\n\n" +
+                    "A vehicle must carry a light.\n\nA vehicle must carry a light.\n\n" +
+                    "A truck must not carry a light.\n\nA vehicle must stop at the crossing."), x = 30.0, y = 860.0),
+                LcncNode("n26", "book.curate", params = mapOf("book" to "road", "work" to "road", "date" to "1"), x = 330.0, y = 860.0),
+                LcncNode("n27", "constellation.join", params = mapOf("constellation" to "roads"), x = 630.0, y = 860.0),
+                LcncNode("n28", "constellation.ask", params = mapOf("constellation" to "roads", "class" to "Automobile"), x = 930.0, y = 860.0),
+                LcncNode("n29", "constellation.ask", params = mapOf("constellation" to "roads", "class" to "Truck"), x = 930.0, y = 1000.0),
+                // The text is a candidate only; wire an explicit positiveFacts array to assume a premise.
+                LcncNode("n30", "constellation.ask", params = mapOf("constellation" to "leases", "class" to "tenant"), x = 1230.0, y = 60.0),
+                LcncNode("n31", "constellation.ask", params = mapOf("constellation" to "leases", "class" to "tenant",
+                    "facts" to "The rent is due."), x = 1230.0, y = 200.0),
+                // The answer edge: a book stating the fact a premise asks about closes it for the constellation.
+                LcncNode("n32", "text.value", params = mapOf("value" to "The rent is due on the first."), x = 30.0, y = 1100.0),
+                LcncNode("n33", "book.curate", params = mapOf("book" to "notice", "work" to "notice", "date" to "4"), x = 330.0, y = 1100.0),
+                LcncNode("n34", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 1100.0),
+                LcncNode("n35", "display", x = 930.0, y = 1100.0),
+                // for (move in settle(board)) { kanban.move(move) }: answered premise cards go to done.
+                LcncNode("n36", "board.get", x = 930.0, y = 1240.0),
+                LcncNode("n37", "constellation.settle", params = mapOf("constellation" to "leases"), x = 1230.0, y = 1240.0),
+                LcncNode("n38", LcncContracts.SCOPE, params = mapOf("item" to "command"), x = 1530.0, y = 1240.0,
+                    children = listOf(
+                        LcncNode("n39", LcncContracts.SCOPE_IN, params = mapOf("name" to "command")),
+                        LcncNode("n40", "kanban.move"),
+                        LcncNode("n41", LcncContracts.SCOPE_OUT, params = mapOf("name" to "card")),
+                    ).toSeries()),
+                LcncNode("n42", "display", x = 1830.0, y = 1240.0),
+                // The RDF atoms are queryable: which SUMO class bears which predicate, at what confidence.
+                LcncNode("n43", "rdf.select", params = mapOf("sparql" to
+                    "SELECT ?class ?predicate ?confidence WHERE { ?n a forge:Norm . ?n forge:bearerClass ?class . " +
+                    "?n forge:predicate ?predicate . ?n forge:confidence ?confidence . }"), x = 930.0, y = 1380.0),
+                LcncNode("n44", "display", x = 1230.0, y = 1380.0),
+                // The frontier as the wiki passes' outcome summary: wire `summary` into wiki.propose's summary?.
+                LcncNode("n45", "constellation.brief", params = mapOf("constellation" to "leases"), x = 930.0, y = 1520.0),
+                LcncNode("n46", "display", x = 1230.0, y = 1520.0),
+                // if (unresolved) { brief } else { settled }: two rings on one guard, joined by a typed merge.
+                LcncNode("n47", LcncContracts.SCOPE, x = 930.0, y = 1660.0, children = listOf(
+                    LcncNode("n48", "constellation.brief", params = mapOf("constellation" to "leases", "page" to "true")),
+                    LcncNode("n49", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summary")),
+                    // The unresolved brief is the proposer's outcome summary: one atomic wiki proposal per run.
+                    LcncNode("n55", LcncContracts.WIKI_PROPOSE, params = mapOf("maxTurns" to "4", "contextId" to "constellation/leases")),
+                    LcncNode("n56", LcncContracts.SCOPE_OUT, params = mapOf("name" to "proposal")),
+                ).toSeries()),
+                LcncNode("n50", LcncContracts.SCOPE, params = mapOf("else" to "true"), x = 930.0, y = 1800.0, children = listOf(
+                    LcncNode("n51", "text.value", params = mapOf("value" to "Constellation 'leases' is settled: no conflicts, no open premises.")),
+                    LcncNode("n52", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summary")),
+                ).toSeries()),
+                LcncNode("n53", "merge", x = 1230.0, y = 1730.0),
+                LcncNode("n54", "display", x = 1530.0, y = 1730.0),
+                LcncNode("n8", "note", params = mapOf("text" to
+                    "two editions of one work join a constellation: restated norms gain confidence, opposed force is a conflict,\n" +
+                    "bearers typed by SUMO class; frontier = new, untyped and conflicting statements as blackboard addresses.\n" +
+                    "bank: (norm ?id ?modality ?class ?predicate ?f ?c), (normSource ?id ?book ?section)"), x = 330.0, y = 460.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "value", "n3", "text"),
+                LcncWire("n2", "value", "n4", "text"),
+                LcncWire("n3", "book", "n5", "book?"),
+                LcncWire("n4", "book", "n6", "book?"),
+                LcncWire("n6", "frontier", "n7", "x"),
+                LcncWire("n9", "text", "n10", "text"),
+                LcncWire("n11", "value", "n12", "text?"),
+                LcncWire("n12", "text", "n13", "value"),
+                LcncWire("n12", "drift", "n14", "value"),
+                LcncWire("n10", "returns", "n15", "x"),
+                LcncWire("n6", "tasks", "n16", "each?"),
+                LcncWire("n17", "value", "n18", "command?"),
+                LcncWire("n18", "jobId", "n19", "value"),
+                LcncWire("n16", "card", "n20", "x"),
+                LcncWire("n21", "text", "n22", "text"),
+                LcncWire("n22", "book", "n23", "book?"),
+                LcncWire("n23", "frontier", "n24", "x"),
+                LcncWire("n25", "value", "n26", "text"),
+                LcncWire("n26", "book", "n27", "book?"),
+                LcncWire("n32", "value", "n33", "text"),
+                LcncWire("n33", "book", "n34", "book?"),
+                LcncWire("n34", "frontier", "n35", "x"),
+                LcncWire("n36", "json", "n37", "board?"),
+                LcncWire("n37", "moves", "n38", "each?"),
+                LcncWire("n39", "value", "n40", "command?"),
+                LcncWire("n40", "jobId", "n41", "value"),
+                LcncWire("n38", "card", "n42", "x"),
+                LcncWire("n34", "rdf", "n43", "turtle?"),
+                LcncWire("n43", "rows", "n44", "x"),
+                LcncWire("n34", "frontier", "n45", "trigger?"),
+                LcncWire("n45", "summary", "n46", "x"),
+                LcncWire("n34", "unresolved", "n47", "when?"),
+                LcncWire("n34", "unresolved", "n50", "when?"),
+                LcncWire("n48", "summary", "n49", "value"),
+                LcncWire("n48", "summary", "n55", "summary?"),
+                LcncWire("n55", "report", "n56", "value"),
+                LcncWire("n51", "value", "n52", "value"),
+                LcncWire("n47", "summary", "n53", "a?"),
+                LcncWire("n50", "summary", "n53", "b?"),
+                LcncWire("n53", "value", "n54", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
+            seq = 9,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    private fun curator(): String {
+        val program = LcncProgram(
+            name = "preset-curator",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "60"), x = 30.0, y = 60.0),
+                LcncNode("n2", "beliefs.introspect", x = 250.0, y = 60.0),
+                // The field is a SUMMARY — size, crux bits, concepts. It was
+                // wired into review.facts, which parses turn facts, so the
+                // curator parsed zero and landed zero on every tick while every
+                // kind matched and every test stayed green. The field belongs on
+                // a display; the review needs facts.
+                LcncNode("n7", "display", x = 470.0, y = 300.0),
+                // Turn facts: {verb, ok, context, object}. Two observations in
+                // one context are enough for the induction to fire and land a
+                // third belief — edit a verb, or flip an `ok`, and watch what
+                // lands change.
+                LcncNode("n0", "json.value", params = mapOf("value" to
+                    """[{"verb":"bash","ok":true,"context":"build","object":"gradle"},
+ {"verb":"edit","ok":true,"context":"build","object":"kotlin"},
+ {"verb":"bash","ok":false,"context":"deploy","object":"ssh"}]"""),
+                    x = 250.0, y = 60.0),
+                LcncNode("n3", "beliefs.review", x = 690.0, y = 60.0),
+                LcncNode("n5", "display", x = 950.0, y = 60.0),
+                LcncNode("n6", "note", params = mapOf("text" to "curator preset — quota-free branch:\nmint → review → tick → render → revise.\nteach via POST /api/beliefs/teach (W5.3).\n\nfacts are {verb, ok, context, object}.\nTwo in one context induce a third belief;\nthe display beside it is the live bag field."), x = 690.0, y = 300.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n2", "field", "n7", "x"),
+                LcncWire("n0", "value", "n3", "facts"),
+                LcncWire("n3", "landed", "n5", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
+            seq = 7,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── brain-mux: MVP keymux recall, modelmux recall, model action ──
+    // Three lanes: keys.status → display (what keys exist),
+    //   mux.models → display (what models are routable),
+    //   credential.enter → prompt.chat → result.confirm (action demo).
+    // The graph IS the BrainClient decomposition — no single god-class.
+    // ── the patch-panel player: url arrives on a text WIRE (text.value →
+    // media.player.url); play/stop/rewind are GENERIC BUTTONS patched in —
+    // the button doesn't know it means "play", the wire does; volume is a
+    // GENERIC SLIDER patched into `volume?`; `ended` fires downstream into
+    // display. Nothing internal — every control is an external cable.
+    private fun mediaDemo(): String {
+        val program = LcncProgram(
+            name = "preset-media",
+            nodes = listOf(
+                LcncNode("n1", "text.value",
+                    params = mapOf("value" to "https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3"),
+                    x = 30.0, y = 60.0),
+                LcncNode("bplay", "button", params = mapOf("label" to "play"), x = 30.0, y = 220.0),
+                LcncNode("bstop", "button", params = mapOf("label" to "stop"), x = 190.0, y = 220.0),
+                LcncNode("brew", "button", params = mapOf("label" to "rewind"), x = 350.0, y = 220.0),
+                LcncNode("svol", "slider",
+                    params = mapOf("label" to "volume", "min" to "0", "max" to "1", "step" to "0.05", "value" to "0.8"),
+                    x = 30.0, y = 340.0),
+                LcncNode("n2", "media.player", x = 320.0, y = 40.0),
+                LcncNode("n3", "display", x = 1080.0, y = 60.0),
+                LcncNode("n4", "note",
+                    params = mapOf("text" to "the player is a PATCH PANEL: url rides a text wire;\nplay/stop/rewind are GENERIC buttons — the button\nknows nothing, the WIRE means \"play\"; volume is a\nGENERIC slider patched into volume?. state flows\nout as json, ended fires downstream. nothing internal."),
+                    x = 30.0, y = 460.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "value", "n2", "url"),
+                LcncWire("bplay", "press", "n2", "play?"),
+                LcncWire("bstop", "press", "n2", "stop?"),
+                LcncWire("brew", "press", "n2", "rewind?"),
+                LcncWire("svol", "value", "n2", "volume?"),
+                LcncWire("n2", "state", "n3", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
+            seq = 5,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    private fun brainMux(): String {
+        // The BrainMux family for a person who has never seen a patch panel:
+        // three numbered steps top to bottom, the answer to the right of the
+        // question, the router's account at the bottom. x starts at 320 because
+        // the palette (216px, fixed) covers the canvas's left edge — a note at
+        // x=30 is a note nobody sees. Rows are spaced by the tallest node above
+        // them (ask a model runs ~700 canvas px, the prompt node ~280): the loader
+        // pushes an overlapping node sideways, which scattered a tighter grid.
+        val program = LcncProgram(
+            name = "preset-brain-mux",
+            // Columns 320 / 720 / 1000 / 1240 and these rows are measured against Chrome's node
+            // sizes (a note is 330 wide; prompt.chat is 644 tall) so the harness's overlap
+            // resolver moves nothing and the preset opens on the blackboard, not as a draft.
+            nodes = listOf(
+                LcncNode("note-keys", "note",
+                    params = mapOf("text" to "1 · keys this machine already has —\nany model from one of these providers\nanswers with nothing typed."),
+                    x = 320.0, y = 60.0),
+                LcncNode("k1", "keys.status", x = 720.0, y = 60.0),
+                LcncNode("kd", "display", x = 1000.0, y = 60.0),
+                LcncNode("note-ask", "note",
+                    // Lines stay under ~42 characters: a wider note overlaps the next column and
+                    // the loader would push that column sideways, opening the preset as a draft.
+                    params = mapOf("text" to "2 · ask —\nthe question is the stored prompt\nnamed hello (change it with the\nSave a prompt gallery item);\npick a model (the list is what runs here,\nnewest first), press ▶ run.\nThe answer lands in the green card;\na red card says what went wrong."),
+                    x = 320.0, y = 700.0),
+                // The prompt is a citizen, not a literal: read by name, its version
+                // recorded on the run's receipt as promptVersions.
+                LcncNode("pr1", "prompt.get", params = mapOf("name" to "hello"), x = 720.0, y = 330.0),
+                LcncNode("p1", "prompt.chat",
+                    params = mapOf(
+                        "prompt" to "",
+                        // Blank model/prefill/url/key: the live list leads with the newest
+                        // model Hermes ran here and the router finds the key.
+                        "model" to "",
+                        // 256, not 128: a thinking model spends its budget on reasoning
+                        // first, and a small cap returned an empty answer.
+                        "maxTokens" to "1024",
+                        "temperature" to "0.3",
+                        "prefill" to "",
+                        "url" to "",
+                        "key" to "",
+                        "headers" to "[]",
+                    ), x = 720.0, y = 700.0),
+                LcncNode("d1", "result.confirm", x = 1000.0, y = 700.0),
+                LcncNode("note-save", "note",
+                    params = mapOf("text" to "3 · optional: save your own key —\nfor a provider step 1 does not list.\nIt then shows up under \"prefill\" in step 2."),
+                    x = 320.0, y = 1420.0),
+                LcncNode("c1", "credential.enter",
+                    params = mapOf(
+                        "key_type" to "nvidia",
+                        "url" to "https://integrate.api.nvidia.com/v1",
+                        "api_type" to "openai",
+                        "key" to "",
+                    ), x = 720.0, y = 1420.0),
+                LcncNode("note-router", "note",
+                    params = mapOf("text" to "what the router did —\nthe last answer: which model and provider,\nwhether it succeeded, how long it took,\nand the tokens spent. Refreshes every 30 s."),
+                    x = 320.0, y = 1840.0),
+                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 720.0, y = 1840.0),
+                LcncNode("me1", "mux.meta", x = 1000.0, y = 1840.0),
+                LcncNode("dm1", "display", x = 1240.0, y = 1840.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("k1", "have", "kd", "x"),
+                LcncWire("pr1", "text", "p1", "prompt?"),
+                LcncWire("p1", "content", "d1", "content"),
+                LcncWire("p1", "ok", "d1", "ok"),
+                LcncWire("p1", "error", "d1", "error"),
+                LcncWire("p1", "cached", "d1", "cached?"),
+                LcncWire("t1", "tick", "me1", "trigger?"),
+                LcncWire("me1", "lastAnswer", "dm1", "x"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── save a prompt: the stored set of prompts, authored on the canvas ──
+    // The post Forge answers asked for "a stored set of prompts". This is the
+    // rendered way to author a version without a dialog: write the text, name
+    // it, press run. A byte-identical save changes nothing; a changed text
+    // mints a new version whose lineage names the one it replaced.
+    private fun promptEditor(): String {
+        val program = LcncProgram(
+            name = "preset-prompt",
+            nodes = listOf(
+                LcncNode("note-write", "note",
+                    params = mapOf("text" to "1 · write the prompt —\nthe text below is what gets saved.\nA {{name}} in it is a hole a program\nfills at run time."),
+                    x = 320.0, y = 60.0),
+                LcncNode("t1", "text.value", params = mapOf("value" to "Say hello in one sentence."), x = 620.0, y = 60.0),
+                LcncNode("note-save", "note",
+                    params = mapOf("text" to "2 · name it and press ▶ run —\na saved prompt keeps its name across runs;\nsaving the same text again changes nothing;\nask nodes pick it by that name."),
+                    x = 320.0, y = 360.0),
+                LcncNode("s1", "prompt.save", params = mapOf("name" to "hello", "role" to "user", "tags" to ""), x = 620.0, y = 360.0),
+                LcncNode("d1", "display", x = 1000.0, y = 360.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("t1", "value", "s1", "text"),
+                LcncWire("s1", "cid", "d1", "x"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.8),
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── corpus digest: iterate a mounted folder, fully drawn ─────────────
+    // The post Forge answers: "all this stuff which I want to process over in an
+    // iterated way". A mounted folder is the document set; the ring's each? is the
+    // iteration; the question is a stored prompt; the receipt records which
+    // documents and which prompt version were read. Every step is an ordinary
+    // lego the palette offers on its own — the can and the atoms are one substance.
+    private fun corpusDigest(): String {
+        val program = LcncProgram(
+            name = "preset-corpus",
+            // Geometry measured in Chrome (2026-09-06): a note is 330 wide, scope.in 296 tall,
+            // project.docs 401 tall, a ring frame ~776 tall. Columns 320 / 720 / 1100 and the row
+            // gaps below clear the harness's overlap resolver, so the preset opens on the
+            // blackboard rather than as a pushed-around draft.
+            nodes = listOf(
+                LcncNode("note-which", "note",
+                    params = mapOf("text" to "1 · which folder —\nname the mounted project in the run's\ninputs; the glob picks the documents."),
+                    x = 320.0, y = 60.0),
+                LcncNode("n-proj", LcncContracts.SCOPE_IN, params = mapOf("name" to "project", "kind" to "id"), x = 320.0, y = 300.0),
+                LcncNode("n-docs", ProjectNodes.DOCS,
+                    params = mapOf("project" to "", "prefix" to "", "glob" to "*.md", "limit" to "32"),
+                    x = 720.0, y = 60.0),
+                LcncNode("n-count", "display", x = 1100.0, y = 60.0),
+                LcncNode("note-each", "note",
+                    params = mapOf("text" to "2 · for each document —\nread it, ask the model with the stored\nprompt named summarize, keep the answer."),
+                    x = 320.0, y = 700.0),
+                LcncNode("n-ring", LcncContracts.SCOPE,
+                    params = mapOf("item" to "doc", "limit" to "32"),
+                    x = 720.0, y = 700.0,
+                    children = listOf(
+                        LcncNode("r-in", LcncContracts.SCOPE_IN, params = mapOf("name" to "doc", "kind" to ProjectDoc.KIND), x = 40.0, y = 40.0),
+                        LcncNode("r-read", ProjectNodes.READ, params = mapOf("maxChars" to "65536"), x = 300.0, y = 40.0),
+                        LcncNode("r-q", PromptNodes.GET, params = mapOf("name" to LcncPromptSeeds.SUMMARIZE), x = 300.0, y = 420.0),
+                        LcncNode("r-fold", "text.fold", params = mapOf("label" to "", "numbered" to "false", "separator" to "\n\n"), x = 560.0, y = 40.0),
+                        LcncNode("r-ask", "prompt.chat",
+                            params = mapOf("prompt" to "", "model" to "", "maxTokens" to "1024", "temperature" to "0.2", "prefill" to "", "url" to "", "key" to "", "headers" to "[]"),
+                            x = 820.0, y = 40.0),
+                        LcncNode("r-sum", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summary", "kind" to "text"), x = 1100.0, y = 40.0),
+                        LcncNode("r-id", LcncContracts.SCOPE_OUT, params = mapOf("name" to "id", "kind" to "id"), x = 1100.0, y = 260.0),
+                        LcncNode("r-cid", LcncContracts.SCOPE_OUT, params = mapOf("name" to "cid", "kind" to "id"), x = 1100.0, y = 400.0),
+                    ).toSeries()),
+                LcncNode("note-digest", "note",
+                    params = mapOf("text" to "3 · the digest —\none line per document, and the whole\nlist as the run's result."),
+                    x = 320.0, y = 1600.0),
+                LcncNode("n-lines", "list.format", params = mapOf("template" to "{id}: {summary}", "limit" to ""), x = 720.0, y = 1600.0),
+                LcncNode("n-show", "display", x = 1100.0, y = 1600.0),
+                LcncNode("n-out", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summaries", "kind" to "json"), x = 1100.0, y = 1800.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n-proj", "value", "n-docs", "project?"),
+                LcncWire("n-docs", "count", "n-count", "x"),
+                LcncWire("n-docs", "docs", "n-ring", "each?"),
+                LcncWire("r-in", "value", "r-read", "doc?"),
+                LcncWire("r-q", "text", "r-fold", "brief?"),
+                LcncWire("r-read", "text", "r-fold", "parts"),
+                LcncWire("r-fold", "text", "r-ask", "prompt?"),
+                LcncWire("r-ask", "content", "r-sum", "value"),
+                LcncWire("r-read", "id", "r-id", "value"),
+                LcncWire("r-read", "cid", "r-cid", "value"),
+                LcncWire("n-ring", "returns", "n-lines", "x"),
+                LcncWire("n-lines", "lines", "n-show", "x"),
+                LcncWire("n-ring", "returns", "n-out", "value"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.6),
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── ccek-mux: Hermes model + CCEK reactor choreography ────────────
+    // keys.status & ModelMux (Hermes 3 default) → prompt.chat →
+    // ccek.signal (append Hermes action to articulated node) →
+    // ccek.projection (markdown view) & ccek.fact (causal lineage) →
+    // mux.meta (telemetry)
+    private fun ccekMux(): String {
+        val program = LcncProgram(
+            name = "preset-ccek-mux",
+            nodes = listOf(
+                LcncNode("note-keys", "note",
+                    params = mapOf("text" to "1 · KeyMux & ModelMux —\nInspect keys and run the Hermes model.\nAuto-routes to the first available key."),
+                    x = 320.0, y = 60.0),
+                LcncNode("k1", "keys.status", x = 620.0, y = 60.0),
+                LcncNode("kd", "display", x = 920.0, y = 60.0),
+                LcncNode("note-ask", "note",
+                    params = mapOf("text" to "2 · Ask Hermes —\nPrompts the Hermes model (or resolved provider)\nto propose an action to orchestrate."),
+                    x = 320.0, y = 320.0),
+                LcncNode("p1", "prompt.chat",
+                    params = mapOf(
+                        "prompt" to "Propose a concise next action for the project workspace.",
+                        "model" to "", // blank adopts the newest model Hermes ran here
+                        "maxTokens" to "1024",
+                        "temperature" to "0.2",
+                        "prefill" to "",
+                        "url" to "",
+                        "key" to "",
+                        "headers" to "[]",
+                    ), x = 620.0, y = 320.0),
+                LcncNode("d-chat", "display", x = 920.0, y = 320.0),
+                LcncNode("note-ccek", "note",
+                    params = mapOf("text" to "3 · CCEK Hub & Context —\nIncarnates an articulated node,\nfans out Hermes's response as a signal,\nand asserts a causal fact in the context lineage."),
+                    x = 320.0, y = 620.0),
+                LcncNode("c1", "ccek.incarnate",
+                    params = mapOf(
+                        "title" to "hermes-ccek-orchestration",
+                        "record" to "true",
+                        "maxConcurrency" to "4",
+                    ), x = 620.0, y = 620.0),
+                LcncNode("ctx1", "ccek.context",
+                    params = mapOf("role" to "hermes-agent"),
+                    x = 620.0, y = 800.0),
+                LcncNode("s1", "ccek.signal",
+                    params = mapOf("verb" to "append", "blockKind" to "TEXT"),
+                    x = 920.0, y = 620.0),
+                LcncNode("cf1", "ccek.fact",
+                    params = mapOf("kind" to "observation"),
+                    x = 920.0, y = 800.0),
+                LcncNode("pr1", "ccek.projection",
+                    params = mapOf("kind" to "markdown"),
+                    x = 1180.0, y = 620.0),
+                LcncNode("d-proj", "display", x = 1420.0, y = 620.0),
+                LcncNode("d-fact", "display", x = 1180.0, y = 800.0),
+                LcncNode("note-mux", "note",
+                    params = mapOf("text" to "4 · Router telemetry —\nInspect the last route selection,\nlatency, and quota usage."),
+                    x = 320.0, y = 1020.0),
+                LcncNode("t1", "timer", params = mapOf("seconds" to "30"), x = 620.0, y = 1020.0),
+                LcncNode("me1", "mux.meta", x = 850.0, y = 1020.0),
+                LcncNode("dm1", "display", x = 1130.0, y = 1020.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("k1", "have", "kd", "x"),
+                LcncWire("p1", "content", "d-chat", "x"),
+                LcncWire("c1", "handle", "s1", "handle"),
+                LcncWire("p1", "content", "s1", "text"),
+                LcncWire("c1", "handle", "pr1", "handle"),
+                LcncWire("pr1", "projection", "d-proj", "x"),
+                LcncWire("ctx1", "contextId", "cf1", "contextId"),
+                LcncWire("cf1", "factCount", "d-fact", "x"),
+                LcncWire("t1", "tick", "me1", "trigger?"),
+                LcncWire("me1", "lastAnswer", "dm1", "x"),
+            ).toSeries(),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
+            seq = 17,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+
+    // ── hermes-train: the NARS bag training preset ────────────────────
+    // timer → curator.feed → [corenlp span-hints] → construction.propose
+    // → construction.gate → nal.decay → nal.recall → display.
+    // Extends the curator loop with belief-bag minting and decay.
+
+    private fun hermesTrain(): String {
+        val program = LcncProgram(
+            name = "preset-hermes-train",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "60"), x = 30.0, y = 60.0),
+                LcncNode("n2", "beliefs.introspect", x = 250.0, y = 60.0),
+                // Same category error preset-curator carried: the field is a
+                // SUMMARY, review wants turn facts. Outcome markers are the
+                // evidence this preset's own note describes — here they are.
+                LcncNode("n0", "json.value", params = mapOf("value" to
+                    """[{"verb":"CONSOLIDATE","ok":true,"context":"wiki","object":"skill-draft"}, """ +
+                    """{"verb":"PATCH","ok":true,"context":"wiki","object":"skill-draft"}, """ +
+                    """{"verb":"PRUNE","ok":false,"context":"wiki","object":"stale-trace"}]"""),
+                    x = 250.0, y = 240.0),
+                // read.construct reads LINES — the outcome markers this preset's
+                // note describes, as text. Fact objects are not lines.
+                LcncNode("n0b", "json.value", params = mapOf("value" to
+                    """["CONSOLIDATE wiki/skill-draft: merged two overlapping traces", """ +
+                    """"PATCH wiki/skill-draft: corrected the mount path", """ +
+                    """"PRUNE wiki/stale-trace: FAIL, no longer reachable"]"""),
+                    x = 250.0, y = 380.0),
+                LcncNode("n3", "beliefs.review", x = 470.0, y = 60.0),
+                LcncNode("n4", "read.construct",
+                    params = mapOf("maxTokens" to "1024"), x = 700.0, y = 60.0),
+                LcncNode("n5", "nal.decay", x = 940.0, y = 60.0),
+                LcncNode("n6", "nal.recall",
+                    params = mapOf("mode" to "top", "k" to "16"), x = 1160.0, y = 60.0),
+                LcncNode("n7", "display", x = 1400.0, y = 60.0),
+                LcncNode("n8", "note", params = mapOf("text" to
+                    "preset-hermes-train\n" +
+                    "timer(60s) -> curator.feed -> beliefs.review\n" +
+                    "-> read.construct (bot proposes, gate disposes)\n" +
+                    "-> nal.decay (AttentionEconomy pulse)\n" +
+                    "-> nal.recall (top-k) -> display.\n" +
+                    "Evidence comes from outcome markers:\n" +
+                    "CONSOLIDATE/PRUNE/PATCH/DEPRECATE/PASS/FAIL."),
+                    x = 470.0, y = 300.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n0", "value", "n3", "facts"),
+                // landed is empty whenever the beliefs already exist (a revise, not
+                // a land), which killed this lane on every run but the first. The
+                // facts themselves are the stable input; landed still displays.
+                LcncWire("n0b", "value", "n4", "lines"),
+                LcncWire("n4", "aggregates", "n5", "after?"),
+                LcncWire("n1", "tick", "n5", "trigger?"),
+                LcncWire("n5", "decayed", "n6", "trigger?"),
+                LcncWire("n6", "beliefs", "n7", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 0.65),
+            seq = 8,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── legal-tribunal: extended preset-tribunal for legal review ─────
+    // legal.ingest (canonical retained document curation) → legal.evidence
+    // → sparql.query(evidence-bank) → tribunal LOOP/JOIN
+    // → tribunal.record → display.
+    // Extends preset-tribunal with legal system prompts and
+    // evidence-bank injection via SparqlKifMcpServer tools.
+
+    private fun legalTribunal(caseMode: Boolean = false, repeatArgue: Boolean = false): String {
+        val kanban = KanbanGraph(
+            boardId = "legal-tribunal",
+            lanes = listOf(
+                KanbanLane("brief", "Brief of the legal matter", 0, "legal", outputs = mapOf("brief" to "work")),
+                KanbanLane("argue", "Argue for the motion", 1, "legal", inputs = mapOf("brief" to "work", "work" to "work", "result" to "result"), outputs = mapOf("result" to "result")),
+                KanbanLane("rebut", "Rebut the argument", 2, "opposing", inputs = mapOf("result" to "result"), outputs = mapOf("result" to "result")),
+                KanbanLane("deliberate", "Deliberate on the record", 3, "judge", inputs = mapOf("result" to "result")),
+                KanbanLane("mistrial", "Terminal — proceedings void", 4, "judge"),
+            ).toSeries(),
+            edges = listOf(
+                KanbanEdge("brief-argue", "brief", "argue"),
+                KanbanEdge("argue-rebut", "argue", "rebut"),
+                KanbanEdge("rebut-argue", "rebut", "argue", mode = KanbanEdgeMode.LOOP, maxIterations = 3),
+                KanbanEdge("join-deliberate", "rebut", "deliberate", mode = KanbanEdgeMode.JOIN, group = "record", requiredBranches = 2),
+                KanbanEdge("argue-joins-record", "argue", "deliberate", mode = KanbanEdgeMode.JOIN, group = "record", requiredBranches = 2),
+                KanbanEdge("abort-mistrial", "argue", "mistrial", mode = KanbanEdgeMode.ABORT),
+                // The judge's clarification escape: bounded at 1 (a single
+                // extra round, distinct from the counsel-level rebut-argue
+                // bound), guarded by TribunalPredicates.NEEDS_CLARIFICATION
+                // so it only fires when the verdict says the record is
+                // insufficient — silent no-op otherwise.
+                KanbanEdge(
+                    "deliberate-clarify", "deliberate", "argue",
+                    mode = KanbanEdgeMode.LOOP, maxIterations = 1,
+                    condition = KanbanCondition(TribunalPredicates.NEEDS_CLARIFICATION),
+                ),
+            ).toSeries(),
+        )
+        val program = LcncProgram(
+            name = "preset-legal-tribunal",
+            nodes = listOf(
+                // The matter itself. Empty, "grounded legal review" reviewed
+                // nothing — replace this text with a real filing.
+                LcncNode("t0", "text.value", params = mapOf("value" to
+                    "In re Wilkins v. Datacorp, 412 F.3d 118 (9th Cir. 2021). " +
+                    "Movant seeks summary judgment on the breach claim, arguing the " +
+                    "limitation clause in section 7.2 bars consequential damages. " +
+                    "Respondent contends section 7.2 is unconscionable under Cal. Civ. Code 1670.5."),
+                    x = 30.0, y = 260.0),
+                LcncNode("n1", "legal.ingest",
+                    params = mapOf("brief" to "brief"),
+                    x = 300.0, y = 60.0),
+                LcncNode("n1b", "legal.evidence", x = 190.0, y = 60.0),
+                LcncNode("n2", "mux.chat", params = mapOf(
+                    "job" to "argue",
+                    "system" to "You are counsel for the motion in a legal proceeding. Argue based on the evidence and legal standards provided. Cite specific statutes and cases. Apply the relevant standard of proof (preponderance, clear and convincing, or beyond reasonable doubt as appropriate).",
+                    "maxTokens" to "600"),
+                    x = 350.0, y = 60.0),
+                LcncNode("n3", "mux.chat", params = mapOf(
+                    "job" to "rebut",
+                    "system" to "You are opposing counsel. Rebut the argument point by point, citing contradictory evidence, distinguishable precedent, or statutory defenses. Challenge the applicability of cited authority.",
+                    "maxTokens" to "600"),
+                    x = 650.0, y = 200.0),
+                LcncNode("n4", "mux.chat", params = mapOf(
+                    "job" to "deliberate",
+                    "system" to "You are the presiding judge. Weigh the record, apply the relevant legal standard, and rule. If the record is insufficient for a ruling, state what clarification is needed and route back to counsel.",
+                    "maxTokens" to "800"),
+                    x = 950.0, y = 60.0),
+                LcncNode("n5", "tribunal.record", x = 1200.0, y = 60.0),
+                LcncNode("n6", "display", x = 1440.0, y = 60.0),
+                LcncNode("n7", "note", params = mapOf("text" to
+                    "preset-legal-tribunal\n" +
+                    "legal.ingest (canonical retained document curation)\n" +
+                    "-> legal.evidence (queries the shared KIF bank for\n" +
+                    "   doc_<cid> facts, folds them into the brief)\n" +
+                    "-> argue <-> rebut (LOOP <=3, MAD shape)\n" +
+                    "-> deliberate (JOIN 2) -> tribunal.record -> display.\n" +
+                    "ABORT edge = mistrial."),
+                    x = 450.0, y = 380.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("t0", "value", "n1", "text?"),
+                LcncWire("n1", "documentCid", "n1b", "documentCid?"),
+                LcncWire("n1", "brief", "n1b", "brief?"),
+                LcncWire("n1b", "brief", "n2", "prompt?"),
+                LcncWire("n2", "content", "n3", "prompt?"),
+                LcncWire("n3", "content", "n4", "prompt?"),
+                LcncWire("n4", "content", "n5", "text?"),
+                LcncWire("n5", "report", "n6", "x"),
+            ).toSeries(),
+            controls = LcncConfixControls(humanOversight = true),
+            kanban = kanban,
+            view = LcncView(x = 20.0, y = 10.0, zoom = 0.5),
+            seq = 9,
+        )
+        val authored = tribunal(program)
+        return LcncProgramConfix.toJson(if (caseMode) LcncCaseProgram.authored(authored,
+            if (repeatArgue) "preset-legal-tribunal-case-v2" else "preset-legal-tribunal-case", repeatArgue) else authored)
+    }
+
+
+    // ── state-freeze: persist bag + KIF + RdfGraph to CAS ────────────
+    // trigger → state.freeze → display.  The freeze node snapshots the
+    // belief bag, serializes the KIF knowledge base and RdfGraph to
+    // Turtle, and stores everything in CAS with a receipt CID.
+
+    private fun stateFreeze(): String {
+        val program = LcncProgram(
+            name = "preset-state-freeze",
+            nodes = listOf(
+                LcncNode("n1", "timer", params = mapOf("seconds" to "300"), x = 30.0, y = 60.0),
+                LcncNode("n2", "state.freeze", x = 280.0, y = 60.0),
+                LcncNode("n3", "display", x = 520.0, y = 60.0),
+                LcncNode("n4", "note", params = mapOf("text" to
+                    "preset-state-freeze\n" +
+                    "timer(300s) -> state.freeze -> display.\n" +
+                    "Snapshots belief bag, KIF KB, RdfGraph\n" +
+                    "to CAS. Receipt CID returned."),
+                    x = 280.0, y = 240.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "tick", "n2", "trigger?"),
+                LcncWire("n2", "snapshot", "n3", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
+            seq = 5,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+}

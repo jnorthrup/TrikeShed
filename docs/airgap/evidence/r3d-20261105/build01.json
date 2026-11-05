@@ -1,0 +1,25 @@
+{
+  "sourceCommit": "b91f0ce69deb5fbd1a13efa2f145bf9f294550c0",
+  "startedAt": "2026-11-05T08:27:15.287397+00:00",
+  "command": [
+    "unshare",
+    "--user",
+    "--map-current-user",
+    "--net",
+    "--keep-caps",
+    "sh",
+    "-c",
+    "ip link set lo up && exec \"$@\"",
+    "airgap-check",
+    "./gradlew",
+    "--offline",
+    "--no-daemon",
+    "--max-workers=2",
+    "-PkotlinJsApps=spacegraph",
+    "airgapDocumentPagesJar",
+    "stageKotlinJs"
+  ],
+  "cwd": "/workspace/TrikeShed-target-checks",
+  "exit": 0,
+  "finishedAt": "2026-11-05T08:28:33.751889+00:00"
+}

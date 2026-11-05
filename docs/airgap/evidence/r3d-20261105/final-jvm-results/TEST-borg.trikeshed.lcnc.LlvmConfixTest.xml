@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LlvmConfixTest[jvm]" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:54:48.844Z" hostname="0d6dfba25614" time="0.37">
+  <properties/>
+  <testcase name="upstreamScannersMatchRetainedKotlinGeometry()[jvm]" classname="borg.trikeshed.lcnc.LlvmConfixTest" time="0.139"/>
+  <testcase name="yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm]" classname="borg.trikeshed.lcnc.LlvmConfixTest" time="0.037"/>
+  <testcase name="admittedCancellationSettlesBeforeEvidenceAndClose()[jvm]" classname="borg.trikeshed.lcnc.LlvmConfixTest" time="0.034"/>
+  <testcase name="faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm]" classname="borg.trikeshed.lcnc.LlvmConfixTest" time="0.057"/>
+  <testcase name="strictProfilesAndFailedOpeningLeaveNoSeat()[jvm]" classname="borg.trikeshed.lcnc.LlvmConfixTest" time="0.051"/>
+  <testcase name="copiedGeometryRemainsReadableAfterContextClose()[jvm]" classname="borg.trikeshed.lcnc.LlvmConfixTest" time="0.025"/>
+  <testcase name="admissionBoundsAndOperatorAuthorityAreEnforced()[jvm]" classname="borg.trikeshed.lcnc.LlvmConfixTest" time="0.025"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

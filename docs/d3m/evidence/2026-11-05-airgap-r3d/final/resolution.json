@@ -1,0 +1,10 @@
+{
+  "file": "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishCorpusWireTest.kt",
+  "base": "Corpus preset test composed PureNodes and retained corpus owner but lacked display runner; wired-query fixture put producers after consumer.",
+  "left": "Add real display-only TribunalNodes registration with a failing dialog; append consumer after all query producers.",
+  "right": "Same behavior and assertions; temporary variable names, formatting and failing-dialog wording differ.",
+  "resolution": "Use one display-only registration with the existing failing dialog and compose it once. Retain all assertions and agreed producer-before-consumer order. The resolved file is byte-identical to the tested 81438b129 version.",
+  "sourceAfterSha256": "301dcd3f0d28a6fe5bd7a95b2a2cbf656fd2c3c20abb1e4f6ccde6c6eeef6d23",
+  "stages": "conflicts/fdc30302f34307c318621136c394f4891dc3d4a2",
+  "policy": "No blanket side preference. Stage blobs and conflicted working file retained before intent resolution."
+}

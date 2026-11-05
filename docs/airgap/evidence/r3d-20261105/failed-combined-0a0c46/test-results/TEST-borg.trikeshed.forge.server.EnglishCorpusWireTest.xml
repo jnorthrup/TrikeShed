@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="EnglishCorpusWireTest[jvm]" tests="11" skipped="0" failures="2" errors="0" timestamp="2026-11-05T08:46:50.350Z" hostname="0d6dfba25614" time="6.183">
+  <properties/>
+  <testcase name="optionalSearchPreservesLegacyBytesAndBindsOnlyItsQueryReceipt()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.112"/>
+  <testcase name="offeredLocalCorpusPresetRunsTheRegisteredOwnerAndReturnsStatisticsWithSearch()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.082">
+    <failure message="borg.trikeshed.lcnc.LcncUnknownNodeType: no runner registered for node type 'display'" type="borg.trikeshed.lcnc.LcncUnknownNodeType">borg.trikeshed.lcnc.LcncUnknownNodeType: no runner registered for node type 'display'
+	at borg.trikeshed.lcnc.LcncRunner.runRing(LcncRunner.kt:933)
+	at borg.trikeshed.lcnc.LcncRunner.access$runRing(LcncRunner.kt:124)
+	at borg.trikeshed.lcnc.LcncRunner$runRing$1.invokeSuspend(LcncRunner.kt)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.UndispatchedCoroutine.afterResume(CoroutineContext.kt:278)
+	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:47)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(Unknown Source)
+	at borg.trikeshed.forge.server.EnglishCorpusWireTest.offeredLocalCorpusPresetRunsTheRegisteredOwnerAndReturnsStatisticsWithSearch(EnglishCorpusWireTest.kt:431)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="wiredOptionalTopicsReachTheRegisteredCorpusRunnerWithPresencePrecedence()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.157"/>
+  <testcase name="twoVerifiedReceiptsProduceExactConcordanceAndOptionalReproducibleTopics()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.057"/>
+  <testcase name="overlapsDuplicatesStaleSourcesAndInvalidTopicRequestsRefuse()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.022"/>
+  <testcase name="samplerWorkAndFullResponseBoundsRefuseWithoutPublishingPartialDerivedReceipts()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="3.497"/>
+  <testcase name="malformedAndOversizedSearchesRefuseWithoutPartialHitsOrNewDerivedReceipts()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="2.108"/>
+  <testcase name="searchUsesTheSamePolicyAndExplicitNoMatchDatasetWithoutChangingTopics()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.042"/>
+  <testcase name="currentSearchChecksBeforeAfterWorkAndAfterRetentionWhileSnapshotsStayHistorical()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.03"/>
+  <testcase name="actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.018">
+    <failure message="borg.trikeshed.lcnc.LcncUseBeforeDef: use before def: corpus consumes input-0 before it runs — statements execute in authored order" type="borg.trikeshed.lcnc.LcncUseBeforeDef">borg.trikeshed.lcnc.LcncUseBeforeDef: use before def: corpus consumes input-0 before it runs — statements execute in authored order
+	at borg.trikeshed.lcnc.LcncRunner.gather(LcncRunner.kt:441)
+	at borg.trikeshed.lcnc.LcncRunner.runRing(LcncRunner.kt:613)
+	at borg.trikeshed.lcnc.LcncRunner.runRing$default(LcncRunner.kt:492)
+	at borg.trikeshed.lcnc.LcncRunner$runProcedure$returns$result$1.invokeSuspend(LcncRunner.kt:311)
+	at borg.trikeshed.lcnc.LcncRunner$runProcedure$returns$result$1.invoke(LcncRunner.kt)
+	at borg.trikeshed.lcnc.LcncRunner$runProcedure$returns$result$1.invoke(LcncRunner.kt)
+	at borg.trikeshed.lcnc.LcncServicesKt$lcncContext$2.invokeSuspend(LcncServices.kt:106)
+	at borg.trikeshed.lcnc.LcncServicesKt$lcncContext$2.invoke(LcncServices.kt)
+	at borg.trikeshed.lcnc.LcncServicesKt$lcncContext$2.invoke(LcncServices.kt)
+	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatched(Undispatched.kt:66)
+	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+	at kotlinx.coroutines.BuildersKt__Builders_commonKt.withContext(Builders.common.kt:497)
+	at kotlinx.coroutines.BuildersKt.withContext(Unknown Source)
+	at borg.trikeshed.lcnc.LcncServicesKt.lcncContext(LcncServices.kt:105)
+	at borg.trikeshed.lcnc.LcncRunner.runProcedure(LcncRunner.kt:310)
+	at borg.trikeshed.lcnc.LcncRunner.runProcedure$default(LcncRunner.kt:273)
+	at borg.trikeshed.forge.server.EnglishCorpusWireTest$actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson$1.invokeSuspend$wired(EnglishCorpusWireTest.kt:330)
+	at borg.trikeshed.forge.server.EnglishCorpusWireTest$actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson$1.invokeSuspend$wired$default(EnglishCorpusWireTest.kt:319)
+	at borg.trikeshed.forge.server.EnglishCorpusWireTest$actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson$1.invokeSuspend(EnglishCorpusWireTest.kt:336)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)
+	at kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)
+	at kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)
+	at kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)
+	at kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)
+	at kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK$default(Builders.concurrent.kt:157)
+	at kotlinx.coroutines.BuildersKt.runBlockingK$default(Unknown Source)
+	at borg.trikeshed.forge.server.EnglishCorpusWireTest.actualWiredQueryPresencePrecedesAliasesAndBoundedAuthoredJson(EnglishCorpusWireTest.kt:313)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1604)
+</failure>
+  </testcase>
+  <testcase name="optionalViewPreservesLegacyRequestsAndHttpAndLcncRefuseExplicitNullOrUnknown()[jvm]" classname="borg.trikeshed.forge.server.EnglishCorpusWireTest" time="0.047"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

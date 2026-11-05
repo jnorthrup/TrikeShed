@@ -1,0 +1,1805 @@
+package borg.trikeshed.lcnc
+
+import borg.trikeshed.lib.*
+
+/** Port contract shared by every LCNC surface. Browser code may render this value,
+ *  but it must never invent compatibility rules. */
+data class LcncPortContract(
+    val type: String,
+    val title: String = type,
+    val inputs: List<String>,
+    val outputs: List<String>,
+    val cardinality: Map<String, LcncCardinality> = emptyMap(),
+    val functions: Map<String, List<String>> = emptyMap(),
+    val inputKinds: Map<String, String> = emptyMap(),
+    val outputKinds: Map<String, String> = emptyMap(),
+    /**
+     * Server-owned parameter defaults for the surface's editor widgets.
+     * The retired JS TYPES table carried these as `params:{k:{v,opts}}`;
+     * Kotlin is now the ONE author — a type with widgets declares them HERE
+     * or the surface renders a bare header.
+     */
+    val params: Map<String, LcncParamSpec> = emptyMap(),
+    /** Sources re-fire on their own clock; sinks terminate a chain; wides render expanded. */
+    val isSource: Boolean = false,
+    val isSink: Boolean = false,
+    val wide: Boolean = false,
+    /**
+     * This node CHANGES SOMETHING outside the graph — writes a card, freezes
+     * state, mints a belief, spawns a VM, posts a request, stores a credential.
+     *
+     * [isSink] does not mean this: the seven sinks are all DISPLAYS. Every
+     * genuine effect in the vocabulary — kanban.submit, state.freeze, nal.mint,
+     * http.post, vm.spawn, credential.enter — is sink=false, so nothing could
+     * tell an effect from a transaction. A treeshake that auto-wires a write is
+     * not tidying a graph, it is performing one.
+     */
+    val isEffect: Boolean = false,
+    /**
+     * Refined kinds this type INTRODUCES, each with the keys every element of
+     * a json array must carry to be that kind. `beliefs.review` wants
+     * `json.turn-facts`, and says what one is: `{verb, ok, context, object}`.
+     * A `json.value` literal whose authored rows all carry those keys IS a
+     * turn-fact list ([LcncKinds.refineLiteral]); a belief field never is.
+     * The hierarchy itself needs no declaration — the dotted name is the
+     * `rdfs:subClassOf` edge ([LcncKinds]).
+     */
+    val kindShapes: Map<String, List<String>> = emptyMap(),
+) {
+    val context: LcncContextContract get() = LcncContextContract.of(type)
+
+    /** One editable parameter: default value, optional dropdown options, multi-line flag, placeholder.
+     *  [cols] non-empty makes it a LIST widget: rows of {col: value}, the param
+     *  VALUE is the JSON array text — daemon shape (Map<String,String>) unchanged. */
+    data class LcncParamSpec(
+        val v: String = "",
+        val opts: List<String> = emptyList(),
+        val ta: Boolean = false,
+        val ph: String = "",
+        val cols: List<String> = emptyList(),
+        /**
+         * LIVE options. [opts] is a dead list an author typed once; this names a
+         * running source and the picklist is filled from it at open time.
+         *
+         * `"<runner>#<path>"` — the runner is executed through the ordinary
+         * /api/lcnc/run lane and the path picks the field out of its result, so
+         * a picklist is a one-node program and nothing new had to be invented to
+         * evaluate it. `mux.models#models[].id` lists the models modelmux can
+         * actually route to right now; `board.get#items[].id` lists the cards
+         * that actually exist. A stale option is then impossible by
+         * construction, because there is no list to go stale.
+         */
+        val optsFrom: String = "",
+        /** Omission differs from an explicit value (including empty text); editors must preserve it. */
+        val optional: Boolean = false,
+        /** Name of an authored parameter containing comma-separated row columns; presentation only. */
+        val colsParam: String = "",
+        /** Executable source presentation; editing never grants evaluation authority. */
+        val code: Boolean = false,
+    ) {
+        fun columns(params: Map<String, String>): List<String> {
+            if (colsParam.isEmpty()) return cols
+            val raw = params[colsParam].orEmpty()
+            if (raw.isBlank()) return emptyList()
+            return raw.split(',').map(String::trim).also { names ->
+                require(names.size <= 64 && names.none(String::isBlank) && names.distinct().size == names.size) {
+                    "Columns must be distinct nonblank names (at most 64), separated by commas"
+                }
+            }
+        }
+    }
+}
+
+object LcncContracts {
+    private val PORT_KIND_OPTIONS = listOf("", "json", "text", "id", "trigger", "num")
+
+    // ── picklists DERIVED from the enum that owns them ────────────────────
+    // These were transcribed by hand at three sites and drifted in both
+    // directions: VmFacet declares JVM("java") first and no picklist offered it,
+    // while three facets that ARE offered (ruby, clojure, llvm) have no language
+    // jar staged. A copied list is a list that goes stale silently; the enum is
+    // the authority, so read it.
+    /** Facet ENUM NAMES — the spelling vm.graalce takes. */
+    val VM_FACET_NAMES: List<String> =
+        borg.trikeshed.pointcut.VmFacet.entries.map { it.name }
+    /** Facet WIRE IDS — the spelling vm.eval takes. */
+    val VM_FACET_IDS: List<String> =
+        borg.trikeshed.pointcut.VmFacet.entries.map { it.id }
+    /** Guest trust levels, from [borg.trikeshed.vm.VmTrust]. */
+    val VM_TRUST_OPTIONS: List<String> =
+        borg.trikeshed.vm.VmTrust.entries.map { it.name }
+    /** One spelling of a boolean picklist; it was written both ways, nine times. */
+    val BOOLEAN_OPTIONS: List<String> = listOf("false", "true")
+
+    /** Concentric-scope vocabulary (spec §4): the call, the binding, the return. */
+    const val SCOPE = "scope"
+    const val SCOPE_IN = "scope.in"
+    const val SCOPE_OUT = "scope.out"
+    /** P2 map-reduce vocabulary: declarative Confix/LCNC only, never JS eval. */
+    const val VIEW_EMIT = "view.emit"
+    const val VIEW_REDUCE = "view.reduce"
+    /** WikiSkill consolidation vocabulary: one pass per invocation, loop outside. */
+    const val WIKI_CONSOLIDATE = "wiki.consolidate"
+    const val WIKI_PROPOSE = "wiki.propose"
+    /** uring vocabulary: the ring as palette legos — SQE in, CQE out, backend never named here. */
+    const val URING_PROBE = "uring.probe"
+    const val URING_READ = "uring.read"
+    const val URING_WRITE = "uring.write"
+    const val URING_FSYNC = "uring.fsync"
+
+    /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
+     *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
+     *  is invisible to drag-to-empty-space. */
+    fun all(): List<LcncPortContract> = SqlGraph.contracts() + SparqlGraph.contracts() + HeadhunterWorkflow.contracts() + EnglishLcncPreset.contracts() + borg.trikeshed.memory.ace.BreadcrumbContextNodes.contracts() + _l[LlvmScalarContract.contract(), LlvmConfixContract.contract()] + listOf(
+        // ── §4: concentric scope — the call, the binding, the return ──
+        // A scope's REAL ports are declared by its child (`scope.in`/`scope.out`
+        // names); the generic args?/returns pair is the declared wire spelling —
+        // args? merges UNDER per-name wires (per-name wins), returns carries the
+        // composed map beside the per-name pass-through (spec §4).
+        // `each?` is the ring's `for`: fed a list, the body runs once per element with the
+        // `item` parameter bound to it, per-name yields become lists, `returns` the list of
+        // per-iteration maps. Its `json` here is a placeholder like scope.in/scope.out's:
+        // LcncTypeCheck types it as List<K> from the item's declared kind or the feeding cable.
+        LcncPortContract(SCOPE, "scope (a ring — holds its children)",
+            listOf("args?", "when?", "each?"), listOf("returns"),
+            inputKinds = mapOf("args" to "json", "when" to "json", "each" to "json"),
+            outputKinds = mapOf("returns" to "json"),
+            params = mapOf(
+                "program" to LcncPortContract.LcncParamSpec(ph = "named ring (stored program / preset) — empty for inline children"),
+                "item" to LcncPortContract.LcncParamSpec(v = "item", ph = "the parameter name each element binds to when each? is fed"),
+                "limit" to LcncPortContract.LcncParamSpec(v = "64", ph = "at most this many iterations over each? (or loop turns with carry)"),
+                "carry" to LcncPortContract.LcncParamSpec(opts = listOf("", "true"), ph = "true: loop — each turn's scope.out values rebind the same-named scope.in; ends at the fixed point"),
+                "until" to LcncPortContract.LcncParamSpec(ph = "with carry: the yield whose empty value ends the loop"),
+                "else" to LcncPortContract.LcncParamSpec(opts = listOf("", "true"), ph = "true: run only when when? is false — the else ring; merge joins the two yields"),
+            )),
+        LcncPortContract(SCOPE_IN, "scope.in (formal parameter)",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "json"),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(ph = "parameter name (trailing ? = optional)"),
+                "default" to LcncPortContract.LcncParamSpec(ph = "value when the caller omits it", optional = true),
+                // Progressive typing: a ring parameter is GENERIC until it declares a
+                // kind. Declared ⇒ LcncTypeCheck enforces it like any leaf port; absent
+                // ⇒ the ring accepts any kind (a frame binding is Any?, and pretending
+                // otherwise is what made the shipped council preset undrawable).
+                "kind" to LcncPortContract.LcncParamSpec(
+                    opts = PORT_KIND_OPTIONS,
+                    ph = "declared parameter kind — empty = generic"),
+            )),
+        LcncPortContract(SCOPE_OUT, "scope.out (return value)",
+            listOf("value"), emptyList(),
+            inputKinds = mapOf("value" to "json"),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(ph = "return name"),
+                "kind" to LcncPortContract.LcncParamSpec(
+                    opts = PORT_KIND_OPTIONS,
+                    ph = "declared yield kind — empty = generic"),
+            ),
+            isSink = true),
+
+        // ── blackboard: the shared Confix surface as first-class nodes ──
+        // (BlackboardWire's own GET routes; the canvas reads, never invents)
+        LcncPortContract("blackboard.facts", "blackboard facts",
+            listOf("trigger?"), listOf("facts"),
+            inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("facts" to "json")),
+        LcncPortContract("blackboard.board", "blackboard board view",
+            listOf("trigger?"), listOf("board"),
+            inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("board" to "json")),
+        LcncPortContract("blackboard.neighbors", "blackboard semantic neighbors",
+            listOf("key?"), listOf("neighbors", "projection"),
+            inputKinds = mapOf("key" to "text"), outputKinds = mapOf("neighbors" to "json", "projection" to "json"),
+            params = mapOf(
+                "key" to LcncPortContract.LcncParamSpec(ph = "blackboard node key"),
+            )),
+        LcncPortContract("blackboard.sites", "blackboard sites",
+            listOf("trigger?"), listOf("sites"),
+            inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("sites" to "json")),
+
+        // ── CCEK: the substrate every other plane rides, made programmable ──
+        // Bounded fan-out agents over a ForgeDocument, ten control verbs, live
+        // projections, the recorded signal log, and context lineage. Everything
+        // above (kanban, council, legal, belief) is a projection OF this; these
+        // nodes let a program drive the engine itself.
+        LcncPortContract("ccek.incarnate", "ccek node (incarnate / attach)",
+            listOf("trigger?", "args?", "title?", "record?", "maxConcurrency?", "projections?"), listOf("handle", "node", "arguments"),
+            inputKinds = mapOf("trigger" to "trigger", "args" to "json", "title" to "text", "record" to "json", "maxConcurrency" to "num", "projections" to "json"),
+            outputKinds = mapOf("handle" to "id", "node" to "json", "arguments" to "json"),
+            params = mapOf(
+                "title" to LcncPortContract.LcncParamSpec(v = "lcnc-node", ph = "same title = same node (idempotent)"),
+                "record" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS),
+                "maxConcurrency" to LcncPortContract.LcncParamSpec(v = "8", ph = "bounded fan-out width"),
+                "projections" to LcncPortContract.LcncParamSpec(ph = "DOCUMENT,BOARD,MARKDOWN — empty = all"),
+            ), isEffect = true),
+        LcncPortContract("ccek.signal", "ccek signal (every ForgeSignal verb)",
+            listOf("handle", "fields?", "text?"), listOf("sent", "signal"),
+            inputKinds = mapOf("handle" to "id", "fields" to "json", "text" to "text"),
+            outputKinds = mapOf("sent" to "json", "signal" to "json"),
+            params = mapOf(
+                "verb" to LcncPortContract.LcncParamSpec(v = "append", opts = CcekNodes.VERBS),
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "append / update"),
+                "blockKind" to LcncPortContract.LcncParamSpec(v = "TEXT", ph = "append: TEXT, HEADING_1, TODO…"),
+                "blockId" to LcncPortContract.LcncParamSpec(ph = "update / delete"),
+                "cardId" to LcncPortContract.LcncParamSpec(ph = "move / continue / repeat / abort / fork / join / vote"),
+                "toColumnId" to LcncPortContract.LcncParamSpec(ph = "move"),
+                "edgeId" to LcncPortContract.LcncParamSpec(ph = "repeat"),
+                "reason" to LcncPortContract.LcncParamSpec(ph = "abort"),
+                "targetLane" to LcncPortContract.LcncParamSpec(ph = "fork"),
+                "group" to LcncPortContract.LcncParamSpec(ph = "join"),
+                "requiredBranches" to LcncPortContract.LcncParamSpec(v = "2", ph = "join"),
+                "verdict" to LcncPortContract.LcncParamSpec(ph = "vote"),
+            ), isEffect = true),
+        LcncPortContract("ccek.projection", "ccek projection (live view)",
+            listOf("handle"), listOf("projection", "kind"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("projection" to "json", "kind" to "text"),
+            params = mapOf("kind" to LcncPortContract.LcncParamSpec(
+                v = "markdown", opts = listOf("markdown", "board", "document")))),
+        LcncPortContract("ccek.recording", "ccek recording (replay log)",
+            listOf("handle"), listOf("signals", "count"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("signals" to "json", "count" to "json")),
+        LcncPortContract("ccek.agent", "ccek agent (this program subscribes)",
+            listOf("handle"), listOf("agent", "signals", "count"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("agent" to "text", "signals" to "json", "count" to "json"),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "agent name — empty uses the node id"))),
+        LcncPortContract("ccek.status", "ccek fan-out status",
+            listOf("handle"), listOf("events", "started", "completed", "failed"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("events" to "json", "started" to "json", "completed" to "json", "failed" to "json")),
+        LcncPortContract("ccek.drain", "ccek drain (graceful cancel)",
+            listOf("handle"), listOf("drained"),
+            inputKinds = mapOf("handle" to "id"), outputKinds = mapOf("drained" to "json"), isEffect = true),
+        LcncPortContract("ccek.context", "ccek user context (fork lineage)",
+            listOf("parent?"), listOf("context", "contextId"),
+            inputKinds = mapOf("parent" to "id"),
+            outputKinds = mapOf("context" to "json", "contextId" to "id"),
+            params = mapOf(
+                "role" to LcncPortContract.LcncParamSpec(v = "root", ph = "context role"),
+                "parent" to LcncPortContract.LcncParamSpec(ph = "parent contextId — empty = root"),
+            )),
+        LcncPortContract("ccek.fact", "ccek causal fact",
+            listOf("contextId", "fields?"), listOf("factCount", "asserted"),
+            inputKinds = mapOf("contextId" to "id", "fields" to "json"),
+            outputKinds = mapOf("factCount" to "json", "asserted" to "json"),
+            params = mapOf("kind" to LcncPortContract.LcncParamSpec(v = "observation", ph = "assertion kind")), isEffect = true),
+        // The rest of the engine, member by member. lcnc-depth's CCEK decomposition
+        // (utils/lcnc-depth, `scan_repo --fail-on-ccek-gap`) named each of these as
+        // a public capability no runner reached: node liveness, a node choreographed
+        // BY a context, context activation and its standing document, the causal
+        // rete query, polyglot facts, prediction and its table test, the graphical
+        // flow, the spreadsheet veneer, paradigm adaptation, and scope validation.
+        LcncPortContract("ccek.vitals", "ccek node vitals (alive?)",
+            listOf("handle"), listOf("active", "childScopes", "markdownProjections", "closed", "subscribers"),
+            inputKinds = mapOf("handle" to "id"),
+            outputKinds = mapOf("active" to "json", "childScopes" to "json", "markdownProjections" to "json",
+                "closed" to "json", "subscribers" to "num")),
+        LcncPortContract("ccek.choreograph", "ccek choreograph (a node the context asserts against)",
+            listOf("contextId", "title?"), listOf("handle", "bound"),
+            inputKinds = mapOf("contextId" to "id", "title" to "text"),
+            outputKinds = mapOf("handle" to "id", "bound" to "json"),
+            params = mapOf("title" to LcncPortContract.LcncParamSpec(ph = "same title = same node — empty uses the node id")),
+            isEffect = true),
+        LcncPortContract("ccek.activate", "ccek context activate / deactivate",
+            listOf("contextId"), listOf("active", "known"),
+            inputKinds = mapOf("contextId" to "id"),
+            outputKinds = mapOf("active" to "json", "known" to "json"),
+            params = mapOf("mode" to LcncPortContract.LcncParamSpec(v = "activate", opts = listOf("activate", "deactivate"))),
+            isEffect = true),
+        LcncPortContract("ccek.lineage", "ccek context document (as it stands now)",
+            listOf("contextId"), listOf("context", "parentId", "factCount", "active"),
+            inputKinds = mapOf("contextId" to "id"),
+            outputKinds = mapOf("context" to "json", "parentId" to "id", "factCount" to "json", "active" to "json")),
+        LcncPortContract("ccek.query", "ccek rete query (facts by kind)",
+            listOf("contextId"), listOf("facts", "count", "contains"),
+            inputKinds = mapOf("contextId" to "id"),
+            outputKinds = mapOf("facts" to "json", "count" to "json", "contains" to "json"),
+            params = mapOf("kind" to LcncPortContract.LcncParamSpec(v = "observation", ph = "exact kind, or a prefix"))),
+        LcncPortContract("ccek.polyglot.load", "ccek polyglot facts (load)",
+            listOf("contextId", "facts"), listOf("loaded"),
+            inputKinds = mapOf("contextId" to "id", "facts" to "json"),
+            outputKinds = mapOf("loaded" to "json"), isEffect = true),
+        LcncPortContract("ccek.polyglot.query", "ccek polyglot facts (query)",
+            listOf("contextId"), listOf("facts", "count"),
+            inputKinds = mapOf("contextId" to "id"),
+            outputKinds = mapOf("facts" to "json", "count" to "json"),
+            params = mapOf(
+                "language" to LcncPortContract.LcncParamSpec(ph = "e.g. kotlin"),
+                "kind" to LcncPortContract.LcncParamSpec(ph = "fact kind"),
+            )),
+        LcncPortContract("ccek.predict", "ccek model prediction",
+            listOf("contextId", "inputs?"), listOf("prediction"),
+            inputKinds = mapOf("contextId" to "id", "inputs" to "json"),
+            outputKinds = mapOf("prediction" to "json"),
+            params = mapOf("model" to LcncPortContract.LcncParamSpec(v = "default", ph = "model name"))),
+        LcncPortContract("ccek.table.test", "ccek table test (prediction against the facts)",
+            listOf("contextId", "prediction"), listOf("passed", "evidence"),
+            inputKinds = mapOf("contextId" to "id", "prediction" to "json"),
+            outputKinds = mapOf("passed" to "json", "evidence" to "text")),
+        LcncPortContract("ccek.flow", "ccek graphical flow (blocks + edges → cursor)",
+            listOf("contextId", "blocks", "edges?"), listOf("flow", "size"),
+            inputKinds = mapOf("contextId" to "id", "blocks" to "json", "edges" to "json"),
+            outputKinds = mapOf("flow" to "json", "size" to "json"),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(v = "flow", ph = "flow name"))),
+        LcncPortContract("ccek.veneer", "ccek spreadsheet veneer (facet the facts)",
+            listOf("contextId"), listOf("rows", "count"),
+            inputKinds = mapOf("contextId" to "id"),
+            outputKinds = mapOf("rows" to "json", "count" to "json"),
+            params = mapOf(
+                "column" to LcncPortContract.LcncParamSpec(ph = "fact field"),
+                "value" to LcncPortContract.LcncParamSpec(ph = "field value"),
+            )),
+        LcncPortContract("ccek.paradigm", "ccek adapt paradigm (rules → facts)",
+            listOf("contextId", "rules"), listOf("paradigm", "factCount"),
+            inputKinds = mapOf("contextId" to "id", "rules" to "json"),
+            outputKinds = mapOf("paradigm" to "json", "factCount" to "json"),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(v = "paradigm", ph = "paradigm name")),
+            isEffect = true),
+        LcncPortContract("ccek.validate", "ccek scope validation (what this runner's context carries)",
+            listOf("trigger?"), listOf("valid", "providedKeys", "missingKeys", "providedSpis", "missingSpis", "error"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("valid" to "json", "providedKeys" to "json", "missingKeys" to "json",
+                "providedSpis" to "json", "missingSpis" to "json", "error" to "text"),
+            params = mapOf(
+                "requiredKeys" to LcncPortContract.LcncParamSpec(v = "MuxReactorElement",
+                    ph = CcekNodes.CONTEXT_KEYS.keys.joinToString(", ")),
+                "minimumSpis" to LcncPortContract.LcncParamSpec(ph = "SPI names NioSupervisor must have registered"),
+            )),
+
+        // ── sources (no inputs) ──────────────────────────────────────
+        LcncPortContract("timer", "timer",
+            emptyList(), listOf("tick"),
+            mapOf("tick" to LcncCardinality.MANY),
+            mapOf("tick" to listOf("identity")),
+            outputKinds = mapOf("tick" to "trigger"),
+            params = mapOf("seconds" to LcncPortContract.LcncParamSpec(v = "5")),
+            isSource = true),
+        LcncPortContract(WorkSelectNode.TYPE, "work select (declared quotes)",
+            listOf("offers", "feature", "currency", "ceilingMicros"),
+            listOf("selection", "model", "service", "decisions", "criterion", "status", "asOf"),
+            inputKinds = mapOf("offers" to "json", "feature" to "text", "currency" to "text", "ceilingMicros" to "text"),
+            outputKinds = mapOf("selection" to "json", "model" to "json", "service" to "json", "decisions" to "json",
+                "criterion" to "text", "status" to "text", "asOf" to "num")),
+        LcncPortContract("graal.events", "graal event source (SSE)",
+            emptyList(), listOf("event"),
+            outputKinds = mapOf("event" to "json"),
+            params = mapOf("filter" to LcncPortContract.LcncParamSpec(ph = "substring filter (gc, compile, deopt, commit…)")),
+            isSource = true),
+        LcncPortContract("vm.events", "vm event source (SSE)",
+            emptyList(), listOf("event"),
+            outputKinds = mapOf("event" to "json"),
+            params = mapOf(
+                "vmId" to LcncPortContract.LcncParamSpec(ph = "empty = all vms"),
+                "kind" to LcncPortContract.LcncParamSpec(ph = "spawned|evaluated|revoked"),
+            ),
+            isSource = true),
+
+        // ── trigger-driven data fetchers ─────────────────────────────
+        LcncPortContract("http.get", "http get",
+            listOf("trigger?"), listOf("json"),
+            mapOf("json" to LcncCardinality.ONE),
+            mapOf("json" to listOf("identity", "pick")),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("json" to "json"),
+            params = mapOf("path" to LcncPortContract.LcncParamSpec(v = "/api/health"))),
+        LcncPortContract("graal.vitals", "jvm vitals",
+            listOf("trigger?"), listOf("json"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("json" to "json")),
+        LcncPortContract("vms.list", "sub-vms",
+            listOf("trigger?"), listOf("rows"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("rows" to "json")),
+        // have/missing: the provider lists a person reads; roster: the full rows.
+        LcncPortContract("keys.status", "keys this machine already has",
+            listOf("trigger?"), listOf("have", "missing", "roster"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("have" to "json", "missing" to "json", "roster" to "json")),
+        LcncPortContract("board.get", "kanban board",
+            listOf("trigger?"), listOf("json"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("json" to "json")),
+        LcncPortContract("mux.models", "models that can answer here",
+            listOf("trigger?"), listOf("models"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("models" to "json")),
+        // mux.meta: modelmux presence — strategy, last selection, quota standings.
+        // lastAnswer: the one record a person reads (model, provider, ok, tokens);
+        // meta: the full account (strategy, route selection, quota standings).
+        LcncPortContract("mux.meta", "what the model router did",
+            listOf("trigger?"), listOf("lastAnswer", "meta"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("lastAnswer" to "json", "meta" to "json")),
+        LcncPortContract("project.kill", "project db kill",
+            listOf("trigger?"), listOf("verdict"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("verdict" to "json"),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "project db name (hierarchy kill)")), isEffect = true),
+        LcncPortContract("project.list", "mounted scopes",
+            listOf("trigger?"), listOf("scopes", "projects"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("scopes" to "json", "projects" to "List<ProjectRef>")),
+        // ── project documents as typed workflow input (Forge genesis, Cut F) ──
+        // A mounted folder is a document set a program can walk: `project.docs` lists
+        // its documents as the exact type ProjectDoc, `project.read` reads one as text,
+        // `project.extract` reads the mined twin, mining the document first when it has none.
+        LcncPortContract(ProjectNodes.DOCS, "documents of a mounted folder",
+            listOf("project?", "trigger?"), listOf("docs", "count"),
+            inputKinds = mapOf("project" to "id", "trigger" to "trigger"),
+            outputKinds = mapOf("docs" to ProjectDoc.LIST_KIND, "count" to "num"),
+            params = mapOf(
+                "project" to LcncPortContract.LcncParamSpec(ph = "which mounted folder — the list is what is mounted here", optsFrom = "project.list#scopes[].name"),
+                "prefix" to LcncPortContract.LcncParamSpec(ph = "only documents under this path"),
+                "glob" to LcncPortContract.LcncParamSpec(ph = "*.md matches Markdown anywhere; a glob with / matches the whole path"),
+                "limit" to LcncPortContract.LcncParamSpec(v = "256"),
+            ),
+            kindShapes = mapOf(ProjectDoc.LIST_KIND to ProjectDoc.SHAPE)),
+        LcncPortContract(ProjectNodes.READ, "one document as text",
+            listOf("doc?", "project?", "id?"), listOf("text", "cid", "id", "doc", "error"),
+            inputKinds = mapOf("doc" to ProjectDoc.KIND, "project" to "id", "id" to "id"),
+            outputKinds = mapOf("text" to "text", "cid" to "id", "id" to "id", "doc" to ProjectDoc.KIND, "error" to "text"),
+            params = mapOf(
+                "project" to LcncPortContract.LcncParamSpec(ph = "the mounted folder, when no document is wired"),
+                "id" to LcncPortContract.LcncParamSpec(ph = "the document's path in it, when no document is wired"),
+                "maxChars" to LcncPortContract.LcncParamSpec(v = "65536"),
+            )),
+        LcncPortContract(FinanceNodes.RECONCILE, "exact financial reconciliation candidates",
+            _l["bank", "expenditure"], _l["report", "rows", "complete", "status"],
+            inputKinds = _m["bank" j ProjectDoc.KIND, "expenditure" j ProjectDoc.KIND],
+            outputKinds = _m["report" j "json", "rows" j "json", "complete" j "json", "status" j "text"],
+            params = _m[
+                "currency" j LcncPortContract.LcncParamSpec(v = "USD", ph = "declared currency code"),
+                "scale" j LcncPortContract.LcncParamSpec(v = "2", ph = "decimal places, without rounding"),
+                "accountScope" j LcncPortContract.LcncParamSpec(ph = "exact account identifier in both files"),
+                "includeDate" j LcncPortContract.LcncParamSpec(v = "true", opts = _l["true", "false"]),
+                "policyId" j LcncPortContract.LcncParamSpec(v = "finance.exact.v1"),
+            ]),
+        LcncPortContract(KifNodes.INSPECT, "KIF syntax and variable scope",
+            _l["text?"], _l["formula", "text", "sourceCid", "canonical", "freeVariables", "unsupportedForms", "status"],
+            inputKinds = _m["text" j "text"],
+            outputKinds = _m["formula" j "json", "text" j "text", "sourceCid" j "id", "canonical" j "text",
+                "freeVariables" j "json", "unsupportedForms" j "json", "status" j "text"],
+            params = _m["kif" j LcncPortContract.LcncParamSpec(ta = true, ph = "one KIF formula; inspection does not assert a fact")]),
+        LcncPortContract(ProjectNodes.NOTES, "a document's curation notes: `key: value` conventions (work, edition, date, …) and prose the reading is held to",
+            listOf("doc?", "project?", "id?"), listOf("text", "cid", "found", "conventions", "prose"),
+            inputKinds = mapOf("doc" to ProjectDoc.KIND, "project" to "id", "id" to "id"),
+            outputKinds = mapOf("text" to "text", "cid" to "id", "found" to "json", "conventions" to "json", "prose" to "text"),
+            params = mapOf(
+                "project" to LcncPortContract.LcncParamSpec(ph = "the mounted folder, when no document is wired"),
+                "id" to LcncPortContract.LcncParamSpec(ph = "the document's path in it, when no document is wired"),
+            )),
+        LcncPortContract(ProjectNodes.EXTRACT, "the text of a document: its mined twin, mined now when absent",
+            listOf("doc?", "project?", "id?"), listOf("text", "cid", "found"),
+            inputKinds = mapOf("doc" to ProjectDoc.KIND, "project" to "id", "id" to "id"),
+            outputKinds = mapOf("text" to "text", "cid" to "id", "found" to "json"),
+            params = mapOf(
+                "project" to LcncPortContract.LcncParamSpec(ph = "the mounted folder, when no document is wired"),
+                "id" to LcncPortContract.LcncParamSpec(ph = "the document's path in it, when no document is wired"),
+            )),
+        // The field is a SUMMARY of the bag — size, crux bits, concepts: a
+        // Confix object, so `json` is honest here. It is `beliefs.review` that
+        // names the exact type it consumes; a cable between them is not a cable.
+        LcncPortContract("beliefs.introspect", "NAL-9 introspection",
+            listOf("trigger?"), listOf("field"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("field" to "json")),
+        LcncPortContract("pointcut.routes", "pointcut routes",
+            listOf("trigger?"), listOf("routes"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("routes" to "json")),
+        LcncPortContract("panels.list", "stored programs (click → embed)",
+            listOf("trigger?"), listOf("panels"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("panels" to "json"),
+            wide = true),
+        LcncPortContract("board.view", "kanban board (summary)",
+            listOf("trigger?"), listOf("board", "alerts"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("board" to "json", "alerts" to "json")),
+
+        // ── VM lifecycle ─────────────────────────────────────────────
+        LcncPortContract("vm.spawn", "vm spawn",
+            emptyList(), listOf("vmId"),
+            outputKinds = mapOf("vmId" to "id"),
+            params = mapOf(
+                "id" to LcncPortContract.LcncParamSpec(v = "vm-panel"),
+                "facet" to LcncPortContract.LcncParamSpec(v = "python", opts = VM_FACET_IDS),
+                "wallMillis" to LcncPortContract.LcncParamSpec(v = "1800000"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "host dirs, comma-sep"),
+            ), isEffect = true),
+        LcncPortContract("vm.eval", "vm eval",
+            listOf("vmId", "source?"), listOf("value", "cid"),
+            inputKinds = mapOf("vmId" to "id", "source" to "text"),
+            outputKinds = mapOf("value" to "json", "cid" to "id"),
+            params = mapOf("source" to LcncPortContract.LcncParamSpec(v = "1+1", ta = true, code = true)), isEffect = true),
+        LcncPortContract("vm.revoke", "vm revoke",
+            listOf("vmId"), listOf("ok"),
+            inputKinds = mapOf("vmId" to "id"),
+            outputKinds = mapOf("ok" to "json"), isEffect = true),
+        // The coding-agent lane (Forge genesis, Cut A): one bounded run of an installed CLI in a
+        // scratch clone of the repo; its diff and transcript are CAS citizens the receipt names.
+        LcncPortContract("agent.run", "coding agent run",
+            listOf("brief?", "agent?", "repo?", "budgetSeconds?", "model?", "jobId?"),
+            listOf("summary", "transcriptCid", "patchCid", "exit", "ok", "error", "runId", "truncated", "jobId", "receipt"),
+            inputKinds = mapOf("brief" to "text", "agent" to "id", "repo" to "text", "budgetSeconds" to "num", "model" to "id", "jobId" to "id"),
+            outputKinds = mapOf("summary" to "text", "transcriptCid" to "id", "patchCid" to "id", "exit" to "num",
+                "ok" to "json", "error" to "text", "runId" to "id", "truncated" to "json", "jobId" to "id", "receipt" to "json"),
+            params = mapOf(
+                "brief" to LcncPortContract.LcncParamSpec(ta = true, ph = "what the agent should do in its scratch clone"),
+                "agent" to LcncPortContract.LcncParamSpec(optsFrom = "agent.list#agents[].id"),
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "task identity retained in the agent receipt"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "the CLI's own model id; blank for its default"),
+                "budgetSeconds" to LcncPortContract.LcncParamSpec(v = "600"),
+                "repo" to LcncPortContract.LcncParamSpec(ph = "blank: the daemon's repo"),
+                "maxBytes" to LcncPortContract.LcncParamSpec(v = "4194304"),
+                "retain" to LcncPortContract.LcncParamSpec(v = "false", opts = listOf("false", "true")),
+            ), isEffect = true),
+        LcncPortContract("agent.list", "installed coding agents",
+            emptyList(), listOf("agents", "count"),
+            outputKinds = mapOf("agents" to "json", "count" to "num")),
+        // The workspace snapshot (Forge genesis, Cut C): one content-addressed document naming every
+        // program version, prompt version, project sequence and latest receipt; taking one is an effect.
+        LcncPortContract("workspace.snapshot", "take a workspace snapshot",
+            listOf("trigger?", "note?"), listOf("cid", "previousCid", "snapshot"),
+            inputKinds = mapOf("trigger" to "trigger", "note" to "text"),
+            outputKinds = mapOf("cid" to "id", "previousCid" to "id", "snapshot" to "json"),
+            params = mapOf("note" to LcncPortContract.LcncParamSpec(ph = "why this moment is worth naming")), isEffect = true),
+        LcncPortContract("pytest.pure", "pytest (pure, in-vm)",
+            listOf("vmId"), listOf("exit", "tail"),
+            inputKinds = mapOf("vmId" to "id"),
+            outputKinds = mapOf("exit" to "json", "tail" to "json"),
+            params = mapOf(
+                "path" to LcncPortContract.LcncParamSpec(v = "/workspace/computronium/tests"),
+                "flags" to LcncPortContract.LcncParamSpec(
+                    v = "-q -s -o addopts= -p no:cacheprovider -p no:cov --continue-on-collection-errors"),
+            )),
+
+        // ── transforms ───────────────────────────────────────────────
+        LcncPortContract("pick", "pick path",
+            listOf("x"), listOf("y"),
+            mapOf("x" to LcncCardinality.ONE, "y" to LcncCardinality.ONE),
+            mapOf("x" to listOf("identity", "pick")),
+            inputKinds = mapOf("x" to "json"),
+            outputKinds = mapOf("y" to "json"),
+            params = mapOf("path" to LcncPortContract.LcncParamSpec(v = "memory.heapUsed", ph = "dot.path"))),
+        LcncPortContract("js", "js transform",
+            listOf("x"), listOf("y"),
+            inputKinds = mapOf("x" to "json"),
+            outputKinds = mapOf("y" to "json"),
+            params = mapOf("expr" to LcncPortContract.LcncParamSpec(v = "x", ta = true, ph = "expression over x"))),
+        // A LIST as a first-class value: rows of key/model pairs authored in
+        // the widget (or dropped from any result tree), emitted as json.
+        LcncPortContract("list.pairs", "key/model pairs",
+            emptyList(), listOf("pairs"),
+            outputKinds = mapOf("pairs" to "json"),
+            params = mapOf("pairs" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")))),
+        LcncPortContract("list.groupBy", "group by key (generic)",
+            listOf("x"), listOf("groups"),
+            mapOf("x" to LcncCardinality.ONE),
+            mapOf("x" to listOf("groupBy")),
+            inputKinds = mapOf("x" to "json"),
+            outputKinds = mapOf("groups" to "json"),
+            params = mapOf("key" to LcncPortContract.LcncParamSpec(v = "status", ph = "field name (dot.path ok)"))),
+        LcncPortContract("http.post", "http post",
+            listOf("body"), listOf("json"),
+            inputKinds = mapOf("body" to "json"),
+            outputKinds = mapOf("json" to "json"),
+            params = mapOf("path" to LcncPortContract.LcncParamSpec(v = "/api/submit")), isEffect = true),
+        LcncPortContract("rf.rpc", "requestfactory rpc",
+            listOf("target?", "args?"), listOf("result", "receipt"),
+            inputKinds = mapOf("target" to "text", "args" to "json"),
+            outputKinds = mapOf("result" to "json", "receipt" to "json"),
+            params = mapOf(
+                "target" to LcncPortContract.LcncParamSpec(v = "session.info", ph = "Kotlin target name"),
+                "args" to LcncPortContract.LcncParamSpec(v = "{}", ta = true, ph = "JSON object args"),
+            ), isEffect = true),
+        LcncPortContract("rf.batch", "requestfactory batch",
+            listOf("operations"), listOf("ok", "receipts"),
+            inputKinds = mapOf("operations" to "json"),
+            outputKinds = mapOf("ok" to "json", "receipts" to "json"),
+            params = mapOf(
+                "operations" to LcncPortContract.LcncParamSpec(
+                    v = """[{"op":"rpc","target":"session.info","args":{}}]""",
+                    ta = true,
+                    ph = "RequestFactory operation objects",
+                ),
+            ), isEffect = true),
+
+        // ── media: an audio/video player as a PATCH PANEL citizen — every
+        // control is a patch point: url arrives on a text wire, the
+        // transports are trigger signals, `ended` fires downstream.
+        // Nothing internal.
+        LcncPortContract("media.player", "audio/video player",
+            listOf("url", "play?", "stop?", "rewind?", "volume?"), listOf("state", "ended", "rendered"),
+            inputKinds = mapOf("url" to "text", "play" to "trigger", "stop" to "trigger", "rewind" to "trigger", "volume" to "num"),
+            outputKinds = mapOf("state" to "json", "ended" to "trigger", "rendered" to "json"),
+            wide = true),
+        // generic controls: a nameable button (its press is a trigger patch
+        // point) and a slider (its value is a num patch point — volume, gain…)
+        LcncPortContract("button", "button (nameable trigger)",
+            emptyList(), listOf("press"),
+            outputKinds = mapOf("press" to "trigger"),
+            params = mapOf("label" to LcncPortContract.LcncParamSpec(v = "press", ph = "what this button says"))),
+        LcncPortContract("slider", "slider (num patch point)",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "num"),
+            params = mapOf(
+                "label" to LcncPortContract.LcncParamSpec(ph = "what this slider sets"),
+                "min" to LcncPortContract.LcncParamSpec(v = "0"),
+                "max" to LcncPortContract.LcncParamSpec(v = "1"),
+                "step" to LcncPortContract.LcncParamSpec(v = "0.01"),
+                "value" to LcncPortContract.LcncParamSpec(v = "0.8"),
+            )),
+        // the text literal that feeds text patch points (a url, a prompt…)
+        LcncPortContract("text.value", "text literal",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "text"),
+            params = mapOf("value" to LcncPortContract.LcncParamSpec(ph = "the text this node emits"))),
+        // …and its json twin. Mating is exact kind equality, so `text` could
+        // never reach a json socket: bullets, fields, args, command, facts had
+        // NO hand-authorable source at all, and every preset that needed one
+        // shipped with the socket empty. This is that source.
+        LcncPortContract("json.value", "json literal",
+            emptyList(), listOf("value"),
+            outputKinds = mapOf("value" to "json"),
+            params = mapOf(
+                "value" to LcncPortContract.LcncParamSpec(
+                    v = "[]", ta = true, ph = "the json this node emits — edit me", colsParam = "columns"),
+                "columns" to LcncPortContract.LcncParamSpec(optional = true,
+                    ph = "optional row editor: comma-separated keys, e.g. subject,obj"))),
+
+        // ── LCNC composition ─────────────────────────────────────────
+        LcncPortContract("dom.events", "DOM gesture source",
+            emptyList(), listOf("source", "event"),
+            outputKinds = mapOf("source" to "id", "event" to "json"), isSource = true),
+        LcncPortContract("dom.board", "draggable grouped board (generic)",
+            listOf("groups", "columns?", "fields?", "events?", "result?"), listOf("move"),
+            mapOf("groups" to LcncCardinality.ONE, "move" to LcncCardinality.MANY),
+            mapOf("move" to listOf("kanban.move")),
+            inputKinds = mapOf("groups" to "json", "columns" to "json", "fields" to "json", "events" to "id", "result" to "json"),
+            outputKinds = mapOf("move" to "json"),
+            params = mapOf(
+                "idField" to LcncPortContract.LcncParamSpec(v = "id"),
+                "titleField" to LcncPortContract.LcncParamSpec(v = "title"),
+                "subtitleField" to LcncPortContract.LcncParamSpec(v = "id"),
+                "badgeField" to LcncPortContract.LcncParamSpec(v = "priority"),
+            ),
+            wide = true),
+
+        // ── sinks (no outputs) ───────────────────────────────────────
+        LcncPortContract("display", "display",
+            listOf("x"), emptyList(),
+            mapOf("x" to LcncCardinality.MANY),
+            mapOf("x" to listOf("identity")),
+            inputKinds = mapOf("x" to "Any") /* the runner echoes whatever it is given: exact type Any */,
+            isSink = true),
+        LcncPortContract("gauge", "gauge",
+            listOf("x"), emptyList(),
+            mapOf("x" to LcncCardinality.MANY),
+            inputKinds = mapOf("x" to "json"),
+            params = mapOf("label" to LcncPortContract.LcncParamSpec(v = "value")),
+            isSink = true),
+
+        // ── mux / chat ───────────────────────────────────────────────
+        LcncPortContract("mux.chat", "mux chat (provider-neutral)",
+            listOf("prompt?", "system?"), listOf("content", "model", "prompt"),
+            inputKinds = mapOf("prompt" to "text", "system" to "text"),
+            outputKinds = mapOf("content" to "text", "model" to "id", "prompt" to "text"),
+            params = mapOf(
+                "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "prompt (or wire one in)"),
+                "system" to LcncPortContract.LcncParamSpec(ph = "system (optional)"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "512"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "brief" to LcncPortContract.LcncParamSpec(ph = "root frame binding to read when no prompt is wired (first-seat brief)"),
+                // The seat's ordered admissible endpoints: roster name × model, a LIST —
+                // lawyer/agent/worker/scribe/curator seats all author it here.
+                // Shared by LCNC and /api/mux/chat; keys identify roster entries,
+                // never credential values. Empty uses ordinary roster failover.
+                "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")),
+                "strengths" to LcncPortContract.LcncParamSpec(cols = _l["key", "model", "strength"], optional = true,
+                    ph = "operator-declared strengths; not measured or used for routing"),
+            ), isEffect = true),
+        LcncPortContract(WorkSelectNode.MODEL, "work model (selected route)",
+            _l["selection", "prompt?", "system?"], _l["content", "model", "prompt"],
+            inputKinds = _m["selection" j "json", "prompt" j "text", "system" j "text"],
+            outputKinds = _m["content" j "text", "model" j "id", "prompt" j "text"],
+            params = _m[
+                "prompt" j LcncPortContract.LcncParamSpec(ta = true, ph = "prompt (or wire one in)"),
+                "system" j LcncPortContract.LcncParamSpec(ph = "system (optional)"),
+                "maxTokens" j LcncPortContract.LcncParamSpec(v = "512"),
+                "temperature" j LcncPortContract.LcncParamSpec(v = "0.2"),
+                "brief" j LcncPortContract.LcncParamSpec(ph = "root frame binding when no prompt is wired"),
+                "models" j LcncPortContract.LcncParamSpec(cols = _l["key", "model"]),
+                "strengths" j LcncPortContract.LcncParamSpec(cols = _l["key", "model", "strength"], optional = true,
+                    ph = "operator-declared strengths; not measured or used for routing"),
+            ], isEffect = true),
+
+        // ── project / scope ──────────────────────────────────────────
+        LcncPortContract("project.mount", "mount scope (git|assets)",
+            listOf("path?"), listOf("scope"),
+            inputKinds = mapOf("path" to "text"),
+            outputKinds = mapOf("scope" to "id"),
+            params = mapOf("path" to LcncPortContract.LcncParamSpec(ph = "/absolute/dir — or drop a folder on the canvas")), isEffect = true),
+
+        // ── knowledge / beliefs ──────────────────────────────────────
+        LcncPortContract("tribunal.record", "tribunal verdict (retained prose + lifecycle receipt)",
+            listOf("text?"), listOf("report"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf("text" to LcncPortContract.LcncParamSpec(ta = true, ph = "verdict text")), isEffect = true),
+        LcncPortContract("kg.ingest", "kg → nal (turtle/kif)",
+            listOf("text?"), listOf("report"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf("kg" to LcncPortContract.LcncParamSpec(ta = true, ph = "@prefix ex: <...> .\nex:a ex:causes ex:b .")), isEffect = true),
+        // `facts` is `List<TurnFact>` — the exact type the runner parses — not
+        // json: the curator wired the introspect field here for as long as both
+        // were `json`, and reviewed nothing. The shape says what a turn fact is,
+        // so an authored literal that matches it IS one (LcncFacts.refineLiteral).
+        LcncPortContract("beliefs.review", "turn review (induction)",
+            listOf("facts"), listOf("landed"),
+            inputKinds = mapOf("facts" to "List<TurnFact>"),
+            outputKinds = mapOf("landed" to "json"),
+            params = mapOf("turnSucceeded" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS)), isEffect = true,
+            kindShapes = mapOf("List<TurnFact>" to listOf("verb", "ok", "context", "object"))),
+        LcncPortContract("beliefs.resonate", "resonance (support/refutation)",
+            listOf("goal?"), listOf("synonyms", "antonyms"),
+            inputKinds = mapOf("goal" to "text"),
+            outputKinds = mapOf("synonyms" to "json", "antonyms" to "json"),
+            params = mapOf(
+                "goal" to LcncPortContract.LcncParamSpec(ph = "solver proposal"),
+                "taxonomy" to LcncPortContract.LcncParamSpec(),
+                "mode" to LcncPortContract.LcncParamSpec(v = "whitened", opts = listOf("whitened", "hamming")),
+                "k" to LcncPortContract.LcncParamSpec(v = "4"),
+            )),
+
+        // ── navigation / UI ──────────────────────────────────────────
+        LcncPortContract("program.ref", "program (dive in)",
+            emptyList(), emptyList(),
+            params = mapOf("name" to LcncPortContract.LcncParamSpec(ph = "stored program name")),
+            isSink = true),
+        LcncPortContract("note", "note",
+            emptyList(), emptyList(),
+            params = mapOf("text" to LcncPortContract.LcncParamSpec(ta = true, ph = "sticky note")),
+            isSink = true),
+
+        // ── W5.2: job control as first-class nodes ───────────────────
+        // /api/invoke accepts the sealed JobCommand verbs (11 — Submit, Start,
+        // Complete, Fail, Retry, Progress, Block, Cancel, Move, Acknowledge,
+        // Retract); job.command composes the map so Cancel/Block/Retry/Retract
+        // are reachable from a graph.
+        LcncPortContract("job.command", "job command (verb + jobId + revision)",
+            listOf("verb", "jobId", "expectedRevision?"), listOf("result"),
+            inputKinds = mapOf("verb" to "text", "jobId" to "id", "expectedRevision" to "json"),
+            outputKinds = mapOf("result" to "json")),
+        LcncPortContract("job.batch", "job batch (multiple commands)",
+            listOf("commands"), listOf("results"),
+            inputKinds = mapOf("commands" to "json"),
+            outputKinds = mapOf("results" to "json"), isEffect = true),
+
+        // ── W5.4: VM lifecycle completion ───────────────────────────
+        // VmHandle.call and stats() exist but have no route; vm.call/vm.stats
+        // make them reachable. vm.tiers surfaces VmSupervisor reports/bind/install.
+        LcncPortContract("vm.call", "vm call (VmHandle.call)",
+            listOf("vmId", "root", "args?"), listOf("value"),
+            inputKinds = mapOf("vmId" to "id", "root" to "text", "args" to "json"),
+            outputKinds = mapOf("value" to "json"), isEffect = true),
+        LcncPortContract("vm.stats", "vm stats",
+            listOf("vmId"), listOf("stats"),
+            inputKinds = mapOf("vmId" to "id"),
+            outputKinds = mapOf("stats" to "json")),
+        LcncPortContract("vm.tiers", "vm provider tiers",
+            emptyList(), listOf("tiers"),
+            outputKinds = mapOf("tiers" to "json")),
+
+        // ── Step 5: kanban/sheet/confix — the server runner family surfaced.
+        // These execute IN THE DAEMON (LcncKanbanExperience/LcncSheetNodes via
+        // POST /api/lcnc/run against the composed lcncRunners registry); the
+        // browser posts params+inputs and renders outputs. One author of
+        // execution semantics — the same runners webhook dispatch resolves.
+        LcncPortContract("kanban.activeSheets", "kanban concentric sheets",
+            listOf("trigger?", "after?"),
+            listOf("board", "byStatus", "byPriority", "boardView", "orchestration", "laneOrder", "conditions"),
+            inputKinds = mapOf("trigger" to "trigger", "after" to "json"),
+            outputKinds = mapOf(
+                "board" to "json", "byStatus" to "json", "byPriority" to "json",
+                "boardView" to "json", "orchestration" to "json",
+                "laneOrder" to "json", "conditions" to "json",
+            )),
+        LcncPortContract("kanban.submit", "kanban submit (create or resubmit)",
+            listOf("command?"), listOf("accepted", "jobId", "revision", "sheets"),
+            inputKinds = mapOf("command" to "json"),
+            outputKinds = mapOf("accepted" to "json", "jobId" to "id", "revision" to "json", "sheets" to "json"),
+            params = mapOf(
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "card-…", optsFrom = "board.get#json.items[].id"),
+                "title" to LcncPortContract.LcncParamSpec(ph = "card title"),
+                "priority" to LcncPortContract.LcncParamSpec(v = "2"),
+                "expectedRevision" to LcncPortContract.LcncParamSpec(ph = "expected card revision", optional = true),
+                "idempotencyKey" to LcncPortContract.LcncParamSpec(ph = "unique per submit"),
+            ), isEffect = true),
+        LcncPortContract("kanban.update", "kanban update (title and priority)",
+            listOf("command?"), listOf("accepted", "jobId", "revision", "sheets"),
+            inputKinds = mapOf("command" to "json"),
+            outputKinds = mapOf("accepted" to "json", "jobId" to "id", "revision" to "json", "sheets" to "json"),
+            params = mapOf(
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "existing card id", optsFrom = "board.get#json.items[].id"),
+                "title" to LcncPortContract.LcncParamSpec(ph = "new card title", optional = true),
+                "priority" to LcncPortContract.LcncParamSpec(opts = listOf("0", "1", "2"), optional = true),
+                "expectedRevision" to LcncPortContract.LcncParamSpec(ph = "current card revision"),
+                "idempotencyKey" to LcncPortContract.LcncParamSpec(ph = "unique per update"),
+            ), isEffect = true),
+        LcncPortContract("kanban.move", "kanban move (WAL command)",
+            listOf("command?"), listOf("accepted", "jobId", "revision", "sheets"),
+            inputKinds = mapOf("command" to "json"),
+            outputKinds = mapOf("accepted" to "json", "jobId" to "id", "revision" to "json", "sheets" to "json"),
+            params = mapOf(
+                "jobId" to LcncPortContract.LcncParamSpec(ph = "wire a command in, or type one", optsFrom = "board.get#json.items[].id"),
+                "toColumn" to LcncPortContract.LcncParamSpec(ph = "target column id", optsFrom = "board.get#json.columns[].id"),
+                "expectedRevision" to LcncPortContract.LcncParamSpec(ph = "card revision"),
+                "idempotencyKey" to LcncPortContract.LcncParamSpec(ph = "unique per gesture"),
+            ), isEffect = true),
+        LcncPortContract("kanban.import", "kanban import (plan doc → cards)",
+            listOf("text?"), listOf("parsed", "imported", "duplicates", "jobIds"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("parsed" to "json", "imported" to "json", "duplicates" to "json", "jobIds" to "json"),
+            params = mapOf(
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "- one bullet per card (dedupe by content hash)"),
+            ), isEffect = true),
+        LcncPortContract("kanban.attention", "NARS attention garnish (belief bag)",
+            listOf("trigger?"), listOf("cards", "ordered"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("cards" to "json", "ordered" to "json")),
+        LcncPortContract("kanban.drift", "NARS board drift (Hotelling T²)",
+            listOf("trigger?"), listOf("t2", "alarm"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("t2" to "json", "alarm" to "json")),
+        LcncPortContract("kanban.review", "TurnReview glosses (board window drain)",
+            listOf("trigger?"), listOf("minted", "count"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("minted" to "json", "count" to "json"),
+            // It mints glosses and writes blackboard receipts: an effect, and said so.
+            isEffect = true),
+        LcncPortContract("list.format", "declarative list → lines projector",
+            listOf("x"), listOf("lines"),
+            inputKinds = mapOf("x" to "json"),
+            outputKinds = mapOf("lines" to "json"),
+            params = mapOf(
+                "template" to LcncPortContract.LcncParamSpec(ph = "{field} substitution, e.g. {id}: attention={attention}"),
+                "limit" to LcncPortContract.LcncParamSpec(ph = "max rows (empty = all)"),
+            )),
+        LcncPortContract("kanban.alerts", "board rule alerts (productions' live tail)",
+            listOf("trigger?"), listOf("breaches", "stalls", "cycles", "ready"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("breaches" to "json", "stalls" to "json", "cycles" to "json", "ready" to "json")),
+        LcncPortContract("confix.sheets", "json → confix sheet family",
+            listOf("json?"), listOf("sheets", "sheet"),
+            inputKinds = mapOf("json" to "json"),
+            outputKinds = mapOf("sheets" to "json", "sheet" to "json"),
+            params = mapOf(
+                "json" to LcncPortContract.LcncParamSpec(ta = true, ph = "JSON (or wire it in)"),
+                "id" to LcncPortContract.LcncParamSpec(v = "confix"),
+                "title" to LcncPortContract.LcncParamSpec(ph = "sheet title"),
+            )),
+        // json is OPTIONAL: the runner falls back to the `json` param when the
+        // port is unwired (the LcncOperationalSheets use case runs on params).
+        LcncPortContract("confix.pickPath", "json path → sheet",
+            _l["json?", "data?", "rows?", "sourceCid?", "ok?", "format?"],
+            _l["found", "path", "value", "sheets", "sheet", "geometry", "sourceCid", "byteSpan"],
+            inputKinds = _m["json" j "json", "data" j "text", "rows" j "json", "sourceCid" j "id", "ok" j "Boolean", "format" j "text"],
+            outputKinds = _m["found" j "json", "path" j "json", "value" j "json", "sheets" j "json", "sheet" j "json",
+                "geometry" j "text", "sourceCid" j "id", "byteSpan" j "json"],
+            params = _m["path" j LcncPortContract.LcncParamSpec(ph = "dot.or/slash path"),
+                "geometry" j LcncPortContract.LcncParamSpec(v = "kotlin", opts = _l["kotlin", "native"])]),
+        LcncPortContract("sheet.flatten", "sheet flatten (refs → ids)",
+            listOf("sheet"), listOf("sheet"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("sheet" to "json")),
+        LcncPortContract("sheet.filter", "sheet filter (column = value)",
+            listOf("sheet"), listOf("sheet"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("sheet" to "json"),
+            params = mapOf(
+                "columnName" to LcncPortContract.LcncParamSpec(ph = "column"),
+                "columnValue" to LcncPortContract.LcncParamSpec(ph = "value"),
+            )),
+        LcncPortContract("sheet.count", "sheet row count",
+            listOf("sheet"), listOf("count"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("count" to "json")),
+        LcncPortContract("sheet.columns", "sheet schema",
+            listOf("sheet"), listOf("columns"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("columns" to "json")),
+        LcncPortContract("sheet.cell", "sheet cell (row, column)",
+            listOf("sheet"), listOf("value"),
+            inputKinds = mapOf("sheet" to "json"),
+            outputKinds = mapOf("value" to "json"),
+            params = mapOf(
+                "row" to LcncPortContract.LcncParamSpec(v = "0"),
+                "column" to LcncPortContract.LcncParamSpec(v = "0"),
+            )),
+        // The concentric treesheet VIEW — the one sheet primitive that touches the
+        // DOM (like dom.board): crumb from `parent` chains, SheetRef cells drill in.
+        LcncPortContract("sheet.concentric", "concentric treesheets (drill-in)",
+            listOf("board", "byStatus?", "byPriority?", "orchestration?"), emptyList(),
+            inputKinds = mapOf(
+                "board" to "json", "byStatus" to "json",
+                "byPriority" to "json", "orchestration" to "json",
+            ),
+            isSink = true, wide = true),
+
+        // ── continents: heap + legion standings on the same canvas ───
+        LcncPortContract("graal.heap", "heap continent (bytes by class)",
+            listOf("trigger?"), listOf("heap"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("heap" to "json"),
+            params = mapOf("lane" to LcncPortContract.LcncParamSpec(
+                v = "allocation", opts = listOf("allocation", "histogram"))),
+            wide = true),
+        LcncPortContract("mux.standings", "quota legion standings",
+            listOf("trigger?"), listOf("standings"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("standings" to "json"),
+            wide = true),
+
+        // ── wise-micali step 11: the workgroup vote (Seats + quorum; ties signal) ──
+        LcncPortContract("panel.vote", "panel vote (odd decides · even tie = research)",
+            listOf("ballots"), listOf("verdict", "accepted", "tie", "triage", "tally", "dissent", "transcript", "quorumMet", "quorum", "seats"),
+            inputKinds = mapOf("ballots" to "json"),
+            outputKinds = mapOf(
+                "verdict" to "text", "accepted" to "json", "tie" to "json",
+                "triage" to "text", "tally" to "json", "dissent" to "json",
+                "transcript" to "json", "quorumMet" to "json",
+                "quorum" to "num", "seats" to "num",
+            ),
+            params = mapOf("quorum" to LcncPortContract.LcncParamSpec(ph = "weighted quorum — blank = strict majority of OK ballots"))),
+
+        // ── Step K: adaptive context engineering as LCNC ─────────────────
+        LcncPortContract("context.fold", "playbook fold (deterministic)",
+            listOf("bullets"), listOf("playbook"),
+            inputKinds = mapOf("bullets" to "json"),
+            outputKinds = mapOf("playbook" to "text")),
+        LcncPortContract("context.assemble", "context chain (cache identity)",
+            listOf("toolsSystem?", "playbook?", "envelope?", "tail?"), listOf("chain", "chainHead"),
+            inputKinds = mapOf(
+                "toolsSystem" to "text", "playbook" to "text",
+                "envelope" to "text", "tail" to "text",
+            ),
+            outputKinds = mapOf("chain" to "json", "chainHead" to "id"),
+            params = mapOf(
+                "model" to LcncPortContract.LcncParamSpec(v = ""),
+                "effort" to LcncPortContract.LcncParamSpec(v = "medium", opts = listOf("low", "medium", "high")),
+                "tools" to LcncPortContract.LcncParamSpec(v = "", ph = "comma-separated tool names"),
+            )),
+
+        // ── P2: map-reduce as LCNC (Confix DSL lowering; never JS) ───────
+        LcncPortContract(VIEW_EMIT, "view emit (declarative map)",
+            listOf("documents?"), listOf("rows"),
+            inputKinds = mapOf("documents" to "json"),
+            outputKinds = mapOf("rows" to "json"),
+            params = mapOf(
+                "ddoc" to LcncPortContract.LcncParamSpec(v = "_design/lcnc"),
+                "view" to LcncPortContract.LcncParamSpec(ph = "view name; program name when blank"),
+                "key" to LcncPortContract.LcncParamSpec(v = "_id", ph = "_id | doc.field | const:value"),
+                "value" to LcncPortContract.LcncParamSpec(v = "const:1", ph = "_doc | doc.field | const:value"),
+                "arrayField" to LcncPortContract.LcncParamSpec(ph = "non-empty → emit each array element"),
+            )),
+        LcncPortContract(VIEW_REDUCE, "view reduce (bounded monoid)",
+            listOf("rows"), listOf("reduced"),
+            inputKinds = mapOf("rows" to "json"),
+            outputKinds = mapOf("reduced" to "json"),
+            params = mapOf("reducer" to LcncPortContract.LcncParamSpec(
+                v = "_count", opts = listOf("_count", "_sum", "_stats", "rollup-count")))),
+
+        // ── P4: bot seat — only this node may spend tokens ─────────────
+        // ConstructionBotNode.runner is the one implementation behind both
+        // `read.construct` and `nal.mint` below (nal.mint is the NAL-domain
+        // alias); both contracts must describe its REAL shape: in `lines`,
+        // out `{accepted, refused, aggregates}` (ConstructionReadingReceipt).
+        LcncPortContract("read.construct", "read causal constructions (bot proposes; gate disposes)",
+            listOf("lines"), listOf("accepted", "refused", "aggregates"),
+            inputKinds = mapOf("lines" to "json"),
+            outputKinds = mapOf("accepted" to "json", "refused" to "json", "aggregates" to "json"),
+            params = mapOf(
+                "model" to LcncPortContract.LcncParamSpec(ph = "ModelMux route/model id"),
+                "window" to LcncPortContract.LcncParamSpec(v = "16"),
+            )),
+
+        // ── NAL belief-bag as LCNC nodes ─────────────────────────────
+        LcncPortContract("nal.mint", "mint beliefs from construction receipts",
+            listOf("lines"), listOf("accepted", "refused", "aggregates"),
+            inputKinds = mapOf("lines" to "json"),
+            outputKinds = mapOf("accepted" to "json", "refused" to "json", "aggregates" to "json"),
+            params = mapOf(
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "1024"),
+            ), isEffect = true),
+        LcncPortContract("nal.decay", "attention decay pulse (thin wrapper)",
+            listOf("trigger?", "after?"), listOf("decayed"),
+            // `after?` is the same pulse-only port under a second declared
+            // kind: it sequences the decay pulse behind a data-bearing
+            // upstream (e.g. read.construct's aggregates) without the
+            // runner reading the payload — decayRunner ignores all inputs.
+            inputKinds = mapOf("trigger" to "trigger", "after" to "json"),
+            outputKinds = mapOf("decayed" to "trigger"), isEffect = true),
+        LcncPortContract("nal.recall", "belief recall (geometry or exact source-local roles)",
+            _l["trigger?", "request?"], _l["beliefs", "selection", "angular", "propositionCid"],
+            inputKinds = _m["trigger" j "trigger", "request" j "json"],
+            outputKinds = _m["beliefs" j "json", "selection" j "json", "angular" j "id", "propositionCid" j "id"],
+            params = _m[
+                "mode" j LcncPortContract.LcncParamSpec(v = "top", opts = _l["top", "sample", "near", "exact-role"]),
+                "k" j LcncPortContract.LcncParamSpec(v = "16"),
+                "request" j LcncPortContract.LcncParamSpec(ta = true, ph = "exact-role only: sourceContext CID, predicate, subject, optional object. Typed angular/propositionCid outputs require exactly one documentary match that is an exact resident; otherwise both are null. Selection does not attend or infer."),
+            ]),
+        LcncPortContract("nl.rules", "describe it: unreviewed parser candidates; class answers deferred",
+            listOf("text?", "ask?"), listOf("candidates", "rules", "answers", "answerStatus", "coverage", "unparsed"),
+            inputKinds = mapOf("text" to "text", "ask" to "text"),
+            outputKinds = mapOf("candidates" to "json", "rules" to "json", "answers" to "json", "answerStatus" to "text", "coverage" to "text", "unparsed" to "json"),
+            params = mapOf(
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "Mammals cause allergies."),
+                "ask" to LcncPortContract.LcncParamSpec(ph = "SUMO classes, e.g. DomesticDog Lion"),
+                "promote" to LcncPortContract.LcncParamSpec(v = "0.7", ph = "legacy CLI only; ignored by candidate mode"),
+            ), isEffect = true),
+        LcncPortContract("norm.clauses", "text → unreviewed clause readings; publication deferred",
+            listOf("text"), listOf("candidates", "beliefs", "rules", "clauses", "sections", "coverage", "publicationStatus"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("candidates" to "json", "beliefs" to "json", "rules" to "json", "clauses" to "num", "sections" to "num", "coverage" to "text", "publicationStatus" to "text"),
+            params = mapOf(
+                "generic" to LcncPortContract.LcncParamSpec(ph = "subjects whose present tense states a rule"),
+                "promote" to LcncPortContract.LcncParamSpec(v = "0.6", ph = "legacy CLI only; ignored by candidate mode"),
+            ), isEffect = true),
+        LcncPortContract("book.curate", "text → the sections its own heading shape evidences → statements (every asserted clause: modal norms and OpenIE relations, coreference resolved) with section support, frozen as a book",
+            listOf("text?", "doc?", "conventions?", "notes?", "source?", "ontologyCid?"), listOf("book", "sections", "clauses", "statements", "senses", "shape", "conformance", "curationReceiptCid", "ontologyCid", "ontologyVersion", "relationships"),
+            inputKinds = mapOf("text" to "text", "doc" to borg.trikeshed.lcnc.ProjectDoc.KIND, "conventions" to "json", "notes" to "text", "source" to "DocumentSource", "ontologyCid" to "id"),
+            outputKinds = mapOf("book" to "text", "sections" to "num", "clauses" to "num", "statements" to "num", "senses" to "json", "shape" to "json", "conformance" to "json", "curationReceiptCid" to "id", "ontologyCid" to "id", "ontologyVersion" to "text", "relationships" to "ProposedRelationships"),
+            params = mapOf(
+                "book" to LcncPortContract.LcncParamSpec(ph = "book name (blank = the wired document's id)"),
+                "work" to LcncPortContract.LcncParamSpec(ph = "work the book is an edition of (blank = the book)"),
+                "date" to LcncPortContract.LcncParamSpec(ph = "edition date, sortable"),
+                "generic" to LcncPortContract.LcncParamSpec(ph = "subjects whose present tense states a rule"),
+                "constellation" to LcncPortContract.LcncParamSpec(ph = "constellation whose believed classes steer word senses (blank = section context only)"),
+            ), isEffect = true),
+        LcncPortContract("book.snapshot", "retained parser statements under a selected customer ontology",
+            listOf("source", "book", "ontologyCid"), listOf("book", "curationReceiptCid", "ontologyCid", "ontologyVersion", "relationships"),
+            inputKinds = mapOf("source" to "DocumentSource", "book" to "text", "ontologyCid" to "id"),
+            outputKinds = mapOf("book" to "text", "curationReceiptCid" to "id", "ontologyCid" to "id", "ontologyVersion" to "text", "relationships" to "ProposedRelationships"), isEffect = true),
+        *listOf("ontology.retain", "ontology.align").map { type -> LcncPortContract(type,
+            if (type == "ontology.retain") "versioned customer ontology" else "explicit SUMO alignment",
+            listOf("corpus?", "version?", "kif?", "mappings?", "sourceCids?", "sumoAlignmentCid?"), listOf("ontologyCid", "ontology"),
+            inputKinds = mapOf("corpus" to "text", "version" to "text", "kif" to "text", "mappings" to "json", "sourceCids" to "json", "sumoAlignmentCid" to "id"),
+            outputKinds = mapOf("ontologyCid" to "id", "ontology" to "json"),
+            params = mapOf("corpus" to LcncPortContract.LcncParamSpec(), "version" to LcncPortContract.LcncParamSpec(),
+                "kif" to LcncPortContract.LcncParamSpec(ta = true), "mappings" to LcncPortContract.LcncParamSpec(v = "{}", code = true),
+                "sourceCids" to LcncPortContract.LcncParamSpec(v = "[]", code = true),
+                "sumoAlignmentCid" to LcncPortContract.LcncParamSpec(optional = true)), isEffect = true)
+        }.toTypedArray(),
+        LcncPortContract("constellation.join", "a curated book joins a named constellation: restated norms, conflicts, edition alignment, published to constellation/<name>",
+            listOf("book?", "releaseCid?"), listOf("constellation", "books", "statements", "restated", "conflicts", "rules", "rdf", "frontier", "tasks", "unresolved", "relationships", "outputCid"),
+            inputKinds = mapOf("book" to "text", "releaseCid" to "id"),
+            outputKinds = mapOf("constellation" to "text", "books" to "num", "statements" to "num", "restated" to "num", "conflicts" to "num", "rules" to "json",
+                "rdf" to "text", "frontier" to "json", "tasks" to "json", "unresolved" to "json", "relationships" to "ReviewedRelationships", "outputCid" to "id"),
+            params = mapOf(
+                "constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"),
+                "book" to LcncPortContract.LcncParamSpec(ph = "book name when no cable carries it"),
+            ), isEffect = true),
+        LcncPortContract("constellation.brief", "a constellation's frontier as an outcome summary: conflicts, open premises as questions, restated norms, with sections — wiki.propose's summary",
+            listOf("trigger?"), listOf("summary", "cid", "page"),
+            inputKinds = mapOf("trigger" to "json"),
+            outputKinds = mapOf("summary" to "text", "cid" to "id", "page" to "text"),
+            params = mapOf("constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"),
+                "page" to LcncPortContract.LcncParamSpec(opts = listOf("", "true"), ph = "true: publish the brief as wiki patterns/constellation-<name>.md"))),
+        LcncPortContract("rdf.select", "SPARQL basic graph pattern (PREFIX, SELECT ?v, WHERE { s p o . … }) over Turtle → rows",
+            listOf("turtle?", "sparql?"), listOf("rows", "count"),
+            inputKinds = mapOf("turtle" to "text", "sparql" to "text"),
+            outputKinds = mapOf("rows" to "json", "count" to "num"),
+            params = mapOf(
+                "sparql" to LcncPortContract.LcncParamSpec(ta = true, ph = "SELECT ?n ?c WHERE { ?n forge:bearerClass ?c . }"),
+                "turtle" to LcncPortContract.LcncParamSpec(ta = true, ph = "Turtle, when no cable carries it"),
+            )),
+        LcncPortContract("constellation.settle", "premise cards whose premise a joined book now states → kanban.move commands to done",
+            listOf("board?"), listOf("moves", "count"),
+            inputKinds = mapOf("board" to "json"),
+            outputKinds = mapOf("moves" to "json", "count" to "num"),
+            params = mapOf("constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"))),
+        LcncPortContract("constellation.ask", "query class norms using explicit premise assumptions; text and stored facts are unverified candidates",
+            listOf("class?", "facts?", "positiveFacts?", "negativeFacts?"), listOf("class", "held", "count", "facts", "factsSource", "positiveFacts", "positiveFactsSource", "candidateText", "parsedCandidates", "withheldReason", "withheldLegacyFacts", "negativeFacts", "negativeFactsSource", "fires", "pending", "blocked", "conflicted"),
+            inputKinds = mapOf("class" to "text", "facts" to "text", "positiveFacts" to "json", "negativeFacts" to "json"),
+            outputKinds = mapOf("class" to "text", "held" to "json", "count" to "num", "facts" to "json", "factsSource" to "text", "positiveFacts" to "json", "positiveFactsSource" to "text", "candidateText" to "text", "parsedCandidates" to "json", "withheldReason" to "text", "withheldLegacyFacts" to "json", "negativeFacts" to "json", "negativeFactsSource" to "text", "fires" to "json", "pending" to "json", "blocked" to "json", "conflicted" to "json"),
+            params = mapOf(
+                "constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"),
+                "class" to LcncPortContract.LcncParamSpec(ph = "SUMO class or noun, when no cable carries it"),
+                "facts" to LcncPortContract.LcncParamSpec(ph = "text to parse as unverified candidates; does not establish premises"),
+            ), isEffect = true),
+        LcncPortContract("wiki.read", "the wiki's pages as one text, one `§ <page>.` section per page, for book.curate (heading ^§ )",
+            emptyList(), listOf("text", "pages", "count"),
+            outputKinds = mapOf("text" to "text", "pages" to "json", "count" to "num"),
+            params = mapOf("dir" to LcncPortContract.LcncParamSpec(ph = "wiki subdirectory (blank = whole wiki)"))),
+        LcncPortContract("constellation.render", "statements → sentences read back through the parser: the text, and the statements whose sentence parses to another statement (drift)",
+            listOf("text?"), listOf("text", "statements", "drift"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("text" to "text", "statements" to "num", "drift" to "json"),
+            params = mapOf(
+                "constellation" to LcncPortContract.LcncParamSpec(ph = "constellation whose restated statements render when no text is wired"),
+            )),
+        LcncPortContract("skill.overlap", "skill consolidation candidates (SUMO class Jaccard, no model)",
+            listOf("trigger?"), listOf("pairs", "skills", "vocabulary"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("pairs" to "json", "skills" to "num", "vocabulary" to "num"),
+            params = mapOf(
+                "min" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "common" to LcncPortContract.LcncParamSpec(v = "0.25"),
+            ), isEffect = true),
+        LcncPortContract("skill.curate", "hermes skill curation (usage → lifecycle tuples)",
+            listOf("trigger?"), listOf("skills", "divergent", "count"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("skills" to "json", "divergent" to "json", "count" to "num"),
+            params = mapOf("daysAhead" to LcncPortContract.LcncParamSpec(v = "0")),
+            isEffect = true),
+        LcncPortContract("skill.decay", "skill budget decay (per-skill AttentionEconomy)",
+            listOf("trigger?"), listOf("budgets"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("budgets" to "json")),
+        LcncPortContract("nal.attend", "attend (processed budget rekey, evidence untouched)",
+            _l["angular?", "propositionCid?", "p?", "d?", "q?"], _l["attended"],
+            inputKinds = _m["angular" j "id", "propositionCid" j "id", "p" j "num", "d" j "num", "q" j "num"],
+            outputKinds = mapOf("attended" to "json"),
+            params = mapOf(
+                "angular" to LcncPortContract.LcncParamSpec(ph = "angular (decimal string) when none is wired"),
+                "propositionCid" to LcncPortContract.LcncParamSpec(ph = "exact resident PID; blank keeps legacy angular scope"),
+                "p" to LcncPortContract.LcncParamSpec(ph = "priority 0..1 (resident value kept when blank)"),
+                "d" to LcncPortContract.LcncParamSpec(ph = "durability 0..1"),
+                "q" to LcncPortContract.LcncParamSpec(ph = "quality 0..1"),
+            ), isEffect = true),
+        LcncPortContract("nal.reinforce", "reinforce (receipted source observation; budget untouched)",
+            _l["angular?", "receiptCid?", "basis?"], _l["revised"],
+            inputKinds = _m["angular" j "id", "receiptCid" j "id", "basis" j "json"],
+            outputKinds = mapOf("revised" to "json"),
+            params = mapOf(
+                "angular" to LcncPortContract.LcncParamSpec(ph = "angular (decimal string) when none is wired"),
+                "receiptCid" to LcncPortContract.LcncParamSpec(ph = "required explicit observation receipt CID (or wire it)"),
+                "basis" to LcncPortContract.LcncParamSpec(ph = "required JSON array of source leaf CIDs (or wire it)"),
+                "wPlus" to LcncPortContract.LcncParamSpec(v = "1"),
+                "wMinus" to LcncPortContract.LcncParamSpec(v = "0"),
+            ), isEffect = true),
+        LcncPortContract("nal.encode", "encode 64-bit centroid (AngularCodec)",
+            listOf("subject?"), listOf("centroid"),
+            inputKinds = mapOf("subject" to "text"),
+            outputKinds = mapOf("centroid" to "id"),
+            params = mapOf(
+                "subject" to LcncPortContract.LcncParamSpec(ph = "subject term when none is wired"),
+                "object" to LcncPortContract.LcncParamSpec(ph = "object term (optional)"),
+                "taxonomy" to LcncPortContract.LcncParamSpec(ph = "taxonomy key (optional)"),
+                "relation" to LcncPortContract.LcncParamSpec(v = "CAUSALITY"),
+                "grade" to LcncPortContract.LcncParamSpec(v = "NONE"),
+            )),
+
+        // ── Rule admission: eternal law into the LIVE rete ────────────
+        LcncPortContract("nal.rule.admit", "admit reviewed eternal rules (live rete; host policy)",
+            listOf("rules?", "releaseCid?"), listOf("admitted", "ruleCids", "rejected"),
+            inputKinds = mapOf("rules" to "json", "releaseCid" to "id"),
+            outputKinds = mapOf("admitted" to "json", "ruleCids" to "json", "rejected" to "num"),
+            params = mapOf(
+                "antecedent" to LcncPortContract.LcncParamSpec(ph = "one rule's antecedent when no rules wired"),
+                "consequent" to LcncPortContract.LcncParamSpec(ph = "one rule's consequent"),
+                "copula" to LcncPortContract.LcncParamSpec(v = "==>", opts = listOf("==>", "<=>")),
+                "discount" to LcncPortContract.LcncParamSpec(v = "1.0"),
+            ), isEffect = true),
+        LcncPortContract("nal.rules.fromKg", "kg → unreviewed rule candidates (admission deferred)",
+            listOf("kgText?"), listOf("rules", "admitted", "admissionStatus", "rejectedTemporal", "rejectedNonEternal"),
+            inputKinds = mapOf("kgText" to "text"),
+            outputKinds = mapOf("rules" to "json", "admitted" to "json", "admissionStatus" to "text", "rejectedTemporal" to "json", "rejectedNonEternal" to "json"),
+            params = mapOf(
+                "kgText" to LcncPortContract.LcncParamSpec(ta = true, ph = "(=> fire smoke)\nex:a ex:causes ex:b ."),
+                "confidence" to LcncPortContract.LcncParamSpec(v = "0.9"),
+                "copula" to LcncPortContract.LcncParamSpec(ph = "force every bridged copula", opts = listOf("==>", "<=>")),
+            ), isEffect = true),
+        LcncPortContract("nars.reteFire", "hypothetical rule evaluation (in-process, no live admission)",
+            listOf("assertions?", "rules?"), listOf("firings", "ruleCid", "ruleCids", "rejected", "rules", "assertions", "hypothetical", "discount", "evaluation"),
+            inputKinds = mapOf("assertions" to "json", "rules" to "json"),
+            outputKinds = mapOf("firings" to "json", "ruleCid" to "id", "ruleCids" to "json", "rejected" to "num",
+                "rules" to "json", "assertions" to "json", "hypothetical" to "json", "discount" to "num", "evaluation" to "json"),
+            params = mapOf(
+                "antecedent" to LcncPortContract.LcncParamSpec(ph = "rule antecedent when no rules are wired"),
+                "consequent" to LcncPortContract.LcncParamSpec(ph = "rule consequent when no rules are wired"),
+                "copula" to LcncPortContract.LcncParamSpec(v = "==>", opts = listOf("==>", "<=>")),
+                "discount" to LcncPortContract.LcncParamSpec(v = "0.5"),
+            )),
+
+        LcncPortContract("document.source", "retain original document and extraction evidence",
+            listOf("doc?", "source?"), listOf("source"), inputKinds = mapOf("doc" to ProjectDoc.KIND, "source" to "json"),
+            outputKinds = mapOf("source" to "DocumentSource"), isEffect = true,
+            params = _m["view" j LcncPortContract.LcncParamSpec(v = "inline", opts = _l["inline", "reference"])]),
+        LcncPortContract("document.spans", "bounded retained document passages", _l["source"],
+            _l["data", "batchCid", "sourceCid", "count", "begin", "end", "nextOffset", "complete", "bytes"],
+            inputKinds = _m["source" j "DocumentSource"],
+            outputKinds = _m["data" j "text", "batchCid" j "id", "sourceCid" j "id", "count" j "num", "begin" j "num",
+                "end" j "num", "nextOffset" j "num", "complete" j "Boolean", "bytes" j "num"], isEffect = true,
+            params = _m["offset" j LcncPortContract.LcncParamSpec(v = "0"), "count" j LcncPortContract.LcncParamSpec(v = "2"),
+                "spanChars" j LcncPortContract.LcncParamSpec(v = "512"), "maxBytes" j LcncPortContract.LcncParamSpec(v = "16384")]),
+        LcncPortContract("document.reviewSnapshot", "freeze selected curation evidence for analyst review",
+            listOf("receiptCid", "selection?"), listOf("snapshotCid", "snapshot", "revision", "state", "decisionCid", "current", "history"),
+            inputKinds = mapOf("receiptCid" to "id", "selection" to "json"),
+            outputKinds = mapOf("snapshotCid" to "id", "snapshot" to "ReviewSnapshot", "revision" to "num", "state" to "text", "decisionCid" to "id", "current" to "json", "history" to "json"),
+            params = mapOf("kind" to LcncPortContract.LcncParamSpec(v = "book", opts = listOf("book", "document")),
+                "selection" to LcncPortContract.LcncParamSpec(v = "[]", code = true)), isEffect = true),
+        LcncPortContract("document.reviewDecision", "authenticated analyst decision on frozen evidence",
+            listOf("snapshotCid", "expectedRevision"), listOf("snapshotCid", "snapshot", "revision", "state", "decisionCid", "current", "history"),
+            inputKinds = mapOf("snapshotCid" to "id", "expectedRevision" to "num"),
+            outputKinds = mapOf("snapshotCid" to "id", "snapshot" to "ReviewSnapshot", "revision" to "num", "state" to "text", "decisionCid" to "id", "current" to "json", "history" to "json"),
+            params = mapOf("action" to LcncPortContract.LcncParamSpec(v = "draft", opts = listOf("draft", "approve", "reject", "correct")),
+                "note" to LcncPortContract.LcncParamSpec(ta = true)), isEffect = true),
+        LcncPortContract("document.reviewRelease", "release the exact current analyst approval once",
+            listOf("snapshotCid", "approvalCid", "expectedRevision"), listOf("releaseCid", "snapshotCid", "approvalCid", "revision", "relationships", "ruleCandidates"),
+            inputKinds = mapOf("snapshotCid" to "id", "approvalCid" to "id", "expectedRevision" to "num"),
+            outputKinds = mapOf("releaseCid" to "id", "snapshotCid" to "id", "approvalCid" to "id", "revision" to "num", "relationships" to "ReviewedRelationships", "ruleCandidates" to "ReviewedRules"), isEffect = true),
+        LcncPortContract("document.curate", "document curation (managed NLP, source-linked cursor)",
+            listOf("extent?", "source?", "instructions?"),
+            listOf("receiptCid", "record", "nlpStatus", "sheet", "sheets", "ruleCandidates"),
+            inputKinds = mapOf("extent" to "json", "source" to "DocumentSource", "instructions" to "text"),
+            // ruleCandidates rows are shaped for nal.rule.admit's `rules` input; nothing admits until cabled there.
+            outputKinds = mapOf("receiptCid" to "id", "record" to "json", "nlpStatus" to "text",
+                "sheet" to "json", "sheets" to "json", "ruleCandidates" to "ProposedRules"), isEffect = true),
+
+        LcncPortContract("document.sheet", "retained curation cursor page (no NLP or model call)",
+            listOf("receiptCid?", "sentence?", "offset?"), listOf("sheet", "rowCount", "next", "receiptCid", "ruleCandidates", "selection"),
+            inputKinds = mapOf("receiptCid" to "id", "sentence" to "num", "offset" to "num"),
+            outputKinds = mapOf("sheet" to "json", "rowCount" to "num", "next" to "json", "receiptCid" to "id", "ruleCandidates" to "ProposedRules", "selection" to "json"),
+            params = mapOf(
+                "receiptCid" to LcncPortContract.LcncParamSpec(ph = "retained curation receipt CID (or wire it)"),
+                "view" to LcncPortContract.LcncParamSpec(v = "sentences", opts = listOf("sentences", "tokens", "dependencies", "proposals", "rules")),
+                "sentence" to LcncPortContract.LcncParamSpec(v = "0", ph = "source sentence ordinal for a child cursor"),
+                "offset" to LcncPortContract.LcncParamSpec(v = "0"),
+                "limit" to LcncPortContract.LcncParamSpec(v = "32", ph = "rows per page, 1–128; rowCount names the full cursor"),
+                "axes" to LcncPortContract.LcncParamSpec(v = "[]", ph = "independent field indexes, e.g. [[\"subject\"],[\"predicate\",\"polarity\"]]"),
+                "selections" to LcncPortContract.LcncParamSpec(v = "[]", ph = "AND [index,group] pairs; pin receiptCid to the same receipt even when wired"))),
+
+        LcncPortContract(DocumentCurationTasks.TASKS, "document issues (retained result to Kanban)",
+            listOf("receiptCid"), listOf("tasks", "completed", "reopened", "unchanged", "ignored"),
+            inputKinds = mapOf("receiptCid" to "id"),
+            outputKinds = mapOf("tasks" to "json", "completed" to "json", "reopened" to "json",
+                "unchanged" to "json", "ignored" to "json"), isEffect = true),
+        LcncPortContract(DocumentCurationTasks.REVIEW_TASK, "document proposal review (retained seat to TODO card)",
+            listOf("question", "runReceiptCid?", "nodeId?"), listOf("task", "provenance"),
+            inputKinds = mapOf("question" to "text", "runReceiptCid" to "id", "nodeId" to "id"),
+            outputKinds = mapOf("task" to "json", "provenance" to "json"),
+            params = mapOf(
+                "runReceiptCid" to LcncPortContract.LcncParamSpec(ph = "exact completed run receipt CID"),
+                "nodeId" to LcncPortContract.LcncParamSpec(ph = "successful top-level council.seat in that run")), isEffect = true),
+        LcncPortContract(DocumentCurationTasks.CORRECT, "document correction (retained source lineage)",
+            listOf("source", "taskId?", "expectedRevision?", "priorReceiptCid?"),
+            listOf("source", "taskId", "revision", "priorReceiptCid", "instructions"),
+            inputKinds = mapOf("source" to "json", "taskId" to "id", "expectedRevision" to "num", "priorReceiptCid" to "id"),
+            outputKinds = mapOf("source" to "DocumentSource", "taskId" to "id", "revision" to "num",
+                "priorReceiptCid" to "id", "instructions" to "text"),
+            params = mapOf(
+                "taskId" to LcncPortContract.LcncParamSpec(ph = "existing document task"),
+                "expectedRevision" to LcncPortContract.LcncParamSpec(ph = "current task revision"),
+                "priorReceiptCid" to LcncPortContract.LcncParamSpec(ph = "task's retained curation receipt")), isEffect = true),
+
+        // ── CoreNLP extract (NER + deps) ──────────────────────────
+        LcncPortContract(SubVm.LEGO_PREFIX + "corenlp.extract", "corenlp extract (NER, deps)",
+            listOf("text?"), listOf("sentences"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("sentences" to "json"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
+                "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse,ner"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            )),
+
+        // ── State freeze / thaw (persistence seam) ────────────────
+        LcncPortContract("state.freeze", "freeze bag+KB to CAS (snapshot)",
+            listOf("trigger?"), listOf("snapshot"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("snapshot" to "json"), isEffect = true),
+        LcncPortContract("state.thaw", "thaw bag+KB from CAS (restore)",
+            listOf("trigger?"), listOf("restored"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("restored" to "json"), isEffect = true),
+
+        // ── Legal domain nodes ────────────────────────────────────
+        LcncPortContract("legal.ingest", "legal source through the canonical document curator (retained proposals, not legal conclusions)",
+            listOf("text?"), listOf("documentCid", "receiptCid", "citations", "elements", "brief", "record", "sheet", "sheets", "ruleCandidates", "nlpStatus"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("documentCid" to "id", "receiptCid" to "id", "citations" to "json", "elements" to "json", "brief" to "text",
+                "record" to "json", "sheet" to "json", "sheets" to "json", "ruleCandidates" to "json", "nlpStatus" to "text"),
+            params = mapOf(
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "legal document text (or wire one in)"),
+                "brief" to LcncPortContract.LcncParamSpec(ph = "root frame binding to read when no text is wired (human-oversight brief)"),
+            ), isEffect = true),
+        LcncPortContract("legal.evidence", "evidence-bank query (shared KIF bank) → brief folded with prior facts",
+            listOf("documentCid?", "brief?"), listOf("brief"),
+            inputKinds = mapOf("documentCid" to "id", "brief" to "text"),
+            outputKinds = mapOf("brief" to "text"),
+            params = mapOf(
+                "documentCid" to LcncPortContract.LcncParamSpec(ph = "doc CID to query when none is wired"),
+                "brief" to LcncPortContract.LcncParamSpec(ta = true, ph = "brief text to query when none is wired"),
+            )),
+        // ── BrainClient decomposition as LCNC ──────────────────────
+        // credential.enter: manual key-type/url/api-type/key entry →
+        //   stored in CouchDB via CouchKeyStore, resolvable by KeyMux.
+        //   The key field is a secret (password input) — the panel renders
+        //   type=password when the placeholder carries the `secret:` prefix.
+        // credential.list: the stored credentials, "(none …)" first — what the
+        //   prompt.chat prefill picklist is filled from (a stored name, or none).
+        LcncPortContract("credential.list", "saved keys",
+            listOf("trigger?"), listOf("names", "stored"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("names" to "json", "stored" to "json")),
+        LcncPortContract("credential.enter", "save a key",
+            emptyList(), listOf("credential"),
+            outputKinds = mapOf("credential" to "json"),
+            params = mapOf(
+                // Provider ids are the keymux roster's — filled live from keys.status,
+                // not a second hand-typed list that drifts from HarnessRegistry.
+                "key_type" to LcncPortContract.LcncParamSpec(
+                    ph = "the provider this key is for", v = "nvidia",
+                    optsFrom = "keys.status#roster[].provider"),
+                "url" to LcncPortContract.LcncParamSpec(ph = "the provider's API address", v = "https://integrate.api.nvidia.com/v1"),
+                "api_type" to LcncPortContract.LcncParamSpec(v = "openai", opts = listOf("openai", "anthropic", "google")),
+                "key" to LcncPortContract.LcncParamSpec(ph = "secret:the key itself — stored, never shown again"),
+            ), isEffect = true),
+        // prompt.chat: prompt → model → content. Credential precedence,
+        //   highest first: (1) the ModelMux key chain — KeyMux resolves
+        //   llm.<provider>.key from env → dotenv → harness stores, so a model
+        //   with a resolvable key runs with NOTHING entered; (2) the prefill
+        //   CouchKeyStore entry; (3) the manual url+key fields. The key field
+        //   is a password input (secret: prefix).
+        LcncPortContract("prompt.chat", "ask a model",
+            _l["prompt?", "context?"], _l["content", "model", "ok", "error", "cached", "receipt", "context"],
+            inputKinds = _m["prompt" j "text", "context" j "id"],
+            // cached: the reactor answered from its cache (same question as before) —
+            // the answer card says so, because a repeat that looks live is a lie.
+            outputKinds = _m["content" j "text", "model" j "id", "ok" j "json", "error" j "text", "cached" j "json", "receipt" j "json", "context" j "id"],
+            params = mapOf(
+                "prompt" to LcncPortContract.LcncParamSpec(ta = true, ph = "what do you want to ask?"),
+                "context" to LcncPortContract.LcncParamSpec(ph = "breadcrumb context shared with Pi, Hermes or ModelMux"),
+                // Blank default: the live list leads, and its first entry is the newest
+                // model Hermes ran here (mux cards come from Hermes first).
+                "model" to LcncPortContract.LcncParamSpec(ph = "which model answers — the list is what runs here", optsFrom = "mux.models#models[].id"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "256", ph = "how long the answer may be"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2", ph = "0 = precise, 1 = creative"),
+                // The stored credentials, "(none …)" first — filled live from
+                // credential.list, so the list is what credential.enter actually saved.
+                "prefill" to LcncPortContract.LcncParamSpec(
+                    ph = "a saved key to use, or none (the router finds one)",
+                    optsFrom = "credential.list#names[]"),
+                "url" to LcncPortContract.LcncParamSpec(ph = "advanced: API address, only if the model is not in the list"),
+                "key" to LcncPortContract.LcncParamSpec(ph = "secret:advanced: key, only if the model is not in the list"),
+                "headers" to LcncPortContract.LcncParamSpec(
+                    cols = listOf("name", "value"),
+                    ph = "advanced: extra request headers"),
+            ), isEffect = true),
+        // ── stored prompts: citizens, not literals ─────────────────────
+        // A prompt has a name, a role, a text with {{variables}} and a content id
+        // minted from its canonical bytes (PromptDocument). Programs read one by
+        // name; a receipt records which version ran (promptVersions). Only
+        // prompt.save writes, so it is the effect.
+        LcncPortContract(PromptNodes.GET, "a stored prompt",
+            listOf("name?"), listOf("text", "cid", "name", "role"),
+            inputKinds = mapOf("name" to "text"),
+            outputKinds = mapOf("text" to "text", "cid" to "id", "name" to "text", "role" to "text"),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(
+                    ph = "which stored prompt — the list is what is saved here",
+                    optsFrom = "prompt.list#prompts[].name"),
+            )),
+        LcncPortContract(PromptNodes.RENDER, "fill a prompt's holes",
+            listOf("template", "args?"), listOf("text", "variables"),
+            inputKinds = mapOf("template" to "text", "args" to "json"),
+            outputKinds = mapOf("text" to "text", "variables" to "json"),
+            params = mapOf(
+                "template" to LcncPortContract.LcncParamSpec(ta = true, ph = "text with {{name}} holes (or wire one in)"),
+            )),
+        LcncPortContract(PromptNodes.LIST, "the stored prompts",
+            listOf("trigger?"), listOf("prompts", "count"),
+            inputKinds = mapOf("trigger" to "trigger"),
+            outputKinds = mapOf("prompts" to "json", "count" to "num")),
+        LcncPortContract(PromptNodes.SAVE, "save a prompt version",
+            listOf("text"), listOf("cid", "previousCid", "name", "changed"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("cid" to "id", "previousCid" to "id", "name" to "text", "changed" to "json"),
+            params = mapOf(
+                "name" to LcncPortContract.LcncParamSpec(ph = "the prompt's name: lowercase, dots, dashes"),
+                "role" to LcncPortContract.LcncParamSpec(v = PromptDocument.ROLE_USER, opts = PromptDocument.ROLES),
+                "tags" to LcncPortContract.LcncParamSpec(ph = "comma-separated tags"),
+            ), isEffect = true),
+        // result.confirm: content is the completion signal. `ok` and `error`
+        // refine that completion when the producer has an explicit verdict;
+        // content-only producers are successful confirmations, not starved
+        // nodes (and not blank ERROR cards).
+        LcncPortContract("result.confirm", "the answer",
+            listOf("content", "ok?", "error?", "cached?"), emptyList(),
+            inputKinds = mapOf("content" to "text", "ok" to "json", "error" to "text", "cached" to "json"),
+            isSink = true),
+
+        // ── Sub-VM module legos: tika / corenlp / camel / graalce ──────
+        LcncPortContract(SubVm.LEGO_PREFIX + "tika", "tika: extract text+metadata in a sub-VM",
+            listOf("files?"), listOf("text"),
+            inputKinds = mapOf("files" to "json"),
+            outputKinds = mapOf("text" to "text"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM", opts = listOf("JVM", "GRAAL_JS", "GRAAL_PYTHON", "GRAAL_RUBY", "GRAAL_CLOJURE", "GRAAL_LLVM")),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                "in:files" to LcncPortContract.LcncParamSpec(ph = "comma-separated workspace paths (world-seeded)"),
+                "in:text" to LcncPortContract.LcncParamSpec(ph = "fallback when no files wired"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            )),
+        LcncPortContract(SubVm.LEGO_PREFIX + "corenlp", "corenlp: Stanford pipeline in a sub-VM",
+            listOf("text?"), listOf("tokens"),
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf("tokens" to "text"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                "annotators" to LcncPortContract.LcncParamSpec(v = "tokenize,ssplit,pos,lemma,depparse"),
+                "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "inline text when nothing wired"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            )),
+        // Read-only audit of the classpaths this daemon can execute guest code from. No inputs, so
+        // nothing upstream can steer it; two params and two outputs, so its whole capability is
+        // visible here. It cannot mount, unmount or install — not because the body refuses, but
+        // because no such port is declared.
+        LcncPortContract(SubVm.LEGO_PREFIX + "modules", "modules: audit mounted guest classpaths",
+            emptyList(), listOf("modules", "count"),
+            outputKinds = mapOf("modules" to "json", "count" to "json"),
+            params = mapOf(
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                "verify" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            ),
+        ),
+        LcncPortContract(SubVm.LEGO_PREFIX + "polyglot", "typed function in an owned language guest",
+            listOf("input?"), listOf("value", "text", "language", "facet", "vmId", "cid"),
+            isEffect = true,
+            inputKinds = mapOf("input" to "json"),
+            outputKinds = mapOf("value" to "json", "text" to "text", "language" to "text",
+                "facet" to "text", "vmId" to "text", "cid" to "text"),
+            params = mapOf(
+                "language" to LcncPortContract.LcncParamSpec(v = "js",
+                    opts = borg.trikeshed.vm.VmLanguage.entries.map { it.id }),
+                "source" to LcncPortContract.LcncParamSpec(v = "return input", ta = true, code = true, ph = "function body; input is typed data"),
+                "input" to LcncPortContract.LcncParamSpec(v = "null", ta = true, ph = "JSON when no input is wired"),
+                "inputKind" to LcncPortContract.LcncParamSpec(v = "JSON", opts = borg.trikeshed.vm.VmValueKind.entries.map { it.name }),
+                "outputKind" to LcncPortContract.LcncParamSpec(v = "JSON", opts = borg.trikeshed.vm.VmValueKind.entries.map { it.name }),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "statements" to LcncPortContract.LcncParamSpec(v = "5000000"),
+                "wallMillis" to LcncPortContract.LcncParamSpec(v = "5000"),
+                "calls" to LcncPortContract.LcncParamSpec(v = "0"),
+            )),
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel", "camel: dispatch a declared route",
+            listOf("messages?", "route?"), listOf("routed", "ok", "error", "receipt"),
+            isEffect = true,
+            inputKinds = mapOf("messages" to "json", "route" to "json"),
+            // ok/error are declared because the linkage gate can refuse a route before it is
+            // ever built: a lego that can decline has to be able to SAY it declined, or the
+            // refusal arrives as a blank `routed` and reads like a route that carried nothing.
+            outputKinds = mapOf("routed" to "text", "ok" to "json", "error" to "text", "receipt" to "json"),
+            params = mapOf(
+                "authoring" to LcncPortContract.LcncParamSpec(v = "declared", opts = listOf("declared", "native-dsl")),
+                "source" to LcncPortContract.LcncParamSpec(v = "", ta = true, code = true,
+                    ph = "Native Java or Groovy RouteBuilder.configure body. Variables: input (messages), id, entry (from). OWN only; unbounded, not sandboxed. Mutually exclusive with route."),
+                "language" to LcncPortContract.LcncParamSpec(v = "java", opts = listOf("java", "groovy")),
+                "route" to LcncPortContract.LcncParamSpec(v = "", ta = true,
+                    ph = "Optional Confix route {from,steps}; replaces from/to. Or wire a language function's value to route."),
+                "body" to LcncPortContract.LcncParamSpec(v = "", ta = true,
+                    ph = "Plain text when messages is unwired; wired messages are encoded as JSON."),
+                "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
+                // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
+                // surface can express the override; blank means the lego's own default.
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                // LIVE, not a typed list: the endpoints an author may pick are exactly the ones
+                // the mounted module ships and CamelLinkage admits, and both change when a module
+                // is mounted or re-resolved. vm.camel.catalog runs as a one-node program to fill
+                // these, so a stale option is impossible — there is no list here to go stale.
+                // Scoped by THIS node's own module and reach, not global. A picklist over
+                // everything Camel ships is a few hundred rows and useless; scoped to the
+                // mounted department it is a dozen, and it lists exactly what the gate below
+                // will actually admit — so the editor cannot offer a value that then fails.
+                "from" to LcncPortContract.LcncParamSpec(
+                    v = "direct:lcnc",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                "to" to LcncPortContract.LcncParamSpec(
+                    v = "log:lcnc",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                // How far this route may reach, spelled out on the node. LOCAL is the default
+                // and admits only schemes that stay on the machine; DEPARTMENT admits whatever
+                // a mounted department provides, the wire included. Mounting camel-mail is what
+                // makes smtp POSSIBLE; setting this is what makes it ALLOWED, and putting the
+                // second half in the graph is the point — otherwise a route's reach is implied
+                // by what someone installed months ago.
+                "reach" to LcncPortContract.LcncParamSpec(v = "LOCAL", opts = listOf("LOCAL", "DEPARTMENT")),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            )),
+        // The lazy half of the palette: one entry that stands for everything the mounted
+        // module offers, instead of a hundred rows that go stale on the next re-resolve.
+        // Read-only in the structural sense — no VM, and no port through which it could
+        // mount, install or execute. It opens zips and reports names.
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.catalog", "camel: enumerate the mounted module (lazy)",
+            emptyList(), listOf("endpoints", "count", "detail", "installed", "mounted", "unlisted"),
+            outputKinds = mapOf(
+                "endpoints" to "json", "count" to "json", "detail" to "text",
+                "installed" to "json", "mounted" to "json", "unlisted" to "json",
+            ),
+            params = mapOf(
+                // A DEPARTMENT name here scopes everything below it to that department plus the
+                // spine it extends — which is how one palette entry stays small while the set of
+                // mountable components grows.
+                "module" to LcncPortContract.LcncParamSpec(
+                    v = "", optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?kind=department#endpoints[]"),
+                // endpoint = ready-to-run URIs (the picklist shape, and the default because the
+                // picklist resolver runs this node with no params at all); eip = the 104 model
+                // names; scheme = every component the mounted chain announces; linkage = what the
+                // gate admits under this reach; department = the installed modules that extend another.
+                "kind" to LcncPortContract.LcncParamSpec(
+                    v = "endpoint", opts = listOf("endpoint", "eip", "scheme", "linkage", "department")),
+                "reach" to LcncPortContract.LcncParamSpec(v = "LOCAL", opts = listOf("LOCAL", "DEPARTMENT")),
+                "name" to LcncPortContract.LcncParamSpec(
+                    ph = "one eip or scheme — fetches its full JSON into detail"),
+            )),
+        // The LIFETIME half of camel, as against vm.camel above, which is the DISPATCH half.
+        // vm.camel starts a context, carries one body and stops it inside a single run — the right
+        // shape for a request and the wrong one for a consumer, because every consumer Camel has
+        // (timer:, file:, imaps:) is a poller and a poller outlives the gesture that started it.
+        // These three put a route on the daemon's clock and publish what crosses it as facts.
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.up", "camel: start a route and leave it running",
+            emptyList(), listOf("id", "status", "routes", "ok", "error"),
+            outputKinds = mapOf(
+                "id" to "id", "status" to "text", "routes" to "json", "ok" to "json", "error" to "text",
+            ),
+            params = mapOf(
+                // The route's name for as long as it runs. Blank takes the node's own id, so the
+                // simple case needs no ceremony; naming it matters when one program starts several.
+                "id" to LcncPortContract.LcncParamSpec(ph = "route id — blank uses this node's id"),
+                // Same LIVE picklists as vm.camel, and for the same reason: the admissible set is
+                // whatever the mounted module ships under this node's reach, and it changes when a
+                // module is mounted or re-resolved. There is no list here to go stale.
+                "from" to LcncPortContract.LcncParamSpec(
+                    v = "timer:lcnc?period=1000",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                "to" to LcncPortContract.LcncParamSpec(
+                    v = "log:lcnc",
+                    optsFrom = SubVm.LEGO_PREFIX + "camel.catalog?module=\$module&reach=\$reach#endpoints[]"),
+                "module" to LcncPortContract.LcncParamSpec(v = ""),
+                // The second gate, spelled on the node. Mounting camel-mail makes smtp POSSIBLE;
+                // this is what makes it ALLOWED, and a long-lived route is exactly the case the
+                // distinction was drawn for — a route that stays up is reaching for as long as it
+                // is up, so what it may reach belongs in the graph and not in an install history.
+                "reach" to LcncPortContract.LcncParamSpec(v = "LOCAL", opts = listOf("LOCAL", "DEPARTMENT")),
+            )),
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.down", "camel: stop a running route",
+            emptyList(), listOf("stopped", "count", "ok", "error"),
+            outputKinds = mapOf(
+                "stopped" to "json", "count" to "json", "ok" to "json", "error" to "text",
+            ),
+            params = mapOf(
+                // Picked from what is actually up, not typed from memory: a stop that names a
+                // route which ended an hour ago is the most common way an operator concludes the
+                // stop is broken.
+                "id" to LcncPortContract.LcncParamSpec(
+                    ph = "route id", optsFrom = SubVm.LEGO_PREFIX + "camel.routes#ids[]"),
+                "all" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            )),
+        // Read-only, no params, and no port through which it could start, stop or reach anything —
+        // which is what makes it safe to call from a picklist that fills on every editor open,
+        // the same argument camel.catalog makes about itself.
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel.routes", "camel: what is running right now",
+            emptyList(), listOf("ids", "routes", "count"),
+            outputKinds = mapOf("ids" to "json", "routes" to "json", "count" to "json")),
+        LcncPortContract(SubVm.LEGO_PREFIX + "graalce", "graalce: any Graal language, inline source",
+            listOf("context?"), listOf("result"),
+            inputKinds = mapOf("context" to "json"),
+            outputKinds = mapOf("result" to "text"),
+            params = mapOf(
+                "facet" to LcncPortContract.LcncParamSpec(v = "GRAAL_JS", opts = VM_FACET_NAMES),
+                "source" to LcncPortContract.LcncParamSpec(ta = true, code = true, ph = "guest source; print() lands in text"),
+                "world" to LcncPortContract.LcncParamSpec(ph = "comma-separated host dirs seeded to /workspace"),
+                "trust" to LcncPortContract.LcncParamSpec(v = "OWN", opts = VM_TRUST_OPTIONS),
+                "keep" to LcncPortContract.LcncParamSpec(v = "false", opts = BOOLEAN_OPTIONS),
+            )),
+
+        // ── Legal council (design/legal-council-3x5.md) — the node family
+        // behind CouncilProgram.build / preset-council. MANY cardinality on
+        // the fold/record parts is LOAD-BEARING: LcncRunner.isManyInput
+        // consults these declarations to collect multi-wire ports as lists.
+        // Kinds: the council's assembly lane is json end to end (scope.in
+        // values and scope.out yields are json-kinded, and every fold/prompt
+        // /content port sits between them); the ONE text-kinded legacy feed
+        // — legal.evidence's brief into the ruling fold — rides text.fold's
+        // dedicated `brief?` port so every declared kind pair on every
+        // preset wire agrees (the kind-parity gate checks each one).
+        // `prompt` is read as a String by the seat runner: its exact type is
+        // text. It said `json`, and the council preset's text cable into it was
+        // the first thing exact cable typing refused.
+        LcncPortContract("council.seat", "council seat (one model call, degrade-loudly)",
+            listOf("prompt"), listOf("content", "labeled", "model", "record"),
+            inputKinds = mapOf("prompt" to "text"),
+            // content and labeled are Strings in the runner (the model's answer, and
+            // the same under a bracket header); record is a turn-record map.
+            outputKinds = mapOf("content" to "text", "labeled" to "text", "model" to "id", "record" to "json"),
+            params = mapOf(
+                "system" to LcncPortContract.LcncParamSpec(ta = true, ph = "seat system charge"),
+                "persona" to LcncPortContract.LcncParamSpec(ph = "seat persona (experts)"),
+                "panel" to LcncPortContract.LcncParamSpec(ph = "panel token (p1…)"),
+                "seat" to LcncPortContract.LcncParamSpec(ph = "seat name (e1, synth, ruling…)"),
+                "role" to LcncPortContract.LcncParamSpec(ph = "expert|rebuttal|synthesis|ruling|clarify"),
+                "round" to LcncPortContract.LcncParamSpec(v = "1"),
+                "charge" to LcncPortContract.LcncParamSpec(ph = "panel charge"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id (roster failover behind it)"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "512"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")),
+                "strengths" to LcncPortContract.LcncParamSpec(cols = _l["key", "model", "strength"], optional = true,
+                    ph = "operator-declared strengths; not measured or used for routing"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "council/<caseId>/<panel>/<seat> spend receipt"),
+                "caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"),
+            ), isEffect = true),
+        LcncPortContract("nars.seat", "NARS seat (unverified nearby context; asks for review)",
+            listOf("charge", "choices"), listOf("content", "labeled", "model", "record"),
+            cardinality = mapOf("choices" to LcncCardinality.MANY),
+            inputKinds = mapOf("charge" to "text", "choices" to "json"),
+            outputKinds = mapOf("content" to "text", "labeled" to "text", "model" to "id", "record" to "json"),
+            params = mapOf(
+                "charge" to LcncPortContract.LcncParamSpec(ta = true, ph = "question for the curated evidence"),
+                "choices" to LcncPortContract.LcncParamSpec(ta = true, ph = "JSON array of alternatives when no choices are wired"),
+                "taxonomy" to LcncPortContract.LcncParamSpec(ph = "belief taxonomy"),
+                "k" to LcncPortContract.LcncParamSpec(v = "8"),
+                "maxDistance" to LcncPortContract.LcncParamSpec(v = "16"),
+                "minEvidence" to LcncPortContract.LcncParamSpec(v = "1", ph = "legacy setting; no effect until reviewed proposition bindings exist"),
+                "panel" to LcncPortContract.LcncParamSpec(v = "council"),
+                "seat" to LcncPortContract.LcncParamSpec(ph = "seat name"),
+                "role" to LcncPortContract.LcncParamSpec(v = "review"),
+                "round" to LcncPortContract.LcncParamSpec(v = "1"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "review provenance context"),
+            )),
+        LcncPortContract("text.fold", "text fold (dumb MANY-part concatenator)",
+            listOf("parts", "brief?"), listOf("text"),
+            mapOf("parts" to LcncCardinality.MANY),
+            // flattenText folds strings (or lists of them) and joins them: text in, text out.
+            inputKinds = mapOf("parts" to "text", "brief" to "text"),
+            outputKinds = mapOf("text" to "text"),
+            params = mapOf(
+                "label" to LcncPortContract.LcncParamSpec(ph = "fold header (== label ==)"),
+                "separator" to LcncPortContract.LcncParamSpec(v = "\n\n---\n\n"),
+                "numbered" to LcncPortContract.LcncParamSpec(v = "true", opts = BOOLEAN_OPTIONS),
+            )),
+        LcncPortContract("record.fold", "record fold (turn provenance gatherer)",
+            listOf("parts"), listOf("turns"),
+            mapOf("parts" to LcncCardinality.MANY),
+            inputKinds = mapOf("parts" to "json"),
+            outputKinds = mapOf("turns" to "json")),
+        LcncPortContract("ruling.parse", "ruling parse (trailing JSON, strict-false booleans)",
+            listOf("text"), listOf("verdict", "needsClarification", "clarificationQuestion", "mistrial", "text"),
+            // the runner reads `text` as a String and passes it through: text in, text out.
+            inputKinds = mapOf("text" to "text"),
+            outputKinds = mapOf(
+                "verdict" to "json", "needsClarification" to "json",
+                "clarificationQuestion" to "text", "mistrial" to "json", "text" to "text",
+            )),
+        LcncPortContract("merge", "merge (the if/else join: the one guarded ring's yield that is present)",
+            listOf("a?", "b?"), listOf("value"),
+            // merge<T>(a?: T, b?: T): T — both branches must yield the same kind.
+            inputKinds = mapOf("a" to "T", "b" to "T"),
+            outputKinds = mapOf("value" to "T")),
+        LcncPortContract("coalesce", "coalesce (a? over b — clarified wins, absent yields lose)",
+            listOf("a?", "b"), listOf("value"),
+            // A pass-through: coalesce<T>(a?: T, b: T): T. The first cable fixes T, the
+            // second must be T, and the value cable carries T (LcncTypeCheck.Resolver).
+            inputKinds = mapOf("a" to "T", "b" to "T"),
+            outputKinds = mapOf("value" to "T")),
+        LcncPortContract("council.convene", "council convene (config → drawn program)",
+            listOf("config?"), listOf("program", "summary"),
+            inputKinds = mapOf("config" to "json"),
+            outputKinds = mapOf("program" to "json", "summary" to "json"),
+            params = mapOf(
+                "config" to LcncPortContract.LcncParamSpec(
+                    ta = true, ph = "{\"panels\":[{name,charge,experts}],\"rounds\":2,…} — empty = DEFAULT_3x5"),
+            ), isEffect = true),
+        LcncPortContract("council.record", "council record (CAS + blackboard + couch + KIF + case lifecycle)",
+            listOf("verdict", "transcript", "turns?", "caseId?", "documentCid?"), listOf("report"),
+            mapOf("transcript" to LcncCardinality.MANY, "turns" to LcncCardinality.MANY),
+            // transcript is MANY text parts the runner flattens; caseId is read as a String.
+            inputKinds = mapOf(
+                "verdict" to "json", "transcript" to "text", "turns" to "json",
+                "caseId" to "id", "documentCid" to "id",
+            ),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf("caseId" to LcncPortContract.LcncParamSpec(v = "default")), isEffect = true),
+        LcncPortContract("council.case", "council case read-back (index + transcript/verdict from CAS)",
+            listOf("caseId?"), listOf("case"),
+            inputKinds = mapOf("caseId" to "id"),
+            outputKinds = mapOf("case" to "json"),
+            params = mapOf("caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"))),
+
+        // ── WikiSkill (arXiv 2608.27454) — the two consolidation legos.
+        // ONE invocation is ONE pass: wiki.consolidate is a single Maintainer
+        // iteration k, wiki.propose is a single Proposer pass. The iteration
+        // LOOP is the caller's (a program document / successive runs), never
+        // hidden inside a runner — cans and atoms. Wiki state lives under the
+        // FORGE home the daemon wires, never the repo worktree.
+        LcncPortContract(WIKI_CONSOLIDATE, "wiki consolidate (Wiki Maintainer: traces + prior wiki → PATCH edits)",
+            listOf("cids?"), listOf("report"),
+            inputKinds = mapOf("cids" to "json"),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf(
+                "cids" to LcncPortContract.LcncParamSpec(
+                    ta = true, ph = "sampled transcript cids (comma/newline separated) — success AND failure mix"),
+                "iteration" to LcncPortContract.LcncParamSpec(v = "1"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "4096"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "traceChars" to LcncPortContract.LcncParamSpec(v = "9000", ph = "per-trace context budget"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id (roster failover behind it)"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "spend receipt id; also names the captured response file"),
+            )),
+        LcncPortContract(WIKI_PROPOSE, "wiki propose (Skill Proposer: multi-turn ReAct → ONE atomic proposal)",
+            listOf("summary?"), listOf("report"),
+            inputKinds = mapOf("summary" to "text"),
+            outputKinds = mapOf("report" to "json"),
+            params = mapOf(
+                "summary" to LcncPortContract.LcncParamSpec(
+                    ta = true, ph = "concise summary of training outcomes (the paper's third initial input)"),
+                "maxTurns" to LcncPortContract.LcncParamSpec(v = "6"),
+                "maxTokens" to LcncPortContract.LcncParamSpec(v = "4096"),
+                "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
+                "readChars" to LcncPortContract.LcncParamSpec(v = "9000", ph = "per-read context budget"),
+                "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "spend receipt id; also names the read log"),
+            )),
+
+        // ── uring — the ring, as palette legos. Every node runs through the
+        // userspace facade (prep* → submit → CQE); the backend underneath is
+        // the probed actual (Panama/JNI ring or emulation), never chosen here.
+        LcncPortContract(URING_PROBE, "uring probe (capability report: what THIS machine's ring answers)",
+            emptyList(), listOf("report"),
+            outputKinds = mapOf("report" to "json")),
+        LcncPortContract(URING_READ, "uring read (READ SQE at offset → bytes + res)",
+            listOf("path"), listOf("bytes", "res"),
+            inputKinds = mapOf("path" to "text"),
+            outputKinds = mapOf("bytes" to "text", "res" to "json"),
+            params = mapOf(
+                "path" to LcncPortContract.LcncParamSpec(ta = true, ph = "file path — opened and closed through the ring"),
+                "offset" to LcncPortContract.LcncParamSpec(v = "0", ph = "pread offset"),
+                "len" to LcncPortContract.LcncParamSpec(v = "65536", ph = "max bytes"),
+            )),
+        LcncPortContract(URING_WRITE, "uring write (WRITE SQE at offset ← bytes)",
+            listOf("path", "bytes"), listOf("res"),
+            inputKinds = mapOf("path" to "text", "bytes" to "text"),
+            outputKinds = mapOf("res" to "json"),
+            params = mapOf(
+                "path" to LcncPortContract.LcncParamSpec(ta = true, ph = "file path — created (0600) through the ring when absent"),
+                "offset" to LcncPortContract.LcncParamSpec(v = "0", ph = "pwrite offset"),
+            )),
+        LcncPortContract(URING_FSYNC, "uring fsync (FSYNC SQE — one CQE on durability)",
+            listOf("path"), listOf("res"),
+            inputKinds = mapOf("path" to "text"),
+            outputKinds = mapOf("res" to "json"),
+            params = mapOf(
+                "path" to LcncPortContract.LcncParamSpec(ta = true, ph = "file path — opened through the ring"),
+            )),
+    )
+
+    fun compatible(sourceType: String, sourcePort: String): List<LcncPortContract> =
+        all().filter { it.inputs.isNotEmpty() && it.inputs.any { p -> p.removeSuffix("?") == sourcePort.removeSuffix("?") } }
+
+    private val byType: Map<String, LcncPortContract> by lazy {
+        buildMap {
+            for (contract in all()) if (contract.type !in this) put(contract.type, contract)
+        }
+    }
+
+    fun find(type: String): LcncPortContract? = byType[type]
+}

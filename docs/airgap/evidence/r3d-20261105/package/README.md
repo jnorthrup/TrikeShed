@@ -1,0 +1,7 @@
+# R3d runtime update
+
+This archive is an overlay, not a standalone runtime. Retain the exact R4f Linux x86-64 runtime named and hashed in UPDATE.json. Verify that base archive's SHA-256, then extract it into a fresh installation directory. Extract this update into that same directory. Both archives use airgap-document-rootfs/; the update replaces only the paths enumerated in UPDATE.json. Do not overlay a running installation or overwrite writable runtime state.
+
+Inside airgap-document-rootfs, verify `sha256sum --check SHA256SUMS` and the complete file/directory membership and modes against package-identity.json. Use the retained package verifier for the latter checks. Apply the recorded read-only filesystem, writable state, UTF-8 locale and isolated network launch from the runbook. The host kernel, bwrap and browser remain external inputs.
+
+The browser reuses semantic comparisons for identical serialized graph snapshots and measures node dimensions before batched overlap moves. Existing human-paced transfer inspection and owner checks remain in place. D3M also retains the local English corpus lexical-search contract and preset, NARS exact-role selection and native Horn certificate projections. Sulong engine modules, native buffers and durable storage code retain their existing contracts. This update does not establish dense recursive visualization, machine power-loss durability or full vendor/native rebuild provenance.

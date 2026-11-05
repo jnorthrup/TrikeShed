@@ -1,0 +1,628 @@
+{
+  "release": "R3d receipt rendering",
+  "createdAt": "2026-11-05T09:07:27.490448+00:00",
+  "testedSourceCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+  "testedSourceTree": "91b659d5921b932d7eda47bca6c90b6beab24d46",
+  "integration": {
+    "integratedCommit": "36cc2535d6927ec71aa80545aff62c3e0c37b771",
+    "testedCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+    "integratedTreeMatchesTestedTree": true,
+    "frozenRefCounts": [
+      549,
+      551,
+      553
+    ],
+    "merges": 6,
+    "conflictedFiles": 1,
+    "conflictedHunks": 1,
+    "allFrozenTipsAreAncestors": true,
+    "conflictResolution": "final/resolution.json",
+    "localMachine": "Cloud checkout /workspace/TrikeShed; Jim Mac unchanged",
+    "pushPolicy": "Ordinary master push; no force, pruning, or branch deletion. Final remote readback recorded separately."
+  },
+  "sourceSha256": {
+    "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40",
+    "PRELOAD.md": "28b3044a14053b4755e48ce9284451e0c2868e21b3c8d78c5141bde5c25e33f1",
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "gradle.properties": "2b288c27e97606c41f9a74b9ab3734b0ee06f7dc60c1147b861722bfe2dec51e",
+    "release/airgap-document/README.md": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13",
+    "settings.gradle.kts": "35a1e6101800fabb05bc43e460e649e3b8b53611011d6d6dc23e5158263c8315",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishCorpusContract.kt": "0b76e0be21cefeb897bdbd471dd6f447ba008bdad58f1546752c4a91e6b6d00b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishCorpusPreset.kt": "60cd1203bb8d659abf0a2489c60e9829a709638c4feabfa64903af8c28418e27",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "f799e4dd7f6a6257e4ce34bf0987ce9c26ab480e53c4922933d7ff6fa085e2ae",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt": "d4e292c671e12875b1311b38784bd7a4e7101a02cc592f458fecaaae84c90b1b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncPresets.kt": "03d3e8ec933e94fc3ed1e112d74608669d287f89ddba70d283eedb82c13c5fe4",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt": "5ee7b106022b5ef569e286e51eeac027ecd3be749d631182bfc7fc61974d1238",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefsNodes.kt": "46100f3cb0301112306404bf95df5ab95be98deba4a72f14e8641c1fd7afa33c",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/KgRetention.kt": "bdf611b11f86565f58f0838987c3a6dafba1cdb5e87c9d54fd147aa0ee3cfb0d",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/NalNodes.kt": "d45721713515bfa44fb11d2078d82ed63222a65faf03e4e9141c07a0e1465b8d",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/EnglishCorpusPresetTest.kt": "1ddbe31d98507da17bcccbbcfc45f61977fd3be3861c146fbf92007a9b9614bb",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt": "0c2a511e38cdf99d6328d0de855193db8ddcf96003a87088346ad4407d7e5f5c",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt": "70392931cc5a7babd63f2ba8a5f5befd56e031ac5043866b043d632c44be2a54",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "2488553641ed399c6636d8105a50f08104f9f8fb312652d565ea7a9926158c93",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "11fc0dc7b68aee638097c0e4c1ac1ae3b4e361f51277c654a294a6f0a9e41966",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "f2cf9082c70a4d4b907958a590bd134c68851b37a34f14c1fb0c581a049135ca",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt": "c2cd7b6030689103fb8518c4924409e58b81091f2b8814261d92ef5da056732b",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/EnglishCorpusWire.kt": "7cd2405363aefda8b64a028930788e8c75315efdd61ebbd7cf1a2d2e5f74dc88",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt": "ef3fc4f0bd53310af9a296f483ac328c407b1c0863cad6787150b3ba1e2f23e9",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishCorpusWireTest.kt": "301dcd3f0d28a6fe5bd7a95b2a2cbf656fd2c3c20abb1e4f6ccde6c6eeef6d23",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "739b5cb6a03c4e9c1e10eb5d07b0e30fb4fb13c0858afb9b414346d65eac209b",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornCertificateTest.kt": "c2c5d0b005d355f33c437d4dbe7ecddeb42acec97bbc162ff8b287381e172800",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt": "95ab7d8d1f5340941160a49431265f3b1d3afd90308fb0f1666d92f367e97b1c",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/ExactRoleRecallTest.kt": "1d6ded7f3f906276f5e0e87bb2892fbe9a4989fd86499d683b82a854be6ab97d"
+  },
+  "testTotals": {
+    "tests": 316,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 6,
+    "passed": 310
+  },
+  "browser": {
+    "passed": 26,
+    "frameMeasurementsRecorded": 3,
+    "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+    "cases": {
+      "final-fanout01": {
+        "cases": {
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "frameMeasurement": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:57a9ef2ea1e4a0180d40d76af868d9ae38854ebbc089c9346a8f2ebc0b1ce276",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:7096ab97c836e911fd0f09006959d9b44c97e1ae67620259ea3b3239ce25fb5b",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:9e7b0faba383594f07d5d59befb6f14b600f76c26b9976dc188199dcc741d6b2",
+              "status": "completed"
+            }
+          ],
+          "runId": "b84601f6-4254-46db-91c3-52739341e7cf",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:9e7b0faba383594f07d5d59befb6f14b600f76c26b9976dc188199dcc741d6b2",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 166,
+            "p50": 16.699999999999818,
+            "p95": 16.800000000000182,
+            "maximum": 150,
+            "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-fanout01"
+      },
+      "final-fanout02": {
+        "cases": {
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "frameMeasurement": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:134f1f82c02aa121c36789d989e0b3460ac5ac1fe552ef1d52ce15fd428e0b4e",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:579ab442662c4459aa17f6b079d87c28e873b74277063d7c26ae1eb7365cf326",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:21ecd3adf868c78399f6fb443a6c1f50ae24ba0b47602180e968db6b665ae28b",
+              "status": "completed"
+            }
+          ],
+          "runId": "5f32d4e9-3f02-487c-b4e9-ddc09dccd721",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:21ecd3adf868c78399f6fb443a6c1f50ae24ba0b47602180e968db6b665ae28b",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 163,
+            "p50": 16.699999999999818,
+            "p95": 33.30000000000018,
+            "maximum": 150.10000000000036,
+            "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-fanout02"
+      },
+      "final-fanout03": {
+        "cases": {
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "frameMeasurement": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:d6527f276ce796432a5a5b1cd097224ff4c848a39909d87abce341bd0cf99300",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:ab4470e0b774e06eb787e2d605377c48de935bf557f7400c7af1b11f6906fa27",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:56d8667854a0c75e583cdf70ac0087743a772404ef5d04364601186ec2c2f2ce",
+              "status": "completed"
+            }
+          ],
+          "runId": "1081b6ce-1d68-4ff7-9f71-6659b6fa33df",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:56d8667854a0c75e583cdf70ac0087743a772404ef5d04364601186ec2c2f2ce",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 168,
+            "p50": 16.699999999999818,
+            "p95": 16.800000000000182,
+            "maximum": 116.70000000000073,
+            "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-fanout03"
+      },
+      "final-document": {
+        "cases": {
+          "continuousClock": "PASS",
+          "pausedCamera": "PASS",
+          "pauseIsPresentationOnly": "PASS",
+          "retainedTable": "PASS",
+          "keyboardInspection": "PASS",
+          "idleEditInvalidation": "PASS",
+          "reducedReplay": "PASS",
+          "hide": "PASS",
+          "quote": "PASS",
+          "reopenedInspection": "PASS"
+        },
+        "audit": {
+          "kind": "document",
+          "casObjectsVerified": 27,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:6d469ceb9157f855dd90e211b1384e81535b4289af217c134e4825e3ebdd94d0",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:604348aec17089e75b035e10208d2665ff340157950ad899677a2e2f8921f373",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:8d15565ffd0296e2d2c2f54c8fb8c69dd86cc85ce1f085df5bea889c954a2f1e",
+              "status": "completed"
+            }
+          ],
+          "runId": "948e3b38-519c-458e-a828-914c1aaa8191",
+          "programCid": "sha256:346979fe70f6e54c3ac28526bb23d7ec49fc412f3e863ab16a86b91644a540c3",
+          "receiptCid": "sha256:8d15565ffd0296e2d2c2f54c8fb8c69dd86cc85ce1f085df5bea889c954a2f1e",
+          "mappedReceivedSelections": 8,
+          "mappedWires": 8,
+          "ownerOmissionsInFinalLedger": 0,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0,
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+          "frameIntervals": {},
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-document"
+      },
+      "final-ownership": {
+        "cases": {
+          "recordedReference": "PASS",
+          "layoutChange": "PASS",
+          "changedDuringRead": "PASS",
+          "restoredDefinition": "PASS"
+        },
+        "audit": {
+          "kind": "retained-reference-ownership",
+          "casObjectsVerified": 33,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:1a1a945a4154ed86baf77139e325f2f23bed60472494a971fb7e978575e9d6e1",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:9845a048a1f40b0302c86fd34d3befbfc96b48fe1047e09193da5e1c611ad799",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:c8b3630028b44a92093a00dbe7cc792a19b29c92a468ecbc3c09aa6038af0d20",
+              "status": "completed"
+            },
+            {
+              "cid": "sha256:edf07921fb6ccb64c70cfb9dbd20d433a22a3ce80cb4a12ef1ee84a90a0ef527",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:94fb831ac1ceedc6cdd81693d07d077a0b7e506992731ecb0cda54d3789c1620",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:f2b289cdc099dacca2010ffc464ab13581533bd320a0704686263c5ffc60255f",
+              "status": "completed"
+            }
+          ],
+          "runIds": [
+            "804f4f28-a8c9-4086-85fb-e6c52a2ca160",
+            "281338ca-0b64-4a72-bf72-acfd9cc28339"
+          ],
+          "programCids": [
+            "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+            "sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b"
+          ],
+          "sourceReadSha256": "1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "runSubmissions": 2,
+          "retainedReads": 4,
+          "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+          "scope": "Two real commonMain JSON literal runs and four actual CAS GET requests. The third request is delayed, then continued unchanged, to edit the canvas during an awaited read. No response fabrication or additional execution."
+        },
+        "evidence": "accepted/final-ownership"
+      }
+    }
+  },
+  "comparison": [
+    {
+      "case": "baseline-fanout01",
+      "kind": "baseline",
+      "startedAt": "2026-11-05T09:01:56.080337+00:00",
+      "finishedAt": "2026-11-05T09:02:07.527503+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3d",
+        "python3",
+        "/workspace/airgap-r3d-proof/run.py",
+        "baseline-fanout01",
+        "fanout"
+      ],
+      "exit": 0,
+      "frames": {
+        "unit": "ms",
+        "samples": 110,
+        "p50": 16.699999999999818,
+        "p95": 33.30000000000018,
+        "maximum": 1049.9000000000005,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "frameMeasurement": "RECORDED"
+      }
+    },
+    {
+      "case": "final-fanout01",
+      "kind": "final",
+      "startedAt": "2026-11-05T09:02:07.562826+00:00",
+      "finishedAt": "2026-11-05T09:02:19.176149+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3d",
+        "python3",
+        "/workspace/airgap-r3d-proof/run.py",
+        "final-fanout01",
+        "fanout"
+      ],
+      "exit": 0,
+      "frames": {
+        "unit": "ms",
+        "samples": 166,
+        "p50": 16.699999999999818,
+        "p95": 16.800000000000182,
+        "maximum": 150,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "frameMeasurement": "RECORDED"
+      }
+    },
+    {
+      "case": "final-fanout02",
+      "kind": "final",
+      "startedAt": "2026-11-05T09:02:19.213237+00:00",
+      "finishedAt": "2026-11-05T09:02:30.724959+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3d",
+        "python3",
+        "/workspace/airgap-r3d-proof/run.py",
+        "final-fanout02",
+        "fanout"
+      ],
+      "exit": 0,
+      "frames": {
+        "unit": "ms",
+        "samples": 163,
+        "p50": 16.699999999999818,
+        "p95": 33.30000000000018,
+        "maximum": 150.10000000000036,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "frameMeasurement": "RECORDED"
+      }
+    },
+    {
+      "case": "baseline-fanout02",
+      "kind": "baseline",
+      "startedAt": "2026-11-05T09:02:30.761449+00:00",
+      "finishedAt": "2026-11-05T09:02:42.176023+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3d",
+        "python3",
+        "/workspace/airgap-r3d-proof/run.py",
+        "baseline-fanout02",
+        "fanout"
+      ],
+      "exit": 0,
+      "frames": {
+        "unit": "ms",
+        "samples": 111,
+        "p50": 16.699999999999818,
+        "p95": 33.399999999999636,
+        "maximum": 1000,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "frameMeasurement": "RECORDED"
+      }
+    },
+    {
+      "case": "baseline-fanout03",
+      "kind": "baseline",
+      "startedAt": "2026-11-05T09:02:42.211451+00:00",
+      "finishedAt": "2026-11-05T09:02:53.579756+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3d",
+        "python3",
+        "/workspace/airgap-r3d-proof/run.py",
+        "baseline-fanout03",
+        "fanout"
+      ],
+      "exit": 0,
+      "frames": {
+        "unit": "ms",
+        "samples": 112,
+        "p50": 16.699999999999818,
+        "p95": 33.399999999999636,
+        "maximum": 983.3000000000002,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "frameMeasurement": "RECORDED"
+      }
+    },
+    {
+      "case": "final-fanout03",
+      "kind": "final",
+      "startedAt": "2026-11-05T09:02:53.617060+00:00",
+      "finishedAt": "2026-11-05T09:03:05.738736+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3d",
+        "python3",
+        "/workspace/airgap-r3d-proof/run.py",
+        "final-fanout03",
+        "fanout"
+      ],
+      "exit": 0,
+      "frames": {
+        "unit": "ms",
+        "samples": 168,
+        "p50": 16.699999999999818,
+        "p95": 16.800000000000182,
+        "maximum": 116.70000000000073,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "frameMeasurement": "RECORDED"
+      }
+    }
+  ],
+  "preliminaryRuns": [
+    "document-candidate01",
+    "fanout-candidate01",
+    "fanout-candidate02",
+    "fanout-candidate03",
+    "ownership01",
+    "profile-baseline01",
+    "profile-candidate01"
+  ],
+  "runtimeUpdate": {
+    "baseArchive": {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "bytes": 460778817,
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    "targetSourceCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+    "previousJvmSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "files": {
+      "SHA256SUMS": {
+        "before": "e93c64c20797875170cbe1f52e1b062e57a0a08fb44ced42e23e44666dec1115",
+        "after": "34b82892f235f8af324ce65ed993c32ab0156d473daad2511d3909dfb2bcf987"
+      },
+      "opt/trikeshed/README.md": {
+        "before": "c3e4ca1db3af4a4fda1bf1deec036b38aca4c8fcc552b38f5f3d729756608bdd",
+        "after": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13"
+      },
+      "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+        "before": "b65eddc8f95bc93bb7ff1f1431d0dedc904c8bd6b55af818bd37f8513e6d022a",
+        "after": "2cfd9269d9cd3d295aaaaed00886786518ae4ab41d2f6aa085bf711b682f9e78"
+      },
+      "opt/trikeshed/lib/TrikeShed-jvm-0.1.0-SNAPSHOT.jar": {
+        "before": "5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c",
+        "after": "e4fa6c396fbff190d160c084df0ac6991ab35ebac44149c4736a18c59165382a"
+      },
+      "package-identity.json": {
+        "before": "ee6456520a5e7c99e752e1759416d95aac81d9bbf1b4e989c327095965c12271",
+        "after": "e9899b3504d36e0a9219c15aed3c084d52346acd718087393e9ffb6cebe69622"
+      }
+    },
+    "scope": "Layered runtime update. Requires the exact immutable R4f runtime; the production JVM and Spacegraph jars are rebuilt from combined D3M source, retaining the runtime instructions and exact manifests. The combined build retains exact-role NARS and native Horn work and adds the local English corpus search preset. Identical graph comparisons are reused; overlap measurements are batched before position writes. No new dependency or native module.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3d-runtime-update-2026-11-05.tar.gz",
+      "sha256": "e115e47d71f3e7f32c8a5a9c22da7fddbffa0f816f816aeabcef3c7d5f345077",
+      "bytes": 36881833
+    },
+    "identicalTwoAssemblies": true,
+    "installedRoot": "/workspace/airgap-r3d-proof/installed-combined/airgap-document-rootfs",
+    "installation": "Verified immutable R4f root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete combined membership/mode/hash verification passes. No mutation of the R4f root."
+  },
+  "sourceUpdate": {
+    "baseSourceCommit": "792a14c3b982956df3a139661797e171cba9b963",
+    "targetSourceCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+    "targetTree": "91b659d5921b932d7eda47bca6c90b6beab24d46",
+    "requiredSourceChain": [
+      {
+        "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+        "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+      },
+      {
+        "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+        "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+      },
+      {
+        "file": "airgap-document-r3c-final-sources-update-2026-11-05.tar.gz",
+        "sha256": "dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f"
+      }
+    ],
+    "patchSha256": "fc6d1917d9b2ce6226d2ecb2c7cb759b3adc758f88d3ec89f666f27c93fa6de4",
+    "verifiedAppliedTreeMatches": true,
+    "dependencyChanges": [],
+    "scope": "Apply after the R3c final source update, itself applied after R4f on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3d-final-sources-update-2026-11-05.tar.gz",
+      "bytes": 12680655,
+      "sha256": "a57105c0fbf9fea0f2d9b3a0bfbc566eeeaf531df75d52b7e1ef543c566ce1c6"
+    }
+  },
+  "limits": [
+    "Final maximum frame gaps of 116.7\u2013150.1 ms remain; sustained frame-rate/control-latency acceptance is open.",
+    "Full canvas serialization on each validity check and pairwise quadratic layout remain.",
+    "65-node fixture only; no dense recursive or 10k/50k graph acceptance.",
+    "Final live table is a bounded received-event projection; missing observations are not fabricated.",
+    "Six external native Horn checks skipped; incoming evidence keeps its original scope.",
+    "Pinned-byte packaging does not close full vendor/native source rebuild provenance or machine power-loss durability."
+  ],
+  "reproduction": "../../14-receipt-rendering.md",
+  "evidenceStanding": "Original logs/state/profile bytes retained. Preliminary, baseline and accepted scopes are separate. Authored whitespace checks exclude raw evidence; SHA256.json verifies its bytes.",
+  "sourceSnapshotCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+  "publicationInstructionUpdates": {
+    "PRELOAD.md": "33b92f1d40c738ca36c4ed3c307944c3101d727a76ff0c5b81a5e9fce681e467"
+  }
+}

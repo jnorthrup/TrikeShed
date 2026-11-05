@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ExactRoleRecallTest[jvm]" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-05T08:54:50.945Z" hostname="0d6dfba25614" time="0.239">
+  <properties/>
+  <testcase name="uniqueDocumentaryResidentTargetsTypeCheckAndWireToSeparateAttentionWithoutAvailabilityDisambiguation()[jvm]" classname="borg.trikeshed.narsese.ExactRoleRecallTest" time="0.143"/>
+  <testcase name="structuredCanonicalAndOptionalWirePresenceNeverFallBackFromNullOrBadRequest()[jvm]" classname="borg.trikeshed.narsese.ExactRoleRecallTest" time="0.019"/>
+  <testcase name="lexicalLiteralsRemainTypedAndNeverBecomeInjectedPatternsOrEntityFallbacks()[jvm]" classname="borg.trikeshed.narsese.ExactRoleRecallTest" time="0.004"/>
+  <testcase name="sameAngularOwesAndOtherContextRemainDocumentaryMatchesWithoutWrongResidentAttention()[jvm]" classname="borg.trikeshed.narsese.ExactRoleRecallTest" time="0.004"/>
+  <testcase name="unsupportedWholeSourcesAndMissingUnrelatedDefinitionsNeverReturnPartialNoMatch()[jvm]" classname="borg.trikeshed.narsese.ExactRoleRecallTest" time="0.012"/>
+  <testcase name="actualC2StructuredWireSelectsPaysThenExplicitAttentionChangesOnlyBudget()[jvm]" classname="borg.trikeshed.narsese.ExactRoleRecallTest" time="0.01"/>
+  <testcase name="duplicateOccurrencesAndRepeatedSelectionNeverAddEvidenceAndEvictionCannotBeRevived()[jvm]" classname="borg.trikeshed.narsese.ExactRoleRecallTest" time="0.045"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
