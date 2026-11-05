@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="KgRouteErrorTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T02:05:35.202Z" hostname="0d6dfba25614" time="0.024">
+  <properties/>
+  <testcase name="invalidInputReturns400WithoutMintAndTheNextValidRequestWorks()[jvm]" classname="borg.trikeshed.narsese.KgRouteErrorTest" time="0.016"/>
+  <testcase name="retentionRefusalsKeepExisting503And413Responses()[jvm]" classname="borg.trikeshed.narsese.KgRouteErrorTest" time="0.004"/>
+  <testcase name="admissionConflictReturns409AndDoesNotPretendTheProcessedPrefixRolledBack()[jvm]" classname="borg.trikeshed.narsese.KgRouteErrorTest" time="0.002"/>
+  <testcase name="cancellationIsPropagatedInsteadOfBecomingAnHttpInputError()[jvm]" classname="borg.trikeshed.narsese.KgRouteErrorTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

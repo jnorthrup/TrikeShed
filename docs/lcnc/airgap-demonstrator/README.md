@@ -24,14 +24,19 @@ records 19 passing current regressions with external networking unavailable
 and compilation of all affected targets. This closes a bounded transport
 milestone; the full evaluator and visual acceptance gates remain as specified.
 
-The [airgap release index](../../airgap/README.md) now continues through R2:
-the actual upstream Confix JSON/CBOR/YAML scanner, bounded native ownership,
-Kotlin geometry comparisons and a durable scanner-to-scalar run. Its
-[combined-source evidence](../../airgap/evidence/r2-20261104/verification.json)
-records 61 passing selected regressions under external-network isolation, two
-conditional native-solver skips and affected-target compilation. The
-[R3 handoff](../../airgap/03-visible-traversal.md) maps the next visible-transfer
-mechanics; final animation and sealed distribution remain open gates.
+The [airgap release index](../../airgap/README.md) now reaches R4a. R2 executes
+the actual upstream Confix scanner with bounded native ownership; R3a adds
+observed wire sparks and native flyovers; R3b traverses a retained 12-page
+PDF and verifies an exact passage. [R4a](../../airgap/06-offline-runtime.md)
+packages that path and verifies a new JVM recovering its receipt without
+source assets, extraction tools or LLVM runners, inside a fresh filesystem
+with no external networking. Its [combined-source evidence](../../airgap/evidence/r4a-20261105/verification.json)
+records 219 selected JVM regressions, affected-target compilation, ten browser
+cases, startup/integrity refusals and identical archives from pinned bytes.
+These bounded milestones do not complete the whole programme. Dense recursive
+visualization, wider LCNC wizards, crash recovery and vendor/native
+source-build reproducibility remain open; the original timeline and cost
+envelope are planning estimates, not measured totals for these increments.
 
 | Reader or decision | Read first |
 |---|---|

@@ -1,0 +1,27 @@
+[
+  {
+    "case": "changed-jar",
+    "exit": 1,
+    "result": "PASS"
+  },
+  {
+    "case": "changed-mode",
+    "exit": 1,
+    "result": "PASS"
+  },
+  {
+    "case": "extra-file",
+    "exit": 1,
+    "result": "PASS"
+  },
+  {
+    "case": "extra-directory",
+    "exit": 1,
+    "result": "PASS"
+  },
+  {
+    "case": "changed-manifest",
+    "exit": 1,
+    "result": "PASS"
+  }
+]

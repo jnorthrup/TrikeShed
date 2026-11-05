@@ -1,0 +1,54 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: airgapDocumentInstall
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Could not determine the dependencies of task ':kotlinNpmInstall'.
+> Failed to query the value of task ':kotlinNpmInstall' property 'packageJsonFiles'.
+   > Could not resolve all dependencies for configuration ':jsTestNpmAggregated'.
+      > Could not resolve org.jetbrains.kotlin:kotlin-test-js:2.4.21.
+        Required by:
+            root project 'TrikeShed' > org.jetbrains.kotlin:kotlin-test:2.4.21
+         > No cached version of org.jetbrains.kotlin:kotlin-test-js:2.4.21 available for offline mode.
+         > No cached version of org.jetbrains.kotlin:kotlin-test-js:2.4.21 available for offline mode.
+         > No cached version of org.jetbrains.kotlin:kotlin-test-js:2.4.21 available for offline mode.
+         > No cached version of org.jetbrains.kotlin:kotlin-test-js:2.4.21 available for offline mode.
+         > No cached version of org.jetbrains.kotlin:kotlin-test-js:2.4.21 available for offline mode.
+      > Could not resolve org.jetbrains.kotlinx:kotlinx-coroutines-test-js:1.11.0.
+        Required by:
+            root project 'TrikeShed' > org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0
+         > No cached version of org.jetbrains.kotlinx:kotlinx-coroutines-test-js:1.11.0 available for offline mode.
+         > No cached version of org.jetbrains.kotlinx:kotlinx-coroutines-test-js:1.11.0 available for offline mode.
+         > No cached version of org.jetbrains.kotlinx:kotlinx-coroutines-test-js:1.11.0 available for offline mode.
+         > No cached version of org.jetbrains.kotlinx:kotlinx-coroutines-test-js:1.11.0 available for offline mode.
+         > No cached version of org.jetbrains.kotlinx:kotlinx-coroutines-test-js:1.11.0 available for offline mode.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 6s
+Configuration cache entry stored.

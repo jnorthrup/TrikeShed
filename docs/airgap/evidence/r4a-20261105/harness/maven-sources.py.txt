@@ -1,0 +1,20 @@
+from pathlib import Path
+import urllib.request,json,hashlib,concurrent.futures,zipfile
+home=Path('/workspace/airgap-r4-proof');out=home/'corresponding-source/maven';out.mkdir(parents=True,exist_ok=True)
+rows=json.loads((home/'maven-inventory.json').read_text())
+def download(row):
+    name=row['name']+'-'+row['version']+'-sources.jar'
+    url='https://repo.maven.apache.org/maven2/'+row['group'].replace('.','/')+'/'+row['name']+'/'+row['version']+'/'+name
+    record={k:row[k] for k in ['group','name','version']};record['url']=url
+    try:
+        with urllib.request.urlopen(url,timeout=25) as r:data=r.read()
+        dest=out/(row['group']+'__'+name);dest.write_bytes(data)
+        with zipfile.ZipFile(dest) as z:assert z.testzip() is None
+        record.update(file=dest.name,bytes=len(data),sha256=hashlib.sha256(data).hexdigest())
+    except Exception as e:record['error']=str(e)
+    return record
+results=[]
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+    for result in pool.map(download,rows):
+        results.append(result);print(result['name'],'retained' if 'sha256' in result else result['error'],flush=True)
+        (home/'maven-source-inventory.json').write_text(json.dumps(results,indent=2)+'\n')

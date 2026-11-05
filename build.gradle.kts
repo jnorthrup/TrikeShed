@@ -552,6 +552,67 @@ val kotlinJsBundlesJar = tasks.register<Jar>("kotlinJsBundlesJar") {
     archiveClassifier.set("web")
 }
 
+// Bounded PDF -> native Confix -> Panels demonstration. Only this bootstrap is
+// taken from test output; JUnit and other test classes are not runtime dependencies.
+val airgapDocumentEntry = tasks.register<Jar>("airgapDocumentEntryJar") {
+    group = "distribution"
+    dependsOn("jvmTestClasses")
+    from(kotlin.jvm().compilations.getByName("test").output.classesDirs) {
+        include("borg/trikeshed/lcnc/AirgapDocumentMainKt*.class")
+    }
+    archiveClassifier.set("airgap-document-entry")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+val airgapDocumentPages = tasks.register<Jar>("airgapDocumentPagesJar") {
+    group = "distribution"
+    val spacegraph = tasks.named<KotlinWebpack>("jsBrowserSpacegraphProductionWebpack")
+    from(spacegraph.flatMap { it.outputDirectory }) { into("web/kotlin/spacegraph") }
+    archiveClassifier.set("airgap-document-web")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+val airgapDocumentRuntime = files(tasks.named("jvmJar"), airgapDocumentEntry, airgapDocumentPages,
+    configurations.getByName("jvmRuntimeClasspath").filter { it.extension == "jar" })
+val airgapDocumentScripts = tasks.register<org.gradle.jvm.application.tasks.CreateStartScripts>("airgapDocumentStartScripts") {
+    group = "distribution"
+    applicationName = "airgap-document"
+    mainClass.set("borg.trikeshed.lcnc.AirgapDocumentMainKt")
+    classpath = airgapDocumentRuntime
+    outputDir = layout.buildDirectory.dir("generated/airgap-document/bin").get().asFile
+    defaultJvmOpts = listOf("--enable-native-access=ALL-UNNAMED", "-Xmx768m", "-XX:ActiveProcessorCount=2",
+        "-Dpolyglot.engine.WarnInterpreterOnly=false", "-Dtrikeshed.airgap=true")
+}
+
+val airgapDocumentInstall = tasks.register<Sync>("airgapDocumentInstall") {
+    group = "distribution"
+    description = "Stage the bounded document demonstration; JDK, OS libraries and network isolation are separate release inputs."
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    into(layout.buildDirectory.dir("install/airgap-document"))
+    from(airgapDocumentScripts) {
+        include("airgap-document")
+        into("bin")
+        filePermissions { unix("rwxr-xr-x") }
+    }
+    from(airgapDocumentRuntime) { into("lib") }
+    from("src/jvmTest/resources/sulong") { include("add-mlir.bc", "confix.bc"); into("modules") }
+    from("src/jvmTest/resources/documents/coinbase-suski") { into("assets") }
+    from("LICENSE", "NOTICE.md")
+    from("release/airgap-document/README.md")
+}
+
+tasks.register<Zip>("airgapDocumentZip") {
+    group = "distribution"
+    description = "Archive the relocatable application layer; this task alone does not establish a sealed offline runtime."
+    from(airgapDocumentInstall) { into("airgap-document") }
+    archiveBaseName.set("airgap-document")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
 // Standalone Pi: the host still uses the project JVM jar, but the guest needs only
 // the JS language and the common runtime, not the daemon's Python/Ruby/LLVM stack.
 // This closure must be exercised by a real packaged-process smoke test before release.

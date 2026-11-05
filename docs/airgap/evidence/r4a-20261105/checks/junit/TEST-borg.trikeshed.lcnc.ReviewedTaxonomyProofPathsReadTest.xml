@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ReviewedTaxonomyProofPathsReadTest[jvm]" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-05T02:05:34.550Z" hostname="0d6dfba25614" time="0.019">
+  <properties/>
+  <testcase name="protectedReportResolvesOffPagePremisesAndRefusesStaleOrWithdrawnApproval()[jvm]" classname="borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsReadTest" time="0.018"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

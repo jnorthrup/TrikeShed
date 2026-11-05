@@ -1,0 +1,2758 @@
+{
+  "scope": "Production project miner, retained document source, bounded passages, LLVM scanner and native geometry selection; local transport fixture",
+  "cases": {
+    "nativeBoundaryPause": {
+      "result": "PASS",
+      "before": "selection",
+      "wire": 2,
+      "positions": [
+        [
+          "842.0799560546875",
+          "167.27471923828125"
+        ],
+        [
+          "848.9335327148438",
+          "163.9363250732422"
+        ]
+      ],
+      "caption": "OBSERVED TRANSFERS\nObserved execution · delayed display · c9eb1ea6-bb95-404f-a445-ac56b5249f90 3 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    },
+    "retainedQuotation": {
+      "result": "PASS",
+      "originalBytes": 111243,
+      "extractedBytes": 23021,
+      "quotation": {
+        "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "begin": 18477,
+        "end": 18654,
+        "quote": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+        "anchors": [
+          {
+            "begin": 18477,
+            "end": 18536,
+            "page": 10,
+            "folio": null,
+            "section": null,
+            "table": null,
+            "diagram": null,
+            "coordinates": [
+              651,
+              871,
+              1248,
+              55
+            ],
+            "coordinateSystem": "pixels-300dpi",
+            "unresolved": [
+              "table",
+              "diagram",
+              "folio",
+              "section"
+            ]
+          },
+          {
+            "begin": 18537,
+            "end": 18594,
+            "page": 10,
+            "folio": null,
+            "section": null,
+            "table": null,
+            "diagram": null,
+            "coordinates": [
+              651,
+              926,
+              1248,
+              55
+            ],
+            "coordinateSystem": "pixels-300dpi",
+            "unresolved": [
+              "table",
+              "diagram",
+              "folio",
+              "section"
+            ]
+          },
+          {
+            "begin": 18595,
+            "end": 18653,
+            "page": 10,
+            "folio": null,
+            "section": null,
+            "table": null,
+            "diagram": null,
+            "coordinates": [
+              651,
+              982,
+              1248,
+              55
+            ],
+            "coordinateSystem": "pixels-300dpi",
+            "unresolved": [
+              "table",
+              "diagram",
+              "folio",
+              "section"
+            ]
+          }
+        ],
+        "unresolved": [
+          "table",
+          "diagram"
+        ],
+        "category": "document",
+        "provenance": {
+          "finalUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf",
+          "notesCid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+          "retrieved": "2026-11-04T23:32:18Z",
+          "requestedUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+        },
+        "authentication": "unverified",
+        "quotationSource": "extracted-text"
+      },
+      "batchCid": "sha256:991b401e0ff86493a85f13e993dba4eda433f35baa3f1b6be1038f0cc38ac3be",
+      "batchComplete": false,
+      "nextOffset": 18654
+    },
+    "durableTransfers": {
+      "result": "PASS",
+      "programCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+      "transfers": [
+        {
+          "invocationOrdinal": 2,
+          "nodeId": "source",
+          "type": "document.source",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 1,
+            "nodeId": "document",
+            "type": "json.value",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 0,
+            "fromNode": "document",
+            "fromPort": "value",
+            "toNode": "source",
+            "toPort": "source?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "source?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 4,
+          "elapsedNanos": 388186626
+        },
+        {
+          "invocationOrdinal": 3,
+          "nodeId": "passages",
+          "type": "document.spans",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 2,
+            "nodeId": "source",
+            "type": "document.source",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 1,
+            "fromNode": "source",
+            "fromPort": "source",
+            "toNode": "passages",
+            "toPort": "source"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "source",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 7,
+          "elapsedNanos": 693914224
+        },
+        {
+          "invocationOrdinal": 4,
+          "nodeId": "scan",
+          "type": "vm.llvm.confix",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 3,
+            "nodeId": "passages",
+            "type": "document.spans",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 2,
+            "fromNode": "passages",
+            "fromPort": "data",
+            "toNode": "scan",
+            "toPort": "data?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "data?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 10,
+          "elapsedNanos": 1022690949
+        },
+        {
+          "invocationOrdinal": 5,
+          "nodeId": "selection",
+          "type": "confix.pickPath",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 3,
+            "nodeId": "passages",
+            "type": "document.spans",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 3,
+            "fromNode": "passages",
+            "fromPort": "data",
+            "toNode": "selection",
+            "toPort": "data?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "data?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 13,
+          "elapsedNanos": 2039498440
+        },
+        {
+          "invocationOrdinal": 5,
+          "nodeId": "selection",
+          "type": "confix.pickPath",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 4,
+            "nodeId": "scan",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 4,
+            "fromNode": "scan",
+            "fromPort": "rows",
+            "toNode": "selection",
+            "toPort": "rows?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "rows?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 14,
+          "elapsedNanos": 2039564157
+        },
+        {
+          "invocationOrdinal": 5,
+          "nodeId": "selection",
+          "type": "confix.pickPath",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 4,
+            "nodeId": "scan",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 5,
+            "fromNode": "scan",
+            "fromPort": "sourceCid",
+            "toNode": "selection",
+            "toPort": "sourceCid?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "sourceCid?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 15,
+          "elapsedNanos": 2039580291
+        },
+        {
+          "invocationOrdinal": 5,
+          "nodeId": "selection",
+          "type": "confix.pickPath",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 4,
+            "nodeId": "scan",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 6,
+            "fromNode": "scan",
+            "fromPort": "ok",
+            "toNode": "selection",
+            "toPort": "ok?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "ok?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 16,
+          "elapsedNanos": 2039593251
+        },
+        {
+          "invocationOrdinal": 5,
+          "nodeId": "selection",
+          "type": "confix.pickPath",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-coinbase-suski",
+          "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 4,
+            "nodeId": "scan",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-coinbase-suski",
+            "documentCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 7,
+            "fromNode": "scan",
+            "fromPort": "format",
+            "toNode": "selection",
+            "toPort": "format?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "format?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 17,
+          "elapsedNanos": 2039605519
+        }
+      ],
+      "summary": {
+        "clockOrigin": "walk-start",
+        "attempted": 18,
+        "retained": 18,
+        "omitted": 0,
+        "firstSequence": 1,
+        "lastSequence": 18,
+        "lastObservedSequence": 18,
+        "coverage": "complete"
+      }
+    },
+    "documentInspection": {
+      "result": "PASS",
+      "sourceStatus": "SHA-256 verified · 22686 UTF-16 units · full extraction shown.",
+      "selectedText": "Selected passage · native JSON geometry\n\nExtracted text is a derivative. Original bytes and extracted text have separate content identities.\n\ntook this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n\n\nUTF-16 [18477, 18654) · physical PDF page 10\n\nText selection only; no legal conclusion or source authentication is asserted.\n\nOriginal bytes · 6c64dcc4476f\nExtracted text · f41aeb7bf801\nVerify quotation against retained text\n\nSHA-256 verified · quotation matches exact UTF-16 range.\n\n of California\n\n\n8\n\nCOINBASE, INC. v. SUSKI\n\nOpinion of the Court\n\nlaw, the Ninth Circuit was wrong to hold that the Official\nRules’ forum selection clause superseded the User Agree-\nment’s delegation provision. That issue is outside the scope\nof the question presented, and we do not address it. We\ntook this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\nabout whether the Ninth Circuit properly applied state law.\nFinally, Coinbase contends that our approach will invite\nchaos by facilitating challenges to delegation clauses. We\ndo not believe that such chaos will follow. In cases where\nparties have agreed to only one contract, and that contract\nconta"
+    },
+    "nativeInspection": {
+      "result": "PASS",
+      "text": "CONFIX & FACETS\nRefresh ✕\nInspected this canvas · blackboard revision 11\nUse cases\nWorkgroups\nCases\nConfix & facets\nLow code\nEvidence\n\nProgram identity: sha256:4c02061170cc053d53fc46607dad0fbe67095f6648a471a59c784b3534df720f\n\nNode inspection · last attempt in this tab. Refresh after running. These observations are not durable run receipts.\n\ndocument · json.value\nsource · document.source\npassages · document.spans\nscan · vm.llvm.confix\nselection · confix.pickPath\n\nNo attempt recorded in this tab.\n\nBindings identify dispatch owners, not readiness. Inputs and named scope bodies are checked when run.\n\ndocument · json.value · KOTLIN\nContext: LcncNodeKey.JSON_VALUE\n\nsource · document.source · KOTLIN\nContext: LcncNodeKey.DOCUMENT_SOURCE\nServices: CasStoreKey, ProjectCorpusKey\n\npassages · document.spans · KOTLIN\nContext: LcncNodeKey.DOCUMENT_SPANS\nServices: CasStoreKey, ProjectCorpusKey\n\nscan · vm.llvm.confix · KOTLIN\nContext: LcncNodeKey.VM_LLVM_CONFIX\n\nselection · confix.pickPath · KOTLIN\nContext: LcncNodeKey.CONFIX_PICK_PATH\n\nRecent recorded runs · up to eight immutable receipts. A matching program version does not mean its inputs or dependencies are still current.\n\nInspect receipt\n\nLatest explicit program run in this page\n\ncompleted · c9eb1ea6-bb95-404f-a445-ac56b5249f90\n\nAn inline run label does not establish named-program membership. Refreshing or reopening this view re-inspects the retained response snapshot.\n\nInspect latest explicit run\n\nInline run · not saved-program history · completed · c9eb1ea6-bb95-404f-a445-ac56b5249f90 · same definition · different presentation\n\nInspect c9eb1ea6-bb95-404f-a445-ac56b5249f90\n\nairgap-coinbase-suski · c9eb1ea6-bb95-404f-a445-ac56b5249f90 · completed\n\nReceipt: sha256:7e633e7c1cba8519677b009c1d498a60058b5dbb84954f7aeee51bee6ee8211c\nProgram: sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7\nDifferent program version from the captured canvas inspection. Inspection does not change the canvas.\n\nCaptured canvas program: sha256:4c02061170cc053d53fc46607dad0fbe67095f6648a471a59c784b3534df720f. Refresh to compare with the current canvas.\n\nThe authored definition matches the captured canvas when presentation is excluded (node position, size, collapse and viewport). Exact program CIDs remain distinct. Inputs and dependencies were not compared.\n\nStarted: 1793844527200 · finished: 1793844529334 (epoch ms)\n\nImmutable receipt JSON\nReceipt as Confix sheets\nInspect receipt in Confix\nInvocation inputs (root inputs, not per-node input snapshots)\nExecution budgets and version policy\nReturned values\nShow recorded outputs on matching canvas\n\nRecorded node outputs · 5 nodes. Missing outputs are not proof that a node did not run; truncation markers remain visible.\n\ndocument\nInspect output document in Confix\nsource\nInspect output source in Confix\npassages\nInspect output passages in Confix\nscan\nInspect output scan in Confix\nselection\nInspect output selection in Confix\nNode invocations · sha256:0d64711732c25da1dc06acb6e80b8b5ad71d76562fc7cefaf2cc3c726e014a9f\nImmutable JSON\nConfix sheets\nInspect Node invocations in Confix\n\n5 node entries · 0 omitted. Retained in entry order, with parent invocation and zero-based iteration. Inputs and outputs are boundary snapshots; omission markers are not empty values. This is execution evidence, not breakpoint control or proof of external effects.\n\nReplay recorded wire activity\n\nDisplay only; no nodes execute. Motion duration is presentation policy, not engine duration.\n\n5 matching retained invocations. No match is not proof of non-execution; the ledger may omit entries.\n\n#1 · document · json.value · completed\n#2 · source · document.source · completed\n#3 · passages · document.spans · completed\n#4 · scan · vm.llvm.confix · completed\n\nScope path: [] · parent: root · iteration: none\n\nRecorded LLVM observation · confix.flat/1\n\nModule: sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3\n\nGraalVM 25.3.4.1 · LLVM 22.1.8\n\nQueue 746.971 µs · call 294.877 ms · load 46.707 ms\n\nInternal progress: unobserved · pause: between-scans\n\nScanner 86.418 ms · row capacity 16384\n\nOwned native allocation 543040 bytes · after release 0 bytes\n\nBuffer guards: verified\n\nAllocation counters cover the bridge buffer, not the VM heap. Scanner success is not strict validation.\n\nRetained measurements, not a live VM. No native-memory isolation or hard native cancellation is established.\n\nMeasured LLVM runtime\nInvocation boundary JSON\nInspect invocation #4 in Confix\n#5 · selection · confix.pickPath · completed\nConsumed evidence and runtime bindings\nFrozen program at invocation · sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7\nPinned subprogram versions\nStored prompt versions\nPrevious state receipt\nRun records\nShared blackboard\n\nPointcuts · latest recorded value per site, daemon-wide. This is not the full trace, a breakpoint, or proof that this canvas executed.\n\nInspect pointcuts\nGraal workspace · VM terminals · Hermes\nDocument evidence and tuple sheets"
+    },
+    "playback": {
+      "result": "PASS",
+      "postRuns": 1
+    },
+    "editedDefinition": {
+      "result": "PASS",
+      "sourceReadRefused": true,
+      "postRuns": 1
+    },
+    "freshProcess": {
+      "result": "PASS",
+      "firstBoot": "f68113fe-6f22-487f-a2b9-ee9e36aa36f2",
+      "secondBoot": "9d458129-857c-46b2-8026-cbfb89eb369c",
+      "firstExit": 0,
+      "firstHostPid": 58471,
+      "secondHostPid": 58680,
+      "projectRevisionsUnchanged": true,
+      "originalAssetsHidden": true,
+      "nativeModulesHidden": true
+    },
+    "supersededOutputRead": {
+      "result": "PASS",
+      "sourcePaneAbsent": true,
+      "postRuns": 1
+    },
+    "reopenedInspection": {
+      "result": "PASS",
+      "nativeInstalled": false,
+      "identicalLedger": true,
+      "sourceStatus": "SHA-256 verified · 22686 UTF-16 units · full extraction shown.",
+      "selectedText": "Selected passage · native JSON geometry\n\nExtracted text is a derivative. Original bytes and extracted text have separate content identities.\n\ntook this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n\n\nUTF-16 [18477, 18654) · physical PDF page 10\n\nText selection only; no legal conclusion or source authentication is asserted.\n\nOriginal bytes · 6c64dcc4476f\nExtracted text · f41aeb7bf801\nVerify quotation against retained text\n\nSHA-256 verified · quotation matches exact UTF-16 range.\n\n of California\n\n\n8\n\nCOINBASE, INC. v. SUSKI\n\nOpinion of the Court\n\nlaw, the Ninth Circuit was wrong to hold that the Official\nRules’ forum selection clause superseded the User Agree-\nment’s delegation provision. That issue is outside the scope\nof the question presented, and we do not address it. We\ntook this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\nabout whether the Ninth Circuit properly applied state law.\nFinally, Coinbase contends that our approach will invite\nchaos by facilitating challenges to delegation clauses. We\ndo not believe that such chaos will follow. In cases where\nparties have agreed to only one contract, and that contract\nconta",
+      "postRuns": 1
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":0.8}},\"inputs\":{},\"debugToken\":\"8bb9ce5f-7daa-4f4f-bc07-09d86ebf629c\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"8bb9ce5f-7daa-4f4f-bc07-09d86ebf629c\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"c9eb1ea6-bb95-404f-a445-ac56b5249f90\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"8bb9ce5f-7daa-4f4f-bc07-09d86ebf629c\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"c9eb1ea6-bb95-404f-a445-ac56b5249f90\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"8bb9ce5f-7daa-4f4f-bc07-09d86ebf629c\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"c9eb1ea6-bb95-404f-a445-ac56b5249f90\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"8bb9ce5f-7daa-4f4f-bc07-09d86ebf629c\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"c9eb1ea6-bb95-404f-a445-ac56b5249f90\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"8bb9ce5f-7daa-4f4f-bc07-09d86ebf629c\",\"ordinal\":5,\"action\":\"continue\",\"runId\":\"c9eb1ea6-bb95-404f-a445-ac56b5249f90\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":0.8}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":428,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":893,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":1291,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1689,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":149.62583518930956,\"y\":5.060133630289535,\"z\":0.7156644394951744}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":428,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":893,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":1291,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1689,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":149.62583518930956,\"y\":5.060133630289535,\"z\":0.7156644394951744}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null},\"compareProgramCid\":\"sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":428,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":893,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":1291,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1689,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":149.62583518930956,\"y\":5.060133630289535,\"z\":0.7156644394951744}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":428,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":893,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":1291,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1689,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":149.62583518930956,\"y\":5.060133630289535,\"z\":0.7156644394951744}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null},\"compareProgramCid\":\"sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":0.8}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"name\\\":\\\"coinbase-suski.pdf\\\",\\\"mediaType\\\":\\\"application/pdf\\\",\\\"category\\\":\\\"document\\\",\\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf\\\",\\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\",\\\"rev\\\":\\\"1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a\\\",\\\"seq\\\":0},\\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\",\\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\",\\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\",\\\"rev\\\":\\\"1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f\\\",\\\"seq\\\":3},\\\"sourceCid\\\":\\\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":245,\"y\":20,\"z\":0.8}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    }
+  ],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "e67538206ad8b3a54bf7670a85c1424bc9168d7c41a882057868c6097334b1da",
+    "bytes": 1805728
+  },
+  "run": {
+    "runId": "c9eb1ea6-bb95-404f-a445-ac56b5249f90",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+    "inputs": {},
+    "status": "completed",
+    "queuedAtMs": 1793844526894,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "8bb9ce5f-7daa-4f4f-bc07-09d86ebf629c",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/c9eb1ea6-bb95-404f-a445-ac56b5249f90",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/c9eb1ea6-bb95-404f-a445-ac56b5249f90",
+    "sequence": 3,
+    "timelineRevision": 3,
+    "receiptCid": "sha256:7e633e7c1cba8519677b009c1d498a60058b5dbb84954f7aeee51bee6ee8211c",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:00c6757c9bfc2b7a8793657aba27ec2982054c1a313f6836b3e28dea3685e8f7",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793844527200,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:01106a35ee25a2ba64eac38f7ab52e2618ad1ceb1eb28613579b1dbecec677a0",
+    "returns": {},
+    "outputs": {
+      "document": {
+        "value": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "name": "coinbase-suski.pdf",
+          "mediaType": "application/pdf",
+          "category": "document",
+          "project": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf",
+            "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+            "rev": "1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a",
+            "seq": 0
+          },
+          "extraction": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf.extract.md",
+            "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+            "rev": "1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f",
+            "seq": 3
+          },
+          "sourceCid": "sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459"
+        }
+      },
+      "source": {
+        "source": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "name": "coinbase-suski.pdf",
+          "mediaType": "application/pdf",
+          "category": "document",
+          "project": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf",
+            "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+            "rev": "1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a",
+            "seq": 0
+          },
+          "extraction": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf.extract.md",
+            "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+            "rev": "1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f",
+            "seq": 3
+          },
+          "sourceCid": "sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459"
+        }
+      },
+      "passages": {
+        "data": "{\"schema\":\"document-spans/1\", \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"sourceManifestCid\":\"sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459\", \"offsetUnit\":\"utf16\", \"rangeConvention\":\"half-open\", \"coverage\":\"extracted-text-window\", \"begin\":18477, \"end\":18654, \"textLength\":22686, \"complete\":false, \"nextOffset\":18654, \"spans\":[{\"index\":0, \"quotation\":{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"begin\":18477, \"end\":18654, \"quote\":\"took this case to decide whether, under the FAA, a court or\\nan arbitrator decides which of the two contractual provi-\\nsions controls. We decline to consider auxiliary questions\\n\", \"anchors\":[{\"begin\":18477, \"end\":18536, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 871, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18537, \"end\":18594, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 926, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18595, \"end\":18653, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 982, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}], \"unresolved\":[\"table\", \"diagram\"], \"category\":\"document\", \"provenance\":{\"finalUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\", \"notesCid\":\"sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\", \"retrieved\":\"2026-11-04T23:32:18Z\", \"requestedUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\"}, \"authentication\":\"unverified\", \"quotationSource\":\"extracted-text\"}}]}",
+        "batchCid": "sha256:991b401e0ff86493a85f13e993dba4eda433f35baa3f1b6be1038f0cc38ac3be",
+        "sourceCid": "sha256:ba4aef28ecb0e24e3359f10107826480b028f1aba9f8afaf1526644bc2e1b459",
+        "count": 1,
+        "begin": 18477,
+        "end": 18654,
+        "nextOffset": 18654,
+        "complete": false,
+        "bytes": 2028
+      },
+      "scan": {
+        "ok": true,
+        "format": "JSON",
+        "sourceCid": "sha256:991b401e0ff86493a85f13e993dba4eda433f35baa3f1b6be1038f0cc38ac3be",
+        "sourceBytes": 2028,
+        "rowCount": 151,
+        "observedRows": 151,
+        "rows": [
+          {
+            "open": 0,
+            "close": 2027,
+            "tag": "IoObject",
+            "depth": 0,
+            "children": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ]
+          },
+          {
+            "open": 1,
+            "close": 8,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 10,
+            "close": 27,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 30,
+            "close": 42,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 44,
+            "close": 116,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 119,
+            "close": 136,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 138,
+            "close": 210,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 213,
+            "close": 231,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 233,
+            "close": 305,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 308,
+            "close": 319,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 321,
+            "close": 327,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 330,
+            "close": 346,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 348,
+            "close": 358,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 361,
+            "close": 370,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 372,
+            "close": 394,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 397,
+            "close": 403,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 405,
+            "close": 409,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 412,
+            "close": 416,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 418,
+            "close": 422,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 425,
+            "close": 436,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 438,
+            "close": 442,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 445,
+            "close": 454,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 456,
+            "close": 460,
+            "tag": "IoBoolean",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 463,
+            "close": 474,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 476,
+            "close": 480,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 483,
+            "close": 489,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 491,
+            "close": 2026,
+            "tag": "IoArray",
+            "depth": 1,
+            "children": [
+              27
+            ]
+          },
+          {
+            "open": 492,
+            "close": 2025,
+            "tag": "IoObject",
+            "depth": 2,
+            "children": [
+              28,
+              29,
+              30,
+              31
+            ]
+          },
+          {
+            "open": 493,
+            "close": 499,
+            "tag": "IoString",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 501,
+            "close": 501,
+            "tag": "IoDouble",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 504,
+            "close": 514,
+            "tag": "IoString",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 516,
+            "close": 2024,
+            "tag": "IoObject",
+            "depth": 3,
+            "children": [
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              131,
+              132,
+              135,
+              136,
+              137,
+              138,
+              147,
+              148,
+              149,
+              150
+            ]
+          },
+          {
+            "open": 517,
+            "close": 529,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 531,
+            "close": 603,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 606,
+            "close": 623,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 625,
+            "close": 697,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 700,
+            "close": 706,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 708,
+            "close": 712,
+            "tag": "IoDouble",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 715,
+            "close": 719,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 721,
+            "close": 725,
+            "tag": "IoDouble",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 728,
+            "close": 734,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 736,
+            "close": 917,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 920,
+            "close": 928,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 930,
+            "close": 1613,
+            "tag": "IoArray",
+            "depth": 4,
+            "children": [
+              44,
+              73,
+              102
+            ]
+          },
+          {
+            "open": 931,
+            "close": 1156,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60,
+              65,
+              66,
+              67,
+              68
+            ]
+          },
+          {
+            "open": 932,
+            "close": 938,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 940,
+            "close": 944,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 947,
+            "close": 951,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 953,
+            "close": 957,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 960,
+            "close": 965,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 967,
+            "close": 968,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 971,
+            "close": 977,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 979,
+            "close": 982,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 985,
+            "close": 993,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 995,
+            "close": 998,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1001,
+            "close": 1007,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1009,
+            "close": 1012,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1015,
+            "close": 1023,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1025,
+            "close": 1028,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1031,
+            "close": 1043,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1045,
+            "close": 1064,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              61,
+              62,
+              63,
+              64
+            ]
+          },
+          {
+            "open": 1046,
+            "close": 1048,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1051,
+            "close": 1053,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1056,
+            "close": 1059,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1062,
+            "close": 1063,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1067,
+            "close": 1084,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1086,
+            "close": 1100,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1103,
+            "close": 1114,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1116,
+            "close": 1155,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              69,
+              70,
+              71,
+              72
+            ]
+          },
+          {
+            "open": 1117,
+            "close": 1123,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1126,
+            "close": 1134,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1137,
+            "close": 1143,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1146,
+            "close": 1154,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1159,
+            "close": 1384,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              74,
+              75,
+              76,
+              77,
+              78,
+              79,
+              80,
+              81,
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              94,
+              95,
+              96,
+              97
+            ]
+          },
+          {
+            "open": 1160,
+            "close": 1166,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1168,
+            "close": 1172,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1175,
+            "close": 1179,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1181,
+            "close": 1185,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1188,
+            "close": 1193,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1195,
+            "close": 1196,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1199,
+            "close": 1205,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1207,
+            "close": 1210,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1213,
+            "close": 1221,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1223,
+            "close": 1226,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1229,
+            "close": 1235,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1237,
+            "close": 1240,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1243,
+            "close": 1251,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1253,
+            "close": 1256,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1259,
+            "close": 1271,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1273,
+            "close": 1292,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              90,
+              91,
+              92,
+              93
+            ]
+          },
+          {
+            "open": 1274,
+            "close": 1276,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1279,
+            "close": 1281,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1284,
+            "close": 1287,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1290,
+            "close": 1291,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1295,
+            "close": 1312,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1314,
+            "close": 1328,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1331,
+            "close": 1342,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1344,
+            "close": 1383,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              98,
+              99,
+              100,
+              101
+            ]
+          },
+          {
+            "open": 1345,
+            "close": 1351,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1354,
+            "close": 1362,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1365,
+            "close": 1371,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1374,
+            "close": 1382,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1387,
+            "close": 1612,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              123,
+              124,
+              125,
+              126
+            ]
+          },
+          {
+            "open": 1388,
+            "close": 1394,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1396,
+            "close": 1400,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1403,
+            "close": 1407,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1409,
+            "close": 1413,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1416,
+            "close": 1421,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1423,
+            "close": 1424,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1427,
+            "close": 1433,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1435,
+            "close": 1438,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1441,
+            "close": 1449,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1451,
+            "close": 1454,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1457,
+            "close": 1463,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1465,
+            "close": 1468,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1471,
+            "close": 1479,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1481,
+            "close": 1484,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1487,
+            "close": 1499,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1501,
+            "close": 1520,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              119,
+              120,
+              121,
+              122
+            ]
+          },
+          {
+            "open": 1502,
+            "close": 1504,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1507,
+            "close": 1509,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1512,
+            "close": 1515,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1518,
+            "close": 1519,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1523,
+            "close": 1540,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1542,
+            "close": 1556,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1559,
+            "close": 1570,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1572,
+            "close": 1611,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              127,
+              128,
+              129,
+              130
+            ]
+          },
+          {
+            "open": 1573,
+            "close": 1579,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1582,
+            "close": 1590,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1593,
+            "close": 1599,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1602,
+            "close": 1610,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1616,
+            "close": 1627,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1629,
+            "close": 1648,
+            "tag": "IoArray",
+            "depth": 4,
+            "children": [
+              133,
+              134
+            ]
+          },
+          {
+            "open": 1630,
+            "close": 1636,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1639,
+            "close": 1647,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1651,
+            "close": 1660,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1662,
+            "close": 1671,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1674,
+            "close": 1685,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1687,
+            "close": 1956,
+            "tag": "IoObject",
+            "depth": 4,
+            "children": [
+              139,
+              140,
+              141,
+              142,
+              143,
+              144,
+              145,
+              146
+            ]
+          },
+          {
+            "open": 1688,
+            "close": 1697,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1699,
+            "close": 1757,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1760,
+            "close": 1769,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1771,
+            "close": 1843,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1846,
+            "close": 1856,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1858,
+            "close": 1879,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1882,
+            "close": 1895,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1897,
+            "close": 1955,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1959,
+            "close": 1974,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1976,
+            "close": 1987,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1990,
+            "close": 2006,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 2008,
+            "close": 2023,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          }
+        ],
+        "fault": {
+          "code": 0,
+          "name": "none",
+          "at": 0,
+          "atKind": "none"
+        },
+        "runtime": {
+          "backend": "graalvm-llvm",
+          "moduleCid": "sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
+          "abi": "confix.flat/1",
+          "engineVersion": "25.3.4.1",
+          "llvmVersion": "22.1.8",
+          "nativeAccess": true,
+          "verifyBitcode": true,
+          "internalProgress": "unobserved",
+          "pauseBoundary": "between-scans",
+          "hardCancellation": false,
+          "nativeMemoryIsolation": false,
+          "loadNanos": 46707392,
+          "semanticProfile": "mlir-nix-confix-571b57d3",
+          "strictValidation": false,
+          "copyTransport": "packed-i32",
+          "scanNanos": 86417513,
+          "allocatedBytes": 543040,
+          "rowCapacity": 16384,
+          "guardsVerified": true,
+          "liveBytesAfter": 0,
+          "queueNanos": 746971,
+          "callNanos": 294877185
+        },
+        "sourceRetained": true
+      },
+      "selection": {
+        "found": true,
+        "path": "spans.0.quotation",
+        "value": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "begin": 18477,
+          "end": 18654,
+          "quote": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+          "anchors": [
+            {
+              "begin": 18477,
+              "end": 18536,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                871,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            },
+            {
+              "begin": 18537,
+              "end": 18594,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                926,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            },
+            {
+              "begin": 18595,
+              "end": 18653,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                982,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            }
+          ],
+          "unresolved": [
+            "table",
+            "diagram"
+          ],
+          "category": "document",
+          "provenance": {
+            "finalUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf",
+            "notesCid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+            "retrieved": "2026-11-04T23:32:18Z",
+            "requestedUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "geometry": "native",
+        "sourceCid": "sha256:991b401e0ff86493a85f13e993dba4eda433f35baa3f1b6be1038f0cc38ac3be",
+        "byteSpan": {
+          "open": 516,
+          "close": 2024,
+          "unit": "utf8-byte-inclusive"
+        },
+        "sheets": [
+          {
+            "id": "confix/spans.0.quotation",
+            "title": "spans.0.quotation",
+            "parent": null,
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "originalCid",
+                "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f"
+              ],
+              [
+                "extractedTextCid",
+                "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801"
+              ],
+              [
+                "begin",
+                18477
+              ],
+              [
+                "end",
+                18654
+              ],
+              [
+                "quote",
+                "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n"
+              ],
+              [
+                "anchors",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors"
+                }
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/unresolved"
+                }
+              ],
+              [
+                "category",
+                "document"
+              ],
+              [
+                "provenance",
+                {
+                  "sheet": "confix/spans.0.quotation/provenance"
+                }
+              ],
+              [
+                "authentication",
+                "unverified"
+              ],
+              [
+                "quotationSource",
+                "extracted-text"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors",
+            "title": "anchors",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0"
+                }
+              ],
+              [
+                1,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1"
+                }
+              ],
+              [
+                2,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0",
+            "title": "[0]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18477
+              ],
+              [
+                "end",
+                18536
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/0",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                871
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/0",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1",
+            "title": "[1]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18537
+              ],
+              [
+                "end",
+                18594
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/1",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                926
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/1",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2",
+            "title": "[2]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18595
+              ],
+              [
+                "end",
+                18653
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/2",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                982
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/2",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/provenance",
+            "title": "provenance",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "finalUrl",
+                "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+              ],
+              [
+                "notesCid",
+                "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679"
+              ],
+              [
+                "retrieved",
+                "2026-11-04T23:32:18Z"
+              ],
+              [
+                "requestedUrl",
+                "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+              ]
+            ]
+          }
+        ],
+        "sheet": {
+          "id": "confix/spans.0.quotation",
+          "title": "spans.0.quotation",
+          "parent": null,
+          "truncated": false,
+          "limit": null,
+          "columns": [
+            {
+              "name": "key",
+              "type": "IoString"
+            },
+            {
+              "name": "value",
+              "type": "Any"
+            }
+          ],
+          "rows": [
+            [
+              "originalCid",
+              "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f"
+            ],
+            [
+              "extractedTextCid",
+              "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801"
+            ],
+            [
+              "begin",
+              18477
+            ],
+            [
+              "end",
+              18654
+            ],
+            [
+              "quote",
+              "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n"
+            ],
+            [
+              "anchors",
+              {
+                "sheet": "confix/spans.0.quotation/anchors"
+              }
+            ],
+            [
+              "unresolved",
+              {
+                "sheet": "confix/spans.0.quotation/unresolved"
+              }
+            ],
+            [
+              "category",
+              "document"
+            ],
+            [
+              "provenance",
+              {
+                "sheet": "confix/spans.0.quotation/provenance"
+              }
+            ],
+            [
+              "authentication",
+              "unverified"
+            ],
+            [
+              "quotationSource",
+              "extracted-text"
+            ]
+          ]
+        }
+      }
+    },
+    "bindings": [],
+    "bindingsTruncated": false,
+    "promptVersions": {},
+    "consumed": [
+      {
+        "kind": "project",
+        "id": "coinbase-suski/coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "sequence": 0,
+        "rev": "1-sha256:0259c4f36bd8cf35c855437e034abb0ff8151c7de4c6500dd78942f39ca2a39a"
+      },
+      {
+        "kind": "project",
+        "id": "coinbase-suski/coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "sequence": 3,
+        "rev": "1-sha256:016cfadc0f4d1ca1c28ab60b3356d394440f591d411f3e6b6ff82bf6a5cb795f"
+      }
+    ],
+    "consumedTruncated": false,
+    "inputFingerprint": "sha256:dfaae39c564ab90be703b7a10a7c405db9d06463ceaff1eb1836b3da0eae2574",
+    "rootStateCid": "sha256:c105a411afb5ebf6fa17ce299ce0278f0256855ccd3061c804f0300f3d42513d",
+    "rootStateFormat": "cbor",
+    "ok": true,
+    "finishedAtMs": 1793844529334,
+    "invocationsCid": "sha256:0d64711732c25da1dc06acb6e80b8b5ad71d76562fc7cefaf2cc3c726e014a9f",
+    "oroborosCid": "sha256:cb7656769ea0811e316780e482e74302a6d206330f7068ef3615aa0d0f214b05",
+    "invocationsAttempted": 5,
+    "invocationsDropped": 0
+  },
+  "documentPaneGeometry": {
+    "quote": [
+      1379.1373291015625,
+      563.3890991210938,
+      1608.14990234375,
+      667.8760986328125
+    ],
+    "pane": [
+      1364.8240966796875,
+      463.1960754394531,
+      1622.4632568359375,
+      1090.8337707519531
+    ],
+    "font": 14,
+    "outerScroll": 0
+  },
+  "liveVideo": "page@60b1f613840a4839ac29bfd6013e70fd.webm",
+  "reopenedVideo": "page@e22d60ae003d5b583be2fe5a35908813.webm"
+}
