@@ -1,0 +1,46 @@
+V75 independent recorded-data audit FINAL PASS against native-v75-attempt1.
+Original first-pass audit output remains under attempt1/; final outputs under green/.
+
+Scope is actual recorded native protected optional-query requests/results/DOM and
+existing canonical receipt/proof/export identities, source quotations, current
+review lineage, configured-state snapshots and after-close ownership. The script
+uses Python standard library only and launches no JVM/browser/server/client,
+parser, model, query evaluator or proof engine. Production/worktree files are
+never written. All original v74 records/auditors remain unchanged.
+
+Portable replay of the actual closed native records (no runtime launched):
+python3 audit.py ATTEMPT /workspace/library-files/reviewed-proof-query-v75-proof/snapshot --source-head 9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3 --main-sha a15bee549a19af990aa57a34cccde775737633bb11418e116ace183c8dc2f867 --documents-sha 0a113702e34733420087b52780d42f2ad0bed3a890b9b9fa5aacac609072822d --archive ORIGINAL_SOURCE_ARCHIVE --out AUDIT
+
+Explicit source/JAR/Documents pins are mandatory. The full frozen snapshot and
+its120-JAR classpath/119 dependencies must be available. Original source archive
+is positive-unmutated-runtime.tar.gz, SHA256
+51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc.
+
+The draft checks exact fixed6/8BGP syntax/terms/wires and its known serialization
+against actual lowered query text. It does not implement general SPARQL parsing
+or execute any query. Typed raw RDF rows and numeric DOM order join exact actual
+selected proof premise ordinals/source-role IRIs/rule IDs/KIF/English literals.
+PhysicalSource remains raw/not-established and separate from authenticated host
+review provenance. Computed frame/export/graph identities are not CAS-fetch
+requirements or persistence promises. Reopen records check stored responses for
+consistency, not query reevaluation or renewed source authority.
+
+HTTP401/405/400/413 negative records are direct actual protected requests, not
+native controller response tests. Source amendment and actual optional retry409
+must clear old query/proof rows and show source currentness unconfirmed. Actual
+configured-state snapshots bind full WAL bytes and CAS-pack prefix hashes,
+empty Rete/blackboard CID and absent bag/KIF-bank/NARS owners. No global QuadStore
+is configured; its scope is explicit, never an invented measured counter.
+
+All26 mutated-copy controls cover old receipt/quote/frame/currentness/ownership
+checks plus typed binding kind/datatype/ordinal/source, authority separation,
+inspection-only policy, DOM values, partial refusal rows, stale rows and forged
+unchanged CAS state. All actual immutable data passed, with no protocol-logic changes needed after
+the first execution. Limits and negative scope are retained in the output.
+Actual checkedAsOf123 is a fixture-controlled clock value, not wall-clock
+attestation or a future authority lease. No universal size-bound coverage is
+claimed from this20-request native pilot.
+
+No independent source authentication, English entailment, legal truth, independent
+query/proof validity, world admission, global OS airgap or universal coverage is
+claimed. Reviewed translations remain selected source assumptions only.

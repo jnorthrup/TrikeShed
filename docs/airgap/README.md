@@ -34,6 +34,13 @@ with cleared proof and unconfirmed currentness. The retained parser, explicit
 synthetic review and independent provenance audit stay scoped to the manual
 translation assumptions; this is not independent English entailment.
 
+The [v75 native evidence queries](evidence/reviewed-proof-query-v75-20261105/README.md)
+run both inspection-only proof-query starters through the real protected quad
+engine and display typed English/KIF rows with route-preserving source focus.
+Actual guarded refusals and source-stale clearing keep data-query rows separate
+from goal truth, physical data authority and current host review provenance.
+This checkpoint remains pinned to its own tested source and artifacts.
+
 ## R2 acceptance and verification
 
 The upstream candidate is `jnorthrup/mlir-nix` revision
