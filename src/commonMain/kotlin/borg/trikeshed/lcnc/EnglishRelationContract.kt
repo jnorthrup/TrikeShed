@@ -12,5 +12,5 @@ object EnglishRelationContract {
         params = _m["receiptCid" j LcncPortContract.LcncParamSpec(ph = "Exact retained English inspection CID"),
             "mode" j LcncPortContract.LcncParamSpec(opts = _l["snapshot", "current"]),
             "query" j LcncPortContract.LcncParamSpec(optional = true, ta = true,
-                ph = "Optional JSON object: predicate is exact reported lemma; subject/object are exact surface words. Omit for all roles; {} matches all. Observations only.")))
+                ph = "Optional JSON object: predicate is exact reported lemma; subject/object are exact surface words. Omit for all roles; {} matches all. Observations only.")])
 }
