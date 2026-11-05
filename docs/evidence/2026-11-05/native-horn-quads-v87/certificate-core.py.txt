@@ -1,0 +1,114 @@
+"""Finite supplied-certificate/identity checks only; no Horn search or inference engine."""
+from pathlib import Path
+import hashlib,re,runpy
+CORE=Path(__file__).with_name('receipt-core.py.txt')
+assert hashlib.sha256(CORE.read_bytes()).hexdigest()=='8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763'
+C=runpy.run_path(str(CORE));need=C['need'];cid=C['cid'];load=C['load'];canonical=C['canonical'];AuditError=C['AuditError']
+def sexps(text):
+    """Bounded syntax reader preserving quoted token spelling; never evaluates a formula."""
+    need(isinstance(text,str) and len(text.encode('utf-16-le'))//2<=65543,'Finite KIF syntax bound')
+    tokens=[];at=0
+    while at<len(text):
+        ch=text[at]
+        if ch.isspace():at+=1;continue
+        if ch==';':
+            while at<len(text) and text[at] not in '\r\n':at+=1
+            continue
+        if ch in '()':tokens.append(ch);at+=1;continue
+        begin=at
+        if ch=='"':
+            at+=1
+            while at<len(text):
+                if text[at]=='\\':at+=2;continue
+                if text[at]=='"':at+=1;break
+                at+=1
+            else:raise AuditError('Unterminated finite KIF literal')
+        else:
+            while at<len(text) and not text[at].isspace() and text[at] not in '();':at+=1
+        need(at>begin,'Nonempty syntax token');tokens.append(text[begin:at])
+    index=0
+    def read(depth=0):
+        nonlocal index
+        need(depth<=64 and index<len(tokens),'Bounded complete KIF syntax')
+        token=tokens[index];index+=1
+        if token!='(':
+            need(token!=')','Unexpected closing parenthesis');return token
+        out=[]
+        while index<len(tokens) and tokens[index]!=')':out.append(read(depth+1))
+        need(index<len(tokens) and out,'Complete nonempty formula');index+=1;return out
+    out=[]
+    while index<len(tokens):out.append(read())
+    return out
+def render(form):return '('+' '.join(render(v) if isinstance(v,list) else v for v in form)+')'
+def atom(value,ground=False):
+    need(isinstance(value,list) and value and all(isinstance(v,str) for v in value),'Scalar atom only')
+    need(not value[0].startswith(('?','@','"')),'Fixed scalar predicate')
+    if ground:need(all(not v.startswith(('?','@')) for v in value),'Positive ground supplied fact')
+    return value
+def ground(text):
+    values=sexps(text);need(len(values)==1,'Exactly one complete supplied proof atom');return atom(values[0],True)
+def typed(token):
+    need(isinstance(token,str) and not token.startswith(('?','@')),'Ground scalar binding')
+    values=sexps('(term '+token+')');need(values==[['term',token]],'One exact scalar typed term, no token substitution')
+    return {'kind':'literal','spelling':token} if token.startswith('"') else {'kind':'constant','token':token}
+def variables(form):
+    if isinstance(form,str):return {form} if form.startswith('?') else set()
+    return set().union(*(variables(v) for v in form))
+def manual_input(source_raw,prepared,input_raw):
+    source=prepared['source'];text=source_raw.decode('utf8',errors='strict')
+    need(source['text']==text and cid(source_raw)==source['sourceCid'] and len(source_raw)<=256*1024 and len(text.encode('utf-16-le'))//2<=65536,'Exact full manual source identity/bounds')
+    forms=sexps(text);need(1<=len(forms)<=32,'All1..32complete source forms, no cherry-picked supported subset')
+    need(prepared['inputJson'].encode('utf8')==input_raw and cid(input_raw)==prepared['inputCid'],'Exact raw compiler input JSON preimage')
+    import json
+    data=json.loads(input_raw);need(data['frameId']==prepared['frameId'] and cid(canonical({k:v for k,v in data.items() if k!='frameId'}))==prepared['frameId'],'Canonical compiler frame domain distinct from raw JSON input CID')
+    facts=[];rules=[];fact_sources=[];rule_sources=[]
+    expected_forms=[]
+    for ordinal,form in enumerate(forms):
+        normal=render(form);body={'kind':'host-manual-horn-form/1','sourceCid':source['sourceCid'],'sourceRevision':source['sourceRevision'],'ordinal':ordinal,'normalForm':normal};identity='manual-form:'+cid(canonical(body))[7:];expected_forms.append({**body,'id':identity})
+        receipt={'id':identity,'sourceCid':source['sourceCid'],'sourceRevision':source['sourceRevision'],'review':'APPROVED','text':normal};receipt['sourceNodeId']=cid(canonical(receipt))
+        if form[0]=='=>':
+            need(len(form)==3,'Complete implication source form');antecedent=form[1];body_atoms=antecedent[1:] if isinstance(antecedent,list) and antecedent[0]=='and' else [antecedent]
+            need(1<=len(body_atoms)<=16,'Ordered finite Horn premises');body_atoms=[atom(a) for a in body_atoms];conclusion=atom(form[2]);need(variables(conclusion)<=variables(body_atoms),'Range-restricted source head')
+            rule=['=>',body_atoms[0] if len(body_atoms)==1 else ['and']+body_atoms,conclusion];rules.append(rule);rule_sources.append({'id':conclusion[0]+'#'+str(len(rules)),'source':receipt})
+        else:
+            fact=atom(form,True);facts.append(fact);fact_sources.append({'fact':fact,'source':receipt})
+    need(prepared['sourceForms']==expected_forms and all(not any(k in f for k in ['begin','end','quote']) for f in expected_forms),'Exact all-form canonical ordinal IDs; normalized references are not source spans/quotes')
+    need(data['facts']==facts and data['rules']==rules and data['provenance']=={'facts':fact_sources,'rules':rule_sources} and data['excluded']==[] and len(facts)+len(rules)==len(forms),'Entire manual source feeds exact supported exporter facts/rules/provenance')
+    need(data['ontology'] is None and data['scope']=='host-explicit-assertions' and data['semantics']=='positive-scalar-horn-first-proof/1' and data['executionStatus']=='NOT_EXECUTED','Compiler input has explicit manual assumptions, no ontology/semantic authority upgrade')
+    return data
+def checked_projection(raw,data,input_cid):
+    if raw is None:return None
+    provenance=data['provenance'];facts=provenance['facts'];rule_sources=provenance['rules'];rules={atom(r[2])[0]+'#'+str(i+1):r for i,r in enumerate(data['rules'])}
+    catalog={};steps=[];count=0
+    def refs(witnesses):
+        out=[]
+        for source in witnesses:
+            identity=source['sourceNodeId'];need(identity not in catalog or catalog[identity]==source,'Source node identity cannot alias/substitute a receipt');catalog[identity]=source;out.append(identity)
+        return out
+    def visit(node,path,depth=0):
+        nonlocal count
+        count+=1;need(depth<=64 and count<=4096 and isinstance(node,dict),'Bounded finite supplied proof tree')
+        fact=ground(node['fact']);witnesses=node['sources'];need(isinstance(witnesses,list) and witnesses,'Actual source witness list')
+        step={'path':path,'normalForm':render(fact),'predicate':fact[0],'arguments':[typed(v) for v in fact[1:]]}
+        if node.get('asserted') is True:
+            need(set(node)=={'fact','asserted','sources','witnessMode'} and node['witnessMode']=='any-one-asserted-source','Repeated source witnesses are alternatives, not votes')
+            eligible=[row['source'] for row in facts if row['fact']==fact];need(all(s in eligible for s in witnesses),'Each supplied asserted source asserts exactly this ground atom')
+            step.update(kind='asserted',witnessMode='any-one-asserted-source',sourceNodeIds=refs(witnesses))
+        else:
+            need(set(node)=={'fact','rule','sources','from'} and node['rule'] in rules,'Actual supplied derived rule contract')
+            rule_id=node['rule'];rule=rules[rule_id];eligible=[row['source'] for row in rule_sources if row['id']==rule_id];need(eligible and witnesses==eligible,'Exact source receipts for this ordered rule')
+            patterns=rule[1][1:] if rule[1][0]=='and' else [rule[1]];children=node['from'];need(len(children)==len(patterns),'Ordered source rule premise count, not witness count')
+            ids=refs(witnesses);bindings={}
+            def match(pattern,actual,bind=True):
+                need(len(pattern)==len(actual),'Exact atom arity')
+                for expected,observed in zip(pattern,actual):
+                    if expected.startswith('?'):
+                        if expected not in bindings:need(bind,'No new unbound head variable');bindings[expected]=observed
+                        else:need(bindings[expected]==observed,'Exact shared variable substitution across ordered premises/head')
+                    else:need(expected==observed,'Exact source literal/constant token, no lexical substitution')
+            for ordinal,(pattern,child) in enumerate(zip(patterns,children)):match(pattern,visit(child,path+[ordinal],depth+1))
+            match(rule[2],fact,False)
+            step.update(kind='derived',rule=rule_id,ruleSourceNodeIds=ids,rulePattern=rule,premises=[{'ordinal':i,'path':path+[i],'pattern':p} for i,p in enumerate(patterns)],bindings=[{'variable':v,'rule':rule_id,'ruleSourceNodeIds':ids,'originalVariableSourceNodeIds':[i for i in ids if v in variables(sexps(catalog[i]['text'])[0])],'term':typed(t)} for v,t in bindings.items()])
+        steps.append(step);return fact
+    need(visit(raw,[])==data['query'],'Supplied proof root must equal exact exported query')
+    return {'kind':'native-horn-checked-proof/1','frameId':data['frameId'],'query':data['query'],'semantics':data['semantics'],'firstProofOnly':True,'sumoNixRevision':data['sumoNixRevision'],'mlirNixRevision':data['mlirNixRevision'],'referenceMode':'normalized-export-atoms-and-rule-scoped-variables-not-source-spans','steps':steps,'sources':catalog,'verification':'supplied-native-certificate-only-not-independent-inference','inputCid':input_cid}

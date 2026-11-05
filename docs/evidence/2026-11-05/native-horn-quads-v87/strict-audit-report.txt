@@ -1,0 +1,6 @@
+PASS: v87 actual selected attempt5 recorded data, six rejected mutated-copy controls.
+3 approved sources, 2 used; 3 typed bindings and 2 premise rows; 6 actual fresh native evaluations of one input.
+Exact review/source/context/frame identities and no-query writes verified; real source change refuses.
+After-close 15 selected blocks plus 2 review and 3 board CRC frames match production replay.
+Separate corpus UI: one snapshot Run, five lexical hits, 14 measured nodes inside viewport after public Fit, note runtime badge absent.
+Recorded-byte, finite supplied-certificate and typed-row consistency. Authenticated synthetic host review over authored KIF assumptions; request-local computed graph is not CAS or sink authority. Separate existing corpus snapshot Run note/Fit observations; no new native Docs/canvas action. No independent proof search, legal accuracy, source authentication, native-library closure, executable portability or general isolation proof. Default public replay authenticates supplied selected records; omitted full packs/external REF paths/JAR/native availability are not rechecked.

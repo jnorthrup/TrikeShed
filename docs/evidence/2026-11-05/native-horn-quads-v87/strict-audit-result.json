@@ -1,0 +1,73 @@
+{
+  "actual": {
+    "boardFrames": 3,
+    "frameId": "sha256:801f598c5d1dfd899e455410814df21511868ccd7cdde2092dc89ac8109c4aa3",
+    "inputCid": "sha256:95c2c073189811d4990f887c110a189e3cde05a6a0da93412c26e434ac405681",
+    "nativeExecutions": 6,
+    "noteRuntimeBadges": 0,
+    "postFitNodesInside": 14,
+    "projectionCid": "sha256:e5529e698ff4bebae6b3f1da64c41c126bf1b84a34f456d452afddc56cbe285a",
+    "readerPid": 176285,
+    "reviewFrames": 2,
+    "selected": 3,
+    "selectedReadbacks": 15,
+    "separateCorpusRuns": 1,
+    "typedRows": {
+      "bindings": 3,
+      "premises": 2
+    },
+    "used": 2,
+    "writerPid": 176043
+  },
+  "artifacts": {
+    "documents.js": "8ba1ab60e863af29678d94b175a61cb6ac36092584d8495bf15dce665c889cea",
+    "main.jar": "604099c30c9d40dd8c68080a9c4606d7a02d90783da38cdcbc07ae7bcef928af",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5",
+    "spacegraph.js": "1745fa77a8a134d71de5175c363cdbc2669ea6b297db045ada1c873d80ca8e49"
+  },
+  "kind": "native-horn-quads-independent-recorded-audit/1",
+  "mutatedCopyControls": [
+    {
+      "label": "binding-constant-mislabelled-as-uri",
+      "rejected": true
+    },
+    {
+      "label": "premise-ordinal-substituted",
+      "rejected": true
+    },
+    {
+      "label": "source-quotation-substituted",
+      "rejected": true
+    },
+    {
+      "label": "unused-approved-selection-omitted",
+      "rejected": true
+    },
+    {
+      "label": "raw-quad-source-claims-review-authority",
+      "rejected": true
+    },
+    {
+      "label": "stale-source-response-replays-success",
+      "rejected": true
+    }
+  ],
+  "recordHashes": {
+    "../closed-record-manifest.json": "f20360b00fbb084f29d44f3defa8647437f77f9a9ca22f6afc26b823d78ddecd",
+    "GO.json": "6f16dc2fe9bf7e0d89cb0e95ecdc40e4efc50fbddba218f0e37bb350520e8620",
+    "after-close-readbacks/board.wal": "13b46a41da33f57c5add7c6253e4f95f9e24fb71c20ed4b7601bf4326d01c974",
+    "after-close-readbacks/review.wal": "4b68fa1b7f43b34648845c43bb799c7dc2838264b1b33316920151b36938c873",
+    "browser-result.json": "769647aae5a97ae4f0b11dbaa1c5a417533f8bb1fd90ed48340cbb8d4076159f",
+    "cleanup.json": "a4c15102e4e4ea9744bec5bb6570d0f73d486460c0553475220bc48abe7baa1a",
+    "client-result.json": "ad9d4c7da8029706e363579ca35b83e1698248805176889344ab6c6fd87096c5",
+    "native-corpus-completed-after-fit.png": "e45b4b65e63d003aaad5bca43c5718879024bfdc7ed5c54f3d694fe79fd30d9f",
+    "native-execution-index.json": "c35940a4f2d867847e613707f557a35b171a942478be83f5e4ba5745346170c0",
+    "native-note-without-runtime-badge.png": "37f37a21946b996340b397c8a4850c4d05fca6e1f4081f6b04df6145f9b90911",
+    "process.trace": "8ef4ea85a361d1be4a81b71aa427b84642c88d1da2d7bd406169392330126a38",
+    "reopened.json": "2d94c9c1c7ea0ccc1b9d355ed74a877e182fd8e2c2c4560b859b95e25836211e",
+    "startup.json": "50cfbcf40277d592a08c4d7fe2634226f0628531aed33a8dc55d75b59ff5f890"
+  },
+  "result": "PASS",
+  "scope": "Recorded-byte, finite supplied-certificate and typed-row consistency. Authenticated synthetic host review over authored KIF assumptions; request-local computed graph is not CAS or sink authority. Separate existing corpus snapshot Run note/Fit observations; no new native Docs/canvas action. No independent proof search, legal accuracy, source authentication, native-library closure, executable portability or general isolation proof. Default public replay authenticates supplied selected records; omitted full packs/external REF paths/JAR/native availability are not rechecked.",
+  "source": "973b078dc929adfbbbedd28345b2980ee5d08a56"
+}

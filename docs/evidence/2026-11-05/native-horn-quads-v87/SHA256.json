@@ -1,0 +1,19 @@
+{
+  "README.md": "f68ef050e6a881775b06cc8a17c6fd5fe60ca0422206f5425f3d2316887db840",
+  "auditor-source-manifest.json": "702a064660185881e908095fcd095e2b9d71a1fa8e0eafe4924d3d627fe1f60a",
+  "certificate-core.py.txt": "3090d99851f84b1638033c0a6fa0c8c950aa656045daa1c5e3ec9b1b5b5095ba",
+  "checks.py.txt": "1f38edd6b8f5a2a419382f682fd3741516d2f83d2c4f0ae00dd4a73da2c101cb",
+  "native-corpus-completed-after-fit.png": "e45b4b65e63d003aaad5bca43c5718879024bfdc7ed5c54f3d694fe79fd30d9f",
+  "native-note-without-runtime-badge.png": "37f37a21946b996340b397c8a4850c4d05fca6e1f4081f6b04df6145f9b90911",
+  "receipt-core.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763",
+  "recorded-audit-report.txt": "250109c46403bc1c61fc5542d61c1ddfcbd04604652582ca2a06515335a12877",
+  "recorded-audit-result.json": "4dcb5174c9805d14131953015ca0431bd9438c6ca31a674fa51557f464c35b77",
+  "recorded-audit-usage.txt": "1406fd14c40c19de17cbf6ed4adee619b72171f226f4a9519e9956f4382ce5c4",
+  "recorded-audit.py.txt": "4723e6820ff3e67d6179cf2a03ac2171c3417afc59fc47c9981d263f5ca595c3",
+  "records-manifest.json": "e8210d4c21103f8e2c774e865ffc424d126336b7bf90d4b5b5d4c3db5ee42886",
+  "records.tar.gz": "26a13a149c1a1f4090ca4ad6559fff05a9dca48ac5762aabb3300df10856c09a",
+  "replay-recorded.py.txt": "c30319064040ec6ed04ba541f1aaef62f533f460ca4515ee4dd3768546683535",
+  "strict-audit-report.txt": "250109c46403bc1c61fc5542d61c1ddfcbd04604652582ca2a06515335a12877",
+  "strict-audit-result.json": "4dcb5174c9805d14131953015ca0431bd9438c6ca31a674fa51557f464c35b77",
+  "verification.json": "fe9acc10cfd5e60eded356aa4812b15bd021cf749b8f4d523bc9faab9980e9d0"
+}
