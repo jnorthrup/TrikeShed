@@ -1,0 +1,2417 @@
+{
+  "result": "PASS",
+  "selectedAttempt": "native-v75-attempt1",
+  "sourceHead": "9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3",
+  "productionParentBeforeTestOnlyFix": "392f405ed2e86cce01d9cb82f828bb228c68fc73",
+  "frozenArtifacts": {
+    "main.jar": "a15bee549a19af990aa57a34cccde775737633bb11418e116ace183c8dc2f867",
+    "documents.js": "0a113702e34733420087b52780d42f2ad0bed3a890b9b9fa5aacac609072822d",
+    "spacegraph.js": "2d8701a34a13623179d04e4f109fc851aecb96a22cf8b07647fbbbd232e6a18d",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "rootBuild": {
+    "selectedJvmTests": 469,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "allJvmTestSources": true,
+    "threeJsBundles": true
+  },
+  "inspectionCid": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+  "source": {
+    "id": "synthetic taxonomy copular clauses.txt",
+    "text": "Tenant is a Person. A Person is an Agent.",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883"
+  },
+  "contextIri": "urn:agreement:reviewed-proof-query-pilot",
+  "reviewer": {
+    "reviewer": "synthetic:proof-query-pilot",
+    "synthetic": true
+  },
+  "approved": {
+    "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+    "revision": 2,
+    "decisionCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+    "reviewer": "synthetic:proof-query-pilot",
+    "synthetic": true,
+    "state": "approve",
+    "current": true
+  },
+  "successfulEvidenceQueries": [
+    {
+      "label": "kif-six-pattern",
+      "english": false,
+      "patternCount": 6,
+      "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+      "query": "SELECT ?ordinal ?source ?rule ?kifQuote WHERE { GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/proof/c49e5d9d4c8bdcd54e398a8f2bec882ad8e8c0f426fb33a787776a946a47b77a> <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:premiseUse> ?use . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:source> ?source . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:ordinal> ?ordinal . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:rule> ?rule . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?source <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:kifQuotation> ?kif . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?kif <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote> ?kifQuote . } }",
+      "physicalSource": {
+        "selected": "quad-store",
+        "sources": [
+          "quad-store"
+        ],
+        "scope": "raw-matched-data",
+        "reviewAuthority": "not-established",
+        "bindingProvenance": "not-established",
+        "sampling": "single-source"
+      },
+      "provenance": {
+        "schema": "reviewed-taxonomy-proof-quads/1",
+        "dataset": "reviewed-taxonomy-proof-projection",
+        "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "quads": 107,
+        "englishAvailable": true,
+        "persistence": "request-local",
+        "planFrameId": "sha256:7aec7b1eb15951853d4e63bf54fe0cd067637671bebd90b0c750b676de4e809c",
+        "exportCid": "sha256:98519748466d52f26d949f6402047a4688f30afbac91ec0c7ac8a8db0a8009fa",
+        "queryId": "sha256:8a8f10f92ff702d80f2a7a15010d1b52ab78bd68d334a8c13462e0c4c4cd4384",
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "truncated": false,
+        "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+        "revision": 2,
+        "approvalCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+        "decisionCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+        "readCid": "sha256:2761110ac0f5bdc548dedf345a2a3093d812481b01cdbe5444203c70a0e9f39a",
+        "readFrameCid": "sha256:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "sourceRevision": "sha256:8451fa7c3b1cc13dbaea35bc1ac914eee1558fe17a635f717c36b3b4c78a395e",
+        "status": "SUPPORTED",
+        "semantics": "positive-ground-taxonomy-support/v1",
+        "checkedAsOf": 123,
+        "reviewer": "synthetic:proof-query-pilot",
+        "synthetic": true
+      },
+      "rawTypedResults": {
+        "head": {
+          "vars": [
+            "ordinal",
+            "source",
+            "rule",
+            "kifQuote"
+          ]
+        },
+        "results": {
+          "bindings": [
+            {
+              "ordinal": {
+                "type": "literal",
+                "value": "0",
+                "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+              },
+              "source": {
+                "type": "uri",
+                "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21"
+              },
+              "rule": {
+                "type": "literal",
+                "value": "kif-taxonomy/v1/instance-assertion"
+              },
+              "kifQuote": {
+                "type": "literal",
+                "value": "(instance urn:legal:Tenant urn:legal:Person)"
+              }
+            },
+            {
+              "ordinal": {
+                "type": "literal",
+                "value": "1",
+                "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+              },
+              "source": {
+                "type": "uri",
+                "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44"
+              },
+              "rule": {
+                "type": "literal",
+                "value": "kif-taxonomy/v1/instance-subclass"
+              },
+              "kifQuote": {
+                "type": "literal",
+                "value": "(subclass urn:legal:Person urn:legal:Agent)"
+              }
+            }
+          ]
+        }
+      },
+      "rawBindingOrder": [
+        "0",
+        "1"
+      ],
+      "domRows": [
+        {
+          "ordinal": "0",
+          "sourceNode": "sha256:a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+          "cells": [
+            {
+              "variable": "ordinal",
+              "kind": "literal",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+              "value": "0",
+              "kindText": "literal · http://www.w3.org/2001/XMLSchema#integer"
+            },
+            {
+              "variable": "source",
+              "kind": "uri",
+              "datatype": null,
+              "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+              "kindText": "uri"
+            },
+            {
+              "variable": "rule",
+              "kind": "literal",
+              "datatype": null,
+              "value": "kif-taxonomy/v1/instance-assertion",
+              "kindText": "literal"
+            },
+            {
+              "variable": "kifQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "(instance urn:legal:Tenant urn:legal:Person)",
+              "kindText": "literal"
+            }
+          ]
+        },
+        {
+          "ordinal": "1",
+          "sourceNode": "sha256:c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+          "cells": [
+            {
+              "variable": "ordinal",
+              "kind": "literal",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+              "value": "1",
+              "kindText": "literal · http://www.w3.org/2001/XMLSchema#integer"
+            },
+            {
+              "variable": "source",
+              "kind": "uri",
+              "datatype": null,
+              "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+              "kindText": "uri"
+            },
+            {
+              "variable": "rule",
+              "kind": "literal",
+              "datatype": null,
+              "value": "kif-taxonomy/v1/instance-subclass",
+              "kindText": "literal"
+            },
+            {
+              "variable": "kifQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "(subclass urn:legal:Person urn:legal:Agent)",
+              "kindText": "literal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "english-kif-eight-pattern",
+      "english": true,
+      "patternCount": 8,
+      "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+      "query": "SELECT ?ordinal ?source ?rule ?kifQuote ?englishQuote WHERE { GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/proof/c49e5d9d4c8bdcd54e398a8f2bec882ad8e8c0f426fb33a787776a946a47b77a> <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:premiseUse> ?use . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:source> ?source . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:ordinal> ?ordinal . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:rule> ?rule . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?source <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:kifQuotation> ?kif . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?kif <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote> ?kifQuote . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?source <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:englishQuotation> ?english . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?english <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote> ?englishQuote . } }",
+      "physicalSource": {
+        "selected": "quad-store",
+        "sources": [
+          "quad-store"
+        ],
+        "scope": "raw-matched-data",
+        "reviewAuthority": "not-established",
+        "bindingProvenance": "not-established",
+        "sampling": "single-source"
+      },
+      "provenance": {
+        "schema": "reviewed-taxonomy-proof-quads/1",
+        "dataset": "reviewed-taxonomy-proof-projection",
+        "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "quads": 107,
+        "englishAvailable": true,
+        "persistence": "request-local",
+        "planFrameId": "sha256:7aec7b1eb15951853d4e63bf54fe0cd067637671bebd90b0c750b676de4e809c",
+        "exportCid": "sha256:98519748466d52f26d949f6402047a4688f30afbac91ec0c7ac8a8db0a8009fa",
+        "queryId": "sha256:8a8f10f92ff702d80f2a7a15010d1b52ab78bd68d334a8c13462e0c4c4cd4384",
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "truncated": false,
+        "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+        "revision": 2,
+        "approvalCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+        "decisionCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+        "readCid": "sha256:2761110ac0f5bdc548dedf345a2a3093d812481b01cdbe5444203c70a0e9f39a",
+        "readFrameCid": "sha256:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "sourceRevision": "sha256:8451fa7c3b1cc13dbaea35bc1ac914eee1558fe17a635f717c36b3b4c78a395e",
+        "status": "SUPPORTED",
+        "semantics": "positive-ground-taxonomy-support/v1",
+        "checkedAsOf": 123,
+        "reviewer": "synthetic:proof-query-pilot",
+        "synthetic": true
+      },
+      "rawTypedResults": {
+        "head": {
+          "vars": [
+            "ordinal",
+            "source",
+            "rule",
+            "kifQuote",
+            "englishQuote"
+          ]
+        },
+        "results": {
+          "bindings": [
+            {
+              "ordinal": {
+                "type": "literal",
+                "value": "0",
+                "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+              },
+              "source": {
+                "type": "uri",
+                "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21"
+              },
+              "rule": {
+                "type": "literal",
+                "value": "kif-taxonomy/v1/instance-assertion"
+              },
+              "kifQuote": {
+                "type": "literal",
+                "value": "(instance urn:legal:Tenant urn:legal:Person)"
+              },
+              "englishQuote": {
+                "type": "literal",
+                "value": "Tenant is a Person."
+              }
+            },
+            {
+              "ordinal": {
+                "type": "literal",
+                "value": "1",
+                "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+              },
+              "source": {
+                "type": "uri",
+                "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44"
+              },
+              "rule": {
+                "type": "literal",
+                "value": "kif-taxonomy/v1/instance-subclass"
+              },
+              "kifQuote": {
+                "type": "literal",
+                "value": "(subclass urn:legal:Person urn:legal:Agent)"
+              },
+              "englishQuote": {
+                "type": "literal",
+                "value": "A Person is an Agent."
+              }
+            }
+          ]
+        }
+      },
+      "rawBindingOrder": [
+        "0",
+        "1"
+      ],
+      "domRows": [
+        {
+          "ordinal": "0",
+          "sourceNode": "sha256:a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+          "cells": [
+            {
+              "variable": "ordinal",
+              "kind": "literal",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+              "value": "0",
+              "kindText": "literal · http://www.w3.org/2001/XMLSchema#integer"
+            },
+            {
+              "variable": "source",
+              "kind": "uri",
+              "datatype": null,
+              "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+              "kindText": "uri"
+            },
+            {
+              "variable": "rule",
+              "kind": "literal",
+              "datatype": null,
+              "value": "kif-taxonomy/v1/instance-assertion",
+              "kindText": "literal"
+            },
+            {
+              "variable": "kifQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "(instance urn:legal:Tenant urn:legal:Person)",
+              "kindText": "literal"
+            },
+            {
+              "variable": "englishQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "Tenant is a Person.",
+              "kindText": "literal"
+            }
+          ]
+        },
+        {
+          "ordinal": "1",
+          "sourceNode": "sha256:c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+          "cells": [
+            {
+              "variable": "ordinal",
+              "kind": "literal",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+              "value": "1",
+              "kindText": "literal · http://www.w3.org/2001/XMLSchema#integer"
+            },
+            {
+              "variable": "source",
+              "kind": "uri",
+              "datatype": null,
+              "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+              "kindText": "uri"
+            },
+            {
+              "variable": "rule",
+              "kind": "literal",
+              "datatype": null,
+              "value": "kif-taxonomy/v1/instance-subclass",
+              "kindText": "literal"
+            },
+            {
+              "variable": "kifQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "(subclass urn:legal:Person urn:legal:Agent)",
+              "kindText": "literal"
+            },
+            {
+              "variable": "englishQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "A Person is an Agent.",
+              "kindText": "literal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "restored-before-source-amendment",
+      "english": true,
+      "patternCount": 8,
+      "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+      "query": "SELECT ?ordinal ?source ?rule ?kifQuote ?englishQuote WHERE { GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/proof/c49e5d9d4c8bdcd54e398a8f2bec882ad8e8c0f426fb33a787776a946a47b77a> <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:premiseUse> ?use . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:source> ?source . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:ordinal> ?ordinal . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?use <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:rule> ?rule . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?source <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:kifQuotation> ?kif . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?kif <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote> ?kifQuote . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?source <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:englishQuotation> ?english . } GRAPH <urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c> { ?english <urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote> ?englishQuote . } }",
+      "physicalSource": {
+        "selected": "quad-store",
+        "sources": [
+          "quad-store"
+        ],
+        "scope": "raw-matched-data",
+        "reviewAuthority": "not-established",
+        "bindingProvenance": "not-established",
+        "sampling": "single-source"
+      },
+      "provenance": {
+        "schema": "reviewed-taxonomy-proof-quads/1",
+        "dataset": "reviewed-taxonomy-proof-projection",
+        "graph": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "quads": 107,
+        "englishAvailable": true,
+        "persistence": "request-local",
+        "planFrameId": "sha256:7aec7b1eb15951853d4e63bf54fe0cd067637671bebd90b0c750b676de4e809c",
+        "exportCid": "sha256:98519748466d52f26d949f6402047a4688f30afbac91ec0c7ac8a8db0a8009fa",
+        "queryId": "sha256:8a8f10f92ff702d80f2a7a15010d1b52ab78bd68d334a8c13462e0c4c4cd4384",
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "truncated": false,
+        "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+        "revision": 2,
+        "approvalCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+        "decisionCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+        "readCid": "sha256:2761110ac0f5bdc548dedf345a2a3093d812481b01cdbe5444203c70a0e9f39a",
+        "readFrameCid": "sha256:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c",
+        "sourceRevision": "sha256:8451fa7c3b1cc13dbaea35bc1ac914eee1558fe17a635f717c36b3b4c78a395e",
+        "status": "SUPPORTED",
+        "semantics": "positive-ground-taxonomy-support/v1",
+        "checkedAsOf": 123,
+        "reviewer": "synthetic:proof-query-pilot",
+        "synthetic": true
+      },
+      "rawTypedResults": {
+        "head": {
+          "vars": [
+            "ordinal",
+            "source",
+            "rule",
+            "kifQuote",
+            "englishQuote"
+          ]
+        },
+        "results": {
+          "bindings": [
+            {
+              "ordinal": {
+                "type": "literal",
+                "value": "0",
+                "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+              },
+              "source": {
+                "type": "uri",
+                "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21"
+              },
+              "rule": {
+                "type": "literal",
+                "value": "kif-taxonomy/v1/instance-assertion"
+              },
+              "kifQuote": {
+                "type": "literal",
+                "value": "(instance urn:legal:Tenant urn:legal:Person)"
+              },
+              "englishQuote": {
+                "type": "literal",
+                "value": "Tenant is a Person."
+              }
+            },
+            {
+              "ordinal": {
+                "type": "literal",
+                "value": "1",
+                "datatype": "http://www.w3.org/2001/XMLSchema#integer"
+              },
+              "source": {
+                "type": "uri",
+                "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44"
+              },
+              "rule": {
+                "type": "literal",
+                "value": "kif-taxonomy/v1/instance-subclass"
+              },
+              "kifQuote": {
+                "type": "literal",
+                "value": "(subclass urn:legal:Person urn:legal:Agent)"
+              },
+              "englishQuote": {
+                "type": "literal",
+                "value": "A Person is an Agent."
+              }
+            }
+          ]
+        }
+      },
+      "rawBindingOrder": [
+        "0",
+        "1"
+      ],
+      "domRows": [
+        {
+          "ordinal": "0",
+          "sourceNode": "sha256:a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+          "cells": [
+            {
+              "variable": "ordinal",
+              "kind": "literal",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+              "value": "0",
+              "kindText": "literal · http://www.w3.org/2001/XMLSchema#integer"
+            },
+            {
+              "variable": "source",
+              "kind": "uri",
+              "datatype": null,
+              "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+              "kindText": "uri"
+            },
+            {
+              "variable": "rule",
+              "kind": "literal",
+              "datatype": null,
+              "value": "kif-taxonomy/v1/instance-assertion",
+              "kindText": "literal"
+            },
+            {
+              "variable": "kifQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "(instance urn:legal:Tenant urn:legal:Person)",
+              "kindText": "literal"
+            },
+            {
+              "variable": "englishQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "Tenant is a Person.",
+              "kindText": "literal"
+            }
+          ]
+        },
+        {
+          "ordinal": "1",
+          "sourceNode": "sha256:c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+          "cells": [
+            {
+              "variable": "ordinal",
+              "kind": "literal",
+              "datatype": "http://www.w3.org/2001/XMLSchema#integer",
+              "value": "1",
+              "kindText": "literal · http://www.w3.org/2001/XMLSchema#integer"
+            },
+            {
+              "variable": "source",
+              "kind": "uri",
+              "datatype": null,
+              "value": "urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/source/c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+              "kindText": "uri"
+            },
+            {
+              "variable": "rule",
+              "kind": "literal",
+              "datatype": null,
+              "value": "kif-taxonomy/v1/instance-subclass",
+              "kindText": "literal"
+            },
+            {
+              "variable": "kifQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "(subclass urn:legal:Person urn:legal:Agent)",
+              "kindText": "literal"
+            },
+            {
+              "variable": "englishQuote",
+              "kind": "literal",
+              "datatype": null,
+              "value": "A Person is an Agent.",
+              "kindText": "literal"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "queryRefusals": [
+    {
+      "label": "missing-host-auth",
+      "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result",
+      "method": "POST",
+      "request": {
+        "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+        "expectedRevision": 2,
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "offset": 0,
+        "limit": 64,
+        "program": {
+          "nodes": [
+            {
+              "id": "select",
+              "type": "sparql.select",
+              "params": {},
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v0",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?ordinal",
+                "ord": "0"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v1",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?source",
+                "ord": "1"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v2",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?rule",
+                "ord": "2"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v3",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?kifQuote",
+                "ord": "3"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v4",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?englishQuote",
+                "ord": "4"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p0",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/proof/c49e5d9d4c8bdcd54e398a8f2bec882ad8e8c0f426fb33a787776a946a47b77a>",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:premiseUse>",
+                "object": "?use",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p1",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:source>",
+                "object": "?source",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p2",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:ordinal>",
+                "object": "?ordinal",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p3",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:rule>",
+                "object": "?rule",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p4",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?source",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:kifQuotation>",
+                "object": "?kif",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p5",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?kif",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote>",
+                "object": "?kifQuote",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p6",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?source",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:englishQuotation>",
+                "object": "?english",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p7",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?english",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote>",
+                "object": "?englishQuote",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            }
+          ],
+          "wires": [
+            {
+              "from": [
+                "v0",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v1",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v2",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v3",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v4",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "p0",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p1",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p2",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p3",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p4",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p5",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p6",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p7",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            }
+          ],
+          "controls": {
+            "humanOversight": true,
+            "matingPoints": [],
+            "inspectionOnly": true
+          },
+          "kanban": null,
+          "view": null,
+          "seq": 1
+        }
+      },
+      "authorization": "absent",
+      "status": 401,
+      "response": {
+        "error": "authenticated_reviewer_required"
+      },
+      "nativeRowsStillDisplayed": 2
+    },
+    {
+      "label": "wrong-host-method",
+      "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result",
+      "method": "GET",
+      "request": null,
+      "authorization": "synthetic-principal",
+      "status": 405,
+      "response": {
+        "error": "method_not_allowed"
+      },
+      "nativeRowsStillDisplayed": 2
+    },
+    {
+      "label": "forged-noninspection-program",
+      "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result",
+      "method": "POST",
+      "request": {
+        "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+        "expectedRevision": 2,
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "offset": 0,
+        "limit": 64,
+        "program": {
+          "nodes": [
+            {
+              "id": "select",
+              "type": "sparql.select",
+              "params": {},
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v0",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?ordinal",
+                "ord": "0"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v1",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?source",
+                "ord": "1"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v2",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?rule",
+                "ord": "2"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v3",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?kifQuote",
+                "ord": "3"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v4",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?englishQuote",
+                "ord": "4"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p0",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/proof/c49e5d9d4c8bdcd54e398a8f2bec882ad8e8c0f426fb33a787776a946a47b77a>",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:premiseUse>",
+                "object": "?use",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p1",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:source>",
+                "object": "?source",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p2",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:ordinal>",
+                "object": "?ordinal",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p3",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:rule>",
+                "object": "?rule",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p4",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?source",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:kifQuotation>",
+                "object": "?kif",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p5",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?kif",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote>",
+                "object": "?kifQuote",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p6",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?source",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:englishQuotation>",
+                "object": "?english",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p7",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?english",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote>",
+                "object": "?englishQuote",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            }
+          ],
+          "wires": [
+            {
+              "from": [
+                "v0",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v1",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v2",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v3",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v4",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "p0",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p1",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p2",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p3",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p4",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p5",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p6",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p7",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            }
+          ],
+          "controls": {
+            "humanOversight": true,
+            "matingPoints": [],
+            "inspectionOnly": false
+          },
+          "kanban": null,
+          "view": null,
+          "seq": 1
+        }
+      },
+      "authorization": "synthetic-principal",
+      "status": 400,
+      "response": {
+        "error": "reviewed_taxonomy_query_refused",
+        "queryStatus": 400,
+        "code": "invalid_visual_program",
+        "reason": "Query program must be inspection-only"
+      },
+      "nativeRowsStillDisplayed": 2
+    },
+    {
+      "label": "forged-nine-pattern-program",
+      "scope": "Direct actual protected HTTP negative, not a native controller response or injected engine result",
+      "method": "POST",
+      "request": {
+        "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+        "expectedRevision": 2,
+        "goal": {
+          "predicate": "instance",
+          "subject": "urn:legal:Tenant",
+          "object": "urn:legal:Agent"
+        },
+        "offset": 0,
+        "limit": 64,
+        "program": {
+          "nodes": [
+            {
+              "id": "select",
+              "type": "sparql.select",
+              "params": {},
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v0",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?ordinal",
+                "ord": "0"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v1",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?source",
+                "ord": "1"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v2",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?rule",
+                "ord": "2"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v3",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?kifQuote",
+                "ord": "3"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "v4",
+              "type": "sparql.variable",
+              "params": {
+                "name": "?englishQuote",
+                "ord": "4"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p0",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/proof/c49e5d9d4c8bdcd54e398a8f2bec882ad8e8c0f426fb33a787776a946a47b77a>",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:premiseUse>",
+                "object": "?use",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p1",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:source>",
+                "object": "?source",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p2",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:ordinal>",
+                "object": "?ordinal",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p3",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?use",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:rule>",
+                "object": "?rule",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p4",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?source",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:kifQuotation>",
+                "object": "?kif",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p5",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?kif",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote>",
+                "object": "?kifQuote",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p6",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?source",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:englishQuotation>",
+                "object": "?english",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "p7",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "?english",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:quote>",
+                "object": "?englishQuote",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            },
+            {
+              "id": "forged-pattern-9",
+              "type": "sparql.pattern",
+              "params": {
+                "subject": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c/proof/c49e5d9d4c8bdcd54e398a8f2bec882ad8e8c0f426fb33a787776a946a47b77a>",
+                "predicate": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:vocab:premiseUse>",
+                "object": "?use",
+                "graph": "<urn:trikeshed:reviewed-taxonomy-proof-quads:1:a6780d6563a991e1de02ecc9682ac427c8532fd2c2f6b87f235eee3891d10c7c>"
+              },
+              "x": 0,
+              "y": 0,
+              "width": null,
+              "height": null,
+              "collapsed": false,
+              "subprogram": null,
+              "children": []
+            }
+          ],
+          "wires": [
+            {
+              "from": [
+                "v0",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v1",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v2",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v3",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "v4",
+                "variable"
+              ],
+              "to": [
+                "select",
+                "variables"
+              ]
+            },
+            {
+              "from": [
+                "p0",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p1",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p2",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p3",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p4",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p5",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p6",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "p7",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            },
+            {
+              "from": [
+                "forged-pattern-9",
+                "pattern"
+              ],
+              "to": [
+                "select",
+                "patterns"
+              ]
+            }
+          ],
+          "controls": {
+            "humanOversight": true,
+            "matingPoints": [],
+            "inspectionOnly": true
+          },
+          "kanban": null,
+          "view": null,
+          "seq": 1
+        }
+      },
+      "authorization": "synthetic-principal",
+      "status": 413,
+      "response": {
+        "error": "reviewed_taxonomy_query_refused",
+        "queryStatus": 413,
+        "code": "visual_query_refused",
+        "reason": "Visual query has too many patterns"
+      },
+      "nativeRowsStillDisplayed": 2
+    }
+  ],
+  "queryStateChecks": [
+    {
+      "label": "kif-six-pattern request-local query changes no configured host state",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    },
+    {
+      "label": "english-kif-eight-pattern request-local query changes no configured host state",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    },
+    {
+      "label": "missing-host-auth refuses without partial rows or configured host changes",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    },
+    {
+      "label": "wrong-host-method refuses without partial rows or configured host changes",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    },
+    {
+      "label": "forged-noninspection-program refuses without partial rows or configured host changes",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    },
+    {
+      "label": "forged-nine-pattern-program refuses without partial rows or configured host changes",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    },
+    {
+      "label": "restored-before-source-amendment request-local query changes no configured host state",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 19905,
+          "sha256": "4a9d595518eaa319d3bfb5fc25fb9f47099a8db29d03fefcdd68a24791a4b79e"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    },
+    {
+      "label": "Stale optional query writes no configured host state",
+      "before": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 20863,
+          "sha256": "527e09acb596815273312c92a19a85ea8ef7716743fc31c3e8efafeb58773b35"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      },
+      "after": {
+        "reviewWal": {
+          "bytes": 194,
+          "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+          "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+        },
+        "casPack": {
+          "bytes": 20863,
+          "sha256": "527e09acb596815273312c92a19a85ea8ef7716743fc31c3e8efafeb58773b35"
+        },
+        "analysisReteFacts": 0,
+        "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+        "beliefBagPresent": false,
+        "kifBankPresent": false,
+        "narsRetePresent": false,
+        "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+        "modelCalls": 0,
+        "configuredModelCount": 0,
+        "automaticIntake": 0,
+        "reviewIntakeCalls": 0
+      }
+    }
+  ],
+  "querySourceFocus": [
+    {
+      "beforeUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+      "sourceNode": "sha256:a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+      "selectionId": "kif:0:44"
+    },
+    {
+      "beforeUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+      "sourceNode": "sha256:c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+      "selectionId": "kif:45:88"
+    },
+    {
+      "beforeUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+      "sourceNode": "sha256:a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+      "selectionId": "kif:0:44"
+    },
+    {
+      "beforeUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+      "sourceNode": "sha256:c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+      "selectionId": "kif:45:88"
+    },
+    {
+      "beforeUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+      "sourceNode": "sha256:a362992a22d38e07e78b97f56cba256efaaedff1ae78b434f820555dcef41c21",
+      "selectionId": "kif:0:44"
+    },
+    {
+      "beforeUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "afterUrl": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+      "activeElementId": "taxonomy-source-c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+      "sourceNode": "sha256:c4d7320279a90955a5b024ffd013464466fe5c6e74dac09d97dabdd5c937ee44",
+      "selectionId": "kif:45:88"
+    }
+  ],
+  "plainProofs": {
+    "supported": {
+      "status": "SUPPORTED",
+      "goal": {
+        "predicate": "instance",
+        "subject": "urn:legal:Tenant",
+        "object": "urn:legal:Agent"
+      },
+      "premiseCounts": [
+        2
+      ]
+    },
+    "unknown": {
+      "status": "UNKNOWN",
+      "goal": {
+        "predicate": "subclass",
+        "subject": "urn:legal:Agent",
+        "object": "urn:legal:Person"
+      },
+      "premiseCounts": []
+    },
+    "reflexive": {
+      "status": "SUPPORTED",
+      "goal": {
+        "predicate": "subclass",
+        "subject": "urn:legal:Person",
+        "object": "urn:legal:Person"
+      },
+      "premiseCounts": [
+        1,
+        1
+      ]
+    }
+  },
+  "staleDom": {
+    "sourceCurrentText": "Snapshot: sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3 · revision 2 · source current: unconfirmed",
+    "sourceCurrentLabelCount": 1,
+    "evidenceQueryCount": 0,
+    "evidenceRowCount": 0,
+    "proofResultCount": 0,
+    "proofPathCount": 0,
+    "url": "http://127.0.0.1:36615/documents#english-taxonomy-fresh-profile-proof/synthetic%20taxonomy%20copular%20clauses.txt",
+    "text": "Review taxonomy translation\n\nDeclare how selected sentences should be represented as classes and individuals. These are your explicit translation choices. No model is called and no world facts are published.\n\ninstance links an individual to a class; subclass links two classes. Use the same exact class IRI only when you intend the same class. Every relation and sort must be chosen explicitly.\n\nInspection: sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d\n\nReviewer credential\n\nSynthetic validation reviewer: synthetic:proof-query-pilot\n\nAuthenticate reviewer and inspect candidates\nForget credential\nDeclared context IRI\n\nEligibility: true · profile english-present-copula-taxonomy/1\n\nSource and eligibility reasons\nSentence 0\nTenant is a Person.\nSource quotation and full parser bindings\nSelect this translation\n\nSource subject: Tenant · nominal head: Person\n\nRelation for sentence:0\nChoose…\ninstance\nsubclass\nSubject sort for sentence:0\nChoose…\nindividual\nclass\nObject sort for sentence:0\nChoose…\nclass\nSubject IRI for sentence:0\nObject IRI for sentence:0\nSentence 1\nA Person is an Agent.\nSource quotation and full parser bindings\nSelect this translation\n\nSource subject: Person · nominal head: Agent\n\nRelation for sentence:1\nChoose…\ninstance\nsubclass\nSubject sort for sentence:1\nChoose…\nindividual\nclass\nObject sort for sentence:1\nChoose…\nclass\nSubject IRI for sentence:1\nObject IRI for sentence:1\nPrepare translation preview\n\nEvidence query or source currentness was not confirmed. Refresh the review; this failure is not an UNKNOWN result.\n\nUnreviewed translation preview\n\nContext: urn:agreement:reviewed-proof-query-pilot\nDeclaration: sha256:7647f957daeb10f181b07a67077e074c9f309cb5cc394a3743a15eb5079f0fda\nDerived KIF: sha256:38933a7824a9b440f306e3cce9f320609ba8f5934f06936fa5043889baed0d96\n\n(instance urn:legal:Tenant urn:legal:Person)\n(subclass urn:legal:Person urn:legal:Agent)\n\n\nEnglish source\n\nTenant is a Person.\n\nDeclared KIF translation\n\n(instance urn:legal:Tenant urn:legal:Person)\nExact source spans, declared mappings and full parser bindings\nFreeze this exact translation\n\nEnglish source\n\nA Person is an Agent.\n\nDeclared KIF translation\n\n(subclass urn:legal:Person urn:legal:Agent)\nExact source spans, declared mappings and full parser bindings\nFreeze this exact translation\nFreeze selected translations for review\nAnalyst review · approve\n\nReview or source status was not confirmed. Refresh before any further decision or query.\n\nSnapshot: sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3 · revision 2 · source current: unconfirmed\n\nFrozen source, declarations and evidence\nReview decision note\nSave draft\nApprove exact selection\nReject selection\nCorrect / withdraw approval\nRefresh review\n\nNo confirmed current approval; no positive support is displayed."
+  },
+  "sourceAmendment": {
+    "before": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+      "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+      "seq": 0,
+      "length": 41,
+      "contentType": "text/plain"
+    },
+    "after": {
+      "project": "english-taxonomy-fresh-profile-proof",
+      "id": "synthetic taxonomy copular clauses.txt",
+      "cid": "sha256:aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db",
+      "rev": "2-sha256:70e5198c7aa3a7476b914822feb6d4282bacd9136cc484fd9fe5ba25d1ef4f41",
+      "seq": 1,
+      "length": 80,
+      "contentType": "text/plain"
+    },
+    "sourceHeadBeforeBase64": "o2RoZWFkeEdzaGEyNTY6ZDE3MGNmMDY5ZDhmMTMxMGMzZTZhNDk2ZTdkOWI3MDZmMTdjMDFhYjBkODIzNDJkZmUyZWY3MmYxN2U5NjhiOGVjb3VudAFmZm9ybWF0bWNvdWNoLXJvb3QtdjE=",
+    "sourceHeadAfterBase64": "o2RoZWFkeEdzaGEyNTY6NGJjNDdkMGNhMTFkZDQ4MGI1MjRmODZlZmE3MWMwZjU4MzUzNzJhMTdiZDdmZDIyODBmNWE2ZDVmNmRhMzJhN2Vjb3VudAJmZm9ybWF0bWNvdWNoLXJvb3QtdjE=",
+    "sourceMirrorBeforeBase64": "VGVuYW50IGlzIGEgUGVyc29uLiBBIFBlcnNvbiBpcyBhbiBBZ2VudC4=",
+    "sourceMirrorAfterBase64": "VGVuYW50IGlzIGEgUGVyc29uLiBBIFBlcnNvbiBpcyBhbiBBZ2VudC4KU291cmNlIGFtZW5kZWQgYWZ0ZXIgc3ludGhldGljIHJldmlldy4="
+  },
+  "reader": {
+    "writerPid": "106034",
+    "readerPid": "106400",
+    "retainedReadbacks": 8,
+    "reviewFrames": [
+      {
+        "sequence": 1,
+        "eventCid": "sha256:e917688425f4316bc8ed9d204d9ebf52af754bdfcbc45decb47b232fd199675f",
+        "event": {
+          "atMs": 123,
+          "kind": "curation-review-event",
+          "action": "snapshot",
+          "family": "taxonomy/english/sha256:195f7270c53c128448231ca8e12e7921ab7b63a18df66bc6a9c8daecbf09c51c",
+          "version": 1,
+          "revision": 1,
+          "previousCid": null,
+          "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3",
+          "previousSnapshotCid": null
+        }
+      },
+      {
+        "sequence": 2,
+        "eventCid": "sha256:428cd6547c38f5676dcd30064ede592f58494b43937c03a7b9d0cd1b4fa4598d",
+        "event": {
+          "atMs": 123,
+          "kind": "curation-review-event",
+          "note": "Synthetic validation reviewer only; manual declared translations, not human legal approval or world facts.",
+          "action": "approve",
+          "family": "taxonomy/english/sha256:195f7270c53c128448231ca8e12e7921ab7b63a18df66bc6a9c8daecbf09c51c",
+          "version": 1,
+          "reviewer": "synthetic:proof-query-pilot",
+          "revision": 2,
+          "synthetic": true,
+          "previousCid": "sha256:e917688425f4316bc8ed9d204d9ebf52af754bdfcbc45decb47b232fd199675f",
+          "snapshotCid": "sha256:1f8917bfaf8a935565bb0ebfb41149be561576ac605ec1323209f8dd474f7aa3"
+        }
+      }
+    ],
+    "walBeforeOpen": {
+      "bytes": 194,
+      "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545"
+    },
+    "walAfterClose": {
+      "bytes": 194,
+      "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545"
+    },
+    "casPackBeforeRead": {
+      "bytes": 20863,
+      "sha256": "527e09acb596815273312c92a19a85ea8ef7716743fc31c3e8efafeb58773b35"
+    },
+    "casPackAfterClose": {
+      "bytes": 20863,
+      "sha256": "527e09acb596815273312c92a19a85ea8ef7716743fc31c3e8efafeb58773b35"
+    },
+    "storedPureQueryChecks": 3
+  },
+  "safety": {
+    "inspectionPosts": 0,
+    "inspectionResponses": 0,
+    "parserObservability": "Actual empty SDK, zero fresh Inspect POSTs, unmodified default retained reader and stored actual CoreNLP4.6 receipt; no parser reauthentication claim",
+    "guestModules": {
+      "installed": [],
+      "mounted": []
+    },
+    "walBytes": 194,
+    "baselineWalBytes": 8,
+    "reviewWal": {
+      "bytes": 194,
+      "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+      "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+    },
+    "casPack": {
+      "bytes": 20863,
+      "sha256": "527e09acb596815273312c92a19a85ea8ef7716743fc31c3e8efafeb58773b35"
+    },
+    "modelCalls": 0,
+    "configuredModelCount": 0,
+    "automaticIntake": 0,
+    "reviewIntakeCalls": 0,
+    "analysisReteFacts": 0,
+    "blackboardBaselineCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+    "blackboardCurrentCid": "sha256:b38e3fd2dcc483f1cca7f2955c98cb9fbf40da2dc78ed367ae9976ff5461402d",
+    "blackboardUnchangedFromReadinessBaseline": true,
+    "readinessBaselineEntries": [
+      "lcnc/readiness/document.reviewDecision"
+    ],
+    "beliefBagPresent": false,
+    "kifBankPresent": false,
+    "narsRetePresent": false,
+    "globalQuadStoreBinding": "not-configured-in-ModuleContext; optional endpoint constructs request-local SparqlSurface(projection.store)",
+    "nativeHornConfigured": false,
+    "syntheticReviewer": true
+  },
+  "cleanup": {
+    "reviewWireDrainedAndClosed": true,
+    "booksDrained": true,
+    "scopesDrained": true,
+    "writerPid": "106034",
+    "allSupervisorsCompleted": true,
+    "remainingChildren": 0,
+    "executorTerminated": true,
+    "casCloseReturned": true,
+    "reviewWalAfterClose": {
+      "bytes": 194,
+      "sha256": "abeed00648a825178a86bc544c913e28e59dde39e24119f14806633232d1f545",
+      "base64": "RE9DLUxPRzFXQUwxAAEAAAAAAAAAAQAAAEdzaGEyNTY6ZTkxNzY4ODQyNWY0MzE2YmM4ZWQ5ZDIwNGQ5ZWJmNTJhZjc1NGJkZmNiYzQ1ZGVjYjQ3YjIzMmZkMTk5Njc1ZpqzfjpXQUwxAAEAAAAAAAAAAgAAAEdzaGEyNTY6NDI4Y2Q2NTQ3YzM4ZjU2NzZkY2QzMDA2NGVkZTU5MmY1ODQ5NGI0MzkzN2MwM2E3YjlkMGNkMWI0ZmE0NTk4ZKyQYk8="
+    },
+    "listenerStopped": true,
+    "inspectionPosts": 0,
+    "inspectionResponses": 0
+  },
+  "independentAudit": {
+    "result": "PASS",
+    "scriptSha256": "6594c0776046f8f927dda7196444b90deff8e95e5798f024d566e6bb7e8b39f5",
+    "mutatedCopyControlsRejected": 26
+  },
+  "limits": [
+    "Typed matched-data row counts do not change goal truth or establish English entailment",
+    "Host current-review authentication remains distinct from raw physicalSource reviewAuthority/bindingProvenance not-established",
+    "No configured globalQuadStore; observed configured state invariance is not a universal global-store claim",
+    "Request-local graphs/frame/export IDs need not be persisted in CAS",
+    "Read-only standard-library audit/pure helper checks do not independently execute SPARQL or prove inference",
+    "No fresh parser/model, raw malformed-UTF8 transport, permitted model transport, OS sandbox or crash-recovery claim",
+    "Later LDA/v76 work is a separate checkpoint; this proof stays9a4/a15/Docs0a113"
+  ]
+}

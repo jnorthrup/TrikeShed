@@ -1,0 +1,18 @@
+Independent recorded reviewed-proof query audit: PASS
+Recorded native protected visual-query requests, typed RDF/DOM rows, canonical receipt/export identity and exact source/provenance/state joins; not an independent query engine, source authentication, English entailment, proof validity or OS airgap.
+Source head: 9a4eaac3d7bbde1ab52a7aae6a23a1cda7ab34b3
+Main SHA256: a15bee549a19af990aa57a34cccde775737633bb11418e116ace183c8dc2f867
+Documents JS SHA256: 0a113702e34733420087b52780d42f2ad0bed3a890b9b9fa5aacac609072822d
+Original receipt/source: sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d / sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 (41 UTF-8 source bytes)
+Actual protected optional programs: KIF6BGP, English/KIF8BGP, restored English/KIF8BGP. Each returns2 exact typed rows; DOM numeric order and six local source-focus actions verified.
+Fixed starter programs/wires/terms and their rendered lowered query text bound; no credentials, dataset selector or procedure dispatch fields.
+Actual direct HTTP negatives401/405/400/413 have no query/plan/bindings; they are out-of-band HTTP tests, not native controller-error tests.
+Host current-review provenance stays separate from physicalSource raw/not-established. The descriptor quad count is host-reported and bounded, not independently reprojected.
+Actual checkedAsOf123 comes from the fixture-controlled clock; it is not a wall-clock attestation or future authority lease.
+Eight query/refusal/stale state captures preserve actual CAS-pack prefix hashes, full review WAL, empty Rete, blackboard CID and absent bag/KIF-bank/NARS owners; no global QuadStore is configured.
+Original support2premise, reverseUNKNOWN and2alternative reflexivity displays remain receipt-bound. Source-profile limits: {"maxAssertions": 256, "maxProofs": 128, "maxSteps": 10000, "maxTotalChars": 1048576}
+Actual source amendment changes CID/revision/sequence; native optional retry409 clears proof/query rows and labels source currentness unconfirmed.
+Separate writer/reader PIDs 106034 / 106400; two actual CRC32C WAL events, eight retained artifacts, closed CAS/WAL and amended source head/mirror verified.
+After-close stored query rows/provenance checked for consistency; no graph CAS fetch, query reevaluation, semantic entailment or historical-current-authority claim.
+All120 classpath JARs/119 dependencies and observer sources/screenshots hashed. Mutated-copy controls rejected: 26
+Scope: selected reviewed translation assumptions only. Native coverage is the recorded20requests, not every size bound or every native controller-error path.
