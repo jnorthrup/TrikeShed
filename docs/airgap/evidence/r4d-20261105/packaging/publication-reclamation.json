@@ -1,0 +1,24 @@
+[
+  {
+    "retained": "/workspace/library-files/airgap-document-r4c-linux-x64-2026-11-05.tar.gz",
+    "removed": "/workspace/airgap-r4c-proof/reproducibility-second.tar.gz",
+    "sha256": "13d6c58e339cfd5ba14d71b8e68ab4a1cb0c14eac5f5c931814a6f051b24054c",
+    "bytes": 460562545
+  },
+  {
+    "retained": "/workspace/library-files/airgap-document-r4d-linux-x64-2026-11-05.tar.gz",
+    "removed": "/workspace/airgap-r4d-proof/reproducibility-second.tar.gz",
+    "sha256": "5521fc287df825fbddff3ed95e56b7b1c1fa5b4e203a0f21b13cac00bf1fa1ac",
+    "bytes": 460561122
+  },
+  {
+    "removed": "/workspace/airgap-r4c-proof/unpacked",
+    "reconstructFrom": "/workspace/library-files/airgap-document-r4c-linux-x64-2026-11-05.tar.gz",
+    "reason": "Verified scratch extraction, not primary archive or proof evidence"
+  },
+  {
+    "removed": "/workspace/airgap-r4d-proof/unpacked",
+    "reconstructFrom": "/workspace/library-files/airgap-document-r4d-linux-x64-2026-11-05.tar.gz",
+    "reason": "Verified scratch extraction, not primary archive or proof evidence"
+  }
+]

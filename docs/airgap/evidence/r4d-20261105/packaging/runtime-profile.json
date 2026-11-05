@@ -1,0 +1,439 @@
+{
+  "jarCount": 26,
+  "dependencyJarCount": 23,
+  "jarBytes": 136705309,
+  "dependencies": [
+    {
+      "group": "org.jetbrains.kotlinx",
+      "name": "atomicfu-jvm",
+      "version": "0.33.0",
+      "file": "atomicfu-jvm-0.33.0.jar",
+      "sha256": "cdc94bfe4f739a0121860e61977d5c1e6a3d53c21f2471493393ba9e900d394e",
+      "pomFiles": [
+        "atomicfu-jvm-0.33.0.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.jetbrains.kotlinx__atomicfu-jvm-0.33.0-sources.jar",
+        "sha256": "09e8719c35c3491633ea8d0dfb2a0f1769dfff5a6bbaf55ee5412a6221331215"
+      }
+    },
+    {
+      "group": "org.jetbrains.kotlinx",
+      "name": "kotlinx-coroutines-core-jvm",
+      "version": "1.11.0",
+      "file": "kotlinx-coroutines-core-jvm-1.11.0.jar",
+      "sha256": "d1d75aa01dffbb4d1c520e67e4c4e7f5f6174718e7cb4632412503f2f0e604fa",
+      "pomFiles": [
+        "kotlinx-coroutines-core-jvm-1.11.0.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.jetbrains.kotlinx__kotlinx-coroutines-core-jvm-1.11.0-sources.jar",
+        "sha256": "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a"
+      }
+    },
+    {
+      "group": "org.jetbrains.kotlinx",
+      "name": "kotlinx-serialization-core-jvm",
+      "version": "1.12.0",
+      "file": "kotlinx-serialization-core-jvm-1.12.0.jar",
+      "sha256": "bcfddcac76159058ba0953af05938c17111d238cd41be7191874656454d62f1a",
+      "pomFiles": [
+        "kotlinx-serialization-core-jvm-1.12.0.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.jetbrains.kotlinx__kotlinx-serialization-core-jvm-1.12.0-sources.jar",
+        "sha256": "b62fb8059123c43a72ddbe4aeaa8c92c8313d822c128ca2f861e3d91e35e5070"
+      }
+    },
+    {
+      "group": "org.jetbrains.kotlinx",
+      "name": "kotlinx-datetime-jvm",
+      "version": "0.8.0-0.6.x-compat",
+      "file": "kotlinx-datetime-jvm-0.8.0-0.6.x-compat.jar",
+      "sha256": "c764cb4882bb30a5b4279e07324ef60ed4f82f23a7bb420ee62550266d0f6162",
+      "pomFiles": [
+        "kotlinx-datetime-jvm-0.8.0-0.6.x-compat.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.jetbrains.kotlinx__kotlinx-datetime-jvm-0.8.0-0.6.x-compat-sources.jar",
+        "sha256": "d2d3e8cf389ab0f162c61a2cfdaec488fca766ee16b8da12ac81bd5d53500de2"
+      }
+    },
+    {
+      "group": "org.jetbrains.kotlin",
+      "name": "kotlin-stdlib",
+      "version": "2.4.21",
+      "file": "kotlin-stdlib-2.4.21.jar",
+      "sha256": "bd8250210584cb659847dce9cda660f8e9906e5def7fbebcea93dc6dcb6a88a3",
+      "pomFiles": [
+        "kotlin-stdlib-2.4.21.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.jetbrains.kotlin__kotlin-stdlib-2.4.21-sources.jar",
+        "sha256": "1e29c0668b0aa555e7b154e5da2e8094e1b755cfee25737839195bbbdad8a4a2"
+      }
+    },
+    {
+      "group": "org.graalvm.truffle",
+      "name": "truffle-runtime",
+      "version": "25.3.4.1",
+      "file": "truffle-runtime-25.3.4.1.jar",
+      "sha256": "d74ff0b8eb9a5fec4a571f78bc21750ee41dfd454877b8cce8b33641efd90ae3",
+      "pomFiles": [
+        "truffle-runtime-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.truffle__truffle-runtime-25.3.4.1-sources.jar",
+        "sha256": "bc365db6f4765d57bc4779508dbe0fcdd2c379b4027eb954fd5b0c9e55c8a519"
+      }
+    },
+    {
+      "group": "org.graalvm.llvm",
+      "name": "llvm-language-native",
+      "version": "25.3.4.1",
+      "file": "llvm-language-native-25.3.4.1.jar",
+      "sha256": "b49d4ea22e77be015a8a4dedd497e725326add5c03297eafd8eca50806a388ef",
+      "pomFiles": [
+        "llvm-language-native-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.llvm__llvm-language-native-25.3.4.1-sources.jar",
+        "sha256": "4750d7a649d9326422ebcd8d592c4473abf9eb530f3dc3afa37592bfd1833c08"
+      }
+    },
+    {
+      "group": "org.graalvm.truffle",
+      "name": "truffle-nfi-libffi",
+      "version": "25.3.4.1",
+      "file": "truffle-nfi-libffi-25.3.4.1.jar",
+      "sha256": "edb64301941d86f785f748f70742614e625971adf4595789e3b7a068dcd574d3",
+      "pomFiles": [
+        "truffle-nfi-libffi-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.truffle__truffle-nfi-libffi-25.3.4.1-sources.jar",
+        "sha256": "b14b8c43f10450cac8b2c8af2d785e43fd22808a6505e0f7d571b2c26bc09f5c"
+      }
+    },
+    {
+      "group": "org.graalvm.truffle",
+      "name": "truffle-nfi-panama",
+      "version": "25.3.4.1",
+      "file": "truffle-nfi-panama-25.3.4.1.jar",
+      "sha256": "e3bdc4c7fa813218cf13a5210cfbc994ede13df5082326c2d709ce652a78ef2c",
+      "pomFiles": [
+        "truffle-nfi-panama-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.truffle__truffle-nfi-panama-25.3.4.1-sources.jar",
+        "sha256": "edec614bf9554c81685a6a8636c5352109234f9984a983dc3ea449a209368c24"
+      }
+    },
+    {
+      "group": "org.graalvm.llvm",
+      "name": "llvm-language-nfi",
+      "version": "25.3.4.1",
+      "file": "llvm-language-nfi-25.3.4.1.jar",
+      "sha256": "c3eed55afc590063636b939e0d75597dbe5d57edb5f237da898b179eaaaf02c9",
+      "pomFiles": [
+        "llvm-language-nfi-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.llvm__llvm-language-nfi-25.3.4.1-sources.jar",
+        "sha256": "f25574a58c939d63a64bb232f672cb276b726cad6ea2b48a407276bc391b2638"
+      }
+    },
+    {
+      "group": "org.graalvm.llvm",
+      "name": "llvm-language",
+      "version": "25.3.4.1",
+      "file": "llvm-language-25.3.4.1.jar",
+      "sha256": "c835fc80abdc818b7487c9e0b9ecd6c7cd59a7bbb7ac7041d6e2cda2be4b9335",
+      "pomFiles": [
+        "llvm-language-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.llvm__llvm-language-25.3.4.1-sources.jar",
+        "sha256": "716562a9c6cbe9201f53bc972d9eafbb1a692a9d9aebb9f177a541c5e0913f66"
+      }
+    },
+    {
+      "group": "org.graalvm.truffle",
+      "name": "truffle-nfi",
+      "version": "25.3.4.1",
+      "file": "truffle-nfi-25.3.4.1.jar",
+      "sha256": "5320c98ba65a13a4ad9609732efa1ca2742ede7892863a154b5a89c987491853",
+      "pomFiles": [
+        "truffle-nfi-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.truffle__truffle-nfi-25.3.4.1-sources.jar",
+        "sha256": "0a5352ff42259c9fd0930cdfb9bc2579dcdf85b5388c877d302e67185c4d4e41"
+      }
+    },
+    {
+      "group": "org.graalvm.llvm",
+      "name": "llvm-language-native-resources",
+      "version": "25.3.4.1",
+      "file": "llvm-language-native-resources-25.3.4.1.jar",
+      "sha256": "2b5fb413806a0046127c975dae8a55d1047b2c3757072b97cb9d06b024c541c3",
+      "pomFiles": [
+        "llvm-language-native-resources-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.llvm__llvm-language-native-resources-25.3.4.1-sources.jar",
+        "sha256": "1efc1ae1a952bacae491d594a1d41ed13e82a49ec47f8411d718be7726ab3ef5"
+      }
+    },
+    {
+      "group": "org.graalvm.llvm",
+      "name": "llvm-api",
+      "version": "25.3.4.1",
+      "file": "llvm-api-25.3.4.1.jar",
+      "sha256": "4e7bf9f0f6e41dbdb9fb68b2b9004548dcda154f83bd769609435f50d8ec593c",
+      "pomFiles": [
+        "llvm-api-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.llvm__llvm-api-25.3.4.1-sources.jar",
+        "sha256": "c5cb69dcbc32e57c9f740ac94216aec88b8673e1a790b42367c42289d49ce922"
+      }
+    },
+    {
+      "group": "org.graalvm.truffle",
+      "name": "truffle-api",
+      "version": "25.3.4.1",
+      "file": "truffle-api-25.3.4.1.jar",
+      "sha256": "f9efa18b1cb6c4e39862f5ac83a88ee4c9e31252c52c2ee5192c2a707cd9b27f",
+      "pomFiles": [
+        "truffle-api-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.truffle__truffle-api-25.3.4.1-sources.jar",
+        "sha256": "19b6c77ad407ca062d4334040177847e322d52ed2f04804953d54dd366579064"
+      }
+    },
+    {
+      "group": "org.graalvm.polyglot",
+      "name": "polyglot",
+      "version": "25.3.4.1",
+      "file": "polyglot-25.3.4.1.jar",
+      "sha256": "befec2cbfb6ca279a73ee20626718a917ab1d1a3970793698ddc11b4d41e0356",
+      "pomFiles": [
+        "polyglot-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.polyglot__polyglot-25.3.4.1-sources.jar",
+        "sha256": "fc796799f60b9463ea082ec8c8a9eed4b5d629035123933beec76e58c6cef28e"
+      }
+    },
+    {
+      "group": "org.jetbrains",
+      "name": "annotations",
+      "version": "23.0.0",
+      "file": "annotations-23.0.0.jar",
+      "sha256": "7b0f19724082cbfcbc66e5abea2b9bc92cf08a1ea11e191933ed43801eb3cd05",
+      "pomFiles": [
+        "annotations-23.0.0.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.jetbrains__annotations-23.0.0-sources.jar",
+        "sha256": "ff2309b42f7584520497bb48bc609aca04c9886cf48708f14be83f00423ec144"
+      }
+    },
+    {
+      "group": "org.graalvm.sdk",
+      "name": "jniutils",
+      "version": "25.3.4.1",
+      "file": "jniutils-25.3.4.1.jar",
+      "sha256": "b1d78402c744e5022fcb19f620644ab38b834c024020f3570dadaaf9cbe77067",
+      "pomFiles": [
+        "jniutils-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.sdk__jniutils-25.3.4.1-sources.jar",
+        "sha256": "b631b01238d9f090857d2c3b8124f037a420c0049efc87e7eba53434454ccc0e"
+      }
+    },
+    {
+      "group": "org.graalvm.sdk",
+      "name": "collections",
+      "version": "25.3.4.1",
+      "file": "collections-25.3.4.1.jar",
+      "sha256": "3d0d2287f0217e7e765a47d69681c0ac1bb4ef50d70c9440449e86045bbe158f",
+      "pomFiles": [
+        "collections-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.sdk__collections-25.3.4.1-sources.jar",
+        "sha256": "df2e466ad9dce602da3f77a0eee7a0b76eb7f72b9b07dc99ebb6b5cfbd8474be"
+      }
+    },
+    {
+      "group": "org.graalvm.sdk",
+      "name": "nativeimage",
+      "version": "25.3.4.1",
+      "file": "nativeimage-25.3.4.1.jar",
+      "sha256": "a4315500775e98d16f083812bf5b8b664d84abad736da14ebbea5b38d7752b0f",
+      "pomFiles": [
+        "nativeimage-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.sdk__nativeimage-25.3.4.1-sources.jar",
+        "sha256": "75c753c6811f070a7ecf9cac7b8372a51fff5c4df5361bf28590994fb47d983c"
+      }
+    },
+    {
+      "group": "org.graalvm.sdk",
+      "name": "word",
+      "version": "25.3.4.1",
+      "file": "word-25.3.4.1.jar",
+      "sha256": "fe1c3723e27907789732ac9f3d639ba6055d459529cfcfbd96156e73911ee7b7",
+      "pomFiles": [
+        "word-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.sdk__word-25.3.4.1-sources.jar",
+        "sha256": "2410996d807d8af10ec86e5c3ced95946c28003c944a22568cd3f1d87e2311f1"
+      }
+    },
+    {
+      "group": "org.graalvm.truffle",
+      "name": "truffle-compiler",
+      "version": "25.3.4.1",
+      "file": "truffle-compiler-25.3.4.1.jar",
+      "sha256": "a422df88ffaabe4669b8b6e5d63f04f2a8152e5fe763b3bfbf3dc58d7e5dd41c",
+      "pomFiles": [
+        "truffle-compiler-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.truffle__truffle-compiler-25.3.4.1-sources.jar",
+        "sha256": "12ac8500adf8679e4959866f9f89be1a65c96cc544334cd4ac6e3c6bfd571230"
+      }
+    },
+    {
+      "group": "org.graalvm.shadowed",
+      "name": "antlr4",
+      "version": "25.3.4.1",
+      "file": "antlr4-25.3.4.1.jar",
+      "sha256": "31f8c4fa0715ca486fa73dfb634537f74d4fae3d8786e37eea00994f8b10da7f",
+      "pomFiles": [
+        "antlr4-25.3.4.1.pom"
+      ],
+      "embeddedNotices": [],
+      "correspondingSource": {
+        "file": "org.graalvm.shadowed__antlr4-25.3.4.1-sources.jar",
+        "sha256": "3addb63be2b9b7ec40892ee3bb3620eb1980454e32b2bd9e85d798442a8b392d"
+      }
+    }
+  ],
+  "removedJarNames": [
+    "animation-core-desktop-1.12.2.jar",
+    "animation-desktop-1.12.2.jar",
+    "annotation-jvm-1.9.1.jar",
+    "annotations-40.0.0.jar",
+    "asm-9.11.1.jar",
+    "asm-tree-9.11.1.jar",
+    "bcpkix-jdk18on-1.85.jar",
+    "bcprov-jdk18on-1.85.jar",
+    "bcutil-jdk18on-1.85.jar",
+    "collection-jvm-1.5.0.jar",
+    "commons-math3-3.6.1.jar",
+    "core-common-2.2.0.jar",
+    "desktop-jvm-1.12.2.jar",
+    "foundation-desktop-1.12.2.jar",
+    "foundation-layout-desktop-1.12.2.jar",
+    "icu4j-25.3.4.1.jar",
+    "jbr-api-1.9.0.jar",
+    "jcodings-25.3.4.1.jar",
+    "jmh-core-1.37.jar",
+    "jmh-generator-annprocess-1.37.jar",
+    "joni-40.0.0.jar",
+    "jopt-simple-5.0.4.jar",
+    "js-language-25.3.4.1.jar",
+    "json-25.3.4.1.jar",
+    "jspecify-1.0.0.jar",
+    "kotlin-build-tools-api-2.4.21.jar",
+    "kotlin-compiler-embeddable-2.4.21.jar",
+    "kotlin-daemon-embeddable-2.4.21.jar",
+    "kotlin-reflect-1.6.10.jar",
+    "kotlin-script-runtime-2.4.21.jar",
+    "kotlin-scripting-common-2.4.21.jar",
+    "kotlin-scripting-compiler-embeddable-2.4.21.jar",
+    "kotlin-scripting-compiler-impl-embeddable-2.4.21.jar",
+    "kotlin-scripting-jvm-2.4.21.jar",
+    "kotlin-scripting-jvm-host-2.4.21.jar",
+    "lifecycle-common-jvm-2.11.0.jar",
+    "lifecycle-runtime-compose-desktop-2.11.0.jar",
+    "lifecycle-runtime-compose-desktop-2.9.6.jar",
+    "lifecycle-runtime-desktop-2.11.0.jar",
+    "lifecycle-viewmodel-compose-desktop-2.11.0.jar",
+    "lifecycle-viewmodel-desktop-2.11.0.jar",
+    "lifecycle-viewmodel-savedstate-desktop-2.11.0.jar",
+    "material-desktop-1.12.2.jar",
+    "material-icons-core-desktop-1.7.3.jar",
+    "material-icons-extended-desktop-1.7.3.jar",
+    "material-ripple-desktop-1.12.2.jar",
+    "material3-desktop-1.9.0.jar",
+    "navigationevent-compose-desktop-1.1.0.jar",
+    "navigationevent-compose-desktop-1.1.1.jar",
+    "navigationevent-desktop-1.1.1.jar",
+    "profiler-tool-25.3.4.1.jar",
+    "python-bouncycastle-support-25.3.4.1.jar",
+    "python-language-25.3.4.1.jar",
+    "python-resources-25.3.4.1.jar",
+    "regex-25.3.4.1.jar",
+    "requestfactory-client-2.13.1.jar",
+    "requestfactory-server-2.13.1.jar",
+    "resources-40.0.0.jar",
+    "runtime-40.0.0.jar",
+    "runtime-annotation-jvm-1.12.1.jar",
+    "runtime-desktop-1.12.1.jar",
+    "runtime-desktop-1.12.2.jar",
+    "runtime-retain-desktop-1.12.1.jar",
+    "runtime-saveable-desktop-1.12.1.jar",
+    "runtime-saveable-desktop-1.12.2.jar",
+    "savedstate-compose-desktop-1.3.6.jar",
+    "savedstate-compose-desktop-1.4.0.jar",
+    "savedstate-desktop-1.4.0.jar",
+    "shared-40.0.0.jar",
+    "skiko-awt-0.150.2.jar",
+    "skiko-awt-runtime-linux-x64-0.150.2.jar",
+    "slf4j-api-2.0.20.jar",
+    "sqlite-jdbc-3.53.4.0.jar",
+    "ui-backhandler-desktop-1.12.2.jar",
+    "ui-desktop-1.12.2.jar",
+    "ui-geometry-desktop-1.12.2.jar",
+    "ui-graphics-desktop-1.12.2.jar",
+    "ui-text-desktop-1.12.2.jar",
+    "ui-tooling-preview-desktop-1.12.2.jar",
+    "ui-unit-desktop-1.12.2.jar",
+    "ui-util-desktop-1.12.2.jar",
+    "validation-api-1.0.0.GA.jar",
+    "xz-25.3.4.1.jar",
+    "zstd-jni-1.5.7-24.jar"
+  ],
+  "scope": "Bounded PDF and native LLVM document graph; other daemon services are not included in this dependency profile"
+}

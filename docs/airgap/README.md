@@ -14,7 +14,8 @@ and D3M integration record. A planned gate is not a completed release.
 | R4a: packaged offline runtime | Generated launcher, sealed server filesystem, real PDF traversal and recovery in a second JVM without source assets or LLVM | [Verified increment](06-offline-runtime.md), [219 regressions and packaged proof](evidence/r4a-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4a.md) |
 | R4b: narrower profile and forced-exit recovery | 23 dependency jars, inert named preset, exact receipt recovery after SIGKILL at a completed receipt | [Verified increment](07-runtime-profile-recovery.md), [237 regressions and extracted-archive proof](evidence/r4b-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4b.md) |
 | R4c: interrupted execution | SIGKILL at three node boundaries, preserved interrupted receipts, explicit new execution and third-JVM inspection | [Verified increment](08-interrupted-execution.md), [247 regressions and three archive scenarios](evidence/r4c-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4c.md) |
-| R4d: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
+| R4d: storage publication | Parent-directory barriers, final-WAL-fsync EIO/SIGKILL and same-run inspection without retry | [Verified increment](09-storage-publication.md), [264 passing tests and 17 browser cases](evidence/r4d-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4d.md) |
+| R4e: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
 verifies the native inert Documents-to-Panels handoff, ten URL/ownership guards,
@@ -173,3 +174,20 @@ the concurrent NAL assertion overlap have preserved evidence and intent
 resolutions. The [runbook](08-interrupted-execution.md) records archive
 identities and measurements. These are cooperative node-boundary failures;
 arbitrary-write crash safety and vendor/native rebuild closure remain open.
+
+## R4d acceptance
+
+The JVM filesystem boundary now syncs new directory entries before dependent
+publication. A real syscall trace checks every new CAS shard's parent barrier.
+Path-filtered EIO and SIGKILL at the final WAL fsync leave an unacknowledged
+completion that a new inspector recovers under the same run identity, with no
+automatic retry, miner or LLVM execution. A separate pre-finish interruption
+still recovers as interrupted and requires an explicit new run.
+
+The combined source passes 264 selected tests, with one conditional
+external-native-solver skip, fresh affected-target compilation, seventeen
+browser cases, seven startup refusals and five integrity refusals. D3M retains
+542 frozen refs through 3 merges and the evidenced structured-input
+integration fix. The [runbook](09-storage-publication.md) retains failed
+attempts, exact identities and measurements. The kernel survives these process
+faults; power-loss safety and full vendor/native rebuild closure remain open.

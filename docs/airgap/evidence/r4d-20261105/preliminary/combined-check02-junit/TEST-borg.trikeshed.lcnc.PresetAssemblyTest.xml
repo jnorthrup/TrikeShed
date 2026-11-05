@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="PresetAssemblyTest[jvm]" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T04:29:58.572Z" hostname="0d6dfba25614" time="0.598">
+  <properties/>
+  <testcase name="everyPresetNodeTypeIsContractDeclared()[jvm]" classname="borg.trikeshed.lcnc.PresetAssemblyTest" time="0.046"/>
+  <testcase name="tribunalCarriesBoundedLoopAbortEdgesAndValidates()[jvm]" classname="borg.trikeshed.lcnc.PresetAssemblyTest" time="0.012"/>
+  <testcase name="everyPresetWireConnectsPortsWithMatchingKinds()[jvm]" classname="borg.trikeshed.lcnc.PresetAssemblyTest" time="0.047"/>
+  <testcase name="presetsAreOfferedNotInstalled()[jvm]" classname="borg.trikeshed.lcnc.PresetAssemblyTest" time="0.013"/>
+  <testcase name="allOfferedPresetsExistAndRoundTrip()[jvm]" classname="borg.trikeshed.lcnc.PresetAssemblyTest" time="0.052"/>
+  <testcase name="presetsCarryViewportGeometryForRoundTripping()[jvm]" classname="borg.trikeshed.lcnc.PresetAssemblyTest" time="0.426"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

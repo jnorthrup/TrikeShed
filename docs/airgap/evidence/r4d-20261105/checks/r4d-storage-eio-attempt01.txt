@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4d-proof/storage.py", line 140, in <module>
+    if driver is not None and driver.poll() is None:driver.terminate();driver.wait(timeout=10)
+                                                                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 1264, in wait
+    return self._wait(timeout=timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 2045, in _wait
+    raise TimeoutExpired(self.args, timeout)
+subprocess.TimeoutExpired: Command '['node', '/workspace/airgap-r4d-proof/storage.cjs', '/workspace/airgap-r4d-proof/storage-eio-attempt01', 'http://127.0.0.1:18764']' timed out after 10 seconds

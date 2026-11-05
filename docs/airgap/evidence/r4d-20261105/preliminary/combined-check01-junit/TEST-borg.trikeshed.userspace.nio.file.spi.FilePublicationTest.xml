@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="FilePublicationTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T04:00:56.108Z" hostname="0d6dfba25614" time="0.003">
+  <properties/>
+  <testcase name="directoryPublicationFollowsAnExistingSymlinkWithoutReplacingIt()[jvm]" classname="borg.trikeshed.userspace.nio.file.spi.FilePublicationTest" time="0.001"/>
+  <testcase name="atomicReplacementPreservesTheOpenedReaderAndCreatesAncestors()[jvm]" classname="borg.trikeshed.userspace.nio.file.spi.FilePublicationTest" time="0.001"/>
+  <testcase name="directoryPublicationRefusesAFileAncestorAndAnExistingExclusiveLeaf()[jvm]" classname="borg.trikeshed.userspace.nio.file.spi.FilePublicationTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

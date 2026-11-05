@@ -1,0 +1,15 @@
+from pathlib import Path
+import subprocess,os
+h=Path('/workspace/airgap-r4d-proof')
+def run(args,name,env=None):
+ with (Path('/workspace')/('r4d-'+name+'.txt')).open('w') as log:p=subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,env=env)
+ assert p.returncode==0,(name,p.returncode)
+ print(name,'PASS',flush=True)
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(h/'unpacked/airgap-document-rootfs')
+prefix=['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4d-proof','python']
+run(['python',str(h/'package.py'),'verify'],'unpacked-reverify',env)
+for fault in ['eio','kill']:
+ name='storage-'+fault+('-archive04' if fault=='eio' else '-archive01');run(prefix+[str(h/'storage.py'),name,'selection',fault],name,env);run(['python',str(h/'storage-audit.py'),name],name+'-audit')
+name='interruption-selection-archive01';run(prefix+[str(h/'run.py'),name,'selection'],name,env);run(['python',str(h/'audit.py'),name],'interruption-selection-audit')
+run(prefix+[str(h/'negative.py'),name,'negative-attempt01'],'negative-attempt01',env);run(prefix+[str(h/'recovery-negative.py'),name,'recovery-negative-attempt01'],'recovery-negative-attempt01',env)
+run(prefix+[str(h/'directory-negative.py'),'storage-eio-archive04','directory-negative-archive01'],'directory-negative-archive01',env)

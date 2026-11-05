@@ -1,0 +1,91 @@
+Replayed 0 nodes into CausalGraphNodeIndex
+multicast join failed: No multicast-capable interface found
+multicast joined: 0 groups
+trikeshed-kanban: listening on :18764  donor=<none>
+Endpoints (CCEK): GET / (Forge PWA) /api/health /api/cap /api/board /api/metrics /api/jules/surface /api/jules/events POST /api/submit /api/donor /api/invoke
+[BIND] accepted conn=1
+[BIND] conn=1 frame complete proto=Http bytes=132 seq-alloc
+[BIND] conn=1 accept ok=true
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/opt/trikeshed/lib/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+[BIND] accepted conn=2
+[BIND] conn=2 frame complete proto=Http bytes=248 seq-alloc
+[BIND] conn=2 accept ok=true
+[BIND] accepted conn=3
+[BIND] conn=3 frame complete proto=Http bytes=329 seq-alloc
+[BIND] conn=3 accept ok=true
+[BIND] accepted conn=4
+[BIND] conn=4 frame complete proto=Http bytes=329 seq-alloc
+[BIND] conn=4 accept ok=true
+[KANBAN] forge shell prewarmed
+[BIND] accepted conn=5
+[BIND] conn=5 frame complete proto=Http bytes=329 seq-alloc
+[BIND] conn=5 accept ok=true
+[BIND] accepted conn=6
+[BIND] conn=6 frame complete proto=Http bytes=663 seq-alloc
+[BIND] conn=6 accept ok=true
+[BIND] accepted conn=7
+[BIND] accepted conn=8
+[BIND] conn=7 frame complete proto=Http bytes=552 seq-alloc
+[BIND] conn=8 frame complete proto=Http bytes=557 seq-alloc
+[BIND] conn=7 accept ok=true
+[BIND] conn=8 accept ok=true
+[BIND] accepted conn=9
+[BIND] conn=9 frame complete proto=Http bytes=549 seq-alloc
+[BIND] conn=9 accept ok=true
+[BIND] accepted conn=10
+[BIND] conn=10 frame complete proto=Http bytes=554 seq-alloc
+[BIND] conn=10 accept ok=true
+[BIND] accepted conn=11
+[BIND] conn=11 frame complete proto=Http bytes=550 seq-alloc
+[BIND] conn=11 accept ok=true
+[BIND] accepted conn=12
+[BIND] conn=12 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=12 accept ok=true
+[BIND] accepted conn=13
+[BIND] conn=13 frame complete proto=Http bytes=588 seq-alloc
+[BIND] conn=13 accept ok=true
+[BIND] accepted conn=14
+[BIND] conn=14 frame complete proto=Http bytes=534 seq-alloc
+[BIND] conn=14 accept ok=true
+[BIND] accepted conn=15
+[BIND] conn=15 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=15 accept ok=true
+[BIND] accepted conn=16
+[BIND] conn=16 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=16 accept ok=true
+[BIND] accepted conn=17
+[BIND] conn=17 frame complete proto=Http bytes=556 seq-alloc
+[BIND] conn=17 accept ok=true
+[BIND] accepted conn=18
+[BIND] conn=18 frame complete proto=Http bytes=525 seq-alloc
+[BIND] conn=18 accept ok=true
+[BIND] accepted conn=19
+[BIND] conn=19 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=19 accept ok=true
+[BIND] accepted conn=20
+[BIND] conn=20 frame complete proto=Http bytes=2863 seq-alloc
+[BIND] conn=20 accept ok=true
+[BIND] accepted conn=21
+[BIND] conn=21 frame complete proto=Http bytes=533 seq-alloc
+[BIND] conn=21 accept ok=true
+[BIND] accepted conn=22
+[BIND] conn=22 frame complete proto=Http bytes=2863 seq-alloc
+[BIND] conn=22 accept ok=true
+[BIND] accepted conn=23
+[BIND] conn=23 frame complete proto=Http bytes=609 seq-alloc
+[BIND] conn=23 accept ok=true
+[BIND] accepted conn=24
+[BIND] conn=24 frame complete proto=Http bytes=2957 seq-alloc
+[BIND] conn=24 accept ok=true
+[BIND] accepted conn=25
+[BIND] conn=25 frame complete proto=Http bytes=609 seq-alloc
+[BIND] conn=25 accept ok=true
+[BIND] accepted conn=26
+[BIND] conn=26 frame complete proto=Http bytes=609 seq-alloc
+[BIND] conn=26 accept ok=true
+[BIND] accepted conn=27
+[BIND] conn=27 frame complete proto=Http bytes=269 seq-alloc
+[BIND] conn=27 accept ok=true

@@ -1,0 +1,42 @@
+from pathlib import Path
+import json,hashlib,struct,sys,re
+h=Path('/workspace/airgap-r4d-proof');a=h/sys.argv[1];state=a/'state';cas=state/'runtime/cas/sha256'
+def read(cid):
+ digest=cid.removeprefix('sha256:');p=cas/digest[0]/digest[1]/digest[2]/digest[3]/digest[4:];b=p.read_bytes();assert hashlib.sha256(b).hexdigest()==digest;return b
+def crc32c(data):
+ crc=0xffffffff
+ for byte in data:
+  crc^=byte
+  for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+ return crc^0xffffffff
+def frames(data):
+ out=[];i=0;previous=0
+ while i<len(data):
+  assert len(data)-i>=22
+  magic,version,sequence,length=struct.unpack('>4sHQI',data[i:i+18]);assert magic==b'WAL1' and version==1 and sequence>previous and length<=10*1024*1024
+  end=i+18+length;assert end+4<=len(data);assert crc32c(data[i:end])==int.from_bytes(data[end:end+4],'big')
+  payload=data[i+18:end].decode();job,cid=payload.rsplit('\t',1);command=json.loads(read(cid));assert command['jobId']==job
+  out.append({'sequence':sequence,'jobId':job,'cid':cid,'status':command['lcncRun']['status']});previous=sequence;i=end+4
+ return out
+n=0
+for p in cas.rglob('*'):
+ if p.is_file():
+  digest=''.join(p.relative_to(cas).parts);assert len(digest)==64 and hashlib.sha256(p.read_bytes()).hexdigest()==digest;n+=1
+before=(a/'wal-before.bin').read_bytes();after=(a/'wal-after-fault.bin').read_bytes();assert after.startswith(before);assert (state/'runtime/.kanban/board.wal').read_bytes()==after
+initial,final=frames(before),frames(after);assert [f['status'] for f in initial]==['queued','running'];assert [f['status'] for f in final]==['queued','running','completed']
+b=json.loads((a/'browser.json').read_text());proc=json.loads((a/'processes.json').read_text());assert proc['driverExit']==0 and proc['error'] is None;assert len(b['cases'])==5 and all(c['result']=='PASS' for c in b['cases'].values()) and not b['errors']
+old=b['running'];row=b['recovered'];assert old['runId']==row['runId'] and old['programCid']==row['programCid'];assert final[-1]['cid']==row['receiptCid'];assert row['previousReceiptCid']==old['receiptCid']==initial[-1]['cid'];assert len({f['jobId'] for f in final})==1
+record=json.loads(read(row['receiptCid']))['lcncRun'];ledger=json.loads(read(row['invocationsCid']));assert record['status']=='completed' and record['ok'] and ledger['runId']==row['runId'] and ledger['programCid']==row['programCid'];assert [e['wire']['index'] for e in ledger['observations'] if e['phase']=='consumed']==list(range(8))
+quote=record['outputs']['selection']['value'];text=read(quote['extractedTextCid']).decode().encode('utf-16-le');assert text[quote['begin']*2:quote['end']*2].decode('utf-16-le')==quote['quote'];assert quote['begin']==18477 and quote['end']==18654;assert len(read(quote['originalCid']))==111243;assert quote['originalCid']=='sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f'
+native=record['outputs']['scan']['runtime'];assert native['guardsVerified'] and native['liveBytesAfter']==0
+writer,inspector=proc['processes'];assert inspector['exit']==0 and all(json.loads((state/'cleanup-inspect.json').read_text()).values());assert not (state/'cleanup-run.json').exists()
+trace=(a/'fault-syscalls.txt').read_text();assert '/state/runtime/.kanban/board.wal' in trace
+if b['fault']=='eio':
+ assert writer['exit']==1 and writer['expectedFailure'] and writer['shutdownErrorPropagated'];assert trace.count('EIO (Input/output error) (INJECTED)')==1
+ assert len(b['responses'])==1 and b['responses'][0]['status']==503 and json.loads(b['responses'][0]['text'])['error']=='receipt_commit_failed'
+ assert json.loads((a/'state-before-crash.json').read_text())['runs']==json.loads((a/'state-after-eio.json').read_text())['runs']
+else:
+ assert writer['exit']==137 and writer['expectedCrash'] and writer['javaReaped'];assert 'killed by SIGKILL' in trace and not re.search(r'fsync.*= 0',trace);assert not b['responses']
+ready=json.loads((a/'run-ready.json').read_text());restored=json.loads((state/'state-inspect.json').read_text());assert ready['documents']==restored['documents'] and len(restored['documents'])==6 and len(restored['runs'])==1;assert not restored['minerInstalled'] and not restored['llvmInstalled']
+result={'fault':b['fault'],'casObjectsVerified':n,'walBefore':{'bytes':len(before),'frames':initial},'walAfter':{'bytes':len(after),'frames':final},'allFrameCrc32cVerified':True,'walUnchangedByReopening':True,'sameRunRecoveredCompleted':True,'noNewRunSubmitted':len([r for r in b['requests'] if r['url'].endswith('/api/lcnc/run')])==1,'liveBoardDidNotAcknowledgeFailedFlush':b['fault']=='eio','sameSixDocuments':True,'exactQuotationVerified':True,'nativeLiveBytesAfter':0,'inspectorCleanupVerified':True,'writerCleanupReportAvailable':False,'scope':'Process/syscall fault with surviving host kernel and readable WAL bytes; not power loss or a calibrated durability guarantee'}
+assert result['noNewRunSubmitted'];(a/'independent-audit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))

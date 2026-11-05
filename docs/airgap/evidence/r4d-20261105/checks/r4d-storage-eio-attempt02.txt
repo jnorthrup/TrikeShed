@@ -1,0 +1,37 @@
+{
+  "fault": "eio",
+  "error": null,
+  "driverExit": 0,
+  "injection": {
+    "javaPid": 82680,
+    "tracerPid": 83084,
+    "allObservedThreadsAttached": true,
+    "threadsAtAttach": 33,
+    "fault": "eio"
+  },
+  "processes": [
+    {
+      "mode": "run",
+      "hostPid": 82677,
+      "startedMonotonic": 41346.85237445,
+      "resourceEvidence": "state/run-status.txt; state-before-crash.json processCpuNanos",
+      "readySeconds": 3.672465905001445,
+      "boot": "2201cf71-38fe-4589-afaf-97e4f7829870",
+      "exit": 1,
+      "elapsedSeconds": 10.395758457998454,
+      "expectedFailure": true,
+      "shutdownErrorPropagated": true,
+      "cleanupReportAvailable": false
+    },
+    {
+      "mode": "inspect",
+      "hostPid": 83129,
+      "startedMonotonic": 41357.248432523,
+      "resourceEvidence": "state/inspect-status.txt; state/state-inspect.json processCpuNanos",
+      "readySeconds": 2.249882115997025,
+      "boot": "e7da35ae-b4c9-45af-92a0-13f131f06716",
+      "exit": 0,
+      "elapsedSeconds": 7.401074484994751
+    }
+  ]
+}

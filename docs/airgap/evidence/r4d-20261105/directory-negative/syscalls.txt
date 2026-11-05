@@ -1,0 +1,50 @@
+88589 1793853691.479959 +++ exited with 0 +++
+88588 1793853691.480055 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=3, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88590 1793853691.481438 +++ exited with 0 +++
+88588 1793853691.481491 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=4, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88591 1793853691.482277 +++ exited with 0 +++
+88588 1793853691.482307 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=5, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88593 1793853691.484208 +++ exited with 0 +++
+88592 1793853691.484360 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=7, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88597 1793853691.490237 +++ exited with 0 +++
+88594 1793853691.490287 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=11, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88598 1793853691.491501 +++ exited with 0 +++
+88594 1793853691.491550 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=12, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88599 1793853691.495243 +++ exited with 0 +++
+88594 1793853691.495292 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=13, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88600 1793853691.497456 +++ exited with 0 +++
+88594 1793853691.497518 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=14, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88601 1793853691.500595 +++ exited with 0 +++
+88594 1793853691.500652 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=15, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88594 1793853691.501005 +++ exited with 0 +++
+88592 1793853691.501044 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=8, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88595 1793853691.501056 +++ exited with 0 +++
+88592 1793853691.501082 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=9, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88596 1793853691.501295 +++ exited with 0 +++
+88592 1793853691.501307 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=10, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88592 1793853691.501401 +++ exited with 0 +++
+88588 1793853691.501443 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=6, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+88602 1793853691.519864 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=NULL} ---
+88608 1793853691.557063 +++ exited with 0 +++
+88602 1793853692.165473 fsync(17</state/runtime/cas>) = -1 EIO (Input/output error) (INJECTED)
+88609 1793853692.185407 +++ exited with 0 +++
+88606 1793853692.185650 +++ exited with 0 +++
+88607 1793853692.185800 +++ exited with 0 +++
+88604 1793853692.185976 +++ exited with 0 +++
+88613 1793853692.186497 +++ exited with 0 +++
+88610 1793853692.186502 +++ exited with 0 +++
+88602 1793853692.186816 +++ exited with 0 +++
+88620 1793853692.187007 +++ exited with 1 +++
+88618 1793853692.187014 +++ exited with 1 +++
+88617 1793853692.187017 +++ exited with 1 +++
+88616 1793853692.187020 +++ exited with 1 +++
+88615 1793853692.187023 +++ exited with 1 +++
+88612 1793853692.187026 +++ exited with 1 +++
+88605 1793853692.187030 +++ exited with 1 +++
+88603 1793853692.187033 +++ exited with 1 +++
+88619 1793853692.190917 +++ exited with 1 +++
+88611 1793853692.190933 +++ exited with 1 +++
+88614 1793853692.191274 +++ exited with 1 +++
+88588 1793853692.191281 +++ exited with 1 +++
+88586 1793853692.191643 +++ exited with 1 +++
+88587 1793853692.191832 +++ exited with 1 +++

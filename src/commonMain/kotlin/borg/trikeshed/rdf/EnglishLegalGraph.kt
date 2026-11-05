@@ -4,6 +4,7 @@ import borg.trikeshed.job.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.DocumentQuotationCheck
 import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.nlp.EnglishGuardAttachments
 
 /** Reified language candidates. Subject/object roles are observations, not world predicates. */
 object EnglishLegalGraph {
@@ -19,6 +20,9 @@ object EnglishLegalGraph {
             payload["originalCid"] == source.originalCid.value && payload["extractedTextCid"] == source.extractedTextCid.value) {
             "Unsupported legal candidate source or authority"
         }
+        val observedSentences = EnglishObservationGraph.list(payload["sentences"])
+        val guards = if ("guardAttachments" in payload) EnglishGuardAttachments.validate(payload["guardAttachments"], observedSentences) else null
+        val guardSentences = guards?.let { EnglishObservationGraph.list(it["sentences"]) }
         val store = QuadStore(); val named = RdfTerm.Iri(graph(candidateCid)); val root = RdfTerm.Iri(named.iri + "/candidates")
         val sourceText = RdfTerm.Iri("urn:sha256:${source.extractedTextCid.hex}")
         fun emit(subject: RdfTerm.Iri, predicate: String, value: RdfTerm) {
@@ -51,7 +55,12 @@ object EnglishLegalGraph {
         text(root, "reviewStatus", "unreviewed"); text(root, "authority", "parser-role-and-quantity-candidates-only")
         text(root, "producerAuthority", "not-established"); text(root, "parserExecution", "not-reverified")
         text(root, "sameSentenceJoin", "cooccurrence-only-not-applicability"); reasons(root, payload["unresolved"])
-        for (rawSentence in EnglishObservationGraph.list(payload["sentences"])) {
+        if (guards != null) {
+            text(root, "guardAttachmentProfile", guards["profile"])
+            text(root, "guardAttachmentCoverage", guards["coverage"])
+            text(root, "guardAttachmentMeaning", guards["meaning"])
+        }
+        for ((sentenceOrdinal, rawSentence) in observedSentences.withIndex()) {
             val row = EnglishObservationGraph.map(rawSentence); val ordinal = EnglishObservationGraph.integer(row["index"])
             val sentence = RdfTerm.Iri(named.iri + "/sentence/$ordinal")
             provenance(sentence, null); text(sentence, "kind", "sentence-observation"); span(sentence, row["begin"], row["end"], row["quote"])
@@ -128,6 +137,51 @@ object EnglishLegalGraph {
                 }
                 for ((field, predicate) in s_["numberDependencies" j "numberDependency", "markerDependencies" j "markerDependency", "attachments" j "attachment"].view)
                     for (edge in EnglishObservationGraph.list(duration[field])) emit(resource, predicate, dependency(edge))
+            }
+            if (guardSentences != null) {
+                val guard = EnglishObservationGraph.map(guardSentences[sentenceOrdinal])
+                val diagnostic = guard["normConditionIssue"] ?: "none-reported"
+                text(sentence, "normConditionIssue", diagnostic)
+                text(sentence, "normDiagnosticProducer", guard["normDiagnosticProducer"])
+                for (id in EnglishObservationGraph.list(guard["quotationIndicatorNodeIds"])) emit(sentence, "quotationIndicator", node(id))
+                for (rawMarker in EnglishObservationGraph.list(guard["markerBindings"])) {
+                    val marker = EnglishObservationGraph.map(rawMarker)
+                    val index = EnglishObservationGraph.integer(marker["markerOrdinal"])
+                    val resource = RdfTerm.Iri(sentence.iri + "/guard-marker/$index")
+                    provenance(resource, sentence); text(resource, "kind", "guard-marker-binding-observation")
+                    integer(resource, "markerOrdinal", index)
+                    emit(resource, "marker", RdfTerm.Iri(sentence.iri + "/marker/$index"))
+                    for (id in EnglishObservationGraph.list(marker["nodeIds"])) emit(resource, "markerNode", node(id))
+                    for (edge in EnglishObservationGraph.list(marker["dependencies"])) emit(resource, "markerDependency", dependency(edge))
+                    reasons(resource, marker["unresolved"])
+                }
+                for (rawAttachment in EnglishObservationGraph.list(guard["attachments"])) {
+                    val attachment = EnglishObservationGraph.map(rawAttachment)
+                    val index = EnglishObservationGraph.integer(attachment["ordinal"])
+                    val resource = RdfTerm.Iri(sentence.iri + "/guard-attachment/$index")
+                    provenance(resource, sentence); text(resource, "kind", "adverbial-attachment-observation")
+                    text(resource, "status", attachment["status"]); integer(resource, "ordinal", index)
+                    emit(resource, "governorNode", node(attachment["governorNodeId"]))
+                    emit(resource, "subordinateNode", node(attachment["subordinateNodeId"]))
+                    emit(resource, "attachmentDependency", dependency(attachment["dependency"]))
+                    text(resource, "attachmentRelation", EnglishObservationGraph.map(attachment["dependency"])["relation"])
+                    text(resource, "normConditionIssue", diagnostic)
+                    for (action in EnglishObservationGraph.list(attachment["modalActionOrdinals"]))
+                        emit(resource, "modalAction", RdfTerm.Iri(sentence.iri + "/action/${EnglishObservationGraph.integer(action)}"))
+                    for (marker in EnglishObservationGraph.list(attachment["markerBindingOrdinals"]))
+                        emit(resource, "markerBinding", RdfTerm.Iri(sentence.iri + "/guard-marker/${EnglishObservationGraph.integer(marker)}"))
+                    for (edge in EnglishObservationGraph.list(attachment["coordinationDependencies"])) emit(resource, "coordinationDependency", dependency(edge))
+                    for ((i, rawCue) in EnglishObservationGraph.list(attachment["directNegationCueBindings"]).withIndex()) {
+                        val cue = EnglishObservationGraph.map(rawCue); val cueResource = RdfTerm.Iri(resource.iri + "/negation/$i")
+                        provenance(cueResource, sentence); text(cueResource, "kind", "negation-cue-attachment-observation")
+                        emit(cueResource, "marker", RdfTerm.Iri(sentence.iri + "/marker/${EnglishObservationGraph.integer(cue["markerOrdinal"])}"))
+                        emit(cueResource, "cueNode", node(cue["cueNodeId"]))
+                        emit(cueResource, "cueGovernor", node(cue["governorNodeId"]))
+                        emit(cueResource, "cueDependency", dependency(cue["dependency"]))
+                        text(cueResource, "cueLocation", cue["location"]); emit(resource, "negationCue", cueResource)
+                    }
+                    reasons(resource, attachment["unresolved"])
+                }
             }
         }
         return store

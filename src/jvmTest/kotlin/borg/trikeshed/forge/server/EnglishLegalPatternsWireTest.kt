@@ -14,6 +14,7 @@ import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.*
 import java.nio.file.Path
+import java.util.Base64
 import kotlin.test.*
 
 class EnglishLegalPatternsWireTest {
@@ -48,16 +49,20 @@ class EnglishLegalPatternsWireTest {
         return NlpDocument(source, s_[NlpSentence(0, 0, source.length, tokens, expanded.toSeries())],
             NlpMetadata("fixture", "EnglishLegalPatternsWireTest"))
     }
-    private fun fixture(name: String, parent: Job?, quantityCopy: Boolean = false): Fixture {
+    private fun fixture(name: String, parent: Job?, quantityCopy: Boolean = false,
+        reader: ((String) -> NlpDocument)? = null, retainedRows: MutableMap<String, ProjectDoc>? = null): Fixture {
         val files = JvmFileOperations(); val cas = FileCasStore(files, directory.resolve(name).toString())
         val owner = SupervisorJob(parent); val scope = CoroutineScope(Dispatchers.IO + owner + files)
         val store = CouchStoreFactory.casBacked(cas); val corpus = InMemoryProjectCorpus(); val hooks = Hooks()
         val live = object : ProjectCorpus by corpus {
-            override suspend fun document(project: String, id: String): ProjectDoc? { hooks.lookup?.invoke(); return corpus.document(project, id) }
+            override suspend fun document(project: String, id: String): ProjectDoc? {
+                hooks.lookup?.invoke()
+                return if (retainedRows != null) retainedRows[project + "\u0000" + id] else corpus.document(project, id)
+            }
         }
         val ctx = ModuleContext(Couch(name, store, cas), ReteNetwork(), ReteProductionRegistry(), null, null,
             ConfixBlackboard.empty(), cas, CouchAttachmentGateway(store, cas), ModuleRouteRegistry(), scope, { 123L }, directory.toFile())
-        val english = DocumentEnglishWire(ctx, live) { NlpReader { hooks.parserCalls++; parsed(it, quantityCopy) } }
+        val english = DocumentEnglishWire(ctx, live) { NlpReader { hooks.parserCalls++; reader?.invoke(it) ?: parsed(it, quantityCopy) } }
         english.attach(); return Fixture(ctx, cas, corpus, english, owner, hooks)
     }
     private suspend fun inspect(f: Fixture, source: String = text): ContentId {
@@ -176,6 +181,52 @@ class EnglishLegalPatternsWireTest {
         assertEquals(status, reply.status, reply.body); return reifyStrict(reply.body) as Map<*, *>
     }
     private fun rows(result: Map<*, *>) = ((result["results"] as Map<*, *>)["results"] as Map<*, *>)["bindings"] as List<*>
+
+    @Test fun originalCanonicalGuardReceiptsReplayThroughExistingWireAndQueryWithoutAParser(): Unit = runBlocking {
+        for (case in s_["G03", "G04", "G07", "G13"].view) {
+            val baseline = guardBaseline(case)
+            val retainedRows = mutableMapOf<String, ProjectDoc>()
+            val f = fixture("attachments-$case", coroutineContext[Job], reader = { error("Original retained replay cannot parse") }, retainedRows = retainedRows)
+            try {
+                fun resource(name: String) = requireNotNull(javaClass.getResourceAsStream("/english-guards/$name")).use { it.readBytes() }
+                val originalBytes = Base64.getMimeDecoder().decode(resource("$case-inspection.cbor.b64"))
+                val inspection = f.cas.put(originalBytes)
+                assertEquals(baseline.originalBaselineInspectionCid, inspection)
+                assertEquals(baseline.sourceCid, f.cas.put(resource("$case-source.txt")))
+                val original = EnglishObservationGraph.read(f.cas, inspection)
+                assertEquals("4.6.0", original.parsed.metadata?.runtime?.get("packageVersion"))
+                assertEquals(baseline.text, original.source.text)
+                for (row in assertNotNull(original.sourceSnapshots)) retainedRows[row.project + "\u0000" + row.id] = row
+                val candidate = request(f, inspection)
+                assertEquals(baseline.sourceCid.value, candidate["extractedTextCid"])
+                assertEquals(inspection.value, candidate["inspectionCid"])
+                val section = candidate["guardAttachments"] as Map<*, *>
+                assertEquals(EnglishGuardAttachments.KIND, section["kind"])
+                val guard = (section["sentences"] as List<*>).single() as Map<*, *>
+                assertEquals(when(case) { "G03" -> null; "G07" -> "COORDINATED"; else -> "NEGATED" }, guard["normConditionIssue"])
+                val syntax = program(s_["?head", "?relation", "?issue", "?inspection"], s_[
+                    Triple("?a", predicate("kind"), "\"adverbial-attachment-observation\""),
+                    Triple("?a", predicate("subordinateNode"), "?node"), Triple("?node", predicate("word"), "?head"),
+                    Triple("?a", predicate("attachmentRelation"), "?relation"), Triple("?a", predicate("normConditionIssue"), "?issue"),
+                    Triple("?a", predicate("inspectionReceipt"), "?inspection")])
+                val answer = query(f, inspection, syntax)
+                val bindings = rows(answer)
+                assertEquals((guard["attachments"] as List<*>).size, bindings.size)
+                assertTrue(bindings.all { ((it as Map<*, *>)["inspection"] as Map<*, *>)["value"] == "urn:sha256:${inspection.hex}" })
+                if (case == "G07") assertEquals(_s["approves", "Trustee"], bindings.map { ((it as Map<*, *>)["head"] as Map<*, *>)["value"] }.toSet())
+                if (case == "G13") assertTrue(bindings.any { ((it as Map<*, *>)["relation"] as Map<*, *>)["value"] == "advcl:without" })
+                assertEquals(candidate["receiptCid"], (answer["source"] as Map<*, *>)["candidateCid"])
+                assertEquals(0, f.hooks.parserCalls)
+                val row = retainedRows.values.single()
+                retainedRows[row.project + "\u0000" + row.id] = row.copy(cid = ContentId.of("Changed source.".encodeToByteArray()).value,
+                    rev = "2-changed", seq = row.seq + 1)
+                query(f, inspection, syntax, status = 409)
+                assertEquals(bindings.size, rows(query(f, inspection, syntax, mode = "snapshot")).size)
+                assertEquals(0, f.hooks.parserCalls)
+                assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
+            } finally { close(f) }
+        }
+    }
 
     @Test fun visualQuantityQueryReturnsExactSourceAndCandidateScopeThroughTheSameOwner(): Unit = runBlocking {
         val f = fixture("legal-quantity-query", coroutineContext[Job])

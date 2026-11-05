@@ -1,0 +1,2 @@
+fsync(3</workspace/airgap-r4d-proof/filter-probe/a>) = -1 EIO (Input/output error) (INJECTED)
++++ exited with 0 +++

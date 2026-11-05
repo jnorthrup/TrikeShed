@@ -1,0 +1,7 @@
+{
+  "file": "/workspace/library-files/airgap-document-r4d-sources-2026-11-05.tar.gz",
+  "sha256": "873d439976d6cda86019902c2a781d0d98efc09a81ab6ac873de69c6fb261aa3",
+  "bytes": 712190498,
+  "sourceCommit": "b8ed92a2347a01ea1be000c50d10568e765ba1f2",
+  "disposition": "Unpublished candidate archive replaced after integration test failure; Git source, archive identity, inventory and failed JUnit records retained."
+}

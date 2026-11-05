@@ -511,9 +511,17 @@ class Panels : PatchSurface {
             y1 = maxOf(y1, num(n.y) + (if (truthy(n.el.offsetHeight)) num(n.el.offsetHeight) else 90.0))
         }
         val r = viewport.getBoundingClientRect(); val pad = 48.0
-        val z = minOf(LandscapeNavigation.detailZoom, maxOf(LandscapeNavigation.minZoom, minOf((r.width - pad * 2) / maxOf(1.0, x1 - x0), (r.height - pad * 2) / maxOf(1.0, y1 - y0))))
+        var inset = 0.0
+        val palette = document.getElementById("palette")
+        if (palette != null && window.getComputedStyle(palette).visibility != "hidden") {
+            val p = palette.getBoundingClientRect()
+            if (minOf(r.bottom, p.bottom) > maxOf(r.top, p.top) && minOf(r.right, p.right) > maxOf(r.left, p.left))
+                inset = (minOf(r.right, p.right) - r.left).coerceIn(0.0, maxOf(0.0, r.width))
+        }
+        val width = maxOf(0.0, r.width - inset)
+        val z = minOf(LandscapeNavigation.detailZoom, maxOf(LandscapeNavigation.minZoom, minOf((width - pad * 2) / maxOf(1.0, x1 - x0), (r.height - pad * 2) / maxOf(1.0, y1 - y0))))
         view.z = z
-        view.x = (r.width - (x1 - x0) * z) / 2 - x0 * z
+        view.x = inset + (width - (x1 - x0) * z) / 2 - x0 * z
         view.y = (r.height - (y1 - y0) * z) / 2 - y0 * z
         applyView(); camera.saveCameraSoon()
     }

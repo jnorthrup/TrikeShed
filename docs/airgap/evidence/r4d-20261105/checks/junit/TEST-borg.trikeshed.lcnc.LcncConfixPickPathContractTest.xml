@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LcncConfixPickPathContractTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T04:37:09.761Z" hostname="0d6dfba25614" time="0.084">
+  <properties/>
+  <testcase name="registeredDefaultProducesAllPortsAndWiresObjectsArraysScalarsFalseAndNull()[jvm]" classname="borg.trikeshed.lcnc.LcncConfixPickPathContractTest" time="0.056"/>
+  <testcase name="sourceIdentityAndInclusiveSpanReferToOriginalUtf8NotTheSheetProjection()[jvm]" classname="borg.trikeshed.lcnc.LcncConfixPickPathContractTest" time="0.024"/>
+  <testcase name="nativeMetadataStillSelectsNativeAndCannotFallBackToKotlin()[jvm]" classname="borg.trikeshed.lcnc.LcncConfixPickPathContractTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
