@@ -238,7 +238,7 @@ object NativeHornProofGraph {
         }
         val descriptor = _m["schema" j SCHEMA, "dataset" j DATASET, "graph" j graph, "projectionCid" j projectionCid.value,
             "quads" j store.size, "persistence" j "request-local", "sourceReferenceMode" j "checked-first-proof-with-complete-selection-context"] +
-            fields.view.filter { it !in _s["proof", "checkedProof", "sourceEvidence", "hostRules"] }.associateWith { report[it] }
+            fields.view.filter { it !in _s["proof", "checkedProof", "sourceEvidence", "hostRules"] }.view.associateWith { report[it] }
         return Projection(store, graph, projectionCid, descriptor)
     }
 }
