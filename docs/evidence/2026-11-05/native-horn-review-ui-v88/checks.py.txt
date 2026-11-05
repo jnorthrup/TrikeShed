@@ -1,0 +1,71 @@
+"""Bounded DOM/response consistency and ownership checks; no browser or inference."""
+from pathlib import Path
+import hashlib,runpy,re
+ROOT=Path(__file__).parent
+assert hashlib.sha256((ROOT/'view-core.py.txt').read_bytes()).hexdigest()=='1f38edd6b8f5a2a419382f682fd3741516d2f83d2c4f0ae00dd4a73da2c101cb'
+V=runpy.run_path(str(ROOT/'view-core.py.txt'))
+need=V['need'];AuditError=V['AuditError'];cid=V['cid'];canonical=V['canonical'];normalized=V['normalized']
+def typed_rows(rows):
+    out=[]
+    for row in rows:
+        fields={}
+        for c in row:
+            need(c['variable'] not in fields,'Distinct DOM typed variables')
+            term={'type':c['kind'],'value':c['value']}
+            if c.get('datatype') is not None:term['datatype']=c['datatype']
+            fields[c['variable']]=term
+        out.append(fields)
+    return out
+def card_check(card,plain,graph):
+    node=card['sourceNode'];catalog=plain['checkedProof']['sources'];need(node in catalog,'Card uses actual checked source node')
+    source=catalog[node];expected=graph+'/source/'+node.removeprefix('sha256:')
+    need(card['sourceIri']==expected and node in card['text'] and expected in card['text'],'Card local URI and full source identity')
+    if source['id'].startswith('host-rule:'):
+        need(card['referenceMode']=='host-rule-normalized-form' and card['quote'] is None and source['text'] in card['text'] and source['sourceCid'] in card['text'] and source['sourceRevision'] in card['text'],'Host rule exact normalized form/policy/content CID, not documentary quote')
+        need('Normalized host rule' in card['text'] and 'no document quotation offsets' in card['text'] and re.search(r'UTF-16\s*\[',card['text']) is None,'No invented host-rule document span')
+    else:
+        q=plain['sourceEvidence'][source['id']];span=re.search(r'UTF-16\s*\[([0-9.]+),\s*([0-9.]+)\)',card['text'])
+        need(card['referenceMode']=='reviewed-kif-exact-quotation' and card['quote']==q['quote'] and q['selectionId'] in card['text'] and q['originalCid'] in card['text'] and q['textCid'] in card['text'] and source['sourceRevision'] in card['text'],'Reviewed card exact original/extracted source/selection/quote/revision')
+        need(span is not None and float(span[1])==q['begin'] and float(span[2])==q['end'],'Card exact half-open UTF16 quotation span, not proof-normal-form position')
+def successful(capture,plain,data):
+    profile=capture['profile'];http=capture['http'];report=http['response'];value=report['quadQuery'];projection=V['projection'](plain,data['mlirNixRevision']);graph=V['PREFIX']+projection[7:]
+    need(http['status']==200 and profile in V['VARS'],'Actual successful protected optional browser action')
+    need('program' in http['request'] and set(http['request'])=={'snapshotCid','expectedRevision','goal','program'},'Only existing protected owner request fields, no client certificate')
+    need(http['request']['snapshotCid']==plain['snapshotCid'] and http['request']['expectedRevision']==plain['revision'] and http['request']['goal']=={'predicate':plain['query'][0],'subject':plain['query'][1],'object':plain['query'][2]},'Browser action retains exact approved context and goal')
+    descriptor={'schema':V['SCHEMA'],'dataset':V['DATASET'],'graph':graph,'projectionCid':projection,'quads':86,'persistence':'request-local','sourceReferenceMode':'checked-first-proof-with-complete-selection-context',**{k:plain[k] for k in V['FIELDS'] if k not in ['proof','checkedProof','sourceEvidence','hostRules']}}
+    need(value['provenance']['projectionCid']==projection and value['provenance']['graph']==graph,'DOM action projection identity')
+    group={'response':report,'answerRows':typed_rows(capture['rows']),'program':http['request']['program'],'query':value['query']}
+    count=V['view_check'](plain,group,profile,projection,descriptor,data['mlirNixRevision'])
+    need([c['variable'] for c in capture['rows'][0]]==V['VARS'][profile],'Actual DOM eight-column order')
+    # The executed observer used innerText on closed details: empty text is a
+    # documented capture gap, not evidence that program/SPARQL was displayed.
+    need(capture['programText']=='' or value['query'] in capture['programText'],'Any captured program-details text must include the actual SPARQL')
+    need(projection in capture['projectionText'] and graph in capture['projectionText'],'Full graph/projection identities displayed')
+    need(capture['dom']['queryRowCount']==count and capture['dom']['nativeResultCount']==1 and capture['dom']['profiles']==[profile],'Validated current native proof and selected profile displayed')
+    catalog=plain['checkedProof']['sources'];need(len(capture['cards'])==len(catalog) and {c['sourceNode'] for c in capture['cards']}==set(catalog),'Every actual source catalog card, no fabricated/dangling card')
+    for card in capture['cards']:card_check(card,plain,graph);need(card['tabindex']=='-1','Cards are focus targets')
+    for k in ['pack','reviewWal','sourceFiles','nativeRow','nativeMirror','reteFacts','blackboard','journal','rows']:need(capture['before'][k]==capture['after'][k],'Browser inspection query leaves '+k+' unchanged')
+    return count
+def cleared(dom,unconfirmed=False):
+    need(dom['nativeResultCount']==dom['queryRowCount']==dom['sourceCardCount']==0 and dom['profiles']==[],'Invalidated old native result/rows/cards cannot reappear')
+    if unconfirmed:need(dom['unconfirmedCount']==1 and dom['nativeRunDisabled'] is True,'Failed currentness/provenance requires refresh, no stale native support')
+def held_check(entry,graph=False):
+    need(entry['kind']=='held-actual-response' and entry['actualStatus']==200 and entry['deliveredSha256']==entry['actualResponseSha256'] and entry['deliveredBytes']==entry['actualResponseBytes'] and entry['requestPatch'] is None and entry['responsePatch'] is None,'Held case replays unchanged genuine server response, not fake native data')
+    need(entry['beforeInvalidation']['nativeResultCount']==1,'Actual prior native result existed when held')
+    cleared(entry['afterInvalidation']);cleared(entry['afterRelease'])
+    timeline=entry['chronology'];events=[x['event'] for x in timeline];need(events[0]=='actual-response-held-before-delivery' and events[-1]=='response-delivered' and all(a['at']<=b['at'] for a,b in zip(timeline,timeline[1:])),'Actual hold/invalidation/release chronology')
+    if graph:
+        need(entry['graphB']['nodeCount']==4 and entry['afterInvalidation']['nodeCount']==3 and entry['afterRelease']['nodeCount']==3,'Actual public import graph A/B/A states')
+        need(entry['beforeInvalidation']['runPosts']==entry['graphB']['runPosts']==entry['afterInvalidation']['runPosts']==entry['afterRelease']['runPosts'],'Graph imports never auto-run')
+    else:
+        need(events==['actual-response-held-before-delivery','public-goal-input-B','public-goal-input-A-restored','response-delivered'],'Actual intervening goal events retained despite final A equality')
+        def goal(dom):return {x['label']:x['value'] for x in dom['goals']}
+        a={'Taxonomy predicate':'instance','Taxonomy subject':'Tenant','Taxonomy object':'Agent'}
+        need(goal(entry['beforeInvalidation'])==goal(entry['afterInvalidation'])==goal(entry['afterRelease'])==a and goal(entry['intermediateB'])=={**a,'Taxonomy object':'Person'},'Actual DOM confirms intervening B before returning to A')
+def refusal_check(entry):
+    status=entry['actualStatus'];after=entry['after'];body=entry['actualResponse']
+    if status in [400,413]:
+        need(body['error']=='reviewed_taxonomy_query_refused' and body['queryStatus']==status and isinstance(body['code'],str) and isinstance(body['reason'],str),'Exact structured refusal permits keeping validated plain proof')
+        need(after['nativeResultCount']==1 and after['queryRowCount']==after['sourceCardCount']==after['unconfirmedCount']==0 and after['profiles']==[],'Structured optional refusal retains plain report and clears old inspection')
+        need('Native proof status: SUPPORTED' in after['visibleReviewText'] and 'Inspection refused' in after['visibleReviewText'],'Plain validated support label remains distinct from optional refusal')
+    else:cleared(after,True)
