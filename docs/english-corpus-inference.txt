@@ -1,5 +1,33 @@
 Local English corpus, query and inference boundaries
 
+Verified corpus-search increment — 2026-11-05
+Published source1aa29894aeeb290a5644b3370fd895f261f576d2 passes535 selected
+checks and all three browser builds. In Panels, choose the preset "Find sentences
+in a retained English corpus", supply retained inspection CIDs, an explicit
+current/snapshot mode and query {terms:[exact reported lemmas],limit:32}, then Run.
+It uses the existing BM25 search. Matching sentences retain every matching original token
+span and source identity; corpus, matrix, word-selection policy and optional topic
+identities stay shared. The query and hits bind a separate response receipt.
+Omitting query preserves the earlier response bytes and canonical receipt CID.
+
+The actual public preset and Documents pilot reused two genuine retained ranges
+of one105-byte source without rerunning NLP. Both wordcloud and query found five
+imply occurrences with exact source witnesses. A real amendment made current
+mode refuse and clear the cloud; an explicit snapshot Run returned the historical
+five hits. Seeded topic identity stayed unchanged when only query terms changed.
+All28 materialized readbacks survived close/reopen. BM25 uses five sentence
+postings here; the topic matrix represents one source document. Scores/counts
+remain lexical/statistical, separate from evidence confidence.
+
+Evidence and known presentation limits are recorded under
+evidence/2026-11-05/corpus-lexical-query-v86. The overview clips rightmost return
+cards after output expansion, and the static note shows a misleading unavailable
+badge; readable source/card/refusal screenshots are retained without modification.
+The current amended source remains a live REF in the local pack; exported records
+are materialized, and this proof does not establish a portable full CAS pack.
+
+The earlier increments below retain their original scope and artifact pins.
+
 Documents: open a document, inspect an explicit text range, then use that inspection in the corpus. The project shelf stores retained inspection CIDs, not document text. Build explicitly in current or snapshot mode. Current mode checks the selected document/extraction rows before and after processing; it is not an atomic guarantee of future currency. Snapshot mode reads historical retained content. A current-document link can open a later revision and is labelled accordingly.
 
 The wordcloud displays included lexical lemma counts. Concordance shows exact original sentences and token spans. Original parser words count once; Enhanced++ copy vertices remain graph structure. Disjoint ranges of one original/extraction form one statistical document; duplicate or overlapping ranges and mixed extractions are refused. Punctuation observations remain retained even when excluded from lexical counts. Default policy preserves lexical lemmas without stop-word filtering.
