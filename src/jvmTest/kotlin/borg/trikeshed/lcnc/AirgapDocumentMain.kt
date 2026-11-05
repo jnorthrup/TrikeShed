@@ -23,14 +23,14 @@ import java.lang.System
 
 /** Packaged demonstrator composition. The miner, store, execution and HTTP owners are production code. */
 fun main(args: Array<String>) {
-    require(args.size == 4) { "Usage: AirgapDocumentMainKt STATE INSTALL PORT run|inspect" }
+    require(args.size == 4) { "Usage: AirgapDocumentMainKt STATE INSTALL PORT run|inspect|recover" }
     val root = File(args[0]).absoluteFile
     val install = File(args[1]).absoluteFile
     val port = args[2].toInt().also { require(it in 1024..65535) }
-    val mode = args[3].also { require(it == "run" || it == "inspect") }
+    val mode = args[3].also { require(it == "run" || it == "inspect" || it == "recover") }
     val runtime = File(root, "runtime")
     require(if (mode == "run") !runtime.exists() else runtime.isDirectory) {
-        "run requires fresh state; inspect requires an existing runtime"
+        if (mode == "run") "run requires fresh state" else "$mode requires an existing runtime"
     }
     System.setProperty(Airgap.PROPERTY, "true")
     runBlocking(Airgap()) {
@@ -53,7 +53,7 @@ fun main(args: Array<String>) {
         var listener: Job? = null
         var kernel: KernelElement? = null
         try {
-            // Inspector has no miner: reopening cannot accidentally extract or repair the retained PDF.
+            // Reopening has no miner: inspect/recover cannot extract or repair the retained PDF.
             val miner = if (mode == "run") ProjectMiner(registry, scopes, cas, null, filesRoot = File(runtime, "files")) else null
             val corpus = JvmProjectCorpus(registry, scopes, miner)
             val project = "coinbase-suski"
@@ -81,6 +81,18 @@ fun main(args: Array<String>) {
                     LcncNode("admission", "document.source", _m["view" j "reference"]), _m["doc" j doc.toMap()])["source"]
                 files.writeAtomically(admission.path, jsonOf(_m["document" j doc.toMap(), "documents" j documents,
                     "sourceReference" j source, "passageOffset" j anchor.begin, "ingestion" j ingestion]).encodeToByteArray())
+            } else {
+                check(scopes.remountLedger() == 1) { "Expected one durably mounted project" }
+            }
+            val seed = reifyMap(admission.readText())
+            for (entry in seed["documents"] as List<*>) {
+                val expected = checkNotNull(ProjectDoc.fromMap(entry as Map<*, *>))
+                val actual = checkNotNull(corpus.document(project, expected.id))
+                check(actual == expected) { "Project revision changed at startup: ${expected.id}" }
+                val bytes = checkNotNull(corpus.bytes(project, expected.id))
+                check(ContentId.of(bytes).value == expected.cid) { "Retained source differs: ${expected.id}" }
+            }
+            if (mode != "inspect") {
                 ctx.lcncRunners.putAll(PureNodes.registry { System.currentTimeMillis() })
                 ctx.lcncRunners[DocumentCurationLegos.SOURCE] = DocumentCurationLegos.source(cas, corpus)
                 ctx.lcncRunners[DocumentSpans.TYPE] = DocumentSpans.runner(cas, corpus)
@@ -94,16 +106,6 @@ fun main(args: Array<String>) {
                     _m["maxInputBytes" j 65536, "maxRows" j 16384])
                 kernel = checkNotNull(OroborosLcncWiring.vmLegos(ctx) { cleanups.add(it) })
                 check(LlvmScalarContract.TYPE in ctx.lcncRunners && LlvmConfixContract.TYPE in ctx.lcncRunners)
-            } else {
-                check(scopes.remountLedger() == 1) { "Expected one durably mounted project" }
-            }
-            val seed = reifyMap(admission.readText())
-            for (entry in seed["documents"] as List<*>) {
-                val expected = checkNotNull(ProjectDoc.fromMap(entry as Map<*, *>))
-                val actual = checkNotNull(corpus.document(project, expected.id))
-                check(actual == expected) { "Project revision changed at startup: ${expected.id}" }
-                val bytes = checkNotNull(corpus.bytes(project, expected.id))
-                check(ContentId.of(bytes).value == expected.cid) { "Retained source differs: ${expected.id}" }
             }
             fun node(id: String, type: String, x: Int, y: Int, params: Map<String, String>) =
                 _m["id" j id, "type" j type, "x" j x, "y" j y, "params" j params]
@@ -135,7 +137,7 @@ fun main(args: Array<String>) {
                     File(root, "$mode-$name.txt").writeText(File("/proc/self/$name").readText())
                 return seed + _m["canvas" j canvas,
                 "mode" j mode, "boot" j boot, "pid" j ProcessHandle.current().pid(),
-                "reopened" j (mode == "inspect"), "llvmInstalled" j (LlvmConfixContract.TYPE in ctx.lcncRunners),
+                "reopened" j (mode != "run"), "minerInstalled" j (miner != null), "llvmInstalled" j (LlvmConfixContract.TYPE in ctx.lcncRunners),
                 "runs" j ctx.blackboard.snapshot().values.filterKeys { it.startsWith("lcnc/run/") },
                 "javaHome" j System.getProperty("java.home"), "classpath" j System.getProperty("java.class.path"),
                 "workspaceVisible" j File("/workspace").exists(), "gradleCacheVisible" j File("/home/agent/.gradle").exists(),
