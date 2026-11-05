@@ -3,6 +3,7 @@ package borg.trikeshed.nlp
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.narsese.NormClauses
 
 /** Parser roles and bounded quantity-language readings only; never legal force, applicability or admitted facts. */
 object EnglishLegalPatterns {
@@ -141,12 +142,17 @@ object EnglishLegalPatterns {
                 "nodes" j observed["nodes"], "dependencies" j observed["dependencies"],
                 "modalActions" j actions, "durations" j durations, "unresolved" j unresolved])
         }
+        val guards = EnglishGuardAttachments.section(sentences,
+            parsed.sentences.view.map { NormClauses.conditionIssue(parsed, it)?.name }) {
+            require(bindingCount++ < MAX_BINDINGS) { "Legal pattern dependency binding limit" }
+        }
         val result = _m["schema" j "trikeshed.english-legal-patterns.v1", "reviewStatus" j "unreviewed",
             "authority" j "parser-role-and-quantity-candidates-only", "originalCid" j source.originalCid.value,
             "extractedTextCid" j source.extractedTextCid.value, "selection" j source.project?.toMap(),
             "extraction" j source.extraction?.toMap(), "range" j observations["range"], "parser" j observations["parser"],
             "coverage" j "modal-auxiliary-roles-and-bounded-number-unit-language; legal meaning and intersentence scope not established",
-            "sentences" j sentences, "counts" j _m["modalActions" j modalCount, "durations" j durationCount, "dependencyBindings" j bindingCount]]
+            "sentences" j sentences, "guardAttachments" j guards,
+            "counts" j _m["modalActions" j modalCount, "durations" j durationCount, "dependencyBindings" j bindingCount]]
         require(CanonicalCbor.encodeMap(result).size <= MAX_BYTES) { "Legal pattern inventory exceeds 4MiB" }
         return result
     }

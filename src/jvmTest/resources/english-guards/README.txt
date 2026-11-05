@@ -1,0 +1,21 @@
+Original retained observations, not legal gold or a fresh parser execution.
+
+Exact source and canonical CBOR bytes copied from records/attempt-remaining/cases
+in docs/airgap/evidence/english-guard-baseline-v77-20261105/records.tar.gz.
+The base64 encoding changes no decoded CBOR bytes; tests assert original CIDs and
+reopen through EnglishObservationGraph.read before the existing candidate/query wire.
+Current-source rows are explicit controlled test fixtures from the retained snapshots.
+
+Executed producer source0219223a3846887fe283b93598942de332214cd2,
+main JAR SHA256 d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636,
+actual CoreNLP4.6.0 syntax-v1; historical parser metadata is preserved unchanged.
+The baseline had zero copied vertices: genuine copy behavior NOT_EXERCISED.
+
+G03 inspection sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85
+source sha256:c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b
+G04 inspection sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec
+source sha256:873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1
+G07 inspection sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608
+source sha256:a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896
+G13 inspection sha256:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39
+source sha256:72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4
