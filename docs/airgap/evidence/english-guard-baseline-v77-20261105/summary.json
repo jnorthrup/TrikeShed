@@ -1,0 +1,524 @@
+{
+  "kind": "english-guard-baseline-v77-documentation-summary/1",
+  "documentationBase": "4e57df1dacab8955398ef70be475f65c00228282",
+  "executedSourceHead": "0219223a3846887fe283b93598942de332214cd2",
+  "mainJarSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+  "artifactCheckpoint": "v76; not relabelled as documentation base or v77 runtime",
+  "localParser": {
+    "processor": "edu.stanford.nlp.pipeline.StanfordCoreNLP",
+    "packageVersion": "4.6.0",
+    "profile": "syntax-v1",
+    "dependencyIdentity": "token-index+copy-count/1",
+    "manifestCid": "sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd",
+    "processorJarSha256": "277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431"
+  },
+  "producerResponses": {
+    "total": 18,
+    "status200": 18,
+    "refusals": 0,
+    "defaultReader": true,
+    "injectedReader": false,
+    "transport": "public registered ModuleRoute callback; HTTP socket/browser not exercised"
+  },
+  "parserProcesses": [
+    {
+      "cases": [
+        "G01"
+      ],
+      "exitCode": 1,
+      "receiptStatus": "valid retained200 before incorrect external invariant failed",
+      "failurePreserved": true
+    },
+    {
+      "cases": [
+        "G02",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G09",
+        "G10",
+        "G11",
+        "G12",
+        "G13",
+        "G14",
+        "G15",
+        "G16",
+        "G17",
+        "S12"
+      ],
+      "exitCode": 0,
+      "invariants": "zero intake/Rete/board; no configured bag/KIFbank/provider/miner/reviewowner; four attached read-only runner instances unchanged"
+    }
+  ],
+  "counts": {
+    "sources": 18,
+    "sentences": 23,
+    "tokens": 201,
+    "nodes": 201,
+    "dependencies": 203,
+    "markers": 48,
+    "copies": 0,
+    "utf8Bytes": 996
+  },
+  "actualCopiedVertexCoverage": "NOT_EXERCISED",
+  "recognizerS12": {
+    "count": 5,
+    "uniqueRuleCids": 4,
+    "admission": "not-performed",
+    "sameSourceOccurrences": "not-independent-evidence"
+  },
+  "executedPureFunctions": [
+    "NormClauses.conditionIssue",
+    "NlpcoreAxiomatics.recognize (S12 only)"
+  ],
+  "notExecuted": [
+    "NAL runtime",
+    "rule admission",
+    "training",
+    "quad projection/query",
+    "review approval",
+    "HTTP transport",
+    "browser"
+  ],
+  "preParseProbes": "invented hypotheses, not observed syntax or legal gold",
+  "materializedReceipts": true,
+  "refResolutionRequired": false,
+  "largeRuntimeBinariesIncluded": false,
+  "observerDataAudit": {
+    "status": "PASS_RECORDED_DATA_AUDIT",
+    "independentFromJvmCodec": true,
+    "independentReviewer": false,
+    "originalScriptSha256": "7df3592a08ed94be06f9f440d61536df744be634e361206d16028de868767a37",
+    "extractedReplay": "PASS; Python only"
+  },
+  "records": [
+    {
+      "id": "G01",
+      "sourceCid": "sha256:33739ec22bf33c7433aee82d0325108428f02a922a840c664746198b7b8fa4b0",
+      "inspectionCid": "sha256:9ee6a4c328fe5bff1dd898019e51ff862032992985f4a3c3270c100f4e4e27c2",
+      "graph": "urn:trikeshed:english:9ee6a4c328fe5bff1dd898019e51ff862032992985f4a3c3270c100f4e4e27c2",
+      "counts": {
+        "sentences": 1,
+        "tokens": 8,
+        "nodes": 8,
+        "dependencies": 8,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-first-G01/cases/G01"
+    },
+    {
+      "id": "G02",
+      "sourceCid": "sha256:c7d8d37966a4bbeabb3712e475c1da6d1a30b0fd40cb953261c3051c0ab4422b",
+      "inspectionCid": "sha256:fa3d2d3849ab51a6c5210344c2031a93f31b2cc7d8fbbcd519822eeb048f6f6b",
+      "graph": "urn:trikeshed:english:fa3d2d3849ab51a6c5210344c2031a93f31b2cc7d8fbbcd519822eeb048f6f6b",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G02"
+    },
+    {
+      "id": "G03",
+      "sourceCid": "sha256:c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+      "inspectionCid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+      "graph": "urn:trikeshed:english:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G03"
+    },
+    {
+      "id": "G04",
+      "sourceCid": "sha256:873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+      "inspectionCid": "sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+      "graph": "urn:trikeshed:english:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G04"
+    },
+    {
+      "id": "G05",
+      "sourceCid": "sha256:8746e685e05ce171025dd01d6f723b2405967b63e5926090d2a846f99720dc8a",
+      "inspectionCid": "sha256:3f6a61f63f1e1c992e26433d28124f1c6b831828b895760696e5f67f37618966",
+      "graph": "urn:trikeshed:english:3f6a61f63f1e1c992e26433d28124f1c6b831828b895760696e5f67f37618966",
+      "counts": {
+        "sentences": 1,
+        "tokens": 12,
+        "nodes": 12,
+        "dependencies": 12,
+        "markers": 5
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G05"
+    },
+    {
+      "id": "G06",
+      "sourceCid": "sha256:e8f2cb6cde19bcf7cb08c5a88628365fb31fa225b2346b099b0c4341ae461e09",
+      "inspectionCid": "sha256:a141006cbbcc8dd16ec63b89aac37d0a00e42a1e42ad6acc0548dbb8229f71b1",
+      "graph": "urn:trikeshed:english:a141006cbbcc8dd16ec63b89aac37d0a00e42a1e42ad6acc0548dbb8229f71b1",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 11,
+        "markers": 4
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "MULTIPLE"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G06"
+    },
+    {
+      "id": "G07",
+      "sourceCid": "sha256:a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896",
+      "inspectionCid": "sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+      "graph": "urn:trikeshed:english:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 12,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "COORDINATED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G07"
+    },
+    {
+      "id": "G08",
+      "sourceCid": "sha256:15b1e924998c9d497801edc831802082f3d63843381a2eafd2af2b53ab1dcd62",
+      "inspectionCid": "sha256:cc6273262c54146d75eb3389f0b96a19d5d4f78c903aa05b48a8319b27ede086",
+      "graph": "urn:trikeshed:english:cc6273262c54146d75eb3389f0b96a19d5d4f78c903aa05b48a8319b27ede086",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 12,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "COORDINATED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G08"
+    },
+    {
+      "id": "G09",
+      "sourceCid": "sha256:f852cbbb0a7033f34dc6e4f7f581b77f16ff1bd44f9315ae7c144f8895abc0da",
+      "inspectionCid": "sha256:ab402d273364ff305b4afc7a6f30f23504f6c4f002616aa2dee8793f6f9dcaac",
+      "graph": "urn:trikeshed:english:ab402d273364ff305b4afc7a6f30f23504f6c4f002616aa2dee8793f6f9dcaac",
+      "counts": {
+        "sentences": 1,
+        "tokens": 15,
+        "nodes": 15,
+        "dependencies": 15,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "MULTIPLE"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G09"
+    },
+    {
+      "id": "G10",
+      "sourceCid": "sha256:f7a8d61b4dc83852865769ccfa14fc8c4cd7355ba5e3ab406172d85eaa2ed538",
+      "inspectionCid": "sha256:585fa8d8599a814b4fcc8be0641ecb0b25aa625b72fcd7c01a88c6f27060a173",
+      "graph": "urn:trikeshed:english:585fa8d8599a814b4fcc8be0641ecb0b25aa625b72fcd7c01a88c6f27060a173",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "PASSIVE"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G10"
+    },
+    {
+      "id": "G11",
+      "sourceCid": "sha256:5995d8e351d4cad2fb25d12c4886084f90cc90d3c42226c3416fa4f34c4efde6",
+      "inspectionCid": "sha256:352c60ea812a4e508693250f4eb53a8427452952e545a76fdba9cb3898e6d411",
+      "graph": "urn:trikeshed:english:352c60ea812a4e508693250f4eb53a8427452952e545a76fdba9cb3898e6d411",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "MODAL"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G11"
+    },
+    {
+      "id": "G12",
+      "sourceCid": "sha256:3eea29778e9b588d4d0097f10ee960589d35691dd7d320623c9419d0c18ec2d4",
+      "inspectionCid": "sha256:05cf5b172f1e344b3c935295e8749d0b64ec7c6315634cd2fb739d5ffba6561a",
+      "graph": "urn:trikeshed:english:05cf5b172f1e344b3c935295e8749d0b64ec7c6315634cd2fb739d5ffba6561a",
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "UNSUPPORTED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G12"
+    },
+    {
+      "id": "G13",
+      "sourceCid": "sha256:72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4",
+      "inspectionCid": "sha256:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+      "graph": "urn:trikeshed:english:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+      "counts": {
+        "sentences": 1,
+        "tokens": 13,
+        "nodes": 13,
+        "dependencies": 13,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G13"
+    },
+    {
+      "id": "G14",
+      "sourceCid": "sha256:8717ddd3a9b3f3da4dd854da0a7ce3395c9b0fc1b08972667bc4a41b149e57db",
+      "inspectionCid": "sha256:46b56be81b98a04d2dcef74695bdadb311ff752bf09191d0036e5686a4db4dfa",
+      "graph": "urn:trikeshed:english:46b56be81b98a04d2dcef74695bdadb311ff752bf09191d0036e5686a4db4dfa",
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 3
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "UNSUPPORTED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G14"
+    },
+    {
+      "id": "G15",
+      "sourceCid": "sha256:587b149912575230241d887ac2a592dd06562205a50d11664e6209f69153f3a1",
+      "inspectionCid": "sha256:56ebb71c3c738683877ee5cb3edd5cb7dcf67a299431f190a8bf4c5ec7a1f55b",
+      "graph": "urn:trikeshed:english:56ebb71c3c738683877ee5cb3edd5cb7dcf67a299431f190a8bf4c5ec7a1f55b",
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "UNSUPPORTED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G15"
+    },
+    {
+      "id": "G16",
+      "sourceCid": "sha256:dc69d52e88735cb38066271d42d663345a9712de00c5499da668954abbaa48dd",
+      "inspectionCid": "sha256:444c3c09b2b79b1e364176277964e708fbcf76411c45b7ad701c17ef6758f0f3",
+      "graph": "urn:trikeshed:english:444c3c09b2b79b1e364176277964e708fbcf76411c45b7ad701c17ef6758f0f3",
+      "counts": {
+        "sentences": 2,
+        "tokens": 14,
+        "nodes": 14,
+        "dependencies": 14,
+        "markers": 2
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 1,
+          "conditionIssue": null
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G16"
+    },
+    {
+      "id": "G17",
+      "sourceCid": "sha256:02bc8a36e287ef31f140acb15e0a678f3be93450464e7de3154824fc85950d4e",
+      "inspectionCid": "sha256:48593709c7fc945ae540728f47bc11e5cf13c10e2fa1d3256b49b45e72c246ae",
+      "graph": "urn:trikeshed:english:48593709c7fc945ae540728f47bc11e5cf13c10e2fa1d3256b49b45e72c246ae",
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 11,
+        "markers": 5
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": "NEGATED"
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/G17"
+    },
+    {
+      "id": "S12",
+      "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+      "inspectionCid": "sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+      "graph": "urn:trikeshed:english:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+      "counts": {
+        "sentences": 5,
+        "tokens": 20,
+        "nodes": 20,
+        "dependencies": 20,
+        "markers": 0
+      },
+      "copiedNodes": 0,
+      "copyCoverage": "NOT_EXERCISED",
+      "conditionDiagnostics": [
+        {
+          "sentence": 0,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 1,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 2,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 3,
+          "conditionIssue": null
+        },
+        {
+          "sentence": 4,
+          "conditionIssue": null
+        }
+      ],
+      "materializedRecordDirectory": "records/attempt-remaining/cases/S12"
+    }
+  ],
+  "independentRecordedDataAudit": {
+    "status": "PASS",
+    "reviewer": "separate agent, read-only standard-library verification",
+    "scriptSha256": "a7a30dfe84160b5bb1ce7fa5bef071c47d243343fdcf26f25d823b9df8408e0a",
+    "resultSha256": "874d1081b0d7e1e5ca5d72bcb9276ba2d8f3f6bbca0fc1901e8cdb1df0cbd132",
+    "reportSha256": "184a354598cb8e743e153d30135ed35d66379d5b35effff5c795ca9252d379a9",
+    "originalAndSafelyExtractedResults": "byte-identical PASS",
+    "parserRuntimeReexecuted": false
+  }
+}
