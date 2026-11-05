@@ -1,0 +1,81 @@
+{
+  "kind": "native-horn-bindings-v85-evidence/1",
+  "sourceHead": "bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70",
+  "mainSha256": "a02c27f9a6153376ab6b73ae10c481c6a0e549f2d282510db834962fe21e9cf2",
+  "rootTests": 528,
+  "nativeInvocations": 8,
+  "initialPinnedExecve": 8,
+  "samePidSelfReexecve": 8,
+  "totalSuccessfulExecve": 16,
+  "nativeChildExit0": 8,
+  "observerPid": 155443,
+  "SUPPORTED": 3,
+  "UNKNOWN": 5,
+  "mutationsRejected": 6,
+  "nativeProofFileMeaning": "Actual returned proof STRUCTURE, deterministic host serialization; original native stdout bytes not retained",
+  "sourceReferenceMeaning": "Normalized form ordinals/canonical IDs; not original text spans",
+  "pinProvenance": "Raw native echoesSUMO; checkedProof MLIR revision binds declared exporter input, not native field/buildattestation",
+  "copiedOperatorTexts": "run.nix/datalog.nix text only for profile hash provenance; no binary/interpreter execution by public replay",
+  "archive": {
+    "bytes": 153555,
+    "sha256": "de83a083708e89f82eba84f3ee8101c2706482dcffa8d6362a66b64484e5737b",
+    "members": 126,
+    "uncompressedBytes": 714722
+  },
+  "audit": {
+    "kind": "native-horn-bindings-independent-audit-files/1",
+    "sourceHead": "bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70",
+    "selectedAttempt": "native-horn-bindings-v85-native-proof/native-attempt1",
+    "files": {
+      "audit.py": {
+        "bytes": 23518,
+        "sha256": "bd8fee406512a2a2127af7f4fdcbadc19cad3225fbe5d52f9ed2293ee87ddc88"
+      },
+      "checks.py": {
+        "bytes": 9648,
+        "sha256": "3090d99851f84b1638033c0a6fa0c8c950aa656045daa1c5e3ec9b1b5b5095ba"
+      },
+      "receipt-core.py.txt": {
+        "bytes": 33996,
+        "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+      },
+      "README.txt": {
+        "bytes": 6485,
+        "sha256": "04f4ccf02c718e223985c438a5cf07e21bb63c177c45b1c9c82f563ea81be5d6"
+      },
+      "attempt1/audit.py.txt": {
+        "bytes": 20817,
+        "sha256": "f6f4731559616eadb853aad27a826fe4453acfb8717929e967e1d979b9cb2ef6"
+      },
+      "attempt1/checks.py.txt": {
+        "bytes": 9648,
+        "sha256": "3090d99851f84b1638033c0a6fa0c8c950aa656045daa1c5e3ec9b1b5b5095ba"
+      },
+      "attempt1/result.json": {
+        "bytes": 13773,
+        "sha256": "72051c3ffaf2499a531c621dfff8ae18e84af6073aabcd8bc1d7b1013ceb2559"
+      },
+      "attempt1/report.txt": {
+        "bytes": 673,
+        "sha256": "c16d7966b14a12a3c724a394fddd26fa8239b7ddb48453ec6157cc6dac02feec"
+      },
+      "final/result.json": {
+        "bytes": 13773,
+        "sha256": "286f44dddcec3ebb3f75503ff74469c2343de3a3e890ac3c128fc7d1c1304058"
+      },
+      "final/report.txt": {
+        "bytes": 3268,
+        "sha256": "67cf8cccb17fd5c3f6ecab8c3233f64c785b13dd942481e9f435b13209918573"
+      },
+      "repeat/result.json": {
+        "bytes": 13773,
+        "sha256": "286f44dddcec3ebb3f75503ff74469c2343de3a3e890ac3c128fc7d1c1304058"
+      },
+      "repeat/report.txt": {
+        "bytes": 3268,
+        "sha256": "67cf8cccb17fd5c3f6ecab8c3233f64c785b13dd942481e9f435b13209918573"
+      }
+    }
+  },
+  "scope": "Finite supplied-certificate consistency, no solver search/UNKNOWN completeness/sourceapproval/English/NARS/publicendpoint/enginebundle or fullOSseal claim. Default publicdata audit only; optional external hashing not executed."
+}

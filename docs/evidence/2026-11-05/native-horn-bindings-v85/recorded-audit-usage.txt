@@ -1,0 +1,95 @@
+V85 independent native Horn checked-binding recorded-data audit — FINAL
+
+Selected data: native-horn-bindings-v85-native-proof/native-attempt1. Actual
+observerPID155443; eight native childPIDs. Sourcebafb47f3bb4977c0ed8e6abfde53cafa2a12bf70,
+maina02c27f9a6153376ab6b73ae10c481c6a0e549f2d282510db834962fe21e9cf2.
+No solver/JVM/parser-model/browser/build/namespace is launched by this Python audit.
+
+Restore audit.py.txt as audit.py and checks.py.txt as checks.py in an EXTERNAL
+directory, retaining receipt-core.py.txt beside them unchanged. Python3 stdlib.
+Set PROOF to extracted proof directory containing cases.json, execution-index.json,
+native-profile.json, inputs/, native/ and native-attempt1/; AUDITOR to restored
+scripts and OUT to a separate output directory. Run:
+
+python3 "$AUDITOR/audit.py" "$PROOF" \
+ --source-head bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70 \
+ --main-sha a02c27f9a6153376ab6b73ae10c481c6a0e549f2d282510db834962fe21e9cf2 \
+ --out "$OUT"
+
+Default PUBLIC mode checks supplied bytes/recorded runtime metadata. It never
+opens external Java/JAR/nativebinary/library paths. Exit0 writes result.json and
+report.txt; exact hashes are in manifest.json. Optional --check-external-artifacts
+also hashes external120JARs/nativebinary/profile files if available. That optional
+mode was NOT executed by this auditor; public data alone is not executable proof.
+No --recorded-only flag: default already is supplied-data/metadata mode.
+
+Public minimum consumed: root cases.json/execution-index.json/native-profile.json,
+all8 inputs/*.kif, copied native/run.nix and native/sumo-nix/datalog.nix;
+native-attempt1/{GO.json,startup.json,summary.json,native-processes.json,process.trace,
+observer-command.json,trace-command.json,classpath.json,native-pins-before.json,
+native-pins-after.json,network.json,controller-before-netns.json,namespace-command.json,
+compile.exit,observer.exit,namespace.exit}; artifact-metadata/{source-head.txt,
+sha256.json,classpath.txt}; exact observer-inputs; each8case directory source.kif,
+input.json,prepared.json,frame.cbor,result.json,native-proof-structure.json,
+checked-proof.json. Keep actual source/compile/log/protocol/manifests/build528
+provenance alongside this minimum. Optional readelf text/linkage-scope metadata
+must remain explicitly DECLARED dependencies, not observed loaded-library use.
+No engine/JAR/class/model/PDF binaries or prior full proof trees need ship.
+
+Finite verifier scope: check supplied certificate only, no Horn closure/search or
+independent proof of UNKNOWN. Bounded syntax reading and scalar matching verify
+whole-source input, all forms/duplicate ordinals, canonical manual-form/source-node
+IDs, exact raw compiler JSON inputCID and separate CBOR frameID. frame.cbor is a
+DERIVED frame-domain preimage (input without frameId, integer revision), not a CAS
+artifact or native stdout. Source refs are normalized atoms/form ordinals and
+rule-scoped variable identities, NOT exact source spans/quotations/entityCIDs.
+Raw source bytes are retained separately; repeated text does not create votes.
+
+Each actual raw proof STRUCTURE file equals result.proof; the additive checked
+receipt is independently recomputed by walking exactly that finite tree. Checked
+paths are postorder/root[], child0 assignedTo(Lark,Harbor), child1 authorized(Lark,
+Access); shared operator=Lark/resource=Harbor, typed constant.token vs literal.
+spelling, rule IDs/patterns, premise ordinals and source catalog/free-variable refs
+must all agree. This verifies a supplied certificate, not alternate derivations.
+UNKNOWN has no proof/bindings and is not legal falsehood or full KIF completeness.
+Original native stdout bytes were not retained and are not claimed unchanged.
+
+Eight separate theories: original S5 hash0a1ab3d15d9e8e453e7467ba5ae170defded7244bdca7b4047d414773706bf9f
+and S6 hash5427aad52ecd1e911128a54c00021bbaa7bce382d240e83698815a48501180e3
+stay UNKNOWN. NEWpositive has distinct source/input/frame and is SUPPORTED;
+duplicate authorization and remove-one are SUPPORTED; remove-last, mismatched
+authorization and reversed goal UNKNOWN. Removal controls legitimately restore
+positive/originalS6 equal bytes and identities. Duplicate authorization carries
+two distinct alternative witness IDs/any-one-asserted-source; required premises
+remain2, bindings2, no confidence/evidence/independence-vote multiplication.
+
+Actual process-only strace independently yields8native initialexecve events plus
+8/proc/self/exe SAME-PID reexecs, all8distinct children exit0. Not16theory runs.
+Sequential execution-index binds case/source/input/frame/PID/argv/elapsed result;
+per-call temporary input removal is recorded, no current oldtemp path opened.
+Observed solver input/output caps45s/1MiB and supplied certificate depth64/nodes4096
+are distinct from native unbounded fixpoint semantics; no solver stepbound or
+UNKNOWN completeness proof invented. All coroutine/native children0 and
+GuestModules closed; empty installed/mounted SDK observed.
+
+Trusted HOST fixture only: bounded reflection of exact internal manualInput and
+manualTheory methods; production class origins final main, no privatechecker,
+-Xfriend/main overlay/public approval endpoint. Host KifReview.APPROVED is an
+explicit assumption, not authenticated source/review/currentness/sink authority.
+worldObligationApplicability remains UNKNOWN. No English/NLP/LLM/model/NARS
+admission, live global store or automatic union. Root528test metadata includes
+9certificate+5property-configured nativeQuery methods; stale519author count is
+not used. These8actual observer runs are separate from root's build/test cohort.
+
+External onlyloUP/routes[]/ENETUNREACH private user/netnamespace is recorded;
+NativeHornProfile itself explicitly provides no memory/network isolation.
+Nativebinary/adapter/datalog hashes are before/after pinned; dynamic runtime
+libraries remain external/operator-trusted. Readelf declarations are not loaded
+library traces or a new closure/full R4 rootfs/hostileescape/hardware seal claim.
+No executable/model bundle or public reviewedHTTPworkflow is established.
+
+Six proportional in-memory mutants reject operator substitution, premise order,
+wrong asserted source, constant-to-literal type, frame identity and raw root/query
+mismatch. First complete independent audit passed; exact initial scripts/output
+are preserved. Final report-only addition and repeat produce byte-identical
+results. No native/source corrections, additional runtime or broader testmatrix.
