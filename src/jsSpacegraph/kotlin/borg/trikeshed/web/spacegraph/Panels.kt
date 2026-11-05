@@ -461,14 +461,26 @@ class Panels : PatchSurface {
         wiresSvg.innerHTML = ""
         redrawConcentric()
         val wires = arr(graph.wires)
+        val centers = HashMap<String, MutableMap<String, dynamic>>()
+        fun endpoint(port: dynamic, dir: String): dynamic {
+            val id = str(port[0]); val name = PatchKinds.bare(str(port[1]))
+            val measured = centers.getOrPut(id) { HashMap() }
+            val key = "$dir:$name"
+            if (!measured.containsKey(key)) measured[key] = portCenter(id, dir, name)
+            return measured[key]
+        }
+        // Snapshot geometry before attaching paths; shared ports are measured once per redraw.
+        val endpoints = (wires.toSeries() α { wr -> endpoint(wr.from, "out") j endpoint(wr.to, "in") }).toList()
+        val width = num(viewport.clientWidth); val height = num(viewport.clientHeight)
+        val fragment = document.createDocumentFragment().asDynamic()
         val resolve = try { portKindResolver() } catch (_: dynamic) { null }
         wires.forEachIndexed { idx, wr ->
-            val a = portCenter(str(wr.from[0]), "out", str(wr.from[1])); val b = portCenter(str(wr.to[0]), "in", str(wr.to[1]))
+            val a = endpoints[idx].a; val b = endpoints[idx].b
             if (a == null || b == null) return@forEachIndexed
             ends.add(a); ends.add(b)
             val path = svg("path")
             path.setAttribute("data-wire-index", str(idx))
-            PatchNavigation.wireCurve(path, a, b, viewport, view); path.classList.add("live")
+            PatchNavigation.wireCurve(path, a, b, width, height, view); path.classList.add("live")
             val srcN = node(wr.from[0])
             val tc = PatchKinds.kindColor[if (srcN != null && resolve != null)
                 PatchKinds.portClass(resolve(srcN, "out", str(wr.from[1])), kindAcceptance)
@@ -488,7 +500,7 @@ class Panels : PatchSurface {
                 val t = svg("title"); t.textContent = "refused by the daemon: $refused"; path.appendChild(t)
             }
             on(path, "pointerdown", { e -> e.stopPropagation(); graph.wires.splice(idx, 1); redraw(); save() })
-            wiresSvg.appendChild(path)
+            fragment.appendChild(path)
             if (board.cables.containsKey(bk)) {
                 val ty = board.cables[bk]
                 val label = svg("text")
@@ -497,9 +509,10 @@ class Panels : PatchSurface {
                 label.textContent = if (ty == null) "unresolved" else ty
                 val tt = svg("title")
                 tt.textContent = (if (ty == null) "unresolved on the board" else "typed on the board: " + str(ty)) + (if (refused != null) " — refused: $refused" else ""); label.appendChild(tt)
-                wiresSvg.appendChild(label)
+                fragment.appendChild(label)
             }
         }
+        wiresSvg.appendChild(fragment)
         // endpoints are the truth: a cable into a deeply nested, zoomed ring can sit outside the prediction
         if (ends.isNotEmpty() && growWireBox(ends)) applyWireBox()
         shake.positionVerdicts()

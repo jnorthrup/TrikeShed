@@ -28,11 +28,14 @@ object PatchNavigation {
         for (path in arr(svg.asDynamic().querySelectorAll("path"))) if (path._wireCurve != null) projectCurve(path, width, height, view)
     }
 
-    fun wireCurve(path: dynamic, a: dynamic, b: dynamic, viewport: dynamic, view: dynamic) {
+    fun wireCurve(path: dynamic, a: dynamic, b: dynamic, viewport: dynamic, view: dynamic) =
+        wireCurve(path, a, b, num(viewport.clientWidth), num(viewport.clientHeight), view)
+
+    fun wireCurve(path: dynamic, a: dynamic, b: dynamic, width: Double, height: Double, view: dynamic) {
         val ax = num(a.x); val ay = num(a.y); val bx = num(b.x); val by = num(b.y)
         val dx = maxOf(40.0, kotlin.math.abs(bx - ax) / 2)
         path._wireCurve = Cubic(Pt(ax, ay), Pt(ax + dx, ay), Pt(bx - dx, by), Pt(bx, by))
-        projectCurve(path, num(viewport.clientWidth), num(viewport.clientHeight), view)
+        projectCurve(path, width, height, view)
     }
 
     fun projectCurve(path: dynamic, width: Double, height: Double, view: dynamic) {
