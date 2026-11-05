@@ -1,0 +1,240 @@
+{
+  "kind": "english-combined-checkpoint/77",
+  "at": "2026-11-05T03:55:46.434256+00:00",
+  "testedSource": "c23dd240190d8023437ba4121485b1c28ea42b89",
+  "sourceRefFreeze": {
+    "refs": 679,
+    "ordinaryThreeWayMerges": 5,
+    "allContained": true,
+    "oneConflictResolved": "Independent R4b acceptance and source-promotion appended sections both retained; all base/left/right stages preserved."
+  },
+  "behavior": {
+    "retainedNal": "One complete identity-reported retained English atomic implication frame uses existing recognizer and NAL primitives; exact frame/surface term identities and shared source ancestry; one-level deduction and weak induction remain hypotheses, never new observations.",
+    "cli": "Explicit historical CAS/inspection input, strict arguments and bounded read; readonly structural scan rejects damaged tails before store recovery can modify them.",
+    "profiles": "Any unaccounted, guarded, negative, modal, quoted, copied, partial or inconsistent identity input refuses the whole atomic profile; no semantic UNKNOWN fallback.",
+    "sourceDeployment": "Separate pinned-v76 mount proof promotes verified41byte REF source to same-CID BLOB, retaining original receipt/revision/sequence and pack prefix; next sealed-host composition remains separate."
+  },
+  "build": {
+    "totals": {
+      "tests": 480,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "allJvmTestSourcesCompiled": true,
+    "allThreeBrowserBuilds": "PASS",
+    "failedBuildAttempts": [
+      {
+        "attempt": 1,
+        "source": "58f1c44d1ac22c1aab22aea62aea627318dfcc6f",
+        "result": "MAIN_JVM_AND_JS_COMPILE_FAILURE",
+        "reason": "copied already has house Series type; invalid redundant toSeries() in copied-node refusal",
+        "location": "SyntheticNalExperiment.kt:172",
+        "testsExecuted": false,
+        "log": "build-v77-attempt1.log"
+      },
+      {
+        "attempt": 2,
+        "source": "b7c05f34474f36a0652ee8392f1def88988bddda",
+        "result": "TEST_SOURCE_COMPILE_FAILURE",
+        "reason": "Filtered test helper is a house Series without standard Iterable.single; materialize typed List for existing assertions",
+        "location": "RetainedNalImplicationTest.results helper",
+        "productionAndAllThreeJs": "PASS",
+        "testsExecuted": false,
+        "log": "build-v77-attempt2.log"
+      }
+    ]
+  },
+  "artifacts": {
+    "main.jar": "b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448",
+    "documents.js": "a9e86b2ab1f1d65b08b830777644fa9ba710ce7658197012962727e94e99b80d",
+    "spacegraph.js": "2d8701a34a13623179d04e4f109fc851aecb96a22cf8b07647fbbbd232e6a18d",
+    "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+  },
+  "dependencyJars": 119,
+  "totalClasspathJars": 120,
+  "nativeCli": {
+    "cases": {
+      "S12": {
+        "status": "EVALUATED",
+        "premises": 4,
+        "occurrences": 5,
+        "attemptedPairs": 12,
+        "results": [
+          [
+            "DEDUCTION",
+            "ALPHA",
+            "GAMMA",
+            289,
+            0
+          ],
+          [
+            "INDUCTION",
+            "DELTA",
+            "GAMMA",
+            224,
+            0
+          ],
+          [
+            "INDUCTION",
+            "GAMMA",
+            "DELTA",
+            224,
+            0
+          ]
+        ],
+        "basis": [
+          "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+        ]
+      },
+      "G01": {
+        "status": "UNSUPPORTED",
+        "issues": [
+          {
+            "code": "unaccounted-sentence",
+            "sentenceIndex": 0
+          }
+        ]
+      },
+      "G03": {
+        "status": "UNSUPPORTED",
+        "issues": [
+          {
+            "code": "unaccounted-sentence",
+            "sentenceIndex": 0
+          }
+        ]
+      },
+      "G04": {
+        "status": "UNSUPPORTED",
+        "issues": [
+          {
+            "code": "unaccounted-sentence",
+            "sentenceIndex": 0
+          }
+        ]
+      },
+      "G13": {
+        "status": "UNSUPPORTED",
+        "issues": [
+          {
+            "code": "unaccounted-sentence",
+            "sentenceIndex": 0
+          }
+        ]
+      }
+    },
+    "commands": {
+      "commands": 14,
+      "pids": [
+        118614,
+        118635,
+        118656,
+        118681,
+        118706,
+        118731,
+        118756,
+        118781,
+        118802,
+        118823,
+        118844,
+        118865,
+        118890,
+        118911
+      ],
+      "zeroArgBytes": 25531,
+      "zeroArgSha256": "733716c1e44a3c43f2ba0e1854f334ea379ca42175157e26498ddced34e4bbbd"
+    },
+    "independentResult": "PASS_RECORDED_NAL_APPLICATION_CONSISTENCY",
+    "independentMode": "local-artifact-strict",
+    "sourceTruthScope": "Recorded production CLI and identity/source/ordered-rule/Float32 NAL application consistency. This auditor launches no JVM/parser/build/query engine, generates no new inference closure, and grants no semantic truth, calibrated probability, current-source authority, independence, admission or OS seal. Original absolute REF targets remain JVM rerun dependencies; static comparisons use exact copied source bytes.",
+    "mutatedCopyRefusals": 6,
+    "auditorSha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+  },
+  "genuineParserBaseline": {
+    "result": "PASS",
+    "publicFiles": 13,
+    "safeExtractedRegularFiles": 223,
+    "archiveSha256": "0dd5432c133cfa65c9f14756f21ebdef5bc6c749cafa1632969d394f0ce465c4",
+    "manifestSha256": "cef3e033d3781f56892c0e59830bda92fe033b43e9d4ee1f0b12396653519957",
+    "independentScriptSha256": "a7a30dfe84160b5bb1ce7fa5bef071c47d243343fdcf26f25d823b9df8408e0a",
+    "independentResultSha256": "874d1081b0d7e1e5ca5d72bcb9276ba2d8f3f6bbca0fc1901e8cdb1df0cbd132",
+    "counts": {
+      "sources": 18,
+      "sentences": 23,
+      "tokens": 201,
+      "nodes": 201,
+      "dependencies": 203,
+      "markers": 48,
+      "copies": 0,
+      "utf8Bytes": 996
+    },
+    "copies": "NOT_EXERCISED",
+    "primaryStatus": "PASS_RECORDED_DATA_AUDIT",
+    "rootWrapperCorrection": "Primary script uses status, not result; unchanged original/extracted audit outputs already passed. No replay required for summary correction.",
+    "scope": "Recorded data and artifact consistency; no parser/query/NAL/semantic or OS containment replay."
+  },
+  "sourcePromotionMountProof": {
+    "result": "PASS",
+    "scope": "Recorded exact-pack/source/receipt/row, child mount/PID/origin and after-close checks. No new runtime, dependency rehash, sealed network or parser/authority claim.",
+    "sourceHead": "0219223a3846887fe283b93598942de332214cd2",
+    "mainSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+    "pids": {
+      "before": 113594,
+      "promote": 113620,
+      "after": 113650
+    },
+    "originalPrefixBytes": 7666,
+    "finalPack": {
+      "bytes": 7744,
+      "sha256": "c7ed80dcca429efb78cf36ca2fd5134773639549d2bf227ead1a36f82a205c7c"
+    },
+    "publicFiles": 8,
+    "safeExtractedRegularFiles": 52,
+    "safeDirectoryEntries": 23,
+    "archiveSha256": "ecc9d330ec09ca91ddc9345b4e5028ed58413aaad361af05f7f12db563eb8bb0",
+    "manifestSha256": "fd3e58a860f7a756916a5faf0ce0520fdd3c4b3e0ebb8e7ec52024c12098fecf",
+    "verifierSha256": "54e79fdfae68197677d87819aef03df495e5baf27e7941b5f92b117c144accd6"
+  },
+  "concurrentMasterPreserved": "c66df43e54c14da21dcd0bfb3de9729f8a119fb1",
+  "concurrentR4bScope": "23 dependency jars plus packaged named5nodepreset and recorded abrupt completed-receipt recovery. Source/build bootstrap preserved and compiled; matching old runtime/source archives/rootfs/communityJDK unavailable locally, so no R4b runtime rerun or inherited English closure claim.",
+  "semanticEvaluation": "Existing16case semantic-seat report remains MISSING16/scored0. Observed atomic-symbol application is not a legal-English accuracy benchmark or trained role/context reasoner.",
+  "limits": [
+    "Frame-scoped positive atomic implication profile only;64rawclauses,4096ordered-pair cap, one inference level. General role variables, contexts, guards and full English comprehension remain unsupported.",
+    "NAL numeric confidence derives from unchanged structural milli-evidence with horizon1000; no parser probability, calibrated legal truth or independent-source confidence is established.",
+    "Reported graph/sentence/node resources refer to the existing inspection namespace; this experiment executes no quad query or independent inference closure.",
+    "Historical CLI does not check source currentness, authenticate parser execution, approve review, mint live bag/Rete observations or train models.",
+    "CLI requires a quiescent input pack; structural preflight makes no atomic guarantee against a concurrent writer or pathname replacement.",
+    "The genuine parser baseline had no copied vertices; copy behavior was not exercised by those actual parses. Synthetic refusal cases are separately labeled.",
+    "Copied native CLI packs retain18 original absolute REF target dependencies. They are not self-contained exports; the separate verified source-promotion proof handles one41byte deployment case.",
+    "The parser/source-portability records execute the pinned v76artifact021/d0a813; new NAL CLI is pinnedc23/b432. No older record is relabeled to the later artifact.",
+    "No full sealed English/review host, fresh parser/model release closure, crash/power-loss guarantee, or vendor-source reproducibility is added here."
+  ],
+  "nextSlices": [
+    "Expose the existing retained evaluator through one LCNC inspection node and offered source-focus preset under the existing English owner/currentness checks.",
+    "Compose Documents and English/review owners in a local package with explicit loopback boundary, private reviewer provisioning and verified source materialization, then test a new sealed closure.",
+    "Extend typed guard attachment observations from the genuine ambiguous/quoted-clause baseline before attempting broader legal role/condition reasoning."
+  ],
+  "publication": "PENDING final all-head D3M and ordinary master push; all actual proof artifacts remain pinned to their source-specific checkpoints.",
+  "publicNativeEvidence": "docs/evidence/2026-11-05/retained-english-nal-v77",
+  "rootPublicNativeAudit": {
+    "result": "PASS",
+    "publicFiles": 11,
+    "publicManifestSha256": "495b88ca4b7ae618f7d76015d89d24cdd74d75ff1c6d42acdd5d814b33995431",
+    "archiveSha256": "5dccd87b70e855c51c25bd1e7ee929ffc6c67b8b940c2aed2f06e2e1c3ea316f",
+    "archiveBytes": 711770,
+    "safelyExtractedRegularFiles": 177,
+    "recordedAuditResultSha256": "40069c72c30fe5b77537b6e39a0392fc502e2322fd716053fc881ca7ecf36ae5",
+    "strictAuditResultSha256": "1fef137911051c2c48dbbd8c7ea5e2144f199a9c5c180386e50d663774a855b7",
+    "mutatedCopyRefusals": 6,
+    "scriptSha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763",
+    "sourceHead": "c23dd240190d8023437ba4121485b1c28ea42b89",
+    "mainSha256": "b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448",
+    "actualNativeRuntimeReplayed": false
+  },
+  "defaultCliCompatibility": {
+    "stdoutBytes": 25531,
+    "sha256": "733716c1e44a3c43f2ba0e1854f334ea379ca42175157e26498ddced34e4bbbd",
+    "oldV76NewV77BytesEqual": true
+  }
+}

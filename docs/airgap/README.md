@@ -150,3 +150,7 @@ durability or the full vendor/native source-build gate.
 ## Retained-source deployment boundary
 
 The [v77 source-promotion checkpoint](evidence/retained-source-promotion-v77-20261105/README.md) verifies actual missing-source refusal, same-CID BLOB promotion and separate-JVM reopening with the old producer directory hidden. It uses the pinned v76 artifact and does not establish the full sealed English host.
+
+## Retained English NAL application
+
+The [v77 retained-English checkpoint](../evidence/2026-11-05/retained-english-nal-v77/README.md) applies the existing NAL operations to one bounded atomic-symbol inspection. It preserves source and premise identities, separates deduction from weak induction hypotheses, refuses guarded or incomplete frames, and performs no live admission. The old zero-argument example remains byte-identical.
