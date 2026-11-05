@@ -1,0 +1,125 @@
+{
+  "actual": {
+    "boardFrames": 6,
+    "heldResponses": 2,
+    "labelledTransportControls": 4,
+    "nativeEvaluations": 14,
+    "programDetailsDomTextCaptured": false,
+    "publicReviewRuns": 2,
+    "readerPid": 185285,
+    "reviewFrames": 2,
+    "selected": 3,
+    "selectedReadbacks": 12,
+    "selectedUniqueReadbacks": 11,
+    "sourceFocus": 3,
+    "typedRows": {
+      "before-real-source-amendment": 2,
+      "premise-sources": 2,
+      "substitutions": 3
+    },
+    "used": 2,
+    "writerPid": 184978
+  },
+  "artifacts": {
+    "documents.js": "4aa634be72b1d8e2657a1e8dcc75e138b8a3bd0195ae58b09714824f9f0bbd35",
+    "main.jar": "f784107dd8f0fe0471e9ee0c43edccc9debce8a5e323844f0d7a22b40eaf533e",
+    "pages.js": "f1c1458fc3900b8e57c5eea5683ca33ab05334d7368c4e38bc50850cdc074de5",
+    "spacegraph.js": "324325a57bcbf55db29d3bca9e4b8730ad7695dd7217173e4e27df177807676d"
+  },
+  "captureLimits": [
+    "Program-details DOM text NOT_EXERCISED: all three innerText captures of closed-details PRE are empty. Actual posted programs and server-lowered SPARQL are independently checked.",
+    "First-report oversized/profile-limit behavior SOURCE-REVIEWED ONLY.",
+    "One real derived root; no distinct-step switch or credential change while query is busy. Forget is after completed output and visibly says credential removed; it clears/disables native result.",
+    "Standalone Documents reader is not connected; actual actions are in the Spacegraph Documents review-output node. No private layout/PDF data included."
+  ],
+  "kind": "native-horn-docs-independent-recorded-audit/1",
+  "mutatedCopyControls": [
+    {
+      "label": "DOM-constant-becomes-URI",
+      "rejected": true
+    },
+    {
+      "label": "quotation-span-substituted",
+      "rejected": true
+    },
+    {
+      "label": "goal-ABA-late-response-repaints",
+      "rejected": true
+    },
+    {
+      "label": "structured413-keeps-stale-rows",
+      "rejected": true
+    },
+    {
+      "label": "401-retains-old-native-support",
+      "rejected": true
+    },
+    {
+      "label": "source-focus-navigates-router",
+      "rejected": true
+    }
+  ],
+  "observedStateChanges": [
+    {
+      "after": "public-review-snapshot-run-after",
+      "before": "public-review-snapshot-run-before",
+      "changed": [
+        "pack",
+        "reviewWal",
+        "reteFacts",
+        "blackboard",
+        "journal"
+      ]
+    },
+    {
+      "after": "first-browser-native-report-before",
+      "before": "public-review-snapshot-run-after",
+      "changed": [
+        "pack",
+        "reviewWal"
+      ]
+    },
+    {
+      "after": "public-review-reopen-after-graph-ABA-after",
+      "before": "public-review-reopen-after-graph-ABA-before",
+      "changed": [
+        "pack",
+        "reteFacts",
+        "blackboard",
+        "journal"
+      ]
+    },
+    {
+      "after": "final",
+      "before": "before-real-source-amendment-after",
+      "changed": [
+        "pack",
+        "sourceFiles",
+        "nativeRow",
+        "nativeMirror"
+      ]
+    }
+  ],
+  "recordHashes": {
+    "../closed-record-manifest.json": "5f925b434191db6e43ab33e70e29cdfbe8f187a44af49bedcd641dd40c045eec",
+    "GO.json": "010f7be3215e41b6884ae84167fc03419703a9b17db29c8b08961fafc4a3e00b",
+    "after-close-readbacks/board.wal": "5ae48485aa27c1875667708f84ef3dab8182d9c8485b7c2d7c9202286e0de05e",
+    "after-close-readbacks/review.wal": "c3ae0d1451d6fd7525b156a7c3738008380105b08aa89d7192f191609f907b63",
+    "browser-result.json": "e6506f7e68ffc97b6720d34f88b0918ac3766134e6288b08b9eaa0f0f0cbaa6e",
+    "cleanup.json": "9c4870f46bdb4f73b9e78d3dbc1f83bddf71070f95168e2cd0d1e3c29b7e14ec",
+    "derived-projection-domain-preimage.cbor": "4a91de8d188c5f154c5e4cb8f18b34ccc9a4f907fa15567dbd360545be49d009",
+    "native-exact-instance-source-quotation.png": "c16bd8822ddad2ba2251304792d2a08acd9303261310da35eec46c027508d8be",
+    "native-exact-subclass-source-quotation.png": "4d044d10a72071ec6dc1d3c2b4f78ccb3bf2928293d5d0bce7d0292f3efabb7d",
+    "native-execution-index.json": "57b7468b2881fa2447228a83ac2d6b7f210b05181797dde0d4ffcbab26021e1d",
+    "native-first-reviewed-proof-report.png": "ea6f1e94853e07fada99d02300b5bd987e49f89cbe7231dd9a5758b6c1642a49",
+    "native-normalized-host-rule-source.png": "b0c0445ca104248d70fdfc58d4ada6850fa1acd014e47cca13fef031be6b2a9b",
+    "native-real-source-stale-unconfirmed.png": "ce5370562de7ea91c236ce1d353d28e5fa6d9a3d40b100cbbcf44f5537fbc3fa",
+    "native-substitution-table-visible-columns.png": "d4c9947dc27f1b8cf5f1d57404ed39cb5624926f45054ed507cf4bd08bb65669",
+    "process.trace": "0cb997b4f6baf145c0818f4944e6095aa427f370dc0b51195ec230cf70a1d4b4",
+    "reopened.json": "53b71f96cb85781347d5872a67d1f6c723ec3a5674cbc9ae020bc8ea429dae96",
+    "startup.json": "59ee45dc2870aa081e38d1a99a97674ad25ce64199d6a552fc0257398d75ca80"
+  },
+  "result": "PASS",
+  "scope": "Recorded canonical identities, supplied-certificate/typed-row and UI ownership consistency. Actual Spacegraph Documents review output actions, synthetic approved manual KIF assumptions; no standalone Documents reader, native LCNC runner, arbitrary native admission, independent solver/search, legal/source authentication, private PDF/layout baseline or portable executable/full isolation claim. First-report oversized/profile-limit behavior is SOURCE-REVIEWED ONLY, not browser verified. Public replay authenticates supplied selected bytes and metadata; omitted full packs/REF/native/JAR dependencies are not availability proofs.",
+  "source": "92510e6a1bff13a71b0ad9a76ba261498932e9ba"
+}
