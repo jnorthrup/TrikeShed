@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Finite recorded Horn certificate audit; no solver/search/JVM/browser/build execution."""
+import argparse,copy,hashlib,json,re
+from pathlib import Path,PurePosixPath
+from urllib.parse import urlsplit,unquote
+from checks import *
+SOURCE='bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70'
+MAIN='a02c27f9a6153376ab6b73ae10c481c6a0e549f2d282510db834962fe21e9cf2'
+SUMO='1e2fb138d562769d21e7f3e6cfdade9129705ec4';MLIR='1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba'
+BINARY='97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5'
+ADAPTER='e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c'
+DATALOG='9953ebeb4c4792817f49ff00ff16a4fb82945ff44b2778eecb7f3651e4e7fdd7'
+RULE='(=> (and (assignedTo ?operator ?resource) (authorized ?operator Access)) (mayRead ?operator ?resource))'
+S5=(RULE+'\n(assignedTo Harbor Lark)\n(authorized Lark Access)\n').encode()
+S6=(RULE+'\n(assignedTo Lark Harbor)\n').encode();POSITIVE=S6+b'(authorized Lark Access)\n'
+EXPECT={'S5-original':(S5,'UNKNOWN'),'S6-original':(S6,'UNKNOWN'),'positive-new':(POSITIVE,'SUPPORTED'),'duplicate-authorization':(POSITIVE+b'(authorized Lark Access)\n','SUPPORTED'),'remove-one-authorization':(POSITIVE,'SUPPORTED'),'remove-last-authorization':(S6,'UNKNOWN'),'mismatched-authorization':(S6+b'(authorized Harbor Access)\n','UNKNOWN'),'reversed-goal':(POSITIVE,'UNKNOWN')}
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def origins(values,main):need(values and all(unquote(urlsplit(v).path)==main for v in values.values()),'Actual exporter/checker/process origins are immutable final main JAR')
+def artifact(attempt,args):
+    go=load(attempt/'GO.json');need(go['GO'] is True and go['source']==SOURCE==args.source_head and go['mainSha256']==MAIN==args.main_sha and go['checks']=={'tests':528,'failures':0,'errors':0,'skipped':0},'Exact final528rootGO source/main metadata')
+    metadata=attempt/'artifact-metadata';manifest=load(metadata/'sha256.json');need((metadata/'source-head.txt').read_text().strip()==SOURCE and sha((metadata/'source-head.txt').read_bytes())==manifest['source-head.txt'] and manifest['main.jar']==MAIN,'Final frozen source metadata')
+    cp=load(attempt/'classpath.json');paths=[r['path'] for r in cp['actualClasspath']];need(cp['productionJars']==120 and cp['totalClasspathEntries']==121 and cp['overlays'] is cp['friendPaths'] is False and len(paths)==len(set(paths))==120 and len(manifest['dependencies'])==119,'120productionJARs/externalobserver; no overlays/friendpaths')
+    need((metadata/'classpath.txt').read_text().strip().split(':')==paths and paths[0]==go['snapshot']+'/main.jar','Exact final classpath identity metadata')
+    for row in cp['actualClasspath']:
+        expected=MAIN if row['path']==paths[0] else manifest['dependencies'][row['path']];need(row['sha256']==expected,'Every recorded production dependency hash')
+        if args.check_external_artifacts:need(sha(Path(row['path']).read_bytes())==expected,'Optional actual external JAR bytes')
+    command=load(attempt/'observer-command.json');index=command.index('-cp');need(command[index+1].split(':')==[cp['observerClasses']]+paths and command[index+2]=='proof.nativehorn.ObserverKt','Actual external observer/final production JVM entrypoint')
+    trace_command=load(attempt/'trace-command.json');need(trace_command==['strace','-f','-e','trace=process','-s','4096','-o',command[-2]+'/process.trace','--']+command,'Actual process-only tracing; solver binary is not wrapped/replaced')
+    return go,cp,command
+def native_executions(trace,profile):
+    initial=[];self_exec=[]
+    for line in trace.splitlines():
+        match=re.match(r'\s*(\d+)\s+execve\(("(?:[^"\\]|\\.)*"), (\[.*\]), .*\)\s*=\s*0$',line)
+        if not match:continue
+        path=json.loads(match[2])
+        if path not in [profile['binary'],'/proc/self/exe']:continue
+        argv=json.loads(match[3]);need(argv[0]==profile['binary'],'Actual native exec path/argv identity')
+        pid=int(match[1]);exit_line=re.search(r'^\s*'+str(pid)+r'\s+\+\+\+ exited with (\d+) \+\+\+$',trace,re.M)
+        need(exit_line is not None and exit_line[1]=='0','Actual native child exit0 in raw process trace')
+        expected=[profile['binary'],'instantiate','--eval','--strict','--json','--readonly-mode','--store','dummy://',profile['adapter'],'--argstr','sumoNix',profile['datalogDirectory'],'--argstr','input',argv[-1]]
+        need(argv==expected,'Actual pinned readonly native adapter arguments, no invented solver/fetch dispatch')
+        row={'pid':pid,'argv':argv,'exit':0,'inputPath':argv[-1],'inputRemovedAfterObserver':True}
+        (initial if path==profile['binary'] else self_exec).append(row)
+    need(len(initial)==len({r['pid'] for r in initial})==8 and self_exec==initial,'Eight actual native child PIDs, each initialexec and same-PID /proc/self/exe reexec; not sixteen theories')
+    return initial,{'nativeChildPids':8,'initialExecveEvents':8,'samePidSelfExecveEvents':8}
+def audit(root,args):
+    attempt=root/'native-attempt1';go,cp,command=artifact(attempt,args);startup=load(attempt/'startup.json');summary=load(attempt/'summary.json');cases=load(root/'cases.json');profile=load(root/'native-profile.json')
+    need(summary['result']=='PASS' and startup['go']==go and startup['pid']==summary['pid'] and summary['sourceHead']==SOURCE and summary['mainSha256']==MAIN,'Actual closed observer identity and final artifact pins')
+    origins(startup['origins'],go['snapshot']+'/main.jar');need(summary['origins']==startup['origins'] and set(startup['origins'])=={'NativeHornQuery','NativeHornProfile','SumoNixBridge','KifSourceAssertion','KifSemantic','JvmFileOperations','JvmProcessProtocolPipes','ProcessCaptureChannel'},'Actual final production fixture/compiler/checker/process owners')
+    need(unquote(urlsplit(startup['observerCodeSource']).path).rstrip('/')==cp['observerClasses'],'Separate new observer classes, not main-class overlay')
+    methods=startup['methods'];need(methods==summary['methods'] and methods['declaringClass']=='borg.trikeshed.lcnc.NativeHornQuery' and 'manualTheory$' in methods['manualTheory'] and 'kotlin.coroutines.Continuation' in methods['manualTheory'] and 'manualInput$' in methods['manualInput'],'Actual bounded internal trusted-host method reflection, not public approval endpoint/private checker')
+    need(startup['sdkInstalled']==startup['sdkMounted']==[] and summary['guestModulesClosed'] is True and summary['remainingCoroutineChildren']==summary['remainingNativeChildren']==0,'No mounted parser/model and actual coroutine/native owners closed')
+    for name in ['compile.exit','observer.exit','namespace.exit']:need((attempt/name).read_text().strip()=='0','Actual '+name+'=0')
+    native_before=load(attempt/'native-pins-before.json');need(native_before==load(attempt/'native-pins-after.json'),'Actual native profile byte pins unchanged before/after all executions')
+    need(profile['binarySha256']==BINARY and profile['timeoutMillis']==45000 and profile['adapter']==command[-3]+'/native/run.nix' and profile['datalogDirectory']==command[-3]+'/native/sumo-nix','Exact existing native operator profile')
+    expected_pins={profile['binary']:BINARY,profile['adapter']:ADAPTER,profile['datalogDirectory']+'/datalog.nix':DATALOG};need(set(native_before)==set(expected_pins) and all(native_before[k]['sha256']==v for k,v in expected_pins.items()),'Existing binary/adapter/datalog exact pinned metadata')
+    need(sha((root/'native/run.nix').read_bytes())==ADAPTER and sha((root/'native/sumo-nix/datalog.nix').read_bytes())==DATALOG,'Supplied copied native adapter/datalog source bytes')
+    if args.check_external_artifacts:
+        for name,record in native_before.items():need(len(Path(name).read_bytes())==record['bytes'] and sha(Path(name).read_bytes())==record['sha256'],'Optional actual external native artifact bytes')
+    trace=(attempt/'process.trace').read_text();executions,counts=native_executions(trace,profile);need(executions==load(attempt/'native-processes.json'),'Independent raw strace parsing equals actual8process export')
+    need(re.search(r'^'+str(summary['pid'])+r' execve\(',trace,re.M) is not None and re.search(r'^'+str(summary['pid'])+r' \+\+\+ exited with 0 \+\+\+$',trace,re.M) is not None,'Actual observer JVM PID/exit appears in raw process trace')
+    index=load(root/'execution-index.json');need(index['sourceHead']==SOURCE and index['mainSha256']==MAIN and index['observerPid']==summary['pid'] and len(index['executions'])==8,'Actual sequential theory/process provenance index')
+    need(len(cases)==8 and [c['name'] for c in cases]==list(EXPECT) and len(summary['cases'])==8,'Eight separate whole manual theories, no automatic union')
+    outcomes={};case_hashes={};details={}
+    for ordinal,(case,record,process,binding) in enumerate(zip(cases,summary['cases'],executions,index['executions'])):
+        name=case['name'];folder=attempt/name;expected_source,expected_status=EXPECT[name];source_raw=(folder/'source.kif').read_bytes();prepared=load(folder/'prepared.json');input_raw=(folder/'input.json').read_bytes();data=manual_input(source_raw,prepared,input_raw);result=load(folder/'result.json')
+        need(source_raw==expected_source==(root/case['file']).read_bytes()==(attempt/case['file']).read_bytes() and cid(source_raw)==case['sourceCid'] and len(source_raw)==case['bytes'],'Exact supplied original/new-control source bytes and full source CID')
+        query='(mayRead Harbor Lark)' if name=='reversed-goal' else '(mayRead Lark Harbor)';need(case['query']==query and data['query']==ground(query),'Exact independent selected ground query; no role reversal normalization')
+        need(data['sumoNixRevision']==SUMO and data['mlirNixRevision']==MLIR and data['schema']=='sumo-nix-positive-horn/1','Exact source compiler revision/semantics pins')
+        frame_bytes=(folder/'frame.cbor').read_bytes();need(frame_bytes==canonical({k:v for k,v in data.items() if k!='frameId'}) and cid(frame_bytes)==data['frameId'],'Derived frame-domain CBOR preimage, not a CAS artifact/native stdout')
+        need(result['kind']=='host-manual-horn-result/1' and result['policy']==prepared['policy']=='host-manual-whole-positive-horn/1' and result['authority']=='declared-host-manual-assumptions-only' and result['reviewAuthority']=='not-established' and result['currentness']=='not-checked' and result['worldObligationApplicability']=='UNKNOWN','Host manual assumed source label grants no independent review/current/world authority')
+        need(result['nativeBinarySha256']==BINARY and result['nativeAdapterSha256']==ADAPTER and result['wallLimitMillis']==45000 and result['outputLimitBytes']==1048576 and result['memoryIsolationProvided'] is result['networkIsolationProvided'] is False,'Actual fixed native caps/pins; no helper-provided memory/network isolation')
+        need(result['firstProofOnly'] is True and result['ontology'] is None and result['semantics']==data['semantics'] and result['sumoNixRevision']==SUMO and result['scope']==data['scope'] and result['query']==data['query'] and result['revision']==data['revision'] and result['excluded']==[],'Actual positive scalar first-proof contract, no hidden ontology/exclusions')
+        need(result['inputCid']==prepared['inputCid'] and result['frameId']==prepared['frameId'] and result['source']==prepared['source'] and result['sourceForms']==prepared['sourceForms'],'Exact source/input/frame export identities and all normalized form references')
+        need(case['expectedStatus']==result['status']==record['status']==expected_status and record['case']==case and record['inputCid']==result['inputCid'] and record['frameId']==result['frameId'] and record['sourceCid']==case['sourceCid'],'Actual separate result/status provenance without relabelling original controls')
+        raw=load(folder/'native-proof-structure.json');checked=load(folder/'checked-proof.json');need(raw==result['proof'] and checked==result['checkedProof'],'Host serialized raw proof STRUCTURE is unchanged sibling of additive checked projection; no raw stdout bytes claim')
+        expected_checked=checked_projection(raw,data,result['inputCid']);need(expected_checked==checked,'Independent finite certificate walk exactly matches ordered typed/source-scoped checked binding receipt')
+        need((expected_status=='UNKNOWN')==(raw is None) and (raw is None)==(checked is None),'UNKNOWN has no certificate/binding receipt; not negative truth')
+        if checked is not None:
+            steps=checked['steps'];need([s['path'] for s in steps]==[[0],[1],[]] and [s['normalForm'] for s in steps[:2]]==['(assignedTo Lark Harbor)','(authorized Lark Access)'] and steps[-1]['rule']=='mayRead#1','Actual ordered role-join source premises and root')
+            need([b['term'] for b in steps[-1]['bindings']]==[{'kind':'constant','token':'Lark'},{'kind':'constant','token':'Harbor'}] and len(steps[-1]['premises'])==2,'Exact rule-scoped operator/resource typed substitutions, no repeated-witness votes')
+            if name=='duplicate-authorization':need(len(steps[1]['sourceNodeIds'])==2 and len(set(steps[1]['sourceNodeIds']))==2 and steps[1]['witnessMode']=='any-one-asserted-source','Two repeated source occurrences remain alternative asserted witnesses')
+        need(record['nativeChildrenAfter']==[] and 0<=record['elapsedMillis']<=45000,'Actual per-call deadline observation and no surviving child')
+        need(binding['case']==name and binding['nativePid']==process['pid'] and binding['nativeExit']==0 and binding['argv']==process['argv'] and binding['sourceCid']==case['sourceCid'] and binding['inputCid']==result['inputCid'] and binding['frameId']==result['frameId'] and binding['status']==result['status'] and binding['elapsedMillis']==record['elapsedMillis'] and binding['inputPathRemoved'] is True,'Actual ordered observer case→straced PID/input/result provenance binding')
+        need(process['inputPath'].startswith(command[-2]+'/tmp/trikeshed-horn-') and process['inputPath'].endswith('/input.json'),'Actual per-call temporary input path, captured removal rather than CAS fetch claim')
+        outcomes[name]=result['status'];details[name]={'sourceCid':case['sourceCid'],'inputCid':result['inputCid'],'frameId':result['frameId'],'status':result['status'],'nativePid':process['pid'],'sourceForms':len(prepared['sourceForms']),'checkedSteps':0 if checked is None else len(checked['steps'])};case_hashes[name]={n:sha((folder/n).read_bytes()) for n in ['source.kif','input.json','prepared.json','frame.cbor','result.json','native-proof-structure.json','checked-proof.json']}
+    need(cid(S5)=='sha256:0a1ab3d15d9e8e453e7467ba5ae170defded7244bdca7b4047d414773706bf9f' and cid(S6)=='sha256:5427aad52ecd1e911128a54c00021bbaa7bce382d240e83698815a48501180e3','Original supplied S5/S6 immutable hash pins')
+    need(details['positive-new']['sourceCid'] not in [details['S5-original']['sourceCid'],details['S6-original']['sourceCid']] and details['positive-new']['inputCid']!=details['S6-original']['inputCid'] and details['positive-new']['frameId']!=details['S6-original']['frameId'],'New positive is a distinct source/input/frame, never a new label for original S6')
+    need(details['remove-one-authorization']['inputCid']==details['positive-new']['inputCid'] and details['remove-last-authorization']['inputCid']==details['S6-original']['inputCid'],'Removal controls legitimately restore equal whole bytes/identities, not invented distinct receipts')
+    network=load(attempt/'network.json');outside=load(attempt/'controller-before-netns.json');need(network['networkNamespace']!=outside['networkNamespace'] and {i['ifname'] for i in network['interfaces']}=={'lo'} and 'UP' in network['interfaces'][0]['flags'] and network['routes']==[] and network['externalTcp']['errno']==101,'Actual external loopback-only namespace, not full rootfs/R4 seal')
+    namespace=load(attempt/'namespace-command.json');need(namespace==['unshare','--user','--map-root-user','--net','python3',command[-3]+'/run.py','--inside',command[-2],go['snapshot'],cp['observerClasses']],'Actual private-user/netns observer command')
+    controls=[];positive_folder=attempt/'positive-new';data=load(positive_folder/'input.json');raw=load(positive_folder/'native-proof-structure.json');checked=load(positive_folder/'checked-proof.json');prepared=load(positive_folder/'prepared.json')
+    def rejects(label,fn):
+        try:fn()
+        except (AuditError,ValueError,KeyError,TypeError,StopIteration):controls.append({'mutation':label,'result':'REJECTED'})
+        else:raise AuditError('Mutated copy accepted: '+label)
+    bad=copy.deepcopy(checked);bad['steps'][-1]['bindings'][0]['term']['token']='Harbor';rejects('substituted-operator-binding',lambda:need(checked_projection(raw,data,prepared['inputCid'])==bad,'Typed binding differs from ordered raw source match'))
+    bad=copy.deepcopy(raw);bad['from'].reverse();rejects('reversed-ordered-premises',lambda:checked_projection(bad,data,prepared['inputCid']))
+    bad=copy.deepcopy(raw);bad['from'][0]['sources']=copy.deepcopy(bad['from'][1]['sources']);rejects('wrong-source-for-asserted-premise',lambda:checked_projection(bad,data,prepared['inputCid']))
+    bad=copy.deepcopy(checked);bad['steps'][-1]['bindings'][0]['term']={'kind':'literal','spelling':'"Lark"'};rejects('constant-substituted-as-literal',lambda:need(checked_projection(raw,data,prepared['inputCid'])==bad,'Literal spelling cannot replace source constant token'))
+    bad=copy.deepcopy(prepared);bad['frameId']='sha256:'+'0'*64;rejects('wrong-frame-domain-identity',lambda:manual_input(POSITIVE,bad,(positive_folder/'input.json').read_bytes()))
+    bad=copy.deepcopy(raw);bad['fact']='(mayRead Harbor Lark)';rejects('raw-proof-root-query-mismatch',lambda:checked_projection(bad,data,prepared['inputCid']))
+    names=['GO.json','startup.json','summary.json','native-processes.json','process.trace','observer-command.json','trace-command.json','classpath.json','native-pins-before.json','native-pins-after.json','network.json','namespace-command.json']
+    return {'result':'PASS_RECORDED_NATIVE_HORN_CERTIFICATE_CONSISTENCY','sourceHead':SOURCE,'mainSha256':MAIN,'observerPid':summary['pid'],'caseStatus':outcomes,'statusPopulation':{'SUPPORTED':sum(v=='SUPPORTED' for v in outcomes.values()),'UNKNOWN':sum(v=='UNKNOWN' for v in outcomes.values())},'cases':details,'caseArtifactSha256':case_hashes,'nativeProcessCounts':counts,'nativePins':native_before,'mutatedCopyControls':controls,'recordSha256':{n:sha((attempt/n).read_bytes()) for n in names}|{'execution-index.json':sha((root/'execution-index.json').read_bytes()),'cases.json':sha((root/'cases.json').read_bytes()),'native-profile.json':sha((root/'native-profile.json').read_bytes())},'observerSourceSha256':{p.name:sha(p.read_bytes()) for p in sorted((attempt/'observer-inputs').iterdir()) if p.is_file()},'externalArtifactVerification':'actual external JVM/native JAR/binary bytes additionally rehashed' if args.check_external_artifacts else 'recorded runtime metadata only; executable/native-library availability not checked','scope':'Finite supplied-certificate/source/input/typed-binding consistency, no independent Horn search or unknown-result completeness proof. Actual eight trusted HOST manual fixture theories; assumed APPROVED metadata is not authenticated review/currentness/source/legal authority. Native proof STRUCTURE is preserved, not original stdout bytes. Form ordinals/normalized atoms and rule-scoped variable references are not source spans/quotes/entity IDs. Repeated witnesses are alternatives, not votes. No English/NLP/model/NARS admission/public endpoint/global union/full rootfs/loaded-library closure or hardware durability claim.'}
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('proof',type=Path);parser.add_argument('--source-head',required=True);parser.add_argument('--main-sha',required=True);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--check-external-artifacts',action='store_true');args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    try:result=audit(args.proof,args)
+    except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:result={'result':'FAIL','error':str(error)}
+    result['auditScriptSha256']=sha(Path(__file__).read_bytes());result['supportSha256']={n:sha(Path(__file__).with_name(n).read_bytes()) for n in ['checks.py','receipt-core.py.txt']}
+    (args.out/'result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
+    lines=[result['result'],result.get('scope',result.get('error',''))]
+    if result['result'].startswith('PASS'):
+        lines+=['Source '+SOURCE+'; external main '+MAIN+'; actual observer PID '+str(result['observerPid'])+'. No JVM/native solver or build run by this auditor.',
+          'Eight separate actual manual theories: three SUPPORTED (new positive, duplicate authorization, remove-one); five UNKNOWN (original S5/S6, remove-last, mismatched authorization, reversed goal). Original source hashes unchanged; no automatic union or positive relabelling of S5/S6.',
+          'Whole-source bytes/all normalized form ordinals, manual-form/source-node canonical CBOR IDs, raw compiler JSON inputCid and separate frame-domain CBOR/frameId verified. Equal bytes in removal controls legitimately restore equal identities.',
+          'Finite supplied-certificate walk matches raw proof STRUCTURE and additive checkedProof: ordered child paths, exact asserted/rule source receipts, shared ?operator=Lark/?resource=Harbor substitutions and constant.token/literal.spelling types. No independent theorem search or UNKNOWN completeness proof.',
+          'Repeated authorization has two distinct alternative source IDs and any-one-asserted-source witness mode; required premises stay exactly assignedTo then authorized. No vote, confidence or evidence multiplication.',
+          'Source references are normalized atoms/form ordinals and rule-scoped original variable references, not source spans or exact quotations/entity CIDs. Raw source is supplied separately. Raw native stdout bytes are not retained/claimed.',
+          'Raw process trace independently confirms eight native child PIDs, eight initial execve calls plus eight same-PID /proc/self/exe reexecs, all exit0. Ordered execution index binds case/source/input/frame identities; captured temporary input removal and zero surviving children agree.',
+          'Final main-only origins, exact bounded reflection of trusted internal manualInput/manualTheory, external120JAR classpath/no overlays/friends, binary/adapter/datalog pins and 45s/1MiB caps checked as recorded. Manual APPROVED metadata is a host assumption, not authenticated approval/currentness/world legal authority.',
+          'External loopback namespace onlyloUP/routes[]/ENETUNREACH recorded. Native helper explicitly supplies no memory/network isolation; declared ELF linkage is not a loaded-library trace or complete closure. No English/NLP/model/NARS admission or public reviewed endpoint claim.',
+          'Six proportional mutants rejected: operator substitution, premise order, asserted source, constant-to-literal type, frame identity and raw root/query mismatch. '+result['externalArtifactVerification']+'.']
+    (args.out/'report.txt').write_text('\n'.join(lines)+'\n');print(json.dumps({'result':result['result'],'error':result.get('error'),'out':str(args.out)}));raise SystemExit(0 if result['result'].startswith('PASS') else 1)
