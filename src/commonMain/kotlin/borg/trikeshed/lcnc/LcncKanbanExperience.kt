@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.forge.sheet.SheetSeed
 import borg.trikeshed.forge.sheet.confixSheets
@@ -241,9 +242,10 @@ class LcncKanbanExperience(
             },
             "confix.pickPath" to LcncNodeRunner { node, inputs ->
                 fun input(port: String): Any? = inputs[port] ?: inputs["$port?"]
-                val json = (input("data") ?: input("json") ?: node.params["json"])
-                    ?.toString()
+                val value = (input("data") ?: input("json") ?: node.params["json"])
                     ?: error("confix.pickPath: json input or param required")
+                // Text retains its original byte geometry; structured JSON ports need JSON, not Map.toString().
+                val json = if (value is String) value else jsonOf(value)
                 val path = required(node, "path")
                 if (node.params["geometry"] == "native" || inputs.keys.any { it.removeSuffix("?") in _s["rows", "sourceCid", "ok", "format"] })
                     return@LcncNodeRunner LcncConfixSelection.select(json, path, input("rows"), input("sourceCid"), input("ok"), input("format"))

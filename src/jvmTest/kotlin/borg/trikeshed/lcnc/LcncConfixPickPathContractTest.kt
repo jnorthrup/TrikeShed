@@ -4,6 +4,8 @@ import borg.trikeshed.job.*
 import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.Syntax
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyStrict
 import kotlinx.coroutines.*
 import kotlin.test.*
 
@@ -84,6 +86,21 @@ class LcncConfixPickPathContractTest {
             val result = select(runners, large, "/").nodeOutputs.getValue("selection")
             assertEquals(true, result["found"], "The Kotlin path must not inherit the native 65536-byte scan limit")
             assertEquals("é".repeat(33_000), result["value"])
+        } }
+    }
+
+    @Test fun structuredJsonPortSerializesQuotesUnicodeArraysAndNullBeforeSelection(): Unit = runBlocking {
+        withTimeout(10_000) { registry { runners ->
+            val value = _l[_m["quote" j "é水🙂 \"x\"", "flags" j _l[false, null]]]
+            val json = jsonOf(value)
+            val selected = runners.getValue("confix.pickPath").run(
+                LcncNode("selection", "confix.pickPath", _m["path" j "0"]), _m["json?" j value])
+            assertEquals(true, selected["found"])
+            assertEquals((reifyStrict(json) as List<*>).first(), selected["value"])
+            assertEquals(ContentId.of(json.encodeToByteArray()).value, selected["sourceCid"])
+            assertEquals(_m["open" j 1, "close" j (json.encodeToByteArray().size - 2),
+                "unit" j "utf8-byte-inclusive"], selected["byteSpan"])
+            assertEquals("kotlin", selected["geometry"])
         } }
     }
 
