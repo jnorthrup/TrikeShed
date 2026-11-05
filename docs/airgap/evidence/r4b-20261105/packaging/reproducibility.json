@@ -1,0 +1,14 @@
+{
+  "first": {
+    "file": "/workspace/library-files/airgap-document-r4b-linux-x64-2026-11-05.tar.gz",
+    "bytes": 460512553,
+    "sha256": "065ca62ee7d4e75a0564440a70736b22b548ca7699479f516becf9245916fbfa"
+  },
+  "second": {
+    "file": "/workspace/airgap-r4b-proof/reproducibility-second.tar.gz",
+    "bytes": 460512553,
+    "sha256": "065ca62ee7d4e75a0564440a70736b22b548ca7699479f516becf9245916fbfa"
+  },
+  "identical": true,
+  "scope": "Deterministic packaging of the same pinned files; not source-build reproducibility"
+}

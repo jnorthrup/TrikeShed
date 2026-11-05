@@ -1,0 +1,6 @@
+From https://github.com/jnorthrup/TrikeShed
+ * [new branch]          codex/english-corpus-topics-port-20261105 -> origin/codex/english-corpus-topics-port-20261105
+ * [new branch]          codex/reviewed-proof-query-integration-20261105 -> origin/codex/reviewed-proof-query-integration-20261105
+ * [new branch]          codex/reviewed-taxonomy-proof-graph-20261105 -> origin/codex/reviewed-taxonomy-proof-graph-20261105
+ * [new branch]          codex/reviewed-taxonomy-query-ui-20261105 -> origin/codex/reviewed-taxonomy-query-ui-20261105
+ * [new branch]          feat/reviewed-proof-query-owner-20261105 -> origin/feat/reviewed-proof-query-owner-20261105

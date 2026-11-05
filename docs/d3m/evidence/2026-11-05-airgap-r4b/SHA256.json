@@ -1,0 +1,9 @@
+{
+  ".gitattributes": "e97602ab9cac70102245345c5ab0fc9830df8b17f1072b188265a662a3a547ae",
+  "fetch.txt": "a3b8475d0ac26575e9e315e8140cab787094b5ade140e2612c1d253269961acf",
+  "integrate.py.txt": "fc2257fb780b46b5a54c668522553b825e5e3f2d5f55ae2528d43383e6a247c6",
+  "integration-inputs.json": "9d9ecdc9d2c4888163291f67827374419ce1567f4be82ee50ce3636158df21ba",
+  "integration-result.txt": "9ed3dc6c44254bf0e42310d2edbcee43c6d9029a0d5a095a8fdb03c736cb20fa",
+  "integration-steps.json": "daee34d65983566035bf37fdc88a1b5414d2ed0b3792135c978b3209e144caa1",
+  "remote-heads.txt": "dad87d805924e2293f44f7ab4800c95d29bf9588b0c22a74a3d69cd7fb475bc4"
+}

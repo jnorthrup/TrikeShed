@@ -1,0 +1,12 @@
+{
+  "casObjectsVerified": 27,
+  "identicalRunRowsAcrossProcesses": true,
+  "runs": 1,
+  "quoteMatchesUtf16Range": true,
+  "physicalPage": 10,
+  "consumedWires": 8,
+  "receiptCid": "sha256:ec34d582b264efa1f08f8aedbce989c651ce42f7ef63868be839d6182b1b7874",
+  "programCid": "sha256:4f5f4ae039a082c5973118a4fd9c09534151474cf9d1b868c20a3887b088c1d4",
+  "invocationsCid": "sha256:45cce9fc3beaed24ce73e347902bf502e960dd66fdd09c4e3dfc9a5af090a983",
+  "nativeLiveBytesAfter": 0
+}

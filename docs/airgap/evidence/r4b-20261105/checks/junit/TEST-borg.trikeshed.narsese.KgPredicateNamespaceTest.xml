@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="KgPredicateNamespaceTest[jvm]" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T02:55:26.830Z" hostname="0d6dfba25614" time="0.007">
+  <properties/>
+  <testcase name="arbitraryNamespacesAndCaseLookalikesCannotSupplyTypeCausalityOrNegation()[jvm]" classname="borg.trikeshed.narsese.KgPredicateNamespaceTest" time="0.002"/>
+  <testcase name="barePolicyAliasesRemainWholeTokensWithoutIriOrWhitespaceRepair()[jvm]" classname="borg.trikeshed.narsese.KgPredicateNamespaceTest" time="0.0"/>
+  <testcase name="ownedLcncCausalProjectionKeepsOnlyItsExactDeclaredPredicate()[jvm]" classname="borg.trikeshed.narsese.KgPredicateNamespaceTest" time="0.002"/>
+  <testcase name="customCausalAndNegativeRdfCannotBecomeEternalRulesOrNegativeEvidence()[jvm]" classname="borg.trikeshed.narsese.KgPredicateNamespaceTest" time="0.001"/>
+  <testcase name="strictRdfExpansionUsesTheNamespaceInsteadOfThePrefixName()[jvm]" classname="borg.trikeshed.narsese.KgPredicateNamespaceTest" time="0.001"/>
+  <testcase name="genuineExpandedRdfRdfsAndOwlPredicatesKeepTheirDeclaredNalProjection()[jvm]" classname="borg.trikeshed.narsese.KgPredicateNamespaceTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

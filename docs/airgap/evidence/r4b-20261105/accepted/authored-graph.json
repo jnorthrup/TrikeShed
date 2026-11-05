@@ -1,0 +1,141 @@
+{
+  "nodes": [
+    {
+      "id": "document",
+      "type": "json.value",
+      "x": 30,
+      "y": 800,
+      "params": {
+        "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:73d9aa7d099d81bc46d54e4e02ca35f69f3974ea47336ebf1b0e08bb428eea55\", \"seq\":0.0}, \"extraction\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf.extract.md\", \"cid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"rev\":\"1-sha256:c64a5be6763021aa23699f63157f17a7e5c4e3fd76938f5b1fb7ae814dbb84db\", \"seq\":3.0}, \"sourceCid\":\"sha256:3ab7a9d6915206181942c0238b8e7b08156abd24ff22eed4ab519ff8379a84d6\"}"
+      }
+    },
+    {
+      "id": "source",
+      "type": "document.source",
+      "x": 30,
+      "y": 60,
+      "params": {
+        "view": "reference"
+      }
+    },
+    {
+      "id": "passages",
+      "type": "document.spans",
+      "x": 460,
+      "y": 60,
+      "params": {
+        "offset": "18477",
+        "count": "1",
+        "spanChars": "200",
+        "maxBytes": "8192"
+      }
+    },
+    {
+      "id": "scan",
+      "type": "vm.llvm.confix",
+      "x": 890,
+      "y": 60,
+      "params": {
+        "format": "JSON"
+      }
+    },
+    {
+      "id": "selection",
+      "type": "confix.pickPath",
+      "x": 1320,
+      "y": 60,
+      "params": {
+        "path": "spans.0.quotation",
+        "geometry": "native"
+      }
+    }
+  ],
+  "wires": [
+    {
+      "from": [
+        "document",
+        "value"
+      ],
+      "to": [
+        "source",
+        "source?"
+      ]
+    },
+    {
+      "from": [
+        "source",
+        "source"
+      ],
+      "to": [
+        "passages",
+        "source"
+      ]
+    },
+    {
+      "from": [
+        "passages",
+        "data"
+      ],
+      "to": [
+        "scan",
+        "data?"
+      ]
+    },
+    {
+      "from": [
+        "passages",
+        "data"
+      ],
+      "to": [
+        "selection",
+        "data?"
+      ]
+    },
+    {
+      "from": [
+        "scan",
+        "rows"
+      ],
+      "to": [
+        "selection",
+        "rows?"
+      ]
+    },
+    {
+      "from": [
+        "scan",
+        "sourceCid"
+      ],
+      "to": [
+        "selection",
+        "sourceCid?"
+      ]
+    },
+    {
+      "from": [
+        "scan",
+        "ok"
+      ],
+      "to": [
+        "selection",
+        "ok?"
+      ]
+    },
+    {
+      "from": [
+        "scan",
+        "format"
+      ],
+      "to": [
+        "selection",
+        "format?"
+      ]
+    }
+  ],
+  "seq": 1,
+  "view": {
+    "x": 245,
+    "y": 20,
+    "z": 0.8
+  }
+}
