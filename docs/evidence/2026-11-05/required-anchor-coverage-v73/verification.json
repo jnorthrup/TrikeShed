@@ -1,0 +1,747 @@
+{
+  "kind": "required-anchor-final-jar-verification/1",
+  "status": "PASS",
+  "scope": "Supplied annotation controls only; no predictor, proof verifier, training, bag, review or source mutation.",
+  "rootGo": "08dd94f6cf88e1fb002291bcc3b2195a9f426608-GREEN-v73-72f74004dc435f869787d6d77e04eddbd31927065894bbe4e4f908245636a87a",
+  "sourceHead": "08dd94f6cf88e1fb002291bcc3b2195a9f426608",
+  "mainJarSha256": "72f74004dc435f869787d6d77e04eddbd31927065894bbe4e4f908245636a87a",
+  "checks": [
+    {
+      "name": "frozen snapshot metadata exists",
+      "passed": true
+    },
+    {
+      "name": "classpath is JAR-only and begins with frozen main",
+      "passed": true
+    },
+    {
+      "name": "classpath has no duplicate or live class directories",
+      "passed": true
+    },
+    {
+      "name": "main hash agrees with freeze manifest",
+      "passed": true
+    },
+    {
+      "name": "all classpath dependency origins match freeze hashes",
+      "passed": true
+    },
+    {
+      "name": "extended manifest only adds requirements to original sixteen cases",
+      "passed": true
+    },
+    {
+      "name": "six explicit nonempty requirement declarations",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S1",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S1:0",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S1",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S2",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S2:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S2:21",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S2",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S3",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S3:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S3:18",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S3",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S4",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S4:0",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S4",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S5",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S5:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S5:59",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S5:103",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S5",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S6",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S6:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S6:59",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S6",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S7",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S7:0",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S7",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S8",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S8:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S8:47",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S8",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S9",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S9:0",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S9",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S10",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S10:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S10:38",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S10",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S11",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S11:0",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S11",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID S12",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S12:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S12:20",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S12:40",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S12:63",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span S12:86",
+      "passed": true
+    },
+    {
+      "name": "required exact subset S12",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID C1",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span C1:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span C1:21",
+      "passed": true
+    },
+    {
+      "name": "required exact subset C1",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID C2",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span C2:0",
+      "passed": true
+    },
+    {
+      "name": "required exact subset C2",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID C3",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span C3:99",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span C3:120",
+      "passed": true
+    },
+    {
+      "name": "required exact subset C3",
+      "passed": true
+    },
+    {
+      "name": "source bytes and independent case CID C4",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span C4:0",
+      "passed": true
+    },
+    {
+      "name": "exact role/source/span C4:39",
+      "passed": true
+    },
+    {
+      "name": "required exact subset C4",
+      "passed": true
+    },
+    {
+      "name": "thirty source anchor spans checked",
+      "passed": true
+    },
+    {
+      "name": "legacy-prepare expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "legacy-prepare exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "legacy-prepare blind request fields and source bytes",
+      "passed": true
+    },
+    {
+      "name": "legacy blind request whole report unchanged",
+      "passed": true
+    },
+    {
+      "name": "extended-prepare expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "extended-prepare exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "extended-prepare blind request fields and source bytes",
+      "passed": true
+    },
+    {
+      "name": "legacy-partial expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "legacy-partial exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "legacy-partial exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "legacy-partial all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "legacy semantic fields exactly equal frozen v71 report",
+      "passed": true
+    },
+    {
+      "name": "legacy metric undeclared and null rate",
+      "passed": true
+    },
+    {
+      "name": "extended-empty-seat expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "extended-empty-seat exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "extended-empty-seat exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "extended-empty-seat all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "empty seat stays MISSING16 UNKNOWN0 with null rates",
+      "passed": true
+    },
+    {
+      "name": "extended-partial expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "extended-partial exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "extended-partial exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "extended-partial all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "partial S2 keeps old grounded agreement but covers only exact p1",
+      "passed": true
+    },
+    {
+      "name": "extended-full expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "extended-full exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "extended-full exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "extended-full all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "full S2 covers exact p1 and p2",
+      "passed": true
+    },
+    {
+      "name": "partial summary denominator is one comparable among six declared",
+      "passed": true
+    },
+    {
+      "name": "partial S6 explicit UNKNOWN remains undeclared",
+      "passed": true
+    },
+    {
+      "name": "full summary denominator is one comparable among six declared",
+      "passed": true
+    },
+    {
+      "name": "full S6 explicit UNKNOWN remains undeclared",
+      "passed": true
+    },
+    {
+      "name": "bad-quote expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "bad-quote exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "bad-quote exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "bad-quote all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "bad-quote cannot enter comparable denominator or claim complete coverage",
+      "passed": true
+    },
+    {
+      "name": "bad-quote old integrity/acceptance rejects padded evidence",
+      "passed": true
+    },
+    {
+      "name": "wrong-role expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "wrong-role exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "wrong-role exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "wrong-role all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "wrong-role cannot enter comparable denominator or claim complete coverage",
+      "passed": true
+    },
+    {
+      "name": "wrong-role old integrity/acceptance rejects padded evidence",
+      "passed": true
+    },
+    {
+      "name": "duplicate-quote expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "duplicate-quote exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "duplicate-quote exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "duplicate-quote all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "duplicate-quote cannot enter comparable denominator or claim complete coverage",
+      "passed": true
+    },
+    {
+      "name": "duplicate-quote old integrity/acceptance rejects padded evidence",
+      "passed": true
+    },
+    {
+      "name": "spurious-padding expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "spurious-padding exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "spurious-padding exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "spurious-padding all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "spurious-padding cannot enter comparable denominator or claim complete coverage",
+      "passed": true
+    },
+    {
+      "name": "spurious-padding old integrity/acceptance rejects padded evidence",
+      "passed": true
+    },
+    {
+      "name": "wrong-label expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "wrong-label exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "wrong-label exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "wrong-label all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "quote coverage is independent of label agreement",
+      "passed": true
+    },
+    {
+      "name": "unknown-empty-quotes expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "unknown-empty-quotes exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "unknown-empty-quotes exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "unknown-empty-quotes all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "nonempty requirements prevent vacuous UNKNOWN quote coverage",
+      "passed": true
+    },
+    {
+      "name": "duplicate-predictions expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "duplicate-predictions exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "duplicate-predictions exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "duplicate-predictions all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "duplicate predictions stay INVALID_PREDICTION without quote comparison",
+      "passed": true
+    },
+    {
+      "name": "empty-requirements expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "empty-requirements exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "empty-requirements exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "empty-requirements all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "empty-requirements is invalid fixture without coverage",
+      "passed": true
+    },
+    {
+      "name": "empty-requirements-prepare-refusal expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "empty-requirements-prepare-refusal refusal emits no report",
+      "passed": true
+    },
+    {
+      "name": "duplicate-requirements expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "duplicate-requirements exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "duplicate-requirements exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "duplicate-requirements all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "duplicate-requirements is invalid fixture without coverage",
+      "passed": true
+    },
+    {
+      "name": "duplicate-requirements-prepare-refusal expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "duplicate-requirements-prepare-refusal refusal emits no report",
+      "passed": true
+    },
+    {
+      "name": "wrong-role-requirement expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "wrong-role-requirement exact manifest origin",
+      "passed": true
+    },
+    {
+      "name": "wrong-role-requirement exact prediction origin and metric scopes",
+      "passed": true
+    },
+    {
+      "name": "wrong-role-requirement all sixteen case identities unchanged",
+      "passed": true
+    },
+    {
+      "name": "wrong-role-requirement is invalid fixture without coverage",
+      "passed": true
+    },
+    {
+      "name": "wrong-role-requirement-prepare-refusal expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "wrong-role-requirement-prepare-refusal refusal emits no report",
+      "passed": true
+    },
+    {
+      "name": "wrong-type-refusal expected process outcome",
+      "passed": true
+    },
+    {
+      "name": "wrong-type-refusal refusal emits no report",
+      "passed": true
+    },
+    {
+      "name": "frozen classpath hashes unchanged across every attempt",
+      "passed": true
+    },
+    {
+      "name": "fixture input hashes unchanged across every attempt",
+      "passed": true
+    }
+  ],
+  "commandCount": 20,
+  "exitZero": 16,
+  "expectedRefusals": 4,
+  "records": "cli-records.jsonl",
+  "mutationInputs": "mutation-inputs.jsonl",
+  "originalAttempt": "/workspace/library-files/required-anchor-coverage-v73-proof/attempt-20261105T003944.144996Z",
+  "originalSummarySha256": "a05dd25a6367df089c4d43f85197ee9ebcb05ef069dcb1aa74f5c9f1b505d4c0",
+  "originalOutputSha256": {
+    "fixture-origins.json": "32751c5d61b9a1b110c11763cf93fbce9760b10fc1d63188687d2c91d7d25484",
+    "inputs/bad-quote-predictions.json": "6c804026cc6c18745f4cdd14dbabdfd1ffd9dd464eed2f268e1d2e413ea46a2f",
+    "inputs/controls-scorer-contract-predictions.json": "231135e72f97cbeb704de0cb28a52cf0591106f705e4c7a3c5b0134fe6416f1d",
+    "inputs/controls-scorer-contract-report.json": "2e0995c098bd6003d29e0189fd3081e1813ebc52fe1a65e83cd5ce3db5a87eb2",
+    "inputs/duplicate-predictions.json": "9f856bcfb753c5db728d761b92572ab5c7a5ae700650b2741be2586d08211486",
+    "inputs/duplicate-quote-predictions.json": "578c11ace9cc26353ad340c29df91a2df54343aa01f4cef5fb72803c212182bd",
+    "inputs/duplicate-requirements-manifest.json": "200a24ff01186b476138f37e33084703c51dc364e8ba5f47d8898cb891782fb9",
+    "inputs/empty-requirements-manifest.json": "d49e409d3e0bf2b0029e11c42dacf8cce787196101b69f16cd524706f07bac02",
+    "inputs/english-symbol-corpus-blind-requests.json": "a7c4bb32ca89f3093ccf33d127c438dc1063c9f3b17f4a74a8401c99f4345258",
+    "inputs/english-symbol-corpus-empty-seat-predictions.json": "d4789dc81ab5a46ea31aefbd70883c285897504df6df2f3a9f6219ae220e24c6",
+    "inputs/english-symbol-corpus-manifest.json": "26d79580865b88174c0a4d4443d9859080348700f922d54ea56b18ea6c556bc8",
+    "inputs/legal-required-anchor-coverage-full-anchor-predictions.json": "a03ea65ff22e52677dacc14d3cf1ee67c20032b6ae84a33a6fb856c644a99145",
+    "inputs/legal-required-anchor-coverage-manifest.json": "6e4eeba1fca2d0fd297a996218d26d1daea23c14383a07ff26be0b7442127fff",
+    "inputs/snapshot-classpath.txt": "9428787d9d77159023e96538d839f8582835e014647000febb3f4acd23f4e9e5",
+    "inputs/snapshot-sha256.json": "03254564c14ca6af4c1c23ab42e232d936467ba5cc68cf7a2f38972316f1c0fa",
+    "inputs/snapshot-source-head.txt": "d8c17c4e83935d7ff3ecedf0edd48ab226033191e591400881735938eb637b7a",
+    "inputs/spurious-padding-predictions.json": "b81d0a001dd8832dc3b440098c87f6ccc0464d6844ceff0249dbd51126af2304",
+    "inputs/unknown-empty-quotes-predictions.json": "7e7c3addd1c69eeb08c4044ea86e5f5d66620ff0d1ab4fa856adf9dac10df605",
+    "inputs/wrong-label-predictions.json": "3e8d30910236fc5fac4765fd1fb01ac21a64ecd7d840d8b5211c6c840d68ac98",
+    "inputs/wrong-role-predictions.json": "3eff76a10f57c4250c990d26a82d379a740919af6e07a06b84c488ec1c04e03a",
+    "inputs/wrong-role-requirement-manifest.json": "0bc721b470ad080ed2b43c14064e778ff31bbbe13cf6f95ecbd5af4d373c052c",
+    "inputs/wrong-type-manifest.json": "dca9b64ebe0dc0bcee6663e5a20eb934908a704e7ce77314779cfaf62eca797a",
+    "origins.json": "259b8f4f67e1f2ecfe69f5f689620ac3de1eef950a14bb53fc5189e95cc5f3e6",
+    "outputs/bad-quote.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/bad-quote.stdout.json": "bcc883097dfa6317ef846e75594fb1df248a7f62255a88034fa1f67da0469e27",
+    "outputs/duplicate-predictions.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/duplicate-predictions.stdout.json": "743d5a5b084dac0c68e0be9c1517e374d5b759c0ca4535c7ff4b31c096182322",
+    "outputs/duplicate-quote.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/duplicate-quote.stdout.json": "f2cb7596b7e095a7233920db0d17e250cd9b95d9cefd5ad9cdc4913b7d2cc779",
+    "outputs/duplicate-requirements-prepare-refusal.stderr.txt": "a49b490ec93edcea8601fe1d5b1a29afac75d16e7f533cebb4435a5d5a2e29a5",
+    "outputs/duplicate-requirements-prepare-refusal.stdout.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/duplicate-requirements.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/duplicate-requirements.stdout.json": "dafa6b5937e3a58dfdf8e84cb135802b7f383d28e7a6df38d595136a55af9b4d",
+    "outputs/empty-requirements-prepare-refusal.stderr.txt": "a49b490ec93edcea8601fe1d5b1a29afac75d16e7f533cebb4435a5d5a2e29a5",
+    "outputs/empty-requirements-prepare-refusal.stdout.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/empty-requirements.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/empty-requirements.stdout.json": "9d7db73b3db40ad7519f5d363aa8b4edbdc366fe6de759880ec4c7362f48ddfa",
+    "outputs/extended-empty-seat.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/extended-empty-seat.stdout.json": "3167ff074c390f82269222ff0ae3dd6f38b0ab211af7dfaee1c63cfae1319556",
+    "outputs/extended-full.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/extended-full.stdout.json": "a21c76b2b67e3bf0f7fa693837d352fcb90d754d6e86ca0f86c7477ca55aefe8",
+    "outputs/extended-partial.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/extended-partial.stdout.json": "eccfbe75a30d3528ab42507813616eca8a0b902bf9093682379922249a94d559",
+    "outputs/extended-prepare.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/extended-prepare.stdout.json": "d0b2a9771c75184e4bed3fcee33fb04f2ffcc5b0e9a33cc875a9f63d03b81d73",
+    "outputs/legacy-partial.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/legacy-partial.stdout.json": "136c4b0343445a3ac6956a9370599d5b08b4200af46f353003b1d3e93d9d4e58",
+    "outputs/legacy-prepare.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/legacy-prepare.stdout.json": "a7c4bb32ca89f3093ccf33d127c438dc1063c9f3b17f4a74a8401c99f4345258",
+    "outputs/spurious-padding.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/spurious-padding.stdout.json": "dbc8debb0aeebda703a61d661af464d58c7a2dcc81d07c286f1d8dca4a7a803d",
+    "outputs/unknown-empty-quotes.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/unknown-empty-quotes.stdout.json": "d1e090cf1dc7f0c890e4d5ca82ef67740015662ceecf0286381abfde67b8f8ba",
+    "outputs/wrong-label.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/wrong-label.stdout.json": "fa4ea88d1ce82c1764ef460fa3e02eb345aa9013e949224915c7f3468b313b28",
+    "outputs/wrong-role-requirement-prepare-refusal.stderr.txt": "a49b490ec93edcea8601fe1d5b1a29afac75d16e7f533cebb4435a5d5a2e29a5",
+    "outputs/wrong-role-requirement-prepare-refusal.stdout.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/wrong-role-requirement.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/wrong-role-requirement.stdout.json": "cf163397b98984aeb4e113075e3092e2ddbd0ee2eadae773e19e4a93976f63f3",
+    "outputs/wrong-role.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "outputs/wrong-role.stdout.json": "f3de4a7cf81e1ef719461a3fa54889966bcc3ee2d918e60454e51cc94b22a48e",
+    "outputs/wrong-type-refusal.stderr.txt": "b6b2b9f65000c8c9804cfe3fbc6c3646e4705c89e623c9c9029d2004bc4a1529",
+    "outputs/wrong-type-refusal.stdout.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "note": "The CLI was invoked only from the frozen final JAR classpath; no liveclasses, overlays, Gradle, model, bag, review or native evaluator was invoked by this verification."
+}

@@ -1,0 +1,11 @@
+{
+  "README.md": "169b9613abb0204fe3ead462f2b9fa39717759c6b8211906d90432c3093133a6",
+  "artifact-origins.json": "428610dc6d4e66cd03fb05acee320381d6d2f1b9ff4c04c24e6c59d2f3b44295",
+  "build-provenance.json": "470d641586f88a40f711585f56674b1246b1aedacfd5f8c3a22548a90f3106c2",
+  "cli-records.jsonl": "ebf02a76c6273c7d86a8d373e5a45b756369769ec963ec938014e9e87c89c298",
+  "fixture-origins.json": "32751c5d61b9a1b110c11763cf93fbce9760b10fc1d63188687d2c91d7d25484",
+  "mutation-inputs.jsonl": "abc733c7be3ea600d429d7bdbbcc01d2ed253f19980edfae61e4d5a998b2ad07",
+  "verification.json": "d675bbae89e2858d029e2859e9f2169b56060f4edc01aa4ad79c8135e0d62395",
+  "verifier-reference.json": "7e29b2346c1074feaf621d732e1f4052023ddb1ec85b46a43a1928cb8fca841a",
+  "verify.py.txt": "6cc9fc74c915fb33fe4d601f73eca907adb07c1b33d8fe142f921898edd89e07"
+}

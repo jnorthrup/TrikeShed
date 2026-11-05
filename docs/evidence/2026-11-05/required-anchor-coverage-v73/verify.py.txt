@@ -1,0 +1,311 @@
+#!/usr/bin/env python3
+"""Run only after root supplies the final immutable JAR snapshot and GO."""
+import argparse
+import copy
+import datetime
+import hashlib
+import json
+import pathlib
+import shutil
+import subprocess
+import sys
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def cid(path):
+    return "sha256:" + sha(path)
+
+
+def read(path):
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def save(path, value):
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def cbor(value):
+    # Cbor.encode ultimately sorts map keys by unsigned encoded bytes (RFC 8949).
+    def head(major, count):
+        if count < 24:
+            return bytes([major * 32 + count])
+        for code, width in [(24, 1), (25, 2), (26, 4), (27, 8)]:
+            if count < 2 ** (8 * width):
+                return bytes([major * 32 + code]) + count.to_bytes(width, "big")
+        raise ValueError("CBOR size exceeds uint64")
+    if isinstance(value, str):
+        encoded = value.encode("utf-8", errors="strict")
+        return head(3, len(encoded)) + encoded
+    assert isinstance(value, dict)
+    return head(5, len(value)) + b"".join(cbor(key) + cbor(value[key]) for key in sorted(value, key=cbor))
+
+
+def proposition(row):
+    return "sha256:" + hashlib.sha256(cbor({
+        "kind": "legal-eval-proposition/1", "original": row["originalCid"],
+        "excerpt": row["excerptCid"], "proposition": row["proposition"]})).hexdigest()
+
+
+def legacy_projection(report):
+    report = copy.deepcopy(report)
+    for key in ["requiredAnchorCoverageScope", "requiredAnchorCases", "requiredAnchorComparableCases",
+                "completeRequiredAnchorCoverageCases", "completeRequiredAnchorCoverageRate"]:
+        report.pop(key)
+    for row in report["rows"]:
+        assert row.pop("requiredAnchorCoverage") is None
+    return report
+
+
+def row(report, name="S2"):
+    return next(value for value in report["rows"] if value["name"] == name)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--snapshot", required=True, type=pathlib.Path)
+    parser.add_argument("--repo", default="/workspace/TrikeShed", type=pathlib.Path)
+    parser.add_argument("--java", default="/workspace/.trikeshed-cloud/toolchains/graalvm-25/bin/java", type=pathlib.Path)
+    parser.add_argument("--root-go", required=True, help="Root's final freeze/GO identifier; not an approval mechanism")
+    args = parser.parse_args()
+    directory = pathlib.Path(__file__).resolve().parent
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    attempt = directory / ("attempt-" + timestamp)
+    attempt.mkdir()
+    inputs = attempt / "inputs"
+    inputs.mkdir()
+    outputs = attempt / "outputs"
+    outputs.mkdir()
+    checks = []
+    commands = []
+    summary = {"kind": "required-anchor-final-jar-verification/1", "status": "RUNNING",
+               "attempt": str(attempt), "rootGo": args.root_go,
+               "scope": "Supplied annotation controls only; no predictor, proof verifier, training, bag, review or source mutation.",
+               "checks": checks, "commands": commands}
+    save(attempt / "summary.json", summary)
+
+    def check(name, condition):
+        checks.append({"name": name, "passed": bool(condition)})
+        save(attempt / "summary.json", summary)
+        if not condition:
+            raise AssertionError(name)
+
+    try:
+        repo = args.repo.resolve()
+        snapshot = args.snapshot.resolve()
+        required_files = ["main.jar", "classpath.txt", "source-head.txt", "sha256.json"]
+        check("frozen snapshot metadata exists", all((snapshot / name).is_file() for name in required_files))
+        for name in required_files[1:]:
+            shutil.copyfile(snapshot / name, inputs / ("snapshot-" + name))
+        classpath = (snapshot / "classpath.txt").read_text().strip().split(":")
+        main_jar = snapshot / "main.jar"
+        check("classpath is JAR-only and begins with frozen main", pathlib.Path(classpath[0]).resolve() == main_jar
+              and all(pathlib.Path(name).is_file() and pathlib.Path(name).suffix == ".jar" for name in classpath))
+        check("classpath has no duplicate or live class directories", len(set(classpath)) == len(classpath)
+              and all("overlay" not in name and "/build/classes/" not in name for name in classpath))
+        hashes_before = {name: sha(pathlib.Path(name)) for name in classpath}
+        frozen_hashes = read(snapshot / "sha256.json")
+        check("main hash agrees with freeze manifest", hashes_before[str(main_jar)] == frozen_hashes["main.jar"])
+        dependencies = frozen_hashes["dependencies"]
+        check("all classpath dependency origins match freeze hashes", len(dependencies) == len(classpath) - 1
+              and all(hashes_before.get(name) == value for name, value in dependencies.items()))
+        origins = {
+            "snapshot": str(snapshot), "sourceHead": (snapshot / "source-head.txt").read_text().strip(),
+            "rootHeadAtExecution": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip(),
+            "java": str(args.java.resolve()), "javaExecutableSha256": sha(args.java.resolve()),
+            "javaVersion": subprocess.run([str(args.java), "-version"], capture_output=True, text=True).stderr,
+            "verificationScript": str(pathlib.Path(__file__).resolve()), "verificationScriptSha256": sha(pathlib.Path(__file__)),
+            "classpathEntries": len(classpath), "jarOriginsAndSha256": hashes_before,
+            "snapshotMetadataSha256": {name: sha(snapshot / name) for name in required_files[1:]}}
+        save(attempt / "origins.json", origins)
+
+        old = repo / "docs/fixtures/2026-11-04/english-symbol-corpus"
+        new = repo / "docs/fixtures/2026-11-05/legal-required-anchor-coverage"
+        manifest = read(new / "manifest.json")
+        baseline = read(old / "manifest.json")
+        stripped = copy.deepcopy(manifest)
+        for case in stripped["cases"]:
+            case.pop("requiredAnchors", None)
+        check("extended manifest only adds requirements to original sixteen cases", stripped == baseline)
+        check("six explicit nonempty requirement declarations", len(manifest["cases"]) == 16
+              and sum("requiredAnchors" in case for case in manifest["cases"]) == 6)
+        blind_baseline = read(old / "blind-requests.json")
+        identity_by_name = {value["name"]: value["propositionCid"] for value in blind_baseline["requests"]}
+        span_count = 0
+        input_hashes = {}
+        for case in manifest["cases"]:
+            path = repo / case["excerptPath"]
+            input_hashes[str(path)] = sha(path)
+            text = path.read_bytes().decode("utf-8", errors="strict").encode("utf-16-le")
+            check("source bytes and independent case CID " + case["name"], cid(path) == case["excerptCid"] == case["originalCid"]
+                  and proposition(case) == identity_by_name[case["name"]])
+            for anchor in case["anchors"]:
+                check("exact role/source/span " + case["name"] + ":" + str(anchor["begin"]),
+                      anchor["excerptCid"] == case["excerptCid"]
+                      and text[anchor["begin"] * 2:anchor["end"] * 2].decode("utf-16-le") == anchor["quote"]
+                      and anchor["role"] in {"SUPPORTS", "REFUTES", "CONTEXT"})
+                span_count += 1
+            required = case.get("requiredAnchors")
+            check("required exact subset " + case["name"], required is None or bool(required)
+                  and len({json.dumps(value, sort_keys=True) for value in required}) == len(required)
+                  and all(value in case["anchors"] for value in required))
+        check("thirty source anchor spans checked", span_count == 30)
+        for path in [old / "manifest.json", old / "blind-requests.json", old / "empty-seat-predictions.json",
+                     old / "controls/scorer-contract-predictions.json", old / "controls/scorer-contract-report.json",
+                     new / "manifest.json", new / "full-anchor-predictions.json"]:
+            input_hashes[str(path)] = sha(path)
+            shutil.copyfile(path, inputs / (path.parent.name + "-" + path.name))
+        save(attempt / "fixture-origins.json", input_hashes)
+
+        def invoke(name, mode, manifest_path, predictions=None, success=True):
+            argv = [str(args.java), "-cp", ":".join(classpath), "borg.trikeshed.narsese.LegalNarsEvaluationCli",
+                    mode, str(manifest_path)]
+            if predictions is not None:
+                argv.append(str(predictions))
+            try:
+                result = subprocess.run(argv, cwd=repo, capture_output=True, timeout=45)
+            except subprocess.TimeoutExpired as error:
+                (outputs / (name + ".stdout.partial")).write_bytes(error.stdout or b"")
+                (outputs / (name + ".stderr.partial")).write_bytes(error.stderr or b"")
+                commands.append({"name": name, "argv": argv, "cwd": str(repo), "timeoutSeconds": 45})
+                raise
+            (outputs / (name + ".stdout.json")).write_bytes(result.stdout)
+            (outputs / (name + ".stderr.txt")).write_bytes(result.stderr)
+            commands.append({"name": name, "argv": argv, "cwd": str(repo), "exitCode": result.returncode,
+                             "stdoutSha256": hashlib.sha256(result.stdout).hexdigest(),
+                             "stderrSha256": hashlib.sha256(result.stderr).hexdigest()})
+            print(name, "exit", result.returncode, flush=True)
+            check(name + " expected process outcome", (result.returncode == 0) == success)
+            if not success:
+                check(name + " refusal emits no report", not result.stdout.strip())
+                return None
+            report = json.loads(result.stdout.decode("utf-8", errors="strict"))
+            check(name + " exact manifest origin", report["manifestCid"] == cid(manifest_path))
+            if mode == "prepare":
+                check(name + " blind request fields and source bytes", report["kind"] == "legal-eval-requests/1"
+                      and report["requests"] == blind_baseline["requests"]
+                      and report["scope"] == "excerpt only; original lineage claimed")
+            else:
+                check(name + " exact prediction origin and metric scopes", report["predictionCid"] == cid(predictions)
+                      and report["kind"] == "legal-eval-report/1"
+                      and report["scope"] == "provisional excerpt annotations; no legal truth or source authentication"
+                      and report["requiredAnchorCoverageScope"] == "exact annotated quote coverage; independent of label agreement; not proof validity or inference performance")
+                check(name + " all sixteen case identities unchanged", {value["name"]: value["propositionCid"] for value in report["rows"]} == identity_by_name)
+            return report
+
+        legacy_prepare = invoke("legacy-prepare", "prepare", old / "manifest.json")
+        check("legacy blind request whole report unchanged", legacy_prepare == blind_baseline)
+        invoke("extended-prepare", "prepare", new / "manifest.json")
+        legacy = invoke("legacy-partial", "score", old / "manifest.json", old / "controls/scorer-contract-predictions.json")
+        check("legacy semantic fields exactly equal frozen v71 report", legacy_projection(legacy) == read(old / "controls/scorer-contract-report.json"))
+        check("legacy metric undeclared and null rate", legacy["requiredAnchorCases"] == legacy["requiredAnchorComparableCases"] == 0
+              and legacy["completeRequiredAnchorCoverageRate"] is None)
+        missing = invoke("extended-empty-seat", "score", new / "manifest.json", old / "empty-seat-predictions.json")
+        check("empty seat stays MISSING16 UNKNOWN0 with null rates", missing["missing"] == 16
+              and missing["scored"] == missing["explicitUnknown"] == missing["invalidFixtures"] == missing["invalidPredictions"] == 0
+              and missing["requiredAnchorCases"] == 6 and missing["requiredAnchorComparableCases"] == 0
+              and missing["completeRequiredAnchorCoverageRate"] is None and missing["groundedAgreementRate"] is None
+              and all(value["predicted"] is None for value in missing["rows"]))
+        partial = invoke("extended-partial", "score", new / "manifest.json", old / "controls/scorer-contract-predictions.json")
+        expected = next(case["requiredAnchors"] for case in manifest["cases"] if case["name"] == "S2")
+        check("partial S2 keeps old grounded agreement but covers only exact p1", row(partial)["groundedAgreement"] is True
+              and row(partial)["requiredAnchorCoverage"] == {"requiredCount": 2, "acceptedQuotes": True,
+                  "matchedCount": 1, "missingAnchors": [expected[1]], "complete": False})
+        full_path = new / "full-anchor-predictions.json"
+        full = invoke("extended-full", "score", new / "manifest.json", full_path)
+        check("full S2 covers exact p1 and p2", row(full)["groundedAgreement"] is True
+              and row(full)["requiredAnchorCoverage"] == {"requiredCount": 2, "acceptedQuotes": True,
+                  "matchedCount": 2, "missingAnchors": [], "complete": True})
+        for name, report, complete in [("partial", partial, 0), ("full", full, 1)]:
+            check(name + " summary denominator is one comparable among six declared", report["missing"] == 14
+                  and report["scored"] == report["groundedAgreements"] == 2 and report["requiredAnchorCases"] == 6
+                  and report["requiredAnchorComparableCases"] == 1 and report["completeRequiredAnchorCoverageCases"] == complete
+                  and report["completeRequiredAnchorCoverageRate"] == float(complete))
+            check(name + " S6 explicit UNKNOWN remains undeclared", row(report, "S6")["predicted"] == "UNKNOWN"
+                  and row(report, "S6")["requiredAnchorCoverage"] is None)
+
+        def prediction_mutation(name, modify):
+            prediction = read(full_path)
+            modify(prediction["predictions"][0])
+            path = inputs / (name + "-predictions.json")
+            save(path, prediction)
+            return invoke(name, "score", new / "manifest.json", path)
+
+        def bad_quote(value):
+            value["witnesses"][1]["quote"] += " invalid"
+
+        def wrong_role(value):
+            value["witnesses"][1]["role"] = "CONTEXT"
+
+        def duplicate(value):
+            value["witnesses"].append(copy.deepcopy(value["witnesses"][0]))
+
+        def padding(value):
+            case = next(case for case in manifest["cases"] if case["name"] == "S2")
+            text = (repo / case["excerptPath"]).read_bytes().decode("utf-8")
+            value["witnesses"].append({"excerptCid": case["excerptCid"], "begin": 0,
+                "end": len(text.encode("utf-16-le")) // 2, "quote": text, "role": "SUPPORTS"})
+
+        for name, mutate in [("bad-quote", bad_quote), ("wrong-role", wrong_role),
+                             ("duplicate-quote", duplicate), ("spurious-padding", padding)]:
+            report = prediction_mutation(name, mutate)
+            check(name + " cannot enter comparable denominator or claim complete coverage",
+                  row(report)["requiredAnchorCoverage"] == {"requiredCount": 2, "acceptedQuotes": False,
+                      "matchedCount": None, "missingAnchors": None, "complete": None}
+                  and report["requiredAnchorCases"] == 6 and report["requiredAnchorComparableCases"] == 0
+                  and report["completeRequiredAnchorCoverageRate"] is None)
+            check(name + " old integrity/acceptance rejects padded evidence", row(report)["acceptedWitness"] is False)
+
+        wrong_label = prediction_mutation("wrong-label", lambda value: value.update(label="UNKNOWN"))
+        check("quote coverage is independent of label agreement", row(wrong_label)["groundedAgreement"] is False
+              and row(wrong_label)["requiredAnchorCoverage"]["complete"] is True)
+        empty_unknown = prediction_mutation("unknown-empty-quotes", lambda value: value.update(label="UNKNOWN", witnesses=[]))
+        check("nonempty requirements prevent vacuous UNKNOWN quote coverage", row(empty_unknown)["requiredAnchorCoverage"] == {
+            "requiredCount": 2, "acceptedQuotes": True, "matchedCount": 0, "missingAnchors": expected, "complete": False})
+
+        duplicate_predictions = read(full_path)
+        duplicate_predictions["predictions"].append(copy.deepcopy(duplicate_predictions["predictions"][0]))
+        duplicate_path = inputs / "duplicate-predictions.json"
+        save(duplicate_path, duplicate_predictions)
+        duplicate_report = invoke("duplicate-predictions", "score", new / "manifest.json", duplicate_path)
+        check("duplicate predictions stay INVALID_PREDICTION without quote comparison",
+              row(duplicate_report)["status"] == "INVALID_PREDICTION" and duplicate_report["invalidPredictions"] == 2
+              and duplicate_report["requiredAnchorCases"] == 6 and duplicate_report["requiredAnchorComparableCases"] == 0
+              and row(duplicate_report)["requiredAnchorCoverage"] == {"requiredCount": 2, "acceptedQuotes": None,
+                  "matchedCount": None, "missingAnchors": None, "complete": None})
+
+        for name, required in [("empty-requirements", []), ("duplicate-requirements", [expected[0], expected[0]]),
+                               ("wrong-role-requirement", [dict(expected[0], role="CONTEXT")])]:
+            altered = copy.deepcopy(manifest)
+            next(case for case in altered["cases"] if case["name"] == "S2")["requiredAnchors"] = required
+            path = inputs / (name + "-manifest.json")
+            save(path, altered)
+            report = invoke(name, "score", path, full_path)
+            check(name + " is invalid fixture without coverage", row(report)["status"] == "INVALID_FIXTURE"
+                  and row(report)["requiredAnchorCoverage"] is None and report["invalidFixtures"] == 1
+                  and report["requiredAnchorCases"] == 5)
+            invoke(name + "-prepare-refusal", "prepare", path, success=False)
+        altered = copy.deepcopy(manifest)
+        next(case for case in altered["cases"] if case["name"] == "S2")["requiredAnchors"] = "not-an-array"
+        path = inputs / "wrong-type-manifest.json"
+        save(path, altered)
+        invoke("wrong-type-refusal", "score", path, full_path, success=False)
+
+        check("frozen classpath hashes unchanged across every attempt", hashes_before == {name: sha(pathlib.Path(name)) for name in classpath})
+        check("fixture input hashes unchanged across every attempt", input_hashes == {name: sha(pathlib.Path(name)) for name in input_hashes})
+        summary["status"] = "PASS"
+    except Exception as error:
+        summary["status"] = "FAIL"
+        summary["error"] = type(error).__name__ + ": " + str(error)
+        raise
+    finally:
+        summary["outputSha256"] = {str(path.relative_to(attempt)): sha(path) for path in sorted(attempt.rglob("*"))
+                                  if path.is_file() and path.name != "summary.json"}
+        save(attempt / "summary.json", summary)
+        print(summary["status"], attempt, flush=True)
+
+
+if __name__ == "__main__":
+    main()
