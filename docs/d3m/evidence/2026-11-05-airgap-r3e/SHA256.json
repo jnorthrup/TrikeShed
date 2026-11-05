@@ -1,5 +1,6 @@
 {
   "fetch-final.py.txt": "b9953b4d10db1673a5934b0ee5fb45d1b48ca35ea325e87fabdb3a8f94d05f6a",
+  "fetch-final2.py.txt": "b3ad5f91899c75f8bfb79d877d7b74729864f6f6b90d57fb51d62d146f988c37",
   "fetch-publication.py.txt": "0d24e57701b9b482d56f2df04f49d357f1f778290e879eb6dfb81e3f36dccaaf",
   "fetch.json": "c5b88d06d41ccd799dba577b27366f5077d4ac183b484d6df53cf36694465ab1",
   "fetch.py.txt": "b3aa70a67ab61e1075fa9772dc7a856b7f37dbafacbeb80232ac3c03f43258f5",
@@ -11,18 +12,25 @@
   "final-freeze/remote-heads.json": "1387928cfe7e8cb0b3bc63ab84454c18081267850719d56168e489ffd6194246",
   "final-incoming-horn.txt": "9c163c95ac8b4bd397d1ed08ac913e6b44c40b510f7fc240fc4478d6fc3ef55d",
   "final-reconciliation.json": "f424d4f02aae98d1b76f7de97c38ab0baf99f3b352c5a05ccc5d994bed87dc92",
+  "final2/integration-inputs.json": "0c38ade0f094b8893be6d3e85f4d6acf52c8900be055b86ec13545fe09556a16",
+  "final2/integration-steps.json": "03085f4d6af48ad5be8a2f7929d3ea6a6e469e02867b7723fff0f453c5426a66",
+  "final2-freeze/fetch.json": "6f27aea5d9c18657922345d3657a1997ba5735ae86abeba9bcccedc43fc2c07f",
+  "final2-freeze/integration-inputs.json": "0c38ade0f094b8893be6d3e85f4d6acf52c8900be055b86ec13545fe09556a16",
+  "final2-freeze/remote-heads.json": "58fe27df519a59b11f3302670fc956b2c558e599c1ec6e99393660dddba3f852",
   "initial/integration-inputs.json": "93ddb123431d3cbbc9fc7b5cb88b8596124ce7b8e51b9dbf04c1e72ebcfb7c87",
   "initial/integration-steps.json": "da8146d1e33bb12fca4c89f723f64899e9c972ea1a2d9b5c239631b6886ba5db",
   "integrate-final.py.txt": "076b6d601543dc359e444c0855bf1f4c2eba211a65ec56beb6db5b2f602c20f1",
+  "integrate-final2.py.txt": "11ce1b36b13c77484ea3f6b3f52cfea915a847ba57114525730c24a8efd356e1",
   "integrate-publication.py.txt": "7c98a036d19061beb721c0350fa523a70b22a838118605ffaec4be956e32962b",
   "integrate.py.txt": "2c80c651a3ebc756e6bd596fccb24666a991e4557aca74d2dfd82be0b9baedf6",
   "integration-inputs.json": "93ddb123431d3cbbc9fc7b5cb88b8596124ce7b8e51b9dbf04c1e72ebcfb7c87",
   "pre-push-heads01.json": "e69dde2de21bdc1c037ccfc68d7255c0de497185987ea6ec5dcc78afc5cd1c2c",
+  "pre-push-heads02.json": "2b55c13d0ca445bd5e671b91bca8751ecb272e10d111104aa4225ebc995114ee",
   "publication/integration-inputs.json": "170bfbe8f86b0135ac580b22a78f22304e59e7a4dc4fb9a4ec0f4e0e49bd46bf",
   "publication/integration-steps.json": "1975163466ee0ae91da21ba1ad5c525173d8ced9227d59025ebc454cd3c71d63",
   "publication-freeze/fetch.json": "01a8383d3e6dae9a6f1310759e0e6edf3e6390c65f35d6f12cbd7d2a7c08941e",
   "publication-freeze/integration-inputs.json": "170bfbe8f86b0135ac580b22a78f22304e59e7a4dc4fb9a4ec0f4e0e49bd46bf",
   "publication-freeze/remote-heads.json": "4d334d799c7f99565b2b20063af3aa6c0ceeae05f62d1f2d1b3d58bcd331a302",
   "remote-heads.json": "20c34eac9e79f0abb56a0832884173834698acdf17847567166190d3b8064677",
-  "verification.json": "13a906461e25a6e3194e4ef6bcb294a1cfffe648f4ffb52db8a63c36b1487bf6"
+  "verification.json": "813299fd892cf009645d9eaefef67ada6487513073293363405ee7403b304947"
 }

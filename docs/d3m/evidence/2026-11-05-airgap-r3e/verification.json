@@ -1,9 +1,10 @@
 {
-  "integratedCommit": "cf544ffd37f291287ea7ec09aa1a538db5ce7893",
+  "integratedCommit": "fa83b91c556a9dda301bac77e203bbebd1943f78",
   "testedCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
   "targetCompilationCommit": "d1e5d413259e191a9aa6cff15998f6df2b50aa38",
   "frozenRefCounts": [
     556,
+    557,
     557,
     557
   ],
@@ -12,7 +13,7 @@
     "remoteBranchHeads": 547,
     "remoteHeadAliases": 1
   },
-  "merges": 7,
+  "merges": 8,
   "conflictedFiles": 0,
   "allFrozenTipsAreAncestors": true,
   "equivalentCorrections": "Production and fixture bracket corrections merge automatically with the independently written equivalent fixes; both histories retained.",
@@ -28,5 +29,11 @@
     "skipped": 0,
     "passed": 5
   },
-  "runtimeSourceAndBuildInputsUnchanged": true
+  "runtimeSourceAndBuildInputsUnchanged": true,
+  "finalMasterReconciliation": {
+    "incoming": "973b078dc929adfbbbedd28345b2980ee5d08a56",
+    "merge": "fa83b91c556a9dda301bac77e203bbebd1943f78",
+    "treeBeforeAndAfter": "cfae652febf51082023214e386a00c5793036dc8",
+    "unchanged": true
+  }
 }
