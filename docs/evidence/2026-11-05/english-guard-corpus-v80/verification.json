@@ -1,0 +1,135 @@
+{
+  "kind": "english-guard-corpus-v80-evidence/1",
+  "frozenGo": {
+    "rootGreen": true,
+    "sourceHead": "fdfa355623f03958536089c81e87162e6c8313ff",
+    "snapshot": "/workspace/library-files/english-guard-corpus-v80-proof/snapshot",
+    "mainSha256": "e2352d79aa5b8a6180ed7152897a80bd98d86a48cd3282e4656268ec1ee7bf0d",
+    "spacegraphSha256": "d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b",
+    "documentsSha256": "6e99a60f9942c1242ae20a016e1e7993294175f72d7a1b3638b3bcc760ab48cb",
+    "pagesSha256": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5",
+    "totals": {
+      "tests": 503,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "dependencyJars": 119,
+    "totalClasspathJars": 120,
+    "issued": "2026-11-05T05:32:05.645410+00:00",
+    "sdkRoot": "/workspace/library-files/corpus-concordance-v79-preparation/isolated-subvm",
+    "sdkStaticClosureSha256": "9424b0a673e7f9a0189d216304a7e38ebcbb76bf572e13188c11e51aad4574ab",
+    "scope": "Same full real native guard/corpus workflow with query-table presentation fixed; direct receipt/core/matrix CAS readbacks; two genuine CoreNLP-only ranges; actual amendments/current refusals; strict loopback network namespace; no generative model/provider/admission."
+  },
+  "result": "ACTUAL_NATIVE_CLOSED_AND_INDEPENDENT_RECORDED_AUDIT_PASS",
+  "selectedAttempt": "native-attempt1",
+  "writerPid": 137358,
+  "readerPid": 137676,
+  "originalSyntheticCases": [
+    "S12",
+    "G03",
+    "G04",
+    "G07",
+    "G13"
+  ],
+  "guardCases": 4,
+  "typedRows": 6,
+  "genuineNewRangeParserCalls": 2,
+  "actualParserElapsedMillis": [
+    12462,
+    311
+  ],
+  "actualRangeCids": [
+    "sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824",
+    "sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a"
+  ],
+  "concordanceCards": 5,
+  "inertPopups": 2,
+  "browserRequests": 95,
+  "wholeProgramRuns": 0,
+  "copularQueryPosts": 0,
+  "casBlocksSuppliedAndAfterCloseRead": 19,
+  "corpusCoreActuallyFetched": true,
+  "corpus": {
+    "receiptCid": "sha256:0e4682987e9d093233fd26f50c8435b3287a6e3ff0b7eec6a7d4dbb1e6d5f38c",
+    "corpusCid": "sha256:b83b2616d8b433e50e184a208c73822fa09fc10f67ab9f466ffde998bb90867e",
+    "matrixCid": "sha256:20b16662f8ce8c402d1a79114d35141de0bbc2fe19a52226f8b6321c5d52faa2"
+  },
+  "actualAmendedMirrors": [
+    "G03",
+    "S12"
+  ],
+  "guardFreshRefusalHttp": 409,
+  "concordanceFreshRefusalHttp": 409,
+  "SDKBinaryBytesPublished": 0,
+  "SDKClosureHashesUnchanged": true,
+  "modelResourceScope": "Actual processor/SDK/model-resource availability after parse; not a separate I/O/model-use trace or output accuracy authentication",
+  "finalReteKinds": {
+    "now": 1
+  },
+  "historicalRefRecords": 17,
+  "activeDigestRefs": 0,
+  "fullRuntimePackPublished": false,
+  "readerPack": {
+    "bytes": 200761,
+    "sha256": "50de32f457d1206ea949942a2b50eac90b696dce9f8fd92b9be2e681152720c6",
+    "recordedUnchangedBeforeAfter": true,
+    "bytesPublished": false
+  },
+  "archive": {
+    "bytes": 4814395,
+    "sha256": "3052e1497dc56dfdd35c7b078a29ef09e4a4580322c09642a5017904f6eaff50",
+    "members": 281,
+    "uncompressedBytes": 31410956
+  },
+  "auditor": {
+    "kind": "guard-corpus-independent-audit-files/1",
+    "selectedNativeAttempt": "guard-corpus-v80-native-proof/native-attempt1",
+    "sourceHead": "fdfa355623f03958536089c81e87162e6c8313ff",
+    "files": {
+      "audit.py": {
+        "bytes": 30243,
+        "sha256": "19189b8d5fc1ff32e3053a6aef5f8746274d47112870e698ea39a23966b93a51"
+      },
+      "checks.py": {
+        "bytes": 20905,
+        "sha256": "274ba01ae57e693b4c83332dafbf4793fc09df9e20d08ffb108eebdaa6e431c9"
+      },
+      "receipt-core.py.txt": {
+        "bytes": 33996,
+        "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+      },
+      "README.txt": {
+        "bytes": 4843,
+        "sha256": "663ba18cf05ae51fe833acb3095efbc5d30a2e4c9c3fc57644fc10fc8333f6ce"
+      },
+      "final-v80-strict/result.json": {
+        "bytes": 17196,
+        "sha256": "4fada18998d4e93ff8baf5f223f7d23845bfd2ccf81593ab7b20276468b30078"
+      },
+      "final-v80-strict/report.txt": {
+        "bytes": 2480,
+        "sha256": "429796ae69870c639687f97ef31de2362d24353205a97d31b7e67d9272f017bb"
+      },
+      "final-v80-recorded/result.json": {
+        "bytes": 17204,
+        "sha256": "0027f49108df5f401e10dfb16d553b3b18f74c2c4b3cab473ea7c4172af4d2b8"
+      },
+      "final-v80-recorded/report.txt": {
+        "bytes": 2488,
+        "sha256": "11970153b79ec78c837a3e19a96665e2102dbb8a496eef2abadb3114c5183639"
+      }
+    }
+  },
+  "outerScreenshots": {
+    "concordance-range-40-105.png": "93baf932ee3b72de5ae944e877e4941464dfde4a83a3ed09a28d6fada820c225",
+    "corpus-wordcloud.png": "3b3a52877668647b03a0bc7d1a01816a672bfd1a0ca8eb25c84e59cc113b3220",
+    "guard-G07-left.png": "1dd0f8f34d6d105acaad84d406587388e6dd3626f14daf671728b97cb2983b3b",
+    "guard-G07-right.png": "58b6a5dd67a45683454d7347fba7cacce330f69ae5b06335062f5f9cd347ba4c",
+    "guard-G13-source.png": "1541e5425fd450a8112527c80aad7219ee387717e40448781307d7c0547aab26",
+    "guard-G13-whole-quotation.png": "250fe0f0ec1412f61149e7b7cb21e05bb1724af70d2cdeff544c606d0a1d07f4",
+    "palette-fit.png": "ea5c1ff14a7d11cb47b3176420f10799a455a883d854d2b4e1f80e539f19b4a0",
+    "prior-v79-G07-layout.png": "2b2ab8a9d4b90c69658e3be93e3394529302c2e3e612ba2cdaf4d3b720c35784"
+  },
+  "scope": "Selected synthetic parser/source/query/navigation consistency; no legal accuracy/gold guard semantics/independent evidence/producer authentication/review/NALadmission/fullR4seal or portable CAS/SDK bundle. Priorv79c929/E235 functional data+layout/scroll limitations and externalcompile1 failure preserved separately. PCFG documentation separately owned."
+}

@@ -1,0 +1,39 @@
+{
+  "kind": "guard-corpus-independent-audit-files/1",
+  "selectedNativeAttempt": "guard-corpus-v80-native-proof/native-attempt1",
+  "sourceHead": "fdfa355623f03958536089c81e87162e6c8313ff",
+  "files": {
+    "audit.py": {
+      "bytes": 30243,
+      "sha256": "19189b8d5fc1ff32e3053a6aef5f8746274d47112870e698ea39a23966b93a51"
+    },
+    "checks.py": {
+      "bytes": 20905,
+      "sha256": "274ba01ae57e693b4c83332dafbf4793fc09df9e20d08ffb108eebdaa6e431c9"
+    },
+    "receipt-core.py.txt": {
+      "bytes": 33996,
+      "sha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+    },
+    "README.txt": {
+      "bytes": 4843,
+      "sha256": "663ba18cf05ae51fe833acb3095efbc5d30a2e4c9c3fc57644fc10fc8333f6ce"
+    },
+    "final-v80-strict/result.json": {
+      "bytes": 17196,
+      "sha256": "4fada18998d4e93ff8baf5f223f7d23845bfd2ccf81593ab7b20276468b30078"
+    },
+    "final-v80-strict/report.txt": {
+      "bytes": 2480,
+      "sha256": "429796ae69870c639687f97ef31de2362d24353205a97d31b7e67d9272f017bb"
+    },
+    "final-v80-recorded/result.json": {
+      "bytes": 17204,
+      "sha256": "0027f49108df5f401e10dfb16d553b3b18f74c2c4b3cab473ea7c4172af4d2b8"
+    },
+    "final-v80-recorded/report.txt": {
+      "bytes": 2488,
+      "sha256": "11970153b79ec78c837a3e19a96665e2102dbb8a496eef2abadb3114c5183639"
+    }
+  }
+}

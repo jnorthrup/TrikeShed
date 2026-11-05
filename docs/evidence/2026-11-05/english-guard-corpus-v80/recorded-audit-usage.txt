@@ -1,0 +1,73 @@
+V80 independent recorded-data audit — final selected attempt
+
+Selected data: guard-corpus-v80-native-proof/native-attempt1, closed writer
+137358 and separate reader 137676. Source fdfa355623f03958536089c81e87162e6c8313ff.
+The directory name of this auditor preserves its v79 preparation history.
+No JVM, parser, query engine, browser, container, build or namespace is launched.
+
+Restore byte-identical audit.py.txt as audit.py and checks.py.txt as checks.py
+in an external directory; keep receipt-core.py.txt beside them unchanged.
+Python 3 standard library only. Set PROOF to the extracted proof directory that
+contains inputs/ and native-attempt1/. Set AUDITOR to the restored scripts and
+OUT to a separate writable output directory. Run:
+
+python3 "$AUDITOR/audit.py" "$PROOF" "$PROOF/native-attempt1" \
+  --source-head fdfa355623f03958536089c81e87162e6c8313ff \
+  --main-sha e2352d79aa5b8a6180ed7152897a80bd98d86a48cd3282e4656268ec1ee7bf0d \
+  --panels-sha d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b \
+  --documents-sha 6e99a60f9942c1242ae20a016e1e7993294175f72d7a1b3638b3bcc760ab48cb \
+  --recorded-only --out "$OUT"
+
+Successful output is result.json plus report.txt. Exit0 means recorded-data
+consistency PASS, not a new runtime test. The expected final recorded result
+hash is in final-audit-manifest.json. Omit --recorded-only only when the original
+frozen120-JAR classpath, browser files,29-file SDK, and closed local CAS/owner
+files remain at their recorded paths: that stricter audit additionally rehashes
+the actual external bytes. The strict result and portable result intentionally
+differ in artifactVerification. No external paths are opened in recorded-only
+mode merely because they appear in provenance, CodeSource or REF metadata.
+
+Public minimum consumed by this audit: exact selected S12/G03/G04/G07/G13
+original source, request, response, status, source-row and materialized canonical
+CBOR/source readbacks; four original condition-diagnostic files; pinned SDK
+static-closure metadata; final actual GO/startup/browser/cleanup/reopened,
+readback-index, classpath/artifact metadata, writer/reader command and network
+records; all19 fetched raw CAS blocks; actual G03/S12 upload and after-close
+amended mirrors; exact observer-inputs and23 PNGs. Keep complete recorded raw
+HTTP responses and selected fresh parser input files with the evidence package.
+Do not publish whole original17-case runtime packs or unrelated cases merely
+for this audit. Supplied selected contents are authenticated by SHA256/CID;
+omitted full pack/prefix, external REF targets and SDK/JAR bytes cannot be
+rehashed in portable mode and are not a self-contained CAS/model bundle.
+
+The CBOR codec is the unchanged earlier independent receipt-core.py.txt. No
+Kotlin guard helper is invoked as gold. Raw original advcl/marker/negation and
+quote-node relationships, exact typed URI/literal query bindings, candidate and
+corpus identities, substring parser input hashes and ranges are checked as
+record consistency. G07 retains its unmarked Trustee target. G13 retains nested
+if/without and quote indicators; historical NEGATED diagnostics remain separate
+from lexical cues and do not establish legal force. Two fresh CoreNLP4.6 parses
+are actual captured requests; model resource URLs establish disclosed resource
+availability, not independent model-I/O use tracing or parser accuracy.
+
+Actual concordance links preserve each whole inspection range, two offered
+current-mode popups stay inert, and real source amendments cause fresh current
+refusal and clear old rows/context. Old receipts remain immutable historical
+context. Measured horizontal-wheel/cell records show accessible full-width
+columns; the table exceeds one viewport. Palette Fit is checked by rectangles.
+Eight mutated copies reject role substitution, inherited marker, dropped G07
+target, wrong source CID, sentence/inspection-range confusion, full-source hash
+as parser-input hash, stale row reuse, and automatic Run.
+
+Preserved history: v79-logic-attempt1 failed an observer-entrypoint namespace
+assumption; its exact scripts and failure remain. v79-logic-attempt2 passed the
+old c929 functional records, whose table-layout defect/clipped capture and
+external compile-attempt1 delimiter failure remain under their original pins.
+The first v80 strict pass and its exact scripts remain in v80-audit-attempt1;
+final-v80-strict and final-v80-recorded add explicit source/record/image hashes
+and resource-provenance checks without changing native data. v79 is not relabeled
+as v80. Final v80 runtime had no source/data correction by this auditor.
+
+No legal accuracy, source authentication, independent English entailment,
+benchmark completeness, source independence, review/admission or full R4 rootfs
+claim is made. Source16-seat completeness remains unestablished.
