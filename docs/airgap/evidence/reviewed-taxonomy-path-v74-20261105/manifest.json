@@ -1,0 +1,83 @@
+{
+  "scope": "Documentation-only v74 native proof-path evidence. Every artifact below this directory except manifest itself is SHA256-bound. Final selectedv2; earlier v1 explicitly before label correction.",
+  "sourceHead": "ddce0153ef4cb625b30b2cc5ca47cec98dddfa3e",
+  "selectedAttempt": "native-v74-attempt2",
+  "files": {
+    "README.md": {
+      "bytes": 7049,
+      "sha256": "08296b68349a42fb26b563c84299969994dc474515b85e137686558a25221e63"
+    },
+    "audit-report.txt": {
+      "bytes": 1648,
+      "sha256": "e43b4ec19078fecb2aa2575b22677d8cd1c82e591c5828045ba5ac86e2bcbb1c"
+    },
+    "audit-result.json": {
+      "bytes": 60321,
+      "sha256": "3179eda58f54559ae39e70051970f3fd951e34f51d392c8f4f54e626d7147866"
+    },
+    "audit-usage.txt": {
+      "bytes": 2514,
+      "sha256": "c61c9c268bd383a77387c00dc8419a29f3056b3d3b7f2663a4816240ce4ad915"
+    },
+    "audit.py.txt": {
+      "bytes": 43265,
+      "sha256": "5f8af53a0eca28f542bc63136b14e803bc6b17a8c0482dafd860ea71a1c38575"
+    },
+    "before-label-correction/README.txt": {
+      "bytes": 2206,
+      "sha256": "90abd66451278bea121bfe9f030a0d58fe4d773048b7fe3910eea54d62019c8f"
+    },
+    "before-label-correction/audit-result.json": {
+      "bytes": 58297,
+      "sha256": "ac2057c8a7a94b56d78d9a5e2aa7cc38333c64007814a87672443e5d32772d6d"
+    },
+    "before-label-correction/audit.py.txt": {
+      "bytes": 42282,
+      "sha256": "3d39a1b53ffbbf3e14fddb9f7c45cf216f3eb7cf28407b66138148320cc68d56"
+    },
+    "before-label-correction/extracted-records-audit-result.json": {
+      "bytes": 59390,
+      "sha256": "fa6a6739f3ab9888cc518a4182536d6039fb404372290a82906456baf1e33d09"
+    },
+    "before-label-correction/report.txt": {
+      "bytes": 1527,
+      "sha256": "1ac294fd01e0d7bbf9f3c62f3f66cef4af174e897ffad057f4849d33e7333440"
+    },
+    "extracted-records-audit-result.json": {
+      "bytes": 61589,
+      "sha256": "92196389adf81effc91af9b7e3350ee55ac147dbebff429e747a91c87564c195"
+    },
+    "native-actual-source-amendment-refuses-old-proof.png": {
+      "bytes": 146046,
+      "sha256": "0a5cb6ec6494b4fcc31b2ab15ddf482012c6dfaab203736ad2d315241d4e33bf"
+    },
+    "native-source-backed-reflexivity-visible-proof.png": {
+      "bytes": 170805,
+      "sha256": "bc7c2f96834c21c014cdb7e50c5298798d56485bef5e6fe936256505cd14f431"
+    },
+    "native-source-current-unconfirmed.png": {
+      "bytes": 7969,
+      "sha256": "b7a79b43698c97a6d86ec733702bde5f0d9762e51848bef2d67b06efb2e89141"
+    },
+    "native-supported-two-ordered-premises-visible-proof.png": {
+      "bytes": 166634,
+      "sha256": "c1d207ac4b1f9873bf6e74612231573679d9584e0845c72505e4eb98a508b13a"
+    },
+    "native-unknown-no-proof-visible-proof.png": {
+      "bytes": 144106,
+      "sha256": "73c93f6b5957430d50776b84034cd73882e7013f1d543c65dfa5ea266615e2b7"
+    },
+    "records.tar.gz": {
+      "bytes": 1483474,
+      "sha256": "9b4745269c341017f1ceb28a4728714ee93ab5150eb60f2235f7dd159ea7b5ba"
+    },
+    "root-build-provenance.json": {
+      "bytes": 8541,
+      "sha256": "ce9d2d84a320ec8fa2a0fe0c152e2eda3f1734f19557bb31d3ce94ef2a47b874"
+    },
+    "summary.json": {
+      "bytes": 38588,
+      "sha256": "39c4dd1e8ef56761303362cac26e86c1d888565f7ecce44f0953abee234e4993"
+    }
+  }
+}
