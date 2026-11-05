@@ -80,6 +80,24 @@ class NativeHornProfile(
 
 /** One finite capture per admitted review request; its owning wire drains requests before retirement. */
 class NativeHornQuery(private val profile: NativeHornProfile) {
+    /**
+     * Explicit HOST assumptions, not a review/read permit or a public source admission path.
+     * Every form of this one hash-checked manual source must cross the existing Horn exporter.
+     * Normalized form ordinals are source references; they are not exact quotations or spans.
+     */
+    internal suspend fun manualTheory(revision: Long, source: KifSourceAssertion,
+                                      query: String): Map<String, Any?> = withTimeoutOrNull(profile.timeoutMillis) {
+        val input = manualInput(revision, source, query)
+        val result = execute(input, "host-explicit-assertions")
+        result + _m["kind" j "host-manual-horn-result/1", "policy" j MANUAL_POLICY,
+            "source" j input["source"], "sourceForms" j input["sourceForms"],
+            "authority" j "declared-host-manual-assumptions-only", "reviewAuthority" j "not-established",
+            "currentness" j "not-checked", "worldObligationApplicability" j "UNKNOWN",
+            "nativeBinarySha256" j profile.binarySha256, "nativeAdapterSha256" j NativeHornProfile.ADAPTER_SHA256,
+            "wallLimitMillis" j profile.timeoutMillis, "outputLimitBytes" j OUTPUT_LIMIT,
+            "memoryIsolationProvided" j false, "networkIsolationProvided" j false]
+    } ?: error("Native manual query exceeded its overall wall limit")
+
     suspend fun report(review: CurationReview, cas: CasStore, snapshot: ContentId, revision: Long,
                        goal: String): Map<String, Any?> = withTimeoutOrNull(profile.timeoutMillis) {
         val before = ReviewedHornPlan.report(review, cas, snapshot, revision, goal)
@@ -220,20 +238,22 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
             require(result["inputCid"] == report["inputCid"] && result["frameId"] == report["frameId"]) { "Native result identity differs" }
             require(result["status"] in _s["SUPPORTED", "UNKNOWN"]) { "Native result status differs" }
             require((result["status"] == "UNKNOWN") == (result["proof"] == null)) { "Native proof status differs" }
-            checkProof(result["proof"], data)
+            val checked = checkProof(result["proof"], data)
             withContext(fileIoContext) {
                 require(profile.check(files) == resolved) { "Native profile canonical paths changed" }
                 require(ContentId.of(NativeHornProfile.boundedRead(files, path, INPUT_LIMIT)).value == report["inputCid"]) { "Native input changed" }
             }
-            return result
+            // The native certificate is retained unchanged. This sibling is a host projection of
+            // the same certificate check, not a second search or an independent semantic oracle.
+            return result + _m["checkedProof" j checked?.plus(_m["inputCid" j report["inputCid"]])]
         } finally {
             withContext(NonCancellable + fileIoContext) { files.deleteRecursively(directory) }
         }
     }
 
     /** Verify only the supplied certificate; no theorem search or replacement inference. */
-    private fun checkProof(proof: Any?, data: Map<String, Any?>) {
-        if (proof == null) return
+    private fun checkProof(proof: Any?, data: Map<String, Any?>): Map<String, Any?>? {
+        if (proof == null) return null
         fun atom(value: Any?): List<String> {
             val words = value as? List<*> ?: error("Native atom required")
             require(words.isNotEmpty() && words.all { it is String }) { "Native scalar atom required" }
@@ -263,18 +283,45 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
                 require(put(atom(rule[2]).first() + "#${index + 1}", rule) == null)
             }
         }
+        val steps = mutableListOf<Map<String, Any?>>()
+        val sources = linkedMapOf<String, Any?>()
+        val originalVariables = mutableMapOf<String, Set<String>>()
+        fun references(witnesses: List<*>): List<String> = witnesses.map {
+            val source = it as Map<*, *>
+            val id = source["sourceNodeId"] as? String ?: error("Native source node identity required")
+            val previous = sources.put(id, source)
+            require(previous == null || previous == source) { "Native source node identity is ambiguous" }
+            id
+        }
+        fun term(token: String): Map<String, Any?> {
+            // The projection wrapper is longer than a valid short-predicate source atom.
+            val parsed = KifSemantic.decode("(term $token)", KifDecodeLimits(maxChars = 65_543)).formula as KifFormula.Predicate
+            return when (val value = parsed.arguments.single()) {
+                is KifTerm.Constant -> _m["kind" j "constant", "token" j value.token]
+                is KifTerm.Literal -> _m["kind" j "literal", "spelling" j value.spelling]
+                else -> error("Native binding must be a ground scalar term")
+            }
+        }
         var count = 0
-        fun visit(value: Any?, depth: Int): List<String> {
+        fun visit(value: Any?, path: List<Int>, depth: Int): List<String> {
             require(depth <= 64 && ++count <= 4096) { "Native proof limit" }
             val node = value as? Map<*, *> ?: error("Native proof node required")
             val fact = ground(node["fact"])
             val witnesses = node["sources"] as? List<*> ?: error("Native proof sources required")
             require(witnesses.isNotEmpty()) { "Native proof witnesses required" }
+            val step = linkedMapOf<String, Any?>()
+            step["path"] = path
+            step["normalForm"] = "(${fact.joinToString(" ")})"
+            step["predicate"] = fact.first()
+            step["arguments"] = fact.drop(1).map(::term)
             if (node["asserted"] == true) {
                 require(node.keys == _s["fact", "asserted", "sources", "witnessMode"] &&
                     node["witnessMode"] == "any-one-asserted-source") { "Native asserted proof contract differs" }
                 val eligible = factsByAtom[fact].orEmpty().map { it["source"] }
                 require(witnesses.all { it in eligible }) { "Native leaf source does not assert this fact" }
+                step["kind"] = "asserted"
+                step["witnessMode"] = "any-one-asserted-source"
+                step["sourceNodeIds"] = references(witnesses)
             } else {
                 require(node.keys == _s["fact", "rule", "sources", "from"]) { "Native derived proof contract differs" }
                 val id = node["rule"] as? String ?: error("Native proof rule required")
@@ -285,6 +332,7 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
                 val body = if (antecedent.firstOrNull() == "and") antecedent.drop(1).map(::atom) else _l[atom(antecedent)]
                 val children = node["from"] as? List<*> ?: error("Native proof premises required")
                 require(children.size == body.size) { "Native proof premise count differs" }
+                val ruleSources = references(witnesses)
                 val bindings = mutableMapOf<String, String>()
                 fun match(pattern: List<String>, actual: List<String>, bind: Boolean = true) {
                     require(pattern.size == actual.size) { "Native proof atom arity differs" }
@@ -296,17 +344,96 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
                         } else require(expected == observed) { "Native proof rule atom differs" }
                     }
                 }
-                for (i in body.indices) match(body[i], visit(children[i], depth + 1))
+                for (i in body.indices) match(body[i], visit(children[i], path + i, depth + 1))
                 match(atom(rule[2]), fact, bind = false)
+                step["kind"] = "derived"
+                step["rule"] = id
+                step["ruleSourceNodeIds"] = ruleSources
+                step["rulePattern"] = rule
+                step["premises"] = body.indices.map { i -> _m["ordinal" j i, "path" j (path + i), "pattern" j body[i]] }
+                step["bindings"] = bindings.entries.map { (variable, token) ->
+                    // Exported variables retain their original spelling with the current bridge.
+                    // A matching source occurrence is named explicitly, never a global variable.
+                    val originals = ruleSources.filter { sourceId ->
+                        variable in originalVariables.getOrPut(sourceId) {
+                            KifSemantic.decode((sources.getValue(sourceId) as Map<*, *>)["text"] as String).freeVariables
+                        }
+                    }
+                    _m["variable" j variable, "rule" j id, "ruleSourceNodeIds" j ruleSources,
+                        "originalVariableSourceNodeIds" j originals, "term" j term(token)]
+                }
             }
+            steps.add(step)
             return fact
         }
-        require(visit(proof, 0) == atom(data["query"])) { "Native proof root differs from query" }
+        require(visit(proof, emptyList(), 0) == atom(data["query"])) { "Native proof root differs from query" }
+        val checked = _m["kind" j "native-horn-checked-proof/1", "frameId" j data["frameId"],
+            "query" j data["query"], "semantics" j data["semantics"], "firstProofOnly" j true,
+            "sumoNixRevision" j data["sumoNixRevision"], "mlirNixRevision" j data["mlirNixRevision"],
+            "referenceMode" j "normalized-export-atoms-and-rule-scoped-variables-not-source-spans",
+            "steps" j steps, "sources" j sources,
+            "verification" j "supplied-native-certificate-only-not-independent-inference"]
+        require(jsonOf(checked).encodeToByteArray(throwOnInvalidSequence = true).size <= CHECKED_PROOF_LIMIT) {
+            "Native checked proof projection limit"
+        }
+        return checked
     }
 
     companion object {
         const val INPUT_LIMIT = 4 * 1024 * 1024
         const val OUTPUT_LIMIT = 1024 * 1024
+        const val CHECKED_PROOF_LIMIT = 16 * 1024 * 1024
+        const val MANUAL_POLICY = "host-manual-whole-positive-horn/1"
+
+        /** Pure preparation for trusted host fixture callers; no approval is inferred from text. */
+        internal fun manualInput(revision: Long, source: KifSourceAssertion, query: String): Map<String, Any?> {
+            require(source.review == KifReview.APPROVED) { "Manual theory requires explicit host assumptions" }
+            require(source.id.length in 1..1024 && source.sourceRevision.length in 1..1024 && source.text.length <= 65_536) {
+                "Manual source bound"
+            }
+            for (value in s_[source.id, source.sourceRevision].view) value.encodeToByteArray(throwOnInvalidSequence = true)
+            val bytes = source.text.encodeToByteArray(throwOnInvalidSequence = true)
+            require(bytes.size <= 256 * 1024 && ContentId.of(bytes) == source.sourceCid) { "Manual whole-source identity differs" }
+            val decoded = KifSemantic.decodeAll(source.text)
+            require(decoded.size in 1..32) { "Manual theory supports 1..32 complete forms" }
+            val forms = decoded.mapIndexed { ordinal, form ->
+                _m["kind" j "host-manual-horn-form/1", "sourceCid" j source.sourceCid.value,
+                    "sourceRevision" j source.sourceRevision, "ordinal" j ordinal,
+                    "normalForm" j form.syntax.toKifString()]
+            }
+            val assertions = forms.map { form ->
+                val id = "manual-form:" + ContentId.of(CanonicalCbor.encodeMap(form)).hex
+                KifSourceAssertion(id, source.sourceCid, source.sourceRevision, source.review, form["normalForm"] as String)
+            }
+            val export = SumoNixBridge.compile(revision, assertions, query)
+            val data = reifyMap(export.inputJson)
+            require((data["excluded"] as List<*>).isEmpty() &&
+                (data["facts"] as List<*>).size + (data["rules"] as List<*>).size == decoded.size) {
+                "Whole manual source is outside the positive Horn profile"
+            }
+            // Match the existing native adapter's lexical restrictions before any execution.
+            val reserved = _s["and", "or", "not", "exists", "forall", "equal", "=>", "<=>", "iff", "implies", "equivalence",
+                "modalAttribute", "believes", "knows", "desires", "holdsDuring", "holds", "necessarily", "possibly"]
+            fun relation(raw: Any?) {
+                val words = raw as List<*>
+                require(words.first() !in reserved && words.all { !(it as String).startsWith('@') }) {
+                    "Whole manual source contains a reserved native relation or term"
+                }
+            }
+            (data["facts"] as List<*>).forEach(::relation)
+            for (raw in data["rules"] as List<*>) {
+                val rule = raw as List<*>
+                val body = rule[1] as List<*>
+                if (body.first() == "and") body.drop(1).forEach(::relation) else relation(body)
+                relation(rule[2])
+            }
+            relation(data["query"])
+            return _m["inputJson" j export.inputJson, "inputCid" j export.inputCid.value,
+                "frameId" j export.frameId.value, "policy" j MANUAL_POLICY,
+                "source" j _m["id" j source.id, "sourceCid" j source.sourceCid.value,
+                    "sourceRevision" j source.sourceRevision, "text" j source.text],
+                "sourceForms" j assertions.mapIndexed { i, assertion -> forms[i] + _m["id" j assertion.id] }]
+        }
     }
 }
 
