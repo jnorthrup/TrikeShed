@@ -1,0 +1,28 @@
+{
+  "recordedAt": "2026-11-05T03:42:03.357392+00:00",
+  "testedSourceCommit": "d80e698139c69e70c594940b007a22673b193937",
+  "mergedHead": "4ef53ef2ad893f698bd0a335a70e671e9f234267",
+  "command": [
+    "git",
+    "diff",
+    "--exit-code",
+    "d80e698139c69e70c594940b007a22673b193937",
+    "4ef53ef2ad893f698bd0a335a70e671e9f234267",
+    "--",
+    "src",
+    "release",
+    "build.gradle.kts",
+    "gradle",
+    "gradle.properties",
+    "settings.gradle.kts",
+    "PRELOAD.md",
+    "AGENTS.md"
+  ],
+  "exit": 0,
+  "output": "",
+  "frozenRefCounts": {
+    "initial": 540,
+    "publication": 540
+  },
+  "allFrozenTipsContained": true
+}

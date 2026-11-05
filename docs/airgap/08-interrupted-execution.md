@@ -143,7 +143,16 @@ then expected the cancellation wording for an ordinary transport failure.
 Both failed attempts and their cleanup remain retained. The corrected
 harness uses the existing `/api/lcnc/run/debug` route and checks the actual
 unknown-outcome/no-retry message. Production UI behavior was not weakened
-to satisfy either mistaken assertion.
+to satisfy either mistaken assertion. The first extracted-archive document
+scenario also opened the facets drawer before asynchronous preset loading
+and fitting finished; the production revision guard correctly invalidated
+that read. Waiting for “Loaded for review” alone did not close that race:
+`fit()` schedules `saveCameraSoon()`, which later calls the existing canvas
+save and invalidates a pending inspection. The harness now records that
+refusal and explicitly clicks the visible Refresh control before continuing.
+It caps those read refreshes, retains each reason, and never resubmits a run.
+Both failed archive scenarios remain in evidence with recovered interrupted
+rows and clean recovery exits. No production guard was weakened.
 
 The complete JDK remains bundled with 23 application dependency jars and the
 three application/entry/web jars. Vendor JDK modifications and embedded
@@ -153,3 +162,51 @@ extraction and resource interpretation remain those of R4a/R4b. This
 increment closes only the named interruption/retry/inspection scenarios;
 dense recursive visualization, broader LCNC authoring, arbitrary-write
 crash safety and wider deployment environments still require work.
+
+## Accepted R4c checkpoint
+
+Tested source `d80e698139c69e70c594940b007a22673b193937` passed 247 selected JVM
+tests; one external native Horn endpoint check was conditionally skipped
+because that separate profile is unconfigured. JS, Wasm JS, Wasm WASI and
+Linux x64 compilation and Documents/Spacegraph staging passed without
+external networking. These checks do not claim every repository test ran.
+
+The three extracted-archive scenarios each pass seven browser cases and an
+independent retained-state audit. Their nine actual JVM processes are
+recorded separately; each writer exits 137 without cleanup, and each
+recovery/inspector exits zero after draining. All six startup refusals and
+five package-integrity refusals pass; restored package verification passes.
+
+| Before node | Process | Startup seconds | Java VmHWM KiB | Java CPU seconds | Exit |
+|---|---|---:|---:|---:|---:|
+| document | run | 3.442 | 420512 | 9.420 | 137 |
+| document | recover | 2.844 | 413560 | 10.530 | 0 |
+| document | inspect | 2.253 | 356512 | 7.990 | 0 |
+| scan | run | 3.236 | 414956 | 9.310 | 137 |
+| scan | recover | 2.840 | 433668 | 10.230 | 0 |
+| scan | inspect | 2.243 | 367012 | 7.760 | 0 |
+| selection | run | 3.239 | 456408 | 10.400 | 137 |
+| selection | recover | 2.844 | 475812 | 11.280 | 0 |
+| selection | inspect | 2.050 | 366884 | 7.270 | 0 |
+
+These are individual observations on the shared verification host, not a
+benchmark distribution. VmHWM is the Java process high-water mark. CPU and
+uptime snapshots precede the kill or normal shutdown; browser, controller
+and build-process resource usage is excluded. JVM heap/processor settings
+remain separate from OS limits.
+
+The runtime has 1,339 manifested files totaling
+997,445,898 bytes, including 136,684,531 jar bytes.
+Two archives of the pinned tree have identical bytes; this establishes
+deterministic packaging, not reproducible vendor/source compilation.
+
+| Delivery | Compressed bytes | SHA-256 |
+|---|---:|---|
+| Runtime | 460,562,545 | `13d6c58e339cfd5ba14d71b8e68ab4a1cb0c14eac5f5c931814a6f051b24054c` |
+| Source companion | 680,528,672 | `44cfdf2bea24fd63d3eae88bf8308b62e05601d122e3f46736095fcb2a61817a` |
+
+The [verification packet](evidence/r4c-20261105/verification.json) identifies
+all accepted and failed attempts, exact harnesses, original logs, native
+ownership evidence and source hashes. The [D3M packet](../d3m/evidence/2026-11-05-airgap-r4c/SHA256.json)
+preserves the two textual conflict stage sets and concurrent test-fix intent.
+Publication verifies the tested source equivalence and every frozen tip.

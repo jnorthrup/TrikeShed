@@ -1,0 +1,15 @@
+86 39 0:27 /workspace/airgap-r4c-proof/unpacked/airgap-document-rootfs / ro,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/lower-0,upperdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/upper,workdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/work,index=off,metacopy=off
+87 86 0:27 /workspace/airgap-r4c-proof/interruption-selection-archive01/state /state rw,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/lower-0,upperdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/upper,workdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/work,index=off,metacopy=off
+88 86 0:38 / /tmp rw,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+89 86 0:39 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+90 86 0:40 / /dev rw,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+91 90 0:31 /null /dev/null rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+92 90 0:31 /zero /dev/zero rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+93 90 0:31 /full /dev/full rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+94 90 0:31 /random /dev/random rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+95 90 0:31 /urandom /dev/urandom rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+96 90 0:31 /tty /dev/tty rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+97 90 0:41 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,mode=620,ptmxmode=666
+98 86 0:42 / /opt/trikeshed/assets ro,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+99 86 0:31 /null /usr/bin/pdfinfo ro,nosuid,nodev master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+100 86 0:31 /null /usr/bin/pdftotext ro,nosuid,nodev master:3 - tmpfs tmpfs rw,size=65536k,mode=755

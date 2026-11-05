@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ProjectCorpusVisitTest[jvm]" tests="27" skipped="0" failures="0" errors="0" timestamp="2026-11-05T03:35:09.144Z" hostname="0d6dfba25614" time="0.159">
+  <properties/>
+  <testcase name="visitorCanStopBeforeASecondDocumentIsRead()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.003"/>
+  <testcase name="extractionDoesNotMineAfterEvidenceReadFailure()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.006"/>
+  <testcase name="casCapturePreservesCompoundTypesAndAliases()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.005"/>
+  <testcase name="visitorDoesNotSwallowCancellationCaughtByItsLastCallback()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.003"/>
+  <testcase name="duplicateAttachmentFieldsAreRejectedBeforeRevisionPublication()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.001"/>
+  <testcase name="visitorEmitsOnCallerContextAndStopsWhenItsJobIsCancelled()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.009"/>
+  <testcase name="visitorRetainsCommittedIdentityWhenFieldListsAreMutated()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="casCaptureRetainsDistinctMapKeysWithTheSameCanonicalText()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="missingOriginDoesNotHideCorruptCompletionOrTriggerMining()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.005"/>
+  <testcase name="extractionDoesNotCombineOldAnchorsWithAReplacementCompletion()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.008"/>
+  <testcase name="casBodyBytesRemainStableWhenHeadAliasesChangeDuringPublication()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="casBodyBytesOwnEncodedCompoundContentsWhileHeadPreservesTypes()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="missingProjectIsAnIncompleteVisit()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.001"/>
+  <testcase name="visitorFailsIfTheProjectIsRemountedMidScan()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.003"/>
+  <testcase name="extractionPropagatesCancellationRaisedDuringSynchronousEvidenceRead()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.004"/>
+  <testcase name="extractionRequiresVerifiedPdfFootnotes()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.008"/>
+  <testcase name="visitorObservesCurrentRevisionsAndSkipsDeletedOrNewSlots()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="casCaptureRetainsOpaqueValuesWhileHashingTheirCanonicalString()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.0"/>
+  <testcase name="casCaptureRejectsCyclesAndExcessiveDepthBeforePublication()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.001"/>
+  <testcase name="casStoreCapturesAttachmentFieldsBeforeHashingAndPublication()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.001"/>
+  <testcase name="mountedReadsVerifyBytesEvenWhenTheCidIsUnchanged()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="mountedReadsFailClosedWhenTheExposedHeadBodyIsMutated()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.004"/>
+  <testcase name="conflictsAndIdempotentReplicationShortCircuitBeforeBodyCapture()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="directTextExtractionDoesNotMixSourceRevisions()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.003"/>
+  <testcase name="mountedVisitorMatchesGatewayDeletionAndMissingCidRules()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.002"/>
+  <testcase name="concurrentVisitsOnlyEmitCommittedRevisionTuples()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.065"/>
+  <testcase name="mountedReadsRejectMissingOrInvalidDeclaredLengths()[jvm]" classname="borg.trikeshed.forge.server.ProjectCorpusVisitTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[[OROBOROS] project db project: removed 1 docs under book.pdf.extract-origin.tsv
+[OROBOROS] project db unmounted: project
+[OROBOROS] project db project: removed 1 docs under gone.pdf
+]]></system-err>
+</testsuite>
