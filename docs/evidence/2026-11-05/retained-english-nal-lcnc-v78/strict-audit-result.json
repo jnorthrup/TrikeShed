@@ -1,0 +1,678 @@
+{
+  "recordSha256": {
+    "GO.json": "5d6b2b1c46573caac1cd28ba3e5177a3b6b66d9337bbfc7be806d80d6b854fa9",
+    "startup.json": "749c94b28148985bc9f62318d4b2f92f89f2827c5aab5acf40da79e751a01655",
+    "browser-result.json": "39a31bf0c3acfc7f7f28788f442d9384432e7dd6ad8053d4f683fe7b6f2f99d4",
+    "cleanup.json": "a6c21373a719ce3de0fe05178745875c414ca43c378774a2a56d0b757ad2589f",
+    "reopened.json": "067af39249ca913e873bbcdd9139946019dad003d5ef5cfe18fb555c5d095fd0",
+    "classpath.json": "3153b4a022e98583935b3e84f66a53ad6fb625383d22d325d1bafd4df981198f",
+    "network.json": "3564c2b6c661ff7eff323a9544551f585982f56774d85c2e341f9858c2f4f5fe",
+    "writer-command.json": "70f877c466be9cb9d6ff3afb27df5ff72999b11c67ee84fec00e17cad3f1d75d",
+    "reader-command.json": "9c70d62710a385119055319d7808cd64c7134c63b0bbfaa991060a29b08838bc"
+  },
+  "observerSourceSha256": {
+    "compile.sh": "3c03e301fe8c39d14f3fb1718707452aafc60059b49b92333c715b59dcc7ce7a",
+    "protocol.txt": "27330db9c600a63bf3bf1b81f8ee79b4d0164e97825fdc357e57fe674b7964b4",
+    "Reopen.kt": "9d471c0c5b5697b8e93e4d5456b8ccaf67976942c7a69b1d680f456e6349437a",
+    "run-proof.py": "6915b1b66577dffa7e3297551e66a95910ce81d112950e06dda3ae6d42756ec0",
+    "driver.cjs": "1b11abca4c2eb6fb05e81909f18e57f8b68a71f9dae9896f2096adc8e396d96f",
+    "Fixture.kt": "ab59e08e3148a3cabb1e9404f2824830bcb43c474b75d609fb7b9971bc690d15"
+  },
+  "selectedInputSha256": {
+    "inputs/S12/source.txt": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+    "inputs/S12/request.json": "837df697ec22332dbebba84470e7f82b1744c565f004b858e09f6f38468d6813",
+    "inputs/S12/response.json": "0853437007c98cab17ec3daeb036de25865d928cf32a5580ad6105760c16544e",
+    "inputs/S12/source-row.json": "63066d2e1017b27ad459e22b7b2d847bad2f1fcf7065ae9f29ca5f1e597b1c56",
+    "inputs/S12/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/S12/cas-readbacks/b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0.cbor": "b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+    "inputs/S12/cas-readbacks/2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac.txt": "2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+    "inputs/G03/source.txt": "c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+    "inputs/G03/request.json": "53678b73abc489d400ca304db4291d7092812393623840cf861641f437548a29",
+    "inputs/G03/response.json": "428148d3b42291a10211d93be569aaa031ebf07d0585646753795c92551e69e6",
+    "inputs/G03/source-row.json": "9bb59996e14e2b9e5bc1737276abc38fdd0eb29be19dd38621cabba6823635ff",
+    "inputs/G03/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/G03/cas-readbacks/da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85.cbor": "da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+    "inputs/G03/cas-readbacks/c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b.txt": "c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+    "inputs/G04/source.txt": "873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+    "inputs/G04/request.json": "d71453601615b585ece646c5b8bef30b392d43f2a9213204a9e7ea3f89b76b81",
+    "inputs/G04/response.json": "9ba3711a023d8ea6bec3383f96c0c5863212314cf6dd3e9887fcba93aeb8e14b",
+    "inputs/G04/source-row.json": "2ce557f88c3e029e502dbf63406d39b5f8dffe9764654ae320a02b1c7c5290d3",
+    "inputs/G04/status.txt": "c11e3f4837efde2441e23a7b9da02131f53bf59fddeb7147c4ab81afe400460f",
+    "inputs/G04/cas-readbacks/f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec.cbor": "f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+    "inputs/G04/cas-readbacks/873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1.txt": "873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+    "inputs/S12/prior-v77-common-report.json": "70b6beb7b9d4cbcfea58b3e2585c6e32dbcae2ad7980761c895b3d2b74a5928e"
+  },
+  "writerPid": 129422,
+  "readerPid": 129618,
+  "fullOutputBytes": 280607,
+  "afterCloseJsonReadbacks": 25,
+  "mutatedCopyControls": [
+    {
+      "mutation": "wrong-NAL-milli-weight",
+      "result": "REJECTED",
+      "reason": "Existing Float32 NAL milli-evidence result"
+    },
+    {
+      "mutation": "substituted-source-quotation",
+      "result": "REJECTED",
+      "reason": "Every exact original/extracted quotation and occurrence linkage in source order"
+    },
+    {
+      "mutation": "unconfirmed-owner-mislabeled-current",
+      "result": "REJECTED",
+      "reason": "Outer current check distinct from inner historical report"
+    },
+    {
+      "mutation": "computed-frame-as-full-output-receipt",
+      "result": "REJECTED",
+      "reason": "Computed frame CID cannot stand in for a retained full output receipt"
+    },
+    {
+      "mutation": "fresh-refusal-borrows-old-completed-report",
+      "result": "REJECTED",
+      "reason": "Fresh refusal cannot borrow an old completed report"
+    },
+    {
+      "mutation": "reader-reuses-live-writer-identity",
+      "result": "REJECTED",
+      "reason": "Distinct actual writer/after-close reader PIDs"
+    }
+  ],
+  "result": "PASS_RECORDED_VISUAL_WORKFLOW_CONSISTENCY",
+  "sourceHead": "aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26",
+  "mainSha256": "5370a549d963f871d8bdd81328bc28a3f00a064807334d3dabd47e95d6ddf036",
+  "panelsSha256": "fd19345d638b5542c9d36f5ccf1ea6887542368d35dd716984ff01bb23979c3a",
+  "runs": 8,
+  "sourceFocus": 5,
+  "reports": [
+    {
+      "status": "EVALUATED",
+      "premises": 4,
+      "occurrences": 5,
+      "attemptedPairs": 12,
+      "results": [
+        [
+          "DEDUCTION",
+          "ALPHA",
+          "GAMMA",
+          289,
+          0
+        ],
+        [
+          "INDUCTION",
+          "DELTA",
+          "GAMMA",
+          224,
+          0
+        ],
+        [
+          "INDUCTION",
+          "GAMMA",
+          "DELTA",
+          224,
+          0
+        ]
+      ],
+      "basis": [
+        "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+      ]
+    },
+    {
+      "status": "EVALUATED",
+      "premises": 4,
+      "occurrences": 5,
+      "attemptedPairs": 12,
+      "results": [
+        [
+          "DEDUCTION",
+          "ALPHA",
+          "GAMMA",
+          289,
+          0
+        ],
+        [
+          "INDUCTION",
+          "DELTA",
+          "GAMMA",
+          224,
+          0
+        ],
+        [
+          "INDUCTION",
+          "GAMMA",
+          "DELTA",
+          224,
+          0
+        ]
+      ],
+      "basis": [
+        "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+      ]
+    },
+    {
+      "status": "EVALUATED",
+      "premises": 4,
+      "occurrences": 5,
+      "attemptedPairs": 12,
+      "results": [
+        [
+          "DEDUCTION",
+          "ALPHA",
+          "GAMMA",
+          289,
+          0
+        ],
+        [
+          "INDUCTION",
+          "DELTA",
+          "GAMMA",
+          224,
+          0
+        ],
+        [
+          "INDUCTION",
+          "GAMMA",
+          "DELTA",
+          224,
+          0
+        ]
+      ],
+      "basis": [
+        "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+      ]
+    },
+    {
+      "status": "EVALUATED",
+      "premises": 4,
+      "occurrences": 5,
+      "attemptedPairs": 12,
+      "results": [
+        [
+          "DEDUCTION",
+          "ALPHA",
+          "GAMMA",
+          289,
+          0
+        ],
+        [
+          "INDUCTION",
+          "DELTA",
+          "GAMMA",
+          224,
+          0
+        ],
+        [
+          "INDUCTION",
+          "GAMMA",
+          "DELTA",
+          224,
+          0
+        ]
+      ],
+      "basis": [
+        "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+      ]
+    },
+    {
+      "status": "EVALUATED",
+      "premises": 4,
+      "occurrences": 5,
+      "attemptedPairs": 12,
+      "results": [
+        [
+          "DEDUCTION",
+          "ALPHA",
+          "GAMMA",
+          289,
+          0
+        ],
+        [
+          "INDUCTION",
+          "DELTA",
+          "GAMMA",
+          224,
+          0
+        ],
+        [
+          "INDUCTION",
+          "GAMMA",
+          "DELTA",
+          224,
+          0
+        ]
+      ],
+      "basis": [
+        "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+      ]
+    },
+    {
+      "status": "UNSUPPORTED",
+      "issues": [
+        {
+          "code": "unaccounted-sentence",
+          "sentenceIndex": 0
+        }
+      ]
+    },
+    {
+      "status": "EVALUATED",
+      "premises": 4,
+      "occurrences": 5,
+      "attemptedPairs": 12,
+      "results": [
+        [
+          "DEDUCTION",
+          "ALPHA",
+          "GAMMA",
+          289,
+          0
+        ],
+        [
+          "INDUCTION",
+          "DELTA",
+          "GAMMA",
+          224,
+          0
+        ],
+        [
+          "INDUCTION",
+          "GAMMA",
+          "DELTA",
+          224,
+          0
+        ]
+      ],
+      "basis": [
+        "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+      ]
+    }
+  ],
+  "stateDeltas": [
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b",
+              "lifecycle": "closed",
+              "column": "done",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 3,
+              "lastMoveMs": 1793854623736,
+              "priority": 2,
+              "order": 0,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b"
+            },
+            "versionCid": "sha256:b014ae15e6034690cfc20f42c160dd28f57bdeabb013cf97a6a46a637eb1bbe5"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b/1",
+        "kanban/committed/lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b/2",
+        "kanban/committed/lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b/3",
+        "lcnc/run/49d6a5d6-49bd-4cbf-a0fb-655cfc32b16b"
+      ],
+      "packBefore": {
+        "bytes": 129885,
+        "sha256": "b7c78765e98c7cb656901d0ac035567b7a2a3ff15751ed9d584e1ced2f8ee957"
+      },
+      "packAfter": {
+        "bytes": 351158,
+        "sha256": "7248e2ad78e255123b8db0e1f027a9321618eb7199dcb3203a85c7af58af64f3"
+      }
+    },
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63",
+              "lifecycle": "closed",
+              "column": "done",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 6,
+              "lastMoveMs": 1793854627297,
+              "priority": 2,
+              "order": 1,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63"
+            },
+            "versionCid": "sha256:0bce1315362c9f6f7822f3d870b2fd35e422ef1934447ad0617d66a5ecbfbfbc"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63/4",
+        "kanban/committed/lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63/5",
+        "kanban/committed/lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63/6",
+        "lcnc/run/ec2070e8-8f39-49d7-96be-0c5192f27b63"
+      ],
+      "packBefore": {
+        "bytes": 351158,
+        "sha256": "7248e2ad78e255123b8db0e1f027a9321618eb7199dcb3203a85c7af58af64f3"
+      },
+      "packAfter": {
+        "bytes": 572430,
+        "sha256": "12df272321dea3cf8b7fa191c9658e5c6e721a98a8c733cc10e93fe8df11b91b"
+      }
+    },
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1",
+              "lifecycle": "closed",
+              "column": "done",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 9,
+              "lastMoveMs": 1793854628468,
+              "priority": 2,
+              "order": 2,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1"
+            },
+            "versionCid": "sha256:db286b22515dba2ebb70db4942bd48ed498d9aeeacc873ba0d6283e968c7bdd7"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1/7",
+        "kanban/committed/lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1/8",
+        "kanban/committed/lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1/9",
+        "lcnc/run/02cd03cb-965d-4768-97f5-771b39122dd1"
+      ],
+      "packBefore": {
+        "bytes": 572430,
+        "sha256": "12df272321dea3cf8b7fa191c9658e5c6e721a98a8c733cc10e93fe8df11b91b"
+      },
+      "packAfter": {
+        "bytes": 793703,
+        "sha256": "dcc25a208d8bcc38d5c50f1ee5754073d9b58eb2e054318410bd72585b64bf17"
+      }
+    },
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5",
+              "lifecycle": "closed",
+              "column": "done",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 12,
+              "lastMoveMs": 1793854629786,
+              "priority": 2,
+              "order": 3,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5"
+            },
+            "versionCid": "sha256:4ca870bb54f8e595079cca9c64232e354bcd2a2e5c6b5b5e3a8818ca5835f2e9"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5/10",
+        "kanban/committed/lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5/11",
+        "kanban/committed/lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5/12",
+        "lcnc/run/bf4e15fd-e655-4bac-9648-b2d44de4c9c5"
+      ],
+      "packBefore": {
+        "bytes": 793703,
+        "sha256": "dcc25a208d8bcc38d5c50f1ee5754073d9b58eb2e054318410bd72585b64bf17"
+      },
+      "packAfter": {
+        "bytes": 1014969,
+        "sha256": "0fb5b02f398559902fa3bd5099f3554c6fd1494390cbbd06259e1e004143f6d9"
+      }
+    },
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807",
+              "lifecycle": "closed",
+              "column": "done",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 15,
+              "lastMoveMs": 1793854631521,
+              "priority": 2,
+              "order": 4,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807"
+            },
+            "versionCid": "sha256:3036cb8a3089312bad17a4d1a225547f99b649f119e3dd5a38d5b854bf72af4a"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807/13",
+        "kanban/committed/lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807/14",
+        "kanban/committed/lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807/15",
+        "lcnc/run/64537f12-6e61-4a4c-bfca-3b1a88b50807"
+      ],
+      "packBefore": {
+        "bytes": 1014969,
+        "sha256": "0fb5b02f398559902fa3bd5099f3554c6fd1494390cbbd06259e1e004143f6d9"
+      },
+      "packAfter": {
+        "bytes": 1236219,
+        "sha256": "065925ddda370610cef6c648e09a3be2866788aa43f43405338089256c158ef7"
+      }
+    },
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f",
+              "lifecycle": "closed",
+              "column": "done",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 18,
+              "lastMoveMs": 1793854633509,
+              "priority": 2,
+              "order": 5,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f"
+            },
+            "versionCid": "sha256:525ee6d24bcddd903743a667071bd6fd28aea51d074f20d7971e1afb4551d9d8"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f/16",
+        "kanban/committed/lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f/17",
+        "kanban/committed/lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f/18",
+        "lcnc/run/8cfcabe8-3de9-4c5d-8d51-02e22cc6df2f"
+      ],
+      "packBefore": {
+        "bytes": 1236219,
+        "sha256": "065925ddda370610cef6c648e09a3be2866788aa43f43405338089256c158ef7"
+      },
+      "packAfter": {
+        "bytes": 1322296,
+        "sha256": "b1cdb62d342ec185ed3fe87d26d8583dc171874df13d93ee6882574015ef118c"
+      }
+    },
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86",
+              "lifecycle": "closed",
+              "column": "done",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 21,
+              "lastMoveMs": 1793854636792,
+              "priority": 2,
+              "order": 6,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86"
+            },
+            "versionCid": "sha256:dbf7aee88c99ee2f56539772f4bca573cc16ae1e99ad6c67610c3ab0e75689a3"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86/19",
+        "kanban/committed/lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86/20",
+        "kanban/committed/lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86/21",
+        "lcnc/run/e1d93820-bc8d-4604-88f3-a7d34f90aa86"
+      ],
+      "packBefore": {
+        "bytes": 1322296,
+        "sha256": "b1cdb62d342ec185ed3fe87d26d8583dc171874df13d93ee6882574015ef118c"
+      },
+      "packAfter": {
+        "bytes": 2042460,
+        "sha256": "b681e8a27d53a324dd408a8416067e7ce66300f8671730eb0ea8c969ff8a4469"
+      }
+    },
+    {
+      "reteChanges": [
+        {
+          "partition": "board",
+          "id": "lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1",
+          "before": null,
+          "after": {
+            "partition": "board",
+            "id": "lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1",
+            "fields": {
+              "kind": "card",
+              "jobId": "lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1",
+              "lifecycle": "failed",
+              "column": "blocked",
+              "dependencies": [],
+              "revision": 3,
+              "lastSequence": 24,
+              "lastMoveMs": 1793854640098,
+              "priority": 2,
+              "order": 7,
+              "strikes": 0,
+              "owner": "lcnc-runner",
+              "parent": "",
+              "models": [],
+              "fanout": 0,
+              "agent": "",
+              "executionFamily": "lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1"
+            },
+            "versionCid": "sha256:7b212600721c3d12608c60adf235df3a856dde732219da962245bf5aa6d3d0bd"
+          }
+        }
+      ],
+      "changedBlackboardKeys": [
+        "kanban/committed/lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1/22",
+        "kanban/committed/lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1/23",
+        "kanban/committed/lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1/24",
+        "lcnc/run/acc1c68c-d682-4257-b698-0741cb7191b1"
+      ],
+      "packBefore": {
+        "bytes": 2043235,
+        "sha256": "45b86d13dce65ccc255f1c450ba1197bfbfdb4583cbde4b5a311ee8f3d4f0d4e"
+      },
+      "packAfter": {
+        "bytes": 2067301,
+        "sha256": "97c9dfc4e2a8b2f4aa1b7433f867d7688390b2ac87a285baa2828dbea6241911"
+      }
+    }
+  ],
+  "changedWorkflowFactKinds": {
+    "card": 8
+  },
+  "artifactVerification": "actual frozen main/browser bytes rehashed plus recorded metadata/class origins",
+  "scope": "Recorded selected-source and production-workflow consistency only; no semantic truth/parser authentication/independence/current authority after amendment/live observation admission/global OS seal. Omitted full pack/prefix bytes remain external to this package. Historical REF paths are recorded metadata; they are not asserted active for the selected latest-BLOB reads, nor authenticated as available paths by public replay. No portable CAS availability is established.",
+  "auditScriptSha256": "708ea90441ae151e1d8092ce92e37e68339b3440c18074ebfe78f606f400bf0e",
+  "supportScriptSha256": {
+    "visual_checks.py": "051115f91dfae0048e9be4e2ce1be2c25b502be42a3a1fcdd4d9a1c9c066832f",
+    "v77-audit.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+  }
+}
