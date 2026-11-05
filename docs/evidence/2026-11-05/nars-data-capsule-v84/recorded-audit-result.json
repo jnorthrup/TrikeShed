@@ -1,0 +1,109 @@
+{
+  "result": "PASS_RECORDED_DATA_CAPSULE_CONSISTENCY",
+  "sourceHead": "87e7bb3e945546137c595ff5aaf53781f4168275",
+  "mainSha256": "f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff",
+  "readerPid": 150089,
+  "semanticInputFiles": 3,
+  "semanticInputBytes": 372953,
+  "inputData": {
+    "beliefs.wal": {
+      "bytes": 637,
+      "sha256": "b03f753a36f90c205fb45d9f67c4ee5736a0779118341b3789fc30abfaf32da4"
+    },
+    "cas/pack": {
+      "bytes": 366478,
+      "sha256": "a7ba5f6e7c0e0cb25909566ba31169b372984c68e54e8711e69bcdf61a71a566"
+    },
+    "host/.kanban/board.wal": {
+      "bytes": 5838,
+      "sha256": "eb04f8089e2231334d3b29ef67bd9e5861491dbf63590aa45d6d641f4d164cdd"
+    }
+  },
+  "pack": {
+    "records": 166,
+    "BLOB": 166,
+    "REF": 0,
+    "fullDigestUnique": 166,
+    "actualBoundedReads": 166,
+    "selectedUniqueExports": 113
+  },
+  "beliefFrames": 6,
+  "beliefProjection": {
+    "events": [
+      "R",
+      "B",
+      "A",
+      "A",
+      "D",
+      "E"
+    ],
+    "receiptRecords": 1,
+    "resident": {},
+    "spill": {
+      "4616048923953881095": "sha256:ce05118cfa852ac9a0fea51347413911b12e8698aae10c5c896901b66cad82a8"
+    }
+  },
+  "boardFrames": 42,
+  "recoveredCards": 14,
+  "queryStatus": "MATCHES_IN_COMPLETE_SOURCE",
+  "residentStatus": "MATCH_NOT_RESIDENT",
+  "typedTargets": {
+    "angular": null,
+    "propositionCid": null
+  },
+  "maskedOldPathProbes": 6,
+  "runtime": {
+    "jars": 120,
+    "observerClasses": "/workspace/library-files/nars-data-capsule-v84-proof/observer-attempt1",
+    "assetJars": 0
+  },
+  "mutatedCopyControls": [
+    {
+      "mutation": "old-producer-path-still-visible",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "changed-pack-payload",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "changed-belief-WAL-frame",
+      "result": "REJECTED"
+    },
+    {
+      "mutation": "typed-target-revives-evicted-documentary-match",
+      "result": "REJECTED"
+    }
+  ],
+  "recordSha256": {
+    "capsule-manifest.json": "3e026053dad4948be085e5f37c8475a70bf2e8a88df4b4ab193f90c26afce44a",
+    "verification-manifest.json": "92139644ed714b24aa5072709e2c8e8c1d6f9e1976e5ba7b0f21c3c21e38dd64",
+    "data-copy-manifest.json": "a6d077d21859cbc303eb4851cfba52cc2006b534ed429b6f6f6235866131c3ba",
+    "classpath.json": "1de4cb37dbb0f3c70f6baf4d98cb1ae698a0e06d44bf16596f638fbea16cfa56",
+    "authorization.json": "d93de9e0107d3d2fa885793720329f43dd480439a11a2a1b6645d4108ef4e893",
+    "summary.json": "ee0b3da7d5d0a4f19bc8e5abd8ff1b41ccba8692399588305f01cc05ab8cd2b7",
+    "attempt2/result.json": "6ede5fec0a93966100ca7bf6158d7dcb9041673b56070bda87031b779bbbb0b6",
+    "attempt2/controller-before.json": "2b99e0de1a8861df02368dca07a37d92e2ec05fa40b86dba5c21d02a622b32f8",
+    "attempt2/controller-after.json": "e28ebfccb3b99b367e15cb984c59919768e6aaa21b561c2e74839188338e515c",
+    "attempt2/namespace-command.json": "980fe1a72b60c1d624d75ec7849cc4221bf68f13921e7fe19123903f8e3108eb",
+    "attempt2/network.json": "42ba3f5eeb06589a7ec74923d7a54a745df25130a896ec2bfa469db1a8014f34",
+    "attempt2/reader-command.json": "ce6e2ec4ccb76052969df738df50b6be2606ab79f2369d9f959e911d2435a6c3",
+    "attempt2/compile-reuse.json": "7161ce6af3ea0469257e4fe4c3b844085f70479e41763eb8ca4f49778af1ef9a"
+  },
+  "observerSourceSha256": {
+    "CapsuleReader.kt": "69f0c11b0a1ecc0c633acd3051bb7c54712c805808907cc91deab9884dcea1a0",
+    "authorization.json": "d93de9e0107d3d2fa885793720329f43dd480439a11a2a1b6645d4108ef4e893",
+    "compile.sh": "02921e743e599dcd7dbf7f2736b53e6d57f952d543130c59a00d5ca1cf939ade",
+    "inside.py": "b0d837e364e653aa0010daacdc48a022b5651da3bedd6ea7667987a9a5ca7828",
+    "protocol.txt": "d94d5262297d59a089cda8e20a12792ebab9967758a9ec24120a7c8c48da0b6e",
+    "run.py": "8b7c6d0bda971bca07286475b4592e1e7b0619f8ce28374a26cbb7a626654fc4"
+  },
+  "originalDataVerification": "captured independent-controller before/after hashes agree with capsule bytes; original paths are not opened in default audit mode",
+  "externalArtifactVerification": "recorded metadata only; external executable/runtime/original-path availability not checked",
+  "scope": "Independent supplied-data and recorded-observation consistency for local relocation, production replay and one typed documentary query while old producer root is masked. Three semantic input files are complete for this observed case, not an executable/model bundle. Java/main+119JARs/new observer and verification metadata remain external. No new admission/attention/revival, English/NLP/model use, source authentication/currentness/review/semantic truth, fullrootfs/hostileescape/hardware/crash guarantee or IPFS/network federation claim.",
+  "auditScriptSha256": "762b07918ab172a4a24681b7c785f3ae11c074b1182319a73314fa9da2efe330",
+  "supportSha256": {
+    "checks.py": "821d31b608d0d39e0cd90a8cbafab3470bcd53a6d24abd7a7b369497987ed73c",
+    "receipt-core.py.txt": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763"
+  }
+}

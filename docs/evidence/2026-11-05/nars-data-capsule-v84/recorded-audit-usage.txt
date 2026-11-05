@@ -1,0 +1,96 @@
+V84 independent closed-data-capsule audit — FINAL
+
+Selected capsule proof: nars-data-capsule-v84-proof/attempt2, production reader
+PID150089. Source87e7bb3e945546137c595ff5aaf53781f4168275, external main
+f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff.
+Separate from immutable v83 fourteen-case workflow evidence. This audit launches
+no JVM/compiler, parser, query engine, NARS actor, browser, container or namespace.
+
+Restore audit.py.txt as audit.py and checks.py.txt as checks.py in an external
+directory, keeping receipt-core.py.txt beside them unchanged. Python3 stdlib.
+Set PROOF to the extracted directory containing capsule/, attempt1/, attempt2/,
+verification-manifest.json and capsule-manifest.json; set AUDITOR to restored
+scripts and OUT to a separate writable output directory. Run:
+
+python3 "$AUDITOR/audit.py" "$PROOF" \
+ --source-head 87e7bb3e945546137c595ff5aaf53781f4168275 \
+ --main-sha f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff \
+ --out "$OUT"
+
+Default mode is PUBLIC supplied-data/recorded-metadata only. It does NOT open old
+producer paths or external Java/JAR/classes/model files. PASS produces result.json
+and report.txt, exit0. Expected exact output hashes are in manifest.json. Optional
+--check-external-artifacts additionally rehashes current original-data and120JAR
+paths; those external files must exist. That optional mode was not executed by
+this auditor and cannot be reproduced from the data-only public package alone.
+
+Public minimum consumed:
+- capsule/cas/pack366478B, capsule/beliefs.wal637B,
+  capsule/host/.kanban/board.wal5838B =372953B. Exactly these3semantic inputs.
+- capsule-manifest.json, verification-manifest.json, data-copy-manifest.json,
+  classpath.json, authorization.json, summary.json; artifact-metadata/{source-
+  head.txt,sha256.json,classpath.txt}; attempt2/{result.json,controller-before.json,
+  controller-after.json,namespace-command.json,network.json,reader-command.json,
+  compile-reuse.json,reader.exit,namespace.exit}, exact observer-inputs, and all
+  113selected readbacks/*.bin. Also attempt1/compile.exit and its exact observer
+  CapsuleReader.kt for unchanged compiled-source reuse binding.
+Keep original logs/source/protocol/compile/capability/preflight history alongside
+this minimum. No JAR/class/model binaries, original full v83 proof tree, PDF,
+ordinary v83 HTTP matrix or source mirrors are needed. The generated zero-byte
+board.wal.lock may be omitted from public semantic inputs; its actual new-file
+metadata/hash remain in records. The auditor permits it only as generated
+bookkeeping, never as a fourth copied semantic input or transferred lease.
+
+All supplied capsule paths must be regular single-link files, with no symlinks,
+executables, models or extra data. The independent pack parser checks every37byte
+kind/length/digest header and full payload SHA256:166unique BLOB records,0REF.
+All166actual bounded production reads and113selected exports agree with bytes
+inside this new pack. No old file, REF resolver or network fetch is needed for
+these observed data dependencies. Independent WAL1 version/sequence/length and
+CRC32C checks cover configured DOC-LOG1 and board WAL. R,B,A,A,D,E plus exact
+SignalCodec/spill data support final empty replay; not an unconfigured freshbag
+shortcut. All42board pointers resolve to actual copied command bodies;14cards
+bind final run/program/status identities. C2source/ordered tokens/null roleCIDs
+and both canonical source-proposition definitions are checked with unchanged
+independent earlier helpers, not a new inference/query engine.
+
+One actual production NalNodes query reads C2/pays/Tenant and returns complete
+Landlord/plain literal and source-scoped PID, MATCH_NOT_RESIDENT, beliefs[],
+angular:null/propositionCid:null. Query-before/after hashes match all3files; no
+admission/attention/revival occurs. Production strict KIF syntax parsing is part
+of exact-role selection; no new English/CoreNLP/LLM/model execution is claimed.
+Manual synthetic source claims stay unauthenticated/unreviewed/currentness-not-
+checked; this is not legal or semantic truth or a new independence measure.
+
+Actual bwrap command and filtered mountinfo record rootRO, whole old v83 proof
+root tmpfs shadow, new capsule/outputRW, standard/proc and private user/network
+setup. Six exact old pack/WAL/readback/source/observer probes remain absent before
+and after. Actual inside controller/reader share changed mount/net namespaces,
+onlyloUP, no routes and externalTCP ENETUNREACH. This is a recorded local boundary,
+not proof of full R4 rootfs closure, hostile escape resistance, IPFS/federation,
+remote filesystem or power-loss/physical-disk durability. Java, immutable final
+main+119dependencyJARs, newly compiled observer and verification expectations are
+EXTERNAL; three-file data portability is not executable portability. Verification
+manifest is expectations/provenance, not payload resolver or new source authority.
+
+Non-owning controller records original3files unchanged and independent copies
+with distinct inode/linkcount1; default audit checks those recorded hashes against
+supplied data without opening old paths. Production constructor creates a NEW
+empty sidecar. Stat-only while held avoids POSIX lock-descriptor sabotage; after
+close controller hashes the zero-byte file. New lease is not transferred from old
+state. Actual board/bag/worker/parent/CAS/GuestModules drain with zero children.
+
+Preserved history: attempt1 compiled the observer successfully, then private
+namespace loUP failed EPERM before READER JVM launch. Attempt2 grants private
+CAP_NET_ADMIN only to bring loopbackUP; same compiled observer source/classes
+were reused. Controller preflight metadata.mkdir FileExistsError summary is kept,
+with no namespace/reader launched in that preflight. No product/source changes or
+ordinary fourteen-case rerun. Independent first audit passed; its exact script
+snapshot remains. Final adds report and explicit manifest/controller bindings;
+repeat output byte-identical. Four small mutations reject visible old producer
+path, changed pack payload, changed belief WAL frame and typed-target revival.
+
+This audit establishes supplied-data/recorded-observation consistency. It does
+not independently authenticate the producer, execution log or source semantics.
+Prior v83 workflow evidence retains its original scope; v84 is a separate actual
+relocation/replay/query using only the3copied data files plus external runtime.
