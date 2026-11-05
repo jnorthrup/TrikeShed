@@ -1,0 +1,51 @@
+{
+  "kind": "required-anchor-coverage-expectation/1",
+  "execution": "NOT_RUN_BY_IMPLEMENTATION_AGENT; root owns build and execution",
+  "scope": "Manually supplied scorer annotation controls; no predictor, reasoner, bag or training result. Original v71 outputs stay unchanged.",
+  "validDeclaredRequiredAnchorCases": 6,
+  "emptySeat": {
+    "missing": 16,
+    "scored": 0,
+    "requiredAnchorComparableCases": 0,
+    "completeRequiredAnchorCoverageCases": 0,
+    "completeRequiredAnchorCoverageRate": null
+  },
+  "existingPartialControl": {
+    "predictionsPath": "docs/fixtures/2026-11-04/english-symbol-corpus/controls/scorer-contract-predictions.json",
+    "missing": 14,
+    "scored": 2,
+    "groundedAgreements": 2,
+    "requiredAnchorComparableCases": 1,
+    "completeRequiredAnchorCoverageCases": 0,
+    "completeRequiredAnchorCoverageRate": 0.0,
+    "S2": {
+      "groundedAgreement": true,
+      "requiredCount": 2,
+      "matchedCount": 1,
+      "complete": false,
+      "missingRequiredPremiseIds": [
+        "S2:p2"
+      ]
+    },
+    "S6": {
+      "explicitUnknown": true,
+      "requiredAnchorCoverage": null
+    }
+  },
+  "fullAnchorControl": {
+    "predictionsPath": "docs/fixtures/2026-11-05/legal-required-anchor-coverage/full-anchor-predictions.json",
+    "missing": 14,
+    "scored": 2,
+    "groundedAgreements": 2,
+    "requiredAnchorComparableCases": 1,
+    "completeRequiredAnchorCoverageCases": 1,
+    "completeRequiredAnchorCoverageRate": 1.0,
+    "S2": {
+      "groundedAgreement": true,
+      "requiredCount": 2,
+      "matchedCount": 2,
+      "complete": true,
+      "missingAnchors": []
+    }
+  }
+}

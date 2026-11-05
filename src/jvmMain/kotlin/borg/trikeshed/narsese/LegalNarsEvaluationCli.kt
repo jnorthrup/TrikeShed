@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import java.io.ByteArrayOutputStream
@@ -55,8 +56,17 @@ object LegalNarsEvaluationCli {
         offset(row, "begin"), offset(row, "end"), string(row, "quote"),
         LegalEvalWitnessRole.valueOf(string(row, "role")))
 
+    private fun witnessFields(w: LegalEvalWitness): Map<String, Any?> = _m[
+        "excerptCid" j w.excerptCid.value, "begin" j w.begin, "end" j w.end,
+        "quote" j w.quote, "role" j w.role.name]
+
     @JvmStatic
     fun main(args: Array<String>) {
+        println(jsonOf(report(args)))
+    }
+
+    /** Same bounded CLI operation without redirecting process-wide output for callers. */
+    fun report(args: Array<String>): Map<String, Any?> {
         require(args.size in 2..3 && args[0] in setOf("prepare", "score") &&
             (args[0] == "prepare" && args.size == 2 || args[0] == "score" && args.size == 3)) {
             "Usage: LegalNarsEvaluationCli prepare <manifest.json> | score <manifest.json> <predictions.json>"
@@ -72,8 +82,13 @@ object LegalNarsEvaluationCli {
             val id = ContentId(string(row, "excerptCid"))
             val anchors = row["anchors"] as? List<*> ?: error("Expected anchors")
             require(anchors.size <= 64) { "Anchor limit" }
+            val required = row["requiredAnchors"]?.let { value ->
+                val values = value as? List<*> ?: error("Expected requiredAnchors array")
+                require(values.size <= 64) { "Required anchor limit" }
+                values.map { witness(it as? Map<*, *> ?: error("Expected required anchor object"), id) }
+            }
             val c = LegalEvalCase(string(row, "name"), string(row, "proposition"), ContentId(string(row, "originalCid")),
-                id, LegalEvalLabel.valueOf(string(row, "expected")), anchors.map { witness(it as Map<*, *>, id) })
+                id, LegalEvalLabel.valueOf(string(row, "expected")), anchors.map { witness(it as Map<*, *>, id) }, required)
             // Missing or unreadable excerpts become invalid fixtures, never implicit predictions.
             if (id !in excerpts) runCatching {
                 readBounded(string(row, "excerptPath"), minOf(MAX_EXCERPT, MAX_TOTAL_EXCERPT - totalExcerptBytes))
@@ -113,10 +128,20 @@ object LegalNarsEvaluationCli {
             "unacceptedWitnesses" to report.rows.count { it.acceptedWitness == false },
             "labelAgreementRate" to if (report.scored == 0) null else report.labelAgreements.toDouble() / report.scored,
             "groundedAgreementRate" to if (report.scored == 0) null else report.groundedAgreements.toDouble() / report.scored,
+            "requiredAnchorCoverageScope" to "exact annotated quote coverage; independent of label agreement; not proof validity or inference performance",
+            "requiredAnchorCases" to report.requiredAnchorCases,
+            "requiredAnchorComparableCases" to report.requiredAnchorComparableCases,
+            "completeRequiredAnchorCoverageCases" to report.completeRequiredAnchorCoverageCases,
+            "completeRequiredAnchorCoverageRate" to if (report.requiredAnchorComparableCases == 0) null else
+                report.completeRequiredAnchorCoverageCases.toDouble() / report.requiredAnchorComparableCases,
             "rows" to report.rows.mapIndexed { index, it -> mapOf("name" to it.name, "propositionCid" to cases[index].propositionCid.value,
                 "status" to it.status.name, "predicted" to it.predicted?.name,
                 "labelAgrees" to it.labelAgrees, "witnessIntegrity" to it.witnessIntegrity,
-                "acceptedWitness" to it.acceptedWitness, "groundedAgreement" to it.groundedAgreement) })
-        println(jsonOf(result))
+                "acceptedWitness" to it.acceptedWitness, "groundedAgreement" to it.groundedAgreement,
+                "requiredAnchorCoverage" to it.requiredAnchorCoverage?.let { coverage -> _m[
+                    "requiredCount" j coverage.requiredCount, "acceptedQuotes" j coverage.acceptedQuotes,
+                    "matchedCount" j coverage.matchedCount, "missingAnchors" j coverage.missingAnchors?.map(::witnessFields),
+                    "complete" j coverage.complete] }) })
+        return result
     }
 }
