@@ -1,0 +1,1 @@
+{"status": "PASS_RECORDED_DATA_AUDIT", "counts": {"sources": 18, "sentences": 23, "tokens": 201, "nodes": 201, "dependencies": 203, "markers": 48, "copies": 0, "utf8Bytes": 996}, "S12": {"count": 5, "uniqueRuleCids": 4, "admission": "not-performed", "sameSourceOccurrences": "not-independent-evidence"}}

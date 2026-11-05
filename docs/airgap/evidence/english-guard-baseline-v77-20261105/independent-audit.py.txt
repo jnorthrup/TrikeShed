@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Independent retained-baseline record check. No parser/JVM/query/HTTP or build runs.
+Usage: audit.py RECORD_ROOT --out OUTPUT_DIRECTORY
+"""
+import argparse,hashlib,json,re,struct
+from pathlib import Path
+from urllib.parse import urlsplit,unquote
+class AuditError(Exception):pass
+def need(c,m):
+ if not c:raise AuditError(m)
+def sha(b):return hashlib.sha256(b).hexdigest()
+def cid(b):return 'sha256:'+sha(b)
+def b64(s):return base64.b64decode(s,validate=True)
+def load(p):
+ def pairs(rows):
+  out={}
+  for k,v in rows:need(k not in out,'Duplicate JSON key');out[k]=v
+  return out
+ return json.loads(p.read_bytes().decode('utf8',errors='strict'),object_pairs_hook=pairs)
+def utf16(text,begin,end):return text.encode('utf-16-le')[begin*2:end*2].decode('utf-16-le')
+def header(major,n):
+ if n<24:return bytes([major*32+n])
+ for width,ai in [(1,24),(2,25),(4,26),(8,27)]:
+  if n<1<<(width*8):return bytes([major*32+ai])+n.to_bytes(width,'big')
+ raise AuditError('CBOR integer bound')
+def canonical(v):
+ if v is None:return b'\xf6'
+ if isinstance(v,bool):return b'\xf5' if v else b'\xf4'
+ if isinstance(v,int):return header(0,v) if v>=0 else header(1,-1-v)
+ if isinstance(v,float):return b'\xfb'+struct.pack('>d',v)
+ if isinstance(v,str):
+  b=v.encode('utf8',errors='strict');return header(3,len(b))+b
+ if isinstance(v,bytes):return header(2,len(v))+v
+ if isinstance(v,list):return header(4,len(v))+b''.join(map(canonical,v))
+ if isinstance(v,dict):return header(5,len(v))+b''.join(canonical(k)+canonical(v[k]) for k in sorted(v,key=canonical))
+ raise AuditError('Unsupported CBOR value')
+def decode_cbor(data):
+ at=0
+ def read(n):
+  nonlocal at
+  need(at+n<=len(data),'Truncated CBOR');v=data[at:at+n];at+=n;return v
+ def item(depth=0):
+  need(depth<=64,'CBOR depth');tag=read(1)[0];major,ai=tag>>5,tag&31
+  if major==7:
+   if ai in [20,21,22]:return {20:False,21:True,22:None}[ai]
+   if ai==27:return struct.unpack('>d',read(8))[0]
+   raise AuditError('Unsupported CBOR simple')
+  need(ai<28,'Indefinite/reserved CBOR');n=ai if ai<24 else int.from_bytes(read({24:1,25:2,26:4,27:8}[ai]),'big')
+  if major==0:return n
+  if major==1:return -1-n
+  if major==2:return read(n)
+  if major==3:return read(n).decode('utf8',errors='strict')
+  if major==4:return [item(depth+1) for _ in range(n)]
+  if major==5:
+   out={}
+   for _ in range(n):
+    k,v=item(depth+1),item(depth+1);need(isinstance(k,str) and k not in out,'Duplicate/nontext CBOR key');out[k]=v
+   return out
+  raise AuditError('Unsupported CBOR major')
+ out=item();need(at==len(data) and canonical(out)==data,'Noncanonical/trailing CBOR');return out
+def verify(root):
+ frozen=load(root/'frozen-inputs.json');execution=load(root/'execution-record.json')
+ head='0219223a3846887fe283b93598942de332214cd2';main='d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636'
+ manifest_cid='sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd'
+ processor_sha='277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431'
+ need(frozen['sourceHead']==execution['sourceHead']==head and execution['mainJarSha256']==main,'Frozen source/JAR metadata pin')
+ cp,modules=frozen['classpathEntries'],frozen['moduleFiles'];need(len(cp)==120 and len(modules)==29 and cp[0]['sha256']==main,'Actual120-JAR/29-module-file inventory')
+ for row in cp+modules:
+  path=Path(row['file'])
+  with path.open('rb') as stream:actual=hashlib.file_digest(stream,'sha256').hexdigest()
+  need(path.stat().st_size==row['bytes'] and actual==row['sha256'],'Frozen JAR/module byte drift')
+ main_path=Path(cp[0]['file']).resolve();spec=load(root/'inputs/guard-fixtures.json');fixtures={c['id']:c for c in spec['cases']}
+ need(len(fixtures)==17,'Seventeen invented guard input records')
+ totals={k:0 for k in ['sources','sentences','tokens','nodes','dependencies','markers','copies','utf8Bytes']};receipts=[];bodies={}
+ for attempt in ['attempt-first-G01','attempt-remaining']:
+  a=root/attempt;ident=load(a/'runtime-identity.json');origins=load(a/'origins.json')
+  need(set(origins)=={'borg.trikeshed.forge.server.DocumentEnglishWire','borg.trikeshed.graal.subvm.CoreNlpRuntime','borg.trikeshed.rdf.EnglishObservationGraph','borg.trikeshed.nlp.EnglishInspection','borg.trikeshed.narsese.NlpcoreAxiomatics','borg.trikeshed.module.ModuleContext','borg.trikeshed.job.PackCasStore'},'Actual production class-origin set')
+  need(all(urlsplit(uri).scheme=='file' and Path(unquote(urlsplit(uri).path)).resolve()==main_path for uri in origins.values()),'Production class origins differ from pinned JAR')
+  need(ident['airgapConfigured'] is ident['airgapActive'] is True and ident['maxHeap']==3221225472 and ident['processors']==2 and ident['readerConstruction']=='DocumentEnglishWire default; no readerFactory supplied' and ident['moduleManifestCid']==manifest_cid,'Recorded runtime profile/default reader')
+  need(cid((a/'module-MANIFEST.tsv').read_bytes())==manifest_cid,'Actual copied module manifest identity')
+  for result in load(a/'results.json'):
+   key=result['id'];case=a/'cases'/key;request=load(case/'request.json');row=load(case/'source-row.json');body=load(case/'response.json');source=(case/'source.txt').read_bytes();text=source.decode('utf8',errors='strict')
+   need(key not in bodies and (case/'status.txt').read_text().strip()=='200','Unique successful retained case')
+   expected='sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac' if key=='S12' else fixtures[key]['sourceTextCid']
+   need(cid(source)==expected==row['cid']==request['cid']==body['originalCid']==body['extractedTextCid'],'Original/extracted/request/source-byte identity')
+   input_file=root/'inputs'/('sources/S12.txt' if key=='S12' else fixtures[key]['file'])
+   need(input_file.read_bytes()==source,'Exact original input copy')
+   selection={k:request[k] for k in ['project','id','cid','rev','seq']}
+   need(body['selection']==selection and all(row[k]==v for k,v in selection.items()) and body['source']['project']==selection==body['source']['extraction'] and body['sourceSnapshots']==[row],'Retained source revision chain')
+   length=len(text.encode('utf-16-le'))//2
+   need(body['range']=={'begin':request['begin'],'end':request['end'],'totalLength':length,'complete':request['begin']==0 and request['end']==length},'Actual full/partial UTF16 request range')
+   if key!='S12':need({k:request[k] for k in ['begin','end']}=={k:fixtures[key]['selection'][k] for k in ['begin','end']},'Guard input requested range')
+   raw=(case/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor')).read_bytes()
+   need(cid(raw)==body['receiptCid'] and decode_cbor(raw)=={k:v for k,v in body.items() if k!='receiptCid'},'Materialized canonical CBOR response identity, not a REF envelope')
+   need((case/'cas-readbacks'/(expected[7:]+'.txt')).read_bytes()==source,'Materialized UTF8 source readback')
+   runtime=body['parser']['runtime'];selected=utf16(text,request['begin'],request['end'])
+   need(runtime['profile']=='syntax-v1' and runtime['packageVersion']=='4.6.0' and runtime['dependencyGraph']=='enhanced-plus-plus' and runtime['dependencyNodeIdentity']=='token-index+copy-count/1' and runtime['manifestCid']==manifest_cid and runtime['jarSha256']==processor_sha,'Recorded actual parser provenance')
+   need(runtime['parserNormalization']=='identity/1' and runtime['sourceTextCid']==runtime['parserInputCid']==cid(selected.encode('utf8')) and body['parser']['configuration']=={'annotators':'tokenize,ssplit,pos,lemma,depparse,ner','threads':'1'},'Actual parser input/configuration identity')
+   counts={'sentences':len(body['sentences']),'tokens':0,'nodes':0,'dependencies':0,'markers':0};copies=0
+   for sentence in body['sentences']:
+    quote=utf16(text,sentence['begin'],sentence['end']);q=sentence['quotation']
+    need(quote==sentence['quote']==q['quote'] and q['begin']==sentence['begin'] and q['end']==sentence['end'] and q['originalCid']==q['extractedTextCid']==expected,'Sentence exact quotation and CID/span')
+    nodes={n['id']:n for n in sentence['nodes']};tokens={t['index']:t for t in sentence['tokens']}
+    need(len(nodes)==len(sentence['nodes']) and len(tokens)==len(sentence['tokens']),'Distinct full nodes/tokens')
+    for token in tokens.values():
+     need(sentence['begin']<=token['begin']<token['end']<=sentence['end'] and utf16(text,token['begin'],token['end'])==token['word'],'Exact token UTF16 span')
+    for node in nodes.values():
+     need(node['id']==str(node['index'])+':'+str(node['copy']) and node['index'] in tokens and node['copy']>=0 and utf16(text,node['begin'],node['end'])==node['word'],'Exact full index:copy node identity/span')
+     copies+=int(node['copy']>0)
+    for edge in sentence['dependencies']:
+     governor=str(edge['governor'])+':'+str(edge['governorCopy']);dependent=str(edge['dependent'])+':'+str(edge['dependentCopy'])
+     need(edge['governorNode']==governor and edge['dependentNode']==dependent and dependent in nodes and (governor=='0:0' or governor in nodes),'Full dependency endpoint identity, including copies')
+    for marker in sentence['markers']:need(utf16(text,marker['begin'],marker['end'])==marker['quote'],'Exact lexical marker span')
+    for field in ['tokens','nodes','dependencies','markers']:counts[field]+=len(sentence[field])
+   need(counts==body['counts'] and copies==result['copiedNodes']==0 and result['copyCoverage']=='NOT_EXERCISED','Observed counts and explicit unexercised copies')
+   need(result['graph']=='urn:trikeshed:english:'+body['receiptCid'][7:],'Recorded snapshot graph identity, not query execution')
+   bodies[key]=body;receipts.append({'id':key,'inspectionCid':body['receiptCid'],'sourceCid':expected,'range':body['range'],'counts':counts,'copyCoverage':'NOT_EXERCISED'})
+   totals['sources']+=1;totals['utf8Bytes']+=len(source);totals['copies']+=copies
+   for field,value in counts.items():totals[field]+=value
+  cleanup=load(a/'cleanup.json');need(all(cleanup[k] is True for k in ['wireDrained','scopesDrained','ownerCompleted','casClosed','guestModulesClosed']),'Actual cleanup owner completion')
+ need(set(bodies)==set(fixtures)|{'S12'} and len(bodies)==18,'All actual18 sources')
+ first,remaining=execution['runs'];need(first['exitCode']==1 and first['actualParserDocuments']==1 and remaining['exitCode']==0 and remaining['actualParserDocuments']==17,'Preserved first observer failure, not a green process')
+ need((root/'attempt-first-G01/failure.txt').is_file() and load(root/'attempt-first-G01/cleanup.json')['failed'] is True and load(root/'attempt-remaining/cleanup.json')['failed'] is False,'Preserved actual failure/cleanup distinction')
+ for run in execution['runs']:
+  path=root/run['observerSource']
+  if not path.is_file():path=Path(str(path)+'.txt')
+  need(sha(path.read_bytes())==run['observerSourceSha256'],'Actual observer source identity')
+ invariants=load(root/'attempt-remaining/invariants.json')
+ need(all(invariants[k]==0 for k in ['automaticIntake','reviewIntake','reteFacts','blackboardEntries']) and all(invariants[k] is False for k in ['beliefBagPresent','kifBankPresent','modelProviderConstructed','minerConstructed','reviewOwnerConstructed']) and invariants['attachedRunnersUnchanged'] is invariants['airgapActive'] is True,'Recorded unchanged owners/state and no admission')
+ need(invariants['attachedReadOnlyRunners']==['document.english.corpus','document.english.patterns','document.english.patterns.query','document.english.query'],'Actual four attached read-only runners')
+ axioms=load(root/'attempt-remaining/cases/S12/nlpcore-axiomatics.json');s12=bodies['S12'];candidates=axioms['candidates']
+ pairs=[('ALPHA','BETA'),('BETA','GAMMA'),('EPSILON','GAMMA'),('EPSILON','DELTA'),('ALPHA','BETA')]
+ need(axioms['inputInspectionCid']==s12['receiptCid'] and axioms['status']=='OBSERVED' and axioms['admission']=='not-performed' and axioms['count']==len(candidates)==5 and [(c['antecedent'],c['consequent']) for c in candidates]==pairs,'Recorded S12 recognizer output, no execution claim')
+ for index,candidate in enumerate(candidates):
+  rule=candidate['rule'];sentence=s12['sentences'][index]
+  need(candidate['begin']==sentence['begin'] and candidate['end']==sentence['end'] and candidate['sentenceIndex']==sentence['index'] and rule['positive']==900 and rule['negative']==0 and rule['packed']==900<<32 and rule['copula']=='IMPLICATION' and rule['provenanceCid']==axioms['sourceCidArgument']==s12['extractedTextCid'],'S12 actual occurrence/structural evidence/source basis')
+  preimage=rule['antecedent']+'|'+rule['consequent']+'|IMPLICATION|'+str(rule['packed'])+'|'+rule['provenanceCid']
+  need(cid(preimage.encode())==rule['ruleCid'] and candidate['confidenceMeaning']=='fixed-structural-weight-not-parser-probability','Existing rule identity/weight meaning')
+ gamma=[{'word':t['word'],'lemma':t['lemma'],'pos':t['pos']} for sentence in s12['sentences'] for t in sentence['tokens'] if t['word']=='GAMMA']
+ need(len({c['rule']['ruleCid'] for c in candidates})==4 and candidates[0]['rule']['ruleCid']==candidates[4]['rule']['ruleCid'] and {g['lemma'] for g in gamma}=={'gamma','GAMMA'},'Same-source duplicate identity and exact surface-vs-lemma distinction')
+ return {'result':'PASS_RECORDED_DATA_CONSISTENCY','parserRerun':False,'sourceHead':head,'mainSha256':main,'artifactFilesHashed':len(cp)+len(modules),'counts':totals,'records':receipts,'preservedFirstObserverProcessExit':1,'remainingProcessExit':0,'copies':'NOT_EXERCISED','S12':{'candidates':5,'uniqueRuleCids':4,'sameSourceRepeatedOccurrence':'not independent evidence','gammaSurfaceRecords':gamma},'scope':'Independent retained bytes/metadata consistency only. No Stanford accuracy, semantic truth, legal interpretation, parser/runtime/HTTP rerun, NAL execution, query execution, admission or OS airgap claim.'}
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('records',type=Path);p.add_argument('--out',type=Path,required=True);args=p.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+ try:report=verify(args.records.resolve())
+ except (AuditError,ValueError,KeyError,TypeError,OSError) as error:report={'result':'FAIL','error':str(error)}
+ report['auditorSha256']=sha(Path(__file__).read_bytes());(args.out/'result.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n')
+ text='Independent English baseline recorded-data verification: '+report['result']+'\n'+report.get('scope',report.get('error',''))+'\n'
+ if report['result']!='FAIL':text+='18 canonical materialized receipts/sources; full request/range/UTF16/node-copy endpoints;120 JARs +29 module files hashed. First observer process exit1 remains failed after valid G01; remaining17 exited0. Actual copied vertices0: NOT_EXERCISED. S12 has5 observed candidates/4 rule CIDs and shared-source duplicates, with GAMMA surface preserved across differing lemmas.\n'
+ (args.out/'report.txt').write_text(text);print(json.dumps({'result':report['result'],'counts':report.get('counts'),'output':str(args.out)}));return 1 if report['result']=='FAIL' else 0
+if __name__=='__main__':raise SystemExit(main())

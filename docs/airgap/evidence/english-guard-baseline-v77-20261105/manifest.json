@@ -1,0 +1,71 @@
+{
+  "kind": "english-guard-baseline-v77-evidence-manifest/1",
+  "packagingBase": "4e57df1dacab8955398ef70be475f65c00228282",
+  "executedSourceHead": "0219223a3846887fe283b93598942de332214cd2",
+  "mainJarSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+  "materializedSourceAndCanonicalReceipts": true,
+  "runtimePacksOrRefEnvelopesIncluded": false,
+  "runtimeBinariesIncluded": false,
+  "archiveRegularFiles": 223,
+  "files": {
+    "README.md": {
+      "bytes": 4703,
+      "sha256": "bfb80d1edb003f71a231b0c941552949858a88e0d7871f24f9e61814cee78add"
+    },
+    "audit-usage.txt": {
+      "bytes": 4202,
+      "sha256": "57b9b411148f843fd7532e33cbbbea7e6c50290ec15fbe19cf695dba5543037f"
+    },
+    "execution-record.json": {
+      "bytes": 1999,
+      "sha256": "689fe8570ab297d9a1e4d80203eb482c63357015410dc00c01e2bc0f830a5842"
+    },
+    "extracted-observer-audit-report.txt": {
+      "bytes": 304,
+      "sha256": "d1ba472bdb8d418eed984ce9d40d34012d0562a45ebf98bf164290079a8abd48"
+    },
+    "extracted-observer-audit-result.json": {
+      "bytes": 34559,
+      "sha256": "0ced74437515245a9206b4ce85bf168fb5321b2b6215093c0513cdd208415477"
+    },
+    "independent-audit-report.txt": {
+      "bytes": 661,
+      "sha256": "184a354598cb8e743e153d30135ed35d66379d5b35effff5c795ca9252d379a9"
+    },
+    "independent-audit-result.json": {
+      "bytes": 10566,
+      "sha256": "874d1081b0d7e1e5ca5d72bcb9276ba2d8f3f6bbca0fc1901e8cdb1df0cbd132"
+    },
+    "independent-audit.py.txt": {
+      "bytes": 15044,
+      "sha256": "a7a30dfe84160b5bb1ce7fa5bef071c47d243343fdcf26f25d823b9df8408e0a"
+    },
+    "observer-data-audit-report.txt": {
+      "bytes": 304,
+      "sha256": "d1ba472bdb8d418eed984ce9d40d34012d0562a45ebf98bf164290079a8abd48"
+    },
+    "observer-data-audit-result.json": {
+      "bytes": 34019,
+      "sha256": "8ce4fdbda3a60178110c43d479567985f58cd7cdbedc4a30228308f22d22401b"
+    },
+    "observer-data-audit.py.txt": {
+      "bytes": 10210,
+      "sha256": "7df3592a08ed94be06f9f440d61536df744be634e361206d16028de868767a37"
+    },
+    "records.tar.gz": {
+      "bytes": 138010,
+      "sha256": "0dd5432c133cfa65c9f14756f21ebdef5bc6c749cafa1632969d394f0ce465c4"
+    },
+    "summary.json": {
+      "bytes": 16918,
+      "sha256": "ef4ceb720bf58e637ceb444b691e1b90889a905bb75823d87dc5efa438b9b894"
+    }
+  },
+  "independentAudit": {
+    "scriptSha256": "a7a30dfe84160b5bb1ce7fa5bef071c47d243343fdcf26f25d823b9df8408e0a",
+    "resultSha256": "874d1081b0d7e1e5ca5d72bcb9276ba2d8f3f6bbca0fc1901e8cdb1df0cbd132",
+    "reportSha256": "184a354598cb8e743e153d30135ed35d66379d5b35effff5c795ca9252d379a9",
+    "originalAndExtractedResult": "byte-identical PASS",
+    "parserExecuted": false
+  }
+}
