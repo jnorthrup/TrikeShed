@@ -1,0 +1,43 @@
+This is a Python standard-library verifier of recorded KIF HTTP proof data.
+It does not launch a JVM, HTTP server/client, parser, model, browser or reasoner.
+
+Recorded RED verification:
+  python3 audit.py RED_ATTEMPT FROZEN_V72_SNAPSHOT --mode red --out RED_AUDIT
+
+Future GREEN verification, only after root's frozen artifact GO:
+  python3 audit.py GREEN_ATTEMPT NEW_FROZEN_SNAPSHOT --mode green --source-head PINNED_HEAD --main-sha PINNED_MAIN_SHA --out GREEN_AUDIT
+
+The green source default is 08dd94f6cf88e1fb002291bcc3b2195a9f426608.
+Always pass --source-head for the final separately frozen proof. The main JAR
+SHA is mandatory for green. RED defaults are pinned to the original v72 JAR and
+source. RED_CONFIRMED means the old detection failure was reproduced, followed
+by a healthy plain request; it does not mean the fix passed.
+
+Exit 0 means RED_CONFIRMED or green PASS; exit 2 means PENDING required records;
+exit 1 means FAIL. audit-result.json includes hashes of files actually read,
+the script hash, checks and rejected mutated-copy controls. report.txt is short.
+
+The audit pins the seven actual input fixtures, independently encodes the exact
+source-scoped proposition as canonical CBOR, checks request bytes/statuses and
+source roles, decodes every immutable CAS BLOB record and its digest, validates
+all WAL frames including CRC32C, and independently replays source receipts,
+signal/evidence and budget. It checks separate writer/reader identities, the
+same frozen production JAR origin for all twelve classes, and owner close data.
+Relocated artifacts can be supplied: recorded JAR origin paths remain recorded
+facts, while the supplied JAR must match the explicitly pinned byte hash.
+
+GREEN also requires recorded actual before/after negative full bag snapshots,
+CAS pack byte hashes, unchanged signal bytes during attention, reopened full
+bag/readback hashes and WAL hashes around the after-close reader. Each refused
+request must preserve the complete budget as well as signal/evidence. An explicit
+healthy replay then renews attention from .9 to the incoming .6 budget; it must
+preserve exact signal/evidence and one source receipt, but writes another B WAL
+frame. The audit records those actual separate transitions and validates every B
+signal plus the final WAL budget. Mutation
+controls change only in-memory copies of records, never the evidence files.
+
+Scope: the loopback observer delegates to production BeliefWire but decodes UTF8
+before dispatch itself. This does not prove malformed raw UTF8 handling by the
+production HTTP decoder or an OS airgap. Manual declared KG and clean separate
+process close/reopen do not prove source authenticity, semantic entailment,
+complete KIF conformance, crash recovery or power-loss recovery.

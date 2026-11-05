@@ -1,0 +1,408 @@
+{
+  "result": "PASS",
+  "sourceHead": "08dd94f6cf88e1fb002291bcc3b2195a9f426608",
+  "mainSha256": "72f74004dc435f869787d6d77e04eddbd31927065894bbe4e4f908245636a87a",
+  "productionSourceBeforeTestOnlyFix": "3c9b5e0f551f29bd63acfe4216670fa961a2b239",
+  "build": {
+    "jvmTests": 426,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "allJvmTestSources": true,
+    "browserBundles": [
+      "documents",
+      "spacegraph",
+      "pages"
+    ],
+    "scope": "Root GREEN/frozen artifact handoff; observer does not rebuild product"
+  },
+  "selectedGreenAttempt": "green-v73-attempt2",
+  "selectedRedAttempt": "red-v72-attempt2",
+  "commentedSourceCid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+  "sourceBytes": 77,
+  "definitionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+  "definitionBytes": 242,
+  "realHttpRequests": 12,
+  "primaryStatus": 200,
+  "negativeCases": [
+    {
+      "case": "comment-only",
+      "status": 400,
+      "healthyNextStatus": 200,
+      "bagEvidenceAndBudgetUnchanged": true,
+      "casPackUnchangedOnRefusal": true,
+      "refusedSourceNotRetained": true,
+      "sourceCid": "sha256:02d5281bbc34b637189f1e8b9cdc38f33116c6b7439f9a6a27c8d48e2f9715a1",
+      "bagBefore": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "1037628254634744217",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfter": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "1037628254634744217",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfterHealthy": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "casPackBefore": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "casPackAfter": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "healthyEvidenceUnchanged": true,
+      "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+    },
+    {
+      "case": "unsupported-multiform",
+      "status": 400,
+      "healthyNextStatus": 200,
+      "bagEvidenceAndBudgetUnchanged": true,
+      "casPackUnchangedOnRefusal": true,
+      "refusedSourceNotRetained": true,
+      "sourceCid": "sha256:05919573a1176bfbb241f82f690776a46ca232c94f569aadb774203697382600",
+      "bagBefore": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfter": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfterHealthy": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "casPackBefore": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "casPackAfter": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "healthyEvidenceUnchanged": true,
+      "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+    },
+    {
+      "case": "malformed-multiform",
+      "status": 400,
+      "healthyNextStatus": 200,
+      "bagEvidenceAndBudgetUnchanged": true,
+      "casPackUnchangedOnRefusal": true,
+      "refusedSourceNotRetained": true,
+      "sourceCid": "sha256:37a9dc3fb665a6a60746b047785fa804a84f6697735551aae0b9bf26437d853b",
+      "bagBefore": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfter": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfterHealthy": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "casPackBefore": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "casPackAfter": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "healthyEvidenceUnchanged": true,
+      "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+    },
+    {
+      "case": "mixed-formats",
+      "status": 400,
+      "healthyNextStatus": 200,
+      "bagEvidenceAndBudgetUnchanged": true,
+      "casPackUnchangedOnRefusal": true,
+      "refusedSourceNotRetained": true,
+      "sourceCid": "sha256:c4f732d3eb1c8c0b002af17572996d4da962bea1c176e23243e28201c311e2cd",
+      "bagBefore": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfter": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfterHealthy": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "casPackBefore": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "casPackAfter": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "healthyEvidenceUnchanged": true,
+      "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+    },
+    {
+      "case": "hash-is-not-kif-comment",
+      "status": 400,
+      "healthyNextStatus": 200,
+      "bagEvidenceAndBudgetUnchanged": true,
+      "casPackUnchangedOnRefusal": true,
+      "refusedSourceNotRetained": true,
+      "sourceCid": "sha256:8877c0c70c9b1a895ff76a502cc4714cef481504160e57dd0c7c84488bd920e5",
+      "bagBefore": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfter": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "bagAfterHealthy": [
+        {
+          "angular": "4616048923953057863",
+          "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+          "evidencePacked": "3865470566400",
+          "positive": 900,
+          "negative": 0,
+          "budgetPacked": "691752682861992345",
+          "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+        }
+      ],
+      "casPackBefore": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "casPackAfter": {
+        "bytes": 393,
+        "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+      },
+      "healthyEvidenceUnchanged": true,
+      "healthyBudgetScope": "Explicit healthy KG replay renews attention; refused input changes no budget or evidence"
+    }
+  ],
+  "finalBagRows": [
+    {
+      "angular": "4616048923953057863",
+      "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+      "evidencePacked": "3865470566400",
+      "positive": 900,
+      "negative": 0,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    }
+  ],
+  "bagRowsAfterExplicitAttention": [
+    {
+      "angular": "4616048923953057863",
+      "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+      "evidencePacked": "3865470566400",
+      "positive": 900,
+      "negative": 0,
+      "budgetPacked": "1037628254634744217",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+    }
+  ],
+  "closedCasPack": {
+    "bytes": 393,
+    "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+  },
+  "closedWal": {
+    "bytes": 1757,
+    "sha256": "d0f22242b9fa91195b7108d50c92e15ef3b6d7f7481f5c95f40073e0f2241d62"
+  },
+  "reader": {
+    "result": "PASS",
+    "pid": "87933",
+    "writerPid": "87837",
+    "sourceCid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+    "definitionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+    "sourceAndDefinitionBytesPreserved": true,
+    "bagEvidenceSignalAndBudgetReplayed": true,
+    "ownersDrained": true,
+    "walBeforeOpen": {
+      "bytes": 1757,
+      "sha256": "d0f22242b9fa91195b7108d50c92e15ef3b6d7f7481f5c95f40073e0f2241d62"
+    },
+    "walAfterClose": {
+      "bytes": 1757,
+      "sha256": "d0f22242b9fa91195b7108d50c92e15ef3b6d7f7481f5c95f40073e0f2241d62"
+    },
+    "casPackAfterClose": {
+      "bytes": 393,
+      "sha256": "638e0b117c50e3102d6842781232fe6e553889231c614df926dd4c11b38f2ea6"
+    },
+    "scope": "Clean separate-process close/reopen, not crash or power-loss recovery",
+    "bagRows": [
+      {
+        "angular": "4616048923953057863",
+        "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+        "evidencePacked": "3865470566400",
+        "positive": 900,
+        "negative": 0,
+        "budgetPacked": "691752682861992345",
+        "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OmZhYjVlYjQ5NjA3YTlkZjQzNmM3NDgzNThjYjc2YWM1OWU4OWUzOTg4M2I1Y2NkMDE2NmJiNDc1OWJmYmU4MDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjphOGFmYWM3YTM5N2ZhMjFkNGYxOWE0NzAxYTZkNDlmODNlNjcxNGFiNmE4MjU4OTBjMmE2Y2ZmYWRiNGYzYjBlOw=="
+      }
+    ],
+    "sourceReadback": {
+      "cid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+      "bytes": 77,
+      "sha256": "fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802"
+    },
+    "definitionReadback": {
+      "cid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+      "bytes": 242,
+      "sha256": "a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e"
+    },
+    "sourceContext": {
+      "propositionCid": "sha256:a8afac7a397fa21d4f19a4701a6d49f83e6714ab6a825890c2a6cffadb4f3b0e",
+      "sourceContext": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+      "sourceContextStatus": "verified-retained-kg"
+    }
+  },
+  "cleanup": {
+    "listenerStopped": true,
+    "reviewDrained": true,
+    "bagWorkerCompleted": true,
+    "bagSupervisorCompleted": true,
+    "httpClientClosed": true,
+    "executorTerminated": true,
+    "packSynced": true,
+    "walFlushed": true,
+    "packAndWalClosed": true
+  },
+  "independentAudit": {
+    "green": {
+      "result": "PASS",
+      "checks": 7,
+      "mutatedCopiesRejected": 8
+    },
+    "red": {
+      "result": "RED_CONFIRMED",
+      "checks": 6,
+      "mutatedCopiesRejected": 6
+    },
+    "scriptSha256": "79565d78eb42d37d85b46eb768d382195961b883bd6be74d67eddde29dc48a11"
+  },
+  "preservedIncompleteAttempts": [
+    {
+      "name": "red-v72-attempt1",
+      "scope": "Observer identity failed before HTTP/storage: wildcard System shadowed java.lang.System; explicit import fixed harness"
+    },
+    {
+      "name": "green-v73-attempt1",
+      "scope": "Primary200, attention200, firstnegative400, healthy200 all correct. Harness wrongly expected explicit healthy KG replay not to renew attention from .9 to incoming .6; stopped. Product unchanged."
+    }
+  ],
+  "limits": [
+    "Loopback HttpServer delegates to production BeliefWire; body UTF-8 decoding is done by the observer facade.",
+    "No malformed-raw-UTF8 transport or OS airgap claim.",
+    "Manual declared KG; no source authentication, semantic entailment, reasoner result or complete KIF conformance.",
+    "Clean separate-process close/reopen; no crash or power-loss recovery claim."
+  ]
+}

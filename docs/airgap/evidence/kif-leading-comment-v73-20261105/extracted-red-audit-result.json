@@ -1,0 +1,187 @@
+{
+  "result": "RED_CONFIRMED",
+  "mode": "red",
+  "attemptDirectory": "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2",
+  "snapshotDirectory": "/workspace/library-files/english-query-handoff-v72-proof/snapshot",
+  "sourceHead": "c8b7f5e8a5d0dad8e6352d2fc1c733df7d69e563",
+  "mainSha256": "b4744105e462d94767f84edf23b89f703ec517435f32bbcd8dd7c9090e819797",
+  "recordedProductionJar": "/workspace/library-files/english-query-handoff-v72-proof/snapshot/main.jar",
+  "commentedSourceCid": "sha256:fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802",
+  "acceptedSourceCid": "sha256:6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42",
+  "definitionCid": "sha256:cfe3ff544d1232735801fd1b2300c553b07f473f0882def8f00dc5165d4e2bed",
+  "writerPid": "84054",
+  "readerPid": "84173",
+  "httpRequests": 3,
+  "afterAttendBudgetPacked": "1037628254634744217",
+  "finalBudgetPacked": "1037628254634744217",
+  "negativeBudgetTransitions": [],
+  "casBlobs": 2,
+  "walFrames": [
+    {
+      "sequence": 1,
+      "kind": "R",
+      "bytes": 86,
+      "angular": "4616048923953057863",
+      "sourceCid": "sha256:6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42"
+    },
+    {
+      "sequence": 2,
+      "kind": "B",
+      "bytes": 241,
+      "budgetPacked": "691752682861992345",
+      "signalBase64": "MTk6NDYxNjA0ODkyMzk1MzA1Nzg2MzsxMzozODY1NDcwNTY2NDAwOzU6TUFUQ0g7NzE6c2hhMjU2OjZjZTM5MjYzNzc5NzZhMGU2ODkzOGM3ZTgxMWVlZjYyOWFiMTc2MDgyM2NhMzc3MmE3ZjRmMjNhYjRhN2VhNDI7MDo7MDo7MDo7MDo7MDo7MDo7MTowOzcxOnNoYTI1NjpjZmUzZmY1NDRkMTIzMjczNTgwMWZkMWIyMzAwYzU1M2IwN2Y0NzNmMDg4MmRlZjhmMDBkYzUxNjVkNGUyYmVkOw=="
+    },
+    {
+      "sequence": 3,
+      "kind": "A",
+      "bytes": 41,
+      "angular": "4616048923953057863",
+      "budgetPacked": "1037628254634744217"
+    }
+  ],
+  "checks": [
+    "Frozen JAR/source head and all twelve production owner/codec class origins in two distinct processes",
+    "Seven pinned fixtures and complete source bytes, canonical proposition CBOR and scalar constant/literal roles",
+    "Actual HTTP request byte identities/statuses, exact source-scoped import/replay/attention and closed owners",
+    "Entire actual closed CAS pack decoded and content-hashed: exact accepted source/definition only",
+    "Independent full WAL frame CRC32C/sequence validation and exact source receipt/signal/evidence/budget replay",
+    "6 mutated copies rejected by the same verifier"
+  ],
+  "mutatedCopyControls": [
+    {
+      "mutation": "wrong-source-context-CID",
+      "result": "REJECTED",
+      "reason": "writer source/definition/comment fixture CID"
+    },
+    {
+      "mutation": "wrong-HTTP-request-byte-hash",
+      "result": "REJECTED",
+      "reason": "HTTP request byte/CID mismatch"
+    },
+    {
+      "mutation": "negative-returned-200",
+      "result": "REJECTED",
+      "reason": "HTTP status mismatch: commented"
+    },
+    {
+      "mutation": "same-PID-reader",
+      "result": "REJECTED",
+      "reason": "separate reader PID/source/definition binding"
+    },
+    {
+      "mutation": "wrong-readback-proposition",
+      "result": "REJECTED",
+      "reason": "separate reader PID/source/definition binding"
+    },
+    {
+      "mutation": "unclosed-bag-owner",
+      "result": "REJECTED",
+      "reason": "writer owner/transport/storage cleanup"
+    }
+  ],
+  "limits": [
+    "Loopback HttpServer delegates to production BeliefWire; body UTF-8 decoding is done by the observer facade.",
+    "No malformed-raw-UTF8 transport or OS airgap claim.",
+    "Manual declared KG; no source authentication, semantic entailment, reasoner result or complete KIF conformance.",
+    "Clean separate-process close/reopen; no crash or power-loss recovery claim."
+  ],
+  "artifactHashes": {
+    "/workspace/library-files/english-query-handoff-v72-proof/snapshot/main.jar": {
+      "bytes": 36004279,
+      "sha256": "b4744105e462d94767f84edf23b89f703ec517435f32bbcd8dd7c9090e819797"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/inputs/commented.kif": {
+      "bytes": 77,
+      "sha256": "fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/inputs/plain.kif": {
+      "bytes": 40,
+      "sha256": "6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/inputs/comment-only.kif": {
+      "bytes": 31,
+      "sha256": "02d5281bbc34b637189f1e8b9cdc38f33116c6b7439f9a6a27c8d48e2f9715a1"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/inputs/unsupported-multiform.kif": {
+      "bytes": 61,
+      "sha256": "05919573a1176bfbb241f82f690776a46ca232c94f569aadb774203697382600"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/inputs/malformed-multiform.kif": {
+      "bytes": 62,
+      "sha256": "37a9dc3fb665a6a60746b047785fa804a84f6697735551aae0b9bf26437d853b"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/inputs/mixed-formats.kif": {
+      "bytes": 59,
+      "sha256": "c4f732d3eb1c8c0b002af17572996d4da962bea1c176e23243e28201c311e2cd"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/inputs/hash-is-not-kif-comment.kif": {
+      "bytes": 42,
+      "sha256": "8877c0c70c9b1a895ff76a502cc4714cef481504160e57dd0c7c84488bd920e5"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/accepted-source.kif": {
+      "bytes": 40,
+      "sha256": "6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/commented.kif": {
+      "bytes": 77,
+      "sha256": "fab5eb49607a9df436c748358cb76ac59e89e39883b5ccd0166bb4759bfbe802"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/plain.kif": {
+      "bytes": 40,
+      "sha256": "6ce3926377976a0e68938c7e811eef629ab1760823ca3772a7f4f23ab4a7ea42"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/definition.cbor": {
+      "bytes": 242,
+      "sha256": "cfe3ff544d1232735801fd1b2300c553b07f473f0882def8f00dc5165d4e2bed"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/runtime/cas/pack": {
+      "bytes": 356,
+      "sha256": "ae01a18f7e9d03913123514ea0c12b5bb0cba3fc7e3e4c80ab1b5cdc1f3c2758"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/runtime/beliefs.wal": {
+      "bytes": 442,
+      "sha256": "48d2149568d30c98610ce7447e061ecc3b4a0a0ea3384b6d6f76a1be0c8af64f"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/writer-result.json": {
+      "bytes": 1567,
+      "sha256": "c46b49d30196e1ddf891742b2ad28e7e9a157b16c3e1857d823efefb671bb380"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/reopen-result.json": {
+      "bytes": 420,
+      "sha256": "ce5c531d49f746abc97de0697e716810ae4a484a414a5b983423e27ae320e7dc"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/http-records.json": {
+      "bytes": 1963,
+      "sha256": "a32e45c23ebd9bfffcb786021f1144d0e6b870259c9721dd32b3cca42eb724f9"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/cleanup.json": {
+      "bytes": 168,
+      "sha256": "6cc9cbc3bcc701a6883bb259d720ada99ae1bac6ab96a0379722865c9156394a"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/red-identity.json": {
+      "bytes": 1791,
+      "sha256": "86e6960de427a9abc9d399e301e2666d95c3eaa363d64208ecaee412a53367d4"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/reopen-identity.json": {
+      "bytes": 1794,
+      "sha256": "910df221e7883f2d0f546bd6ff886f4fadb276feb2777518c02a8456f642af98"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/Proof.kt": {
+      "bytes": 14046,
+      "sha256": "c97f996bd26b040bc3bb46206fcb1d8b601834099df3a7181fce01e0fc7cb64a"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/compile.sh": {
+      "bytes": 681,
+      "sha256": "2a846c3f07efe814bcdc177cefd70c9ae269239b134d087f284c08d15c47ae71"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/run.sh": {
+      "bytes": 716,
+      "sha256": "5aa91ad29ae6cb80c336225dd5dac866628699146033f6921f181bd9e11cfb7b"
+    },
+    "/workspace/library-files/kif-leading-comment-http-proof/package-check-v73/proof/red-v72-attempt2/observer-inputs/input-manifest.json": {
+      "bytes": 1477,
+      "sha256": "0a215fb6cf7057b16d8caf4fbb44fa4247adefd05456f405aa728cdc35e5784f"
+    }
+  },
+  "auditScriptSha256": "79565d78eb42d37d85b46eb768d382195961b883bd6be74d67eddde29dc48a11"
+}

@@ -1,0 +1,12 @@
+Independent recorded KIF HTTP audit: PASS
+Selected attempt: /workspace/library-files/kif-leading-comment-http-proof/green-v73-attempt2
+
+- Frozen JAR/source head and all twelve production owner/codec class origins in two distinct processes
+- Seven pinned fixtures and complete source bytes, canonical proposition CBOR and scalar constant/literal roles
+- Actual HTTP request byte identities/statuses, exact source-scoped import/replay/attention and closed owners
+- Entire actual closed CAS pack decoded and content-hashed: exact accepted source/definition only
+- Independent full WAL frame CRC32C/sequence validation and exact source receipt/signal/evidence/budget replay
+- Five refusals preserve full bag and CAS bytes; explicit healthy replay preserves signal/evidence while renewing attention; actual after-close readbacks/WAL match
+- 8 mutated copies rejected by the same verifier
+
+No semantic entailment, raw malformed-UTF8 HTTP, OS airgap or crash-recovery claim.

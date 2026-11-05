@@ -20,6 +20,13 @@ older A invocation reads return. It retains its final-JAR identity, original
 inspection, failed attempts, after-close CAS proof and independent audit; it
 does not close the planned R3/R4 gates.
 
+The [v73 KIF comment follow-up](evidence/kif-leading-comment-v73-20261105/README.md)
+retains an actual v72 RED and v73 GREEN HTTP comparison for the same commented
+CRLF/Unicode source, whole-input refusals without bag/CAS changes, healthy
+replay attention renewal, and independent after-close CAS/WAL verification.
+Its manual declared-KG scope does not establish source entailment or complete
+KIF conformance.
+
 ## R2 acceptance and verification
 
 The upstream candidate is `jnorthrup/mlir-nix` revision
