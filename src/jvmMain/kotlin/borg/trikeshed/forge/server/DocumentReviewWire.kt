@@ -359,7 +359,7 @@ class DocumentReviewWire private constructor(
                                 result
                             }
                             endpoint.endsWith("/taxonomy-query") -> withContext(checkNotNull(actor)) {
-                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
+                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"), setOf("program"))
                                 val goal = input["goal"] as? Map<*, *> ?: error("Taxonomy goal required")
                                 fields(goal, setOf("predicate", "subject", "object"))
                                 fun term(key: String) = goal[key] as? String ?: error("Goal $key must be text")
@@ -368,7 +368,12 @@ class DocumentReviewWire private constructor(
                                     ?: _m["status" j "UNAVAILABLE", "reason" j "native-profile-unconfigured",
                                         "authority" j "reviewed-read-only-not-a-sink-permit"]
                                 require(jsonOf(result).encodeToByteArray().size <= 1048576) { "Native taxonomy report exceeds 1MiB" }
-                                result
+                                if ("program" !in input) result else {
+                                    val queried = result + _m["quadQuery" j nativeTaxonomyQuery(result, input["program"], cid("snapshotCid"), revision())]
+                                    if (jsonOf(queried).encodeToByteArray().size > 1048576)
+                                        throw QueryRefusal(413, "native_horn_query_response_limit", "Native report and query exceed 1MiB")
+                                    queried
+                                }
                             }
                             endpoint.endsWith("/horn-query") -> withContext(checkNotNull(actor)) {
                                 fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
@@ -482,6 +487,46 @@ class DocumentReviewWire private constructor(
     } catch (cancelled: CancellationException) { throw cancelled }
       catch (failure: QueryRefusal) { throw failure }
       catch (failure: Exception) { throw QueryRefusal(400, "invalid_visual_program", failure.message ?: "Invalid visual query program") }
+
+    /** Fresh native owner result only; no request-supplied certificate, source map or approval is accepted. */
+    private suspend fun nativeTaxonomyQuery(report: Map<String, Any?>, value: Any?, snapshot: ContentId,
+                                            expectedRevision: Long): Map<String, Any?> {
+        val program = queryProgram(value)
+        if (report["kind"] != "reviewed-kif-native-result/1")
+            throw QueryRefusal(409, "native_horn_source_unavailable", "Native proof projection is unavailable")
+        val before = review.taxonomyRead(snapshot, expectedRevision)
+        fun matches(read: CurationTaxonomyRead) = report["snapshotCid"] == read.snapshotCid.value &&
+            revision(report["revision"]) == read.revision && report["readCid"] == read.readCid.value &&
+            report["approvalCid"] == read.approvalCid.value && report["decisionCid"] == read.decisionCid.value &&
+            report["reviewer"] == read.reviewer && report["synthetic"] == read.synthetic
+        require(matches(before)) { "Reviewed material changed before native projection query" }
+        val projection = try { NativeHornProofGraph.project(report) }
+            catch (failure: NativeHornProofGraph.ProfileRefused) {
+                throw QueryRefusal(413, "native_horn_source_profile_limit", failure.message ?: "Complete native projection exceeds visual limits")
+            }
+        val patterns = (program["nodes"] as List<*>).map { it as Map<*, *> }.filter { it["type"] == SparqlGraph.PATTERN }
+        if (patterns.size !in 1..8) throw QueryRefusal(413, "native_horn_pattern_limit", "Native proof queries require 1..8 patterns")
+        val graph = borg.trikeshed.rdf.RdfTerm.Iri(projection.graph).toTurtle()
+        if (patterns.any { (it["params"] as? Map<*, *>)?.get("graph")?.toString()?.trim() != graph })
+            throw QueryRefusal(409, "native_horn_projection_changed", "Query must name the complete fresh native projection graph")
+        val visual = SparqlWire(SparqlSurface(projection.store))
+        val reply = requireNotNull(visual.route("POST", "/sparql/visual", "POST /sparql/visual HTTP/1.1\r\n\r\n" +
+            jsonOf(_m["dataset" j "quad-store", "program" j program]), null))
+        if (reply.status != 200) {
+            val error = runCatching { reifyStrict(reply.body) as? Map<*, *> }.getOrNull()
+            throw QueryRefusal(reply.status, "native_horn_visual_query_refused", error?.get("error") as? String ?: "Bounded native visual query refused")
+        }
+        val output = reifyStrict(reply.body) as? Map<*, *> ?: error("Invalid bounded native query response")
+        // Native execution's post-check precedes SPARQL; the same current approval must survive THIS evaluation too.
+        val after = review.taxonomyRead(snapshot, expectedRevision)
+        require(matches(after) && after.snapshotCid == before.snapshotCid && after.revision == before.revision &&
+            after.candidate.sourceRevision == before.candidate.sourceRevision) { "Reviewed material changed during native projection query" }
+        return _m["kind" j "reviewed-native-horn-quad-query/1", "schema" j NativeHornProofGraph.SCHEMA,
+            "dataset" j NativeHornProofGraph.DATASET, "graph" j projection.graph, "query" j output["query"],
+            "results" j output["results"], "physicalSource" j output["source"],
+            "provenance" j (projection.descriptor + _m["checkedAsOf" j after.asOf, "sourceRevision" j after.candidate.sourceRevision]),
+            "persistence" j "request-local", "authority" j "authenticated-reviewed-read-not-a-sink-permit"]
+    }
 
     /** Only this authenticated host-created report supplies the temporary graph; no CAS receipt is assumed. */
     private suspend fun taxonomyQuery(report: Map<String, Any?>, value: Any?, snapshot: ContentId,
