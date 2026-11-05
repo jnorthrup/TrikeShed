@@ -1,9 +1,11 @@
 package borg.trikeshed.docs
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.narsese.DocumentRevision
 import borg.trikeshed.nlp.EnglishCorpusView
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
+import borg.trikeshed.web.EnglishQueryNavigation
 import borg.trikeshed.wiki.WikiSurface
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -370,7 +372,35 @@ internal object DocumentsCorpus {
                 link.setAttribute("href", "/documents#${WikiSurface.encode(project)}/${WikiSurface.encode(selection["id"] as String)}")
                 link.style.color = "var(--accent)"
                 text(card, "p", "The link opens the current document. This quotation remains evidence from the retained inspection snapshot.", "ds-curate-label")
+                visualQuery(card, value, sentence)
             }
+        }
+        private fun visualQuery(parent: HTMLElement, value: Map<*, *>, sentence: Map<*, *>) {
+            val navigation = runCatching {
+                val matrix = value["matrix"] as Map<*, *>
+                val docs = rows(matrix["documents"], 256)
+                val doc = docs[integer(sentence["document"])]
+                val receipt = sourceId(sentence["receiptCid"])
+                val range = rows(doc["ranges"], 32).single { it["receiptCid"] == receipt }
+                require(sentence["selection"] == range["selection"]) { "Concordance source selection differs" }
+                val source = requireNotNull(DocumentRevision.fromMap(range["selection"])) { "Inspection source selection is unavailable" }
+                require(source.project == project && source.cid == doc["originalCid"]) { "Inspection source identity differs" }
+                EnglishQueryNavigation.Selection(receipt, source.project, source.id, source.cid, source.rev, source.seq,
+                    integer(range["begin"]), integer(range["end"])).href()
+            }
+            val href = navigation.getOrNull()
+            if (href == null) {
+                text(parent, "p", "Query canvas unavailable: ${navigation.exceptionOrNull()?.message ?: "inspection identity is unavailable"}", "ds-curate-label")
+                return
+            }
+            val link = text(parent, "a", "Open this inspection in query canvas (does not run)", "ds-curate-submit")
+            link.setAttribute("href", href); link.setAttribute("target", "_blank"); link.setAttribute("rel", "noopener noreferrer")
+            link.setAttribute("data-corpus-open-query", "1")
+            link.style.cssText = "display:inline-block;margin:10px 0;padding:8px 12px;text-decoration:none"
+            text(parent, "p", "Opens the inspection's whole retained range in current-source mode. Changed or unavailable sources are refused. The selected word does not filter the query.", "ds-curate-label")
+            for (event in s_["click", "auxclick", "contextmenu"].view) link.addEventListener(event, { e ->
+                if (!present() || pending || result !== value || parent.asDynamic().isConnected != true) e.preventDefault()
+            })
         }
         private fun topics(parent: HTMLElement, model: Map<*, *>, docs: List<Map<*, *>>) {
             val section = text(parent, "section", ""); section.setAttribute("data-corpus-topics", "1")
