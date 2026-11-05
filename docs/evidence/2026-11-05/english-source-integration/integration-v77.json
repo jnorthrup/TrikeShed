@@ -196,7 +196,7 @@
     "manifestSha256": "fd3e58a860f7a756916a5faf0ce0520fdd3c4b3e0ebb8e7ec52024c12098fecf",
     "verifierSha256": "54e79fdfae68197677d87819aef03df495e5baf27e7941b5f92b117c144accd6"
   },
-  "concurrentMasterPreserved": "c66df43e54c14da21dcd0bfb3de9729f8a119fb1",
+  "concurrentMasterPreserved": "5102281c1107ad7e16262f10ace4f497e401e416",
   "concurrentR4bScope": "23 dependency jars plus packaged named5nodepreset and recorded abrupt completed-receipt recovery. Source/build bootstrap preserved and compiled; matching old runtime/source archives/rootfs/communityJDK unavailable locally, so no R4b runtime rerun or inherited English closure claim.",
   "semanticEvaluation": "Existing16case semantic-seat report remains MISSING16/scored0. Observed atomic-symbol application is not a legal-English accuracy benchmark or trained role/context reasoner.",
   "limits": [
@@ -215,7 +215,7 @@
     "Compose Documents and English/review owners in a local package with explicit loopback boundary, private reviewer provisioning and verified source materialization, then test a new sealed closure.",
     "Extend typed guard attachment observations from the genuine ambiguous/quoted-clause baseline before attempting broader legal role/condition reasoning."
   ],
-  "publication": "PENDING final all-head D3M and ordinary master push; all actual proof artifacts remain pinned to their source-specific checkpoints.",
+  "publication": "Ready for ordinary authenticated master push; no force or history replacement.",
   "publicNativeEvidence": "docs/evidence/2026-11-05/retained-english-nal-v77",
   "rootPublicNativeAudit": {
     "result": "PASS",
@@ -236,5 +236,62 @@
     "stdoutBytes": 25531,
     "sha256": "733716c1e44a3c43f2ba0e1854f334ea379ca42175157e26498ddced34e4bbbd",
     "oldV76NewV77BytesEqual": true
-  }
+  },
+  "publicationRefFreeze": {
+    "refs": 682,
+    "uniqueTips": 530,
+    "ordinaryMerges": 2,
+    "allContained": true,
+    "inventorySha256": "b9df4b4a5b7228cfa71872615c3c616dec61e2a029657e39872f6d8d5e784abf",
+    "resolvedConflicts": [
+      {
+        "file": "docs/airgap/README.md",
+        "resolution": "Retain both independent retained English NAL application and R4c acceptance appended sections; no section removed.",
+        "preservedStages": "conflicts/docs/airgap/README.md.stage1/2/3"
+      }
+    ],
+    "mergeReview": {
+      "runtimeProductionDiffFromC23": [],
+      "incomingMaster": "5102281c1107ad7e16262f10ace4f497e401e416",
+      "changedTestSources": {
+        "RetainedNalImplicationTest.kt": "Incoming equivalent helper uses house Series.filter plus Iterable view.single instead of materialized List.single. All assertions and cases unchanged. Preserve library-native form; repeat combined480 checks.",
+        "AirgapDocumentMain.kt": "Preserve run/inspect/recover bootstrap and source-row validation; recover has no miner, sealed runtime evidence remains peer R4c scope."
+      },
+      "nextValidation": "all JVM test source compilation and same480+3JS under final merged tree"
+    }
+  },
+  "postMergeBuild": {
+    "source": "f906b15c2646290ef39610bd9076866cdad704c5",
+    "started": "2026-11-05T04:01:15.888111+00:00",
+    "result": "PASS",
+    "expectedTests": 480,
+    "productionRuntimeDiffFromFrozenC23": [],
+    "concurrentMasterPreserved": "5102281c1107ad7e16262f10ace4f497e401e416",
+    "testChanges": [
+      "Equivalent Series-filter plus Iterable-view single-result assertions in RetainedNalImplicationTest",
+      "run/inspect/recover packaged bootstrap in AirgapDocumentMain"
+    ],
+    "command": "./gradlew jsBrowserDocumentsDevelopmentWebpack jsBrowserSpacegraphDevelopmentWebpack jsBrowserPagesDevelopmentWebpack jvmTest -I /workspace/.trikeshed-cloud/resolve-jvm.init.gradle -PkotlinJsApps=documents,pages,spacegraph --daemon --configuration-cache --max-workers=4 -Ptrikeshed.native.mlnix=/workspace/library-files/mlnix-native-validation/build/bin/mlnix -Ptrikeshed.native.mlnix.sha256=97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5 -Ptrikeshed.native.adapter=/workspace/TrikeShed/utils/sumo-nix/run.nix -Ptrikeshed.native.datalog=/workspace/library-files/sumo-nix-proof/source --tests borg.trikeshed.nlp.EnglishInspectionTest --tests borg.trikeshed.graal.subvm.CoreNlpSourceTest --tests borg.trikeshed.narsese.NormClauseConditionsTest --tests borg.trikeshed.forge.server.DocumentEnglishWireTest --tests borg.trikeshed.narsese.ApplicabilityFactsTest --tests borg.trikeshed.narsese.ConstellationPremiseTest --tests borg.trikeshed.docs.DocumentSurfaceTest --tests borg.trikeshed.forge.server.PrimaryProjectCorpusTest --tests borg.trikeshed.forge.server.DocumentPdfLinksWireTest --tests borg.trikeshed.lcnc.CamelDispatchOwnershipTest --tests borg.trikeshed.graal.subvm.NlpNodeIdentityTest --tests borg.trikeshed.narsese.DependencyCopyInferenceTest --tests borg.trikeshed.nlp.EnglishLegalPatternsTest --tests borg.trikeshed.forge.server.EnglishLegalPatternsWireTest --tests borg.trikeshed.nlp.EnglishCorpusTest --tests borg.trikeshed.nlp.EnglishLdaTest --tests borg.trikeshed.forge.server.EnglishObservationWireTest --tests borg.trikeshed.forge.server.EnglishCorpusWireTest --tests borg.trikeshed.lcnc.EnglishCamelPresetExecutionTest --tests borg.trikeshed.lcnc.PresetAssemblyTest --tests borg.trikeshed.forge.server.SparqlVisualBoundsTest --tests borg.trikeshed.forge.server.SparqlSourceWireTest --tests borg.trikeshed.narsese.KgRdfFidelityTest --tests borg.trikeshed.narsese.KgPropositionIdentityTest --tests borg.trikeshed.narsese.PropositionReadbackTest --tests borg.trikeshed.kif.KifSemanticTest --tests borg.trikeshed.narsese.BeliefAdmissionTest --tests borg.trikeshed.memory.HermesMemoryFeedbackTest --tests borg.trikeshed.narsese.DocumentCuratorNlpRetentionTest --tests borg.trikeshed.hermes.HermesPenDelegatesTest.modelRefusalCarriesNegativeToolEvidence --tests borg.trikeshed.hermes.HermesPenDelegatesTest.negativeClaimIsNotARefusedOperation --tests borg.trikeshed.hermes.HermesPenDelegatesTest.everyCrossingLandsTwice --tests borg.trikeshed.hermes.HermesPenDelegatesTest.rejectedAssertionAdmissionIsNotSuccess --tests borg.trikeshed.narsese.KgRetentionTest --tests borg.trikeshed.litebike.KgHttpUtf8Test --tests borg.trikeshed.agent.modelmux.BreadcrumbForegroundTest --tests borg.trikeshed.memory.ace.AceContextNodesTest --tests borg.trikeshed.memory.ace.BreadcrumbContextNodesTest --tests borg.trikeshed.docs.DocumentNavigationTest --tests borg.trikeshed.terminal.XtermTerminalEraseSavedTest --tests borg.trikeshed.terminal.XtermTerminalRowIdentityTest --tests borg.trikeshed.forge.server.CurationInstalledLinkTest --tests borg.trikeshed.forge.server.CurationIntakeTest --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest --tests borg.trikeshed.forge.server.LinkGrabRetryTest --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest --tests borg.trikeshed.forge.server.ProjectDbBindingTest --tests borg.trikeshed.job.PackCasVerifierTest --tests borg.trikeshed.narsese.BertPythonSleeveTest --tests borg.trikeshed.narsese.JevaWorkerProtocolTest --tests borg.trikeshed.userspace.nio.channels.FileChannelDuplicateTest --tests borg.trikeshed.narsese.KgPredicateNamespaceTest --tests borg.trikeshed.kif.KifTaxonomySnapshotTest --tests borg.trikeshed.nlp.EnglishCorpusViewTest --tests borg.trikeshed.narsese.KgRouteErrorTest --tests borg.trikeshed.lcnc.EnglishCopularPresetTest --tests borg.trikeshed.lcnc.EnglishCopularPresetExecutionTest --tests borg.trikeshed.lcnc.EnglishTaxonomyCarrierTest --tests borg.trikeshed.lcnc.EnglishTaxonomyExportGuardTest --tests borg.trikeshed.forge.server.EnglishTaxonomyWireTest --tests borg.trikeshed.lcnc.CurationReviewedReadTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyPlanPageTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyWireTest --tests borg.trikeshed.forge.server.ReviewedKifWireTest --tests borg.trikeshed.lcnc.ReviewedKifCancellationTest --tests borg.trikeshed.lcnc.LlvmScalarTest --tests borg.trikeshed.kanban.module.LlvmScalarRunTest --tests borg.trikeshed.lcnc.NativeHornProfileTest --tests borg.trikeshed.lcnc.LlvmConfixTest --tests borg.trikeshed.kanban.module.LlvmConfixRunTest --tests borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest --tests borg.trikeshed.narsese.PropositionAttentionTest --tests borg.trikeshed.lcnc.LcncConsumptionTest --tests borg.trikeshed.narsese.KgKifCommentTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageTest --tests borg.trikeshed.narsese.LegalRequiredAnchorCoverageCliTest --tests borg.trikeshed.kif.KifActivationPlanTest --tests borg.trikeshed.kif.SumoNixBridgeTest --tests borg.trikeshed.lcnc.KifNodesTest --tests borg.trikeshed.forge.server.CurationIntakeEligibilityTest --tests borg.trikeshed.kanban.module.KanbanPinnedDispatchTest --tests borg.trikeshed.lcnc.DocumentSpansTest --tests borg.trikeshed.lcnc.FinanceKifPresetExecutionTest --tests borg.trikeshed.lcnc.LcncConfixSelectionTest --tests borg.trikeshed.lcnc.LcncPinnedBindingTest --tests borg.trikeshed.lcnc.WorkModelRouteTest --tests borg.trikeshed.lcnc.WorkSelectNodeTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofPathsReadTest --tests borg.trikeshed.lcnc.LcncConfixPickPathContractTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyProofGraphTest --tests borg.trikeshed.lcnc.ReviewedTaxonomyQueryViewTest --tests borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest --tests borg.trikeshed.narsese.RetainedNalImplicationTest --tests borg.trikeshed.narsese.SyntheticNalExperimentCliTest",
+    "frozenNativeProof": "c23/b432 remains actual runtime artifact; no new inference execution required for test/bootstrap-only merge",
+    "allJvmTestSourceCompile": true,
+    "threeJsBuilds": "PASS",
+    "finished": "2026-11-05T04:05:19.556701+00:00",
+    "totals": {
+      "tests": 480,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "mainAndAllThreeJsBytesEqualFrozenC23": true,
+    "artifacts": {
+      "main.jar": "b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448",
+      "documents.js": "a9e86b2ab1f1d65b08b830777644fa9ba710ce7658197012962727e94e99b80d",
+      "spacegraph.js": "2d8701a34a13623179d04e4f109fc851aecb96a22cf8b07647fbbbd232e6a18d",
+      "pages.js": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5"
+    },
+    "buildLogSha256": "7ac8e1fac399b6849333096e04a13ddfaa5a3755e379e2eeff423be642ee4afb"
+  },
+  "concurrentReleaseScope": "R4c packaged PDF/native cooperative node-boundary interruption/recovery evidence preserved. Matching archived runtime/source closure remains peer proof, not rerun by this NAL publication.",
+  "productionRuntimeDiffAfterFrozenNativeC23": [],
+  "productionChangesAfterPostMergeValidation": []
 }
