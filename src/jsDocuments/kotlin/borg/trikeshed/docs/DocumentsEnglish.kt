@@ -1,9 +1,12 @@
 package borg.trikeshed.docs
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lcnc.EnglishGuardQueryView
+import borg.trikeshed.lcnc.LcncProgramConfix
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.web.EnglishQueryNavigation
+import borg.trikeshed.web.PatchRead
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.*
@@ -57,6 +60,10 @@ internal object DocumentsEnglish {
         private var legalPending = false
         private var legalFailure: String? = null
         private var legalResult: Map<*, *>? = null
+        private var guardQueryPending = false
+        private var guardQueryFailure: String? = null
+        private var guardQueryStarter: EnglishGuardQueryView.Starter? = null
+        private var guardQueryAnswer: EnglishGuardQueryView.Answer? = null
         private var taxonomy: DocumentsEnglishTaxonomy? = null
         private fun resetTaxonomy() { taxonomy?.close(); taxonomy = null }
         fun close() { inspectionEpoch++; abort?.abort(); resetLegal(); resetTaxonomy(); job.cancel() }
@@ -196,8 +203,14 @@ internal object DocumentsEnglish {
         private fun resetLegal() {
             legalEpoch++; legalAbort?.abort(); legalAbort = null
             legalPending = false; legalFailure = null; legalResult = null
+            clearGuardQuery()
+        }
+        private fun clearGuardQuery() {
+            guardQueryPending = false; guardQueryFailure = null; guardQueryStarter = null; guardQueryAnswer = null
         }
         private fun legalPatterns(inspection: Map<*, *>) {
+            if (!present() || pending || legalPending || guardQueryPending) return
+            clearGuardQuery()
             val receipt = inspection["receiptCid"] as String
             val mode = legalMode; val ticket = ++legalEpoch
             fun selected() = present() && legalEpoch == ticket && result?.get("receiptCid") == receipt
@@ -258,6 +271,9 @@ internal object DocumentsEnglish {
                 val edges = legalRows(original["dependencies"]).map(::key).toSet()
                 fun bindings(raw: Any?) { for (edge in legalRows(raw)) require(key(edge) in edges) { "Candidate dependency differs from the retained parser edge" } }
                 bindings(sentence["dependencies"]); unresolved(sentence["unresolved"])
+                if ("guardAttachments" in value) require(legalRows(sentence["dependencies"]).map(::key) == legalRows(original["dependencies"]).map(::key)) {
+                    "Guard attachment source dependencies differ from the retained inspection"
+                }
                 for (action in legalRows(sentence["modalActions"], 1024)) {
                     actions++; require(actions <= 1024 && action["status"] == "parser-role-candidate")
                     node(action["modal"]); node(action["action"]); bindings(_l[action["dependency"]]); bindings(action["relatedDependencies"])
@@ -292,6 +308,7 @@ internal object DocumentsEnglish {
             }
             val counts = value["counts"] as? Map<*, *> ?: error("Candidate counts are unavailable")
             require(number(counts["modalActions"]) == actions && number(counts["durations"]) == durations) { "Candidate counts differ from the displayed observations" }
+            EnglishGuardQueryView.section(value) // Absent is legacy; present null/unknown/malformed must refuse.
         }
         private fun rangeInput(parent: HTMLElement, label: String, attribute: String, value: Int, assign: (Int) -> Unit) {
             val holder = text(parent, "label", label, "ds-curate-label")
@@ -408,16 +425,167 @@ internal object DocumentsEnglish {
             for ((key, title) in _l["current" j "Check current source", "snapshot" j "Retained historical snapshot"]) {
                 text(mode, "option", title).setAttribute("value", key)
             }
-            mode.value = legalMode; mode.disabled = pending || legalPending; label.appendChild(mode)
-            mode.addEventListener("change", { if (present() && !pending && !legalPending) { resetLegal(); legalMode = mode.value; render() } })
+            mode.value = legalMode; mode.disabled = pending || legalPending || guardQueryPending; label.appendChild(mode)
+            mode.addEventListener("change", { if (present() && !pending && !legalPending && !guardQueryPending) { resetLegal(); legalMode = mode.value; render() } })
             val button = text(controls, "button", "Inspect legal roles and quantities", "ds-curate-submit")
             button.setAttribute("type", "button"); button.setAttribute("data-english-legal-inspect", "1")
-            button.style.cssText = "margin:0;padding:8px 12px"; button.asDynamic().disabled = pending || legalPending
-            button.addEventListener("click", { if (present() && !pending && !legalPending) legalPatterns(inspection) })
+            button.style.cssText = "margin:0;padding:8px 12px"; button.asDynamic().disabled = pending || legalPending || guardQueryPending
+            button.addEventListener("click", { if (present() && !pending && !legalPending && !guardQueryPending) legalPatterns(inspection) })
             if (legalMode == "snapshot") text(section, "p", "Historical snapshot mode does not check current source revisions.", "ds-curate-label")
             if (legalPending) text(section, "p", "Reading retained legal language candidates…").setAttribute("role", "status")
             legalFailure?.let { text(section, "p", it, "ds-curate-error").setAttribute("role", "status") }
             legalResult?.let { legalResult(section, it) }
+        }
+        private fun queryGuardAttachments(candidate: Map<*, *>) {
+            if (!present() || pending || legalPending || guardQueryPending || legalResult !== candidate) return
+            val starter = runCatching { EnglishGuardQueryView.starter(candidate) }.getOrElse {
+                guardQueryFailure = it.message ?: "Clause attachment query is unavailable"; render(); return
+            }
+            val inspectionCid = candidate["inspectionCid"] as String
+            val mode = legalMode; val ticket = ++legalEpoch
+            fun active() = present() && legalEpoch == ticket && result?.get("receiptCid") == inspectionCid && legalMode == mode
+            guardQueryStarter = starter; guardQueryAnswer = null; guardQueryFailure = null; guardQueryPending = true
+            render()
+            scope.launch {
+                var status: Int? = null
+                try {
+                    if (!active() || legalResult !== candidate) return@launch
+                    val controller: dynamic = js("new AbortController()"); legalAbort = controller
+                    val init = RequestInit(method = "POST", body = jsonOf(_m["inspectionCid" j inspectionCid,
+                        "mode" j mode, "program" j reifyStrict(LcncProgramConfix.toJson(starter.program))]),
+                        headers = Headers().apply { append("Content-Type", "application/json") })
+                    init.asDynamic().signal = controller.signal
+                    val response = window.fetch("/api/documents/english/legal-patterns/query", init).await()
+                    status = response.status.toInt()
+                    val body = PatchRead.text(response.asDynamic(), 900_000)
+                    if (!active() || legalResult !== candidate) return@launch
+                    val value = reifyStrict(body) as? Map<*, *> ?: error("Unreadable clause attachment query response")
+                    require(response.ok && value["error"] == null) { (value["error"] ?: "Clause query refused (HTTP $status)").toString() }
+                    val answer = EnglishGuardQueryView.answer(candidate, value, starter)
+                    if (active() && legalResult === candidate) guardQueryAnswer = answer
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Throwable) {
+                    if (active()) {
+                        guardQueryAnswer = null
+                        val message = error.message ?: "Clause attachment query unavailable"
+                        if (status == 400 || status == 413) guardQueryFailure = "Query refused: $message. No partial rows are shown."
+                        else {
+                            legalResult = null; guardQueryStarter = null
+                            legalFailure = "Clause query or source status was not confirmed: $message. Inspect legal candidates again."
+                        }
+                    }
+                } finally { if (active()) { legalAbort = null; guardQueryPending = false; render() } }
+            }
+        }
+        private fun guardAnchor(candidate: Map<*, *>, sentence: Int, ordinal: Int) =
+            "english-guard-" + (candidate["receiptCid"] as String).removePrefix("sha256:") + "-$sentence-$ordinal"
+        private fun focusGuard(candidate: Map<*, *>, sentence: Int, ordinal: Int) {
+            if (present() && legalResult === candidate) {
+                val card = host.querySelector("#" + guardAnchor(candidate, sentence, ordinal)) as? HTMLElement ?: return
+                card.scrollIntoView(); card.focus()
+            }
+        }
+        private fun renderGuardQuery(parent: HTMLElement, candidate: Map<*, *>) {
+            val section = text(parent, "section", "", "ds-run"); section.setAttribute("data-english-guard-query", "1")
+            text(section, "h4", "Observed clause attachments")
+            text(section, "p", "Direct parser edges and lexical cues only. No reconstructed guard scope, legal applicability or polarity decision is established. The eight-pattern query includes every observed adverbial target, including unmarked and nested targets.", "ds-curate-label")
+            val button = text(section, "button", "Query observed clause attachments", "ds-curate-submit")
+            button.setAttribute("type", "button"); button.setAttribute("data-english-guard-query-run", "1")
+            button.asDynamic().disabled = pending || legalPending || guardQueryPending
+            button.addEventListener("click", { queryGuardAttachments(candidate) })
+            if (guardQueryPending) text(section, "p", "Querying this receipt-local candidate graph…").setAttribute("role", "status")
+            guardQueryFailure?.let { text(section, "p", it, "ds-curate-error").setAttribute("role", "status") }
+            val starter = guardQueryStarter ?: return
+            val program = text(section, "details", ""); text(program, "summary", "Inspection-only LCNC query and SPARQL")
+            text(program, "pre", LcncProgramConfix.toJson(starter.program) + "\n\n" + starter.query).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto"
+            val answer = guardQueryAnswer ?: return
+            text(section, "p", "${answer.rows.size} typed attachment rows, displayed in source sentence/attachment order. The query has no ORDER BY. Empty rows mean no matching projected attachment, not absence of guards or legal effects.", "ds-curate-label")
+            val table = table(section, EnglishGuardQueryView.variables.toSeries())
+            for (row in answer.rows) {
+                val tr = text(table, "tr", ""); tr.setAttribute("data-english-guard-query-row", "${row.sentenceIndex}:${row.ordinal}")
+                for (name in EnglishGuardQueryView.variables) {
+                    val binding = row.bindings[name] as Map<*, *>
+                    val cell = text(tr, "td", "${binding["value"]}\nRDF ${binding["type"]}")
+                    cell.setAttribute("data-guard-query-variable", name)
+                    cell.style.cssText = "padding:7px 8px;border-bottom:1px solid var(--rule);vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere"
+                    if (name == "attachment") {
+                        val focus = text(cell, "button", "Inspect attachment source", "ds-curate-submit")
+                        focus.setAttribute("type", "button"); focus.setAttribute("data-guard-query-source-target", guardAnchor(candidate, row.sentenceIndex, row.ordinal))
+                        focus.addEventListener("click", { focusGuard(candidate, row.sentenceIndex, row.ordinal) })
+                    }
+                }
+            }
+            val source = answer.value["source"] as Map<*, *>
+            text(section, "p", "Candidate graph: ${source["namedGraph"]}\nSource mode: ${source["mode"]} · currentness: ${source["currentness"]} · parser: ${source["parserExecution"]} · unreviewed", "ds-cid").style.whiteSpace = "pre-wrap"
+            val raw = text(section, "details", ""); text(raw, "summary", "Typed bindings and source descriptor")
+            text(raw, "pre", jsonOf(answer.value)).style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto"
+        }
+        private fun renderGuardSentence(parent: HTMLElement, candidate: Map<*, *>, sentence: Map<*, *>, guard: Map<*, *>) {
+            val section = text(parent, "section", "", "ds-run"); section.setAttribute("data-english-guard-sentence", guard["index"].toString())
+            text(section, "h4", "Recorded clause attachment observations")
+            val diagnostic = guard["normConditionIssue"] as? String
+            text(section, "p", "Existing NormClauses.conditionIssue: ${diagnostic ?: "none reported (does not establish a supported condition)"}", "ds-curate-label")
+                .setAttribute("data-guard-norm-diagnostic", diagnostic ?: "none-reported")
+            text(section, "p", "This diagnostic is separate from the parser links and quotation indicators. Neither a null diagnostic nor a direct attachment establishes legal scope.", "ds-curate-label")
+            val nodes = legalRows(sentence["nodes"], 16_384).associateBy { it["id"] as String }
+            fun node(id: Any?) = nodes.getValue(id as String)
+            fun ids(raw: Any?) = raw as List<*>
+            fun edge(raw: Any?): String {
+                val value = raw as Map<*, *>
+                fun label(id: Any?) = if (id == "0:0") "virtual root 0:0" else legalNode(node(id))
+                return "${label(value["governorNode"])} — ${value["relation"]} → ${label(value["dependentNode"])}"
+            }
+            val quotationIds = ids(guard["quotationIndicatorNodeIds"])
+            text(section, "p", if (quotationIds.isEmpty()) "No quotation-indicator nodes reported; quotation scope was not evaluated."
+                else "Quotation-indicator source nodes: " + quotationIds.joinToString(" · ") { legalNode(node(it)) }, "ds-curate-label")
+                .setAttribute("data-guard-quotation-indicators", quotationIds.size.toString())
+            text(section, "p", "Quote punctuation is not paired here and does not establish reported-speech or operative scope.", "ds-curate-label")
+            val markers = legalRows(guard["markerBindings"])
+            text(section, "h5", "Condition and exception marker occurrences")
+            if (markers.isEmpty()) text(section, "p", "No listed condition/exception marker occurrence reported.", "ds-curate-label")
+            for (binding in markers) {
+                val marker = binding["marker"] as Map<*, *>
+                val item = text(section, "div", ""); item.setAttribute("data-guard-marker-ordinal", binding["markerOrdinal"].toString())
+                text(item, "p", "Marker ${binding["markerOrdinal"]} · ${marker["kind"]} / ${marker["label"]} · “${marker["quote"]}” [${marker["begin"]}, ${marker["end"]})")
+                text(item, "p", "Aligned full nodes: " + ids(binding["nodeIds"]).joinToString(" · ") { legalNode(node(it)) }.ifBlank { "Not reported" }, "ds-curate-label")
+                val dependencies = legalRows(binding["dependencies"])
+                text(item, "pre", dependencies.joinToString("\n", transform = ::edge).ifBlank { "No direct mark/advmod binding reported." }).style.whiteSpace = "pre-wrap"
+                text(item, "p", "Unresolved: ${unresolved(binding["unresolved"])}", "ds-curate-label")
+            }
+            val attachments = legalRows(guard["attachments"], 1024)
+            if (attachments.isEmpty()) text(section, "p", "No direct adverbial dependency edge reported in this section. Lexical marker observations remain separate.", "ds-curate-label")
+            for (attachment in attachments) {
+                val ordinal = number(attachment["ordinal"]); val index = number(guard["index"])
+                val item = text(section, "article", "", "ds-run"); item.id = guardAnchor(candidate, index, ordinal)
+                item.setAttribute("tabindex", "-1"); item.setAttribute("data-english-guard-attachment", "$index:$ordinal")
+                text(item, "h5", "Observed attachment $ordinal · ${(attachment["dependency"] as Map<*, *>)["relation"]}")
+                text(item, "p", "Governor head: ${legalNode(node(attachment["governorNodeId"]))}")
+                text(item, "p", "Subordinate head: ${legalNode(node(attachment["subordinateNodeId"]))}")
+                text(item, "pre", edge(attachment["dependency"])).style.whiteSpace = "pre-wrap"
+                val modalRefs = ids(attachment["modalActionOrdinals"])
+                text(item, "p", "Direct modal-action references: ${modalRefs.joinToString().ifBlank { "None reported; no modal is inherited" }}", "ds-curate-label")
+                val matched = ids(attachment["markerBindingOrdinals"])
+                text(item, "p", "Direct marker ordinals: ${matched.joinToString().ifBlank { "None reported for this target" }}", "ds-curate-label")
+                    .setAttribute("data-guard-direct-marker-count", matched.size.toString())
+                val cues = legalRows(attachment["directNegationCueBindings"])
+                if (cues.isEmpty()) text(item, "p", "No direct lexical negation-cue binding reported. This is not a positive-polarity conclusion.", "ds-curate-label")
+                for (cue in cues) {
+                    val location = cue["location"] as String
+                    val title = when {
+                        location == "governor-head" && modalRefs.isNotEmpty() -> "Modal-action / governor-head cue"
+                        location == "governor-head" -> "Governor-head cue"
+                        location == "subordinate-head" -> "Subordinate-head cue"
+                        else -> "Other observed head cue"
+                    }
+                    text(item, "p", "$title · ${legalNode(node(cue["cueNodeId"]))} · location $location")
+                        .setAttribute("data-guard-cue-location", location)
+                    text(item, "pre", edge(cue["dependency"])).style.whiteSpace = "pre-wrap"
+                }
+                val coordination = legalRows(attachment["coordinationDependencies"])
+                if (coordination.isNotEmpty()) text(item, "pre", "Observed coordination bindings:\n" + coordination.joinToString("\n", transform = ::edge)).style.whiteSpace = "pre-wrap"
+                text(item, "p", "Unresolved: ${unresolved(attachment["unresolved"])}", "ds-curate-label")
+            }
+            text(section, "p", "Unresolved: ${unresolved(guard["unresolved"])}. Repeated views of one marker/cue do not create independent evidence.", "ds-curate-label")
         }
         private fun legalNode(raw: Any?): String {
             val node = raw as Map<*, *>
@@ -431,7 +599,11 @@ internal object DocumentsEnglish {
             text(section, "p", "Parent inspection: ${value["inspectionCid"]}\nCandidate receipt: ${value["receiptCid"]}\nOriginal source: ${value["originalCid"]}\nExtracted text: ${value["extractedTextCid"]}", "ds-cid").style.whiteSpace = "pre-wrap"
             text(section, "p", "Unresolved: ${unresolved(value["unresolved"])}", "ds-curate-label")
             text(section, "p", "Full parser IDs include copy counts. Copies reuse source words and can repeat roles; they are not additional word occurrences. Integer readings do not establish deadlines, and months are not converted to days.", "ds-curate-label")
-            for (sentence in legalRows(value["sentences"], 512)) {
+            val guardSection = value["guardAttachments"] as? Map<*, *>
+            val guardRows = guardSection?.let { legalRows(it["sentences"], 512) }
+            if (guardRows == null) text(section, "p", "Guard attachment section not recorded. Existing raw observations remain available; no guard coverage is established.", "ds-curate-label")
+            else renderGuardQuery(section, value)
+            for ((ordinal, sentence) in legalRows(value["sentences"], 512).withIndex()) {
                 val row = text(section, "section", "", "ds-run"); row.setAttribute("data-english-legal-sentence", sentence["index"].toString())
                 text(row, "p", "Sentence ${sentence["index"]} · text ${sentence["begin"]}–${sentence["end"]}", "ds-curate-label")
                 text(row, "blockquote", sentence["quote"] as String).style.cssText = "white-space:pre-wrap;margin:10px 0;font-size:16px;line-height:1.6"
@@ -456,6 +628,7 @@ internal object DocumentsEnglish {
                     for (reading in legalRows(duration["numberReadings"], 24)) text(item, "p", "Number form: “${reading["quote"]}” · integer reading: ${reading["integerValue"]?.let { number(it).toString() } ?: "unresolved"} · ${reading["begin"]}–${reading["end"]}", "ds-curate-label")
                     text(item, "p", "Unresolved: ${unresolved(duration["unresolved"])}", "ds-curate-label")
                 }
+                guardRows?.let { renderGuardSentence(row, value, sentence, it[ordinal]) }
             }
         }
         private fun sentence(parent: HTMLElement, value: Map<*, *>) {
