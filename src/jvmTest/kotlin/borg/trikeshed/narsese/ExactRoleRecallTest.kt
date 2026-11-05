@@ -35,7 +35,7 @@ class ExactRoleRecallTest {
     }
     private fun walker(bag: BeliefBagElement) = LcncRunner(PureNodes.registry { 123L } + _m["nal.recall" j NalNodes.recallRunner(bag)])
 
-    @Test fun actualC2StructuredWireSelectsPaysThenExplicitAttentionChangesOnlyBudget() = runBlocking {
+    @Test fun actualC2StructuredWireSelectsPaysThenExplicitAttentionChangesOnlyBudget(): Unit = runBlocking {
         val cas = PropositionAttentionTest.Store()
         owners.owner(cas) { bag ->
             importCollision(bag)
@@ -69,7 +69,7 @@ class ExactRoleRecallTest {
         }
     }
 
-    @Test fun sameAngularOwesAndOtherContextRemainDocumentaryMatchesWithoutWrongResidentAttention() = runBlocking {
+    @Test fun sameAngularOwesAndOtherContextRemainDocumentaryMatchesWithoutWrongResidentAttention(): Unit = runBlocking {
         val cas = PropositionAttentionTest.Store()
         owners.owner(cas) { bag ->
             importCollision(bag)
@@ -92,7 +92,7 @@ class ExactRoleRecallTest {
         }
     }
 
-    @Test fun duplicateOccurrencesAndRepeatedSelectionNeverAddEvidenceAndEvictionCannotBeRevived() = runBlocking {
+    @Test fun duplicateOccurrencesAndRepeatedSelectionNeverAddEvidenceAndEvictionCannotBeRevived(): Unit = runBlocking {
         val cas = PropositionAttentionTest.Store()
         owners.owner(cas, floor = .5f) { bag ->
             val text = "(pays Tenant Landlord)\n".repeat(65)
@@ -115,7 +115,7 @@ class ExactRoleRecallTest {
         }
     }
 
-    @Test fun unsupportedWholeSourcesAndMissingUnrelatedDefinitionsNeverReturnPartialNoMatch() = runBlocking {
+    @Test fun unsupportedWholeSourcesAndMissingUnrelatedDefinitionsNeverReturnPartialNoMatch(): Unit = runBlocking {
         val cas = PropositionAttentionTest.Store()
         owners.owner(cas) { bag ->
             for (tail in s_["(not (pays Tenant Landlord))", "(=> (assignedTo ?x ?y) (mayRead ?x ?y))",
@@ -144,7 +144,7 @@ class ExactRoleRecallTest {
         }
     }
 
-    @Test fun lexicalLiteralsRemainTypedAndNeverBecomeInjectedPatternsOrEntityFallbacks() = runBlocking {
+    @Test fun lexicalLiteralsRemainTypedAndNeverBecomeInjectedPatternsOrEntityFallbacks(): Unit = runBlocking {
         val cas = PropositionAttentionTest.Store()
         owners.owner(cas) { bag ->
             val text = "(labels Tenant \"notice; (exact) 🧾\")"
@@ -160,7 +160,7 @@ class ExactRoleRecallTest {
         }
     }
 
-    @Test fun structuredCanonicalAndOptionalWirePresenceNeverFallBackFromNullOrBadRequest() = runBlocking {
+    @Test fun structuredCanonicalAndOptionalWirePresenceNeverFallBackFromNullOrBadRequest(): Unit = runBlocking {
         val cas = PropositionAttentionTest.Store()
         owners.owner(cas) { bag ->
             importCollision(bag)
@@ -178,6 +178,77 @@ class ExactRoleRecallTest {
             val contract = assertNotNull(LcncContracts.find("nal.recall"))
             assertTrue("request?" in contract.inputs); assertEquals("json", contract.inputKinds["request"])
             assertTrue("selection" in contract.outputs)
+        }
+    }
+
+    @Test fun uniqueDocumentaryResidentTargetsTypeCheckAndWireToSeparateAttentionWithoutAvailabilityDisambiguation(): Unit = runBlocking {
+        val cas = PropositionAttentionTest.Store()
+        owners.owner(cas, floor = .5f) { bag ->
+            importCollision(bag)
+            suspend fun execute(query: Map<String, Any?>, attendParams: Map<String, String> = _m["p" j ".8"],
+                ports: Series<String> = s_["angular", "propositionCid"], optionalTargets: Boolean = false): LcncRunner.ScopeResult {
+                val wires = mutableListOf(LcncWire("request", "value", "recall", "request?"))
+                for (port in ports.view) wires.add(LcncWire("recall", port, "attend", port + if (optionalTargets) "?" else ""))
+                val authored = LcncProgram("Typed exact-role attention", s_[
+                    LcncNode("request", "json.value", _m["value" j jsonOf(query)]),
+                    LcncNode("recall", "nal.recall", _m["mode" j "exact-role"]),
+                    LcncNode("attend", "nal.attend", attendParams)], wires.toSeries())
+                assertTrue(LcncTypeCheck.check(authored).isEmpty())
+                val decoded = LcncProgramConfix.fromJson(authored.name, LcncProgramConfix.toJson(authored))
+                assertTrue(LcncTypeCheck.check(decoded).isEmpty())
+                return LcncRunner(PureNodes.registry { 123L } + _m[
+                    "nal.recall" j NalNodes.recallRunner(bag), "nal.attend" j BeliefsNodes.attendRunner(bag)]).runProcedure(decoded)
+            }
+            val signal = bag.snapshot().values.single(); val bytes = SignalCodec.encode(signal)
+            val priorBudget = assertNotNull(bag.budgetOf(signal.angular)); val puts = cas.puts.size
+            val positive = execute(request())
+            val target = positive.nodeOutputs.getValue("recall")
+            assertEquals(signal.angular.toString(), target["angular"])
+            assertEquals(signal.propositionCid, target["propositionCid"])
+            assertEquals(true, fields(positive.nodeOutputs.getValue("attend")["attended"])["processed"])
+            assertEquals(BudgetCoord(.8f, priorBudget.df, priorBudget.qf), bag.budgetOf(signal.angular))
+            assertContentEquals(bytes, SignalCodec.encode(assertNotNull(bag.signalOf(signal.angular))))
+            assertEquals(puts, cas.puts.size)
+
+            val staleTarget = _m["angular" j signal.angular.toString(), "propositionCid" j assertNotNull(signal.propositionCid), "p" j ".2"]
+            suspend fun noAttention(query: Map<String, Any?>, ports: Series<String> = s_["angular", "propositionCid"],
+                optionalTargets: Boolean = false): Map<String, Any?> {
+                val before = bag.snapshot().values.associateBy { it.angular }
+                val budgets = before.keys.associateWith { bag.budgetOf(it) }; val writes = cas.puts.size
+                val result = execute(query, staleTarget, ports, optionalTargets); val output = result.nodeOutputs.getValue("recall")
+                assertTrue(output.containsKey("angular")); assertTrue(output.containsKey("propositionCid"))
+                assertNull(output["angular"]); assertNull(output["propositionCid"])
+                assertEquals(before, bag.snapshot().values.associateBy { it.angular })
+                assertEquals(budgets, before.keys.associateWith { bag.budgetOf(it) }); assertEquals(writes, cas.puts.size)
+                assertEquals("${ports[0]} required", fields(result.nodeOutputs.getValue("attend")["attended"])["error"])
+                return output
+            }
+            assertEquals("RESIDENT_PID_MISMATCH", matches(selected(noAttention(request(predicate = "owes")))).single()["residentStatus"])
+            assertEquals("NO_MATCH_IN_COMPLETE_SOURCE", selected(noAttention(request(subject = "Landlord", obj = "Tenant")))["status"])
+            assertEquals("UNVERIFIED_SOURCE", selected(noAttention(request(ContentId.of("unavailable source".encodeToByteArray()))))["status"])
+            noAttention(request(predicate = "owes"), s_["angular"])
+            noAttention(request(predicate = "owes"), s_["propositionCid"])
+            noAttention(request(predicate = "owes"), s_["angular"], true)
+            noAttention(request(predicate = "owes"), s_["propositionCid"], true)
+            val legacy = execute(request(predicate = "owes"), staleTarget + _m["p" j ".7"], emptySeriesOf())
+            assertEquals(true, fields(legacy.nodeOutputs.getValue("attend")["attended"])["processed"], "Genuinely unwired identity still uses authored parameters")
+            assertEquals(BudgetCoord(.7f, priorBudget.df, priorBudget.qf), bag.budgetOf(signal.angular))
+            assertContentEquals(bytes, SignalCodec.encode(assertNotNull(bag.signalOf(signal.angular))))
+
+            val text = "(labels Clerk First)\n(labels Clerk Second)\n"
+            bag.ingestKg(text); val source = ContentId.of(text.encodeToByteArray())
+            val pair = KgNalBridge.bridge(text).map { it.signal(source.value) }
+            assertNotEquals(pair[0].angular, pair[1].angular)
+            bag.attendProposition(pair[0].angular, ContentId(assertNotNull(pair[0].propositionCid)), p = .9f)
+            bag.attendProposition(pair[1].angular, ContentId(assertNotNull(pair[1].propositionCid)), p = .1f)
+            bag.intake.send(BeliefIntake.DecayTick); bag.awaitProcessed()
+            val ambiguous = noAttention(request(source, "labels", "Clerk"))
+            assertEquals(2, matches(selected(ambiguous)).size)
+            assertEquals(1, (ambiguous["beliefs"] as List<*>).size, "Only one resident is not permission to choose among two documentary matches")
+            val bounded = (0 until 65).joinToString("\n") { "(labels Clerk$it Record)" }
+            assertEquals("BOUNDED", selected(noAttention(request(retain(bag, bounded), "labels", "Clerk0")))["status"])
+            val contract = assertNotNull(LcncContracts.find("nal.recall"))
+            assertEquals("id", contract.outputKinds["angular"]); assertEquals("id", contract.outputKinds["propositionCid"])
         }
     }
 }
