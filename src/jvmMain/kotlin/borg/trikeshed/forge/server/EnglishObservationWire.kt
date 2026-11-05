@@ -67,10 +67,41 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
         }
     }
 
+    /** Read-only relation observations share this owner's bounded queue and source checks. */
+    private val relationRunner = LcncNodeRunner { node, inputs ->
+        val keys = _s["receiptCid", "mode", "query", "query?"]
+        require(node.params.keys.all { it in _s["receiptCid", "mode", "query", "in:query"] } && inputs.keys.all { it in keys }) {
+            "Retained English relations accept receiptCid, mode and optional exact query only"
+        }
+        require(!("query" in inputs && "query?" in inputs)) { "Relation query supplied twice" }
+        fun parameter(key: String): Any? = if (key in inputs) inputs[key] else node.params[key]
+        val cid = ContentId(requireNotNull(parameter("receiptCid") as? String) { "Retained inspection CID required" })
+        val mode = requireNotNull(parameter("mode") as? String) { "Explicit relation source mode required" }
+        require(mode in _s["snapshot", "current"])
+        val hasQuery = "query" in inputs || "query?" in inputs || "query" in node.params || "in:query" in node.params
+        val query = if (hasQuery) EnglishRelationFrames.request(lcncInputValue(node, inputs, "query")) else emptyMap()
+        requests.call {
+            val snapshot = EnglishObservationGraph.read(ctx.casStore, cid)
+            EnglishObservationCurrent.check(corpus, s_[snapshot], mode)
+            val report = EnglishRelationFrames.build(snapshot)
+            val matches = EnglishRelationFrames.query(report, query)
+            val output = _m["report" j report.value, "matches" j matches,
+                "passages" j EnglishRelationFrames.passages(report, matches), "inspectionCid" j cid.value,
+                "frameCid" j report.cid.value, "status" j report.value["status"],
+                "source" j (snapshot.descriptor(mode) + _m["currentness" j
+                    if (mode == "current") "checked-before-and-after-query" else "not-checked",
+                    "admission" j "not-performed", "roleAuthority" j "recorded-parser-roles-only")])
+            require(jsonOf(output).encodeToByteArray().size <= EnglishRelationFrames.MAX_BYTES) { "Relation output limit" }
+            EnglishObservationCurrent.check(corpus, s_[snapshot], mode)
+            output
+        }
+    }
+
     fun attach() {
         ctx.routes.claim(OWNER, PATH, route = ::route)
         ctx.lcncRunners[TYPE] = runner
         ctx.lcncRunners[EnglishNalContract.TYPE] = nalRunner
+        ctx.lcncRunners[EnglishRelationContract.TYPE] = relationRunner
         statistics.attach()
         legalPatterns.attach()
     }
@@ -81,6 +112,7 @@ class EnglishObservationWire(private val ctx: ModuleContext, private val corpus:
         legalPatterns.drain()
         if (ctx.lcncRunners[TYPE] === runner) ctx.lcncRunners.remove(TYPE)
         if (ctx.lcncRunners[EnglishNalContract.TYPE] === nalRunner) ctx.lcncRunners.remove(EnglishNalContract.TYPE)
+        if (ctx.lcncRunners[EnglishRelationContract.TYPE] === relationRunner) ctx.lcncRunners.remove(EnglishRelationContract.TYPE)
         requests.drain()
     }
 

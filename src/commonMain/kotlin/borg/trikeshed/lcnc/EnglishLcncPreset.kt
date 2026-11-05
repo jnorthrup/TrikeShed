@@ -40,6 +40,7 @@ object EnglishLcncPreset {
             inputKinds = _m["expectedCid" j "id", "routed" j "text", "transport" j "json"], outputKinds = _m["receiptCid" j "id"]),
         EnglishObservationContract.contract(),
         EnglishNalContract.contract(),
+        EnglishRelationContract.contract(),
         EnglishCorpusContract.contract(),
         EnglishLegalPatternsContract.contract(),
         EnglishLegalQueryContract.contract(),
