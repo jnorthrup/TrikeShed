@@ -1,0 +1,15 @@
+Independent recorded proof-path UI audit: PASS
+Recorded native UI, canonical receipt/export identity and exact source/provenance joins; not independent source authentication, English entailment, proof validity or OS airgap.
+Source head: dc4686a399f606397fc8aa6221055f40f5272d41
+Main SHA256: b8cfd4ac9b641df161c5aa8edc6f15c9dfde63f0dec12bdda6b4f5595fb64233
+Original receipt: sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d
+Original source: sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883 (41 UTF-8 bytes)
+Actual HTTP: retained200; session401/200; candidates200; declaration200; snapshot200; unapproved409; approve200; support200; UNKNOWN200; reflexivity200; stale409.
+Actual query premise counts: [[2], [], [1, 1]]
+Unchanged current profile limits: {"maxAssertions": 256, "maxProofs": 128, "maxSteps": 10000, "maxTotalChars": 1048576}
+Full approved plan sources2; exact English/KIF origins; DOM order/rules/quotes/cards; four URL-preserving focus actions.
+Actual review WAL194 bytes/two CRC32C frames (snapshot, approve); seven captured read states; eight retained artifacts.
+Distinct writer/reader PIDs: 97934 / 98145; CAS/WAL/readbacks/current head+mirror bound after close.
+Source amended to a different CID/revision/sequence; actual409 cleared positive DOM. Old retained carrier is historical, not current authority.
+All120 classpath JARs bound;119 dependency SHA256s verified; empty SDK; fresh Inspect/model/intake/Rete counters zero.
+Mutated-copy controls rejected: 13 / 13

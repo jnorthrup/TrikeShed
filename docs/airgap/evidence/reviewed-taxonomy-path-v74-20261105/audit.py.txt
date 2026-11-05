@@ -1,0 +1,490 @@
+#!/usr/bin/env python3
+"""Independent recorded-data audit. No browser, JVM, parser/model or network is launched.
+Usage: audit.py ATTEMPT SNAPSHOT --source-head HEAD --main-sha SHA --documents-sha SHA --out AUDIT
+"""
+import argparse
+import base64
+import copy
+import hashlib
+import json
+import re
+import struct
+import tarfile
+from pathlib import Path
+from urllib.parse import urlsplit, unquote
+
+I='sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d'
+S='sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883'
+TEXT='Tenant is a Person. A Person is an Agent.'
+ARCHIVE='51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc'
+CONTEXT='urn:agreement:reviewed-premise-proof'
+KIF='(instance urn:legal:Tenant urn:legal:Person)\n(subclass urn:legal:Person urn:legal:Agent)\n'
+SEMANTICS='positive-ground-taxonomy-support/v1'
+RULES={'kif-taxonomy/v1/instance-assertion':'Instance assertion',
+ 'kif-taxonomy/v1/subclass-assertion':'Subclass assertion',
+ 'kif-taxonomy/v1/instance-subclass':'Instance inherits through subclass',
+ 'kif-taxonomy/v1/subclass-transitivity':'Subclass transitivity',
+ 'kif-taxonomy/v1/class-reflexivity':'Class reflexivity with declaration witness'}
+
+class AuditError(Exception):pass
+def need(c,m):
+ if not c:raise AuditError(m)
+def sha(b):return hashlib.sha256(b).hexdigest()
+def cid(b):return 'sha256:'+sha(b)
+def b64(s):return base64.b64decode(s,validate=True)
+def load(p):
+ def pairs(rows):
+  out={}
+  for k,v in rows:need(k not in out,'Duplicate JSON key');out[k]=v
+  return out
+ return json.loads(p.read_bytes().decode('utf8',errors='strict'),object_pairs_hook=pairs)
+def utf16(text,begin,end):return text.encode('utf-16-le')[begin*2:end*2].decode('utf-16-le')
+def header(major,n):
+ if n<24:return bytes([major*32+n])
+ for width,ai in [(1,24),(2,25),(4,26),(8,27)]:
+  if n<1<<(width*8):return bytes([major*32+ai])+n.to_bytes(width,'big')
+ raise AuditError('CBOR integer bound')
+def canonical(v):
+ if v is None:return b'\xf6'
+ if isinstance(v,bool):return b'\xf5' if v else b'\xf4'
+ if isinstance(v,int):return header(0,v) if v>=0 else header(1,-1-v)
+ if isinstance(v,float):return b'\xfb'+struct.pack('>d',v)
+ if isinstance(v,str):
+  b=v.encode('utf8',errors='strict');return header(3,len(b))+b
+ if isinstance(v,bytes):return header(2,len(v))+v
+ if isinstance(v,list):return header(4,len(v))+b''.join(map(canonical,v))
+ if isinstance(v,dict):return header(5,len(v))+b''.join(canonical(k)+canonical(v[k]) for k in sorted(v,key=canonical))
+ raise AuditError('Unsupported CBOR value')
+def decode_cbor(data):
+ at=0
+ def read(n):
+  nonlocal at
+  need(at+n<=len(data),'Truncated CBOR');v=data[at:at+n];at+=n;return v
+ def item(depth=0):
+  need(depth<=64,'CBOR depth');tag=read(1)[0];major,ai=tag>>5,tag&31
+  if major==7:
+   if ai in [20,21,22]:return {20:False,21:True,22:None}[ai]
+   if ai==27:return struct.unpack('>d',read(8))[0]
+   raise AuditError('Unsupported CBOR simple')
+  need(ai<28,'Indefinite/reserved CBOR');n=ai if ai<24 else int.from_bytes(read({24:1,25:2,26:4,27:8}[ai]),'big')
+  if major==0:return n
+  if major==1:return -1-n
+  if major==2:return read(n)
+  if major==3:return read(n).decode('utf8',errors='strict')
+  if major==4:return [item(depth+1) for _ in range(n)]
+  if major==5:
+   out={}
+   for _ in range(n):
+    k,v=item(depth+1),item(depth+1);need(isinstance(k,str) and k not in out,'Duplicate/nontext CBOR key');out[k]=v
+   return out
+  raise AuditError('Unsupported CBOR major')
+ out=item();need(at==len(data) and canonical(out)==data,'Noncanonical/trailing CBOR');return out
+def fields(*values):
+ return b''.join(str(len(str(v).encode('utf8',errors='strict'))).encode()+b':'+str(v).encode('utf8',errors='strict') for v in values)
+def identity(*values):return cid(fields(*values))
+def decimal(s):
+ need(re.fullmatch(r'0|[1-9][0-9]*',s) is not None,'Noncanonical decimal field');return int(s)
+def export_plan(text):
+ raw=text.encode('utf8',errors='strict');at=0
+ def field():
+  nonlocal at
+  colon=raw.find(b':',at);need(colon>at,'Missing export length');n=decimal(raw[at:colon].decode('ascii'))
+  at=colon+1;need(at+n<=len(raw),'Truncated export');s=raw[at:at+n].decode('utf8',errors='strict');at+=n;return s
+ need(field()=='kif-activation-plan/v1','Wrong export marker')
+ names=['queryId','frameId','revision','predicate','subject','object','semantics','status','truncated','steps',
+  'maxAssertions','maxTotalChars','maxSteps','maxProofs'];out={k:field() for k in names};out['sources']=[];out['proofs']=[]
+ for _ in range(decimal(field())):
+  keys=['nodeId','assertionCid','id','sourceCid','sourceRevision','review','text','hasExclusion','exclusion']
+  out['sources'].append({k:field() for k in keys})
+ for _ in range(decimal(field())):
+  node=field();premises=[field() for _ in range(decimal(field()))];rules=[field() for _ in range(decimal(field()))]
+  out['proofs'].append({'nodeId':node,'premises':premises,'rules':rules})
+ need(at==len(raw),'Trailing export bytes');return out
+def crc32c(data):
+ crc=0xffffffff
+ for b in data:
+  crc^=b
+  for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+ return crc^0xffffffff
+def wal_frames(raw):
+ need(raw[:8]==b'DOC-LOG1','WAL type/version');at=8;prior=0;out=[]
+ while at<len(raw):
+  need(len(raw)-at>=22 and raw[at:at+4]==b'WAL1','WAL frame header')
+  seq=int.from_bytes(raw[at+6:at+14],'big');n=int.from_bytes(raw[at+14:at+18],'big');end=at+18+n
+  need(raw[at+4:at+6]==b'\0\1' and seq>prior and end+4<=len(raw),'WAL version/order/length')
+  need(crc32c(raw[at:end])==int.from_bytes(raw[end:end+4],'big'),'WAL CRC32C')
+  event=raw[at+18:end].decode('utf8',errors='strict');need(re.fullmatch('sha256:[0-9a-f]{64}',event) is not None,'WAL event CID')
+  out.append({'sequence':seq,'eventCid':event});at=end+4;prior=seq
+ return out
+def quotation(q,text,source):
+ need(q['originalCid']==source and q['extractedTextCid']==source and utf16(text,q['begin'],q['end'])==q['quote'],'Exact fixture source quotation')
+def report_paths(report,observed):
+ prepared,frozen,approved=observed['prepared'],observed['frozen']['snapshot'],observed['approved']
+ p=report['plan'];decoded=export_plan(p['export'])
+ need(p['kind']=='reviewed-taxonomy-proof-paths/1' and cid(p['export'].encode())==p['exportCid'],'Plan export CID/kind')
+ for k in ['queryId','frameId','predicate','subject','object','semantics','status']:
+  need(p[k]==decoded[k],'Projection/export '+k)
+ for k in ['revision','steps']:need(p[k]==decimal(decoded[k]),'Projection/export ordinal '+k)
+ need(str(p['truncated']).lower()==decoded['truncated'],'Projection/export truncation')
+ for k,v in p['limits'].items():need(v==decimal(decoded[k]),'Projection/export limit')
+ need(p['semantics']==report['semantics']==SEMANTICS and p['status']==report['status'] and
+  p['revision']==report['revision']==approved['revision'],'Plan status/semantics/revision scope')
+ need(all(p[k]==report['goal'][k] for k in ['predicate','subject','object']),'Plan goal scope')
+ need(report['snapshotCid']==approved['snapshotCid'] and report['approvalCid']==approved['decisionCid'] and
+  report['curationReceiptCid']==prepared['receiptCid'] and report['sourceRevision']==prepared['sourceRevision'] and
+  report['authority']=='reviewed-read-only-not-a-sink-permit','Approved report identity')
+ need(report['positivePathProven']==(report['status']=='SUPPORTED'),'Positive-path status')
+ need(report['decisionCid']==approved['decisionCid'] and report['reviewer']==approved['reviewer'] and
+  report['synthetic'] is True and report['ontologyCid']==frozen['ontologyCid'],'Actual approval reviewer/ontology binding')
+ read={'kind':'curation-taxonomy-read/1','snapshotCid':report['snapshotCid'],'approvalCid':report['approvalCid'],
+  'decisionCid':report['decisionCid'],'revision':report['revision'],'sourceRevision':report['sourceRevision'],
+  'curationReceiptCid':report['curationReceiptCid'],'ontologyCid':report['ontologyCid']}
+ need(cid(canonical(read))==report['readCid'],'Protected reviewed-read content identity')
+ need(p['queryId']==identity('kif-query/v1',SEMANTICS,p['predicate'],p['subject'],p['object']),'Query content identity')
+ sources={s['nodeId']:s for s in p['sources']};selection_ids=[s['selectionId'] for s in sources.values()]
+ selected={s['id']:s for s in frozen['selections']};offered={s['selectionId']:s for s in prepared['selections']}
+ need(len(sources)==len(p['sources'])==len(selected)==len(set(selection_ids)) and set(selection_ids)==set(selected),'Complete approved selection coverage')
+ need(len(decoded['sources'])==len(sources) and decoded['proofs']==p['proofs'],'Projection/export proof/source coverage')
+ need(len({r['nodeId'] for r in p['proofs']})==len(p['proofs']),'Duplicate proof ID')
+ origins={s['selectionId']:s for s in report['englishWitnesses']}
+ need(set(origins)==set(selected) and len(origins)==len(report['englishWitnesses']),'Complete English witness coverage')
+ origin=report['englishOrigin'];need(origin['contextIri']==CONTEXT and origin['inspectionCid']==I and
+  origin['translationDecisionCid']==prepared['translationCid'] and origin['contextKey']==prepared['contextKey'] and
+  origin['authority']=='explicit-reviewed-translation-assumptions-not-English-entailment' and
+  origin['independentDocumentsOrNarsEvidence'] is False,'English origin scope')
+ need(origin['witnesses']==report['englishWitnesses'],'English witness origin projection')
+ page=report['page'];start=page['offset'];end=min(len(frozen['selections']),start+page['limit'])
+ need(isinstance(start,int) and 0<=start<=len(frozen['selections']) and 1<=page['limit']<=64 and
+  page['total']==len(frozen['selections']) and page['returned']==end-start and
+  page['nextOffset']==(end if end<len(frozen['selections']) else None),'Display pagination metadata')
+ displayed=report['selected'];need(len(displayed)==end-start,'Display page count')
+ for actual,expected in zip(displayed,frozen['selections'][start:end]):
+  need(actual['selectionId']==expected['id'] and all(actual[k]==expected[k] for k in ['kind','value','quotation']) and
+   actual['exclusionReasons']==[],'Displayed evidence differs from frozen selection')
+ need(report['counters']['selected']==report['counters']['eligible']==len(displayed) and
+  report['counters']['excluded']==0 and report['counters']['steps']==p['steps'] and
+  report['counters']['proofs']==len(p['proofs']),'Actual report counters')
+ for s,e in zip(p['sources'],decoded['sources']):
+  need(s['selectionId']==e['id'] and all(s[k]==e[k] for k in ['nodeId','assertionCid','sourceCid','sourceRevision','review','text']),'Source/export fields')
+  need(s['review']=='APPROVED' and s['exclusion'] is None and e['hasExclusion']=='false' and e['exclusion']=='','Source review/exclusion')
+  q=s['quotation'];sid=s['selectionId'];need(q==selected[sid]['quotation'] and
+   all(q[k]==offered[sid]['kifQuotation'][k] for k in ['originalCid','extractedTextCid','begin','end','quote']),'Full frozen/prepared KIF quotation join')
+  quotation(q,prepared['kif'],prepared['derivedKifCid'])
+  need(s['text']==q['quote'] and s['sourceCid']==prepared['derivedKifCid'] and s['sourceRevision']==prepared['sourceRevision'],'Derived KIF source identity')
+  need(s['nodeId']==identity('kif-source/v1',sid,s['sourceCid'],s['sourceRevision'],'APPROVED',s['text'],s['assertionCid'],'false',''),'Source node content identity')
+  need(s['assertionCid']==cid(s['text'].encode()),'Fixture canonical assertion syntax CID')
+  need(all(origins[sid][k]==offered[sid][k] for k in ['selectionId','translationDecisionCid','inspectionCid','contextIri','contextKey',
+   'sentenceIndex','englishQuotation','subject','predicate','copula','bindings','declared','kifQuotation']),'Exact prepared English origin join')
+  quotation(origins[sid]['englishQuotation'],TEXT,S)
+ for proof in p['proofs']:
+  need(proof['premises'] and len(proof['rules'])==len(proof['premises']) and all(s in sources for s in proof['premises']),'Dangling/empty premise')
+  need(all(rule in RULES for rule in proof['rules']),'Unknown rule ID')
+  need(proof['nodeId']==identity('kif-proof/v1',p['queryId'],len(proof['premises']),*proof['premises'],len(proof['rules']),*proof['rules']),'Proof node content identity')
+ need(p['frameId']==identity('kif-frame/v1',p['revision'],p['queryId'],SEMANTICS,*[p['limits'][k] for k in
+  ['maxAssertions','maxTotalChars','maxSteps','maxProofs']],len(sources),*[s['nodeId'] for s in p['sources']],p['status'],str(p['truncated']).lower(),p['steps'],len(p['proofs']),*[r['nodeId'] for r in p['proofs']]),'Frame content identity')
+ frame={'kind':'reviewed-kif-read-frame/1','readCid':report['readCid'],'page':report['page'],'fragmentExportCid':p['exportCid'],'englishOrigin':report['englishOrigin']}
+ need(cid(canonical(frame))==report['readFrameCid'],'Protected read-frame content identity')
+ return decoded,sources,origins
+
+def validate_http(b):
+ o=b['observed'];calls=b['evidence']['requests'];review='/api/documents/review/'
+ expected=[('/api/documents/english/retained','POST',200),(review+'session','GET',401),(review+'session','GET',200),
+  (review+'english-taxonomy-candidates','POST',200),(review+'english-taxonomy','POST',200),
+  (review+'snapshot','POST',200),(review+'taxonomy-plan','POST',409),(review+'decision','POST',200),
+  *[(review+'taxonomy-plan','POST',status) for status in [200,200,200,409]]]
+ need([(c['path'],c['method'],c['status']) for c in calls]==expected,'Actual retained/auth/prepare/freeze/approve/plan HTTP sequence')
+ selected={k:o['inspection']['sourceSnapshots'][0][k] for k in ['project','id','cid','rev','seq']}
+ need(calls[0]['request']=={**selected,'begin':0,'end':41,'receiptCid':I} and
+  calls[0]['response']==o['inspection'],'Actual retained HTTP exact original selection/range/receipt')
+ need(calls[2]['response']==o['session'] and 'error' in calls[1]['response'] and
+  calls[3]['request']=={'inspectionCid':I} and calls[3]['response']==o['candidates'],'Actual authentication/candidates response binding')
+ declarations=[{'id':'sentence:0','relation':'instance','subjectIri':'urn:legal:Tenant','subjectSort':'individual','objectIri':'urn:legal:Person','objectSort':'class'},
+  {'id':'sentence:1','relation':'subclass','subjectIri':'urn:legal:Person','subjectSort':'class','objectIri':'urn:legal:Agent','objectSort':'class'}]
+ need(calls[4]['request']=={'inspectionCid':I,'contextIri':CONTEXT,'declarations':declarations} and
+  calls[4]['response']==o['prepared'],'Actual explicit same-context declaration request/preview')
+ current=o['initialCounters']['reviewWal']['bytes']
+ for call in calls:
+  need(call['walBytesBefore']==current,'HTTP WAL sequence continuity')
+  if call['path'] not in [review+'snapshot',review+'decision']:
+   need(call['walBytesAfter']==current,'Read/auth/prepare request changed review WAL')
+  else:need(call['walBytesAfter']>current and call['authorizationHeaderPresent'] is True,'Actual authenticated WAL append')
+  current=call['walBytesAfter']
+  if call['path'].startswith(review):need(call['authorizationHeaderPresent'] is True,'Actual protected HTTP authorization absent')
+ need(current==o['afterApproval']['reviewWal']['bytes'],'Final HTTP WAL byte count')
+ plans=[c for c in calls if c['path']==review+'taxonomy-plan']
+ goals=[o['supported']['goal'],o['supported']['goal'],o['unknown']['goal'],o['reflexive']['goal'],o['supported']['goal']]
+ for i,(call,goal) in enumerate(zip(plans,goals)):
+  need(call['request']=={'snapshotCid':o['approved']['snapshotCid'],'expectedRevision':o['frozen']['revision'] if i==0 else o['approved']['revision'],'goal':goal},'Actual protected goal/revision/snapshot request')
+
+def validate_browser(b):
+ need(b['result']=='PASS','Browser proof incomplete');validate_http(b);o=b['observed'];m=b['meta'];inspection=o['inspection'];prepared=o['prepared']
+ need(m['inspectionCid']==I and m['source']['cid']==S and m['source']['text']==TEXT,'Original source/inspection identity')
+ need(inspection['receiptCid']==I and inspection['originalCid']==S and inspection['extractedTextCid']==S,'Retained receipt identities')
+ need(inspection['retrieval']=={'kind':'retained-current-inspection','parserExecuted':False,'modelCalled':False,'currentness':'checked-before-and-after-open'},'Retained-read provenance')
+ for sentence in inspection['sentences']:need(sentence['quote']==utf16(TEXT,sentence['begin'],sentence['end']),'Retained exact source quote')
+ need(prepared['contextIri']==CONTEXT and prepared['kif']==KIF and cid(KIF.encode())==prepared['derivedKifCid'] and prepared['reviewStatus']=='unreviewed','Exact manual translation preview')
+ need(o['session']=={'reviewer':m['reviewerId'],'synthetic':True} and o['badCredential']['status']==401 and o['unapproved']['status']==409,'Synthetic reviewer/unapproved guards')
+ approved=o['approved'];need(approved['state']=='approve' and approved['synthetic'] is True and approved['current'] is True,'Earlier synthetic approval')
+ goals={'supported':('instance','urn:legal:Tenant','urn:legal:Agent','SUPPORTED',2),
+  'unknown':('subclass','urn:legal:Agent','urn:legal:Person','UNKNOWN',0),
+  'reflexive':('subclass','urn:legal:Person','urn:legal:Person','SUPPORTED',1)}
+ for name,(predicate,subject,obj,status,n) in goals.items():
+  report=o[name];need(report['goal']=={'predicate':predicate,'subject':subject,'object':obj} and report['status']==status,'Actual query case '+name)
+  plan,sources,origins=report_paths(report,o)
+  need(report['plan']['truncated'] is False,'Actual small fixture unexpectedly truncated')
+  expected_count=0 if name=='unknown' else (1 if name=='supported' else 2)
+  need(len(plan['proofs'])==expected_count,'Actual fixture proof alternatives '+name)
+  visible=o['visible'+name[0].upper()+name[1:]]
+  need(visible['plan']==plan,'Recorded DOM decoder does not match actual export')
+  bindings=visible['bindings'];expected=[(p,i,s) for p in plan['proofs'] for i,s in enumerate(p['premises'],1)]
+  need(len(bindings)==len(expected),'DOM ordered premise count')
+  for binding,(proof,ordinal,source_id) in zip(bindings,expected):
+   source=sources[source_id];origin=origins[source['selectionId']]
+   need(len(proof['premises'])==n and binding['proofId']==proof['nodeId'] and binding['ordinal']==ordinal and
+    binding['source']['nodeId']==source_id and binding['origin']=={**origin,**{k:v for k,v in binding['origin'].items() if k in ['id','kind','label']}} and
+    origin['englishQuotation']['quote'] in binding['visiblePremise'] and source['text'] in binding['visiblePremise'],'DOM premise path/quote substitution')
+  if name=='supported':need([sources[s]['text'] for s in plan['proofs'][0]['premises']]==KIF.strip().split('\n'),'Actual two-premise order')
+  if name=='reflexive':need(all(p['rules']==['kif-taxonomy/v1/class-reflexivity'] for p in plan['proofs']) and
+   {p['premises'][0] for p in plan['proofs']}==set(sources),'Reflexivity needs each actual class witness')
+ need(b['browserErrors']==[] and b['externalBrowserRequests']==[],'Browser errors/external requests')
+ for event in b['events']:need(event['path'] not in ['/api/lcnc/run','/api/documents/english'],'Unexpected execution/fresh Inspect')
+ safety=b['evidence']['safety']
+ for key in ['inspectionPosts','inspectionResponses','modelCalls','configuredModelCount','automaticIntake','reviewIntakeCalls','analysisReteFacts']:need(safety[key]==0,'Unexpected safety counter '+key)
+ need(safety['guestModules']=={'installed':[],'mounted':[]} and safety['beliefBagPresent'] is False and
+  safety['blackboardUnchangedFromReadinessBaseline'] is True and safety['blackboardBaselineCid']==safety['blackboardCurrentCid'],'No analysis admission/empty SDK scope')
+ validate_captured_state(b)
+ return o
+
+def validate_captured_state(b):
+ o=b['observed'];states=o['readStates'];need(len(states)>=6,'Actual per-read WAL captures absent')
+ labels=[s['label'] for s in states];need(len(labels)==len(set(labels)),'Duplicate read-state label')
+ approved=o['afterApproval']['reviewWal'];initial=o['initialCounters']['reviewWal']
+ for state in states:
+  wal=state.get('reviewWal') or state['counters']['reviewWal'];raw=b64(wal['base64'])
+  need(len(raw)==wal['bytes'] and sha(raw)==wal['sha256'],'Captured WAL byte hash/size')
+  expected=initial if 'auth' in state['label'].lower() else approved
+  need(wal==expected,'Readonly operation changed actual WAL bytes')
+ references=o['sourceBackreferences'];need(len(references)>=4,'Actual source focus actions absent')
+ route=references[0]['beforeUrl'];u=urlsplit(route)
+ need(u.path=='/documents' and unquote(u.fragment)==b['meta']['project']+'/'+b['meta']['source']['id'],'Original Documents route')
+ for ref in references:
+  need(ref['beforeUrl']==ref['afterUrl']==route,'Source focus action changed Documents route')
+  need(ref['activeElementId']==ref['target']=='taxonomy-source-'+ref['sourceNode'][7:],'Source focus target identity')
+  need(ref['targetSourceNode']==ref['sourceNode'] and ref['targetSelectionId']==ref['selectionId'],'Focused DOM source-card identity')
+  rect=ref['targetRect'];need(rect['bottom']>0 and rect['top']<rect['viewportHeight'],'Focused source card not in viewport')
+ for name in ['supported','unknown','reflexive']:
+  report=o[name];visible=o['visible'+name[0].upper()+name[1:]];paths=visible['domPaths'];cards=visible['domSources']
+  sources={s['nodeId']:s for s in report['plan']['sources']};origins={s['selectionId']:s for s in report['englishWitnesses']}
+  need(len(paths)==len(report['plan']['proofs']) and len(cards)==len(sources),'Actual DOM path/source count')
+  need({c['sourceNode'] for c in cards}==set(sources),'DOM source coverage')
+  used={n for p in report['plan']['proofs'] for n in p['premises']}
+  for card in cards:
+   source=sources[card['sourceNode']];origin=origins[source['selectionId']]
+   need(card['selectionId']==source['selectionId'] and card['englishQuote']==origin['englishQuotation']['quote'] and
+    card['kifText']==source['text'] and card['unusedEvidenceCount']==(0 if source['nodeId'] in used else 1),'DOM source quotation/unused-evidence identity')
+  for path,proof in zip(paths,report['plan']['proofs']):
+   need(path['proofNode']==proof['nodeId'] and len(path['premises'])==len(proof['premises']),'DOM proof alternative identity')
+   for actual,node,rule in zip(path['premises'],proof['premises'],proof['rules']):
+    source=sources[node];origin=origins[source['selectionId']]
+    need(actual['sourceNode']==node and actual['selectionId']==source['selectionId'] and actual['ruleText']==RULES[rule] and
+     actual['englishQuote']==origin['englishQuotation']['quote'] and actual['kifText']==source['text'],'DOM ordered premise/rule/quotation mismatch')
+ stale=o['staleDom'];need(stale['sourceCurrentLabelCount']==1 and stale['sourceCurrentText']==
+  'Snapshot: '+o['approved']['snapshotCid']+' · revision '+str(o['approved']['revision'])+' · source current: unconfirmed','Stale source currentness label falsely confirmed')
+ need(stale['proofResultCount']==stale['proofPathCount']==0 and stale['url']==route and
+  'Reviewed support is unavailable or stale. Refresh the review; this failure is not an UNKNOWN result.' in stale['text'],'Stale response left positive view or changed route')
+
+def validate_closed_scope(b,r,cleanup,expected):
+ need(r['result']=='PASS' and r['currentSourceMatchesOldInspection'] is False,'Historical carrier falsely presented as current authority')
+ need(all(cleanup[k] is True for k in ['reviewWireDrainedAndClosed','booksDrained','scopesDrained','allSupervisorsCompleted',
+  'listenerStopped','executorTerminated','casCloseReturned']) and cleanup['remainingChildren']==0,'Owner cleanup incomplete')
+ writer=expected['writerPid'];reader=r['readerPid']
+ need(re.fullmatch('[1-9][0-9]*',writer) is not None and re.fullmatch('[1-9][0-9]*',reader) is not None and
+  r['writerPid']==cleanup['writerPid']==writer and reader!=writer,'Distinct writer/after-close reader PID binding')
+ need(r['readerCasCloseReturned'] is True and r['readerWalCloseReturned'] is True,'After-close reader did not close CAS/WAL')
+ def state(raw):return {'bytes':len(raw),'sha256':sha(raw)}
+ for k in ['walBeforeOpen','walAfterClose']:need(r[k]==state(expected['wal']),'After-close exact WAL bytes '+k)
+ for k in ['casPackBeforeRead','casPackAfterClose']:need(r[k]==state(expected['pack']),'After-close exact CAS pack '+k)
+ need(r['sourceMirror']==state(expected['mirror']) and r['sourceHead']==state(expected['head']),'After-close actual amended head/mirror')
+ closed=cleanup['reviewWalAfterClose'];need(b64(closed['base64'])==expected['wal'] and
+  {k:closed[k] for k in ['bytes','sha256']}==state(expected['wal']),'Writer after-close WAL binding')
+ readbacks=r['readbacks'];need(len(readbacks)==len(expected['readbacks']) and
+  {row['cid'] for row in readbacks}==set(expected['readbacks']),'After-close complete retained readback coverage')
+ for row in readbacks:
+  raw,encoding=expected['readbacks'][row['cid']]
+  need(row=={'cid':cid(raw),'encoding':encoding,**state(raw)},'After-close retained readback CID/hash/bytes')
+ need(r['retainedArtifactsUnchanged']==len(readbacks) and r['reviewWalBytes']==len(expected['wal']) and
+  r['sourceSnapshots']==expected['sourceSnapshots'],'After-close receipt source/readback/WAL count scope')
+
+def audit(attempt,snapshot,head,main_sha,documents_sha,archive):
+ required=['browser-result.json','fixture-evidence.json','reopened-cas-wal.json','cleanup.json','startup-evidence.json',
+  'source.txt','input-cas-prefix.bin','review.wal','fixture-attempt1.exit','archive-manifest-before.json','setup.json','observer-inputs/manifest.json',
+  'native-supported-two-ordered-premises-visible-proof.png','native-unknown-no-proof-visible-proof.png',
+  'native-source-backed-reflexivity-visible-proof.png','native-actual-source-amendment-refuses-old-proof.png','native-source-current-unconfirmed.png']
+ missing=[str(attempt/f) for f in required if not (attempt/f).is_file()]
+ if missing:return {'result':'PENDING','missing':missing}
+ hashes={}
+ def data(path):
+  raw=path.read_bytes();hashes[str(path)]={'bytes':len(raw),'sha256':sha(raw)};return raw
+ need((snapshot/'source-head.txt').read_text().strip()==head and sha(data(snapshot/'main.jar'))==main_sha and
+  sha(data(snapshot/'documents.js'))==documents_sha,'Frozen new source/JAR/Documents bundle')
+ frozen_manifest=load(snapshot/'sha256.json')
+ for name,value in frozen_manifest.items():
+  if name!='dependencies':need(sha(data(snapshot/name))==value,'Frozen snapshot artifact '+name)
+ dependencies=frozen_manifest['dependencies'];classpath=(snapshot/'classpath.txt').read_text().strip().split(':')
+ need(len(classpath)==120 and Path(classpath[0]).resolve()==(snapshot/'main.jar').resolve() and
+  len(dependencies)==119 and set(classpath[1:])==set(dependencies),'Frozen exact120-JAR classpath')
+ for name,expected_sha in dependencies.items():need(sha(data(Path(name)))==expected_sha,'Frozen dependency JAR '+name)
+ observer_manifest=load(attempt/'observer-inputs/manifest.json')
+ need(set(observer_manifest)=={'Fixture.kt','Reopen.kt','compile.sh','deny-egress.py','driver.cjs','run-fixture.sh'},'Exact observer source manifest')
+ for name,row in observer_manifest.items():
+  raw=data(attempt/'observer-inputs'/name);need(len(raw)==row['bytes'] and sha(raw)==row['sha256'],'Recorded observer source hash '+name)
+ b=load(attempt/'browser-result.json');e=load(attempt/'fixture-evidence.json');r=load(attempt/'reopened-cas-wal.json');startup=load(attempt/'startup-evidence.json')
+ jar=urlsplit(startup['finalJar'])
+ need(jar.scheme=='file' and jar.netloc in ['', 'localhost'] and Path(unquote(jar.path)).resolve()==(snapshot/'main.jar').resolve(),'Production origins point outside pinned final JAR')
+ need(startup['frozenSourceHead']==head and startup['mainSha256']==main_sha and len(startup['classCodeSources'])>=11 and
+  all(v==startup['finalJar'] for v in startup['classCodeSources'].values()),'Production final JAR origins')
+ need(startup['inspectionCid']==I and startup['guestModules']=={'installed':[],'mounted':[]},'Startup original receipt/empty SDK')
+ need(len(r['codeSources'])>=2 and all(v==startup['finalJar'] for v in r['codeSources'].values()),'After-close final JAR origins')
+ data(snapshot/'source-head.txt');data(snapshot/'sha256.json');data(snapshot/'classpath.txt')
+ need(b['evidence']==e and e['classCodeSources']==startup['classCodeSources'],'Browser/fixture/artifact evidence mismatch');o=validate_browser(b)
+ need(sha(data(archive))==ARCHIVE,'Original archive identity')
+ with tarfile.open(archive) as tar:old={m.name:tar.extractfile(m).read() for m in tar.getmembers() if m.isfile()}
+ manifest=load(attempt/'archive-manifest-before.json');setup=load(attempt/'setup.json')
+ rows=manifest['originalFiles']
+ need(manifest['archiveSha256']==setup['sourceArchiveSha256']==ARCHIVE and len(rows)==len(old)==7 and
+  {r['path'] for r in rows}==set(old) and all(r['bytes']==len(old[r['path']]) and r['sha256']==sha(old[r['path']]) for r in rows),'Complete original seven-file archive manifest')
+ need(setup['inspectionCid']==I and setup['selection']['cid']==S and setup['expectedCurrent'] is True,'Original archive setup selection')
+ need(data(attempt/'input-cas-prefix.bin')==old['runtime/cas/pack'] and data(attempt/'runtime/cas/pack').startswith(old['runtime/cas/pack']),'Original CAS pack prefix')
+ need(data(attempt/'source.txt')==TEXT.encode() and cid(TEXT.encode())==S,'Original source bytes')
+ blocks={}
+ for row in e['retainedReadbacks']:
+  ext='cbor' if row['encoding']=='canonical-cbor' else 'txt';raw=data(attempt/'cas-readbacks'/(row['cid'][7:]+'.'+ext))
+  need(cid(raw)==row['cid'] and len(raw)==row['bytes'] and row['cid'] not in blocks,'Actual retained byte readback identity')
+  blocks[row['cid']]=raw
+ original=decode_cbor(blocks[I]);need(blocks[I] in old['runtime/cas/pack'],'Original 3f958 receipt not in archive')
+ need({**original,'receiptCid':I}=={k:v for k,v in o['inspection'].items() if k!='retrieval'},'Original canonical CBOR differs from opened receipt')
+ need(blocks[S]==TEXT.encode() and blocks[o['prepared']['derivedKifCid']]==KIF.encode(),'Retained original/derived source bytes')
+ need(original['sourceSnapshots']==e['sourceSnapshots']==startup['sourceSnapshots'] and len(original['sourceSnapshots'])==1 and
+  all(original['sourceSnapshots'][0][k]==v for k,v in setup['selection'].items()),'Original exact archived current source selection')
+ need(e['originalCasPrefixCid']==cid(old['runtime/cas/pack']) and e['originalCasPrefixBytes']==len(old['runtime/cas/pack']),'Actual original CAS prefix identity')
+ prepared=o['prepared'];declaration=decode_cbor(blocks[prepared['translationCid']]);carrier=decode_cbor(blocks[prepared['receiptCid']])
+ need(declaration['kind']=='english-taxonomy-declaration/1' and declaration['inspectionCid']==I and
+  declaration['contextIri']==CONTEXT and declaration['contextKey']==prepared['contextKey'] and
+  declaration['derivedKifCid']==prepared['derivedKifCid'] and declaration['reviewStatus']=='proposed' and
+  declaration['unionPolicy']=='single-carrier-pure-taxonomy-plan-only/1','Actual retained declaration/context/source scope')
+ need(carrier['modelId']=='english-taxonomy-carrier/1' and carrier['nlp'] is None and carrier['model'] is None and
+  carrier['source']['text']==KIF and carrier['source']['originalCid']==prepared['derivedKifCid'] and
+  carrier['source']['provenance']['englishTaxonomyDeclarationCid']==prepared['translationCid'] and
+  carrier['source']['provenance']['englishInspectionCid']==I,'Actual immutable carrier source provenance')
+ for form,origin in zip(declaration['forms'],prepared['selections']):
+  need(form['englishQuotation']==origin['englishQuotation'] and form['declared']==origin['declared'] and
+   form['kifQuote']==origin['kifQuotation']['quote'] and form['kifBegin']==origin['kifQuotation']['begin'] and
+   form['kifEnd']==origin['kifQuotation']['end'],'Retained declaration form/English/KIF occurrence join')
+ need(len(declaration['forms'])==len(prepared['selections'])==2,'Two exact manual declarations')
+ frozen=decode_cbor(blocks[o['approved']['snapshotCid']]);need(frozen==o['frozen']['snapshot']==o['approved']['snapshot'] and
+  frozen['curationReceiptCid']==prepared['receiptCid'] and frozen['sourceRevision']==prepared['sourceRevision'],'Actual frozen review snapshot bytes')
+ plans=[call for call in e['requests'] if call['path']=='/api/documents/review/taxonomy-plan']
+ need([call['status'] for call in plans]==[409,200,200,200,409] and plans[0]['response']==o['unapproved']['response'] and
+  [call['response'] for call in plans[1:4]]==[o['supported'],o['unknown'],o['reflexive']] and plans[-1]['response']==o['stale'] and
+  'error' in o['stale'] and 'status' not in o['stale'],'Actual protected unapproved/three read/stale HTTP status sequence')
+ need(all(call['walBytesBefore']==call['walBytesAfter'] and call['authorizationHeaderPresent'] is True for call in plans),'Protected reads appended authority or lacked synthetic authentication')
+ approved_wal=b64(o['afterApproval']['reviewWal']['base64']);need(data(attempt/'review.wal')==approved_wal==data(attempt/'runtime/owner/documents/review.wal'),'Actual approved and after-close review WAL bytes')
+ frames=wal_frames(approved_wal);need(len(frames)==2,'Exactly snapshot+approval review events required')
+ events=[]
+ for f in frames:
+  event=decode_cbor(blocks[f['eventCid']]);need(event['kind']=='curation-review-event' and event['snapshotCid']==o['approved']['snapshotCid'],'Actual review event scope')
+  events.append(event)
+ need(events[0]['action']=='snapshot' and events[0]['previousCid'] is None and events[1]['action']=='approve' and
+  events[1]['previousCid']==frames[0]['eventCid'] and events[1]['revision']==events[0]['revision']+1 and
+  frames[1]['eventCid']==o['approved']['decisionCid'] and events[1]['reviewer']==b['meta']['reviewerId'] and events[1]['synthetic'] is True,'Actual review approval lineage')
+ need(frames[0]['eventCid']==o['frozen']['decisionCid'] and o['frozen']['state']=='snapshot' and
+  o['approved']['revision']==o['frozen']['revision']+1,'Actual freeze response/approval revision join')
+ freezes=[call for call in e['requests'] if call['path']=='/api/documents/review/snapshot']
+ decisions=[call for call in e['requests'] if call['path']=='/api/documents/review/decision']
+ need(len(freezes)==len(decisions)==1 and freezes[0]['status']==decisions[0]['status']==200 and
+  freezes[0]['response']==o['frozen'] and decisions[0]['response']==o['approved'] and
+  freezes[0]['request']['selection']==[s['id'] for s in frozen['selections']] and
+  decisions[0]['request']['action']=='approve' and decisions[0]['request']['snapshotCid']==o['approved']['snapshotCid'] and
+  decisions[0]['request']['expectedRevision']==o['frozen']['revision'] and decisions[0]['request']['note']==events[1]['note'],'Actual authenticated freeze/approve HTTP and retained WAL linkage')
+ mutation=o['mutation'];before,after=mutation['before'],mutation['after'];need(before['cid']==S and after['cid']!=S and before['rev']!=after['rev'] and before['seq']!=after['seq'],'Actual source amendment revision')
+ mirror=data(attempt/'runtime/files'/after['project']/after['id']);need(mirror==b64(mutation['sourceMirrorAfterBase64']) and cid(mirror)==after['cid'],'Persisted amended source mirror')
+ need(b64(mutation['sourceMirrorBeforeBase64'])==TEXT.encode() and b64(mutation['sourceHeadBeforeBase64'])==old['runtime/project-couch/'+after['project']+'/HEAD'],'Original pre-amendment head/mirror')
+ need(data(attempt/'runtime/project-couch'/after['project']/'HEAD')==b64(mutation['sourceHeadAfterBase64']),'Persisted amended source head')
+ need(r['result']=='PASS' and r['currentSourceMatchesOldInspection'] is False and r['inspectionCid']==I and
+  r['translationCid']==o['prepared']['translationCid'] and r['derivedKifCid']==o['prepared']['derivedKifCid'] and
+  r['receiptCid']==o['prepared']['receiptCid'] and r['reviewWalCid']==cid(approved_wal) and r['reviewWalUnchangedByReplay'] is True,'After-close immutable historical carrier scope')
+ need(r['reviewFrames']==[{**f,'event':event} for f,event in zip(frames,events)],'Actual after-close WAL replay')
+ cleanup=load(attempt/'cleanup.json')
+ closed_expected={'writerPid':startup['writerPid'],'wal':approved_wal,'pack':data(attempt/'runtime/cas/pack'),
+  'mirror':mirror,'head':data(attempt/'runtime/project-couch'/after['project']/'HEAD'),
+  'readbacks':{row['cid']:(blocks[row['cid']],row['encoding']) for row in e['retainedReadbacks']},
+  'sourceSnapshots':original['sourceSnapshots']}
+ validate_closed_scope(b,r,cleanup,closed_expected);need(all(cleanup[k] is True for k in ['reviewWireDrainedAndClosed','booksDrained','scopesDrained','allSupervisorsCompleted','listenerStopped']) and
+  cleanup['inspectionPosts']==cleanup['inspectionResponses']==0 and (attempt/'fixture-attempt1.exit').read_text().strip()=='0','Closed owners/fresh parser scope')
+ for f in required:data(attempt/f)
+ controls=[]
+ mutations={
+  'false-positive-path':lambda z:z['observed']['unknown'].__setitem__('status','SUPPORTED'),
+  'substituted-English-quote':lambda z:z['observed']['prepared']['selections'][0]['englishQuotation'].__setitem__('quote','Invented source quote'),
+  'dangling-premise':lambda z:z['observed']['supported']['plan']['proofs'][0]['premises'].__setitem__(0,'sha256:'+'0'*64),
+  'wrong-export-CID':lambda z:z['observed']['supported']['plan'].__setitem__('exportCid','sha256:'+'0'*64),
+  'stale-source-current-label-true':lambda z:z['observed']['staleDom'].__setitem__('sourceCurrentText','source current: true'),
+  'stale-HTTP-falsely-200':lambda z:z['evidence']['requests'][-1].__setitem__('status',200),
+  'wrong-retained-source-CID':lambda z:z['evidence']['requests'][0]['request'].__setitem__('cid','sha256:'+'0'*64),
+  'substituted-DOM-quote':lambda z:z['observed']['visibleSupported']['domPaths'][0]['premises'][0].__setitem__('englishQuote','Invented DOM quote'),
+  'source-focus-changed-route':lambda z:z['observed']['sourceBackreferences'][0].__setitem__('afterUrl','http://127.0.0.1/documents#wrong-route'),
+ }
+ for name,change in mutations.items():
+  modified=copy.deepcopy(b);change(modified)
+  try:validate_browser(modified)
+  except AuditError as error:controls.append({'mutation':name,'result':'REJECTED','reason':str(error)})
+  else:raise AuditError('Mutated copy accepted: '+name)
+ for name,part,change in [
+  ('historical-carrier-falsely-current','reader',lambda z:z.__setitem__('currentSourceMatchesOldInspection',True)),
+  ('owner-not-completed','cleanup',lambda z:z.__setitem__('allSupervisorsCompleted',False)),
+  ('same-writer-reader-PID','reader',lambda z:z.__setitem__('readerPid',z['writerPid'])),
+  ('wrong-after-close-readback','reader',lambda z:z['readbacks'][0].__setitem__('sha256','0'*64)),
+  ('changed-after-close-WAL','reader',lambda z:z['walAfterClose'].__setitem__('bytes',0))]:
+  reader,closed=copy.deepcopy(r),copy.deepcopy(cleanup);change(reader if part=='reader' else closed)
+  try:validate_closed_scope(b,reader,closed,closed_expected)
+  except AuditError as error:controls.append({'mutation':name,'result':'REJECTED','reason':str(error)})
+  else:raise AuditError('Mutated copy accepted: '+name)
+ return {'result':'PASS','sourceHead':head,'mainSha256':main_sha,'documentsSha256':documents_sha,'inspectionCid':I,'sourceCid':S,
+  'scope':'Recorded native UI, canonical receipt/export identity and exact source/provenance joins; not independent source authentication, English entailment, proof validity or OS airgap.',
+  'verifiedNative':{'sourceBytes':41,'originalArchiveFiles':len(old),'canonicalRetainedArtifacts':len(blocks),
+   'httpStatuses':[{'method':c['method'],'path':c['path'],'status':c['status']} for c in e['requests']],
+   'sourceProfileLimits':o['supported']['plan']['limits'],'queryCases':[
+    {'status':o[name]['status'],'goal':o[name]['goal'],'planSources':len(o[name]['plan']['sources']),
+     'displayedSources':len(o[name]['selected']),'premiseCounts':[len(p['premises']) for p in o[name]['plan']['proofs']]} for name in ['supported','unknown','reflexive']],
+   'sourceFocusActions':len(o['sourceBackreferences']),'readonlyWalCaptures':len(o['readStates']),
+   'writerPid':r['writerPid'],'readerPid':r['readerPid'],'wal':r['walAfterClose'],'casPack':r['casPackAfterClose'],
+   'currentSourceBefore':mutation['before'],'currentSourceAfter':mutation['after'],
+   'historicalInspectionCurrentAfterAmendment':r['currentSourceMatchesOldInspection'],
+   'staleSourceCurrentText':o['staleDom']['sourceCurrentText'],
+   'pinnedClasspathJars':len(classpath),'dependencyHashesVerified':len(dependencies)},
+  'reviewFrames':frames,'mutatedCopyControls':controls,'artifactHashes':hashes}
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('attempt',type=Path);p.add_argument('snapshot',type=Path)
+ p.add_argument('--source-head',required=True);p.add_argument('--main-sha',required=True);p.add_argument('--documents-sha',required=True);p.add_argument('--out',type=Path,required=True)
+ p.add_argument('--archive',type=Path,default=Path('/workspace/library-files/english-retained-opener-inputs/positive-unmutated-runtime.tar.gz'))
+ a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
+ try:r=audit(a.attempt.resolve(),a.snapshot.resolve(),a.source_head,a.main_sha,a.documents_sha,a.archive.resolve())
+ except (AuditError,ValueError,KeyError,TypeError,OSError,IndexError) as error:r={'result':'FAIL','error':str(error)}
+ r['auditScriptSha256']=sha(Path(__file__).read_bytes());(a.out/'audit-result.json').write_text(json.dumps(r,indent=2,ensure_ascii=False)+'\n')
+ lines=['Independent recorded proof-path UI audit: '+r['result'],r.get('error',r.get('scope','Required final records pending.'))]
+ if r['result']=='PASS':
+  v=r['verifiedNative'];lines += ['Source head: '+r['sourceHead'],'Main SHA256: '+r['mainSha256'],'Documents JS SHA256: '+r['documentsSha256'],
+   'Original receipt: '+r['inspectionCid'],'Original source: '+r['sourceCid']+' (41 UTF-8 bytes)',
+   'Actual HTTP: retained200; session401/200; candidates200; declaration200; snapshot200; unapproved409; approve200; support200; UNKNOWN200; reflexivity200; stale409.',
+   'Actual query premise counts: '+json.dumps([c['premiseCounts'] for c in v['queryCases']]),
+   'Unchanged current profile limits: '+json.dumps(v['sourceProfileLimits'],sort_keys=True),
+   'Full approved plan sources2; exact English/KIF origins; DOM order/rules/quotes/cards; four URL-preserving focus actions.',
+   'Actual review WAL194 bytes/two CRC32C frames (snapshot, approve); seven captured read states; eight retained artifacts.',
+   'Distinct writer/reader PIDs: '+v['writerPid']+' / '+v['readerPid']+'; CAS/WAL/readbacks/current head+mirror bound after close.',
+   'Source amended to a different CID/revision/sequence; actual409 cleared positive DOM and labels currentness unconfirmed. Old retained carrier is historical, not current authority.',
+   'All120 classpath JARs bound;119 dependency SHA256s verified; empty SDK; fresh Inspect/model/intake/Rete counters zero.',
+   'Mutated-copy controls rejected: '+str(len(r['mutatedCopyControls']))+' / '+str(len(r['mutatedCopyControls']))]
+ (a.out/'report.txt').write_text('\n'.join(lines)+'\n')
+ print(json.dumps({'result':r['result'],'report':str(a.out/'audit-result.json')}));return 0 if r['result']=='PASS' else(2 if r['result']=='PENDING' else 1)
+if __name__=='__main__':raise SystemExit(main())

@@ -27,6 +27,13 @@ replay attention renewal, and independent after-close CAS/WAL verification.
 Its manual declared-KG scope does not establish source entailment or complete
 KIF conformance.
 
+The [v74 native reviewed-proof paths](evidence/reviewed-taxonomy-path-v74-20261105/README.md)
+show actual ordered premises, English/KIF evidence-card focus without route
+changes, valid UNKNOWN and source-backed reflexivity, then real source-stale409
+with cleared proof and unconfirmed currentness. The retained parser, explicit
+synthetic review and independent provenance audit stay scoped to the manual
+translation assumptions; this is not independent English entailment.
+
 ## R2 acceptance and verification
 
 The upstream candidate is `jnorthrup/mlir-nix` revision
