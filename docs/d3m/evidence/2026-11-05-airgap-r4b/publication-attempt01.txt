@@ -1,0 +1,7 @@
+fatal: Not a valid commit name 4e57df1dacab8955398ef70be475f65c00228282
+Traceback (most recent call last):
+  File "/workspace/push-airgap-r4b.py", line 21, in <module>
+    subprocess.run(['git','merge-base','--is-ancestor',remote,head],cwd=repo,check=True)
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['git', 'merge-base', '--is-ancestor', '4e57df1dacab8955398ef70be475f65c00228282', '2c8842b10a7f7bf8eddcbfca903b24302173b616']' returned non-zero exit status 128.

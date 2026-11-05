@@ -142,7 +142,7 @@ new inspector recovers the exact receipt, six revisions and quotation.
 The combined source passed 237 selected JVM regressions and the affected
 platform compiles. Eleven browser cases pass from the extracted runtime;
 startup/integrity refusals and independent CAS verification pass. D3M retains
-534 frozen refs through five sequential merges without conflicts. The
+535 publication-cutoff refs through seven sequential merges without conflicts. The
 [runbook](07-runtime-profile-recovery.md) records hashes, measurements and
 limits. This does not close arbitrary-write crash safety, power-loss
 durability or the full vendor/native source-build gate.
