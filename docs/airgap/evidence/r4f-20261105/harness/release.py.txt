@@ -1,0 +1,14 @@
+from pathlib import Path
+import subprocess,json,hashlib,os
+h=Path('/workspace/airgap-r4f-proof')
+def run(args,name,env=None):
+ with (Path('/workspace')/('r4f-'+name+'.txt')).open('w') as log:p=subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,env=env)
+ assert p.returncode==0,(name,p.returncode)
+ print(name,'PASS',flush=True)
+def record(p):return {'file':str(p),'bytes':p.stat().st_size,'sha256':hashlib.file_digest(p.open('rb'),'sha256').hexdigest()}
+first=Path('/workspace/library-files/airgap-document-r4f-linux-x64-2026-11-05.tar.gz');second=h/'reproducibility-second.tar.gz'
+assert not first.exists()
+for p,name in [(first,'archive-first'),(second,'archive-second')]:run(['python3',str(h/'package.py'),'archive',str(p)],name)
+a,b=record(first),record(second);assert a['sha256']==b['sha256'];(h/'reproducibility.json').write_text(json.dumps({'first':a,'second':b,'identical':True,'scope':'Deterministic pinned-byte packaging; not source-build reproducibility','duplicateRemovedAfterComparison':True},indent=2)+'\n');second.unlink()
+unpacked=h/'unpacked';unpacked.mkdir();run(['tar','-xzpf',str(first),'--no-same-owner','-C',str(unpacked)],'extract')
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(unpacked/'airgap-document-rootfs');run(['python3',str(h/'package.py'),'verify'],'unpacked-verify',env)

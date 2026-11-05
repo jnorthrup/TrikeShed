@@ -1,0 +1,8 @@
+{
+  "acknowledgedCapture": "accepted/continued/acknowledged-completion.png",
+  "passage": "accepted/continued/acknowledged-passage.png",
+  "observed": "After closing overlays and using ordinary Fit, the graph and quotation/verification status are visible. The earlier clipped capture is retained under preliminary.",
+  "diagram": "partial-writes.svg",
+  "diagramData": "Five accepted independent-audit.json files; 278-byte prior prefix and 139-byte expected final frame asserted before plotting.",
+  "adjustment": "Removed overlapping 135/139 axis ticks; the CRC boundary remains shown in the frame-layout bar."
+}

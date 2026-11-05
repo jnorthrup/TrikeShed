@@ -1,0 +1,11 @@
+{
+  "previousPublishedCommit": "04fdbe85a9a3c3c769a048f50703a335e717ec17",
+  "currentSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "changedSourceAndBuildPaths": [
+    "release/airgap-document/README.md",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt"
+  ],
+  "nativeProjectLibrarySourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+  "nativeLibraryWorkingTreeHead": "3314bad96b4977d83668eb4732bbbe0eba7d2f9b",
+  "basis": "Fresh JVM entry/all test-source compilation and 22 focused regressions. Common/native/Linux/JVM production and all browser/build inputs are unchanged since R4e; no new cross-target compile is claimed. Existing native full-project klib linked twice offline into the external probe; current native-relevant inputs are unchanged."
+}

@@ -1,0 +1,25 @@
+{
+  "baseRuntimeSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+  "baseRuntimeArchiveSha256": "c95a4bb318f2f89eb88a2bb2179604483d531e30b30e2c534dd84e6a06c8f254",
+  "addedLibraries": [
+    {
+      "path": "/lib/x86_64-linux-gnu/libutil.so.1",
+      "bytes": 14408,
+      "sha256": "e3981d10efd152a53f083e38f5f9ddde7a049c85d0ab388a5eec91b52fc98a11",
+      "package": "libc6:amd64",
+      "version": "2.41-12+deb13u4",
+      "source": "glibc",
+      "sourceVersion": "2.41-12+deb13u4"
+    },
+    {
+      "path": "/lib/x86_64-linux-gnu/libcrypt.so.1",
+      "bytes": 206776,
+      "sha256": "436788729ab71d794a66954d62e930c723e624587f39beb2f4f86ff1000b1d29",
+      "package": "libcrypt1:amd64",
+      "version": "1:4.4.38-1",
+      "source": "libxcrypt",
+      "sourceVersion": "1:4.4.38-1"
+    }
+  ],
+  "scope": "Exploratory native probe closure. Original R4e root files remain immutable; final combined package manifest not yet generated."
+}

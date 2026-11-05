@@ -1,0 +1,81 @@
+{
+  "cases": [
+    {
+      "case": "jvm-close",
+      "contender": "native",
+      "refusals": 2,
+      "ownerExit": 0,
+      "ownerReaped": true,
+      "samePrefixRecovered": true,
+      "nextSequence": 4,
+      "result": "PASS"
+    },
+    {
+      "case": "jvm-kill",
+      "contender": "native",
+      "refusals": 2,
+      "ownerExit": 137,
+      "ownerReaped": true,
+      "samePrefixRecovered": true,
+      "nextSequence": 4,
+      "result": "PASS"
+    },
+    {
+      "case": "native-close",
+      "contender": "jvm",
+      "refusals": 2,
+      "ownerExit": 0,
+      "ownerReaped": true,
+      "samePrefixRecovered": true,
+      "nextSequence": 4,
+      "result": "PASS"
+    },
+    {
+      "case": "native-kill",
+      "contender": "jvm",
+      "refusals": 2,
+      "ownerExit": 137,
+      "ownerReaped": true,
+      "samePrefixRecovered": true,
+      "nextSequence": 4,
+      "result": "PASS"
+    }
+  ],
+  "seedRecords": [
+    {
+      "sequence": 1,
+      "payload": "JVM \u03b1 first\nline two"
+    },
+    {
+      "sequence": 2,
+      "payload": "native \u03b2 second"
+    },
+    {
+      "sequence": 3,
+      "payload": "JVM third"
+    }
+  ],
+  "retainedStore": {
+    "phase": "store-replayed",
+    "sequence": 3,
+    "cards": [
+      {
+        "jobId": "lcnc/run/c36f2613-536c-4820-be23-b7445269aa0a",
+        "sequence": 3,
+        "receiptCid": "sha256:13d9525cbede42d5455f6bfb9104bf43f6a0c9fc24778a09f964b831a55c9943",
+        "runId": "c36f2613-536c-4820-be23-b7445269aa0a",
+        "programCid": "sha256:90970614b8508ef10a809c7067d2b286b039288a348d01571aea134603e5622d",
+        "status": "completed",
+        "quotation": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+        "begin": 18477,
+        "end": 18654
+      }
+    ]
+  },
+  "retainedRuntimeBytesUnchanged": true,
+  "nativeSourceSha256": "7ffef5edf11d230c5b1928f6d25f715247934e7df1d1b2a0404477a52918fc48",
+  "nativeBinarySha256": "f289376cf6951279b5d2e95511e1588593146c08a628c136fb7924ca21b81d41",
+  "jvmProbeSha256": "62c3a999e4e23786e16c5f5ed3ad9df7d2e3c38082066ca553277f67750a3144",
+  "runtimeBaseSourceCommit": "2c6e55e25dbe8b38355f045a46cc6a91c378787b",
+  "scope": "Actual BoardFileWal owners and native BoardStoreElement replay; constructed short tails, no power-loss claim. Native process runs with the JDK hidden."
+}

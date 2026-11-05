@@ -1,0 +1,45 @@
+{
+  "cutBytes": 9,
+  "walPrefixBytes": 278,
+  "finalFrameBytes": 139,
+  "observedBytesBeforeLimitRestore": 287,
+  "casObjectsVerified": 27,
+  "completedCommandCid": "sha256:1ea89506f545853fd6f6f935bfca6992b346c1f2c49f97037045b950f39cd099",
+  "completedCommandRetained": true,
+  "completedCommandReferencedByFinalWal": true,
+  "recoveredStatus": "completed",
+  "sameRun": true,
+  "newRunSubmissions": 0,
+  "receiptCid": "sha256:1ea89506f545853fd6f6f935bfca6992b346c1f2c49f97037045b950f39cd099",
+  "runId": "9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+  "programCid": "sha256:02defa544e781c493aeffff0306744f76908be3512d25ebb319ca9d600f6c590",
+  "recoveryFrames": [
+    {
+      "sequence": 1,
+      "jobId": "lcnc/run/9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+      "cid": "sha256:7af2d0a82942f171228e178b27e2f5fef2ab35261006de1a7b8e514a003c42f3",
+      "status": "queued"
+    },
+    {
+      "sequence": 2,
+      "jobId": "lcnc/run/9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+      "cid": "sha256:1deee4512cf29354c142ae9a9dd94a140ad4beb0823b9523148f7867343ac896",
+      "status": "running"
+    },
+    {
+      "sequence": 3,
+      "jobId": "lcnc/run/9f7a0f03-0d5b-462a-b646-1b6fcb6f0acb",
+      "cid": "sha256:1ea89506f545853fd6f6f935bfca6992b346c1f2c49f97037045b950f39cd099",
+      "status": "completed"
+    }
+  ],
+  "previousFramesUnchanged": true,
+  "allCompleteFrameCrc32cVerified": true,
+  "finalWalFsyncCompletedAfterLimitRestored": true,
+  "allSixDocumentsUnchanged": true,
+  "completedCommandQuoteAndInvocationLedgerVerified": true,
+  "nativeLiveBytesAfter": 0,
+  "writerExit": 0,
+  "inspectorExit": 0,
+  "scope": "Real short kernel ring write followed by restoration of the file-size limit; the same append completes and flushes before one HTTP 200 receipt. Both JVMs close normally. No direct WAL edit, fabricated write result or repeated graph run."
+}

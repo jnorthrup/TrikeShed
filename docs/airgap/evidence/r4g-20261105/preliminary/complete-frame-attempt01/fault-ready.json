@@ -1,0 +1,23 @@
+{
+  "javaPid": 115470,
+  "tracerPid": 116062,
+  "command": [
+    "strace",
+    "-f",
+    "-yy",
+    "-ttt",
+    "-s",
+    "160",
+    "-e",
+    "trace=io_uring_enter,fsync,prlimit64",
+    "--inject=io_uring_enter:delay_enter=500ms",
+    "--inject=fsync:delay_enter=200ms",
+    "-o",
+    "/workspace/airgap-r4g-proof/complete-frame-attempt01/fault-syscalls.txt",
+    "-p",
+    "115470"
+  ],
+  "allObservedThreadsAttached": true,
+  "cutBytes": 139,
+  "mechanism": "RLIMIT_FSIZE applied after completed receipt CAS publication; delayed ring/fsync entry provides an observed kill interval. No direct WAL edit or fake successful write return."
+}

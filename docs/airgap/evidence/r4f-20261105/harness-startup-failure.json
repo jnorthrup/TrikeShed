@@ -1,0 +1,6 @@
+{
+  "locale": "/workspace/r4f-locale.txt",
+  "interop": "/workspace/r4f-interop-attempt02.txt",
+  "cause": "External verification harness locale.py shadowed Python stdlib locale during subprocess import. No runtime process started.",
+  "fix": "Rename locale.py to locale_check.py; preserve the first source and stderr; use new report directories."
+}

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4f-proof/audit.py", line 15, in <module>
+    quote=run['outputs']['selection']['value'];text=cas[quote['extractedTextCid']].decode();assert text.encode('utf-16-le')[quote['begin']*2:quote['end']*2].decode('utf-16-le')==quote['quote'];assert quote['begin']==18477 and quote['end']==18654
+                                                                                                   ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: slice indices must be integers or None or have an __index__ method

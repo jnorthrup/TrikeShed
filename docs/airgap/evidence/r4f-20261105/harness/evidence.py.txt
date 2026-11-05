@@ -1,0 +1,35 @@
+from pathlib import Path
+import json,shutil,hashlib,subprocess,xml.etree.ElementTree as E
+h=Path('/workspace/airgap-r4f-proof');r=Path('/workspace/TrikeShed');out=r/'docs/airgap/evidence/r4f-20261105';out.mkdir(parents=True)
+def sha(p):return hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+def copy(p,q):q.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,q)
+for name in ['interop-attempt01','interop-attempt03','interop-attempt04','interop-archive01','encoding-archive01','unicode-traversal-archive01','native-smoke01','native-smoke02','locale-check02','integrity-controls']:
+ shutil.copytree(h/name,out/name)
+for p in sorted(h.iterdir()):
+ if p.is_file() and (p.suffix in ['.py','.kt','.java'] or p.name.endswith('.py.txt') or p.name.endswith('.kt.txt')):copy(p,out/'harness'/(p.name if p.name.endswith('.txt') else p.name+'.txt'))
+for name in ['native-link01.json','native-link01.txt','native-link02.json','native-link02.txt','native-root-extension.json','native-verification.json','complete-debian-source-inventory.json','debian-source-inventory.json','reproducibility.json','source-update.json','package-digests.json','harness-startup-failure.json']:
+ copy(h/name,out/name)
+for name in ['package-identity.json','SHA256SUMS']:copy(h/'rootfs'/name,out/name)
+for p in Path('/workspace').glob('r4f-*.txt'):copy(p,out/'logs'/p.name)
+copy(Path('/workspace/r4f-combined-check.json'),out/'jvm-check.json')
+shutil.copytree(r/'build/test-results/jvmTest',out/'junit',ignore=shutil.ignore_patterns('binary'))
+rows=[]
+for p in (out/'junit').glob('TEST-*.xml'):
+ e=E.parse(p).getroot();rows.append({k:e.get(k) for k in ['name','tests','failures','errors','skipped']})
+totals={k:sum(int(x[k]) for x in rows) for k in ['tests','failures','errors','skipped']};assert totals=={'tests':22,'failures':0,'errors':0,'skipped':0}
+head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=r,text=True).strip();previous='04fdbe85a9a3c3c769a048f50703a335e717ec17'
+changed=subprocess.check_output(['git','diff','--name-only',previous,head,'--','src','build.gradle.kts','gradle','settings.gradle.kts','gradle.properties','release','PRELOAD.md','AGENTS.md'],cwd=r,text=True).splitlines();assert changed==['release/airgap-document/README.md','src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt']
+standing={'previousPublishedCommit':previous,'currentSourceCommit':head,'changedSourceAndBuildPaths':changed,'nativeProjectLibrarySourceCommit':'2c6e55e25dbe8b38355f045a46cc6a91c378787b','nativeLibraryWorkingTreeHead':'3314bad96b4977d83668eb4732bbbe0eba7d2f9b','basis':'Fresh JVM entry/all test-source compilation and 22 focused regressions. Common/native/Linux/JVM production and all browser/build inputs are unchanged since R4e; no new cross-target compile is claimed. Existing native full-project klib linked twice offline into the external probe; current native-relevant inputs are unchanged.'}
+(out/'target-standing.json').write_text(json.dumps(standing,indent=2)+'\n')
+paths=['src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt','src/commonMain/kotlin/borg/trikeshed/kanban/BoardFileWal.kt','src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt','src/jvmMain/kotlin/borg/trikeshed/userspace/nio/file/spi/JvmFileOperations.kt','src/linuxMain/kotlin/borg/trikeshed/userspace/nio/file/spi/LinuxFileOperations.kt','src/posixMain/kotlin/borg/trikeshed/userspace/nio/file/spi/PosixFileOperations.kt','src/posixMain/resources/META-INF/cinterop/posix_spawn.def','release/airgap-document/README.md','build.gradle.kts','PRELOAD.md','AGENTS.md']
+for name in paths:assert (r/name).is_file(),name
+with __import__('zipfile').ZipFile(h/'rootfs/opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar') as z:bundle={'sha256':hashlib.sha256(z.read('web/kotlin/spacegraph/spacegraph.js')).hexdigest()}
+v={'testedSourceCommit':head,'sourceSha256':{name:sha(r/name) for name in paths},'testTotals':totals,'tests':rows,'targetStanding':standing,'runtimeArchive':json.loads((h/'reproducibility.json').read_text())['first'],'sourceUpdate':json.loads((h/'source-update.json').read_text()),'nativeVerification':json.loads((h/'native-verification.json').read_text()),'interoperability':json.loads((h/'interop-archive01/verification.json').read_text()),'encoding':json.loads((h/'encoding-archive01/verification.json').read_text()),'freshTraversal':json.loads((h/'unicode-traversal-archive01/audit.json').read_text()),'directorySync':{k:v for k,v in json.loads((h/'unicode-traversal-archive01/mkdir-audit.json').read_text()).items() if k!='rows'},'integrityControls':json.loads((h/'integrity-controls/results.json').read_text()),'browser':{'bundle':bundle,'scope':'One completed fresh document traversal from a Unicode state path. No new animation or dense-graph usability coverage claimed.'},'limits':['Linux x86-64 local filesystem only; no macOS or remote filesystem ownership proof','Constructed short tails and process death preserve a running kernel; no arbitrary-write/power-loss guarantee','Native probe replays the existing BoardStoreElement, not a full native HTTP service','No general Nix evaluator, unified JVM/native GC, zero-copy or performance advantage claim','Complete vendor patches/native-resource source rebuild remains open']}
+(out/'verification.json').write_text(json.dumps(v,indent=2)+'\n')
+(out/'attempt-notes.json').write_text(json.dumps({'interop-attempt01':'Real JVM argv replacement defect without glibc C.utf8; exact corrupted WAL retained.','interop-attempt02':'No runtime process started: locale.py shadowed Python stdlib locale; logs and original source retained.','interop-attempt03':'Unicode seeds passed; /proc/exe descendant identification yielded none in the namespace. Corrected to the existing stat/comm plus exact argv ownership check; maps/status/mountinfo then read successfully.','unicode-mkdir-audit':'Initial parser expected literal UTF-8 paths; strace rendered them with octal C escapes. Decode path escapes before exact path matching; 93/93 required barriers pass.','unicode-quote-audit':'Initial Python audit sliced with integral JSON float values. Require exact integer equality, convert for slicing, and retain original source/error.','native-smoke01':'Original JVM-only root lacked libutil; exit127 retained. Added libutil/libcrypt closure supports actual native probe.'},indent=2)+'\n')
+d=r/'docs/d3m/evidence/2026-11-05-airgap-r4f';shutil.copytree(r/'.git/d3m/airgap-native-utf8-20261105',d)
+for name in ['fetch.json','remote-heads.json','publication-fetch.json','publication-remote-heads.json']:copy(h/name,d/name)
+for name in ['fetch.py','integrate.py','fetch-publication.py','integrate-publication.py']:copy(h/name,d/(name+'.txt'))
+for folder in [out,d]:
+ (folder/'SHA256.json').write_text(json.dumps({p.relative_to(folder).as_posix():sha(p) for p in sorted(folder.rglob('*')) if p.is_file() and p!=folder/'SHA256.json'},indent=2)+'\n')
+print(json.dumps({'source':head,'tests':totals,'evidenceFiles':sum(p.is_file() for p in out.rglob('*'))},indent=2))

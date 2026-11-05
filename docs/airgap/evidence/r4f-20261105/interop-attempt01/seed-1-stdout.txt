@@ -1,0 +1,3 @@
+{"phase":"opened", "records":[{"sequence":1, "payload":"JVM �� first\nline two"}]}
+{"phase":"flushed", "sequence":2}
+{"phase":"closed"}

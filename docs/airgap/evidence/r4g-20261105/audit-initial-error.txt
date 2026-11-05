@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4g-proof/audit.py", line 31, in <module>
+    trace=(a/'fault-syscalls.txt').read_text();assert 'io_uring_enter(' in trace and '(DELAYED)' in trace and 'killed by SIGKILL' in trace;assert not re.search(r'fsync\([^\n]*board\.wal>[^\n]*= 0',trace),'Final WAL fsync completed before kill';assert 'EFBIG' not in trace and 'SIGXFSZ' not in trace
+                                                                                                                                                                                                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

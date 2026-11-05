@@ -1,0 +1,46 @@
+from pathlib import Path
+import json,hashlib,struct,sys,re
+h=Path('/workspace/airgap-r4g-proof');a=h/sys.argv[1];state=a/'state';cas=state/'runtime/cas/sha256';proc=json.loads((a/'processes.json').read_text());cut=proc['cutBytes'];browser=json.loads((a/'browser.json').read_text())
+def read(cid):
+ digest=cid.removeprefix('sha256:');p=cas/digest[0]/digest[1]/digest[2]/digest[3]/digest[4:];data=p.read_bytes();assert hashlib.sha256(data).hexdigest()==digest;return data
+def crc32c(data):
+ crc=0xffffffff
+ for byte in data:
+  crc^=byte
+  for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+ return crc^0xffffffff
+def frames(data):
+ rows=[];i=0
+ while i<len(data):
+  magic,version,seq,n=struct.unpack_from('>4sHQI',data,i);assert magic==b'WAL1' and version==1 and seq==len(rows)+1 and n<=10*1024*1024;end=i+18+n;assert end+4<=len(data);assert crc32c(data[i:end])==struct.unpack_from('>I',data,end)[0];job,cid=data[i+18:end].decode().split('\t');command=json.loads(read(cid));assert command['jobId']==job;rows.append({'sequence':seq,'jobId':job,'cid':cid,'status':command['lcncRun']['status']});i=end+4
+ return rows
+n=0
+for p in cas.rglob('*'):
+ if p.is_file():digest=''.join(p.relative_to(cas).parts);assert re.fullmatch('[0-9a-f]{64}',digest) and hashlib.sha256(p.read_bytes()).hexdigest()==digest;n+=1
+prefix=(a/'wal-before.bin').read_bytes();expected=(a/'expected-final-frame.bin').read_bytes();during=(a/'wal-observed-before-restore.bin').read_bytes();dead=(a/'wal-after-retry.bin').read_bytes();final=(state/'runtime/.kanban/board.wal').read_bytes();assert len(prefix)==278 and len(expected)==139;assert during==prefix+expected[:cut];assert final==dead==prefix+expected
+assert [r['status'] for r in frames(prefix)]==['queued','running'];expected_rows=frames(prefix+expected);complete_cid=expected_rows[-1]['cid'];assert complete_cid==proc['armed']['limit']['completedCommandCid'];complete=json.loads(read(complete_cid))['lcncRun'];assert complete['status']=='completed' and complete['ok']
+final_rows=frames(final);recovered=browser['recovered'];old=browser['running'];assert len(final_rows)==3;assert recovered['receiptCid']==final_rows[-1]['cid'];assert old['runId']==recovered['runId']==complete['runId'] and old['programCid']==recovered['programCid']==complete['programCid'];assert recovered['previousReceiptCid']==old['receiptCid']==final_rows[1]['cid']
+assert [r['status'] for r in final_rows]==['queued','running','completed'];assert recovered['receiptCid']==complete_cid==browser['acknowledged']['receiptCid'];assert browser['acknowledged']['ok']
+quote=complete['outputs']['selection']['value'];text=read(quote['extractedTextCid']).decode().encode('utf-16-le');assert int(quote['begin'])==quote['begin'] and int(quote['end'])==quote['end'];assert text[int(quote['begin'])*2:int(quote['end'])*2].decode('utf-16-le')==quote['quote'];assert quote['begin']==18477 and quote['end']==18654;assert len(read(quote['originalCid']))==111243;assert complete['outputs']['scan']['runtime']['liveBytesAfter']==0
+ledger=json.loads(read(complete['invocationsCid']));assert ledger['runId']==old['runId'];assert [e['wire']['index'] for e in ledger['observations'] if e['phase']=='consumed']==list(range(8))
+assert proc['error'] is None and proc['limited'] and proc['restored'] and not proc['killed'] and proc['restarted'] and proc['driverExit']==0;assert [p['exit'] for p in proc['processes']]==[0,0];assert all(json.loads((state/'cleanup-run.json').read_text()).values());assert all(json.loads((state/'cleanup-inspect.json').read_text()).values())
+limit=proc['armed']['limit'];assert limit['requested']==278+cut and limit['observed'][0]==278+cut and limit['previous']==[-1,-1]
+trace=(a/'fault-syscalls.txt').read_text();assert 'io_uring_enter(' in trace and '(DELAYED)' in trace and 'killed by SIGKILL' not in trace
+pending={};calls=[]
+for line in trace.splitlines():
+ m=re.match(r'^(\d+) ([0-9.]+) (.*)$',line)
+ if not m:continue
+ pid,stamp,body=m.groups()
+ if '<unfinished ...>' in body:pending[pid]=(float(stamp),body.replace('<unfinished ...>',''));continue
+ resumed=re.match(r'<\.\.\. (\w+) resumed>(.*)',body)
+ if resumed:
+  prior=pending.pop(pid,None)
+  if prior is None:continue
+  body=prior[1]+resumed[2]
+ calls.append({'time':float(stamp),'call':body})
+assert limit['restored']==[-1,-1];assert any(re.search(r'fsync\([^\n]*board\.wal>[^\n]*= 0',x['call']) and x['time']>limit['restoredAt'] for x in calls),'Final WAL fsync must complete after restoring the file-size limit'
+assert 'EFBIG' not in trace and 'SIGXFSZ' not in trace
+assert len(browser['cases'])==4 and all(x['result']=='PASS' for x in browser['cases'].values());assert not browser['errors'];assert len([x for x in browser['requests'] if x['url'].endswith('/api/lcnc/run')])==1
+initial=json.loads((a/'run-ready.json').read_text());last=json.loads((state/'state-inspect.json').read_text());assert initial['documents']==last['documents'] and len(last['documents'])==6 and len(last['runs'])==1 and not last['minerInstalled'] and not last['llvmInstalled']
+result={'cutBytes':cut,'walPrefixBytes':278,'finalFrameBytes':139,'observedBytesBeforeLimitRestore':len(during),'casObjectsVerified':n,'completedCommandCid':complete_cid,'completedCommandRetained':True,'completedCommandReferencedByFinalWal':True,'recoveredStatus':recovered['status'],'sameRun':True,'newRunSubmissions':0,'receiptCid':recovered['receiptCid'],'runId':old['runId'],'programCid':old['programCid'],'recoveryFrames':final_rows,'previousFramesUnchanged':True,'allCompleteFrameCrc32cVerified':True,'finalWalFsyncCompletedAfterLimitRestored':True,'allSixDocumentsUnchanged':True,'completedCommandQuoteAndInvocationLedgerVerified':True,'nativeLiveBytesAfter':0,'writerExit':0,'inspectorExit':0,'scope':'Real short kernel ring write followed by restoration of the file-size limit; the same append completes and flushes before one HTTP 200 receipt. Both JVMs close normally. No direct WAL edit, fabricated write result or repeated graph run.'}
+(a/'independent-audit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({k:v for k,v in result.items() if k!='recoveryFrames'},indent=2))

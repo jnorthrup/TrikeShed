@@ -1,0 +1,4 @@
+archive-first PASS
+archive-second PASS
+extract PASS
+unpacked-verify PASS

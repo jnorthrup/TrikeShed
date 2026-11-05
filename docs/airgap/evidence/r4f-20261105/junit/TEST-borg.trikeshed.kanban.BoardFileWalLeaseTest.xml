@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="BoardFileWalLeaseTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T06:10:38.526Z" hostname="0d6dfba25614" time="0.324">
+  <properties/>
+  <testcase name="directoryAliasesShareOwnershipWhileDistinctDirectoriesRemainIndependent()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.262"/>
+  <testcase name="corruptFrameRefusalReleasesTheLeaseWithoutChangingTheWal()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.018"/>
+  <testcase name="channelOpenFailureReleasesTheLease()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.01"/>
+  <testcase name="anotherOwnerCannotRecoverOrOverwriteTheActiveWal()[jvm]" classname="borg.trikeshed.kanban.BoardFileWalLeaseTest" time="0.019"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

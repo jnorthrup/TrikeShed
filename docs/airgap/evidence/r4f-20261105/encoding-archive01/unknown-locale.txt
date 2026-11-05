@@ -1,0 +1,2 @@
+Exception in thread "main" java.lang.IllegalArgumentException: UTF-8 native encoding required; package the C.utf8 locale and set LANG=C.UTF-8
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt.main(AirgapDocumentMain.kt:28)

@@ -1,0 +1,95 @@
+from pathlib import Path
+import os,sys,subprocess,time,json,urllib.request,hashlib,shutil,signal,resource,struct
+h=Path('/workspace/airgap-r4g-proof');a=h/sys.argv[1];a.mkdir();cut=int(sys.argv[2]);assert cut in [9,48,137,139];root=Path('/workspace/airgap-r4f-proof/rootfs');state=a/'state';state.mkdir();reports=[];processes=[];logs=[];http=urllib.request.build_opener(urllib.request.ProxyHandler({}));base='http://127.0.0.1:18764';tracer=None;trace_log=None;driver=None;armed=None;limited=False;killed=False;restart=False;error=None
+network={'namespace':os.readlink('/proc/self/ns/net'),'routes':json.loads(subprocess.check_output(['ip','-j','route']))};assert not network['routes'];(a/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+def sha(p):return hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+def get():
+ with http.open(base+'/__proof/state',timeout=3) as response:return json.load(response)
+def launch(mode):
+ cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--die-with-parent','--ro-bind',str(root),'/','--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv','--setenv','PATH','/opt/trikeshed/jdk/bin:/usr/bin:/bin','--setenv','JAVA_HOME','/opt/trikeshed/jdk','--setenv','HOME','/state/home','--setenv','LANG','C.UTF-8','--setenv','TRIKESHED_PDF_ROUTE','layer','--chdir','/state','--cap-drop','ALL']
+ if mode=='run':
+  for kind,name in [('SCALAR','add-mlir.bc'),('CONFIX','confix.bc')]:cmd+=['--setenv','TRIKESHED_LLVM_'+kind+'_PROFILE','/state/runtime/'+name+'.json']
+ else:
+  for path in ['/opt/trikeshed/assets','/opt/trikeshed/modules']:cmd+=['--tmpfs',path,'--remount-ro',path]
+  for path in ['/usr/bin/pdfinfo','/usr/bin/pdftotext']:cmd+=['--ro-bind','/dev/null',path]
+ cmd+=['/opt/trikeshed/bin/airgap-document','/state','/opt/trikeshed','18764',mode];log=(a/(mode+'.txt')).open('w');logs.append(log);p=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT);processes.append(p);row={'mode':mode,'command':cmd,'hostPid':p.pid};reports.append(row);end=time.monotonic()+90
+ while True:
+  assert p.poll() is None,('early exit',mode,p.returncode)
+  try:report=get();break
+  except OSError:assert time.monotonic()<end;time.sleep(.2)
+ (a/(mode+'-ready.json')).write_text(json.dumps(report,indent=2)+'\n');row['boot']=report['boot'];return p,row,report
+
+def java_pid(parent):
+ children={};names={}
+ for p in Path('/proc').glob('[0-9]*'):
+  try:pid=int(p.name);tail=(p/'stat').read_text().rsplit(') ',1)[1].split();children.setdefault(int(tail[1]),[]).append(pid);names[pid]=(p/'comm').read_text().strip()
+  except (OSError,ValueError,IndexError):pass
+ pending=[parent];found=[]
+ while pending:
+  pid=pending.pop();pending+=children.get(pid,[])
+  if names.get(pid)=='java':found.append(pid)
+ assert len(found)==1,found;assert b'borg.trikeshed.lcnc.AirgapDocumentMainKt' in Path('/proc',str(found[0]),'cmdline').read_bytes().split(b'\0');return found[0]
+
+def attach(parent):
+ global tracer,trace_log
+ pid=java_pid(parent);cmd=['strace','-f','-yy','-ttt','-s','160','-e','trace=io_uring_enter,fsync,prlimit64','--inject=io_uring_enter:delay_enter=500ms','--inject=fsync:delay_enter=500ms','-o',str(a/'fault-syscalls.txt'),'-p',str(pid)]
+ trace_log=(a/'strace.txt').open('w');tracer=subprocess.Popen(cmd,stdout=trace_log,stderr=subprocess.STDOUT);end=time.monotonic()+15
+ while True:
+  assert tracer.poll() is None,tracer.returncode;statuses=[]
+  for p in Path('/proc',str(pid),'task').iterdir():
+   try:statuses.append(int(next(x.split()[1] for x in (p/'status').read_text().splitlines() if x.startswith('TracerPid:'))))
+   except FileNotFoundError:pass
+  if statuses and all(x==tracer.pid for x in statuses):break
+  assert time.monotonic()<end,statuses;time.sleep(.05)
+ return {'javaPid':pid,'tracerPid':tracer.pid,'command':cmd,'allObservedThreadsAttached':True,'cutBytes':cut,'mechanism':'RLIMIT_FSIZE applied after completed receipt CAS publication; delayed ring/fsync entry provides an observed kill interval. No direct WAL edit or fake successful write return.'}
+
+def finish(p,row):
+ if p.poll() is None:
+  try:
+   with http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3) as response:row['finishStatus']=response.status
+  except OSError as e:row['finishTransportError']=repr(e)
+  try:p.wait(timeout=30)
+  except subprocess.TimeoutExpired:p.terminate();p.wait(timeout=10);row['forcedTermination']=True
+ row['exit']=p.returncode
+
+def save(): (a/'processes.json').write_text(json.dumps({'cutBytes':cut,'error':error,'armed':armed,'limited':limited,'killed':killed,'restarted':restart,'driverExit':driver.returncode if driver else None,'processes':reports},indent=2)+'\n')
+try:
+ writer,run,seed=launch('run');env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright';env['TRIKESHED_STORAGE_FAULT']='kill';env['TRIKESHED_WAL_CUT']=str(cut);log=(a/'driver.txt').open('w');logs.append(log);driver=subprocess.Popen(['node',str(h/'partial.cjs'),str(a),base],env=env,stdout=log,stderr=subprocess.STDOUT);end=time.monotonic()+180;wal=state/'runtime/.kanban/board.wal';seen=set()
+ while driver.poll() is None and time.monotonic()<end:
+  if (a/'arm-request.json').exists() and armed is None:
+   before=get();old=next(iter(before['runs'].values()));assert old['status']=='running' and not old.get('invocationsCid');(a/'before.json').write_text(json.dumps(before,indent=2)+'\n');prefix=wal.read_bytes();assert len(prefix)==278;(a/'wal-before.bin').write_bytes(prefix);armed=attach(writer.pid);(a/'fault-ready.json').write_text(json.dumps(armed,indent=2)+'\n');save()
+  if armed and not limited:
+   for p in (state/'runtime/cas/sha256').rglob('*'):
+    if not p.is_file() or p in seen:continue
+    seen.add(p)
+    try:command=json.loads(p.read_bytes())
+    except (ValueError,UnicodeError):continue
+    if not isinstance(command,dict):continue
+    row=command.get('lcncRun')
+    if not isinstance(row,dict) or row.get('runId')!=old['runId'] or row.get('status')!='completed':continue
+    digest=''.join(p.relative_to(state/'runtime/cas/sha256').parts);assert sha(p)==digest
+    payload=(old['jobId']+'\tsha256:'+digest).encode();header=struct.pack('>4sHQI',b'WAL1',1,3,len(payload));data=header+payload;crc=0xffffffff
+    for b in data:
+     crc^=b
+     for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+    frame=data+struct.pack('>I',crc^0xffffffff);assert len(frame)==139;(a/'expected-final-frame.bin').write_bytes(frame);assert wal.read_bytes()==prefix
+    old_limit=resource.prlimit(armed['javaPid'],resource.RLIMIT_FSIZE);limit=len(prefix)+cut;resource.prlimit(armed['javaPid'],resource.RLIMIT_FSIZE,(limit,old_limit[1]));observed=resource.prlimit(armed['javaPid'],resource.RLIMIT_FSIZE);assert observed[0]==limit
+    armed['limit']={'previous':old_limit,'requested':limit,'observed':observed,'completedCommandCid':'sha256:'+digest,'commandFile':str(p),'appliedAt':time.time()};limited=True;save();break
+  if limited and not killed and wal.stat().st_size>=len(prefix)+cut:
+   actual=wal.read_bytes();assert actual==prefix+frame[:cut],(len(actual),cut);(a/'wal-observed-before-kill.bin').write_bytes(actual);os.kill(armed['javaPid'],signal.SIGKILL);writer.wait(timeout=20);assert writer.returncode==137 and not Path('/proc',str(armed['javaPid'])).exists();assert not (state/'cleanup-run.json').exists();assert wal.read_bytes()==actual;(a/'wal-after-fault.bin').write_bytes(actual);run.update(exit=137,javaPid=armed['javaPid'],javaReaped=True,cleanupRan=False);killed=True;save()
+  if (a/'restart-request.json').exists() and not restart:
+   assert killed
+   if tracer.poll() is None:tracer.send_signal(signal.SIGINT);tracer.wait(timeout=10)
+   trace_log.close();inspector,inspection,last=launch('inspect');assert last['boot']!=seed['boot'];(a/'restart-ready.json').write_text(json.dumps({'writerExit':137,'cutBytes':cut})+'\n');restart=True;save()
+  time.sleep(.01)
+ assert driver.poll() is not None,'browser timed out';assert driver.returncode==0 and restart
+except BaseException as e:error=repr(e);print(error,flush=True)
+finally:
+ if tracer is not None and tracer.poll() is None:tracer.send_signal(signal.SIGINT);tracer.wait(timeout=10)
+ if trace_log is not None and not trace_log.closed:trace_log.close()
+ if driver is not None and driver.poll() is None:driver.terminate();driver.wait(timeout=10)
+ for p,row in zip(processes,reports):
+  if 'exit' not in row:finish(p,row)
+ for log in logs:log.close()
+ save();print(json.dumps({'cutBytes':cut,'error':error,'limited':limited,'killed':killed,'restarted':restart,'exits':[p.returncode for p in processes]},indent=2))
+assert error is None,error

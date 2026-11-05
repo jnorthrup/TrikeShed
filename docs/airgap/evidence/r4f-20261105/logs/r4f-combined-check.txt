@@ -1,0 +1,239 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: airgapDocumentInstall jvmTest --tests *.BoardFileWalLeaseTest --tests *.LlvmConfixTest --tests *.LlvmConfixRunTest --tests *.DocumentSpansTest --tests *.LcncConfixSelectionTest muxClasspath
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateComposeResClass SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :generateForgeAssets UP-TO-DATE
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :fetchSumoCorpus UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+> Task :kotlinKotlinNpmCachesSetup
+> Task :kotlinNodeJsSetup UP-TO-DATE
+> Task :kotlinRestoreYarnLock UP-TO-DATE
+> Task :kotlinYarnSetup UP-TO-DATE
+> Task :jsBenchPackageJson UP-TO-DATE
+> Task :jsDocumentsPackageJson UP-TO-DATE
+> Task :jsForgePackageJson UP-TO-DATE
+> Task :jsGraalPackageJson UP-TO-DATE
+> Task :jsHarnessPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPackageJson UP-TO-DATE
+> Task :jsPackageJson UP-TO-DATE
+> Task :jsPagesPackageJson UP-TO-DATE
+> Task :jsSpacegraphPackageJson UP-TO-DATE
+> Task :jsTestPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPackageJson UP-TO-DATE
+> Task :jsViewserverPackageJson UP-TO-DATE
+> Task :jsBenchPublicPackageJson UP-TO-DATE
+> Task :jsDocumentsPublicPackageJson UP-TO-DATE
+> Task :jsForgePublicPackageJson UP-TO-DATE
+> Task :jsGraalPublicPackageJson UP-TO-DATE
+> Task :jsHarnessPublicPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsPagesPublicPackageJson UP-TO-DATE
+> Task :jsPublicPackageJson UP-TO-DATE
+> Task :jsSpacegraphPublicPackageJson UP-TO-DATE
+> Task :jsTestPublicPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsViewserverPublicPackageJson UP-TO-DATE
+> Task :kotlinPackageJsonUmbrella UP-TO-DATE
+> Task :rootPackageJson UP-TO-DATE
+> Task :kotlinNpmInstall UP-TO-DATE
+> Task :convertXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsSpacegraph NO-SOURCE
+> Task :assembleJsSpacegraphResources UP-TO-DATE
+> Task :unpackSkikoWasmRuntime SKIPPED
+> Task :jsSpacegraphProcessResources UP-TO-DATE
+> Task :checkJsMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForJsMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsMain NO-SOURCE
+> Task :generateResourceAccessorsForJsMain SKIPPED
+> Task :generateActualResourceCollectorsForJsMain SKIPPED
+> Task :compileKotlinJvm UP-TO-DATE
+> Task :compileKotlinJs UP-TO-DATE
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses UP-TO-DATE
+> Task :checkJsSpacegraphComposeLibrariesCompatibility
+> Task :generateResourceAccessorsForJsSpacegraph SKIPPED
+> Task :jsResolveResourcesFromDependencies UP-TO-DATE
+> Task :assembleJsMainResources UP-TO-DATE
+> Task :jvmJar UP-TO-DATE
+> Task :jsResolveSelfResourcesCopyHierarchicalMultiplatformResources UP-TO-DATE
+> Task :jsAggregateResources UP-TO-DATE
+> Task :jsProcessResources UP-TO-DATE
+> Task :jsMainClasses UP-TO-DATE
+> Task :compileSpacegraphKotlinJs UP-TO-DATE
+> Task :jsSpacegraphClasses UP-TO-DATE
+> Task :compileSpacegraphProductionExecutableKotlinJs UP-TO-DATE
+> Task :jsSpacegraphSpacegraphProductionExecutableCompileSync UP-TO-DATE
+> Task :kotlinStoreYarnLock UP-TO-DATE
+> Task :jsBrowserSpacegraphProductionWebpack UP-TO-DATE
+> Task :airgapDocumentPagesJar UP-TO-DATE
+> Task :buildJvmKernels UP-TO-DATE
+> Task :hotswapAgentJar UP-TO-DATE
+> Task :muxClasspath UP-TO-DATE
+
+> Task :compileTestKotlinJvm
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt:191:44 Condition is always 'true'.
+
+> Task :compileJvmTestJava NO-SOURCE
+> Task :jvmTestClasses
+> Task :airgapDocumentEntryJar
+> Task :airgapDocumentStartScripts
+> Task :airgapDocumentInstall
+
+> Task :jvmTest
+WARNING: package jdk.internal.classfile.instruction not in java.base
+WARNING: package jdk.internal.classfile.constantpool not in java.base
+WARNING: package jdk.internal.classfile not in java.base
+
+BoardFileWalLeaseTest[jvm] > directoryAliasesShareOwnershipWhileDistinctDirectoriesRemainIndependent()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > directoryAliasesShareOwnershipWhileDistinctDirectoriesRemainIndependent()[jvm] PASSED
+
+BoardFileWalLeaseTest[jvm] > corruptFrameRefusalReleasesTheLeaseWithoutChangingTheWal()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > corruptFrameRefusalReleasesTheLeaseWithoutChangingTheWal()[jvm] PASSED
+
+BoardFileWalLeaseTest[jvm] > channelOpenFailureReleasesTheLease()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > channelOpenFailureReleasesTheLease()[jvm] PASSED
+
+BoardFileWalLeaseTest[jvm] > anotherOwnerCannotRecoverOrOverwriteTheActiveWal()[jvm] STARTED
+
+BoardFileWalLeaseTest[jvm] > anotherOwnerCannotRecoverOrOverwriteTheActiveWal()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] STARTED
+
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::objectFieldOffset has been called by com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime (file:/home/agent/.gradle/caches/modules-2/files-2.1/org.graalvm.truffle/truffle-runtime/25.3.4.1/5f9818cd0413f63bdf1fe52ba4f2fc2786f4cbb7/truffle-runtime-25.3.4.1.jar)
+WARNING: Please consider reporting this to the maintainers of class com.oracle.truffle.runtime.hotspot.HotSpotTruffleRuntime
+WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+
+> Task :jvmTest
+
+LlvmConfixRunTest[jvm] > failedConfixConfigurationPreservesTheExistingScalarSeat()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] STARTED
+
+LlvmConfixRunTest[jvm] > sourceGeometryAndScalarSummarySurviveReopening()[jvm] PASSED
+
+LlvmConfixRunTest[jvm] > nativeSelectionConsumesOptionalPortSpellingsThroughTheActualRoute()[jvm] STARTED
+
+LlvmConfixRunTest[jvm] > nativeSelectionConsumesOptionalPortSpellingsThroughTheActualRoute()[jvm] PASSED
+
+DocumentSpansTest[jvm] > compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm] STARTED
+
+DocumentSpansTest[jvm] > compactSourceRoundTripsAndRejectsAlteredMetadataAndBytes()[jvm] PASSED
+
+DocumentSpansTest[jvm] > oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm] STARTED
+
+DocumentSpansTest[jvm] > oversizedPassageRefusesWithoutPretendingProgressOrClippingAnchors()[jvm] PASSED
+
+DocumentSpansTest[jvm] > continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm] STARTED
+
+DocumentSpansTest[jvm] > continuationCoversExactUnicodeAndEscapesWithoutSplittingSurrogates()[jvm] PASSED
+
+DocumentSpansTest[jvm] > pausedReferenceCannotConsumeARevisedProjectDocument()[jvm] STARTED
+
+DocumentSpansTest[jvm] > pausedReferenceCannotConsumeARevisedProjectDocument()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > geometryCannotCycleAliasEscapeOrOmitItsParentage()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > realNativeRowsSelectAfterGuestClosure()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > realNativeRowsSelectAfterGuestClosure()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > selectedNullAndScalarRemainVisibleWithoutRescanning()[jvm] PASSED
+
+LcncConfixSelectionTest[jvm] > scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm] STARTED
+
+LcncConfixSelectionTest[jvm] > scanFailureWrongFormatAndMismatchedSourceRefuseSelection()[jvm] PASSED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] STARTED
+
+LlvmConfixTest[jvm] > upstreamScannersMatchRetainedKotlinGeometry()[jvm] PASSED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] STARTED
+
+LlvmConfixTest[jvm] > yamlNumericDisagreementIsRetainedWithoutRetagging()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admittedCancellationSettlesBeforeEvidenceAndClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] STARTED
+
+LlvmConfixTest[jvm] > faultsNeverPublishPartialGeometryAndReleaseTheirBuffers()[jvm] PASSED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] STARTED
+
+LlvmConfixTest[jvm] > strictProfilesAndFailedOpeningLeaveNoSeat()[jvm] PASSED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] STARTED
+
+LlvmConfixTest[jvm] > copiedGeometryRemainsReadableAfterContextClose()[jvm] PASSED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] STARTED
+
+LlvmConfixTest[jvm] > admissionBoundsAndOperatorAuthorityAreEnforced()[jvm] PASSED
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 24s
+65 actionable tasks: 10 executed, 55 up-to-date
+Configuration cache entry stored.

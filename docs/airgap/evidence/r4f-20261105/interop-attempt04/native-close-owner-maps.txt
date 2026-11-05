@@ -1,0 +1,78 @@
+00200000-002d5000 r--p 00000000 00:1b 295933                             /tmp/wal-native
+002d5000-007f2000 r-xp 000d4000 00:1b 295933                             /tmp/wal-native
+007f2000-008eb000 r--p 005f0000 00:1b 295933                             /tmp/wal-native
+008eb000-008ed000 rw-p 006e8000 00:1b 295933                             /tmp/wal-native
+008ed000-008ef000 rw-p 00000000 00:00 0 
+06853000-0689f000 rw-p 00000000 00:00 0                                  [heap]
+7fa71c000000-7fa71c021000 rw-p 00000000 00:00 0 
+7fa71c021000-7fa720000000 ---p 00000000 00:00 0 
+7fa7239ae000-7fa723b0e000 rw-p 00000000 00:00 0 
+7fa723b0e000-7fa723b12000 rw-s 10000000 00:0d 652722                     anon_inode:[io_uring]
+7fa723b12000-7fa723b15000 rw-s 00000000 00:0d 652722                     anon_inode:[io_uring]
+7fa723b15000-7fa723cf5000 rw-p 00000000 00:00 0 
+7fa723cf5000-7fa723cf6000 ---p 00000000 00:00 0 
+7fa723cf6000-7fa7244f6000 rw-p 00000000 00:00 0 
+7fa7244f6000-7fa7245d6000 rw-p 00000000 00:00 0 
+7fa7245d6000-7fa7245d7000 ---p 00000000 00:00 0 
+7fa7245d7000-7fa724dd7000 rw-p 00000000 00:00 0 
+7fa724dd7000-7fa724dd8000 ---p 00000000 00:00 0 
+7fa724dd8000-7fa7255d8000 rw-p 00000000 00:00 0 
+7fa7255d8000-7fa7255dd000 rw-p 00000000 00:00 0 
+7fa7255dd000-7fa725605000 r--p 00000000 00:1b 287954                     /lib/x86_64-linux-gnu/libc.so.6
+7fa725605000-7fa725768000 r-xp 00028000 00:1b 287954                     /lib/x86_64-linux-gnu/libc.so.6
+7fa725768000-7fa7257be000 r--p 0018b000 00:1b 287954                     /lib/x86_64-linux-gnu/libc.so.6
+7fa7257be000-7fa7257c2000 r--p 001e0000 00:1b 287954                     /lib/x86_64-linux-gnu/libc.so.6
+7fa7257c2000-7fa7257c4000 rw-p 001e4000 00:1b 287954                     /lib/x86_64-linux-gnu/libc.so.6
+7fa7257c4000-7fa7257d1000 rw-p 00000000 00:00 0 
+7fa7257d1000-7fa7257d5000 r--p 00000000 00:1b 287949                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fa7257d5000-7fa7257f8000 r-xp 00004000 00:1b 287949                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fa7257f8000-7fa7257fc000 r--p 00027000 00:1b 287949                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fa7257fc000-7fa7257fd000 r--p 0002b000 00:1b 287949                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fa7257fd000-7fa7257fe000 rw-p 0002c000 00:1b 287949                     /lib/x86_64-linux-gnu/libgcc_s.so.1
+7fa7257fe000-7fa7257ff000 r--p 00000000 00:1b 287923                     /lib/x86_64-linux-gnu/libdl.so.2
+7fa7257ff000-7fa725800000 r-xp 00001000 00:1b 287923                     /lib/x86_64-linux-gnu/libdl.so.2
+7fa725800000-7fa725801000 r--p 00002000 00:1b 287923                     /lib/x86_64-linux-gnu/libdl.so.2
+7fa725801000-7fa725802000 r--p 00002000 00:1b 287923                     /lib/x86_64-linux-gnu/libdl.so.2
+7fa725802000-7fa725803000 rw-p 00003000 00:1b 287923                     /lib/x86_64-linux-gnu/libdl.so.2
+7fa725803000-7fa725804000 r--p 00000000 00:1b 287916                     /lib/x86_64-linux-gnu/librt.so.1
+7fa725804000-7fa725805000 r-xp 00001000 00:1b 287916                     /lib/x86_64-linux-gnu/librt.so.1
+7fa725805000-7fa725806000 r--p 00002000 00:1b 287916                     /lib/x86_64-linux-gnu/librt.so.1
+7fa725806000-7fa725807000 r--p 00002000 00:1b 287916                     /lib/x86_64-linux-gnu/librt.so.1
+7fa725807000-7fa725808000 rw-p 00003000 00:1b 287916                     /lib/x86_64-linux-gnu/librt.so.1
+7fa725808000-7fa72580a000 r--p 00000000 00:1b 295918                     /lib/x86_64-linux-gnu/libcrypt.so.1
+7fa72580a000-7fa725820000 r-xp 00002000 00:1b 295918                     /lib/x86_64-linux-gnu/libcrypt.so.1
+7fa725820000-7fa72583a000 r--p 00018000 00:1b 295918                     /lib/x86_64-linux-gnu/libcrypt.so.1
+7fa72583a000-7fa72583b000 r--p 00031000 00:1b 295918                     /lib/x86_64-linux-gnu/libcrypt.so.1
+7fa72583b000-7fa72583c000 rw-p 00032000 00:1b 295918                     /lib/x86_64-linux-gnu/libcrypt.so.1
+7fa72583c000-7fa725846000 rw-p 00000000 00:00 0 
+7fa725846000-7fa725847000 r--p 00000000 00:1b 295917                     /lib/x86_64-linux-gnu/libutil.so.1
+7fa725847000-7fa725848000 r-xp 00001000 00:1b 295917                     /lib/x86_64-linux-gnu/libutil.so.1
+7fa725848000-7fa725849000 r--p 00002000 00:1b 295917                     /lib/x86_64-linux-gnu/libutil.so.1
+7fa725849000-7fa72584a000 r--p 00002000 00:1b 295917                     /lib/x86_64-linux-gnu/libutil.so.1
+7fa72584a000-7fa72584b000 rw-p 00003000 00:1b 295917                     /lib/x86_64-linux-gnu/libutil.so.1
+7fa72584b000-7fa72584c000 r--p 00000000 00:1b 287915                     /lib/x86_64-linux-gnu/libpthread.so.0
+7fa72584c000-7fa72584d000 r-xp 00001000 00:1b 287915                     /lib/x86_64-linux-gnu/libpthread.so.0
+7fa72584d000-7fa72584e000 r--p 00002000 00:1b 287915                     /lib/x86_64-linux-gnu/libpthread.so.0
+7fa72584e000-7fa72584f000 r--p 00002000 00:1b 287915                     /lib/x86_64-linux-gnu/libpthread.so.0
+7fa72584f000-7fa725850000 rw-p 00003000 00:1b 287915                     /lib/x86_64-linux-gnu/libpthread.so.0
+7fa725850000-7fa725861000 r--p 00000000 00:1b 287933                     /lib/x86_64-linux-gnu/libm.so.6
+7fa725861000-7fa7258de000 r-xp 00011000 00:1b 287933                     /lib/x86_64-linux-gnu/libm.so.6
+7fa7258de000-7fa72593e000 r--p 0008e000 00:1b 287933                     /lib/x86_64-linux-gnu/libm.so.6
+7fa72593e000-7fa72593f000 r--p 000ed000 00:1b 287933                     /lib/x86_64-linux-gnu/libm.so.6
+7fa72593f000-7fa725940000 rw-p 000ee000 00:1b 287933                     /lib/x86_64-linux-gnu/libm.so.6
+7fa725940000-7fa725943000 r--p 00000000 00:1b 287928                     /lib/x86_64-linux-gnu/libresolv.so.2
+7fa725943000-7fa72594c000 r-xp 00003000 00:1b 287928                     /lib/x86_64-linux-gnu/libresolv.so.2
+7fa72594c000-7fa72594e000 r--p 0000c000 00:1b 287928                     /lib/x86_64-linux-gnu/libresolv.so.2
+7fa72594e000-7fa72594f000 r--p 0000e000 00:1b 287928                     /lib/x86_64-linux-gnu/libresolv.so.2
+7fa72594f000-7fa725950000 rw-p 0000f000 00:1b 287928                     /lib/x86_64-linux-gnu/libresolv.so.2
+7fa725950000-7fa725954000 rw-p 00000000 00:00 0 
+7fa725954000-7fa725958000 r--p 00000000 00:00 0                          [vvar]
+7fa725958000-7fa72595a000 r--p 00000000 00:00 0                          [vvar_vclock]
+7fa72595a000-7fa72595c000 r-xp 00000000 00:00 0                          [vdso]
+7fa72595c000-7fa72595d000 r--p 00000000 00:1b 287912                     /lib64/ld-linux-x86-64.so.2
+7fa72595d000-7fa725985000 r-xp 00001000 00:1b 287912                     /lib64/ld-linux-x86-64.so.2
+7fa725985000-7fa725990000 r--p 00029000 00:1b 287912                     /lib64/ld-linux-x86-64.so.2
+7fa725990000-7fa725992000 r--p 00034000 00:1b 287912                     /lib64/ld-linux-x86-64.so.2
+7fa725992000-7fa725993000 rw-p 00036000 00:1b 287912                     /lib64/ld-linux-x86-64.so.2
+7fa725993000-7fa725994000 rw-p 00000000 00:00 0 
+7ffc6255f000-7ffc62580000 rw-p 00000000 00:00 0                          [stack]
