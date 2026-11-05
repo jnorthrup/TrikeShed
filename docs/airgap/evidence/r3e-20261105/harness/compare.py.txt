@@ -1,0 +1,20 @@
+from pathlib import Path
+import os,subprocess,json,datetime,hashlib
+h=Path('/workspace/airgap-r3e-proof')
+assert json.loads((h/'combined-targets.json').read_text())['exit']==0
+assert json.loads((h/'combined-jvm05.json').read_text())['exit']==0
+roots={'baseline':'/workspace/airgap-r3d-proof/installed-combined/airgap-document-rootfs','final':str(h/'installed-final/airgap-document-rootfs')}
+processes=subprocess.check_output(['ps','-eo','pid,pcpu,args'],text=True);(h/'comparison-processes.txt').write_text(processes)
+assert not any('org.gradle.launcher.daemon.bootstrap.GradleDaemon' in line or 'org.gradle.appname=gradlew' in line for line in processes.splitlines()),'Build still running'
+rows=[]
+for kind,num in [('baseline',1),('final',1),('final',2),('baseline',2),('baseline',3),('final',3)]:
+ case=f'{kind}-geometry{num:02}';env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=roots[kind]
+ cmd=['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','airgap-r3e','python3',str(h/'run.py'),case,'geometry']
+ row={'case':case,'kind':kind,'startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'command':cmd,'driverSha256':hashlib.sha256((h/'geometry.cjs').read_bytes()).hexdigest()}
+ with (h/(case+'-launch.txt')).open('w') as f:r=subprocess.run(cmd,env=env,stdout=f,stderr=subprocess.STDOUT)
+ row.update(exit=r.returncode,finishedAt=datetime.datetime.now(datetime.timezone.utc).isoformat());rows.append(row);(h/'comparison-runs.json').write_text(json.dumps(rows,indent=2)+'\n')
+ assert r.returncode==0,case
+ with (h/(case+'-audit.txt')).open('w') as f:subprocess.run(['python3',str(h/'audit.py'),case,'fanout'],stdout=f,stderr=subprocess.STDOUT,check=True)
+ b=json.loads((h/case/'browser.json').read_text());assert not b.get('error') and not b['errors'];assert all(v['result'] in ['PASS','RECORDED'] for v in b['cases'].values());assert len(b['cases'])==9
+ row['frames']={k:v for k,v in b['frameIntervals'].items() if k!='raw'};row['checks']={k:v['result'] for k,v in b['cases'].items()};row['control']={'roundTripMs':b['controlDispatchRoundTripMs'],'keyboardEvents':b['controlProbe']['events'],'reportedKeyboardTimings':b['receiptControlTimings']};row['geometry']=[{'view':g['label'],'visiblePairs':len(g['rows']),'clippedPairs':g['clippedEndpointPairs'],'maxScreenError':max(v for r in g['rows'] for v in r['errors'])} for g in b['geometry']]
+ (h/'comparison-runs.json').write_text(json.dumps(rows,indent=2)+'\n');print(case,row['frames'],row['geometry'],'reported input timings',len(b['receiptControlTimings']),flush=True)

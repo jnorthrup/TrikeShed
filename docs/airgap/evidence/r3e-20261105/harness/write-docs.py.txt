@@ -1,0 +1,136 @@
+from pathlib import Path
+import json
+h=Path('/workspace/airgap-r3e-proof');repo=Path('/workspace/TrikeShed');rows=json.loads((h/'comparison-runs.json').read_text());ru=json.loads((h/'runtime-final-update.json').read_text());su=json.loads((h/'final-source-update.json').read_text());bundle=json.loads((h/'final-geometry01/identity.json').read_text())['bundleSha256']
+s=(h/'runbook-draft.md').read_text();table='## Matched observations\n\n| Runtime / repetition | Samples | p95 (ms) | Maximum (ms) | CDP round-trip (ms) | Reported keyboard durations (ms) |\n|---|---:|---:|---:|---:|---|\n'
+for kind,label in [('baseline','R3d'),('final','R3e')]:
+ for r in sorted([r for r in rows if r['kind']==kind],key=lambda r:r['case']):
+  f=r['frames'];c=r['control'];table+=f"| {label} / {r['case'][-2:]} | {f['samples']} | {f['p95']:.1f} | {f['maximum']:.1f} | {c['roundTripMs']:.1f} | "+', '.join(str(t['duration']) for t in c['reportedKeyboardTimings'])+' |\n'
+table+='''
+All four keyboard entries were reported in each run. The matched maximum
+frame intervals are 116.7–149.9 ms for R3d and 116.6–133.4 ms for R3e;
+keyboard durations and controller round-trips overlap as well. These small
+repetitions do not establish a consistent latency improvement. The change
+removes repeated geometry reads and separates SVG attachment, while sustained
+frame-rate/control acceptance remains open.
+
+Every final run verifies all 65 native values, zero overlapping node pairs,
+64 visible endpoint pairs after fit, 27 after zoom and 17 after resize. The
+remaining 37/47 pairs are explicitly clipped from those latter checks. The
+largest measured endpoint error is below 0.00012 screen pixels, against a
+one-pixel tolerance. This checks visible endpoints; it does not prove every
+point on each clipped curve. Each final ledger retains 29 of 194 observations
+and reports 165 owner omissions. Live displayed selections are checked against
+actual received events and can vary with polling; they are never reconstructed
+from successful outputs.
+
+'''
+s=s.replace('## Follow-on implementation mechanics',table+'## Follow-on implementation mechanics')
+s+='''
+## Verification, artifacts and reproduction
+
+The final source commit is `5fdd0472c115922287ba46a4977cb1134aa9017a`.
+Offline application installation, Spacegraph production compilation and the
+selected JVM suite pass: **316 passed, seven skipped, zero failures** across
+59 suites. The seven conditional checks require an unavailable external native
+Horn executable. Their names are retained in `skipped-tests.json`; the native
+Sulong scalar/Confix browser path executes separately and is not skipped.
+No source or test exclusions were introduced.
+
+JS main, Documents, Wasm-JS, Wasm-WASI and Linux x64 compilation pass at
+`d1e5d413259e191a9aa6cff15998f6df2b50aa38`. The only runtime source difference
+at the final commit is the Spacegraph endpoint factory correction, which the
+final production build compiles. All target-specific/common source and build
+inputs used by the earlier target check are unchanged. The source-continuity
+record lists the intervening documentation and exact one-file difference.
+Later publication documentation and evidence do not redefine those tested
+source identities.
+
+The final extracted runtime passes **35 browser checks**: seven in each of
+three geometry runs, ten in the document scenario, and four in the retained
+reference ownership scenario. Three frame measurements and three control
+measurements are separately recorded; they are not six additional pass claims.
+The document run retains the 111,243-byte PDF and exact UTF-16 passage
+`[18477,18654)`, checks eight observed transfers, and reopens the same receipt
+in a second JVM with source assets, PDF tools, miner and LLVM owners unavailable.
+The ownership scenario uses two real runs and four actual CAS reads; editing
+the definition during a delayed read refuses display, and restoration permits
+inspection. Every accepted process drains and exits zero.
+
+Independent audits verify CAS path hashes, WAL sequence/CRC32C, programme and
+receipt identity, real scalar values, observed wire endpoints/counts/times,
+unchanged original document records, and cleanup. Each process runs with a
+read-only packaged filesystem and separate writable state in a loopback-only
+network namespace. Actual external connection attempts return `ENETUNREACH`.
+These observations do not establish physical power-loss durability or vendor
+source-build closure.
+
+'''
+s+=f'The final browser bundle SHA-256 is `{bundle}`.\n\n'
+s+=f"The final runtime overlay is `{Path(ru['archive']['file']).name}`\n({ru['archive']['bytes']:,} bytes), SHA-256\n`{ru['archive']['sha256']}`. It requires the immutable R4f runtime\narchive named and hashed in the packet. Two assemblies from the same pinned\nbytes are identical. The actual overlay is extracted over a fresh verified\nbase, then its complete membership, modes and hashes are verified before\nand after the runtime checks. Preliminary candidate archives are retained\nfor diagnosis; use this final overlay for the release.\n\n"
+s+=f"The source overlay is `{Path(su['archive']['file']).name}`\n({su['archive']['bytes']:,} bytes), SHA-256\n`{su['archive']['sha256']}`. Apply the R4e source base, R4f update,\nR3c final update and R3d final update first, then this full-index binary patch.\nA temporary Git index verifies the exact target tree. Raw evidence whitespace\nis intentionally unchanged. The cumulative blueprint PDF and incremental\nevidence ZIP are separate from these archives and retain their own manifests.\n\n"
+s+='''Reproduction scripts are retained as inert `.py.txt`, `.cjs.txt` and
+`.java.txt` files. Adapt the recorded absolute tool/root paths to a matching
+Linux x86-64 host; restore script extensions in a scratch directory. Use
+`package-final.py verify` for complete inventory/mode/hash verification, not
+only a subset checksum. `run.py <case> geometry` executes the matched driver;
+`browser` executes the document/reopen scenario; `ownership` exercises the
+delayed real read. `audit.py <case> fanout|document` and
+`ownership-audit.py <case> ownership` inspect independent retained evidence.
+`compare.py` records exact command/order/driver hashes, while `profiles.py`
+labels its separate diagnostic overhead. No harness fabricates a successful
+server response or native output.
+
+See the existing R4f/R3d runbooks for the complete namespace and filesystem
+launch commands. This release runs in the cloud checkout. Jim's local machine
+has not been synchronized or modified by these commands.
+'''
+(repo/'docs/airgap/15-wire-geometry.md').write_text(s)
+(repo/'docs/d3m/2026-11-05-airgap-r3e.md').write_text((h/'d3m-draft.md').read_text())
+p=repo/'docs/airgap/README.md';s=p.read_text();line=next(l for l in s.splitlines() if l.startswith('| R3d:'));s=s.replace(line,line+'\n| R3e: wire geometry and query rows | Snapshot shared endpoints, batch SVG attachment, preserve structural map hashes for exact Horn inspection | [Verified increment](15-wire-geometry.md), [316 JVM checks and 35 final browser checks](evidence/r3e-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r3e.md); matched timings overlap, sustained rendering remains open |');p.write_text(s)
+p=repo/'docs/lcnc/airgap-demonstrator/README.md';s=p.read_text();needle='Sustained frame performance remains open.';s=s.replace(needle,'[R3e](../../airgap/15-wire-geometry.md) batches wire geometry and fixes common\nmap-entry hashes used by exact Horn query rows. Its 35 final browser checks\ninclude fit/zoom/resize alignment, actual wire editing and keyboard controls.\nMatched frame/control timings overlap the baseline; no broad speedup is claimed.\nSustained frame performance remains open.',1);p.write_text(s)
+p=repo/'docs/lcnc/airgap-demonstrator/07-visualization.md';s=p.read_text();s+='''
+## Implemented checkpoint: R3e
+
+[R3e](../../airgap/15-wire-geometry.md) snapshots distinct port geometry per
+redraw, supplies measured viewport dimensions to the existing curve projector,
+and attaches SVG paths/labels as one fragment. The snapshot is deliberately
+materialized at the DOM boundary; it cannot authorize geometry after a later
+edit or callback. The first compiled candidate exposed a dynamic-call runtime
+failure, retained with its correction through the existing typed Twin factory.
+
+Three matched 65-node runs verify 65 native outputs, wire alignment under fit,
+zoom and resize, real wire deletion and trace invalidation. Maximum frame gaps
+are 116.6–133.4 ms versus 116.7–149.9 ms on R3d with the same expanded driver.
+These small repetitions and keyboard Event Timing observations overlap;
+sustained performance acceptance remains open. A raw frame-timestamp difference
+can be negative and is explicitly excluded from latency claims. The runbook
+retains threshold/quantization, controller overhead and dispatch-after-receipt
+limits. Full-canvas serialization, quadratic overlap and listener retention
+still need bounded alternatives or longer-session evidence.
+''';p.write_text(s)
+p=repo/'docs/lcnc/airgap-demonstrator/04-evidence-rdf-and-memory.md';s=p.read_text();s+='''
+## Implemented query-row boundary: R3e
+
+The [R3e integration](../../airgap/15-wire-geometry.md) retains bounded native
+Horn proof quads and two fixed inspection programmes over supplied proof and
+selection context. Typed source identity, ordered premise uses and exact row
+coverage remain refusal boundaries. These projections do not establish native
+execution, authenticated review or a production permit.
+
+An actual query-row failure exposed `LinearArrayMap` entries with identity
+hashing despite structural map equality. Entry equality/hash semantics are now
+corrected, so equal parsed nested rows remain usable in hash-based coverage
+and ordering. The query assertions were preserved. Before/after diagnostics
+use the actual quad engine and JSON reifier; tests cover reordered fields,
+nulls, indexed lookup and both hash-index directions. This common representation
+contract matters wherever an evidence row becomes a set member or lookup key.
+''';p.write_text(s)
+p=repo/'PRELOAD.md';s=p.read_text();s+='''
+A conflict-free merge and successful compilation do not establish runtime
+acceptance. Execute the changed platform boundary against the actual packaged
+artifact; preserve any failed candidate and its identity before rebuilding.
+Keep measurement clocks and reporting thresholds explicit, and retain adverse
+or overlapping results without turning them into an unsupported speedup claim.
+''';p.write_text(s)
+(h/'visual-review.json').write_text(json.dumps({'inspected':['final-geometry01/wire-geometry-before-edit.png','final-document02/transfer-table.png','final-ownership02/changed-reference-refused.png','wire-comparison.png'],'findings':['Zoomed/resized graph shows connected wires, recorded output and explicit owner omissions; many nodes are outside the viewport.','Document view retains eight observed transfers and keyboard selection.','Changed-reference screenshot shows edited input and refusal in the status bar; the one-node fit is heavily zoomed.','Comparison chart retains zero-based axes, readable labels and explicit overlapping-result/clock limitations.']},indent=2)+'\n')
+print('Runbook words',len(s.split()),'bundle',bundle)

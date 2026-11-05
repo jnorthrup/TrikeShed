@@ -1,0 +1,57 @@
+[
+  {
+    "case": "geometry-harness-pilot01",
+    "runtime": "Released immutable R3d",
+    "error": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert(state.rows.length>0)\n\n    at /workspace/airgap-r3e-proof/geometry.cjs:24:460",
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS"
+    },
+    "normalJvmExits": [
+      0
+    ],
+    "timingStanding": "Excluded: concurrent Gradle compilation during harness development.",
+    "correction": "The fixed zoom anchor moved the shared source offscreen. The later driver anchors zoom on the measured source port and records pairs excluded by clipping; all fully visible pairs must still align."
+  },
+  {
+    "case": "geometry-harness-pilot02",
+    "runtime": "Released immutable R3d",
+    "error": "AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:\n\n  assert(state.rows.length>0)\n\n    at /workspace/airgap-r3e-proof/geometry.cjs:24:497",
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS"
+    },
+    "normalJvmExits": [
+      0
+    ],
+    "timingStanding": "Excluded: concurrent Gradle compilation during harness development.",
+    "correction": "The fixed zoom anchor moved the shared source offscreen. The later driver anchors zoom on the measured source port and records pairs excluded by clipping; all fully visible pairs must still align."
+  },
+  {
+    "case": "geometry-harness-pilot03",
+    "runtime": "Released immutable R3d",
+    "error": null,
+    "checks": {
+      "receiptControl": "PASS",
+      "measuredFanout": "PASS",
+      "receivedCoverage": "PASS",
+      "boundedDisplay": "PASS",
+      "outputLayout": "PASS",
+      "wireGeometry": "PASS",
+      "wireEdit": "PASS",
+      "frameMeasurement": "RECORDED",
+      "controlTiming": "RECORDED"
+    },
+    "normalJvmExits": [
+      0
+    ],
+    "timingStanding": "Excluded: concurrent Gradle compilation during harness development.",
+    "correction": null
+  }
+]

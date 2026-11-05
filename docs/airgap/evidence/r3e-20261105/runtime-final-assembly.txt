@@ -1,0 +1,44 @@
+package membership, modes and SHA-256 verified
+manifest 1355 files 998261630 bytes
+package membership, modes and SHA-256 verified
+package membership, modes and SHA-256 verified
+{
+  "baseArchive": {
+    "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+    "bytes": 460778817,
+    "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+  },
+  "targetSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+  "previousJvmSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+  "files": {
+    "SHA256SUMS": {
+      "before": "e93c64c20797875170cbe1f52e1b062e57a0a08fb44ced42e23e44666dec1115",
+      "after": "0195f2d597367b9a3a4588eae425768b711d0714f777b5de131ca0c602a70341"
+    },
+    "opt/trikeshed/README.md": {
+      "before": "c3e4ca1db3af4a4fda1bf1deec036b38aca4c8fcc552b38f5f3d729756608bdd",
+      "after": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13"
+    },
+    "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+      "before": "b65eddc8f95bc93bb7ff1f1431d0dedc904c8bd6b55af818bd37f8513e6d022a",
+      "after": "4a6fbcf3d7a6d8a10f678938aa24a2e599842c027f4c238052526795889f07db"
+    },
+    "opt/trikeshed/lib/TrikeShed-jvm-0.1.0-SNAPSHOT.jar": {
+      "before": "5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c",
+      "after": "f784107dd8f0fe0471e9ee0c43edccc9debce8a5e323844f0d7a22b40eaf533e"
+    },
+    "package-identity.json": {
+      "before": "ee6456520a5e7c99e752e1759416d95aac81d9bbf1b4e989c327095965c12271",
+      "after": "db1cc17a1b94ef22a4c8b2446f5de9e2bbbb645cb216c0b110a426206e8e60fa"
+    }
+  },
+  "scope": "Layered runtime update. Requires the exact immutable R4f runtime; the production JVM and Spacegraph jars are rebuilt from combined D3M source, retaining the runtime instructions and exact manifests. The combined build retains source-pinned corpus search, native Horn proof-quad inspection and static-note readiness fixes. Common LinearArrayMap entries now preserve structural equality/hash semantics for reified query rows. Wire endpoints and viewport dimensions are captured before SVG paths are attached as one fragment. No new dependency or native module.",
+  "archive": {
+    "file": "/workspace/library-files/airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+    "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006",
+    "bytes": 36928779
+  },
+  "identicalTwoAssemblies": true,
+  "installedRoot": "/workspace/airgap-r3e-proof/installed-final/airgap-document-rootfs",
+  "installation": "Verified immutable R4f root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete combined membership/mode/hash verification passes. No mutation of the R4f root."
+}

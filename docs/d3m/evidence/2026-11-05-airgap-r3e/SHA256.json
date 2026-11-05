@@ -1,0 +1,17 @@
+{
+  "fetch-publication.py.txt": "0d24e57701b9b482d56f2df04f49d357f1f778290e879eb6dfb81e3f36dccaaf",
+  "fetch.json": "c5b88d06d41ccd799dba577b27366f5077d4ac183b484d6df53cf36694465ab1",
+  "fetch.py.txt": "b3aa70a67ab61e1075fa9772dc7a856b7f37dbafacbeb80232ac3c03f43258f5",
+  "initial/integration-inputs.json": "93ddb123431d3cbbc9fc7b5cb88b8596124ce7b8e51b9dbf04c1e72ebcfb7c87",
+  "initial/integration-steps.json": "da8146d1e33bb12fca4c89f723f64899e9c972ea1a2d9b5c239631b6886ba5db",
+  "integrate-publication.py.txt": "7c98a036d19061beb721c0350fa523a70b22a838118605ffaec4be956e32962b",
+  "integrate.py.txt": "2c80c651a3ebc756e6bd596fccb24666a991e4557aca74d2dfd82be0b9baedf6",
+  "integration-inputs.json": "93ddb123431d3cbbc9fc7b5cb88b8596124ce7b8e51b9dbf04c1e72ebcfb7c87",
+  "publication/integration-inputs.json": "170bfbe8f86b0135ac580b22a78f22304e59e7a4dc4fb9a4ec0f4e0e49bd46bf",
+  "publication/integration-steps.json": "1975163466ee0ae91da21ba1ad5c525173d8ced9227d59025ebc454cd3c71d63",
+  "publication-freeze/fetch.json": "01a8383d3e6dae9a6f1310759e0e6edf3e6390c65f35d6f12cbd7d2a7c08941e",
+  "publication-freeze/integration-inputs.json": "170bfbe8f86b0135ac580b22a78f22304e59e7a4dc4fb9a4ec0f4e0e49bd46bf",
+  "publication-freeze/remote-heads.json": "4d334d799c7f99565b2b20063af3aa6c0ceeae05f62d1f2d1b3d58bcd331a302",
+  "remote-heads.json": "20c34eac9e79f0abb56a0832884173834698acdf17847567166190d3b8064677",
+  "verification.json": "b4374d23e2b0a2bde9c36620ab5c4b27eae91359a06dcfe79d385100b8f1876b"
+}

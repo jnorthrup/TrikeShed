@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="LcncConsumptionTest[jvm]" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:04:14.283Z" hostname="0d6dfba25614" time="0.071">
+  <properties/>
+  <testcase name="inlineConsumptionReferencesTheEnclosingOutputOwner()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.006"/>
+  <testcase name="interventionReplacesWireAttributionAndSharesTheAcknowledgedControlSequence()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.007"/>
+  <testcase name="cancelledPausedConsumerDoesNotClaimWireDelivery()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.005"/>
+  <testcase name="intervenedBindingIsLinkedThroughItsActualScopeInputProducer()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.005"/>
+  <testcase name="finalEvidenceTrimmingRecountsTheStreamInsteadOfPreservingAStaleSummary()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.005"/>
+  <testcase name="manyPortsRetainAuthoredPositionsAndTheirExistingSingleValueShape()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.004"/>
+  <testcase name="singlePortRecordsOnlyTheLastFedWireIncludingDuplicateEndpoints()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.004"/>
+  <testcase name="omittedSelectionsAndWindowEvictionKeepExactCountsAndPositions()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.008"/>
+  <testcase name="missingRequiredInputAndGuardedScopesDoNotEmitConsumedSuccess()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.004"/>
+  <testcase name="pulseConsumesTheActualWarmFrameWithoutInventingAProducerInvocation()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.009"/>
+  <testcase name="repeatedNamedFramesUseTheirActualProducerAndDocumentIdentity()[jvm]" classname="borg.trikeshed.lcnc.LcncConsumptionTest" time="0.012"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

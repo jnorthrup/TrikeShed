@@ -1,0 +1,39 @@
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "walFramesVerified": [
+    {
+      "cid": "sha256:7b1a53c2452149adf0a3e8b0cdb7f77e3bea740b1bc382c93e5d32be74a966c6",
+      "status": "queued"
+    },
+    {
+      "cid": "sha256:df27ecba8e94ac9767a3eb5cf77d58d495c52335967d6d1c83dadea6a474a58f",
+      "status": "running"
+    },
+    {
+      "cid": "sha256:6009a8873285f623d3eb31e6111050226325fbc4e104587120763f99a3b6d6ae",
+      "status": "completed"
+    }
+  ],
+  "runId": "9b074b08-835e-4351-904c-a036000fd826",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:6009a8873285f623d3eb31e6111050226325fbc4e104587120763f99a3b6d6ae",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+  "frameIntervals": {
+    "unit": "ms",
+    "samples": 159,
+    "p50": 16.699999999999818,
+    "p95": 33.399999999999636,
+    "maximum": 116.69999999999982,
+    "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+  },
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}

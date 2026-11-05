@@ -1,0 +1,9 @@
+/workspace/airgap-r3e-proof/HornProbe.java:12: error: no suitable method found for answer(SparqlQuery,ColumnCursor,String,String)
+   var raw=new SparqlSurface(projection.getStore(),ClosureExprCompiler.INSTANCE).answer(query,projection.getStore().scan(),"json","");
+                                                                                ^
+    method SparqlSurface.answer(String,List<String>,List<String>,String,String,Join<Integer,? extends Function1<? super Integer,? extends Join<Integer,? extends Function1<? super Integer,? extends Join<? extends Object,? extends Function0<? extends ColumnMeta>>>>>>,SparqlSource) is not applicable
+      (actual and formal argument lists differ in length)
+    method SparqlSurface.answer(SparqlQuery,Join<Integer,? extends Function1<? super Integer,? extends Join<Integer,? extends Function1<? super Integer,? extends Join<? extends Object,? extends Function0<? extends ColumnMeta>>>>>>,String,String) is not applicable
+      (argument mismatch; ColumnCursor cannot be converted to Join<Integer,? extends Function1<? super Integer,? extends Join<Integer,? extends Function1<? super Integer,? extends Join<? extends Object,? extends Function0<? extends ColumnMeta>>>>>>)
+1 error
+error: compilation failed

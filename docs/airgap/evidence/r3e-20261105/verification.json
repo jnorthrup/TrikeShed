@@ -1,0 +1,1259 @@
+{
+  "release": "R3e wire geometry and exact query rows",
+  "createdAt": "2026-11-05T10:12:24.157200+00:00",
+  "testedSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+  "testedSourceTree": "f7a2307948a01bae1109c0931277d2f9dd83c907",
+  "integration": {
+    "integratedCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+    "testedCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+    "targetCompilationCommit": "d1e5d413259e191a9aa6cff15998f6df2b50aa38",
+    "frozenRefCounts": [
+      556,
+      557
+    ],
+    "latestInventory": {
+      "local": 9,
+      "remoteBranchHeads": 547,
+      "remoteHeadAliases": 1
+    },
+    "merges": 6,
+    "conflictedFiles": 0,
+    "allFrozenTipsAreAncestors": true,
+    "equivalentCorrections": "Production and fixture bracket corrections merge automatically with the independently written equivalent fixes; both histories retained.",
+    "sourceContinuity": "../../../airgap/evidence/r3e-20261105/final-source-continuity.json",
+    "localMachine": "Cloud checkout /workspace/TrikeShed; Jim Mac unchanged",
+    "pushPolicy": "Ordinary master push; no force, pruning, or branch deletion. Final remote readback recorded separately."
+  },
+  "sourceSha256": {
+    "AGENTS.md": "bc0f204894cea98cbc07689feac989065b1d497ba953d427b71454b6157f2f40",
+    "PRELOAD.md": "33b92f1d40c738ca36c4ed3c307944c3101d727a76ff0c5b81a5e9fce681e467",
+    "build.gradle.kts": "f34f8fd9c3502e93360f45246437d520dd0a022ef95a13e72479789b2b49160f",
+    "gradle.properties": "2b288c27e97606c41f9a74b9ab3734b0ee06f7dc60c1147b861722bfe2dec51e",
+    "release/airgap-document/README.md": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13",
+    "settings.gradle.kts": "35a1e6101800fabb05bc43e460e649e3b8b53611011d6d6dc23e5158263c8315",
+    "src/commonMain/kotlin/borg/trikeshed/collections/associative/trie/ArrayMap.kt": "ab0b62a37ebf5d3984bdc66d0481c1bb4f09aa4265bc1322549e2facf003e36f",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishCorpusContract.kt": "0b76e0be21cefeb897bdbd471dd6f447ba008bdad58f1546752c4a91e6b6d00b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishCorpusPreset.kt": "60cd1203bb8d659abf0a2489c60e9829a709638c4feabfa64903af8c28418e27",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "f799e4dd7f6a6257e4ce34bf0987ce9c26ab480e53c4922933d7ff6fa085e2ae",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt": "d4e292c671e12875b1311b38784bd7a4e7101a02cc592f458fecaaae84c90b1b",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncPresets.kt": "03d3e8ec933e94fc3ed1e112d74608669d287f89ddba70d283eedb82c13c5fe4",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornProofGraph.kt": "f9fe8ab08cd9487af221f280e999130fce082f05110c10cfcdf0bbdf87ea45ba",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/NativeHornQueryView.kt": "7846b03c951a776261cb77fa9a7d30fca3a6fa622eae27f0860fb8edff839a70",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt": "5ee7b106022b5ef569e286e51eeac027ecd3be749d631182bfc7fc61974d1238",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefsNodes.kt": "46100f3cb0301112306404bf95df5ab95be98deba4a72f14e8641c1fd7afa33c",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/KgRetention.kt": "bdf611b11f86565f58f0838987c3a6dafba1cdb5e87c9d54fd147aa0ee3cfb0d",
+    "src/commonMain/kotlin/borg/trikeshed/narsese/NalNodes.kt": "d45721713515bfa44fb11d2078d82ed63222a65faf03e4e9141c07a0e1465b8d",
+    "src/commonTest/kotlin/borg/trikeshed/collections/LinearArrayMapTest.kt": "2efeb86ce401c0dc4fc00d1dfe1ac3a751708b67ca9605b1f3333796b59449ab",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/EnglishCorpusPresetTest.kt": "1ddbe31d98507da17bcccbbcfc45f61977fd3be3861c146fbf92007a9b9614bb",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryViewTest.kt": "31a067b941e2b041e19683f515c45d1d9703cf6e737c5beaefb885de67cf8992",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt": "0c2a511e38cdf99d6328d0de855193db8ddcf96003a87088346ad4407d7e5f5c",
+    "src/jsMain/kotlin/borg/trikeshed/web/PatchNavigation.kt": "27745544236b5bf04e7af94f2b7bcd2fed5b8acc09e312807bf28b33840c802f",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt": "041a27d15682c7900d900320de8841cb1a3f23c70c2f6bcbef0dd6718bb36949",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt": "2488553641ed399c6636d8105a50f08104f9f8fb312652d565ea7a9926158c93",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsNode.kt": "ff8863db0e186f2c22431ab941e0dd0dfe3c23985f44521527560f94e342fa43",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt": "11fc0dc7b68aee638097c0e4c1ac1ae3b4e361f51277c654a294a6f0a9e41966",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt": "f2cf9082c70a4d4b907958a590bd134c68851b37a34f14c1fb0c581a049135ca",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTransfers.kt": "c2cd7b6030689103fb8518c4924409e58b81091f2b8814261d92ef5da056732b",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsUi.kt": "d011e5bff271cd7a08d469acda163df4286e94ffd72cd9ba6718fa8373e85be7",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/DocumentReviewWire.kt": "ce0ec579d58d70ebffcf0efb62a33be4762fbc2a8918d09325612fa33cd8fcd5",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/EnglishCorpusWire.kt": "7cd2405363aefda8b64a028930788e8c75315efdd61ebbd7cf1a2d2e5f74dc88",
+    "src/jvmMain/kotlin/borg/trikeshed/lcnc/NativeHornQuery.kt": "ef3fc4f0bd53310af9a296f483ac328c407b1c0863cad6787150b3ba1e2f23e9",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishCorpusWireTest.kt": "301dcd3f0d28a6fe5bd7a95b2a2cbf656fd2c3c20abb1e4f6ccde6c6eeef6d23",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/ReviewedKifWireTest.kt": "7831c0e6cbf985bcfab01a5f3f6e50b594ebc8b2b79c3c5c2b8d033a0fb5ad57",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/AirgapDocumentMain.kt": "739b5cb6a03c4e9c1e10eb5d07b0e30fb4fb13c0858afb9b414346d65eac209b",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornCertificateTest.kt": "c2c5d0b005d355f33c437d4dbe7ecddeb42acec97bbc162ff8b287381e172800",
+    "src/jvmTest/kotlin/borg/trikeshed/lcnc/NativeHornQueryTest.kt": "95ab7d8d1f5340941160a49431265f3b1d3afd90308fb0f1666d92f367e97b1c",
+    "src/jvmTest/kotlin/borg/trikeshed/narsese/ExactRoleRecallTest.kt": "1d6ded7f3f906276f5e0e87bb2892fbe9a4989fd86499d683b82a854be6ab97d"
+  },
+  "testTotals": {
+    "tests": 323,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "passed": 316,
+    "suites": 59
+  },
+  "browser": {
+    "passed": 35,
+    "measurementsRecorded": 6,
+    "frameMeasurements": 3,
+    "controlMeasurements": 3,
+    "bundleSha256": "622a0d3f5d54d54e6b30c031426e2f22d7af9b019290d38611f7b87b2ff02de9",
+    "cases": {
+      "final-geometry01": {
+        "cases": {
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:c1ee006509d5b7836898d3f43d5f3aeef3b745c71e3c4704c95bd7a3ddc82ffe",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:4fd6b8533d46bf6f36f19d5488b7cc8482de6ce7c793e4a366bcaed4fdf971c8",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:46549a9d31c8ca7e3a225c319593febc3b77a2e83ec7e1bfd58ddd6c21a2ee82",
+              "status": "completed"
+            }
+          ],
+          "runId": "fdef91b5-12cf-4069-818b-014d0486de44",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:46549a9d31c8ca7e3a225c319593febc3b77a2e83ec7e1bfd58ddd6c21a2ee82",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "622a0d3f5d54d54e6b30c031426e2f22d7af9b019290d38611f7b87b2ff02de9",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 160,
+            "p50": 16.699999999999818,
+            "p95": 33.40000000000009,
+            "maximum": 116.69999999999982,
+            "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-geometry01"
+      },
+      "final-geometry02": {
+        "cases": {
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:6420060b411e4222cd8d59ed9eb0bb66ef012d0a331e5404eee82e152d319691",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:21f15e5ce7b83cd228b3b6a309a2c7aab1730c4405f0fd52a4e36286fd244535",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:2462bcec2faa433cee892bd116082cccda0703ceb73bef14f04c8bb62e7bb84b",
+              "status": "completed"
+            }
+          ],
+          "runId": "ba918cba-8f93-4702-99ed-57b2452e977f",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:2462bcec2faa433cee892bd116082cccda0703ceb73bef14f04c8bb62e7bb84b",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "622a0d3f5d54d54e6b30c031426e2f22d7af9b019290d38611f7b87b2ff02de9",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 162,
+            "p50": 16.699999999999818,
+            "p95": 33.30000000000018,
+            "maximum": 133.40000000000055,
+            "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-geometry02"
+      },
+      "final-geometry03": {
+        "cases": {
+          "receiptControl": "PASS",
+          "measuredFanout": "PASS",
+          "receivedCoverage": "PASS",
+          "boundedDisplay": "PASS",
+          "outputLayout": "PASS",
+          "wireGeometry": "PASS",
+          "wireEdit": "PASS",
+          "frameMeasurement": "RECORDED",
+          "controlTiming": "RECORDED"
+        },
+        "audit": {
+          "kind": "fanout",
+          "casObjectsVerified": 26,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:a83552f3eff14bbe3e4149facdc910d067a871db178206801ee2704fdd4f95ea",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:6436b20552d9f9bee63db94a13afa7c7c35049c49ff973169ffbf8e26e137de8",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:cebefcef50f3e8837eed6b1f66b4c7a2effbec7a1d27c25db11af9cfe6899352",
+              "status": "completed"
+            }
+          ],
+          "runId": "cfd7b325-b937-46d1-9828-b2614433e164",
+          "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+          "receiptCid": "sha256:cebefcef50f3e8837eed6b1f66b4c7a2effbec7a1d27c25db11af9cfe6899352",
+          "mappedReceivedSelections": 19,
+          "mappedWires": 19,
+          "ownerOmissionsInFinalLedger": 165,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "622a0d3f5d54d54e6b30c031426e2f22d7af9b019290d38611f7b87b2ff02de9",
+          "frameIntervals": {
+            "unit": "ms",
+            "samples": 167,
+            "p50": 16.699999999999818,
+            "p95": 33.29999999999973,
+            "maximum": 116.60000000000036,
+            "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+          },
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-geometry03"
+      },
+      "final-document02": {
+        "cases": {
+          "continuousClock": "PASS",
+          "pausedCamera": "PASS",
+          "pauseIsPresentationOnly": "PASS",
+          "retainedTable": "PASS",
+          "keyboardInspection": "PASS",
+          "idleEditInvalidation": "PASS",
+          "reducedReplay": "PASS",
+          "hide": "PASS",
+          "quote": "PASS",
+          "reopenedInspection": "PASS"
+        },
+        "audit": {
+          "kind": "document",
+          "casObjectsVerified": 27,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:81ba8ac294cb8f660bf60dc824e1f5bb84db9ed4222ba3a26e6aad80711d7ef0",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:f7643454e00be4d02646f7516adf3ba8c2ead11d23c926de85fa94b65dcac286",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:24e8037c6c2ed28b1ea746addf2766090b5685dfd79d57d35964f4e825dc4cdd",
+              "status": "completed"
+            }
+          ],
+          "runId": "a60ec0bb-1cf5-40c7-aec3-f6c6e9155a17",
+          "programCid": "sha256:3912c5f3f417b55fdfe719be6fd8d19e7f512cc5113b5420a907e4ca60571078",
+          "receiptCid": "sha256:24e8037c6c2ed28b1ea746addf2766090b5685dfd79d57d35964f4e825dc4cdd",
+          "mappedReceivedSelections": 8,
+          "mappedWires": 8,
+          "ownerOmissionsInFinalLedger": 0,
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0,
+            0
+          ],
+          "oneRunSubmission": true,
+          "bundleSha256": "622a0d3f5d54d54e6b30c031426e2f22d7af9b019290d38611f7b87b2ff02de9",
+          "frameIntervals": {},
+          "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+        },
+        "evidence": "accepted/final-document02"
+      },
+      "final-ownership02": {
+        "cases": {
+          "recordedReference": "PASS",
+          "layoutChange": "PASS",
+          "changedDuringRead": "PASS",
+          "restoredDefinition": "PASS"
+        },
+        "audit": {
+          "kind": "retained-reference-ownership",
+          "casObjectsVerified": 33,
+          "walFramesVerified": [
+            {
+              "cid": "sha256:b867b706142d8d4ade200f82e25ce180123330903d72c0e06d198edd72679051",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:dc4cc65f2e2b28aa1c1e39042a66748d05995ed8bcc45426bc7a18a36f6f58b9",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:47a52eadd7a8a173fc26fad626726b0efe53cee993248e09ce663e081a6e2a73",
+              "status": "completed"
+            },
+            {
+              "cid": "sha256:64314bb13d7231585e571010964174a37472c8a7fe5370abf277cb7219819a63",
+              "status": "queued"
+            },
+            {
+              "cid": "sha256:8a88fc0aff7fd6b03e558d46db1d639960568cd6cf12501bf5e34dc33c71f4fc",
+              "status": "running"
+            },
+            {
+              "cid": "sha256:654562016221129df511b079393fec0b98639b290a149e57595a41ae5e0033cf",
+              "status": "completed"
+            }
+          ],
+          "runIds": [
+            "78e12692-539f-47ed-9bd6-7dfa4725876c",
+            "be2a6755-ad71-495e-87db-e053dfabd869"
+          ],
+          "programCids": [
+            "sha256:1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+            "sha256:34b4509517b68b04f0952687eefa15b01d09b202ab71e9c2797d9bcd4084413b"
+          ],
+          "sourceReadSha256": "1ae5dce637ceb70462a942b61a3b88193366757627cb7315e891e30c2cf5a951",
+          "allSixDocumentsUnchanged": true,
+          "processExits": [
+            0
+          ],
+          "runSubmissions": 2,
+          "retainedReads": 4,
+          "bundleSha256": "622a0d3f5d54d54e6b30c031426e2f22d7af9b019290d38611f7b87b2ff02de9",
+          "scope": "Two real commonMain JSON literal runs and four actual CAS GET requests. The third request is delayed, then continued unchanged, to edit the canvas during an awaited read. No response fabrication or additional execution."
+        },
+        "evidence": "accepted/final-ownership02"
+      }
+    }
+  },
+  "comparison": [
+    {
+      "case": "baseline-geometry01",
+      "kind": "baseline",
+      "startedAt": "2026-11-05T10:07:05.863887+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3e",
+        "python3",
+        "/workspace/airgap-r3e-proof/run.py",
+        "baseline-geometry01",
+        "geometry"
+      ],
+      "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+      "exit": 0,
+      "finishedAt": "2026-11-05T10:07:18.464451+00:00",
+      "frames": {
+        "unit": "ms",
+        "samples": 160,
+        "p50": 16.699999999999818,
+        "p95": 33.399999999999636,
+        "maximum": 116.69999999999982,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "receiptControl": "PASS",
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "wireGeometry": "PASS",
+        "wireEdit": "PASS",
+        "frameMeasurement": "RECORDED",
+        "controlTiming": "RECORDED"
+      },
+      "control": {
+        "roundTripMs": 27.149829,
+        "keyboardEvents": [
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4350.29999999702,
+            "handlerStart": 4352.69999999553,
+            "label": "Resume display",
+            "nextAnimationFrame": 4354.9,
+            "handlerToFrame": 2.2000000044699846
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4356.29999999702,
+            "handlerStart": 4375,
+            "label": "Resume display",
+            "nextAnimationFrame": 4371.6,
+            "handlerToFrame": -3.399999999999636
+          },
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4545.79999999702,
+            "handlerStart": 4550.0999999940395,
+            "label": "Pause display",
+            "nextAnimationFrame": 4538.2,
+            "handlerToFrame": -11.899999994039717
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4558.89999999851,
+            "handlerStart": 4572.29999999702,
+            "label": "Pause display",
+            "nextAnimationFrame": 4554.9,
+            "handlerToFrame": -17.39999999702013
+          }
+        ],
+        "reportedKeyboardTimings": [
+          {
+            "name": "keydown",
+            "startTime": 4350.29999999702,
+            "processingStart": 4352.39999999851,
+            "processingEnd": 4353,
+            "duration": 72,
+            "interactionId": 4788
+          },
+          {
+            "name": "keyup",
+            "startTime": 4356.29999999702,
+            "processingStart": 4374.89999999851,
+            "processingEnd": 4375.19999999553,
+            "duration": 88,
+            "interactionId": 4788
+          },
+          {
+            "name": "keydown",
+            "startTime": 4545.79999999702,
+            "processingStart": 4550,
+            "processingEnd": 4550.19999999553,
+            "duration": 64,
+            "interactionId": 4795
+          },
+          {
+            "name": "keyup",
+            "startTime": 4558.89999999851,
+            "processingStart": 4572.29999999702,
+            "processingEnd": 4572.39999999851,
+            "duration": 72,
+            "interactionId": 4795
+          }
+        ]
+      },
+      "geometry": [
+        {
+          "view": "fit",
+          "visiblePairs": 64,
+          "clippedPairs": 0,
+          "maxScreenError": 5.434072916209426e-05
+        },
+        {
+          "view": "zoom",
+          "visiblePairs": 27,
+          "clippedPairs": 37,
+          "maxScreenError": 7.413886507163982e-05
+        },
+        {
+          "view": "resize",
+          "visiblePairs": 17,
+          "clippedPairs": 47,
+          "maxScreenError": 0.00011919452059596599
+        }
+      ]
+    },
+    {
+      "case": "final-geometry01",
+      "kind": "final",
+      "startedAt": "2026-11-05T10:07:18.501046+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3e",
+        "python3",
+        "/workspace/airgap-r3e-proof/run.py",
+        "final-geometry01",
+        "geometry"
+      ],
+      "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+      "exit": 0,
+      "finishedAt": "2026-11-05T10:07:30.925145+00:00",
+      "frames": {
+        "unit": "ms",
+        "samples": 160,
+        "p50": 16.699999999999818,
+        "p95": 33.40000000000009,
+        "maximum": 116.69999999999982,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "receiptControl": "PASS",
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "wireGeometry": "PASS",
+        "wireEdit": "PASS",
+        "frameMeasurement": "RECORDED",
+        "controlTiming": "RECORDED"
+      },
+      "control": {
+        "roundTripMs": 30.548243,
+        "keyboardEvents": [
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4365.60000000149,
+            "handlerStart": 4380,
+            "label": "Resume display",
+            "nextAnimationFrame": 4375.2,
+            "handlerToFrame": -4.800000000000182
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4385.70000000298,
+            "handlerStart": 4391.4000000059605,
+            "label": "Resume display",
+            "nextAnimationFrame": 4392,
+            "handlerToFrame": 0.5999999940395355
+          },
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4551.20000000298,
+            "handlerStart": 4586.4000000059605,
+            "label": "Pause display",
+            "nextAnimationFrame": 4575.3,
+            "handlerToFrame": -11.100000005960283
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4598.80000000447,
+            "handlerStart": 4623,
+            "label": "Pause display",
+            "nextAnimationFrame": 4608.6,
+            "handlerToFrame": -14.399999999999636
+          }
+        ],
+        "reportedKeyboardTimings": [
+          {
+            "name": "keydown",
+            "startTime": 4365.60000000149,
+            "processingStart": 4379.80000000447,
+            "processingEnd": 4380.20000000298,
+            "duration": 96,
+            "interactionId": 1030
+          },
+          {
+            "name": "keyup",
+            "startTime": 4385.70000000298,
+            "processingStart": 4391.30000000447,
+            "processingEnd": 4391.70000000298,
+            "duration": 104,
+            "interactionId": 1030
+          },
+          {
+            "name": "keydown",
+            "startTime": 4551.20000000298,
+            "processingStart": 4586.30000000447,
+            "processingEnd": 4586.5,
+            "duration": 88,
+            "interactionId": 1037
+          },
+          {
+            "name": "keyup",
+            "startTime": 4598.80000000447,
+            "processingStart": 4622.9000000059605,
+            "processingEnd": 4623.20000000298,
+            "duration": 88,
+            "interactionId": 1037
+          }
+        ]
+      },
+      "geometry": [
+        {
+          "view": "fit",
+          "visiblePairs": 64,
+          "clippedPairs": 0,
+          "maxScreenError": 5.434072916209426e-05
+        },
+        {
+          "view": "zoom",
+          "visiblePairs": 27,
+          "clippedPairs": 37,
+          "maxScreenError": 9.918670017022424e-05
+        },
+        {
+          "view": "resize",
+          "visiblePairs": 17,
+          "clippedPairs": 47,
+          "maxScreenError": 8.840124514265656e-05
+        }
+      ]
+    },
+    {
+      "case": "final-geometry02",
+      "kind": "final",
+      "startedAt": "2026-11-05T10:07:30.961941+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3e",
+        "python3",
+        "/workspace/airgap-r3e-proof/run.py",
+        "final-geometry02",
+        "geometry"
+      ],
+      "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+      "exit": 0,
+      "finishedAt": "2026-11-05T10:07:43.301453+00:00",
+      "frames": {
+        "unit": "ms",
+        "samples": 162,
+        "p50": 16.699999999999818,
+        "p95": 33.30000000000018,
+        "maximum": 133.40000000000055,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "receiptControl": "PASS",
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "wireGeometry": "PASS",
+        "wireEdit": "PASS",
+        "frameMeasurement": "RECORDED",
+        "controlTiming": "RECORDED"
+      },
+      "control": {
+        "roundTripMs": 15.772751,
+        "keyboardEvents": [
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4494,
+            "handlerStart": 4496.9000000059605,
+            "label": "Resume display",
+            "nextAnimationFrame": 4503.8,
+            "handlerToFrame": 6.899999994039717
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4502.20000000298,
+            "handlerStart": 4507.20000000298,
+            "label": "Resume display",
+            "nextAnimationFrame": 4503.8,
+            "handlerToFrame": -3.4000000029800503
+          },
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4697.9000000059605,
+            "handlerStart": 4713,
+            "label": "Pause display",
+            "nextAnimationFrame": 4703.7,
+            "handlerToFrame": -9.300000000000182
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4717.10000000149,
+            "handlerStart": 4726.9000000059605,
+            "label": "Pause display",
+            "nextAnimationFrame": 4720.4,
+            "handlerToFrame": -6.500000005960828
+          }
+        ],
+        "reportedKeyboardTimings": [
+          {
+            "name": "keydown",
+            "startTime": 4494,
+            "processingStart": 4496.70000000298,
+            "processingEnd": 4498.80000000447,
+            "duration": 80,
+            "interactionId": 3814
+          },
+          {
+            "name": "keyup",
+            "startTime": 4502.20000000298,
+            "processingStart": 4507.10000000149,
+            "processingEnd": 4507.30000000447,
+            "duration": 72,
+            "interactionId": 3814
+          },
+          {
+            "name": "keydown",
+            "startTime": 4697.9000000059605,
+            "processingStart": 4713,
+            "processingEnd": 4713.10000000149,
+            "duration": 56,
+            "interactionId": 3821
+          },
+          {
+            "name": "keyup",
+            "startTime": 4717.10000000149,
+            "processingStart": 4726.9000000059605,
+            "processingEnd": 4727,
+            "duration": 88,
+            "interactionId": 3821
+          }
+        ]
+      },
+      "geometry": [
+        {
+          "view": "fit",
+          "visiblePairs": 64,
+          "clippedPairs": 0,
+          "maxScreenError": 5.434072916209426e-05
+        },
+        {
+          "view": "zoom",
+          "visiblePairs": 25,
+          "clippedPairs": 39,
+          "maxScreenError": 8.628503474294957e-05
+        },
+        {
+          "view": "resize",
+          "visiblePairs": 17,
+          "clippedPairs": 47,
+          "maxScreenError": 0.00011598801431198115
+        }
+      ]
+    },
+    {
+      "case": "baseline-geometry02",
+      "kind": "baseline",
+      "startedAt": "2026-11-05T10:07:43.337802+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3e",
+        "python3",
+        "/workspace/airgap-r3e-proof/run.py",
+        "baseline-geometry02",
+        "geometry"
+      ],
+      "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+      "exit": 0,
+      "finishedAt": "2026-11-05T10:07:56.165657+00:00",
+      "frames": {
+        "unit": "ms",
+        "samples": 159,
+        "p50": 16.699999999999818,
+        "p95": 33.399999999999636,
+        "maximum": 149.90000000000055,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "receiptControl": "PASS",
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "wireGeometry": "PASS",
+        "wireEdit": "PASS",
+        "frameMeasurement": "RECORDED",
+        "controlTiming": "RECORDED"
+      },
+      "control": {
+        "roundTripMs": 35.366436,
+        "keyboardEvents": [
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4471.5,
+            "handlerStart": 4481.10000000149,
+            "label": "Resume display",
+            "nextAnimationFrame": 4479,
+            "handlerToFrame": -2.100000001490116
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4482.20000000298,
+            "handlerStart": 4500.80000000447,
+            "label": "Resume display",
+            "nextAnimationFrame": 4495.6,
+            "handlerToFrame": -5.200000004469985
+          },
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4682.20000000298,
+            "handlerStart": 4686.20000000298,
+            "label": "Pause display",
+            "nextAnimationFrame": 4679,
+            "handlerToFrame": -7.200000002980232
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4689.89999999851,
+            "handlerStart": 4698.5,
+            "label": "Pause display",
+            "nextAnimationFrame": 4695.6,
+            "handlerToFrame": -2.899999999999636
+          }
+        ],
+        "reportedKeyboardTimings": [
+          {
+            "name": "keydown",
+            "startTime": 4471.5,
+            "processingStart": 4480.80000000447,
+            "processingEnd": 4481.30000000447,
+            "duration": 88,
+            "interactionId": 3200
+          },
+          {
+            "name": "keyup",
+            "startTime": 4482.20000000298,
+            "processingStart": 4500.70000000298,
+            "processingEnd": 4501.39999999851,
+            "duration": 96,
+            "interactionId": 3200
+          },
+          {
+            "name": "keydown",
+            "startTime": 4682.20000000298,
+            "processingStart": 4686.20000000298,
+            "processingEnd": 4686.30000000447,
+            "duration": 72,
+            "interactionId": 3207
+          },
+          {
+            "name": "keyup",
+            "startTime": 4689.89999999851,
+            "processingStart": 4698.39999999851,
+            "processingEnd": 4698.70000000298,
+            "duration": 80,
+            "interactionId": 3207
+          }
+        ]
+      },
+      "geometry": [
+        {
+          "view": "fit",
+          "visiblePairs": 64,
+          "clippedPairs": 0,
+          "maxScreenError": 5.434072916209426e-05
+        },
+        {
+          "view": "zoom",
+          "visiblePairs": 25,
+          "clippedPairs": 39,
+          "maxScreenError": 5.938915156311857e-05
+        },
+        {
+          "view": "resize",
+          "visiblePairs": 15,
+          "clippedPairs": 49,
+          "maxScreenError": 0.0001332264227306494
+        }
+      ]
+    },
+    {
+      "case": "baseline-geometry03",
+      "kind": "baseline",
+      "startedAt": "2026-11-05T10:07:56.203728+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3e",
+        "python3",
+        "/workspace/airgap-r3e-proof/run.py",
+        "baseline-geometry03",
+        "geometry"
+      ],
+      "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+      "exit": 0,
+      "finishedAt": "2026-11-05T10:08:08.540462+00:00",
+      "frames": {
+        "unit": "ms",
+        "samples": 159,
+        "p50": 16.699999999999818,
+        "p95": 33.399999999999636,
+        "maximum": 116.69999999999982,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "receiptControl": "PASS",
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "wireGeometry": "PASS",
+        "wireEdit": "PASS",
+        "frameMeasurement": "RECORDED",
+        "controlTiming": "RECORDED"
+      },
+      "control": {
+        "roundTripMs": 22.173619,
+        "keyboardEvents": [
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4346.60000000149,
+            "handlerStart": 4349.39999999851,
+            "label": "Resume display",
+            "nextAnimationFrame": 4343.5,
+            "handlerToFrame": -5.899999998509884
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4357.5,
+            "handlerStart": 4366.80000000447,
+            "label": "Resume display",
+            "nextAnimationFrame": 4360.2,
+            "handlerToFrame": -6.60000000447053
+          },
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4534,
+            "handlerStart": 4538.30000000447,
+            "label": "Pause display",
+            "nextAnimationFrame": 4526.8,
+            "handlerToFrame": -11.500000004470166
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4553.5,
+            "handlerStart": 4572.10000000149,
+            "label": "Pause display",
+            "nextAnimationFrame": 4576.8,
+            "handlerToFrame": 4.699999998510066
+          }
+        ],
+        "reportedKeyboardTimings": [
+          {
+            "name": "keydown",
+            "startTime": 4346.60000000149,
+            "processingStart": 4349.20000000298,
+            "processingEnd": 4349.70000000298,
+            "duration": 64,
+            "interactionId": 2831
+          },
+          {
+            "name": "keyup",
+            "startTime": 4357.5,
+            "processingStart": 4366.80000000447,
+            "processingEnd": 4367,
+            "duration": 72,
+            "interactionId": 2831
+          },
+          {
+            "name": "keydown",
+            "startTime": 4534,
+            "processingStart": 4538.20000000298,
+            "processingEnd": 4538.39999999851,
+            "duration": 72,
+            "interactionId": 2838
+          },
+          {
+            "name": "keyup",
+            "startTime": 4553.5,
+            "processingStart": 4572.10000000149,
+            "processingEnd": 4572.39999999851,
+            "duration": 72,
+            "interactionId": 2838
+          }
+        ]
+      },
+      "geometry": [
+        {
+          "view": "fit",
+          "visiblePairs": 64,
+          "clippedPairs": 0,
+          "maxScreenError": 5.434072916209426e-05
+        },
+        {
+          "view": "zoom",
+          "visiblePairs": 27,
+          "clippedPairs": 37,
+          "maxScreenError": 7.927021197388723e-05
+        },
+        {
+          "view": "resize",
+          "visiblePairs": 17,
+          "clippedPairs": 47,
+          "maxScreenError": 0.00012610279695489583
+        }
+      ]
+    },
+    {
+      "case": "final-geometry03",
+      "kind": "final",
+      "startedAt": "2026-11-05T10:08:08.577411+00:00",
+      "command": [
+        "unshare",
+        "--user",
+        "--map-root-user",
+        "--net",
+        "sh",
+        "-c",
+        "ip link set lo up && exec \"$@\"",
+        "airgap-r3e",
+        "python3",
+        "/workspace/airgap-r3e-proof/run.py",
+        "final-geometry03",
+        "geometry"
+      ],
+      "driverSha256": "8ed7346d385ed9f90af85fbf352074768049b36f49bc6e14c207ed5be2c28365",
+      "exit": 0,
+      "finishedAt": "2026-11-05T10:08:20.898258+00:00",
+      "frames": {
+        "unit": "ms",
+        "samples": 167,
+        "p50": 16.699999999999818,
+        "p95": 33.29999999999973,
+        "maximum": 116.60000000000036,
+        "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"
+      },
+      "checks": {
+        "receiptControl": "PASS",
+        "measuredFanout": "PASS",
+        "receivedCoverage": "PASS",
+        "boundedDisplay": "PASS",
+        "outputLayout": "PASS",
+        "wireGeometry": "PASS",
+        "wireEdit": "PASS",
+        "frameMeasurement": "RECORDED",
+        "controlTiming": "RECORDED"
+      },
+      "control": {
+        "roundTripMs": 40.79004,
+        "keyboardEvents": [
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4381.19999999553,
+            "handlerStart": 4386.5,
+            "label": "Resume display",
+            "nextAnimationFrame": 4377,
+            "handlerToFrame": -9.5
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4388,
+            "handlerStart": 4407.89999999851,
+            "label": "Resume display",
+            "nextAnimationFrame": 4393.7,
+            "handlerToFrame": -14.199999998510066
+          },
+          {
+            "name": "keydown",
+            "trusted": true,
+            "eventTime": 4580,
+            "handlerStart": 4585.39999999851,
+            "label": "Pause display",
+            "nextAnimationFrame": 4560.3,
+            "handlerToFrame": -25.099999998509702
+          },
+          {
+            "name": "keyup",
+            "trusted": true,
+            "eventTime": 4608.29999999702,
+            "handlerStart": 4613.10000000149,
+            "label": "Pause display",
+            "nextAnimationFrame": 4593.7,
+            "handlerToFrame": -19.400000001490298
+          }
+        ],
+        "reportedKeyboardTimings": [
+          {
+            "name": "keydown",
+            "startTime": 4381.19999999553,
+            "processingStart": 4386.29999999702,
+            "processingEnd": 4386.60000000149,
+            "duration": 80,
+            "interactionId": 5033
+          },
+          {
+            "name": "keyup",
+            "startTime": 4388,
+            "processingStart": 4407.79999999702,
+            "processingEnd": 4408.10000000149,
+            "duration": 88,
+            "interactionId": 5033
+          },
+          {
+            "name": "keydown",
+            "startTime": 4580,
+            "processingStart": 4585.39999999851,
+            "processingEnd": 4585.39999999851,
+            "duration": 56,
+            "interactionId": 5040
+          },
+          {
+            "name": "keyup",
+            "startTime": 4608.29999999702,
+            "processingStart": 4613,
+            "processingEnd": 4613.19999999553,
+            "duration": 56,
+            "interactionId": 5040
+          }
+        ]
+      },
+      "geometry": [
+        {
+          "view": "fit",
+          "visiblePairs": 64,
+          "clippedPairs": 0,
+          "maxScreenError": 5.434072916209426e-05
+        },
+        {
+          "view": "zoom",
+          "visiblePairs": 27,
+          "clippedPairs": 37,
+          "maxScreenError": 5.293932632220524e-05
+        },
+        {
+          "view": "resize",
+          "visiblePairs": 17,
+          "clippedPairs": 47,
+          "maxScreenError": 0.00010159026150406299
+        }
+      ]
+    }
+  ],
+  "preliminaryRuns": [
+    "final-document",
+    "final-ownership",
+    "geometry-harness-pilot01",
+    "geometry-harness-pilot02",
+    "geometry-harness-pilot03"
+  ],
+  "diagnosticProfiles": [
+    "baseline-profile",
+    "final-profile"
+  ],
+  "runtimeUpdate": {
+    "baseArchive": {
+      "file": "airgap-document-r4f-linux-x64-2026-11-05.tar.gz",
+      "bytes": 460778817,
+      "sha256": "28fb0c97ecb549881238929e7159fbb5847a0817cca4c9632306ea4e95df5c58"
+    },
+    "targetSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+    "previousJvmSourceCommit": "4c00eccd7d2e8ce65ade1b23734c9aa1a018f0ab",
+    "files": {
+      "SHA256SUMS": {
+        "before": "e93c64c20797875170cbe1f52e1b062e57a0a08fb44ced42e23e44666dec1115",
+        "after": "0195f2d597367b9a3a4588eae425768b711d0714f777b5de131ca0c602a70341"
+      },
+      "opt/trikeshed/README.md": {
+        "before": "c3e4ca1db3af4a4fda1bf1deec036b38aca4c8fcc552b38f5f3d729756608bdd",
+        "after": "5c9062ce519e3db384cc543288cc23a02d0d11dbe91adaa42587ba08a89cbb13"
+      },
+      "opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar": {
+        "before": "b65eddc8f95bc93bb7ff1f1431d0dedc904c8bd6b55af818bd37f8513e6d022a",
+        "after": "4a6fbcf3d7a6d8a10f678938aa24a2e599842c027f4c238052526795889f07db"
+      },
+      "opt/trikeshed/lib/TrikeShed-jvm-0.1.0-SNAPSHOT.jar": {
+        "before": "5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c",
+        "after": "f784107dd8f0fe0471e9ee0c43edccc9debce8a5e323844f0d7a22b40eaf533e"
+      },
+      "package-identity.json": {
+        "before": "ee6456520a5e7c99e752e1759416d95aac81d9bbf1b4e989c327095965c12271",
+        "after": "db1cc17a1b94ef22a4c8b2446f5de9e2bbbb645cb216c0b110a426206e8e60fa"
+      }
+    },
+    "scope": "Layered runtime update. Requires the exact immutable R4f runtime; the production JVM and Spacegraph jars are rebuilt from combined D3M source, retaining the runtime instructions and exact manifests. The combined build retains source-pinned corpus search, native Horn proof-quad inspection and static-note readiness fixes. Common LinearArrayMap entries now preserve structural equality/hash semantics for reified query rows. Wire endpoints and viewport dimensions are captured before SVG paths are attached as one fragment. No new dependency or native module.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3e-final-runtime-update-2026-11-05.tar.gz",
+      "sha256": "b96bf9ef74224f625d49767d1e723d5de2c1bc4748ae8d266a8a39c24e6dd006",
+      "bytes": 36928779
+    },
+    "identicalTwoAssemblies": true,
+    "installedRoot": "/workspace/airgap-r3e-proof/installed-final/airgap-document-rootfs",
+    "installation": "Verified immutable R4f root copied with hardlinks; changed paths unlinked before extracting the actual update. Complete combined membership/mode/hash verification passes. No mutation of the R4f root."
+  },
+  "sourceUpdate": {
+    "baseSourceCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+    "targetSourceCommit": "5fdd0472c115922287ba46a4977cb1134aa9017a",
+    "targetTree": "f7a2307948a01bae1109c0931277d2f9dd83c907",
+    "requiredSourceChain": [
+      {
+        "file": "airgap-document-r4e-sources-2026-11-05.tar.gz",
+        "sha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61"
+      },
+      {
+        "file": "airgap-document-r4f-sources-update-2026-11-05.tar.gz",
+        "sha256": "57f1f9db30f45d5abe27f810898b49ec0034be7dab599d045ebec292c3176d5f"
+      },
+      {
+        "file": "airgap-document-r3c-final-sources-update-2026-11-05.tar.gz",
+        "sha256": "dbad017ffba9216ae2c89643bb72567594985776285dc9ed45d30b3d9f730d9f"
+      },
+      {
+        "file": "airgap-document-r3d-final-sources-update-2026-11-05.tar.gz",
+        "sha256": "a57105c0fbf9fea0f2d9b3a0bfbc566eeeaf531df75d52b7e1ef543c566ce1c6"
+      }
+    ],
+    "patchSha256": "648d35e6376c0890f8108295fd43ca272388577df0238c967c4f4922221f69d5",
+    "verifiedAppliedTreeMatches": true,
+    "dependencyChanges": [],
+    "scope": "Apply after the R3d final source update, itself applied after R3c final and R4f on the R4e source base. This full-index binary Git patch reproduces every tracked source/document/evidence change through the tested code commit. Later evidence-only publication changes are separate. Vendor/native source rebuild closure remains open.",
+    "archive": {
+      "file": "/workspace/library-files/airgap-document-r3e-final-sources-update-2026-11-05.tar.gz",
+      "bytes": 37468185,
+      "sha256": "bcef7f2000025f3e2a807bb0536ea84c19d6e48180d2e55fc8dc0568d3cfac75"
+    }
+  },
+  "limits": [
+    "65-node fixture only; sustained frame-rate acceptance and dense recursive/10k/50k graph capacity remain open.",
+    "Event Timing is thresholded/quantized; absent entries are unreported. Keyboard input is dispatched after receipt delivery, not physical input already queued during a prior stall.",
+    "Full canvas serialization, pairwise quadratic layout and page-owned listener retention remain.",
+    "Missing observed events are reported, never inferred from successful final values.",
+    "Seven external native solver checks skipped; projected supplied proof context is not proof of native execution or review authority.",
+    "Pinned-byte packaging does not close full vendor/native source rebuild provenance or machine power-loss durability."
+  ],
+  "reproduction": "../../15-wire-geometry.md",
+  "evidenceStanding": "Original failure logs, candidate packages, CAS/WAL state and profile bytes retained. Preliminary, baseline, diagnostic and accepted scopes are separate. Authored whitespace checks exclude exact raw evidence paths; manifests verify bytes and membership."
+}

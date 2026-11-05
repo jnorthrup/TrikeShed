@@ -1,0 +1,20 @@
+from pathlib import Path
+import json
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+h=Path('/workspace/airgap-r3e-proof');rows=json.loads((h/'comparison-runs.json').read_text());groups={k:sorted([r for r in rows if r['kind']==k],key=lambda r:r['case']) for k in ['baseline','final']}
+plt.rcParams.update({'font.family':'DejaVu Sans','font.size':10})
+fig,axes=plt.subplots(1,2,figsize=(11.6,4.8));colors={'baseline':'#596e87','final':'#147d73'}
+for k,offset,label in [('baseline',-.18,'R3d'),('final',.18,'R3e')]:
+ vals=[r['frames']['maximum'] for r in groups[k]];bars=axes[0].bar([i+offset for i in range(3)],vals,width=.34,color=colors[k],label=label);axes[0].bar_label(bars,labels=[f'{v:.1f}' for v in vals],padding=4,fontsize=9)
+ for i,r in enumerate(groups[k]):
+  d=[x['duration'] for x in r['control']['reportedKeyboardTimings']];axes[1].scatter([i+offset+(n-1.5)*.025 for n in range(len(d))],d,s=28,color=colors[k],label=label if i==0 else None,alpha=.8)
+for ax in axes:
+ ax.set_xticks(range(3),['Pair 1','Pair 2','Pair 3']);ax.set_ylim(0,180 if ax==axes[0] else 125);ax.grid(axis='y',alpha=.2);ax.set_axisbelow(True);ax.spines[['top','right']].set_visible(False);ax.legend(loc='upper center',bbox_to_anchor=(.5,1.17),ncol=2,frameon=False)
+axes[0].set_title('Maximum observed frame interval',pad=30);axes[0].set_ylabel('milliseconds')
+axes[1].set_title('Reported keyboard Event Timing duration',pad=30);axes[1].set_ylabel('milliseconds · four events per run')
+fig.subplots_adjust(left=.07,right=.98,bottom=.2,top=.76,wspace=.26)
+fig.text(.5,.98,'Same 65 native calls and driver · three paired repetitions',ha='center',va='top',fontsize=14,weight='bold')
+fig.text(.5,.06,'Small workload observation; no consistent latency improvement established.\nChromium Event Timing is quantized/thresholded; dispatch follows receipt delivery.',ha='center',fontsize=10)
+for ext in ['png','svg','pdf']:fig.savefig(h/('wire-comparison.'+ext),dpi=180,metadata={'Creator':'TrikeShed R3e retained comparison'})

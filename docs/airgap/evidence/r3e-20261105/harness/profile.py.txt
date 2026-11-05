@@ -1,0 +1,49 @@
+from pathlib import Path
+import json,gzip,collections,zipfile,bisect,sys
+h=Path('/workspace/airgap-r3e-proof');run=h/sys.argv[1]
+identity=json.loads((run/'identity.json').read_text());jar=Path(identity['root'])/'opt/trikeshed/lib/TrikeShed-0.1.0-SNAPSHOT-airgap-document-web.jar'
+with zipfile.ZipFile(jar) as z:sm=json.loads(z.read('web/kotlin/spacegraph/spacegraph.js.map'))
+alphabet={c:i for i,c in enumerate('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/')}
+def vlq(text):
+ values=[];value=shift=0
+ for c in text:
+  n=alphabet[c];value+=(n&31)<<shift
+  if n&32:shift+=5
+  else:values.append(-(value>>1) if value&1 else value>>1);value=shift=0
+ return values
+lines=[];source=original_line=original_column=name=0
+for line in sm['mappings'].split(';'):
+ col=0;rows=[]
+ for segment in line.split(','):
+  if not segment:continue
+  value=vlq(segment);col+=value[0]
+  if len(value)>=4:
+   source+=value[1];original_line+=value[2];original_column+=value[3]
+   if len(value)==5:name+=value[4]
+   rows.append((col,source,original_line,original_column,name if len(value)==5 else None))
+ lines.append(rows)
+def locate(frame):
+ if not frame.get('url','').endswith('/spacegraph.js'):return {'function':frame['functionName'],'url':frame.get('url','')}
+ line=frame['lineNumber'];col=frame['columnNumber'];rows=lines[line];at=bisect.bisect_right([r[0] for r in rows],col)-1
+ if at<0:return {'function':frame['functionName']}
+ row=rows[at];text=sm['sourcesContent'][row[1]].splitlines() if sm.get('sourcesContent') and sm['sourcesContent'][row[1]] else []
+ return {'function':frame['functionName'],'source':sm['sources'][row[1]],'line':row[2]+1,'column':row[3]+1,'name':sm['names'][row[4]] if row[4] is not None else None,'text':text[row[2]].strip() if row[2]<len(text) else ''}
+p=json.loads((run/'cpu-profile.json').read_text());nodes={n['id']:n for n in p['nodes']};parent={c:n['id'] for n in p['nodes'] for c in n.get('children',[])};own=collections.Counter();inclusive=collections.Counter()
+for i,d in zip(p['samples'],p['timeDeltas']):
+ own[i]+=d
+ while True:
+  inclusive[i]+=d
+  if i not in parent:break
+  i=parent[i]
+def top(counter):return [{'ms':round(d/1000,3),'id':i,**locate(nodes[i]['callFrame'])} for i,d in counter.most_common(35)]
+t=json.loads(gzip.decompress((run/'browser-trace.json.gz').read_bytes()));events=[e for e in t['traceEvents'] if e.get('ph')=='X' and e.get('dur',0)>0];totals=collections.Counter()
+for e in events:totals[e['name']]+=e['dur']
+layout=[]
+for e in sorted([e for e in events if e['name']=='Layout'],key=lambda x:x['dur'],reverse=True)[:8]:
+ stack=e.get('args',{}).get('beginData',{}).get('stackTrace',[])
+ layout.append({'ms':e['dur']/1000,'stack':[locate(dict(f,lineNumber=f['lineNumber']-1,columnNumber=f['columnNumber']-1)) for f in stack]})
+result={'bundleSha256':identity['bundleSha256'],'selfSamples':top(own),'inclusiveSamples':top(inclusive),'traceInclusiveMilliseconds':{k:round(v/1000,3) for k,v in totals.most_common(25)},'largestLayoutStacks':layout,'scope':'Sampled CPU attribution through the exact packaged source map. Inclusive values overlap; timeline categories also overlap. This diagnostic run includes profiler overhead.'}
+(run/'profile-analysis.json').write_text(json.dumps(result,indent=2)+'\n')
+for kind in ['selfSamples','inclusiveSamples']:
+ print(kind)
+ for row in result[kind][:20]:print(row['ms'],row.get('source',row['function']),row.get('line',''),row.get('text','')[:160])
