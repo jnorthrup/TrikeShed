@@ -1,0 +1,51 @@
+"""Safely extract v81 focused module/WAL evidence and run its unchanged Python auditor. No JVM."""
+import argparse,hashlib,json,pathlib,shutil,subprocess,sys,tarfile
+
+def need(value,message):
+    if not value:raise ValueError(message)
+
+def sha(path):
+    digest=hashlib.sha256()
+    with pathlib.Path(path).open('rb') as stream:
+        for block in iter(lambda:stream.read(1024*1024),b''):digest.update(block)
+    return digest.hexdigest()
+
+def relative(name):
+    path=pathlib.PurePosixPath(name)
+    need(not path.is_absolute() and chr(92) not in name and '..' not in path.parts and str(path)==name and name not in ('','.'),'Noncanonical relative member: '+name)
+    return path
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--extract',type=pathlib.Path,required=True,help='Fresh nonexistent directory')
+    args=parser.parse_args();here=pathlib.Path(__file__).resolve().parent
+    outer=json.loads((here/'SHA256.json').read_text())
+    for name,digest in outer.items():
+        relative(name);need(sha(here/name)==digest,'Outer hash mismatch: '+name)
+    manifest=json.loads((here/'records-manifest.json').read_text());dest=args.extract.resolve();dest.mkdir(exist_ok=False)
+    seen=set();total=0
+    with tarfile.open(here/'records.tar.gz','r:gz') as tar:
+        for member in tar:
+            name=relative(member.name)
+            need(member.isfile() and member.name in manifest and member.name not in seen,'Unexpected or duplicate member: '+member.name)
+            need(len(member.name)<=4096 and 0<=member.size<=16*1024*1024,'Member bound')
+            total+=member.size;need(total<=32*1024*1024 and len(seen)<1024,'Archive bound')
+            expected=manifest[member.name];need(member.size==expected['bytes'],'Member size')
+            target=dest.joinpath(*name.parts).resolve();need(target.is_relative_to(dest),'Destination escaped')
+            target.parent.mkdir(parents=True,exist_ok=True);source=tar.extractfile(member);need(source is not None,'Missing member data')
+            with source,target.open('xb') as output:shutil.copyfileobj(source,output,1024*1024)
+            need(sha(target)==expected['sha256'],'Member hash: '+member.name);seen.add(member.name)
+        need(seen==set(manifest),'Missing manifest members')
+    auditor=dest/'auditor';auditor.mkdir()
+    for original,name in [('recorded-audit.py.txt','audit.py'),('receipt-core.py.txt','receipt-core.py.txt')]:shutil.copyfile(here/original,auditor/name)
+    proof=dest/'proof';result=dest/'replayed-audit'
+    argv=[sys.executable,str(auditor/'audit.py'),str(proof),str(proof/'native-attempt1'),'--recorded-only',
+          '--source-head','7fb91a0b56cd860a13ce0af8eeef10205e586314',
+          '--main-sha','5986b5d76fd50e9a1bc1562c86618650fa1b10c46ddf6ffd38d4dd97f744278c',
+          '--panels-sha','d9c4e7ec00718c8cc52f0c55e53621096c43f13a675e5c0d56bf5ba6c9eabe1b',
+          '--documents-sha','c795ccc0168c36bf66b59a46acf07276b6813154e8515ef4ec018261f90d2086','--out',str(result)]
+    subprocess.run(argv,check=True)
+    need((result/'result.json').read_bytes()==(here/'recorded-audit-result.json').read_bytes(),'Auditor result differs from exact recorded result')
+    print(json.dumps({'result':'PASS_EXACT_RECORDED_DATA_REPLAY','archiveSha256':sha(here/'records.tar.gz'),'resultSha256':sha(result/'result.json'),'files':len(seen),'rawBytes':total,'extracted':str(dest),'scope':'No JVM/browser/parser/build/production query execution, artifact or SDK/model binaries, full runtime pack or live REF target required'}))
+
+if __name__=='__main__':main()
