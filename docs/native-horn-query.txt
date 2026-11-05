@@ -1,5 +1,44 @@
 Bounded native review-observation query — 2026-11-02
 
+Reviewed native proof quads — source973b078dc929adfbbbedd28345b2980ee5d08a56
+
+The existing authenticated /api/documents/review/taxonomy-query accepts an
+optional inspection-only program alongside snapshotCid, expectedRevision and
+goal. The owner regenerates the native result, constructs a fresh request-local
+proof graph, evaluates the program and rechecks the same current approval/source
+after SPARQL. Every pattern must name that fresh graph. Omitted program keeps
+the earlier native path. No caller-supplied proof, source map or approval is read.
+
+NativeHornQueryView.starter(report,path,bindings) builds one of two eight-pattern
+programs: typed substitutions, or ordered premise/source uses. The corresponding
+answer helper requires exact typed row coverage and provenance. A local copy of
+all row and RDF-term fields supplies stable structural hashes for reified JSON;
+duplicate keys, non-string terms, extra fields and missing/repeated rows refuse.
+This does not weaken the guard or change the native proof or inference engine.
+
+Dataset reviewed-native-horn-proof-projection represents the selected first
+proof, not global world facts or every asserted theory atom. Its projection CID
+binds the complete immutable selection, including unused sources, and exact raw/
+checked proof and producer context. Volatile asOf is excluded; integral values
+use one canonical identity domain across host maps and parsed JSON. The CID is
+computed, not a retained CAS receipt. Genuine reviewed quotation spans and
+normalized host rules remain separate. Repeated witnesses are alternatives.
+
+All 538 selected checks and three browser builds pass. A separate closed fixture
+used actual authenticated approval and native evaluation: three selections/two
+used, three typed substitutions and two ordered premises for Tenant-instance-
+Person / Person-subclass-Agent. Auth, null-program, wrong-graph and real-source-
+amendment controls refuse; query state stays unchanged. Fifteen objects and both
+review/board journals verify after reopen. The corpus regression also shows the
+static note without a false runtime-owner warning and all 14 expanded cards inside
+the viewport after public Fit. Four earlier external harness failures and three
+failed build stages remain recorded under evidence/2026-11-05/native-horn-quads-v87.
+
+That fixture constructs an unreviewed manual carrier with one narrowly reflected
+host codec; approval itself uses the actual public authenticated API. It does not
+establish a new public curation intake, English interpretation, native Documents
+action or protected query-canvas Run. Those UI integrations remain separate work.
+
 Checked binding receipts — 2026-11-05
 
 Published source bafb47f3bb4977c0ed8e6abfde53cafa2a12bf70 adds a
