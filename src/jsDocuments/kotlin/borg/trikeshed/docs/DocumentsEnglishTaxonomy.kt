@@ -479,7 +479,7 @@ internal class DocumentsEnglishTaxonomy(private val inspection: Map<*, *>, paren
         val frozen = review ?: return
         text(parent, "h4", "Analyst review · ${frozen["state"]}").className = "ds-curate-h3"
         if (reviewUncertain) text(parent, "p", "Review or source status was not confirmed. Refresh before any further decision or query.").className = "ds-curate-warn"
-        text(parent, "p", "Snapshot: ${frozen["snapshotCid"]} · revision ${frozen["revision"]} · source current: ${frozen["sourceCurrent"]}").className = "ds-cid"
+        text(parent, "p", "Snapshot: ${frozen["snapshotCid"]} · revision ${frozen["revision"]} · source current: ${if (reviewUncertain) "unconfirmed" else frozen["sourceCurrent"]}", "data-taxonomy-source-current").className = "ds-cid"
         evidence(parent, "Frozen source, declarations and evidence", frozen["snapshot"])
         val noteLabel = text(parent, "label", "Review decision note"); noteLabel.className = "ds-curate-label"
         noteLabel.style.cssText = "display:flex;flex-direction:column;gap:6px;margin:14px 0"
