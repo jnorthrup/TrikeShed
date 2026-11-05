@@ -1,0 +1,126 @@
+package proof.sourcepromotion
+
+import borg.trikeshed.couch.*
+import borg.trikeshed.dag.*
+import borg.trikeshed.forge.server.*
+import borg.trikeshed.graal.subvm.GuestModules
+import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.memory.*
+import borg.trikeshed.parse.*
+import borg.trikeshed.rdf.EnglishObservationGraph
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.util.oroboros.*
+import kotlinx.coroutines.*
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
+
+class ObserverMarker
+
+fun main(args: Array<String>) = runBlocking {
+    val mode = args[0]; require(mode in _s["before", "promote", "after"])
+    val root = File(args[1]).canonicalFile
+    val result = File(args[2])
+    val snapshot = File(args[3]).canonicalFile
+    val runtime = File(root, "runtime")
+    val oldDirectory = "/workspace/library-files/english-taxonomy-v68-fresh-proof/runtime/files/english-taxonomy-fresh-profile-proof"
+    val oldFile = File(oldDirectory, "synthetic taxonomy copular clauses.txt")
+    check(!oldFile.exists()) { "Old producer directory is not hidden" }
+    val sourceId = ContentId("sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883")
+    val inspectionId = ContentId("sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d")
+    val project = "english-taxonomy-fresh-profile-proof"
+    val name = "synthetic taxonomy copular clauses.txt"
+    val mirror = File(runtime, "files/$project/$name")
+    val source = mirror.readBytes()
+    check(source.size == 41 && source.decodeToString(throwOnInvalidSequence = true) == "Tenant is a Person. A Person is an Agent.")
+    check(ContentId.of(source) == sourceId)
+    check(!Files.isSymbolicLink(mirror.toPath()))
+    check(mirror.canonicalFile.toPath().startsWith(File(runtime, "files").canonicalFile.toPath()))
+    val guestHome = File(root, "empty-subvm").apply { check(isDirectory && listFiles().orEmpty().isEmpty()) }
+    java.lang.System.setProperty(GuestModules.HOME_PROPERTY, guestHome.absolutePath)
+    check(GuestModules.installed().isEmpty() && GuestModules.mounted().isEmpty())
+    fun stamp(file: File): Map<String, Any?> { val bytes=file.readBytes();return _m["bytes" j bytes.size, "sha256" j ContentId.of(bytes).hex] }
+    val pack = File(runtime, "cas/pack")
+    val head = File(runtime, "project-couch/$project/HEAD")
+    val manifest = File(runtime, "project-manifests/$project.tsv")
+    val ledger = File(runtime, "projects.tsv")
+    val immutable = _m["sourceMirror" j stamp(mirror), "projectHead" j stamp(head), "projectManifest" j stamp(manifest), "projectLedger" j stamp(ledger)]
+    val original = File(root, "input-cas-prefix.bin").readBytes()
+    val files = JvmFileOperations()
+    val before = stamp(pack)
+    val report = linkedMapOf<String, Any?>("mode" to mode, "pid" to ProcessHandle.current().pid(),
+        "parentPid" to ProcessHandle.current().parent().map { it.pid() }.orElse(-1L),
+        "sourceHead" to "0219223a3846887fe283b93598942de332214cd2",
+        "expectedMainSha256" to "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+        "namespace" to _m["mnt" j Files.readSymbolicLink(Path.of("/proc/self/ns/mnt")).toString(),
+            "pid" j Files.readSymbolicLink(Path.of("/proc/self/ns/pid")).toString()],
+        "mounts" to File("/proc/self/mountinfo").readLines().filter { it.contains(oldDirectory) || it.contains(root.path) || it.substringBefore(" - ").split(' ').getOrNull(4) == "/" },
+        "oldProducerVisible" to oldFile.exists(), "immutableBefore" to immutable, "packBefore" to before,
+        "sourceCid" to sourceId.value, "inspectionCid" to inspectionId.value,
+        "runtimeScope" to "PackCasStore and bounded retained reader; no ModuleContext/Rete/beliefBag/model/provider/parser instantiated",
+        "guestModulesInstalled" to GuestModules.installed(), "guestModulesMounted" to GuestModules.mounted())
+    val origins = _m["PackCasStore" j PackCasStore::class.java, "EnglishObservationGraph" j EnglishObservationGraph::class.java,
+        "JvmProjectCorpus" j JvmProjectCorpus::class.java, "ProjectScopes" j ProjectScopes::class.java,
+        "GuestModules" j GuestModules::class.java]
+    report["codeSources"] = origins.mapValues { (_, cls) -> cls.protectionDomain.codeSource.location.toString().also {
+        check(File(java.net.URI(it)).canonicalFile == File(snapshot, "main.jar").canonicalFile)
+    } }
+    report["observerCodeSource"] = ObserverMarker::class.java.protectionDomain.codeSource.location.toString()
+    var casClosed = false
+    val cas = PackCasStore(files, File(runtime, "cas").absolutePath)
+    var scopes: ProjectScopes? = null
+    try {
+        val receipt = checkNotNull(cas.getBounded(inspectionId, 1024 * 1024)); check(receipt.size == 6838 && ContentId.of(receipt) == inspectionId)
+        report["receiptBefore"] = _m["bytes" j receipt.size, "sha256" j ContentId.of(receipt).hex]
+        val sourceBefore = cas.getBounded(sourceId, 41)
+        report["sourceBefore"] = sourceBefore?.let { _m["bytes" j it.size, "sha256" j ContentId.of(it).hex] }
+        if (mode == "before") {
+            check(sourceBefore == null)
+            val failure = try { EnglishObservationGraph.read(cas, inspectionId); error("Unpromoted read unexpectedly succeeded") }
+                catch (e: IllegalArgumentException) { e }
+            check(failure.message == "Retained English source or receipt unavailable") { failure }
+            report["readStatus"] = "REFUSED_EXPECTED_MISSING_SOURCE"
+            report["failure"] = _m["type" j failure.javaClass.name, "message" j failure.message]
+        } else {
+            if (mode == "promote") {
+                check(sourceBefore == null)
+                check(cas.put(source) == sourceId); cas.sync()
+                report["promotion"] = "Verified archived mirror appended with production put/sync under unchanged sourceCID; no upload"
+            } else check(sourceBefore?.contentEquals(source) == true)
+            check(cas.getBounded(sourceId, 41)?.contentEquals(source) == true)
+            val snap = EnglishObservationGraph.read(cas, inspectionId)
+            check(snap.source.originalCid == sourceId && snap.source.extractedTextCid == sourceId && snap.source.text.encodeToByteArray().contentEquals(source))
+            check(snap.selection.project == project && snap.selection.id == name && snap.selection.cid == sourceId.value &&
+                snap.selection.rev == "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8" && snap.selection.seq == 0L)
+            report["selection"] = snap.selection.toMap()
+            report["retainedSource"] = _m["bytes" j source.size, "sha256" j sourceId.hex, "text" j snap.source.text]
+            val store = CouchStoreFactory.casBacked(cas);val gateway = CouchAttachmentGateway(store, cas);val registry = ProjectDbRegistry("primary")
+            scopes = ProjectScopes(files, gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, store))), cas, null,
+                projectDbs=registry,ledgerFile=ledger,filesRoot=File(runtime,"files"))
+            check(scopes.remountLedger() == 1)
+            val corpus = JvmProjectCorpus(registry, scopes)
+            val row = checkNotNull(corpus.document(project, name))
+            check(row.cid == snap.selection.cid && row.rev == snap.selection.rev && row.seq == snap.selection.seq)
+            check(corpus.bytes(project, name)?.contentEquals(source) == true)
+            report["actualCurrentRow"] = row.toMap()
+            report["readStatus"] = "OPENED_GENUINE_RETAINED_INSPECTION"
+        }
+        val receiptAfter = checkNotNull(cas.getBounded(inspectionId, receipt.size));check(receiptAfter.contentEquals(receipt))
+        report["receiptAfter"] = _m["bytes" j receiptAfter.size, "sha256" j ContentId.of(receiptAfter).hex]
+    } finally {
+        scopes?.drain(); cas.close();casClosed = true
+    }
+    check(casClosed)
+    val immutableAfter = _m["sourceMirror" j stamp(mirror), "projectHead" j stamp(head), "projectManifest" j stamp(manifest), "projectLedger" j stamp(ledger)]
+    check(immutableAfter == immutable)
+    val closedPack = pack.readBytes();check(closedPack.copyOfRange(0,original.size).contentEquals(original))
+    report["immutableAfter"] = immutableAfter
+    report["packAfterClose"] = stamp(pack)
+    report["originalPrefix"] = _m["bytes" j original.size, "sha256" j ContentId.of(original).hex]
+    report["closed"] = _m["cas" j casClosed, "projectScopesDrained" j (scopes != null), "remainingChildren" j coroutineContext[Job]!!.children.count()]
+    check(coroutineContext[Job]!!.children.none())
+    result.writeText(jsonOf(report))
+    println("PASS $mode pid=${ProcessHandle.current().pid()} ${report["readStatus"]}")
+}

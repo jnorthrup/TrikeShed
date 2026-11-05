@@ -1,0 +1,91 @@
+{
+  "result": "PASS",
+  "scope": "Fresh copied CAS only. Read-only / plus narrowly hidden old producer directory and writable attempt2; not sealed R4a, network isolation or general importer.",
+  "sourceHead": "0219223a3846887fe283b93598942de332214cd2",
+  "mainSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+  "modes": {
+    "before": {
+      "pid": 113594,
+      "readStatus": "REFUSED_EXPECTED_MISSING_SOURCE",
+      "mountNamespace": "mnt:[4026532207]",
+      "packBefore": {
+        "bytes": 7666,
+        "sha256": "01f0df36f2adee2ce62da583d3c1d3cf3f95128db95884f341d05884e7522886"
+      },
+      "packAfterClose": {
+        "bytes": 7666,
+        "sha256": "01f0df36f2adee2ce62da583d3c1d3cf3f95128db95884f341d05884e7522886"
+      }
+    },
+    "promote": {
+      "pid": 113620,
+      "readStatus": "OPENED_GENUINE_RETAINED_INSPECTION",
+      "mountNamespace": "mnt:[4026532208]",
+      "packBefore": {
+        "bytes": 7666,
+        "sha256": "01f0df36f2adee2ce62da583d3c1d3cf3f95128db95884f341d05884e7522886"
+      },
+      "packAfterClose": {
+        "bytes": 7744,
+        "sha256": "c7ed80dcca429efb78cf36ca2fd5134773639549d2bf227ead1a36f82a205c7c"
+      }
+    },
+    "after": {
+      "pid": 113650,
+      "readStatus": "OPENED_GENUINE_RETAINED_INSPECTION",
+      "mountNamespace": "mnt:[4026532208]",
+      "packBefore": {
+        "bytes": 7744,
+        "sha256": "c7ed80dcca429efb78cf36ca2fd5134773639549d2bf227ead1a36f82a205c7c"
+      },
+      "packAfterClose": {
+        "bytes": 7744,
+        "sha256": "c7ed80dcca429efb78cf36ca2fd5134773639549d2bf227ead1a36f82a205c7c"
+      }
+    }
+  },
+  "oldProducerAfter": {
+    "bytes": 41,
+    "sha256": "efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "mtimeNs": 1793829642476708827
+  },
+  "originalPackPrefixBytes": 7666,
+  "sourcePromotionRecord": {
+    "offset": 7666,
+    "kind": 1,
+    "bytes": 41,
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883"
+  },
+  "finalPackBytes": 7744,
+  "finalPackSha256": "c7ed80dcca429efb78cf36ca2fd5134773639549d2bf227ead1a36f82a205c7c",
+  "selection": {
+    "project": "english-taxonomy-fresh-profile-proof",
+    "id": "synthetic taxonomy copular clauses.txt",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+    "seq": 0
+  },
+  "actualCurrentRow": {
+    "project": "english-taxonomy-fresh-profile-proof",
+    "id": "synthetic taxonomy copular clauses.txt",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "rev": "1-sha256:97ef42cdc28bec3306954a4f9f2727cad5c4c34c370ba2665d2122bbc2cae1c8",
+    "seq": 0,
+    "length": 41,
+    "contentType": "text/plain"
+  },
+  "receiptReadback": {
+    "bytes": 6838,
+    "sha256": "3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d"
+  },
+  "observerSources": {
+    "Observer.kt": {
+      "bytes": 8821,
+      "sha256": "26d4499a3e696e4f14390227e6929dd88adfc1de6d35b961a4e817034eb8899e"
+    },
+    "run.py": {
+      "bytes": 6467,
+      "sha256": "fec9247857f657c80a992e0f934b3ca7f2cb1d46c4c9c3940407c4cf61d4ae91"
+    }
+  }
+}

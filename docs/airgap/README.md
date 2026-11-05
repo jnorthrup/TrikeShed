@@ -129,3 +129,7 @@ This is a Linux filesystem-namespace proof on the existing host kernel;
 the browser remains an external verification input. It does not establish
 bare-metal installation, power-loss recovery or a fully reproducible source
 build of the vendor JDK and every native dependency.
+
+## Retained-source deployment boundary
+
+The [v77 source-promotion checkpoint](evidence/retained-source-promotion-v77-20261105/README.md) verifies actual missing-source refusal, same-CID BLOB promotion and separate-JVM reopening with the old producer directory hidden. It uses the pinned v76 artifact and does not establish the full sealed English host.
