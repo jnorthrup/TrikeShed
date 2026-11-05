@@ -191,18 +191,27 @@ class Panels : PatchSurface {
     /** rings grow; push a colliding top-level sibling right of the grown square — authored x-order kept */
     fun resolveTopLevelOverlaps() {
         val tops = nodes().filter { !truthy(it._parentScope) && truthy(it.el) }
-        class R(val x: Double, val y: Double, val w: Double, val h: Double)
-        fun rect(n: dynamic) = R(num(n.x), num(n.y), if (truthy(n.el.offsetWidth)) num(n.el.offsetWidth) else 200.0, if (truthy(n.el.offsetHeight)) num(n.el.offsetHeight) else 100.0)
+        class R(val node: dynamic, var x: Double, val y: Double, val w: Double, val h: Double)
         for (pass in 0 until 3) {
             var moved = false
-            val sorted = tops.sortedBy { num(it.x) }
+            val bounds = ArrayList<R>()
+            // Measure before writing positions; one layout read per dimension and node.
+            // A later pass remeasures any size change caused by moving an auto-width node.
+            for (n in tops) {
+                val w = n.el.offsetWidth; val h = n.el.offsetHeight
+                bounds.add(R(n, num(n.x), num(n.y), if (truthy(w)) num(w) else 200.0, if (truthy(h)) num(h) else 100.0))
+            }
+            val sorted = bounds.sortedBy { it.x }
             for (i in sorted.indices) for (j in i + 1 until sorted.size) {
-                val a = rect(sorted[i]); val b = rect(sorted[j])
+                val a = sorted[i]; val b = sorted[j]
                 if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) {
-                    sorted[j].x = a.x + a.w + 40; sorted[j].el.style.left = "${sorted[j].x}px"; moved = true
+                    b.x = a.x + a.w + 40; moved = true
                 }
             }
             if (!moved) break
+            for (b in sorted) if (b.x != num(b.node.x)) {
+                b.node.x = b.x; b.node.el.style.left = "${b.x}px"
+            }
         }
     }
 
