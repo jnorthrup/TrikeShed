@@ -1,0 +1,9 @@
+unpacked-reverify PASS
+Traceback (most recent call last):
+  File "/workspace/airgap-r4d-proof/continue-release.py", line 12, in <module>
+    name='storage-'+fault+('-archive02' if fault=='eio' else '-archive01');run(prefix+[str(h/'storage.py'),name,'selection',fault],name,env);run(['python',str(h/'storage-audit.py'),name],name+'-audit')
+                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/airgap-r4d-proof/continue-release.py", line 6, in run
+    assert p.returncode==0,(name,p.returncode)
+           ^^^^^^^^^^^^^^^
+AssertionError: ('storage-eio-archive02', 1)

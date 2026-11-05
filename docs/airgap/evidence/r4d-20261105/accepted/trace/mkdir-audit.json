@@ -1,0 +1,1719 @@
+{
+  "newCasShardDirectories": 90,
+  "parentsSyncedBeforeDescendantPublication": 90,
+  "missingParentSyncs": 0,
+  "rows": [
+    {
+      "directory": "/state/runtime/cas/sha256",
+      "parent": "/state/runtime/cas",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.436407,
+        "call": "mkdir(\"/state/runtime/cas/sha256\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.441307,
+        "call": "rename(\"/state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.17829073148370030286.tmp\", \"/state/runtime/cas/sha256/5/9/1/f/0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.437018,
+        "call": "fsync(17</state/runtime/cas>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.437109,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.441307,
+        "call": "rename(\"/state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.17829073148370030286.tmp\", \"/state/runtime/cas/sha256/5/9/1/f/0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.437605,
+        "call": "fsync(17</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/9",
+      "parent": "/state/runtime/cas/sha256/5",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.437715,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.441307,
+        "call": "rename(\"/state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.17829073148370030286.tmp\", \"/state/runtime/cas/sha256/5/9/1/f/0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.438279,
+        "call": "fsync(17</state/runtime/cas/sha256/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/9/1",
+      "parent": "/state/runtime/cas/sha256/5/9",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.438534,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/9/1\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.441307,
+        "call": "rename(\"/state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.17829073148370030286.tmp\", \"/state/runtime/cas/sha256/5/9/1/f/0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.439108,
+        "call": "fsync(17</state/runtime/cas/sha256/5/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/9/1/f",
+      "parent": "/state/runtime/cas/sha256/5/9/1",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.439206,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/9/1/f\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.441307,
+        "call": "rename(\"/state/runtime/cas/sha256/5/9/1/f/.0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f.17829073148370030286.tmp\", \"/state/runtime/cas/sha256/5/9/1/f/0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.439673,
+        "call": "fsync(17</state/runtime/cas/sha256/5/9/1>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.457302,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.46145,
+        "call": "rename(\"/state/runtime/cas/sha256/c/c/a/4/.cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779.2461996919193392552.tmp\", \"/state/runtime/cas/sha256/c/c/a/4/cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.458133,
+        "call": "fsync(17</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/c",
+      "parent": "/state/runtime/cas/sha256/c",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.458238,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.46145,
+        "call": "rename(\"/state/runtime/cas/sha256/c/c/a/4/.cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779.2461996919193392552.tmp\", \"/state/runtime/cas/sha256/c/c/a/4/cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.459049,
+        "call": "fsync(17</state/runtime/cas/sha256/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/c/a",
+      "parent": "/state/runtime/cas/sha256/c/c",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.459161,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/c/a\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.46145,
+        "call": "rename(\"/state/runtime/cas/sha256/c/c/a/4/.cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779.2461996919193392552.tmp\", \"/state/runtime/cas/sha256/c/c/a/4/cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.459659,
+        "call": "fsync(17</state/runtime/cas/sha256/c/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/c/a/4",
+      "parent": "/state/runtime/cas/sha256/c/c/a",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.459828,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/c/a/4\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.46145,
+        "call": "rename(\"/state/runtime/cas/sha256/c/c/a/4/.cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779.2461996919193392552.tmp\", \"/state/runtime/cas/sha256/c/c/a/4/cf527396a7576ecac70d4d7d931291549fb7a5935e74b088fe2bb691a779\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.460423,
+        "call": "fsync(17</state/runtime/cas/sha256/c/c/a>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.468691,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.472371,
+        "call": "rename(\"/state/runtime/cas/sha256/1/d/f/9/.fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2.17653877996754052860.tmp\", \"/state/runtime/cas/sha256/1/d/f/9/fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.469365,
+        "call": "fsync(17</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/d",
+      "parent": "/state/runtime/cas/sha256/1",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.469558,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/d\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.472371,
+        "call": "rename(\"/state/runtime/cas/sha256/1/d/f/9/.fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2.17653877996754052860.tmp\", \"/state/runtime/cas/sha256/1/d/f/9/fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.47014,
+        "call": "fsync(17</state/runtime/cas/sha256/1>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/d/f",
+      "parent": "/state/runtime/cas/sha256/1/d",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.470247,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/d/f\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.472371,
+        "call": "rename(\"/state/runtime/cas/sha256/1/d/f/9/.fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2.17653877996754052860.tmp\", \"/state/runtime/cas/sha256/1/d/f/9/fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.470741,
+        "call": "fsync(17</state/runtime/cas/sha256/1/d>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/d/f/9",
+      "parent": "/state/runtime/cas/sha256/1/d/f",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.470847,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/d/f/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.472371,
+        "call": "rename(\"/state/runtime/cas/sha256/1/d/f/9/.fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2.17653877996754052860.tmp\", \"/state/runtime/cas/sha256/1/d/f/9/fe329d6e4aec7640f4b26743913ac08ffddcfa345cfe893cb602fc3896f2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.471415,
+        "call": "fsync(17</state/runtime/cas/sha256/1/d/f>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.479874,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.483159,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/7/7/.41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679.2357273431832182292.tmp\", \"/state/runtime/cas/sha256/3/9/7/7/41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.480482,
+        "call": "fsync(17</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/9",
+      "parent": "/state/runtime/cas/sha256/3",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.480665,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.483159,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/7/7/.41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679.2357273431832182292.tmp\", \"/state/runtime/cas/sha256/3/9/7/7/41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.481191,
+        "call": "fsync(17</state/runtime/cas/sha256/3>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/9/7",
+      "parent": "/state/runtime/cas/sha256/3/9",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.481276,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/9/7\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.483159,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/7/7/.41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679.2357273431832182292.tmp\", \"/state/runtime/cas/sha256/3/9/7/7/41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.481643,
+        "call": "fsync(17</state/runtime/cas/sha256/3/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/9/7/7",
+      "parent": "/state/runtime/cas/sha256/3/9/7",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.481789,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/9/7/7\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.483159,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/7/7/.41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679.2357273431832182292.tmp\", \"/state/runtime/cas/sha256/3/9/7/7/41ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.482341,
+        "call": "fsync(17</state/runtime/cas/sha256/3/9/7>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/2",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.484933,
+        "call": "mkdir(\"/state/runtime/cas/sha256/2\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.488023,
+        "call": "rename(\"/state/runtime/cas/sha256/2/e/6/d/.868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc.2951039028402015857.tmp\", \"/state/runtime/cas/sha256/2/e/6/d/868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.48544,
+        "call": "fsync(17</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/2/e",
+      "parent": "/state/runtime/cas/sha256/2",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.485629,
+        "call": "mkdir(\"/state/runtime/cas/sha256/2/e\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.488023,
+        "call": "rename(\"/state/runtime/cas/sha256/2/e/6/d/.868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc.2951039028402015857.tmp\", \"/state/runtime/cas/sha256/2/e/6/d/868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.486125,
+        "call": "fsync(17</state/runtime/cas/sha256/2>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/2/e/6",
+      "parent": "/state/runtime/cas/sha256/2/e",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.48622,
+        "call": "mkdir(\"/state/runtime/cas/sha256/2/e/6\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.488023,
+        "call": "rename(\"/state/runtime/cas/sha256/2/e/6/d/.868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc.2951039028402015857.tmp\", \"/state/runtime/cas/sha256/2/e/6/d/868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.486625,
+        "call": "fsync(17</state/runtime/cas/sha256/2/e>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/2/e/6/d",
+      "parent": "/state/runtime/cas/sha256/2/e/6",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.48677,
+        "call": "mkdir(\"/state/runtime/cas/sha256/2/e/6/d\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.488023,
+        "call": "rename(\"/state/runtime/cas/sha256/2/e/6/d/.868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc.2951039028402015857.tmp\", \"/state/runtime/cas/sha256/2/e/6/d/868e407a8a11a1fed5d0c5129e357ee035b8c74468927fcd4c873abd5efc\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.48721,
+        "call": "fsync(17</state/runtime/cas/sha256/2/e/6>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/d",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.490644,
+        "call": "mkdir(\"/state/runtime/cas/sha256/d\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.493438,
+        "call": "rename(\"/state/runtime/cas/sha256/d/4/9/f/.1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a.9511432181831417785.tmp\", \"/state/runtime/cas/sha256/d/4/9/f/1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.491166,
+        "call": "fsync(17</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/d/4",
+      "parent": "/state/runtime/cas/sha256/d",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.49135,
+        "call": "mkdir(\"/state/runtime/cas/sha256/d/4\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.493438,
+        "call": "rename(\"/state/runtime/cas/sha256/d/4/9/f/.1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a.9511432181831417785.tmp\", \"/state/runtime/cas/sha256/d/4/9/f/1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.491733,
+        "call": "fsync(17</state/runtime/cas/sha256/d>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/d/4/9",
+      "parent": "/state/runtime/cas/sha256/d/4",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.491829,
+        "call": "mkdir(\"/state/runtime/cas/sha256/d/4/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.493438,
+        "call": "rename(\"/state/runtime/cas/sha256/d/4/9/f/.1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a.9511432181831417785.tmp\", \"/state/runtime/cas/sha256/d/4/9/f/1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.492239,
+        "call": "fsync(17</state/runtime/cas/sha256/d/4>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/d/4/9/f",
+      "parent": "/state/runtime/cas/sha256/d/4/9",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853513.492322,
+        "call": "mkdir(\"/state/runtime/cas/sha256/d/4/9/f\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853513.493438,
+        "call": "rename(\"/state/runtime/cas/sha256/d/4/9/f/.1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a.9511432181831417785.tmp\", \"/state/runtime/cas/sha256/d/4/9/f/1f1b7653567ecab52568b60c1019e9bbd54b31c82098e9e3bb09d46d652a\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853513.492715,
+        "call": "fsync(17</state/runtime/cas/sha256/d/4/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/f",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.087911,
+        "call": "mkdir(\"/state/runtime/cas/sha256/f\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.092192,
+        "call": "rename(\"/state/runtime/cas/sha256/f/f/7/9/.19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101.4416843140868186933.tmp\", \"/state/runtime/cas/sha256/f/f/7/9/19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.088766,
+        "call": "fsync(35</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/f/f",
+      "parent": "/state/runtime/cas/sha256/f",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.089084,
+        "call": "mkdir(\"/state/runtime/cas/sha256/f/f\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.092192,
+        "call": "rename(\"/state/runtime/cas/sha256/f/f/7/9/.19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101.4416843140868186933.tmp\", \"/state/runtime/cas/sha256/f/f/7/9/19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.089526,
+        "call": "fsync(35</state/runtime/cas/sha256/f>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/f/f/7",
+      "parent": "/state/runtime/cas/sha256/f/f",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.08967,
+        "call": "mkdir(\"/state/runtime/cas/sha256/f/f/7\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.092192,
+        "call": "rename(\"/state/runtime/cas/sha256/f/f/7/9/.19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101.4416843140868186933.tmp\", \"/state/runtime/cas/sha256/f/f/7/9/19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.090235,
+        "call": "fsync(35</state/runtime/cas/sha256/f/f>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/f/f/7/9",
+      "parent": "/state/runtime/cas/sha256/f/f/7",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.090356,
+        "call": "mkdir(\"/state/runtime/cas/sha256/f/f/7/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.092192,
+        "call": "rename(\"/state/runtime/cas/sha256/f/f/7/9/.19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101.4416843140868186933.tmp\", \"/state/runtime/cas/sha256/f/f/7/9/19835f96bccd0187c00a09f9eb2a0543342713763c4bab1aa661b45b1101\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.091149,
+        "call": "fsync(35</state/runtime/cas/sha256/f/f/7>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.095205,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.098739,
+        "call": "rename(\"/state/runtime/cas/sha256/e/3/0/b/.50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8.15878148971532808971.tmp\", \"/state/runtime/cas/sha256/e/3/0/b/50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.095786,
+        "call": "fsync(35</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/3",
+      "parent": "/state/runtime/cas/sha256/e",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.096034,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/3\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.098739,
+        "call": "rename(\"/state/runtime/cas/sha256/e/3/0/b/.50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8.15878148971532808971.tmp\", \"/state/runtime/cas/sha256/e/3/0/b/50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.096492,
+        "call": "fsync(35</state/runtime/cas/sha256/e>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/3/0",
+      "parent": "/state/runtime/cas/sha256/e/3",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.096599,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/3/0\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.098739,
+        "call": "rename(\"/state/runtime/cas/sha256/e/3/0/b/.50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8.15878148971532808971.tmp\", \"/state/runtime/cas/sha256/e/3/0/b/50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.097345,
+        "call": "fsync(35</state/runtime/cas/sha256/e/3>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/3/0/b",
+      "parent": "/state/runtime/cas/sha256/e/3/0",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.097453,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/3/0/b\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.098739,
+        "call": "rename(\"/state/runtime/cas/sha256/e/3/0/b/.50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8.15878148971532808971.tmp\", \"/state/runtime/cas/sha256/e/3/0/b/50ae828c3154e5af5e12fe571d271d30582d55ff37bc15c71ebd63f879e8\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.097985,
+        "call": "fsync(35</state/runtime/cas/sha256/e/3/0>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/0",
+      "parent": "/state/runtime/cas/sha256/5",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.122294,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/0\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.125158,
+        "call": "rename(\"/state/runtime/cas/sha256/5/0/c/9/.d9c238711cc007f8722bbf4557c0d6ba403f0da3f0765b38b8f16e2ab277.3338040692165276086.tmp\", \"/state/runtime/cas/sha256/5/0/c/9/d9c238711cc007f8722bbf4557c0d6ba403f0da3f0765b38b8f16e2ab277\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.123037,
+        "call": "fsync(35</state/runtime/cas/sha256/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/0/c",
+      "parent": "/state/runtime/cas/sha256/5/0",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.123288,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/0/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.125158,
+        "call": "rename(\"/state/runtime/cas/sha256/5/0/c/9/.d9c238711cc007f8722bbf4557c0d6ba403f0da3f0765b38b8f16e2ab277.3338040692165276086.tmp\", \"/state/runtime/cas/sha256/5/0/c/9/d9c238711cc007f8722bbf4557c0d6ba403f0da3f0765b38b8f16e2ab277\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.123724,
+        "call": "fsync(35</state/runtime/cas/sha256/5/0>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/0/c/9",
+      "parent": "/state/runtime/cas/sha256/5/0/c",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.123833,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/0/c/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.125158,
+        "call": "rename(\"/state/runtime/cas/sha256/5/0/c/9/.d9c238711cc007f8722bbf4557c0d6ba403f0da3f0765b38b8f16e2ab277.3338040692165276086.tmp\", \"/state/runtime/cas/sha256/5/0/c/9/d9c238711cc007f8722bbf4557c0d6ba403f0da3f0765b38b8f16e2ab277\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.124325,
+        "call": "fsync(35</state/runtime/cas/sha256/5/0/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/9/3",
+      "parent": "/state/runtime/cas/sha256/5/9",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.132704,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/9/3\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.135091,
+        "call": "rename(\"/state/runtime/cas/sha256/5/9/3/f/.d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801.900570142968761129.tmp\", \"/state/runtime/cas/sha256/5/9/3/f/d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.133276,
+        "call": "fsync(35</state/runtime/cas/sha256/5/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/9/3/f",
+      "parent": "/state/runtime/cas/sha256/5/9/3",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.133454,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/9/3/f\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.135091,
+        "call": "rename(\"/state/runtime/cas/sha256/5/9/3/f/.d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801.900570142968761129.tmp\", \"/state/runtime/cas/sha256/5/9/3/f/d4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.134264,
+        "call": "fsync(35</state/runtime/cas/sha256/5/9/3>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/c",
+      "parent": "/state/runtime/cas/sha256/e",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.142006,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.14576,
+        "call": "rename(\"/state/runtime/cas/sha256/e/c/1/e/.f47c145f8bed27d582e2af420fcd7245e47100fbec27869b46bc7d2dc290.14235128776504242354.tmp\", \"/state/runtime/cas/sha256/e/c/1/e/f47c145f8bed27d582e2af420fcd7245e47100fbec27869b46bc7d2dc290\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.14264,
+        "call": "fsync(35</state/runtime/cas/sha256/e>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/c/1",
+      "parent": "/state/runtime/cas/sha256/e/c",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.142989,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/c/1\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.14576,
+        "call": "rename(\"/state/runtime/cas/sha256/e/c/1/e/.f47c145f8bed27d582e2af420fcd7245e47100fbec27869b46bc7d2dc290.14235128776504242354.tmp\", \"/state/runtime/cas/sha256/e/c/1/e/f47c145f8bed27d582e2af420fcd7245e47100fbec27869b46bc7d2dc290\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.143467,
+        "call": "fsync(35</state/runtime/cas/sha256/e/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/c/1/e",
+      "parent": "/state/runtime/cas/sha256/e/c/1",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.143592,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/c/1/e\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.14576,
+        "call": "rename(\"/state/runtime/cas/sha256/e/c/1/e/.f47c145f8bed27d582e2af420fcd7245e47100fbec27869b46bc7d2dc290.14235128776504242354.tmp\", \"/state/runtime/cas/sha256/e/c/1/e/f47c145f8bed27d582e2af420fcd7245e47100fbec27869b46bc7d2dc290\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.145056,
+        "call": "fsync(35</state/runtime/cas/sha256/e/c/1>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/3",
+      "parent": "/state/runtime/cas/sha256/3",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.151459,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/3\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.155323,
+        "call": "rename(\"/state/runtime/cas/sha256/3/3/1/5/.f2a716fc998158a7d09090320cf35ba99ffb1458b31c5cdff6ca1929b4a9.17227152419004381997.tmp\", \"/state/runtime/cas/sha256/3/3/1/5/f2a716fc998158a7d09090320cf35ba99ffb1458b31c5cdff6ca1929b4a9\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.152079,
+        "call": "fsync(35</state/runtime/cas/sha256/3>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/3/1",
+      "parent": "/state/runtime/cas/sha256/3/3",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.152277,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/3/1\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.155323,
+        "call": "rename(\"/state/runtime/cas/sha256/3/3/1/5/.f2a716fc998158a7d09090320cf35ba99ffb1458b31c5cdff6ca1929b4a9.17227152419004381997.tmp\", \"/state/runtime/cas/sha256/3/3/1/5/f2a716fc998158a7d09090320cf35ba99ffb1458b31c5cdff6ca1929b4a9\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.153625,
+        "call": "fsync(35</state/runtime/cas/sha256/3/3>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/3/1/5",
+      "parent": "/state/runtime/cas/sha256/3/3/1",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.153803,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/3/1/5\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.155323,
+        "call": "rename(\"/state/runtime/cas/sha256/3/3/1/5/.f2a716fc998158a7d09090320cf35ba99ffb1458b31c5cdff6ca1929b4a9.17227152419004381997.tmp\", \"/state/runtime/cas/sha256/3/3/1/5/f2a716fc998158a7d09090320cf35ba99ffb1458b31c5cdff6ca1929b4a9\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.154441,
+        "call": "fsync(35</state/runtime/cas/sha256/3/3/1>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/a",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.161146,
+        "call": "mkdir(\"/state/runtime/cas/sha256/a\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.165251,
+        "call": "rename(\"/state/runtime/cas/sha256/a/5/c/0/.c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52.9030190187251771955.tmp\", \"/state/runtime/cas/sha256/a/5/c/0/c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.161646,
+        "call": "fsync(35</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/a/5",
+      "parent": "/state/runtime/cas/sha256/a",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.161912,
+        "call": "mkdir(\"/state/runtime/cas/sha256/a/5\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.165251,
+        "call": "rename(\"/state/runtime/cas/sha256/a/5/c/0/.c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52.9030190187251771955.tmp\", \"/state/runtime/cas/sha256/a/5/c/0/c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.162285,
+        "call": "fsync(35</state/runtime/cas/sha256/a>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/a/5/c",
+      "parent": "/state/runtime/cas/sha256/a/5",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.162377,
+        "call": "mkdir(\"/state/runtime/cas/sha256/a/5/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.165251,
+        "call": "rename(\"/state/runtime/cas/sha256/a/5/c/0/.c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52.9030190187251771955.tmp\", \"/state/runtime/cas/sha256/a/5/c/0/c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.162744,
+        "call": "fsync(35</state/runtime/cas/sha256/a/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/a/5/c/0",
+      "parent": "/state/runtime/cas/sha256/a/5/c",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.163279,
+        "call": "mkdir(\"/state/runtime/cas/sha256/a/5/c/0\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.165251,
+        "call": "rename(\"/state/runtime/cas/sha256/a/5/c/0/.c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52.9030190187251771955.tmp\", \"/state/runtime/cas/sha256/a/5/c/0/c1d2e84ea3574d27dd29d9aec1aa97cbfcd187d24e2d07fec005e140ce52\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.16385,
+        "call": "fsync(35</state/runtime/cas/sha256/a/5/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/0",
+      "parent": "/state/runtime/cas/sha256/e",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.16692,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/0\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.170385,
+        "call": "rename(\"/state/runtime/cas/sha256/e/0/b/2/.5bfdac71141d582602b567f498f628518c9b4d373fb9742379ee1b6bd87e.6615900867156893027.tmp\", \"/state/runtime/cas/sha256/e/0/b/2/5bfdac71141d582602b567f498f628518c9b4d373fb9742379ee1b6bd87e\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.16746,
+        "call": "fsync(35</state/runtime/cas/sha256/e>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/0/b",
+      "parent": "/state/runtime/cas/sha256/e/0",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.167665,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/0/b\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.170385,
+        "call": "rename(\"/state/runtime/cas/sha256/e/0/b/2/.5bfdac71141d582602b567f498f628518c9b4d373fb9742379ee1b6bd87e.6615900867156893027.tmp\", \"/state/runtime/cas/sha256/e/0/b/2/5bfdac71141d582602b567f498f628518c9b4d373fb9742379ee1b6bd87e\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.168148,
+        "call": "fsync(35</state/runtime/cas/sha256/e/0>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/e/0/b/2",
+      "parent": "/state/runtime/cas/sha256/e/0/b",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.168239,
+        "call": "mkdir(\"/state/runtime/cas/sha256/e/0/b/2\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.170385,
+        "call": "rename(\"/state/runtime/cas/sha256/e/0/b/2/.5bfdac71141d582602b567f498f628518c9b4d373fb9742379ee1b6bd87e.6615900867156893027.tmp\", \"/state/runtime/cas/sha256/e/0/b/2/5bfdac71141d582602b567f498f628518c9b4d373fb9742379ee1b6bd87e\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.169069,
+        "call": "fsync(35</state/runtime/cas/sha256/e/0/b>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/6",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.175058,
+        "call": "mkdir(\"/state/runtime/cas/sha256/6\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.178054,
+        "call": "rename(\"/state/runtime/cas/sha256/6/c/5/7/.040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2.16489259628190059280.tmp\", \"/state/runtime/cas/sha256/6/c/5/7/040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.175567,
+        "call": "fsync(35</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/6/c",
+      "parent": "/state/runtime/cas/sha256/6",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.175739,
+        "call": "mkdir(\"/state/runtime/cas/sha256/6/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.178054,
+        "call": "rename(\"/state/runtime/cas/sha256/6/c/5/7/.040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2.16489259628190059280.tmp\", \"/state/runtime/cas/sha256/6/c/5/7/040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.176227,
+        "call": "fsync(35</state/runtime/cas/sha256/6>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/6/c/5",
+      "parent": "/state/runtime/cas/sha256/6/c",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.176311,
+        "call": "mkdir(\"/state/runtime/cas/sha256/6/c/5\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.178054,
+        "call": "rename(\"/state/runtime/cas/sha256/6/c/5/7/.040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2.16489259628190059280.tmp\", \"/state/runtime/cas/sha256/6/c/5/7/040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.176662,
+        "call": "fsync(35</state/runtime/cas/sha256/6/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/6/c/5/7",
+      "parent": "/state/runtime/cas/sha256/6/c/5",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.17678,
+        "call": "mkdir(\"/state/runtime/cas/sha256/6/c/5/7\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.178054,
+        "call": "rename(\"/state/runtime/cas/sha256/6/c/5/7/.040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2.16489259628190059280.tmp\", \"/state/runtime/cas/sha256/6/c/5/7/040f110f12710b2ce2052eb1e61e0a5db3f24f269c902055565834f396b2\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.177248,
+        "call": "fsync(35</state/runtime/cas/sha256/6/c/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/9/8",
+      "parent": "/state/runtime/cas/sha256/3/9",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.190008,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/9/8\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.192075,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/8/e/.52058dee607f58dbf5f55a7976fcff06471899ac0c59dfe03ef90db7a237.12991920023398093249.tmp\", \"/state/runtime/cas/sha256/3/9/8/e/52058dee607f58dbf5f55a7976fcff06471899ac0c59dfe03ef90db7a237\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.190585,
+        "call": "fsync(35</state/runtime/cas/sha256/3/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/9/8/e",
+      "parent": "/state/runtime/cas/sha256/3/9/8",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.190776,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/9/8/e\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.192075,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/8/e/.52058dee607f58dbf5f55a7976fcff06471899ac0c59dfe03ef90db7a237.12991920023398093249.tmp\", \"/state/runtime/cas/sha256/3/9/8/e/52058dee607f58dbf5f55a7976fcff06471899ac0c59dfe03ef90db7a237\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.191242,
+        "call": "fsync(35</state/runtime/cas/sha256/3/9/8>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/9",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.200619,
+        "call": "mkdir(\"/state/runtime/cas/sha256/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.203718,
+        "call": "rename(\"/state/runtime/cas/sha256/9/8/c/2/.8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea.11743731920717752664.tmp\", \"/state/runtime/cas/sha256/9/8/c/2/8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.201205,
+        "call": "fsync(35</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/9/8",
+      "parent": "/state/runtime/cas/sha256/9",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.20147,
+        "call": "mkdir(\"/state/runtime/cas/sha256/9/8\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.203718,
+        "call": "rename(\"/state/runtime/cas/sha256/9/8/c/2/.8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea.11743731920717752664.tmp\", \"/state/runtime/cas/sha256/9/8/c/2/8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.201959,
+        "call": "fsync(35</state/runtime/cas/sha256/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/9/8/c",
+      "parent": "/state/runtime/cas/sha256/9/8",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.202058,
+        "call": "mkdir(\"/state/runtime/cas/sha256/9/8/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.203718,
+        "call": "rename(\"/state/runtime/cas/sha256/9/8/c/2/.8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea.11743731920717752664.tmp\", \"/state/runtime/cas/sha256/9/8/c/2/8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.202429,
+        "call": "fsync(35</state/runtime/cas/sha256/9/8>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/9/8/c/2",
+      "parent": "/state/runtime/cas/sha256/9/8/c",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.202547,
+        "call": "mkdir(\"/state/runtime/cas/sha256/9/8/c/2\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.203718,
+        "call": "rename(\"/state/runtime/cas/sha256/9/8/c/2/.8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea.11743731920717752664.tmp\", \"/state/runtime/cas/sha256/9/8/c/2/8120df5340159c155470126ae71b02fe7113544ddb3cb69644c04c26d1ea\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.203028,
+        "call": "fsync(35</state/runtime/cas/sha256/9/8/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/c/c",
+      "parent": "/state/runtime/cas/sha256/c/c",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.208867,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/c/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.211521,
+        "call": "rename(\"/state/runtime/cas/sha256/c/c/c/9/.9ce2ce591b20cc68f7299ce62673d6bfd56825e14dc9823ff67a4036bfff.11854860283341564145.tmp\", \"/state/runtime/cas/sha256/c/c/c/9/9ce2ce591b20cc68f7299ce62673d6bfd56825e14dc9823ff67a4036bfff\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.210232,
+        "call": "fsync(35</state/runtime/cas/sha256/c/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/c/c/9",
+      "parent": "/state/runtime/cas/sha256/c/c/c",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853514.210406,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/c/c/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853514.211521,
+        "call": "rename(\"/state/runtime/cas/sha256/c/c/c/9/.9ce2ce591b20cc68f7299ce62673d6bfd56825e14dc9823ff67a4036bfff.11854860283341564145.tmp\", \"/state/runtime/cas/sha256/c/c/c/9/9ce2ce591b20cc68f7299ce62673d6bfd56825e14dc9823ff67a4036bfff\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853514.210807,
+        "call": "fsync(35</state/runtime/cas/sha256/c/c/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/2",
+      "parent": "/state/runtime/cas/sha256/1",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853514.555725,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/2\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853514.559035,
+        "call": "rename(\"/state/runtime/cas/sha256/1/2/9/e/.f8000de0657000dbb94aa5e1c347d147684fe253146f14f843abfa5e1b88.12160350319214867265.tmp\", \"/state/runtime/cas/sha256/1/2/9/e/f8000de0657000dbb94aa5e1c347d147684fe253146f14f843abfa5e1b88\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853514.55663,
+        "call": "fsync(35</state/runtime/cas/sha256/1>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/2/9",
+      "parent": "/state/runtime/cas/sha256/1/2",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853514.556829,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/2/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853514.559035,
+        "call": "rename(\"/state/runtime/cas/sha256/1/2/9/e/.f8000de0657000dbb94aa5e1c347d147684fe253146f14f843abfa5e1b88.12160350319214867265.tmp\", \"/state/runtime/cas/sha256/1/2/9/e/f8000de0657000dbb94aa5e1c347d147684fe253146f14f843abfa5e1b88\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853514.557293,
+        "call": "fsync(35</state/runtime/cas/sha256/1/2>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/2/9/e",
+      "parent": "/state/runtime/cas/sha256/1/2/9",
+      "creation": {
+        "pid": 86782,
+        "time": 1793853514.557549,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/2/9/e\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86782,
+        "time": 1793853514.559035,
+        "call": "rename(\"/state/runtime/cas/sha256/1/2/9/e/.f8000de0657000dbb94aa5e1c347d147684fe253146f14f843abfa5e1b88.12160350319214867265.tmp\", \"/state/runtime/cas/sha256/1/2/9/e/f8000de0657000dbb94aa5e1c347d147684fe253146f14f843abfa5e1b88\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86782,
+        "time": 1793853514.558122,
+        "call": "fsync(35</state/runtime/cas/sha256/1/2/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/8",
+      "parent": "/state/runtime/cas/sha256/5",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.277263,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/8\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.281897,
+        "call": "rename(\"/state/runtime/cas/sha256/5/8/9/8/.517f31b59bbd742cea243c4d5cb7777135bc92e950303c5b5f43ddb0074b.18351207641229006476.tmp\", \"/state/runtime/cas/sha256/5/8/9/8/517f31b59bbd742cea243c4d5cb7777135bc92e950303c5b5f43ddb0074b\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.278409,
+        "call": "fsync(44</state/runtime/cas/sha256/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/8/9",
+      "parent": "/state/runtime/cas/sha256/5/8",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.278901,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/8/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.281897,
+        "call": "rename(\"/state/runtime/cas/sha256/5/8/9/8/.517f31b59bbd742cea243c4d5cb7777135bc92e950303c5b5f43ddb0074b.18351207641229006476.tmp\", \"/state/runtime/cas/sha256/5/8/9/8/517f31b59bbd742cea243c4d5cb7777135bc92e950303c5b5f43ddb0074b\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.279638,
+        "call": "fsync(44</state/runtime/cas/sha256/5/8>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/5/8/9/8",
+      "parent": "/state/runtime/cas/sha256/5/8/9",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.279827,
+        "call": "mkdir(\"/state/runtime/cas/sha256/5/8/9/8\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.281897,
+        "call": "rename(\"/state/runtime/cas/sha256/5/8/9/8/.517f31b59bbd742cea243c4d5cb7777135bc92e950303c5b5f43ddb0074b.18351207641229006476.tmp\", \"/state/runtime/cas/sha256/5/8/9/8/517f31b59bbd742cea243c4d5cb7777135bc92e950303c5b5f43ddb0074b\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.280565,
+        "call": "fsync(44</state/runtime/cas/sha256/5/8/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/2/f",
+      "parent": "/state/runtime/cas/sha256/2",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.323852,
+        "call": "mkdir(\"/state/runtime/cas/sha256/2/f\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.328774,
+        "call": "rename(\"/state/runtime/cas/sha256/2/f/5/9/.cbdfb2cc7a0f78da5d083f533e71c5304e0e705e658b882a9db910578c03.307712279840009645.tmp\", \"/state/runtime/cas/sha256/2/f/5/9/cbdfb2cc7a0f78da5d083f533e71c5304e0e705e658b882a9db910578c03\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.325275,
+        "call": "fsync(44</state/runtime/cas/sha256/2>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/2/f/5",
+      "parent": "/state/runtime/cas/sha256/2/f",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.325717,
+        "call": "mkdir(\"/state/runtime/cas/sha256/2/f/5\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.328774,
+        "call": "rename(\"/state/runtime/cas/sha256/2/f/5/9/.cbdfb2cc7a0f78da5d083f533e71c5304e0e705e658b882a9db910578c03.307712279840009645.tmp\", \"/state/runtime/cas/sha256/2/f/5/9/cbdfb2cc7a0f78da5d083f533e71c5304e0e705e658b882a9db910578c03\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.32659,
+        "call": "fsync(44</state/runtime/cas/sha256/2/f>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/2/f/5/9",
+      "parent": "/state/runtime/cas/sha256/2/f/5",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.326795,
+        "call": "mkdir(\"/state/runtime/cas/sha256/2/f/5/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.328774,
+        "call": "rename(\"/state/runtime/cas/sha256/2/f/5/9/.cbdfb2cc7a0f78da5d083f533e71c5304e0e705e658b882a9db910578c03.307712279840009645.tmp\", \"/state/runtime/cas/sha256/2/f/5/9/cbdfb2cc7a0f78da5d083f533e71c5304e0e705e658b882a9db910578c03\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.327517,
+        "call": "fsync(44</state/runtime/cas/sha256/2/f/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/6",
+      "parent": "/state/runtime/cas/sha256/c",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.635706,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/6\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.639164,
+        "call": "rename(\"/state/runtime/cas/sha256/c/6/e/c/.0adc58e8f5fd8b9d97f0e77532aa5cce2965258b60cd9a181b77d52964e7.628257482749641162.tmp\", \"/state/runtime/cas/sha256/c/6/e/c/0adc58e8f5fd8b9d97f0e77532aa5cce2965258b60cd9a181b77d52964e7\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.636653,
+        "call": "fsync(44</state/runtime/cas/sha256/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/6/e",
+      "parent": "/state/runtime/cas/sha256/c/6",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.636978,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/6/e\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.639164,
+        "call": "rename(\"/state/runtime/cas/sha256/c/6/e/c/.0adc58e8f5fd8b9d97f0e77532aa5cce2965258b60cd9a181b77d52964e7.628257482749641162.tmp\", \"/state/runtime/cas/sha256/c/6/e/c/0adc58e8f5fd8b9d97f0e77532aa5cce2965258b60cd9a181b77d52964e7\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.637476,
+        "call": "fsync(44</state/runtime/cas/sha256/c/6>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/c/6/e/c",
+      "parent": "/state/runtime/cas/sha256/c/6/e",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853520.637595,
+        "call": "mkdir(\"/state/runtime/cas/sha256/c/6/e/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853520.639164,
+        "call": "rename(\"/state/runtime/cas/sha256/c/6/e/c/.0adc58e8f5fd8b9d97f0e77532aa5cce2965258b60cd9a181b77d52964e7.628257482749641162.tmp\", \"/state/runtime/cas/sha256/c/6/e/c/0adc58e8f5fd8b9d97f0e77532aa5cce2965258b60cd9a181b77d52964e7\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853520.638231,
+        "call": "fsync(44</state/runtime/cas/sha256/c/6/e>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/8",
+      "parent": "/state/runtime/cas/sha256",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853520.791141,
+        "call": "mkdir(\"/state/runtime/cas/sha256/8\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853520.798168,
+        "call": "rename(\"/state/runtime/cas/sha256/8/e/5/a/.410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e.12673895583587924200.tmp\", \"/state/runtime/cas/sha256/8/e/5/a/410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853520.793324,
+        "call": "fsync(44</state/runtime/cas/sha256>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/8/e",
+      "parent": "/state/runtime/cas/sha256/8",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853520.793623,
+        "call": "mkdir(\"/state/runtime/cas/sha256/8/e\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853520.798168,
+        "call": "rename(\"/state/runtime/cas/sha256/8/e/5/a/.410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e.12673895583587924200.tmp\", \"/state/runtime/cas/sha256/8/e/5/a/410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853520.794208,
+        "call": "fsync(44</state/runtime/cas/sha256/8>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/8/e/5",
+      "parent": "/state/runtime/cas/sha256/8/e",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853520.794309,
+        "call": "mkdir(\"/state/runtime/cas/sha256/8/e/5\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853520.798168,
+        "call": "rename(\"/state/runtime/cas/sha256/8/e/5/a/.410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e.12673895583587924200.tmp\", \"/state/runtime/cas/sha256/8/e/5/a/410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853520.794789,
+        "call": "fsync(44</state/runtime/cas/sha256/8/e>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/8/e/5/a",
+      "parent": "/state/runtime/cas/sha256/8/e/5",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853520.794924,
+        "call": "mkdir(\"/state/runtime/cas/sha256/8/e/5/a\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853520.798168,
+        "call": "rename(\"/state/runtime/cas/sha256/8/e/5/a/.410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e.12673895583587924200.tmp\", \"/state/runtime/cas/sha256/8/e/5/a/410ecbc2774c5ac690da7e0f5425584856d871222d24a892562a5ca8a39e\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853520.796832,
+        "call": "fsync(44</state/runtime/cas/sha256/8/e/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/4",
+      "parent": "/state/runtime/cas/sha256/3",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.185489,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/4\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.192217,
+        "call": "rename(\"/state/runtime/cas/sha256/3/4/d/3/.75dcaedb4066ff2bd2a0932f819b622cf36dae2f2ff6c0c72490b46c6701.7550239007041802023.tmp\", \"/state/runtime/cas/sha256/3/4/d/3/75dcaedb4066ff2bd2a0932f819b622cf36dae2f2ff6c0c72490b46c6701\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.186516,
+        "call": "fsync(44</state/runtime/cas/sha256/3>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/4/d",
+      "parent": "/state/runtime/cas/sha256/3/4",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.186746,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/4/d\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.192217,
+        "call": "rename(\"/state/runtime/cas/sha256/3/4/d/3/.75dcaedb4066ff2bd2a0932f819b622cf36dae2f2ff6c0c72490b46c6701.7550239007041802023.tmp\", \"/state/runtime/cas/sha256/3/4/d/3/75dcaedb4066ff2bd2a0932f819b622cf36dae2f2ff6c0c72490b46c6701\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.189251,
+        "call": "fsync(44</state/runtime/cas/sha256/3/4>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/4/d/3",
+      "parent": "/state/runtime/cas/sha256/3/4/d",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.189449,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/4/d/3\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.192217,
+        "call": "rename(\"/state/runtime/cas/sha256/3/4/d/3/.75dcaedb4066ff2bd2a0932f819b622cf36dae2f2ff6c0c72490b46c6701.7550239007041802023.tmp\", \"/state/runtime/cas/sha256/3/4/d/3/75dcaedb4066ff2bd2a0932f819b622cf36dae2f2ff6c0c72490b46c6701\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.190046,
+        "call": "fsync(44</state/runtime/cas/sha256/3/4/d>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/c",
+      "parent": "/state/runtime/cas/sha256/1",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.195491,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/c\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.198401,
+        "call": "rename(\"/state/runtime/cas/sha256/1/c/9/d/.a70226c06b45823df2f67c68ccae22dd460b66707dedf19fb611c76add2a.2805191034268791232.tmp\", \"/state/runtime/cas/sha256/1/c/9/d/a70226c06b45823df2f67c68ccae22dd460b66707dedf19fb611c76add2a\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.19629,
+        "call": "fsync(44</state/runtime/cas/sha256/1>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/c/9",
+      "parent": "/state/runtime/cas/sha256/1/c",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.196495,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/c/9\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.198401,
+        "call": "rename(\"/state/runtime/cas/sha256/1/c/9/d/.a70226c06b45823df2f67c68ccae22dd460b66707dedf19fb611c76add2a.2805191034268791232.tmp\", \"/state/runtime/cas/sha256/1/c/9/d/a70226c06b45823df2f67c68ccae22dd460b66707dedf19fb611c76add2a\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.197069,
+        "call": "fsync(44</state/runtime/cas/sha256/1/c>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/1/c/9/d",
+      "parent": "/state/runtime/cas/sha256/1/c/9",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.197168,
+        "call": "mkdir(\"/state/runtime/cas/sha256/1/c/9/d\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.198401,
+        "call": "rename(\"/state/runtime/cas/sha256/1/c/9/d/.a70226c06b45823df2f67c68ccae22dd460b66707dedf19fb611c76add2a.2805191034268791232.tmp\", \"/state/runtime/cas/sha256/1/c/9/d/a70226c06b45823df2f67c68ccae22dd460b66707dedf19fb611c76add2a\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.19757,
+        "call": "fsync(44</state/runtime/cas/sha256/1/c/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/9/1",
+      "parent": "/state/runtime/cas/sha256/3/9",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.227085,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/9/1\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.230799,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/1/3/.7dfd91a0b03b89b70e950161850c77c6047be64dc37c9dd729d502631937.244519152582337815.tmp\", \"/state/runtime/cas/sha256/3/9/1/3/7dfd91a0b03b89b70e950161850c77c6047be64dc37c9dd729d502631937\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.228214,
+        "call": "fsync(44</state/runtime/cas/sha256/3/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/3/9/1/3",
+      "parent": "/state/runtime/cas/sha256/3/9/1",
+      "creation": {
+        "pid": 86803,
+        "time": 1793853521.228524,
+        "call": "mkdir(\"/state/runtime/cas/sha256/3/9/1/3\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86803,
+        "time": 1793853521.230799,
+        "call": "rename(\"/state/runtime/cas/sha256/3/9/1/3/.7dfd91a0b03b89b70e950161850c77c6047be64dc37c9dd729d502631937.244519152582337815.tmp\", \"/state/runtime/cas/sha256/3/9/1/3/7dfd91a0b03b89b70e950161850c77c6047be64dc37c9dd729d502631937\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86803,
+        "time": 1793853521.229569,
+        "call": "fsync(44</state/runtime/cas/sha256/3/9/1>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/9/5",
+      "parent": "/state/runtime/cas/sha256/9",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853521.238934,
+        "call": "mkdir(\"/state/runtime/cas/sha256/9/5\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853521.246577,
+        "call": "rename(\"/state/runtime/cas/sha256/9/5/7/0/.a77f943ea58a22171e27e19d173457ac0301b3efdc7361c4e538aaa0f6f6.16122901260418471892.tmp\", \"/state/runtime/cas/sha256/9/5/7/0/a77f943ea58a22171e27e19d173457ac0301b3efdc7361c4e538aaa0f6f6\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853521.242169,
+        "call": "fsync(44</state/runtime/cas/sha256/9>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/9/5/7",
+      "parent": "/state/runtime/cas/sha256/9/5",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853521.242578,
+        "call": "mkdir(\"/state/runtime/cas/sha256/9/5/7\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853521.246577,
+        "call": "rename(\"/state/runtime/cas/sha256/9/5/7/0/.a77f943ea58a22171e27e19d173457ac0301b3efdc7361c4e538aaa0f6f6.16122901260418471892.tmp\", \"/state/runtime/cas/sha256/9/5/7/0/a77f943ea58a22171e27e19d173457ac0301b3efdc7361c4e538aaa0f6f6\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853521.243493,
+        "call": "fsync(44</state/runtime/cas/sha256/9/5>) = 0"
+      }
+    },
+    {
+      "directory": "/state/runtime/cas/sha256/9/5/7/0",
+      "parent": "/state/runtime/cas/sha256/9/5/7",
+      "creation": {
+        "pid": 86807,
+        "time": 1793853521.243743,
+        "call": "mkdir(\"/state/runtime/cas/sha256/9/5/7/0\", 0777) = 0"
+      },
+      "firstDescendantPublication": {
+        "pid": 86807,
+        "time": 1793853521.246577,
+        "call": "rename(\"/state/runtime/cas/sha256/9/5/7/0/.a77f943ea58a22171e27e19d173457ac0301b3efdc7361c4e538aaa0f6f6.16122901260418471892.tmp\", \"/state/runtime/cas/sha256/9/5/7/0/a77f943ea58a22171e27e19d173457ac0301b3efdc7361c4e538aaa0f6f6\") = 0"
+      },
+      "parentSyncBeforePublication": {
+        "pid": 86807,
+        "time": 1793853521.244525,
+        "call": "fsync(44</state/runtime/cas/sha256/9/5/7>) = 0"
+      }
+    }
+  ],
+  "kernelRingSetupObserved": true,
+  "scope": "Observed syscall order in a completed packaged traversal; no power-loss or vendor filesystem guarantee"
+}

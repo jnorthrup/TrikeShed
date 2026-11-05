@@ -1,0 +1,1081 @@
+[
+  {
+    "binary": "/usr/bin/pdfinfo",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libpoppler.so.147",
+      "/lib/x86_64-linux-gnu/libstdc++.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libfreetype.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libfontconfig.so.1",
+      "/lib/x86_64-linux-gnu/libjpeg.so.62",
+      "/lib/x86_64-linux-gnu/libcurl-gnutls.so.4",
+      "/lib/x86_64-linux-gnu/libgpgmepp.so.6",
+      "/lib/x86_64-linux-gnu/libopenjp2.so.7",
+      "/lib/x86_64-linux-gnu/liblcms2.so.2",
+      "/lib/x86_64-linux-gnu/libpng16.so.16",
+      "/lib/x86_64-linux-gnu/libtiff.so.6",
+      "/lib/x86_64-linux-gnu/libnss3.so",
+      "/lib/x86_64-linux-gnu/libsmime3.so",
+      "/lib/x86_64-linux-gnu/libplc4.so",
+      "/lib/x86_64-linux-gnu/libnspr4.so",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libgcc_s.so.1",
+      "/lib/x86_64-linux-gnu/libbz2.so.1.0",
+      "/lib/x86_64-linux-gnu/libbrotlidec.so.1",
+      "/lib/x86_64-linux-gnu/libexpat.so.1",
+      "/lib/x86_64-linux-gnu/libnghttp3.so.9",
+      "/lib/x86_64-linux-gnu/libngtcp2_crypto_gnutls.so.8",
+      "/lib/x86_64-linux-gnu/libngtcp2.so.16",
+      "/lib/x86_64-linux-gnu/libnghttp2.so.14",
+      "/lib/x86_64-linux-gnu/libidn2.so.0",
+      "/lib/x86_64-linux-gnu/librtmp.so.1",
+      "/lib/x86_64-linux-gnu/libssh2.so.1",
+      "/lib/x86_64-linux-gnu/libpsl.so.5",
+      "/lib/x86_64-linux-gnu/libnettle.so.8",
+      "/lib/x86_64-linux-gnu/libgnutls.so.30",
+      "/lib/x86_64-linux-gnu/libgssapi_krb5.so.2",
+      "/lib/x86_64-linux-gnu/libldap.so.2",
+      "/lib/x86_64-linux-gnu/liblber.so.2",
+      "/lib/x86_64-linux-gnu/libzstd.so.1",
+      "/lib/x86_64-linux-gnu/libgpgme.so.11",
+      "/lib/x86_64-linux-gnu/libwebp.so.7",
+      "/lib/x86_64-linux-gnu/liblzma.so.5",
+      "/lib/x86_64-linux-gnu/libLerc.so.4",
+      "/lib/x86_64-linux-gnu/libjbig.so.0",
+      "/lib/x86_64-linux-gnu/libdeflate.so.0",
+      "/lib/x86_64-linux-gnu/libnssutil3.so",
+      "/lib/x86_64-linux-gnu/libplds4.so",
+      "/lib/x86_64-linux-gnu/libbrotlicommon.so.1",
+      "/lib/x86_64-linux-gnu/libunistring.so.5",
+      "/lib/x86_64-linux-gnu/libhogweed.so.6",
+      "/lib/x86_64-linux-gnu/libgmp.so.10",
+      "/lib/x86_64-linux-gnu/libcrypto.so.3",
+      "/lib/x86_64-linux-gnu/libp11-kit.so.0",
+      "/lib/x86_64-linux-gnu/libtasn1.so.6",
+      "/lib/x86_64-linux-gnu/libkrb5.so.3",
+      "/lib/x86_64-linux-gnu/libk5crypto.so.3",
+      "/lib/x86_64-linux-gnu/libcom_err.so.2",
+      "/lib/x86_64-linux-gnu/libkrb5support.so.0",
+      "/lib/x86_64-linux-gnu/libsasl2.so.2",
+      "/lib/x86_64-linux-gnu/libssl.so.3",
+      "/lib/x86_64-linux-gnu/libassuan.so.9",
+      "/lib/x86_64-linux-gnu/libgpg-error.so.0",
+      "/lib/x86_64-linux-gnu/libsharpyuv.so.0",
+      "/lib/x86_64-linux-gnu/libffi.so.8",
+      "/lib/x86_64-linux-gnu/libkeyutils.so.1",
+      "/lib/x86_64-linux-gnu/libresolv.so.2"
+    ]
+  },
+  {
+    "binary": "/usr/bin/pdftotext",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libpoppler.so.147",
+      "/lib/x86_64-linux-gnu/libstdc++.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libfreetype.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libfontconfig.so.1",
+      "/lib/x86_64-linux-gnu/libjpeg.so.62",
+      "/lib/x86_64-linux-gnu/libcurl-gnutls.so.4",
+      "/lib/x86_64-linux-gnu/libgpgmepp.so.6",
+      "/lib/x86_64-linux-gnu/libopenjp2.so.7",
+      "/lib/x86_64-linux-gnu/liblcms2.so.2",
+      "/lib/x86_64-linux-gnu/libpng16.so.16",
+      "/lib/x86_64-linux-gnu/libtiff.so.6",
+      "/lib/x86_64-linux-gnu/libnss3.so",
+      "/lib/x86_64-linux-gnu/libsmime3.so",
+      "/lib/x86_64-linux-gnu/libplc4.so",
+      "/lib/x86_64-linux-gnu/libnspr4.so",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libgcc_s.so.1",
+      "/lib/x86_64-linux-gnu/libbz2.so.1.0",
+      "/lib/x86_64-linux-gnu/libbrotlidec.so.1",
+      "/lib/x86_64-linux-gnu/libexpat.so.1",
+      "/lib/x86_64-linux-gnu/libnghttp3.so.9",
+      "/lib/x86_64-linux-gnu/libngtcp2_crypto_gnutls.so.8",
+      "/lib/x86_64-linux-gnu/libngtcp2.so.16",
+      "/lib/x86_64-linux-gnu/libnghttp2.so.14",
+      "/lib/x86_64-linux-gnu/libidn2.so.0",
+      "/lib/x86_64-linux-gnu/librtmp.so.1",
+      "/lib/x86_64-linux-gnu/libssh2.so.1",
+      "/lib/x86_64-linux-gnu/libpsl.so.5",
+      "/lib/x86_64-linux-gnu/libnettle.so.8",
+      "/lib/x86_64-linux-gnu/libgnutls.so.30",
+      "/lib/x86_64-linux-gnu/libgssapi_krb5.so.2",
+      "/lib/x86_64-linux-gnu/libldap.so.2",
+      "/lib/x86_64-linux-gnu/liblber.so.2",
+      "/lib/x86_64-linux-gnu/libzstd.so.1",
+      "/lib/x86_64-linux-gnu/libgpgme.so.11",
+      "/lib/x86_64-linux-gnu/libwebp.so.7",
+      "/lib/x86_64-linux-gnu/liblzma.so.5",
+      "/lib/x86_64-linux-gnu/libLerc.so.4",
+      "/lib/x86_64-linux-gnu/libjbig.so.0",
+      "/lib/x86_64-linux-gnu/libdeflate.so.0",
+      "/lib/x86_64-linux-gnu/libnssutil3.so",
+      "/lib/x86_64-linux-gnu/libplds4.so",
+      "/lib/x86_64-linux-gnu/libbrotlicommon.so.1",
+      "/lib/x86_64-linux-gnu/libunistring.so.5",
+      "/lib/x86_64-linux-gnu/libhogweed.so.6",
+      "/lib/x86_64-linux-gnu/libgmp.so.10",
+      "/lib/x86_64-linux-gnu/libcrypto.so.3",
+      "/lib/x86_64-linux-gnu/libp11-kit.so.0",
+      "/lib/x86_64-linux-gnu/libtasn1.so.6",
+      "/lib/x86_64-linux-gnu/libkrb5.so.3",
+      "/lib/x86_64-linux-gnu/libk5crypto.so.3",
+      "/lib/x86_64-linux-gnu/libcom_err.so.2",
+      "/lib/x86_64-linux-gnu/libkrb5support.so.0",
+      "/lib/x86_64-linux-gnu/libsasl2.so.2",
+      "/lib/x86_64-linux-gnu/libssl.so.3",
+      "/lib/x86_64-linux-gnu/libassuan.so.9",
+      "/lib/x86_64-linux-gnu/libgpg-error.so.0",
+      "/lib/x86_64-linux-gnu/libsharpyuv.so.0",
+      "/lib/x86_64-linux-gnu/libffi.so.8",
+      "/lib/x86_64-linux-gnu/libkeyutils.so.1",
+      "/lib/x86_64-linux-gnu/libresolv.so.2"
+    ]
+  },
+  {
+    "binary": "/bin/sh",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/usr/bin/ls",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libselinux.so.1",
+      "/lib/x86_64-linux-gnu/libcap.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libpcre2-8.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/usr/bin/uname",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/usr/bin/tr",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/usr/bin/sed",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libacl.so.1",
+      "/lib/x86_64-linux-gnu/libselinux.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libpcre2-8.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/usr/bin/xargs",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/usr/bin/echo",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjaas.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt_headless.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libnet.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libmanagement_ext.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libsimdsort.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libzip.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libverify.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjsig.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libsyslookup.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjawt.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt_xawt.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libX11.so.6",
+      "/lib/x86_64-linux-gnu/libXext.so.6",
+      "/lib/x86_64-linux-gnu/libXi.so.6",
+      "/lib/x86_64-linux-gnu/libXrender.so.1",
+      "/lib/x86_64-linux-gnu/libXtst.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libxcb.so.1",
+      "/lib/x86_64-linux-gnu/libXau.so.6",
+      "/lib/x86_64-linux-gnu/libXdmcp.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libsplashscreen.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libX11.so.6",
+      "/lib/x86_64-linux-gnu/libXext.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libxcb.so.1",
+      "/lib/x86_64-linux-gnu/libXau.so.6",
+      "/lib/x86_64-linux-gnu/libXdmcp.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt_xawt.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libX11.so.6",
+      "/lib/x86_64-linux-gnu/libXext.so.6",
+      "/lib/x86_64-linux-gnu/libXi.so.6",
+      "/lib/x86_64-linux-gnu/libXrender.so.1",
+      "/lib/x86_64-linux-gnu/libXtst.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libxcb.so.1",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libXau.so.6",
+      "/lib/x86_64-linux-gnu/libXdmcp.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/liblcms.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libprefs.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libj2pkcs11.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libnio.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libnet.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libj2gss.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjdwp.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libfontmanager.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libfreetype.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libawt.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libbz2.so.1.0",
+      "/lib/x86_64-linux-gnu/libpng16.so.16",
+      "/lib/x86_64-linux-gnu/libbrotlidec.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libbrotlicommon.so.1"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libextnet.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libsctp.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libnet.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjsvml.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libattach.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libinstrument.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjli.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/jspawnhelper",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libmanagement.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjimage.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libj2pcsc.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libdt_socket.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/librmi.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libnative-image-agent.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjli.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjavajpeg.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjsound.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libasound.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libmlib_image.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjvmcicompiler.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libsaproc.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libmanagement_agent.so",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libjava.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib64/ld-linux-x86-64.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/jexec",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/libnative-image-diagnostics-agent.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jmap",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jmod",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jnativescan",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jrunscript",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jstat",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jar",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jconsole",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jps",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/javadoc",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jstack",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/java",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jdb",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jdeps",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jinfo",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/serialver",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jfr",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jhsdb",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/native-image",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jcmd",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jwebserver",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jlink",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jarsigner",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jdeprscan",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/javac",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/javap",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/keytool",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jpackage",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jstatd",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jshell",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/rmiregistry",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/jimage",
+    "dependencies": [
+      "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/bin/../lib/libjli.so",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjsig.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/server/libjvm.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/svm/bin/native-image",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libm.so.6",
+      "/lib/x86_64-linux-gnu/libz.so.1",
+      "/lib/x86_64-linux-gnu/libpthread.so.0",
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  },
+  {
+    "binary": "/workspace/toolchains/graalvm-community-25.3.4.1+1.1/lib/svm/builder/lib/libreporterchelper.so",
+    "dependencies": [
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/ld-linux-x86-64.so.2"
+    ]
+  }
+]

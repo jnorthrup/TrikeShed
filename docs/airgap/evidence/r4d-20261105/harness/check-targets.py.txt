@@ -1,0 +1,8 @@
+from pathlib import Path
+import subprocess,json
+h=Path('/workspace/airgap-r4d-proof');repo=Path('/workspace/TrikeShed');before='d80e698139c69e70c594940b007a22673b193937'
+build=json.loads(Path('/workspace/r4d-combined-check03.json').read_text());assert build['exit']==0
+result=subprocess.run(['python3',str(h/'verify.py'),'targets','/workspace/r4d-target-check03.txt']);assert result.returncode==0
+check=json.loads(Path('/workspace/r4d-target-check03.json').read_text());assert check['exit']==0 and check['sourceCommit']==build['sourceCommit']
+changed=subprocess.check_output(['git','diff','--name-only',before,build['sourceCommit'],'--','src','build.gradle.kts','gradle','gradle.properties','settings.gradle.kts','release','contracts'],cwd=repo,text=True).splitlines()
+(h/'target-standing.json').write_text(json.dumps({'currentSourceCommit':build['sourceCommit'],'previousTestedSourceCommit':before,'changedBuildAndSourcePaths':changed,'freshCheck':check,'basis':'Fresh browser, JS, Wasm and Linux target compiles after incoming common/browser production changes; preliminary unchanged-target standing superseded.'},indent=2)+'\n')

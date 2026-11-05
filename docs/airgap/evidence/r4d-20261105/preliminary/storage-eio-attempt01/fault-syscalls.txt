@@ -1,0 +1,2 @@
+82281 1793851400.097465 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x14} ---
+82274 1793851400.277394 fsync(19</state/runtime/.kanban/board.wal>) = -1 EIO (Input/output error) (INJECTED)

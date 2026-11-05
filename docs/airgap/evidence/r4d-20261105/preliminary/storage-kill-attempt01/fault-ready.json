@@ -1,0 +1,24 @@
+{
+  "javaPid": 82681,
+  "tracerPid": 83081,
+  "command": [
+    "strace",
+    "-f",
+    "-yy",
+    "-ttt",
+    "-s",
+    "160",
+    "-e",
+    "trace=fsync",
+    "-P",
+    "/state/runtime/.kanban/board.wal",
+    "--inject=fsync:signal=SIGKILL:when=1",
+    "-o",
+    "/workspace/airgap-r4d-proof/storage-kill-attempt01/fault-syscalls.txt",
+    "-p",
+    "82681"
+  ],
+  "allObservedThreadsAttached": true,
+  "threadsAtAttach": 33,
+  "fault": "kill"
+}

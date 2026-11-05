@@ -1,0 +1,20 @@
+{
+  "casObjectsVerified": 30,
+  "before": "selection",
+  "oldRunId": "ea4035b7-a19f-4dff-8816-85bb143059d9",
+  "newRunId": "f0aa070f-8bde-44ff-bd8b-744a19474b43",
+  "runningReceiptCid": "sha256:9450c7707fa34b302af4a00485308530bdd389669c8ca22de8c88ae2715af10a",
+  "interruptedReceiptCid": "sha256:6f4aebbcda199fd11b5944f8ebed08bb4d12593db4a68ba26f599a70f4f71557",
+  "completedReceiptCid": "sha256:cccec6a311ca2c87fef5888ae643af0f51a7dbba8e5112fc5f65765dab935e41",
+  "previousReceiptIdentityVerified": true,
+  "newRunIdentityDistinct": true,
+  "programIdentityUnchanged": true,
+  "noInventedInterruptedOutputsOrInvocations": true,
+  "identicalRowsAfterFinalRestart": true,
+  "sixDocumentRevisionsUnchanged": true,
+  "consumedWires": 8,
+  "nativeLiveBytesAfter": 0,
+  "exactUtf16Quotation": true,
+  "writerCleanupAbsent": true,
+  "recoverAndInspectorCleanupCompleted": true
+}

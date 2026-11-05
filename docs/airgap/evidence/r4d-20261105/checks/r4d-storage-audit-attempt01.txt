@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4d-proof/storage-audit-initial.py", line 26, in <module>
+    initial,final=frames(before),frames(after);assert [f['status'] for f in initial]==['validating','running'];assert [f['status'] for f in final]==['validating','running','completed']
+                                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

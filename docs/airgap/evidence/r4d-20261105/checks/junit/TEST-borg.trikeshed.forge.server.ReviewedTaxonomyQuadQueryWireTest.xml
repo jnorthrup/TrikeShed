@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ReviewedTaxonomyQuadQueryWireTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T04:37:02.916Z" hostname="0d6dfba25614" time="0.236">
+  <properties/>
+  <testcase name="querySyntaxAndBudgetRefusalsHaveNoPartialBindingsOrAuthorityFallback()[jvm]" classname="borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest" time="0.097"/>
+  <testcase name="currentHostQueryUsesOffPagePremisesAndKeepsPhysicalAndReviewedAuthoritySeparate()[jvm]" classname="borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest" time="0.046"/>
+  <testcase name="optionalSourceProfileLimitDoesNotChangePlainReportAcceptance()[jvm]" classname="borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest" time="0.035"/>
+  <testcase name="finalReadRefusesSourceChangeDuringQueryAndWithdrawnApproval()[jvm]" classname="borg.trikeshed.forge.server.ReviewedTaxonomyQuadQueryWireTest" time="0.055"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

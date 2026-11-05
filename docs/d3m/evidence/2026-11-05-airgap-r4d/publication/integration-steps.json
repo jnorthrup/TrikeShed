@@ -1,0 +1,20 @@
+[
+  {
+    "ref": "refs/remotes/origin/HEAD",
+    "commit": "21e70d7d65d29f633c0132e2e03e8716f93c42ae",
+    "time": 1793851519,
+    "before": "7684c178206eaabb142c20bcca07d46c3b5fa4ad",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n docs/airgap/README.md                              |   4 +\n .../integration-v77.json                           | 297 +++++++\n .../verification-v77-post-r4c.json                 |  31 +\n .../verification-v77.json                          | 958 +++++++++++++++++++++\n 4 files changed, 1290 insertions(+)\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/integration-v77.json\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/verification-v77-post-r4c.json\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/verification-v77.json\n",
+    "after": "b4a0f08eb33977ff7362b2ae7e9af3c62db6ce68"
+  },
+  {
+    "ref": "refs/remotes/origin/feat/retained-nal-lcnc-20261105",
+    "commit": "4c59f409b91e1d09c3a375f3b0d7ff6c1827ecc7",
+    "time": 1793852126,
+    "before": "b4a0f08eb33977ff7362b2ae7e9af3c62db6ce68",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../borg/trikeshed/lcnc/EnglishLcncPreset.kt       |   1 +\n .../borg/trikeshed/lcnc/EnglishNalContract.kt      |  16 ++\n .../kotlin/borg/trikeshed/lcnc/EnglishNalPreset.kt |  40 ++++\n .../kotlin/borg/trikeshed/lcnc/LcncNodeKey.kt      |   1 +\n .../kotlin/borg/trikeshed/lcnc/LcncPresets.kt      |   3 +-\n .../borg/trikeshed/lcnc/EnglishNalPresetTest.kt    |  41 ++++\n .../borg/trikeshed/lcnc/PresetAssemblyTest.kt      |   2 +-\n .../web/spacegraph/PanelsDocumentSource.kt         |   2 +-\n .../forge/server/EnglishObservationWire.kt         |  41 ++++\n .../forge/server/EnglishNalPresetExecutionTest.kt  | 264 +++++++++++++++++++++\n src/jvmTest/resources/english-nal/README.txt       |  29 +++\n .../english-nal/guard-inspection.cbor.b64          | 100 ++++++++\n src/jvmTest/resources/english-nal/guard-source.txt |   1 +\n .../resources/english-nal/s12-inspection.cbor.b64  | 184 ++++++++++++++\n src/jvmTest/resources/english-nal/s12-source.txt   |   5 +\n 15 files changed, 727 insertions(+), 3 deletions(-)\n create mode 100644 src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishNalContract.kt\n create mode 100644 src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishNalPreset.kt\n create mode 100644 src/commonTest/kotlin/borg/trikeshed/lcnc/EnglishNalPresetTest.kt\n create mode 100644 src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishNalPresetExecutionTest.kt\n create mode 100644 src/jvmTest/resources/english-nal/README.txt\n create mode 100644 src/jvmTest/resources/english-nal/guard-inspection.cbor.b64\n create mode 100644 src/jvmTest/resources/english-nal/guard-source.txt\n create mode 100644 src/jvmTest/resources/english-nal/s12-inspection.cbor.b64\n create mode 100644 src/jvmTest/resources/english-nal/s12-source.txt\n",
+    "after": "b8ed92a2347a01ea1be000c50d10568e765ba1f2"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "accepted": false,
+  "observedHttpStatus": 503,
+  "observedError": "receipt_commit_failed",
+  "walBytesBefore": 278,
+  "walBytesAfter": 417,
+  "observedShutdownError": "Kanban module cleanup failed; FSYNC failed: -5",
+  "harnessError": "Expected zero exit after an injected durability failure; cleanup exception then interrupted report export",
+  "preserved": "Original logs, browser response, WAL bytes and per-attempt harness; no successful cleanup or recovered inspector claimed"
+}

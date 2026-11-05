@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="KgKifCommentTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-05T04:00:55.476Z" hostname="0d6dfba25614" time="0.05">
+  <properties/>
+  <testcase name="commentsDoNotTurnMalformedMixedOrUnsupportedTailsIntoFacts()[jvm]" classname="borg.trikeshed.narsese.KgKifCommentTest" time="0.005"/>
+  <testcase name="leadingAndTrailingCommentsUseTheStrictKifCrossing()[jvm]" classname="borg.trikeshed.narsese.KgKifCommentTest" time="0.002"/>
+  <testcase name="wireRefusesTheWholeCommentedInputBeforeRetentionAndKeepsTheOwnerHealthy()[jvm]" classname="borg.trikeshed.narsese.KgKifCommentTest" time="0.038"/>
+  <testcase name="wireRetainsExactCommentedSourceAndItsDefinitionWithoutNormalizing()[jvm]" classname="borg.trikeshed.narsese.KgKifCommentTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

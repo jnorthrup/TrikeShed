@@ -131,6 +131,21 @@ callback after the page had already received HTTP 503. Its harness now awaits
 the exact run response directly. That failed archive attempt remains retained;
 no application behavior or receipt assertion was weakened.
 
+A second extracted-archive attempt completed the fault, recovery and retained
+evidence checks, but its Evidence-tab read was invalidated by the preset's
+pending camera-save callback. The screenshot preserves the application's
+explicit stale-inspection message. The harness now waits for that callback's
+observable URL bookmark and handles a stale Evidence read with the existing
+Refresh action. It neither retries Run nor disables the revision guard.
+
+The third archive EIO attempt passed all five browser assertions, then lost
+the proof-only shutdown response as the inspector closed its listener. The
+inspector actually exited zero and exported complete cleanup. That attempt
+remains marked failed. Final harnesses let the process controller request
+shutdown after the browser closes; they record the response or transport
+error and require the actual zero exit, no forced termination and complete
+cleanup record. An HTTP shutdown acknowledgment alone is not cleanup evidence.
+
 The first independent audit expected `validating` as the first WAL status;
 the actual profile retains `queued`. A second audit reached the quotation and
 needed integer indices for JSON coordinates represented as integral floating
@@ -140,20 +155,78 @@ require the exact run chain, frame CRCs and known quotation boundaries.
 ## Scope and reproduction
 
 The [D3M record](../d3m/2026-11-05-airgap-r4d.md) binds this correction to the
-combined source. The JVM application and selected tests are rebuilt. Other
-targets reuse R4c's successful compile evidence only after checking that their
-source sets, build files and contracts are byte-identical; no fresh non-JVM
-compile is claimed.
+combined source. A publication fetch added the retained-English NAL LCNC node
+and a geometry-label correction after the first successful JVM build. The
+combined source therefore requires fresh JVM, browser and affected-target
+checks; the earlier unchanged-target comparison is retained as preliminary
+evidence only. The packaged document graph still uses its existing LLVM
+scanner and does not silently add a NAL evaluation.
+
+That combined build exposed a structured-input conversion error in the
+existing Confix selection node: Kotlin `toString()` is not JSON serialization.
+Four incoming NAL preset tests failed at strict JSON parsing. The integration
+fix uses the existing JSON serializer for structured wire inputs while
+preserving encoded text and native source-identity checks. The failing build
+and corrected source identities remain in the D3M record.
 
 Use the packaged launch and isolation instructions in the
 [release README](../../release/airgap-document/README.md) and
 [offline-runtime runbook](06-offline-runtime.md). The retained storage harness
 adds external `strace` fault control on the verification host; it is not an
 application dependency or a new product control. Only trace owned processes.
-Preserve archive modes when extracting. Verification-host kernel, browser,
+The final packaging/proof pass overlaps the independent target build on the
+verification host. Resource observations are process snapshots under that
+shared load, not performance benchmarks. Preserve archive modes when
+extracting. Verification-host kernel, browser,
 namespace tooling and tracer remain external inputs.
 
 Vendor JDK modifications, embedded native-resource source-build closure,
 arbitrary-write/power-loss recovery, broader deployment environments and the
 full recursive LCNC visualization remain open. The complete JDK remains in the
 package; this increment does not claim a smaller runtime or benchmark gains.
+
+## Accepted R4d checkpoint
+
+The tested source is `8579dcad12d3b22c84ef3017157bf41e9a0fdbaf`. The selected JVM run has
+265 tests: 264 pass, zero fail/error, and one conditional external
+native-Horn endpoint check is skipped. Fresh offline compilation covers the
+Documents and Spacegraph applications, JS main, Wasm JS, Wasm WASI and Linux
+x64. No compile exclusion is added. The failed earlier combined run and all
+preliminary archive attempts are retained.
+
+The extracted runtime passes seventeen browser cases across final-flush EIO,
+final-flush SIGKILL and a pre-finish selection-boundary interruption. Their
+process exits are respectively `[1,0]`, `[137,0]`, and `[137,0,0]`; the nonzero
+writer exits are the expected failures and are not reported as clean shutdown.
+Seven startup refusal controls and five package-integrity refusal controls
+pass. An ordinary completed run supplies the separate syscall-order trace.
+
+The baseline has 89 new shard directories and 89 missing parent barriers.
+The accepted trace has 90 new shard directories and zero missing parent barriers.
+This comparison is about observed ordering, not a throughput benchmark.
+
+| Scenario / process | Ready, seconds | JVM high-water KiB at snapshot | JVM CPU seconds at snapshot | Exit |
+|---|---:|---:|---:|---:|
+| eio / run | 3.637 | 432124 | 10.320 | 1 |
+| eio / inspect | 2.456 | 364496 | 7.590 | 0 |
+| kill / run | 3.681 | 404588 | 10.520 | 137 |
+| kill / inspect | 2.697 | 363220 | 8.090 | 0 |
+| interruption / run | 3.665 | 445560 | 10.630 | 137 |
+| interruption / recover | 3.452 | 431308 | 10.680 | 0 |
+| interruption / inspect | 2.296 | 356220 | 7.680 | 0 |
+
+Writer snapshots precede the selected fault; other snapshots precede normal
+shutdown. Heap and reported-processor settings are not OS resource quotas.
+The package contains 23 dependency jars and three application jars; the full
+JDK remains. Two independently emitted archives over the pinned bytes match.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| Linux x64 runtime | 460575849 | `79a46f04b12ddcba0d5e89f9d9e4c43a4ffcde705ec89ab19a9fb5c9d917df86` |
+| Corresponding-source companion | 712180393 | `a0ab4c279c7a59982e46772a6d4fa182598f5a508029fd768af57aeae0b93407` |
+
+The [verification packet](evidence/r4d-20261105/verification.json) links exact
+commands, independent CAS/WAL audits, syscall traces, screenshots, recordings,
+failed attempts and package inventories. Its `SHA256.json` covers raw retained
+evidence bytes. Source-build reproducibility is separate from identical
+packaging; the vendor JDK `SOURCE` plus-sign qualification remains open.

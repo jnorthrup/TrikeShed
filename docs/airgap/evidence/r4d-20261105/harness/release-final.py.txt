@@ -1,0 +1,24 @@
+from pathlib import Path
+import subprocess,json,hashlib,os
+h=Path('/workspace/airgap-r4d-proof');repo=Path('/workspace/TrikeShed')
+def run(args,name,env=None):
+ with (Path('/workspace')/('r4d-'+name+'.txt')).open('w') as log:p=subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,env=env)
+ assert p.returncode==0,(name,p.returncode)
+ print(name,'PASS',flush=True)
+def record(p):return {'file':str(p),'bytes':p.stat().st_size,'sha256':hashlib.file_digest(p.open('rb'),'sha256').hexdigest()}
+build=json.loads(Path('/workspace/r4d-combined-check03.json').read_text());assert build['exit']==0 and build['sourceCommit']==subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
+run(['python',str(h/'assemble.py'),'application'],'application-stage-final02')
+profile=json.loads((h/'runtime-profile.json').read_text());profile['jarBytes']=sum(p.stat().st_size for p in (h/'rootfs/opt/trikeshed/lib').glob('*.jar'));(h/'runtime-profile.json').write_text(json.dumps(profile,indent=2)+'\n')
+run(['python',str(h/'package.py'),'manifest'],'package-manifest');run(['python',str(h/'package.py'),'verify'],'package-verify');run(['python',str(h/'integrity-final.py')],'integrity')
+first=Path('/workspace/library-files/airgap-document-r4d-linux-x64-2026-11-05.tar.gz');second=h/'reproducibility-second.tar.gz'
+for p,name in [(first,'archive-first'),(second,'archive-second')]:run(['python',str(h/'package.py'),'archive',str(p)],name)
+a,b=record(first),record(second);assert a['sha256']==b['sha256'];(h/'reproducibility.json').write_text(json.dumps({'first':a,'second':b,'identical':True,'scope':'Deterministic pinned-byte packaging; not source-build reproducibility'},indent=2)+'\n')
+unpacked=h/'unpacked';unpacked.mkdir(exist_ok=False);run(['tar','-xzpf',str(first),'--no-same-owner','-C',str(unpacked)],'archive-extract')
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(unpacked/'airgap-document-rootfs');run(['python',str(h/'package.py'),'verify'],'unpacked-verify',env)
+prefix=['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4d-proof','python']
+run(prefix+[str(h/'trace.py'),'trace-archive02'],'trace-archive02',env);run(['python',str(h/'mkdir-audit.py'),'trace-archive02','require'],'mkdir-archive-audit')
+for fault in ['eio','kill']:
+ name='storage-'+fault+('-archive03' if fault=='eio' else '-archive01');run(prefix+[str(h/'storage.py'),name,'selection',fault],name,env);run(['python',str(h/'storage-audit.py'),name],name+'-audit')
+name='interruption-selection-archive01';run(prefix+[str(h/'run.py'),name,'selection'],name,env);run(['python',str(h/'audit.py'),name],'interruption-selection-audit')
+run(prefix+[str(h/'negative.py'),name,'negative-attempt01'],'negative-attempt01',env);run(prefix+[str(h/'recovery-negative.py'),name,'recovery-negative-attempt01'],'recovery-negative-attempt01',env)
+run(prefix+[str(h/'directory-negative.py'),'storage-eio-archive03','directory-negative-archive01'],'directory-negative-archive01',env)

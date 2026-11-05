@@ -1,0 +1,31 @@
+from pathlib import Path
+import subprocess,json,time,urllib.request,os,sys,socket,errno,hashlib
+h=Path('/workspace/airgap-r4d-proof');a=h/sys.argv[1];a.mkdir(exist_ok=False);state=a/'state';state.mkdir();base='http://127.0.0.1:18764';http=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+source=Path('/workspace/airgap-r4c-proof/interruption-selection-archive01/processes.json');cmd=json.loads(source.read_text())['processes'][0]['command'];i=cmd.index('--bind');cmd[i+1]=str(state);cmd[cmd.index('--hostname')+1]='airgap-r4d'
+trace=['strace','-f','-yy','-ttt','-s','160','-e','trace=write,pwrite64,pwritev,pwritev2,writev,fsync,fdatasync,rename,renameat,renameat2,ftruncate,mkdir,mkdirat,io_uring_setup,io_uring_enter,io_uring_register','-o',str(a/'syscalls.txt')]+cmd
+report={'command':trace,'namespace':os.readlink('/proc/self/ns/net'),'routes':json.loads(subprocess.check_output(['ip','-j','route']))};assert not report['routes']
+for name in ['trace.py','trace.cjs']:(a/(name+'.txt')).write_bytes((h/name).read_bytes())
+log=(a/'run.txt').open('w');p=subprocess.Popen(trace,stdout=log,stderr=subprocess.STDOUT);driver=None
+try:
+ end=time.monotonic()+60
+ while True:
+  assert p.poll() is None,('early exit',p.returncode)
+  try:
+   with http.open(base+'/__proof/state',timeout=2) as response:seed=json.load(response)
+   break
+  except OSError:
+   assert time.monotonic()<end;time.sleep(.2)
+ (a/'ready.json').write_text(json.dumps(seed,indent=2)+'\n')
+ env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright'
+ with (a/'driver.txt').open('w') as d:driver=subprocess.run(['node',str(h/'trace.cjs'),str(a),base],env=env,stdout=d,stderr=subprocess.STDOUT,timeout=180)
+ assert driver.returncode==0
+ p.wait(timeout=30);assert p.returncode==0
+except BaseException as e:report['error']=repr(e)
+finally:
+ if p.poll() is None:
+  try:http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3).read()
+  except OSError:pass
+  try:p.wait(timeout=30)
+  except subprocess.TimeoutExpired:p.terminate();p.wait(timeout=10)
+ log.close();report['exit']=p.returncode;report['driverExit']=driver.returncode if driver else None;(a/'process.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps({k:v for k,v in report.items() if k!='command'},indent=2))
+assert 'error' not in report,report

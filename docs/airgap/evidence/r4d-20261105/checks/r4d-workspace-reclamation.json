@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-05T03:55:43.390493+00:00",
+  "scope": "Remove only two reproducible scratch extractions; all published archives, original runtime trees and evidence retained",
+  "records": [
+    {
+      "removedGeneratedExtraction": "/workspace/airgap-r4-proof/unpacked",
+      "retainedReleaseArchive": "/workspace/library-files/airgap-document-r4a-linux-x64-2026-11-05.tar.gz",
+      "sha256": "81348e664c96af611aba391b3a377c865608980c30eba19382f13397614ce3a7",
+      "restore": "mkdir -p /workspace/airgap-r4-proof/unpacked && tar -xzpf /workspace/library-files/airgap-document-r4a-linux-x64-2026-11-05.tar.gz --no-same-owner -C /workspace/airgap-r4-proof/unpacked"
+    },
+    {
+      "removedGeneratedExtraction": "/workspace/airgap-r4b-proof/unpacked",
+      "retainedReleaseArchive": "/workspace/library-files/airgap-document-r4b-linux-x64-2026-11-05.tar.gz",
+      "sha256": "065ca62ee7d4e75a0564440a70736b22b548ca7699479f516becf9245916fbfa",
+      "restore": "mkdir -p /workspace/airgap-r4b-proof/unpacked && tar -xzpf /workspace/library-files/airgap-document-r4b-linux-x64-2026-11-05.tar.gz --no-same-owner -C /workspace/airgap-r4b-proof/unpacked"
+    }
+  ]
+}

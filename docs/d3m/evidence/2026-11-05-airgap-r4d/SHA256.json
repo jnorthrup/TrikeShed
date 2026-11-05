@@ -1,0 +1,19 @@
+{
+  ".gitattributes": "e97602ab9cac70102245345c5ab0fc9830df8b17f1072b188265a662a3a547ae",
+  "fetch.txt": "1b767642cdf791b289358d6b48cbf802dfb80b82e19582debb22a90f7e0bffcf",
+  "integrate-publication.py.txt": "1622a2eaf56ec4b7f01673312f0ecfd35691993a88f7ee26d3de962b6dc2e2e2",
+  "integrate.py.txt": "857c893b277734ff0ab38831c8681632cdec4a536f69a52e880a57e6604a761d",
+  "integration-inputs.json": "79a16ad85799f44acdfc001051f26d3896623f5f03f630df6a820478dac67f60",
+  "integration-log.txt": "c1b7ab481b36988293dc3f632ec1927f1883f1916ac54237c4bcd8043fcb3882",
+  "integration-steps.json": "54e869c10c5e9e51cc8909c87ae6c0f1a732361d74d90a57683d9d42bb9e82c7",
+  "publication/integration-steps.json": "57f2499dbb4812c5ca66ff2ff93fcbafa8f428418274012d11e7b81b6d112a32",
+  "publication/intent/incoming-preset.kt.txt": "904c83445eed7b79c5856e962d36f970ae0277d7e1495e0d521a78ed52d299ce",
+  "publication/intent/resolution.json": "138333c69dbd62eaa99ca2af64b32c1ccf5b41cb13998ca8eaaca8dbc0dce97d",
+  "publication/intent/selection-before-intent.kt.txt": "081a5b201680656dfc5d7988c5f5e0450ccd7cff6b2c331b7b0fee7ae73c4624",
+  "publication/publication-inputs.json": "eced602e01275d53dd60de56f28077019bbf5eba2b5aa6a51c70066dac464b27",
+  "publication-fetch.json": "48e4e552cb0b211cdc79d2a8ee081568968f95e4f8af769db9c6c3b1f04e2b55",
+  "publication-inputs.json": "eced602e01275d53dd60de56f28077019bbf5eba2b5aa6a51c70066dac464b27",
+  "publication-integration-log.txt": "ebdf6fac7a16f93acf6aef4e67298d7f7011d9a6547bb877b9b1d64486eda31d",
+  "publication-remote-heads.json": "df655f8a0ab724f65a00d7a4c1f570ce05d737dcf42ac9c959a0c7bc6dfad51c",
+  "remote-heads.txt": "81a6a85ee034ea4229aebf2d9f92de5e1e37dddfc9e966bacd0b0c83324ff910"
+}

@@ -1,0 +1,2287 @@
+{
+  "fault": "eio",
+  "cases": {
+    "beforePublication": {
+      "result": "PASS",
+      "runId": "7cb1fb76-dd3d-4cda-b6e5-05e8a699e958",
+      "pausedBefore": "selection"
+    },
+    "unconfirmedResponse": {
+      "result": "PASS",
+      "text": "Forge\nBoard\nCurator\nDocuments\nWiki\nGraal\nPanels\nJob agent\nKanban\nPi\nHermes\nKeyMux\nModelMux\nFuton\nPANELS\nLOWCODE · NOCODE · CONSTRUCTION\n▶ run\nSPARQL query\nSQL query\nDebug nodes\nOroboros\nLive\n■ stop timers\n+ node\n↦ fd\nshake\n⤢ fit\n⇪ store\n⇩ store\n▤ presets\nConfix & facets\n⟁ rdf\nSpaceGraph\n⧉ palette\n⌫ assets\n⚿ keys\nexport\nimport\n↶\n↷\nclear\n⚡\n⚑\nRequest returned HTTP 503 without a receipt: receipt_commit_failed. No automatic retry.\nProvider keys & modelsConcentric work network\nAGENT\nagent.list\ninstalled coding agents\nUnavailable: No runtime owner is bound\nagent.run\ncoding agent run\nUnavailable: No runtime owner is bound\nBELIEFS\nbeliefs.introspect\nNAL-9 introspection\nUnavailable: No runtime owner is bound\nbeliefs.resonate\nresonance (support/refutation)\nUnavailable: No runtime owner is bound\nbeliefs.review\nturn review (induction)\nUnavailable: No runtime owner is bound\nBLACKBOARD\nblackboard.board\nblackboard board view\nUnavailable: No runtime owner is bound\nblackboard.facts\nblackboard facts\nUnavailable: No runtime owner is bound\nblackboard.neighbors\nblackboard semantic neighbors\nUnavailable: No runtime owner is bound\nblackboard.sites\nblackboard sites\nUnavailable: No runtime owner is bound\nBOARD\nboard.get\nkanban board\nboard.view\nkanban board (summary)\nBOOK\nbook.curate\ntext → the sections its own heading shape evidences → statements (every asserted clause: modal norms and OpenIE relations, coreference resolved) with section support, frozen as a book\nUnavailable: No runtime owner is bound\nbook.snapshot\nretained parser statements under a selected customer ontology\nUnavailable: No runtime owner is bound\nCCEK\nccek.activate\nccek context activate / deactivate\nUnavailable: No runtime owner is bound\nccek.agent\nccek agent (this program subscribes)\nUnavailable: No runtime owner is bound\nccek.choreograph\nccek choreograph (a node the context asserts against)\nUnavailable: No runtime owner is bound\nccek.context\nccek user context (fork lineage)\nUnavailable: No runtime owner is bound\nccek.drain\nccek drain (graceful cancel)\nUnavailable: No runtime owner is bound\nccek.fact\nccek causal fact\nUnavailable: No runtime owner is bound\nccek.flow\nccek graphical flow (blocks + edges → cursor)\nUnavailable: No runtime owner is bound\nccek.incarnate\nccek node (incarnate / attach)\nUnavailable: No runtime owner is bound\nccek.lineage\nccek context document (as it stands now)\nUnavailable: No runtime owner is bound\nccek.paradigm\nccek adapt paradigm (rules → facts)\nUnavailable: No runtime owner is bound\nccek.polyglot.load\nccek polyglot facts (load)\nUnavailable: No runtime owner is bound\nccek.polyglot.query\nccek polyglot facts (query)\nUnavailable: No runtime owner is bound\nccek.predict\nccek model prediction\nUnavailable: No runtime owner is bound\nccek.projection\nccek projection (live view)\nUnavailable: No runtime owner is bound\nccek.query\nccek rete query (facts by kind)\nUnavailable: No runtime owner is bound\nccek.recording\nccek recording (replay log)\nUnavailable: No runtime owner is bound\nccek.signal\nccek signal (every ForgeSignal verb)\nUnavailable: No runtime owner is bound\nccek.status\nccek fan-out status\nUnavailable: No runtime owner is bound\nccek.table.test\nccek table test (prediction against the facts)\nUnavailable: No runtime owner is bound\nccek.validate\nccek scope validation (what this runner's context carries)\nUnavailable: No runtime owner is bound\nccek.veneer\nccek spreadsheet veneer (facet the facts)\nUnavailable: No runtime owner is bound\nccek.vitals\nccek node vitals (alive?)\nUnavailable: No runtime owner is bound\nCONFIX\nconfix.pickPath\njson path → sheet\nconfix.sheets\njson → confix sheet family\nCONSTELLATION\nconstellation.ask\nquery class norms using explicit premise assumptions; text and stored facts are unverified candidates\nUnavailable: No runtime owner is bound\nconstellation.brief\na constellation's frontier as an outcome summary: conflicts, open premises as questions, restated norms, with sections — wiki.propose's summary\nUnavailable: No runtime owner is bound\nconstellation.join\na curated book joins a named constellation: restated norms, conflicts, edition alignment, published to constellation/\nUnavailable: No runtime owner is bound\nconstellation.render\nstatements → sentences read back through the parser: the text, and the statements whose sentence parses to another statement (drift)\nUnavailable: No runtime owner is bound\nconstellation.settle\npremise cards whose premise a joined book now states → kanban.move commands to done\nUnavailable: No runtime owner is bound\nCONTEXT\ncontext.assemble\ncontext chain (cache identity)\nUnavailable: No runtime owner is bound\ncontext.fold\nplaybook fold (deterministic)\nUnavailable: No runtime owner is bound\ncontext.project\nProject local source passages\nUnavailable: No runtime owner is bound\ncontext.recall\nRecall retained source passages\nUnavailable: No runtime owner is bound\nCORE\nbutton\nbutton (nameable trigger)\ncoalesce\ncoalesce (a? over b — clarified wins, absent yields lose)\nUnavailable: No runtime owner is bound\ndisplay\ndisplay\nUnavailable: No runtime owner is bound\ngauge\ngauge\njs\njs transform\nmerge\nmerge (the if/else join: the one guarded ring's yield that is present)\nnote\nnote\nUnavailable: No runtime owner is bound\npick\npick path\npreset-bughunter\npreset-bughunter (composite)\npreset-corpus\npreset-corpus (composite)\npreset-council\npreset-council (composite)\npreset-document-review\npreset-document-review (composite)\npreset-english-camel-query\npreset-english-camel-query (composite)\npreset-english-copular-query\npreset-english-copular-query (composite)\npreset-english-nal-report\npreset-english-nal-report (composite)\npreset-legal-tribunal-case\npreset-legal-tribunal-case (composite)\npreset-legal-tribunal-case-v2\npreset-legal-tribunal-case-v2 (composite)\npreset-scope\npreset-scope (composite)\npreset-scope-inner\npreset-scope-inner (composite)\npreset-shake\npreset-shake (composite)\npreset-subvm-audit\npreset-subvm-audit (composite)\npreset-tribunal-case\npreset-tribunal-case (composite)\npreset-tribunal-case-v2\npreset-tribunal-case-v2 (composite)\nscope\nscope (a ring — holds its children)\nslider\nslider (num patch point)\ntimer\ntimer\nCOUNCIL\ncouncil.case\ncouncil case read-back (index + transcript/verdict from CAS)\nUnavailable: No runtime owner is bound\ncouncil.convene\ncouncil convene (config → drawn program)\nUnavailable: No runtime owner is bound\ncouncil.record\ncouncil record (CAS + blackboard + couch + KIF + case lifecycle)\nUnavailable: No runtime owner is bound\ncouncil.seat\ncouncil seat (one model call, degrade-loudly)\nUnavailable: No runtime owner is bound\nCREDENTIAL\ncredential.enter\nsave a key\nUnavailable: No runtime owner is bound\ncredential.list\nsaved keys\nUnavailable: No runtime owner is bound\nDOCUMENT\ndocument.correct\ndocument correction (retained source lineage)\ndocument.curate\ndocument curation (managed NLP, source-linked cursor)\nUnavailable: No runtime owner is bound\ndocument.english.corpus\nEnglish corpus statistics and topics\nUnavailable: No runtime owner is bound\ndocument.english.evidence\nCheck routed evidence identity\ndocument.english.nal\nInspect retained English NAL hypotheses\nUnavailable: No runtime owner is bound\ndocument.english.patterns\nInspect legal language candidates\nUnavailable: No runtime owner is bound\ndocument.english.patterns.query\nQuery retained legal language candidates\nUnavailable: No runtime owner is bound\ndocument.english.query\nQuery English receipt observations\nUnavailable: No runtime owner is bound\ndocument.english.route\nLocal English evidence route\ndocument.reviewDecision\nauthenticated analyst decision on frozen evidence\nUnavailable: No runtime owner is bound\ndocument.reviewRelease\nrelease the exact current analyst approval once\nUnavailable: No runtime owner is bound\ndocument.reviewSnapshot\nfreeze selected curation evidence for analyst review\nUnavailable: No runtime owner is bound\ndocument.reviewTask\ndocument proposal review (retained seat to TODO card)\ndocument.sheet\nretained curation cursor page (no NLP or model call)\nUnavailable: No runtime owner is bound\ndocument.source\nretain original document and extraction evidence\ndocument.spans\nbounded retained document passages\ndocument.tasks\ndocument issues (retained result to Kanban)\nDOM\ndom.board\ndraggable grouped board (generic)\ndom.events\nDOM gesture source\nFINANCE\nfinance.reconcile\nexact financial reconciliation candidates\nUnavailable: No runtime owner is bound\nGRAAL\ngraal.events\ngraal event source (SSE)\ngraal.heap\nheap continent (bytes by class)\nUnavailable: No runtime owner is bound\ngraal.vitals\njvm vitals\nUnavailable: No runtime owner is bound\nHEADHUNTER\nheadhunter.capture\nCapture professional source\nUnavailable: No runtime owner is bound\nheadhunter.context\nSelect professional evidence\nUnavailable: No runtime owner is bound\nheadhunter.draft\nPrepare application drafts\nUnavailable: No runtime owner is bound\nheadhunter.profile\nProject applicant knowledge\nUnavailable: No runtime owner is bound\nheadhunter.save\nSave proposed artifacts\nUnavailable: No runtime owner is bound\nheadhunter.source\nRead professional source\nUnavailable: No runtime owner is bound\nHTTP\nhttp.get\nhttp get\nUnavailable: No runtime owner is bound\nhttp.post\nhttp post\nUnavailable: No runtime owner is bound\nJOB\njob.batch\njob batch (multiple commands)\nUnavailable: No runtime owner is bound\njob.command\njob command (verb + jobId + revision)\nUnavailable: No runtime owner is bound\nJSON\njson.value\njson literal\nKANBAN\nkanban.activeSheets\nkanban concentric sheets\nkanban.alerts\nboard rule alerts (productions' live tail)\nkanban.attention\nNARS attention garnish (belief bag)\nUnavailable: No runtime owner is bound\nkanban.drift\nNARS board drift (Hotelling T²)\nUnavailable: No runtime owner is bound\nkanban.import\nkanban import (plan doc → cards)\nkanban.move\nkanban move (WAL command)\nkanban.review\nTurnReview glosses (board window drain)\nUnavailable: No runtime owner is bound\nkanban.submit\nkanban submit (create or resubmit)\nkanban.update\nkanban update (title and priority)\nKEYS\nkeys.status\nkeys this machine already has\nUnavailable: No runtime owner is bound\nKG\nkg.ingest\nkg → nal (turtle/kif)\nUnavailable: No runtime owner is bound\nKIF\nkif.inspect\nKIF syntax and variable scope\nLEGAL\nlegal.evidence\nevidence-bank query (shared KIF bank) → brief folded with prior facts\nUnavailable: No runtime owner is bound\nlegal.ingest\nlegal source through the canonical document curator (retained proposals, not legal conclusions)\nUnavailable: No runtime owner is bound\nLIST\nlist.format\ndeclarative list → lines projector\nlist.groupBy\ngroup by key (generic)\nlist.pairs\nkey/model pairs\nMEDIA\nmedia.player\naudio/video player\nMUX\nmux.chat\nmux chat (provider-neutral)\nUnavailable: No runtime owner is bound\nmux.meta\nwhat the model router did\nUnavailable: No runtime owner is bound\nmux.models\nmodels that can answer here\nUnavailable: No runtime owner is bound\nmux.standings\nquota legion standings\nUnavailable: No runtime owner is bound\nNAL\nnal.attend\nattend (processed budget rekey, evidence untouched)\nUnavailable: No runtime owner is bound\nnal.decay\nattention decay pulse (thin wrapper)\nUnavailable: No runtime owner is bound\nnal.encode\nencode 64-bit centroid (AngularCodec)\nUnavailable: No runtime owner is bound\nnal.mint\nmint beliefs from construction receipts\nUnavailable: No runtime owner is bound\nnal.recall\nbelief recall (top/sample/near)\nUnavailable: No runtime owner is bound\nnal.reinforce\nreinforce (receipted source observation; budget untouched)\nUnavailable: No runtime owner is bound\nnal.rule.admit\nadmit reviewed eternal rules (live rete; host policy)\nUnavailable: No runtime owner is bound\nnal.rules.fromKg\nkg → unreviewed rule candidates (admission deferred)\nUnavailable: No runtime owner is bound\nNARS\nnars.reteFire\nhypothetical rule evaluation (in-process, no live admission)\nnars.seat\nNARS seat (unverified nearby context; asks for review)\nUnavailable: No runtime owner is bound\nNL\nnl.rules\ndescribe it: unreviewed parser candidates; class answers deferred\nUnavailable: No runtime owner is bound\nNORM\nnorm.clauses\ntext → unreviewed clause readings; publication deferred\nUnavailable: No runtime owner is bound\nONTOLOGY\nontology.align\nexplicit SUMO alignment\nUnavailable: No runtime owner is bound\nontology.retain\nversioned customer ontology\nUnavailable: No runtime owner is bound\nPANEL\npanel.vote\npanel vote (odd decides · even tie = research)\nPANELS\npanels.list\nstored programs (click → embed)\nUnavailable: No runtime owner is bound\nPOINTCUT\npointcut.routes\npointcut routes\nUnavailable: No runtime owner is bound\nPROGRAM\nprogram.ref\nprogram (dive in)\nUnavailable: No runtime owner is bound\nPROJECT\nproject.docs\ndocuments of a mounted folder\nUnavailable: No runtime owner is bound\nproject.extract\nthe text of a document: its mined twin, mined now when absent\nUnavailable: No runtime owner is bound\nproject.kill\nproject db kill\nUnavailable: No runtime owner is bound\nproject.list\nmounted scopes\nUnavailable: No runtime owner is bound\nproject.mount\nmount scope (git|assets)\nUnavailable: No runtime owner is bound\nproject.notes\na document's curation notes: `key: value` conventions (work, edition, date, …) and prose the reading is held to\nUnavailable: No runtime owner is bound\nproject.read\none document as text\nUnavailable: No runtime owner is bound\nPROMPT\nprompt.chat\nask a model\nUnavailable: No runtime owner is bound\nprompt.get\na stored prompt\nUnavailable: No runtime owner is bound\nprompt.list\nthe stored prompts\nUnavailable: No runtime owner is bound\nprompt.render\nfill a prompt's holes\nUnavailable: No runtime owner is bound\nprompt.save\nsave a prompt version\nUnavailable: No runtime owner is bound\nPYTEST\npytest.pure\npytest (pure, in-vm)\nRDF\nrdf.select\nSPARQL basic graph pattern (PREFIX, SELECT ?v, WHERE { s p o . … }) over Turtle → rows\nREAD\nread.construct\nread causal constructions (bot proposes; gate disposes)\nUnavailable: No runtime owner is bound\nRECORD\nrecord.fold\nrecord fold (turn provenance gatherer)\nUnavailable: No runtime owner is bound\nRESULT\nresult.confirm\nthe answer\nUnavailable: No runtime owner is bound\nRF\nrf.batch\nrequestfactory batch\nUnavailable: No runtime owner is bound\nrf.rpc\nrequestfactory rpc\nUnavailable: No runtime owner is bound\nRULING\nruling.parse\nruling parse (trailing JSON, strict-false booleans)\nUnavailable: No runtime owner is bound\nSCOPE\nscope.in\nscope.in (formal parameter)\nscope.out\nscope.out (return value)\nSHEET\nsheet.cell\nsheet cell (row, column)\nsheet.columns\nsheet schema\nsheet.concentric\nconcentric treesheets (drill-in)\nsheet.count\nsheet row count\nsheet.filter\nsheet filter (column = value)\nsheet.flatten\nsheet flatten (refs → ids)\nSKILL\nskill.curate\nhermes skill curation (usage → lifecycle tuples)\nUnavailable: No runtime owner is bound\nskill.decay\nskill budget decay (per-skill AttentionEconomy)\nUnavailable: No runtime owner is bound\nskill.overlap\nskill consolidation candidates (SUMO class Jaccard, no model)\nUnavailable: No runtime owner is bound\nSPARQL\nsparql.pattern\nGraph pattern\nUnavailable: No runtime owner is bound\nsparql.select\nSPARQL SELECT\nUnavailable: No runtime owner is bound\nsparql.variable\nProjected variable\nUnavailable: No runtime owner is bound\nSQL\nsql.arith\nsql.arith\nUnavailable: No runtime owner is bound\nsql.asCondition\nsql.asCondition\nUnavailable: No runtime owner is bound\nsql.asValue\nsql.asValue\nUnavailable: No runtime owner is bound\nsql.call\nsql.call\nUnavailable: No runtime owner is bound\nsql.cast\nsql.cast\nUnavailable: No runtime owner is bound\nsql.cmp\nsql.cmp\nUnavailable: No runtime owner is bound\nsql.col\nsql.col\nUnavailable: No runtime owner is bound\nsql.item\nsql.item\nUnavailable: No runtime owner is bound\nsql.itemStar\nsql.itemStar\nUnavailable: No runtime owner is bound\nsql.join\nsql.join\nUnavailable: No runtime owner is bound\nsql.like\nsql.like\nUnavailable: No runtime owner is bound\nsql.lit\nsql.lit\nUnavailable: No runtime owner is bound\nsql.logic\nsql.logic\nUnavailable: No runtime owner is bound\nsql.path\nsql.path\nUnavailable: No runtime owner is bound\nsql.select\nsql.select\nUnavailable: No runtime owner is bound\nsql.sortKey\nsql.sortKey\nUnavailable: No runtime owner is bound\nsql.table\nsql.table\nUnavailable: No runtime owner is bound\nSTATE\nstate.freeze\nfreeze bag+KB to CAS (snapshot)\nUnavailable: No runtime owner is bound\nstate.thaw\nthaw bag+KB from CAS (restore)\nUnavailable: No runtime owner is bound\nTEXT\ntext.fold\ntext fold (dumb MANY-part concatenator)\nUnavailable: No runtime owner is bound\ntext.value\ntext literal\nTRIBUNAL\ntribunal.record\ntribunal verdict (retained prose + lifecycle receipt)\nUnavailable: No runtime owner is bound\nURING\nuring.fsync\nuring fsync (FSYNC SQE — one CQE on durability)\nuring.probe\nuring probe (capability report: what THIS machine's ring answers)\nuring.read\nuring read (READ SQE at offset → bytes + res)\nuring.write\nuring write (WRITE SQE at offset ← bytes)\nVIEW\nview.emit\nview emit (declarative map)\nview.reduce\nview reduce (bounded monoid)\nVM\nvm.call\nvm call (VmHandle.call)\nvm.camel\ncamel: dispatch a declared route\nvm.camel.catalog\ncamel: enumerate the mounted module (lazy)\nvm.camel.down\ncamel: stop a running route\nvm.camel.routes\ncamel: what is running right now\nvm.camel.up\ncamel: start a route and leave it running\nvm.corenlp\ncorenlp: Stanford pipeline in a sub-VM\nvm.corenlp.extract\ncorenlp extract (NER, deps)\nvm.eval\nvm eval\nvm.events\nvm event source (SSE)\nvm.graalce\ngraalce: any Graal language, inline source\nvm.llvm.confix\nLLVM Confix scanner\nvm.llvm.scalar\nLLVM scalar kernel\nvm.modules\nmodules: audit mounted guest classpaths\nvm.polyglot\ntyped function in an owned language guest\nvm.revoke\nvm revoke\nvm.spawn\nvm spawn\nvm.stats\nvm stats\nvm.tiers\nvm provider tiers\nvm.tika\ntika: extract text+metadata in a sub-VM\nVMS\nvms.list\nsub-vms\nUnavailable: No runtime owner is bound\nWIKI\nwiki.consolidate\nwiki consolidate (Wiki Maintainer: traces + prior wiki → PATCH edits)\nUnavailable: No runtime owner is bound\nwiki.propose\nwiki propose (Skill Proposer: multi-turn ReAct → ONE atomic proposal)\nUnavailable: No runtime owner is bound\nwiki.read\nthe wiki's pages as one text, one `§ .` section per page, for book.curate (heading ^§ )\nUnavailable: No runtime owner is bound\nWORK\nwork.model\nwork model (selected route)\nUnavailable: No runtime owner is bound\nwork.select\nwork select (declared quotes)\nWORKSPACE\nworkspace.snapshot\ntake a workspace snapshot\nUnavailable: No runtime owner is bound\nGALLERY — PROGRAMS\n▤ preset-airgap-document\ndrag → program.ref · click → open\njson literal\n▤\n✕\nr1 warm base (frame outputs)\nagent signals → board projections\nvalue\nVALUE\nJSON\nCOLUMNS\nretain original document and extraction evidence\n▤\n✕\nr1 warm base (frame outputs)\nagent signals → board projections\ndoc?\nsource?\nsource\nVIEW\ninline\nreference\nbounded retained document passages\n▤\n✕\nr1 warm base (frame outputs)\nagent signals → board projections\nsource\ndata\nbatchCid\nsourceCid\ncount\nbegin\nend\nnextOffset\ncomplete\nbytes\nOFFSET\nCOUNT\nSPANCHARS\nMAXBYTES\nLLVM Confix scanner\n▤\n✕\nr1 warm base (frame outputs)\nagent signals → board projections\ndata?\nok\nformat\nrows\nrowCount\nfault\nsourceCid\nruntime\nFORMAT\nJSON\nCBOR\nYAML\nDATA\njson path → sheet\n▤\n✕\ndaemon-root emit (HtxKey)\nBoardIntake receipts (WAL seq)\njson?\ndata?\nrows?\nsourceCid?\nok?\nformat?\nfound\npath\nvalue\nsheets\nsheet\ngeometry\nsourceCid\nbyteSpan\nPATH\nGEOMETRY\nkotlin\nnative\nstore · LcncScopeFrame r1\nfanout · LcncScopeFrame r2\nOBSERVED TRANSFERS\nObservation ended; remaining activity is recorded · 7cb1fb76-dd3d-4cda-b6e5-05e8a699e958 8 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity\nNODE / SOURCE DEBUGGER\nSame run · no replay · pauses count toward timeouts.\nStepping and limits\nOpen Panels editor (saved scratch)\nFrozen program in Confix\nReconnect this run\nRequest ended. A lost response is not proof of cancellation; use Reconnect this run or inspect Evidence. No matching durable outcome was returned. Do not infer success or cancellation.\n{\n  \"invocationOrdinal\": 5,\n  \"nodeId\": \"selection\",\n  \"type\": \"confix.pickPath\",\n  \"path\": [],\n  \"parent\": null,\n  \"iteration\": null,\n  \"params\": {\n    \"path\": \"spans.0.quotation\",\n    \"geometry\": \"native\"\n  },\n  \"inputs\": {},\n  \"bindings\": {},\n  \"outputsOmitted\": \"payload_limit\",\n  \"depth\": 0,\n  \"frameId\": 0,\n  \"documentCid\": \"sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344\",\n  \"documentName\": \"airgap-coinbase-suski\",\n  \"scopeFrames\": [\n    {\n      \"depth\": 0,\n      \"bindings\": {},\n      \"outputsOmitted\": \"payload_limit\"\n    }\n  ],\n  \"scopeFramesTruncated\": false,\n  \"phase\": \"after\",\n  \"status\": \"completed\",\n  \"resultOmitted\": \"work_limit\"\n}\nCoordinates \nAuthored body\nGenerated guest\n · line \nStep into next node\nInto guest source\nStep over source\nStep out of source\nRun to line\nContinue run\nCancel run\nClose debugger\nThe snapshot above is the last observed pause, not live state.",
+      "submittedRuns": 1
+    },
+    "recoveredCompletion": {
+      "result": "PASS",
+      "sameRun": true,
+      "noReplay": true,
+      "noMinerOrLlvm": true,
+      "sourceRevisionsUnchanged": true
+    },
+    "retainedEvidence": {
+      "result": "PASS",
+      "quote": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+      "consumedWires": 8,
+      "liveBytesAfter": 0
+    },
+    "inspectedWithoutRetry": {
+      "result": "PASS",
+      "submittedRuns": 1
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:60a4f49838840f0c3f6b9d7d608e9bb5c45a0812ce991ca27096e3b2c822e9f3\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:76224bb0a2e88d0505138d56a5942a81ae0c8873c68ca16cb390493ef4b77524\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"inputs\":{},\"debugToken\":\"d7ea4502-9612-4c27-9c36-1d730e9decfb\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"d7ea4502-9612-4c27-9c36-1d730e9decfb\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"7cb1fb76-dd3d-4cda-b6e5-05e8a699e958\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"d7ea4502-9612-4c27-9c36-1d730e9decfb\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"7cb1fb76-dd3d-4cda-b6e5-05e8a699e958\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"d7ea4502-9612-4c27-9c36-1d730e9decfb\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"7cb1fb76-dd3d-4cda-b6e5-05e8a699e958\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"d7ea4502-9612-4c27-9c36-1d730e9decfb\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"7cb1fb76-dd3d-4cda-b6e5-05e8a699e958\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"d7ea4502-9612-4c27-9c36-1d730e9decfb\",\"ordinal\":5,\"action\":\"continue\",\"runId\":\"7cb1fb76-dd3d-4cda-b6e5-05e8a699e958\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:60a4f49838840f0c3f6b9d7d608e9bb5c45a0812ce991ca27096e3b2c822e9f3\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:76224bb0a2e88d0505138d56a5942a81ae0c8873c68ca16cb390493ef4b77524\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":183.34210526315792,\"y\":-6.360902255639097,\"z\":0.9060150375939849}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:60a4f49838840f0c3f6b9d7d608e9bb5c45a0812ce991ca27096e3b2c822e9f3\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:76224bb0a2e88d0505138d56a5942a81ae0c8873c68ca16cb390493ef4b77524\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":183.34210526315792,\"y\":-6.360902255639097,\"z\":0.9060150375939849}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/workspace",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:60a4f49838840f0c3f6b9d7d608e9bb5c45a0812ce991ca27096e3b2c822e9f3\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:76224bb0a2e88d0505138d56a5942a81ae0c8873c68ca16cb390493ef4b77524\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":183.34210526315792,\"y\":-6.360902255639097,\"z\":0.9060150375939849}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null},\"compareProgramCid\":\"sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344\"}"
+    }
+  ],
+  "responses": [
+    {
+      "status": 503,
+      "text": "{\"ok\":false, \"runId\":\"7cb1fb76-dd3d-4cda-b6e5-05e8a699e958\", \"error\":\"receipt_commit_failed\", \"detail\":\"FSYNC failed: -5\"}"
+    }
+  ],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "running": {
+    "runId": "7cb1fb76-dd3d-4cda-b6e5-05e8a699e958",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344",
+    "inputs": {},
+    "status": "running",
+    "queuedAtMs": 1793853528761,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "d7ea4502-9612-4c27-9c36-1d730e9decfb",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/7cb1fb76-dd3d-4cda-b6e5-05e8a699e958",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/7cb1fb76-dd3d-4cda-b6e5-05e8a699e958",
+    "sequence": 2,
+    "timelineRevision": 2,
+    "receiptCid": "sha256:16a9838851a24709c7353c20de63177c673f30e31fdf411bf5f6a4549bc90d9b",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793853529288,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:94b9b8895b465fc2a8dd3b5e2d5f3c75b65dbc21b50aa59e1890d2e3e63d463c"
+  },
+  "injection": {
+    "javaPid": 86981,
+    "tracerPid": 87184,
+    "command": [
+      "strace",
+      "-f",
+      "-yy",
+      "-ttt",
+      "-s",
+      "160",
+      "-e",
+      "trace=fsync",
+      "-P",
+      "/state/runtime/.kanban/board.wal",
+      "--inject=fsync:error=EIO:when=1",
+      "-o",
+      "/workspace/airgap-r4d-proof/storage-eio-archive03/fault-syscalls.txt",
+      "-p",
+      "86981"
+    ],
+    "allObservedThreadsAttached": true,
+    "threadsAtAttach": 34,
+    "fault": "eio"
+  },
+  "writerVideo": "page@b9adbf059ac4cc4717659380dd456e91.webm",
+  "recovered": {
+    "runId": "7cb1fb76-dd3d-4cda-b6e5-05e8a699e958",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344",
+    "inputs": {},
+    "status": "completed",
+    "queuedAtMs": 1793853528761,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "d7ea4502-9612-4c27-9c36-1d730e9decfb",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/7cb1fb76-dd3d-4cda-b6e5-05e8a699e958",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/7cb1fb76-dd3d-4cda-b6e5-05e8a699e958",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:6b5f7d33020c05554c4a3fc88de59cfbc201a0802735b9c67b9c59a25d9d3344",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793853529288,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:16a9838851a24709c7353c20de63177c673f30e31fdf411bf5f6a4549bc90d9b",
+    "returns": {},
+    "outputs": {
+      "document": {
+        "value": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "name": "coinbase-suski.pdf",
+          "mediaType": "application/pdf",
+          "category": "document",
+          "project": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf",
+            "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+            "rev": "1-sha256:60a4f49838840f0c3f6b9d7d608e9bb5c45a0812ce991ca27096e3b2c822e9f3",
+            "seq": 0
+          },
+          "extraction": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf.extract.md",
+            "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+            "rev": "1-sha256:76224bb0a2e88d0505138d56a5942a81ae0c8873c68ca16cb390493ef4b77524",
+            "seq": 3
+          },
+          "sourceCid": "sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b"
+        }
+      },
+      "source": {
+        "source": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "name": "coinbase-suski.pdf",
+          "mediaType": "application/pdf",
+          "category": "document",
+          "project": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf",
+            "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+            "rev": "1-sha256:60a4f49838840f0c3f6b9d7d608e9bb5c45a0812ce991ca27096e3b2c822e9f3",
+            "seq": 0
+          },
+          "extraction": {
+            "project": "coinbase-suski",
+            "id": "coinbase-suski.pdf.extract.md",
+            "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+            "rev": "1-sha256:76224bb0a2e88d0505138d56a5942a81ae0c8873c68ca16cb390493ef4b77524",
+            "seq": 3
+          },
+          "sourceCid": "sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b"
+        }
+      },
+      "passages": {
+        "data": "{\"schema\":\"document-spans/1\", \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"sourceManifestCid\":\"sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b\", \"offsetUnit\":\"utf16\", \"rangeConvention\":\"half-open\", \"coverage\":\"extracted-text-window\", \"begin\":18477, \"end\":18654, \"textLength\":22686, \"complete\":false, \"nextOffset\":18654, \"spans\":[{\"index\":0, \"quotation\":{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"begin\":18477, \"end\":18654, \"quote\":\"took this case to decide whether, under the FAA, a court or\\nan arbitrator decides which of the two contractual provi-\\nsions controls. We decline to consider auxiliary questions\\n\", \"anchors\":[{\"begin\":18477, \"end\":18536, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 871, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18537, \"end\":18594, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 926, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18595, \"end\":18653, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 982, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}], \"unresolved\":[\"table\", \"diagram\"], \"category\":\"document\", \"provenance\":{\"finalUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\", \"notesCid\":\"sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\", \"retrieved\":\"2026-11-04T23:32:18Z\", \"requestedUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\"}, \"authentication\":\"unverified\", \"quotationSource\":\"extracted-text\"}}]}",
+        "batchCid": "sha256:4b845632653e6cbb6b29440a555c1fb210cccd371d965b99477f045a78fa1d4f",
+        "sourceCid": "sha256:0bda874774f24d16fce3ea6d84656e17eedc5c36236a50fd15d98c656339c10b",
+        "count": 1,
+        "begin": 18477,
+        "end": 18654,
+        "nextOffset": 18654,
+        "complete": false,
+        "bytes": 2028
+      },
+      "scan": {
+        "ok": true,
+        "format": "JSON",
+        "sourceCid": "sha256:4b845632653e6cbb6b29440a555c1fb210cccd371d965b99477f045a78fa1d4f",
+        "sourceBytes": 2028,
+        "rowCount": 151,
+        "observedRows": 151,
+        "rows": [
+          {
+            "open": 0,
+            "close": 2027,
+            "tag": "IoObject",
+            "depth": 0,
+            "children": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26
+            ]
+          },
+          {
+            "open": 1,
+            "close": 8,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 10,
+            "close": 27,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 30,
+            "close": 42,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 44,
+            "close": 116,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 119,
+            "close": 136,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 138,
+            "close": 210,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 213,
+            "close": 231,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 233,
+            "close": 305,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 308,
+            "close": 319,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 321,
+            "close": 327,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 330,
+            "close": 346,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 348,
+            "close": 358,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 361,
+            "close": 370,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 372,
+            "close": 394,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 397,
+            "close": 403,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 405,
+            "close": 409,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 412,
+            "close": 416,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 418,
+            "close": 422,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 425,
+            "close": 436,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 438,
+            "close": 442,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 445,
+            "close": 454,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 456,
+            "close": 460,
+            "tag": "IoBoolean",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 463,
+            "close": 474,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 476,
+            "close": 480,
+            "tag": "IoDouble",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 483,
+            "close": 489,
+            "tag": "IoString",
+            "depth": 1,
+            "children": []
+          },
+          {
+            "open": 491,
+            "close": 2026,
+            "tag": "IoArray",
+            "depth": 1,
+            "children": [
+              27
+            ]
+          },
+          {
+            "open": 492,
+            "close": 2025,
+            "tag": "IoObject",
+            "depth": 2,
+            "children": [
+              28,
+              29,
+              30,
+              31
+            ]
+          },
+          {
+            "open": 493,
+            "close": 499,
+            "tag": "IoString",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 501,
+            "close": 501,
+            "tag": "IoDouble",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 504,
+            "close": 514,
+            "tag": "IoString",
+            "depth": 3,
+            "children": []
+          },
+          {
+            "open": 516,
+            "close": 2024,
+            "tag": "IoObject",
+            "depth": 3,
+            "children": [
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              131,
+              132,
+              135,
+              136,
+              137,
+              138,
+              147,
+              148,
+              149,
+              150
+            ]
+          },
+          {
+            "open": 517,
+            "close": 529,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 531,
+            "close": 603,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 606,
+            "close": 623,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 625,
+            "close": 697,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 700,
+            "close": 706,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 708,
+            "close": 712,
+            "tag": "IoDouble",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 715,
+            "close": 719,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 721,
+            "close": 725,
+            "tag": "IoDouble",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 728,
+            "close": 734,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 736,
+            "close": 917,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 920,
+            "close": 928,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 930,
+            "close": 1613,
+            "tag": "IoArray",
+            "depth": 4,
+            "children": [
+              44,
+              73,
+              102
+            ]
+          },
+          {
+            "open": 931,
+            "close": 1156,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              45,
+              46,
+              47,
+              48,
+              49,
+              50,
+              51,
+              52,
+              53,
+              54,
+              55,
+              56,
+              57,
+              58,
+              59,
+              60,
+              65,
+              66,
+              67,
+              68
+            ]
+          },
+          {
+            "open": 932,
+            "close": 938,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 940,
+            "close": 944,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 947,
+            "close": 951,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 953,
+            "close": 957,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 960,
+            "close": 965,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 967,
+            "close": 968,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 971,
+            "close": 977,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 979,
+            "close": 982,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 985,
+            "close": 993,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 995,
+            "close": 998,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1001,
+            "close": 1007,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1009,
+            "close": 1012,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1015,
+            "close": 1023,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1025,
+            "close": 1028,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1031,
+            "close": 1043,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1045,
+            "close": 1064,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              61,
+              62,
+              63,
+              64
+            ]
+          },
+          {
+            "open": 1046,
+            "close": 1048,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1051,
+            "close": 1053,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1056,
+            "close": 1059,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1062,
+            "close": 1063,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1067,
+            "close": 1084,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1086,
+            "close": 1100,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1103,
+            "close": 1114,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1116,
+            "close": 1155,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              69,
+              70,
+              71,
+              72
+            ]
+          },
+          {
+            "open": 1117,
+            "close": 1123,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1126,
+            "close": 1134,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1137,
+            "close": 1143,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1146,
+            "close": 1154,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1159,
+            "close": 1384,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              74,
+              75,
+              76,
+              77,
+              78,
+              79,
+              80,
+              81,
+              82,
+              83,
+              84,
+              85,
+              86,
+              87,
+              88,
+              89,
+              94,
+              95,
+              96,
+              97
+            ]
+          },
+          {
+            "open": 1160,
+            "close": 1166,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1168,
+            "close": 1172,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1175,
+            "close": 1179,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1181,
+            "close": 1185,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1188,
+            "close": 1193,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1195,
+            "close": 1196,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1199,
+            "close": 1205,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1207,
+            "close": 1210,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1213,
+            "close": 1221,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1223,
+            "close": 1226,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1229,
+            "close": 1235,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1237,
+            "close": 1240,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1243,
+            "close": 1251,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1253,
+            "close": 1256,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1259,
+            "close": 1271,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1273,
+            "close": 1292,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              90,
+              91,
+              92,
+              93
+            ]
+          },
+          {
+            "open": 1274,
+            "close": 1276,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1279,
+            "close": 1281,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1284,
+            "close": 1287,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1290,
+            "close": 1291,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1295,
+            "close": 1312,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1314,
+            "close": 1328,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1331,
+            "close": 1342,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1344,
+            "close": 1383,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              98,
+              99,
+              100,
+              101
+            ]
+          },
+          {
+            "open": 1345,
+            "close": 1351,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1354,
+            "close": 1362,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1365,
+            "close": 1371,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1374,
+            "close": 1382,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1387,
+            "close": 1612,
+            "tag": "IoObject",
+            "depth": 5,
+            "children": [
+              103,
+              104,
+              105,
+              106,
+              107,
+              108,
+              109,
+              110,
+              111,
+              112,
+              113,
+              114,
+              115,
+              116,
+              117,
+              118,
+              123,
+              124,
+              125,
+              126
+            ]
+          },
+          {
+            "open": 1388,
+            "close": 1394,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1396,
+            "close": 1400,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1403,
+            "close": 1407,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1409,
+            "close": 1413,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1416,
+            "close": 1421,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1423,
+            "close": 1424,
+            "tag": "IoDouble",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1427,
+            "close": 1433,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1435,
+            "close": 1438,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1441,
+            "close": 1449,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1451,
+            "close": 1454,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1457,
+            "close": 1463,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1465,
+            "close": 1468,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1471,
+            "close": 1479,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1481,
+            "close": 1484,
+            "tag": "IoNothing",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1487,
+            "close": 1499,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1501,
+            "close": 1520,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              119,
+              120,
+              121,
+              122
+            ]
+          },
+          {
+            "open": 1502,
+            "close": 1504,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1507,
+            "close": 1509,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1512,
+            "close": 1515,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1518,
+            "close": 1519,
+            "tag": "IoDouble",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1523,
+            "close": 1540,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1542,
+            "close": 1556,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1559,
+            "close": 1570,
+            "tag": "IoString",
+            "depth": 6,
+            "children": []
+          },
+          {
+            "open": 1572,
+            "close": 1611,
+            "tag": "IoArray",
+            "depth": 6,
+            "children": [
+              127,
+              128,
+              129,
+              130
+            ]
+          },
+          {
+            "open": 1573,
+            "close": 1579,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1582,
+            "close": 1590,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1593,
+            "close": 1599,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1602,
+            "close": 1610,
+            "tag": "IoString",
+            "depth": 7,
+            "children": []
+          },
+          {
+            "open": 1616,
+            "close": 1627,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1629,
+            "close": 1648,
+            "tag": "IoArray",
+            "depth": 4,
+            "children": [
+              133,
+              134
+            ]
+          },
+          {
+            "open": 1630,
+            "close": 1636,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1639,
+            "close": 1647,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1651,
+            "close": 1660,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1662,
+            "close": 1671,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1674,
+            "close": 1685,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1687,
+            "close": 1956,
+            "tag": "IoObject",
+            "depth": 4,
+            "children": [
+              139,
+              140,
+              141,
+              142,
+              143,
+              144,
+              145,
+              146
+            ]
+          },
+          {
+            "open": 1688,
+            "close": 1697,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1699,
+            "close": 1757,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1760,
+            "close": 1769,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1771,
+            "close": 1843,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1846,
+            "close": 1856,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1858,
+            "close": 1879,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1882,
+            "close": 1895,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1897,
+            "close": 1955,
+            "tag": "IoString",
+            "depth": 5,
+            "children": []
+          },
+          {
+            "open": 1959,
+            "close": 1974,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1976,
+            "close": 1987,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 1990,
+            "close": 2006,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          },
+          {
+            "open": 2008,
+            "close": 2023,
+            "tag": "IoString",
+            "depth": 4,
+            "children": []
+          }
+        ],
+        "fault": {
+          "code": 0,
+          "name": "none",
+          "at": 0,
+          "atKind": "none"
+        },
+        "runtime": {
+          "backend": "graalvm-llvm",
+          "moduleCid": "sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
+          "abi": "confix.flat/1",
+          "engineVersion": "25.3.4.1",
+          "llvmVersion": "22.1.8",
+          "nativeAccess": true,
+          "verifyBitcode": true,
+          "internalProgress": "unobserved",
+          "pauseBoundary": "between-scans",
+          "hardCancellation": false,
+          "nativeMemoryIsolation": false,
+          "loadNanos": 115077395,
+          "semanticProfile": "mlir-nix-confix-571b57d3",
+          "strictValidation": false,
+          "copyTransport": "packed-i32",
+          "scanNanos": 173456728,
+          "allocatedBytes": 543040,
+          "rowCapacity": 16384,
+          "guardsVerified": true,
+          "liveBytesAfter": 0,
+          "queueNanos": 636377,
+          "callNanos": 663797008
+        },
+        "sourceRetained": true
+      },
+      "selection": {
+        "found": true,
+        "path": "spans.0.quotation",
+        "value": {
+          "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+          "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+          "begin": 18477,
+          "end": 18654,
+          "quote": "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n",
+          "anchors": [
+            {
+              "begin": 18477,
+              "end": 18536,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                871,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            },
+            {
+              "begin": 18537,
+              "end": 18594,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                926,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            },
+            {
+              "begin": 18595,
+              "end": 18653,
+              "page": 10,
+              "folio": null,
+              "section": null,
+              "table": null,
+              "diagram": null,
+              "coordinates": [
+                651,
+                982,
+                1248,
+                55
+              ],
+              "coordinateSystem": "pixels-300dpi",
+              "unresolved": [
+                "table",
+                "diagram",
+                "folio",
+                "section"
+              ]
+            }
+          ],
+          "unresolved": [
+            "table",
+            "diagram"
+          ],
+          "category": "document",
+          "provenance": {
+            "finalUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf",
+            "notesCid": "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679",
+            "retrieved": "2026-11-04T23:32:18Z",
+            "requestedUrl": "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+          },
+          "authentication": "unverified",
+          "quotationSource": "extracted-text"
+        },
+        "geometry": "native",
+        "sourceCid": "sha256:4b845632653e6cbb6b29440a555c1fb210cccd371d965b99477f045a78fa1d4f",
+        "byteSpan": {
+          "open": 516,
+          "close": 2024,
+          "unit": "utf8-byte-inclusive"
+        },
+        "sheets": [
+          {
+            "id": "confix/spans.0.quotation",
+            "title": "spans.0.quotation",
+            "parent": null,
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "originalCid",
+                "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f"
+              ],
+              [
+                "extractedTextCid",
+                "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801"
+              ],
+              [
+                "begin",
+                18477
+              ],
+              [
+                "end",
+                18654
+              ],
+              [
+                "quote",
+                "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n"
+              ],
+              [
+                "anchors",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors"
+                }
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/unresolved"
+                }
+              ],
+              [
+                "category",
+                "document"
+              ],
+              [
+                "provenance",
+                {
+                  "sheet": "confix/spans.0.quotation/provenance"
+                }
+              ],
+              [
+                "authentication",
+                "unverified"
+              ],
+              [
+                "quotationSource",
+                "extracted-text"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors",
+            "title": "anchors",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0"
+                }
+              ],
+              [
+                1,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1"
+                }
+              ],
+              [
+                2,
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0",
+            "title": "[0]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18477
+              ],
+              [
+                "end",
+                18536
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/0/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/0",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                871
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/0/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/0",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1",
+            "title": "[1]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18537
+              ],
+              [
+                "end",
+                18594
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/1/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/1",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                926
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/1/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/1",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2",
+            "title": "[2]",
+            "parent": "confix/spans.0.quotation/anchors",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "begin",
+                18595
+              ],
+              [
+                "end",
+                18653
+              ],
+              [
+                "page",
+                10
+              ],
+              [
+                "folio",
+                null
+              ],
+              [
+                "section",
+                null
+              ],
+              [
+                "table",
+                null
+              ],
+              [
+                "diagram",
+                null
+              ],
+              [
+                "coordinates",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2/coordinates"
+                }
+              ],
+              [
+                "coordinateSystem",
+                "pixels-300dpi"
+              ],
+              [
+                "unresolved",
+                {
+                  "sheet": "confix/spans.0.quotation/anchors/2/unresolved"
+                }
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2/coordinates",
+            "title": "coordinates",
+            "parent": "confix/spans.0.quotation/anchors/2",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                651
+              ],
+              [
+                1,
+                982
+              ],
+              [
+                2,
+                1248
+              ],
+              [
+                3,
+                55
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/anchors/2/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation/anchors/2",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ],
+              [
+                2,
+                "folio"
+              ],
+              [
+                3,
+                "section"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/unresolved",
+            "title": "unresolved",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "index",
+                "type": "IoInt"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                0,
+                "table"
+              ],
+              [
+                1,
+                "diagram"
+              ]
+            ]
+          },
+          {
+            "id": "confix/spans.0.quotation/provenance",
+            "title": "provenance",
+            "parent": "confix/spans.0.quotation",
+            "truncated": false,
+            "limit": null,
+            "columns": [
+              {
+                "name": "key",
+                "type": "IoString"
+              },
+              {
+                "name": "value",
+                "type": "Any"
+              }
+            ],
+            "rows": [
+              [
+                "finalUrl",
+                "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+              ],
+              [
+                "notesCid",
+                "sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679"
+              ],
+              [
+                "retrieved",
+                "2026-11-04T23:32:18Z"
+              ],
+              [
+                "requestedUrl",
+                "https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf"
+              ]
+            ]
+          }
+        ],
+        "sheet": {
+          "id": "confix/spans.0.quotation",
+          "title": "spans.0.quotation",
+          "parent": null,
+          "truncated": false,
+          "limit": null,
+          "columns": [
+            {
+              "name": "key",
+              "type": "IoString"
+            },
+            {
+              "name": "value",
+              "type": "Any"
+            }
+          ],
+          "rows": [
+            [
+              "originalCid",
+              "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f"
+            ],
+            [
+              "extractedTextCid",
+              "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801"
+            ],
+            [
+              "begin",
+              18477
+            ],
+            [
+              "end",
+              18654
+            ],
+            [
+              "quote",
+              "took this case to decide whether, under the FAA, a court or\nan arbitrator decides which of the two contractual provi-\nsions controls. We decline to consider auxiliary questions\n"
+            ],
+            [
+              "anchors",
+              {
+                "sheet": "confix/spans.0.quotation/anchors"
+              }
+            ],
+            [
+              "unresolved",
+              {
+                "sheet": "confix/spans.0.quotation/unresolved"
+              }
+            ],
+            [
+              "category",
+              "document"
+            ],
+            [
+              "provenance",
+              {
+                "sheet": "confix/spans.0.quotation/provenance"
+              }
+            ],
+            [
+              "authentication",
+              "unverified"
+            ],
+            [
+              "quotationSource",
+              "extracted-text"
+            ]
+          ]
+        }
+      }
+    },
+    "bindings": [],
+    "bindingsTruncated": false,
+    "promptVersions": {},
+    "consumed": [
+      {
+        "kind": "project",
+        "id": "coinbase-suski/coinbase-suski.pdf",
+        "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+        "sequence": 0,
+        "rev": "1-sha256:60a4f49838840f0c3f6b9d7d608e9bb5c45a0812ce991ca27096e3b2c822e9f3"
+      },
+      {
+        "kind": "project",
+        "id": "coinbase-suski/coinbase-suski.pdf.extract.md",
+        "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+        "sequence": 3,
+        "rev": "1-sha256:76224bb0a2e88d0505138d56a5942a81ae0c8873c68ca16cb390493ef4b77524"
+      }
+    ],
+    "consumedTruncated": false,
+    "inputFingerprint": "sha256:dfaae39c564ab90be703b7a10a7c405db9d06463ceaff1eb1836b3da0eae2574",
+    "rootStateCid": "sha256:41b87b8c0870fc01a6942230192d78298f181572b39cc996bd660458ea64c8d8",
+    "rootStateFormat": "cbor",
+    "ok": true,
+    "finishedAtMs": 1793853532151,
+    "invocationsCid": "sha256:7078a4f07ad6c3d81cb7e9da9c01759670b892f9d5ab362dadb4a1e4a732ae8e",
+    "oroborosCid": "sha256:8c19ee41b886ef851f6fc12d3c1cc733d6b98bf38ee7e38c4d65156e0494ab4c",
+    "invocationsAttempted": 5,
+    "invocationsDropped": 0,
+    "sequence": 3,
+    "timelineRevision": 3,
+    "receiptCid": "sha256:4bb5a76a44e7c996708b6e585dd9f0d5895d30609b5870a025c38b220ee85260"
+  },
+  "inspectorVideo": "page@81ed535bc9c66a0f9f79fed2756f4d34.webm",
+  "failure": "apiRequestContext.post: socket hang up\nCall log:\n\u001b[2m  - → POST http://127.0.0.1:18764/__proof/finish\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\n    at /workspace/airgap-r4d-proof/storage.cjs:15:2140"
+}

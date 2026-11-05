@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/airgap-r4d-proof/storage-audit.py", line 30, in <module>
+    quote=record['outputs']['selection']['value'];text=read(quote['extractedTextCid']).decode().encode('utf-16-le');assert text[quote['begin']*2:quote['end']*2].decode('utf-16-le')==quote['quote'];assert quote['begin']==18477 and quote['end']==18654;assert len(read(quote['originalCid']))==111243;assert quote['originalCid']=='sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f'
+                                                                                                                           ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: slice indices must be integers or None or have an __index__ method

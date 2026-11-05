@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "b8ed92a2347a01ea1be000c50d10568e765ba1f2",
+  "testCounts": {
+    "total": 265,
+    "failed": 4,
+    "skipped": 1
+  },
+  "failure": "Structured passage array converted to Kotlin toString() at confix.pickPath input; strict JSON selection rejects its unquoted map keys.",
+  "intentResolution": "Preserve incoming retained-NAL preset and its strict selection tests. Preserve raw JSON text bytes. Serialize structured wire values with existing jsonOf at the existing node boundary; retain native geometry identity checks.",
+  "failingEvidence": "combined-check02-junit"
+}

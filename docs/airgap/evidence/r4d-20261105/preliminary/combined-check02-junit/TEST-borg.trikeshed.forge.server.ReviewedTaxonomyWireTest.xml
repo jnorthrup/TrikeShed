@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="ReviewedTaxonomyWireTest[jvm]" tests="2" skipped="1" failures="0" errors="0" timestamp="2026-11-05T04:29:51.174Z" hostname="0d6dfba25614" time="0.126">
+  <properties/>
+  <testcase name="authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit()[jvm]" classname="borg.trikeshed.forge.server.ReviewedTaxonomyWireTest" time="0.121"/>
+  <testcase name="configuredNativeEndpointRunsActualReviewedQuery()[jvm]" classname="borg.trikeshed.forge.server.ReviewedTaxonomyWireTest" time="0.001">
+    <skipped/>
+  </testcase>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

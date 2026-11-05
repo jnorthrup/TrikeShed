@@ -1,0 +1,10 @@
+{
+  "case": "directory-fsync-eio",
+  "exit": 1,
+  "injectedPath": "/state/runtime/cas",
+  "expectedFailure": "Input/output error in JvmFileOperations.mkdirs",
+  "listenerOpened": false,
+  "admissionPublished": false,
+  "boardWalCreated": false,
+  "result": "PASS"
+}

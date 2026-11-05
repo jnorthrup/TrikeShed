@@ -1,0 +1,18 @@
+{
+  "command": [
+    "strace",
+    "-yy",
+    "-e",
+    "trace=fsync",
+    "-P",
+    "/workspace/airgap-r4d-proof/filter-probe/a",
+    "--inject=fsync:error=EIO",
+    "-o",
+    "/workspace/airgap-r4d-proof/filter-probe/trace.txt",
+    "python",
+    "/workspace/airgap-r4d-proof/filter-probe/probe.py",
+    "/workspace/airgap-r4d-proof/filter-probe"
+  ],
+  "exit": 0,
+  "output": "[{\"file\": \"b\", \"result\": 0}, {\"file\": \"a\", \"errno\": 5}]\n"
+}

@@ -1,0 +1,114 @@
+{
+  "fault": "eio",
+  "cases": {
+    "beforePublication": {
+      "result": "PASS",
+      "runId": "750be84c-6647-4ef4-9b90-c609f159b40f",
+      "pausedBefore": "selection"
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run",
+      "body": "{\"name\":\"airgap-coinbase-suski\",\"document\":{\"name\":\"airgap-coinbase-suski\",\"nodes\":[{\"id\":\"document\",\"type\":\"json.value\",\"x\":30,\"y\":800,\"params\":{\"value\":\"{\\\"originalCid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"extractedTextCid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"name\\\":\\\"coinbase-suski.pdf\\\", \\\"mediaType\\\":\\\"application/pdf\\\", \\\"category\\\":\\\"document\\\", \\\"project\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf\\\", \\\"cid\\\":\\\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\\\", \\\"rev\\\":\\\"1-sha256:d577cb3a6f63997c4591d830d6e2a4aa2f8fbc125ee0019e933ad37e0e827691\\\", \\\"seq\\\":0.0}, \\\"extraction\\\":{\\\"project\\\":\\\"coinbase-suski\\\", \\\"id\\\":\\\"coinbase-suski.pdf.extract.md\\\", \\\"cid\\\":\\\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\\\", \\\"rev\\\":\\\"1-sha256:58a20f7546c2d32b23065e0048d401691c88bfb5bfff5b1623140ef6b0f561c6\\\", \\\"seq\\\":3.0}, \\\"sourceCid\\\":\\\"sha256:e23fe0b2e3ac972fe45e343b6df764a2581a8d9953b7bd4c0ba6f287579b2066\\\"}\"},\"collapsed\":false},{\"id\":\"source\",\"type\":\"document.source\",\"x\":30,\"y\":60,\"params\":{\"view\":\"reference\"},\"collapsed\":false},{\"id\":\"passages\",\"type\":\"document.spans\",\"x\":460,\"y\":60,\"params\":{\"offset\":\"18477\",\"count\":\"1\",\"spanChars\":\"200\",\"maxBytes\":\"8192\"},\"collapsed\":false},{\"id\":\"scan\",\"type\":\"vm.llvm.confix\",\"x\":890,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"\"},\"collapsed\":false},{\"id\":\"selection\",\"type\":\"confix.pickPath\",\"x\":1320,\"y\":60,\"params\":{\"path\":\"spans.0.quotation\",\"geometry\":\"native\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"document\",\"value\"],\"to\":[\"source\",\"source?\"]},{\"from\":[\"source\",\"source\"],\"to\":[\"passages\",\"source\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"scan\",\"data?\"]},{\"from\":[\"passages\",\"data\"],\"to\":[\"selection\",\"data?\"]},{\"from\":[\"scan\",\"rows\"],\"to\":[\"selection\",\"rows?\"]},{\"from\":[\"scan\",\"sourceCid\"],\"to\":[\"selection\",\"sourceCid?\"]},{\"from\":[\"scan\",\"ok\"],\"to\":[\"selection\",\"ok?\"]},{\"from\":[\"scan\",\"format\"],\"to\":[\"selection\",\"format?\"]}],\"view\":{\"x\":156.0741463414635,\"y\":-8.42926829268292,\"z\":0.9404878048780487}},\"inputs\":{},\"debugToken\":\"789e045b-b3ef-4638-8b9c-a13c752f52ef\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"789e045b-b3ef-4638-8b9c-a13c752f52ef\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"750be84c-6647-4ef4-9b90-c609f159b40f\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"789e045b-b3ef-4638-8b9c-a13c752f52ef\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"750be84c-6647-4ef4-9b90-c609f159b40f\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"789e045b-b3ef-4638-8b9c-a13c752f52ef\",\"ordinal\":3,\"action\":\"step\",\"runId\":\"750be84c-6647-4ef4-9b90-c609f159b40f\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"789e045b-b3ef-4638-8b9c-a13c752f52ef\",\"ordinal\":4,\"action\":\"step\",\"runId\":\"750be84c-6647-4ef4-9b90-c609f159b40f\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18764/api/lcnc/run/debug",
+      "body": "{\"token\":\"789e045b-b3ef-4638-8b9c-a13c752f52ef\",\"ordinal\":5,\"action\":\"continue\",\"runId\":\"750be84c-6647-4ef4-9b90-c609f159b40f\"}"
+    }
+  ],
+  "responses": [
+    {
+      "status": 503,
+      "text": "{\"ok\":false, \"runId\":\"750be84c-6647-4ef4-9b90-c609f159b40f\", \"error\":\"receipt_commit_failed\", \"detail\":\"FSYNC failed: -5\"}"
+    }
+  ],
+  "errors": [],
+  "browser": "154.0.8037.57",
+  "running": {
+    "runId": "750be84c-6647-4ef4-9b90-c609f159b40f",
+    "program": "airgap-coinbase-suski",
+    "programKey": null,
+    "programCid": "sha256:9b4c7423a685e8cd8c55c7328bad82869afbcbc7db6f1eb430f20719a654a0f1",
+    "inputs": {},
+    "status": "running",
+    "queuedAtMs": 1793852031060,
+    "queueNamed": false,
+    "queueDeclaredSubnet": null,
+    "queueRequest": {
+      "debugToken": "789e045b-b3ef-4638-8b9c-a13c752f52ef",
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "subnet": "local"
+    },
+    "queueDurability": "DURABLE",
+    "executionFamily": "lcnc/run/750be84c-6647-4ef4-9b90-c609f159b40f",
+    "parentRunId": null,
+    "versionPolicy": "root-at-queue,subprogram-at-first-use",
+    "budgets": {
+      "timeoutMs": 120000,
+      "maxNodes": 10000,
+      "maxPayloadChars": 131072
+    },
+    "jobId": "lcnc/run/750be84c-6647-4ef4-9b90-c609f159b40f",
+    "sequence": 2,
+    "timelineRevision": 2,
+    "receiptCid": "sha256:152ee0b7f535aa84efb3ebd859df38f0a0775c8d7f73691d97a75d344fde761d",
+    "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:9b4c7423a685e8cd8c55c7328bad82869afbcbc7db6f1eb430f20719a654a0f1",
+    "claimId": 1,
+    "subnet": "local",
+    "claimedAtSubnet": "local",
+    "claimLineage": [
+      {
+        "workgroup": "lcnc/program/airgap-coinbase-suski@sha256:9b4c7423a685e8cd8c55c7328bad82869afbcbc7db6f1eb430f20719a654a0f1",
+        "claimId": 1
+      }
+    ],
+    "parentWorkgroup": null,
+    "parentClaimId": null,
+    "startedAtMs": 1793852031667,
+    "programVersions": {},
+    "previousReceiptCid": "sha256:52492a9deb41d59681020f6b97aa284b51784817bd006c11cd09072b03816fb8"
+  },
+  "injection": {
+    "javaPid": 83675,
+    "tracerPid": 83879,
+    "command": [
+      "strace",
+      "-f",
+      "-yy",
+      "-ttt",
+      "-s",
+      "160",
+      "-e",
+      "trace=fsync",
+      "-P",
+      "/state/runtime/.kanban/board.wal",
+      "--inject=fsync:error=EIO:when=1",
+      "-o",
+      "/workspace/airgap-r4d-proof/storage-eio-archive01/fault-syscalls.txt",
+      "-p",
+      "83675"
+    ],
+    "allObservedThreadsAttached": true,
+    "threadsAtAttach": 33,
+    "fault": "eio"
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n0 !== 1\n\n    at /workspace/airgap-r4d-proof/storage.cjs:12:27\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at process.processImmediate (node:internal/timers:502:9)"
+}

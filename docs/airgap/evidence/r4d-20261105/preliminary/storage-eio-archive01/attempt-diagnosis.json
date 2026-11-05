@@ -1,0 +1,14 @@
+{
+  "accepted": false,
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n0 !== 1\n\n    at /workspace/airgap-r4d-proof/storage.cjs:12:27\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at process.processImmediate (node:internal/timers:502:9)",
+  "completedCases": {
+    "beforePublication": {
+      "result": "PASS",
+      "runId": "750be84c-6647-4ef4-9b90-c609f159b40f",
+      "pausedBefore": "selection"
+    }
+  },
+  "diagnosis": "Run response callback had not finished when UI already showed HTTP 503; corrected harness awaits the exact response.",
+  "productionSourceCommit": "8a438f23870e5861b2055fe3dcc26579493c9bb0",
+  "replacementSourceCommit": "b8ed92a2347a01ea1be000c50d10568e765ba1f2"
+}
