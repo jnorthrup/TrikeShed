@@ -150,4 +150,55 @@ class NativeHornQueryTest {
         val bad = NativeHornProfile(good.binary, "0".repeat(64), good.adapter, good.datalogDirectory, good.environment)
         assertFailsWith<IllegalArgumentException> { bad.check(checkNotNull(coroutineContext[borg.trikeshed.userspace.nio.file.spi.FileOperations])) }
     }
+
+    @Test fun realNativeManualRoleJoinKeepsSourcesBindingsAndNegativeControlsSeparate(): Unit = runBlocking(JvmFileOperations()) {
+        val query = NativeHornQuery(profile())
+        suspend fun run(text: String, goal: String = "(mayRead Lark Harbor)") =
+            query.manualTheory(1, manualRoleSource(text), goal)
+        // Supplied S5 and S6 are separate immutable theories. Their facts are not auto-unioned.
+        val reversed = run(manualRoleS5)
+        val missing = run(manualRoleS6)
+        for (result in s_[reversed, missing].view) {
+            assertEquals("UNKNOWN", result["status"])
+            assertNull(result["proof"])
+            assertNull(result["checkedProof"])
+            assertEquals("not-established", result["reviewAuthority"])
+        }
+        // NEW authored control, new source/input/frame, not a new label for original S6.
+        val positive = run(manualRolePositive)
+        assertEquals("SUPPORTED", positive["status"])
+        assertEquals("declared-host-manual-assumptions-only", positive["authority"])
+        assertEquals("UNKNOWN", positive["worldObligationApplicability"])
+        assertNotEquals(missing["inputCid"], positive["inputCid"])
+        assertNotEquals(missing["frameId"], positive["frameId"])
+        val checked = positive["checkedProof"] as Map<*, *>
+        assertEquals(positive["inputCid"], checked["inputCid"])
+        assertEquals(positive["frameId"], checked["frameId"])
+        val steps = (checked["steps"] as List<*>).map { it as Map<*, *> }
+        val root = steps.single { (it["path"] as List<*>).isEmpty() }
+        assertEquals("mayRead#1", root["rule"])
+        assertEquals(_l["(assignedTo Lark Harbor)", "(authorized Lark Access)"],
+            _l[_l[0], _l[1]].map { path -> steps.single { it["path"] == path }["normalForm"] })
+        val bindings = (root["bindings"] as List<*>).map { it as Map<*, *> }.associateBy { it["variable"] }
+        assertEquals(_m["kind" j "constant", "token" j "Lark"], bindings.getValue("?operator")["term"])
+        assertEquals(_m["kind" j "constant", "token" j "Harbor"], bindings.getValue("?resource")["term"])
+        val catalog = checked["sources"] as Map<*, *>
+        val ruleSource = catalog[(root["ruleSourceNodeIds"] as List<*>).single()] as Map<*, *>
+        assertEquals(manualRoleRule, ruleSource["text"])
+        assertEquals(manualRoleSource(manualRolePositive).sourceCid.value, ruleSource["sourceCid"])
+        val forms = (positive["sourceForms"] as List<*>).map { it as Map<*, *> }
+        assertTrue(catalog.values.all { source -> forms.any { it["id"] == (source as Map<*, *>)["id"] } })
+
+        val repeated = run(manualRolePositive + "(authorized Lark Access)\n")
+        assertEquals("SUPPORTED", repeated["status"])
+        val repeatSteps = ((repeated["checkedProof"] as Map<*, *>)["steps"] as List<*>).map { it as Map<*, *> }
+        val repeatLeaf = repeatSteps.single { it["normalForm"] == "(authorized Lark Access)" }
+        assertEquals("any-one-asserted-source", repeatLeaf["witnessMode"])
+        assertEquals(2, (repeatLeaf["sourceNodeIds"] as List<*>).distinct().size)
+        assertEquals(2, (repeatSteps.single { (it["path"] as List<*>).isEmpty() }["premises"] as List<*>).size)
+        assertEquals("SUPPORTED", run(manualRolePositive)["status"], "Removing one repeat retains actual support")
+        assertEquals("UNKNOWN", run(manualRoleS6)["status"], "Removing last authorization changes the theory, not proof strength")
+        assertEquals("UNKNOWN", run(manualRolePositive.replace("(authorized Lark Access)", "(authorized Harbor Access)"))["status"])
+        assertEquals("UNKNOWN", run(manualRolePositive, "(mayRead Harbor Lark)")["status"])
+    }
 }
