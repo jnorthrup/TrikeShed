@@ -173,7 +173,20 @@ class EnglishTaxonomyWireTest {
                 assertEquals(witnesses.map { it["englishQuotation"] }, rows(result["selected"]).map {
                     (((it["value"] as Map<*, *>)["englishOrigin"] as Map<*, *>)["englishQuotation"])
                 })
-                val exported = (result["plan"] as Map<*, *>)["export"] as String
+                val paths = result["plan"] as Map<*, *>
+                ReviewedTaxonomyProofPaths.validate(paths)
+                val proofSources = rows(paths["sources"]).associateBy { it["nodeId"] }
+                assertEquals(witnesses.map { it["selectionId"] }.toSet(), proofSources.values.map { it["selectionId"] }.toSet())
+                val proof = rows(paths["proofs"]).single()
+                assertEquals(_l["(instance $tenant $person)", "(subclass $person $agent)"],
+                    (proof["premises"] as List<*>).map { proofSources.getValue(it)["text"] })
+                for (proofSource in proofSources.values) {
+                    val origin = witnesses.single { it["selectionId"] == proofSource["selectionId"] }
+                    val q = origin["kifQuotation"] as Map<*, *>
+                    val actual = proofSource["quotation"] as Map<*, *>
+                    assertTrue(s_["originalCid", "extractedTextCid", "begin", "end", "quote"].view.all { q[it] == actual[it] })
+                }
+                val exported = paths["export"] as String
                 assertContains(exported, "kif-taxonomy/v1/instance-assertion")
                 assertContains(exported, "kif-taxonomy/v1/instance-subclass")
                 assertEquals("UNKNOWN", query(f, approved, "urn:agreement:pilot:class:Missing")["status"])
