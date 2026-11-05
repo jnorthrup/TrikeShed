@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="AceContextNodesTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T03:35:17.577Z" hostname="0d6dfba25614" time="0.018">
+  <properties/>
+  <testcase name="normalizedFrameNameTakesPrecedenceOverOptionalAlias()[jvm]" classname="borg.trikeshed.memory.ace.AceContextNodesTest" time="0.004"/>
+  <testcase name="optionalFrameWiresRetainPayloadIdentity()[jvm]" classname="borg.trikeshed.memory.ace.AceContextNodesTest" time="0.012"/>
+  <testcase name="frameParametersRemainDefaultsAndNullWiresMaskThem()[jvm]" classname="borg.trikeshed.memory.ace.AceContextNodesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

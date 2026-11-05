@@ -1,0 +1,820 @@
+{
+  "state": "paused",
+  "ordinal": 4,
+  "site": {
+    "invocationOrdinal": 4,
+    "nodeId": "scan",
+    "type": "vm.llvm.confix",
+    "path": [],
+    "parent": null,
+    "iteration": null,
+    "params": {
+      "format": "JSON",
+      "data": ""
+    },
+    "inputs": {
+      "data?": "{\"schema\":\"document-spans/1\", \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"sourceManifestCid\":\"sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd\", \"offsetUnit\":\"utf16\", \"rangeConvention\":\"half-open\", \"coverage\":\"extracted-text-window\", \"begin\":18477, \"end\":18654, \"textLength\":22686, \"complete\":false, \"nextOffset\":18654, \"spans\":[{\"index\":0, \"quotation\":{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"begin\":18477, \"end\":18654, \"quote\":\"took this case to decide whether, under the FAA, a court or\\nan arbitrator decides which of the two contractual provi-\\nsions controls. We decline to consider auxiliary questions\\n\", \"anchors\":[{\"begin\":18477, \"end\":18536, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 871, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18537, \"end\":18594, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 926, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}, {\"begin\":18595, \"end\":18653, \"page\":10, \"folio\":null, \"section\":null, \"table\":null, \"diagram\":null, \"coordinates\":[651, 982, 1248, 55], \"coordinateSystem\":\"pixels-300dpi\", \"unresolved\":[\"table\", \"diagram\", \"folio\", \"section\"]}], \"unresolved\":[\"table\", \"diagram\"], \"category\":\"document\", \"provenance\":{\"finalUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\", \"notesCid\":\"sha256:397741ff3a44af70fd50e3a82d6fe83486612d6ad237f81389af6541b931a679\", \"retrieved\":\"2026-11-04T23:32:18Z\", \"requestedUrl\":\"https://www.supremecourt.gov/opinions/23pdf/23-3_879d.pdf\"}, \"authentication\":\"unverified\", \"quotationSource\":\"extracted-text\"}}]}"
+    },
+    "bindings": {},
+    "outputsOmitted": "payload_limit",
+    "depth": 0,
+    "frameId": 0,
+    "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+    "documentName": "airgap-coinbase-suski",
+    "scopeFrames": [
+      {
+        "depth": 0,
+        "bindings": {},
+        "outputsOmitted": "payload_limit"
+      }
+    ],
+    "scopeFramesTruncated": false,
+    "phase": "before",
+    "status": "running"
+  },
+  "detached": false,
+  "actions": [
+    "step",
+    "continue"
+  ],
+  "boundary": "cooperative node boundary; source controls only when advertised",
+  "pointcuts": {
+    "nodeIds": [],
+    "scope": null,
+    "automatic": "none"
+  },
+  "interventions": [],
+  "interventionsDropped": 0,
+  "controls": [
+    {
+      "sequence": 1,
+      "action": "step",
+      "status": "applied",
+      "ordinal": 1,
+      "nodeId": "document",
+      "path": [],
+      "effectOrdinal": 1,
+      "effectNodeId": "document",
+      "effectPath": []
+    },
+    {
+      "sequence": 2,
+      "action": "step",
+      "status": "applied",
+      "ordinal": 2,
+      "nodeId": "source",
+      "path": [],
+      "effectOrdinal": 2,
+      "effectNodeId": "source",
+      "effectPath": []
+    },
+    {
+      "sequence": 3,
+      "action": "step",
+      "status": "applied",
+      "ordinal": 3,
+      "nodeId": "passages",
+      "path": [],
+      "effectOrdinal": 3,
+      "effectNodeId": "passages",
+      "effectPath": []
+    }
+  ],
+  "controlsDropped": 0,
+  "monitor": {
+    "epoch": 1,
+    "attached": true,
+    "mode": "logging",
+    "requestedMode": "logging",
+    "scope": null,
+    "pointcut": null,
+    "observed": 8,
+    "persistent": 1,
+    "aggregated": 0,
+    "overwritten": 0,
+    "valueTruncations": 6,
+    "complete": false,
+    "coverage": "attached runtime observations",
+    "durableLog": false,
+    "eventCapacity": 256,
+    "binCapacity": 120,
+    "binMillis": 250,
+    "eventsPerBin": 64,
+    "events": [
+      {
+        "sequence": 1,
+        "timeMillis": 82,
+        "scope": "local",
+        "pointcut": "receipt",
+        "kind": "persistent",
+        "persistent": true,
+        "before": {
+          "status": "queued",
+          "jobId": "lcnc/run/efcead21-a3fb-47de-8aef-bfe9bf065e5a",
+          "timelineRevision": 1,
+          "receiptCid": "sha256:e3f69f273af1b28aaee8421dc376b42c757534bbb282afe095936b4518a1efde"
+        },
+        "after": {
+          "status": "running",
+          "jobId": "lcnc/run/efcead21-a3fb-47de-8aef-bfe9bf065e5a",
+          "timelineRevision": 2,
+          "receiptCid": "sha256:fb82bf3ec5fcf9b038bd0dfc558cb4aceb5238c37803b428f1087659da58ca9c",
+          "durability": "durable"
+        },
+        "truncated": false
+      },
+      {
+        "sequence": 2,
+        "timeMillis": 106,
+        "scope": "",
+        "pointcut": "document",
+        "kind": "begin",
+        "persistent": false,
+        "before": {},
+        "after": {
+          "invocationOrdinal": 1,
+          "nodeId": "document",
+          "type": "json.value",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "params": {
+            "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:587c8cece2952724012ba67944e7de80ae62f35389ffe129b0594b17b18eb5a2\", \"seq\":0.0}, \"ex"
+          },
+          "inputs": {},
+          "bindings": {},
+          "outputs": {},
+          "depth": 0,
+          "frameId": 0,
+          "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+          "documentName": "airgap-coinbase-suski",
+          "scopeFrames": [
+            {
+              "depth": 0,
+              "bindings": {},
+              "outputs": {}
+            }
+          ],
+          "scopeFramesTruncated": false,
+          "phase": "before",
+          "status": "running"
+        },
+        "truncated": true
+      },
+      {
+        "sequence": 3,
+        "timeMillis": 360,
+        "scope": "",
+        "pointcut": "document",
+        "kind": "completed",
+        "persistent": false,
+        "before": {},
+        "after": {
+          "invocationOrdinal": 1,
+          "nodeId": "document",
+          "type": "json.value",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "params": {
+            "value": "{\"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"name\":\"coinbase-suski.pdf\", \"mediaType\":\"application/pdf\", \"category\":\"document\", \"project\":{\"project\":\"coinbase-suski\", \"id\":\"coinbase-suski.pdf\", \"cid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"rev\":\"1-sha256:587c8cece2952724012ba67944e7de80ae62f35389ffe129b0594b17b18eb5a2\", \"seq\":0.0}, \"ex"
+          },
+          "inputs": {},
+          "bindings": {},
+          "outputs": {
+            "document": {
+              "value": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": "<unexpanded>",
+                "extraction": "<unexpanded>",
+                "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+              }
+            }
+          },
+          "depth": 0,
+          "frameId": 0,
+          "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+          "documentName": "airgap-coinbase-suski",
+          "scopeFrames": [
+            {
+              "depth": 0,
+              "bindings": {},
+              "outputs": {
+                "document": "<unexpanded>"
+              }
+            }
+          ],
+          "scopeFramesTruncated": false,
+          "phase": "after",
+          "status": "completed",
+          "result": {
+            "value": {
+              "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+              "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+              "name": "coinbase-suski.pdf",
+              "mediaType": "application/pdf",
+              "category": "document",
+              "project": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf",
+                "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "rev": "1-sha256:587c8cece2952724012ba67944e7de80ae62f35389ffe129b0594b17b18eb5a2",
+                "seq": 0
+              },
+              "extraction": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf.extract.md",
+                "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "rev": "1-sha256:1968fabb121f97f069309cc559a1d132a7dae5e17c298a421fdfdf791ee25d29",
+                "seq": 3
+              },
+              "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+            }
+          }
+        },
+        "truncated": true
+      },
+      {
+        "sequence": 4,
+        "timeMillis": 361,
+        "scope": "",
+        "pointcut": "source",
+        "kind": "begin",
+        "persistent": false,
+        "before": {},
+        "after": {
+          "invocationOrdinal": 2,
+          "nodeId": "source",
+          "type": "document.source",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "params": {
+            "view": "reference"
+          },
+          "inputs": {
+            "source?": {
+              "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+              "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+              "name": "coinbase-suski.pdf",
+              "mediaType": "application/pdf",
+              "category": "document",
+              "project": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf",
+                "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "rev": "1-sha256:587c8cece2952724012ba67944e7de80ae62f35389ffe129b0594b17b18eb5a2",
+                "seq": 0
+              },
+              "extraction": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf.extract.md",
+                "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "rev": "1-sha256:1968fabb121f97f069309cc559a1d132a7dae5e17c298a421fdfdf791ee25d29",
+                "seq": 3
+              },
+              "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+            }
+          },
+          "bindings": {},
+          "outputs": {
+            "document": {
+              "value": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": "<unexpanded>",
+                "extraction": "<unexpanded>",
+                "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+              }
+            }
+          },
+          "depth": 0,
+          "frameId": 0,
+          "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+          "documentName": "airgap-coinbase-suski",
+          "scopeFrames": [
+            {
+              "depth": 0,
+              "bindings": {},
+              "outputs": {
+                "document": "<unexpanded>"
+              }
+            }
+          ],
+          "scopeFramesTruncated": false,
+          "phase": "before",
+          "status": "running"
+        },
+        "truncated": true
+      },
+      {
+        "sequence": 5,
+        "timeMillis": 686,
+        "scope": "",
+        "pointcut": "source",
+        "kind": "completed",
+        "persistent": false,
+        "before": {},
+        "after": {
+          "invocationOrdinal": 2,
+          "nodeId": "source",
+          "type": "document.source",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "params": {
+            "view": "reference"
+          },
+          "inputs": {},
+          "bindings": {},
+          "outputs": {
+            "document": {
+              "value": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": "<unexpanded>",
+                "extraction": "<unexpanded>",
+                "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+              }
+            },
+            "source": {
+              "source": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": "<unexpanded>",
+                "extraction": "<unexpanded>",
+                "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+              }
+            }
+          },
+          "depth": 0,
+          "frameId": 0,
+          "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+          "documentName": "airgap-coinbase-suski",
+          "scopeFrames": [
+            {
+              "depth": 0,
+              "bindings": {},
+              "outputs": {
+                "document": "<unexpanded>",
+                "source": "<unexpanded>"
+              }
+            }
+          ],
+          "scopeFramesTruncated": false,
+          "phase": "after",
+          "status": "completed",
+          "result": {
+            "source": {
+              "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+              "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+              "name": "coinbase-suski.pdf",
+              "mediaType": "application/pdf",
+              "category": "document",
+              "project": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf",
+                "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "rev": "1-sha256:587c8cece2952724012ba67944e7de80ae62f35389ffe129b0594b17b18eb5a2",
+                "seq": 0
+              },
+              "extraction": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf.extract.md",
+                "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "rev": "1-sha256:1968fabb121f97f069309cc559a1d132a7dae5e17c298a421fdfdf791ee25d29",
+                "seq": 3
+              }
+            }
+          }
+        },
+        "truncated": true
+      },
+      {
+        "sequence": 6,
+        "timeMillis": 686,
+        "scope": "",
+        "pointcut": "passages",
+        "kind": "begin",
+        "persistent": false,
+        "before": {},
+        "after": {
+          "invocationOrdinal": 3,
+          "nodeId": "passages",
+          "type": "document.spans",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "params": {
+            "offset": "18477",
+            "count": "1",
+            "spanChars": "200",
+            "maxBytes": "8192"
+          },
+          "inputs": {
+            "source": {
+              "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+              "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+              "name": "coinbase-suski.pdf",
+              "mediaType": "application/pdf",
+              "category": "document",
+              "project": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf",
+                "cid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "rev": "1-sha256:587c8cece2952724012ba67944e7de80ae62f35389ffe129b0594b17b18eb5a2",
+                "seq": 0
+              },
+              "extraction": {
+                "project": "coinbase-suski",
+                "id": "coinbase-suski.pdf.extract.md",
+                "cid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "rev": "1-sha256:1968fabb121f97f069309cc559a1d132a7dae5e17c298a421fdfdf791ee25d29",
+                "seq": 3
+              },
+              "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+            }
+          },
+          "bindings": {},
+          "outputs": {
+            "document": {
+              "value": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": "<unexpanded>",
+                "extraction": "<unexpanded>",
+                "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+              }
+            },
+            "source": {
+              "source": {
+                "originalCid": "sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f",
+                "extractedTextCid": "sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801",
+                "name": "coinbase-suski.pdf",
+                "mediaType": "application/pdf",
+                "category": "document",
+                "project": "<unexpanded>",
+                "extraction": "<unexpanded>",
+                "sourceCid": "sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd"
+              }
+            }
+          },
+          "depth": 0,
+          "frameId": 0,
+          "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+          "documentName": "airgap-coinbase-suski",
+          "scopeFrames": [
+            {
+              "depth": 0,
+              "bindings": {},
+              "outputs": {
+                "document": "<unexpanded>",
+                "source": "<unexpanded>"
+              }
+            }
+          ]
+        },
+        "truncated": true
+      },
+      {
+        "sequence": 7,
+        "timeMillis": 998,
+        "scope": "",
+        "pointcut": "passages",
+        "kind": "completed",
+        "persistent": false,
+        "before": {},
+        "after": {
+          "invocationOrdinal": 3,
+          "nodeId": "passages",
+          "type": "document.spans",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "params": {
+            "offset": "18477",
+            "count": "1",
+            "spanChars": "200",
+            "maxBytes": "8192"
+          },
+          "inputs": {},
+          "bindings": {},
+          "outputsOmitted": "payload_limit",
+          "depth": 0,
+          "frameId": 0,
+          "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+          "documentName": "airgap-coinbase-suski",
+          "scopeFrames": [
+            {
+              "depth": 0,
+              "bindings": {},
+              "outputsOmitted": "payload_limit"
+            }
+          ],
+          "scopeFramesTruncated": false,
+          "phase": "after",
+          "status": "completed",
+          "resultOmitted": "payload_limit"
+        },
+        "truncated": false
+      },
+      {
+        "sequence": 8,
+        "timeMillis": 998,
+        "scope": "",
+        "pointcut": "scan",
+        "kind": "begin",
+        "persistent": false,
+        "before": {},
+        "after": {
+          "invocationOrdinal": 4,
+          "nodeId": "scan",
+          "type": "vm.llvm.confix",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "params": {
+            "format": "JSON",
+            "data": ""
+          },
+          "inputs": {
+            "data?": "{\"schema\":\"document-spans/1\", \"originalCid\":\"sha256:591f0fdecf41cb297427288a18fd72230e14d4aefe9af4f2d86d6c64dcc4476f\", \"extractedTextCid\":\"sha256:593fd4088374764d6a3bd3d12dfe9b54b016d8ded783fa466579f41aeb7bf801\", \"sourceManifestCid\":\"sha256:0e2c062226e6dc551d68581c086f2ef1e43afc05a8882080c58f20d186c62bbd\", \"offsetUnit\":\"utf16\", \"rangeConvention\":\"half-open\", \"coverage\":\"extracted-text-window\", \"begin\":18477, \"end\":18654, \"textLength\":22686, \"complete\":false, \"nextOffset\":18654, \"spans\":[{\"index\":0, \"quotati"
+          },
+          "bindings": {},
+          "outputsOmitted": "payload_limit",
+          "depth": 0,
+          "frameId": 0,
+          "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+          "documentName": "airgap-coinbase-suski",
+          "scopeFrames": [
+            {
+              "depth": 0,
+              "bindings": {},
+              "outputsOmitted": "payload_limit"
+            }
+          ],
+          "scopeFramesTruncated": false,
+          "phase": "before",
+          "status": "running"
+        },
+        "truncated": true
+      }
+    ],
+    "bins": [
+      {
+        "startMillis": 0,
+        "count": 2,
+        "persistent": 1,
+        "aggregated": 0
+      },
+      {
+        "startMillis": 250,
+        "count": 2,
+        "persistent": 0,
+        "aggregated": 0
+      },
+      {
+        "startMillis": 500,
+        "count": 2,
+        "persistent": 0,
+        "aggregated": 0
+      },
+      {
+        "startMillis": 750,
+        "count": 2,
+        "persistent": 0,
+        "aggregated": 0
+      }
+    ]
+  },
+  "observationSchema": "lcnc-observations/1",
+  "observations": [
+    {
+      "invocationOrdinal": 1,
+      "nodeId": "document",
+      "type": "json.value",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "documentName": "airgap-coinbase-suski",
+      "phase": "before",
+      "status": "running",
+      "sequence": 1,
+      "elapsedNanos": 9682147
+    },
+    {
+      "invocationOrdinal": 1,
+      "nodeId": "document",
+      "type": "json.value",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "documentName": "airgap-coinbase-suski",
+      "phase": "after",
+      "status": "completed",
+      "sequence": 2,
+      "elapsedNanos": 256577011
+    },
+    {
+      "invocationOrdinal": 2,
+      "nodeId": "source",
+      "type": "document.source",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "documentName": "airgap-coinbase-suski",
+      "phase": "before",
+      "status": "running",
+      "sequence": 3,
+      "elapsedNanos": 264693921
+    },
+    {
+      "invocationOrdinal": 2,
+      "nodeId": "source",
+      "type": "document.source",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentName": "airgap-coinbase-suski",
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "origin": "wire",
+      "producer": {
+        "invocationOrdinal": 1,
+        "nodeId": "document",
+        "type": "json.value",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentName": "airgap-coinbase-suski",
+        "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+        "origin": "executed"
+      },
+      "wire": {
+        "index": 0,
+        "fromNode": "document",
+        "fromPort": "value",
+        "toNode": "source",
+        "toPort": "source?"
+      },
+      "phase": "consumed",
+      "status": "delivered",
+      "selection": {
+        "port": "source?",
+        "cardinality": "one",
+        "position": 0,
+        "count": 1,
+        "representation": "scalar"
+      },
+      "evidence": {
+        "status": "unavailable",
+        "reason": "value_identity_not_recorded"
+      },
+      "sequence": 4,
+      "elapsedNanos": 533138423
+    },
+    {
+      "invocationOrdinal": 2,
+      "nodeId": "source",
+      "type": "document.source",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "documentName": "airgap-coinbase-suski",
+      "phase": "after",
+      "status": "completed",
+      "sequence": 5,
+      "elapsedNanos": 589674448
+    },
+    {
+      "invocationOrdinal": 3,
+      "nodeId": "passages",
+      "type": "document.spans",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "documentName": "airgap-coinbase-suski",
+      "phase": "before",
+      "status": "running",
+      "sequence": 6,
+      "elapsedNanos": 590049556
+    },
+    {
+      "invocationOrdinal": 3,
+      "nodeId": "passages",
+      "type": "document.spans",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentName": "airgap-coinbase-suski",
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "origin": "wire",
+      "producer": {
+        "invocationOrdinal": 2,
+        "nodeId": "source",
+        "type": "document.source",
+        "path": [],
+        "parent": null,
+        "iteration": null,
+        "frameId": 0,
+        "documentName": "airgap-coinbase-suski",
+        "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+        "origin": "executed"
+      },
+      "wire": {
+        "index": 1,
+        "fromNode": "source",
+        "fromPort": "source",
+        "toNode": "passages",
+        "toPort": "source"
+      },
+      "phase": "consumed",
+      "status": "delivered",
+      "selection": {
+        "port": "source",
+        "cardinality": "one",
+        "position": 0,
+        "count": 1,
+        "representation": "scalar"
+      },
+      "evidence": {
+        "status": "unavailable",
+        "reason": "value_identity_not_recorded"
+      },
+      "sequence": 7,
+      "elapsedNanos": 833936725
+    },
+    {
+      "invocationOrdinal": 3,
+      "nodeId": "passages",
+      "type": "document.spans",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "documentName": "airgap-coinbase-suski",
+      "phase": "after",
+      "status": "completed",
+      "sequence": 8,
+      "elapsedNanos": 901688912
+    },
+    {
+      "invocationOrdinal": 4,
+      "nodeId": "scan",
+      "type": "vm.llvm.confix",
+      "path": [],
+      "parent": null,
+      "iteration": null,
+      "frameId": 0,
+      "documentCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+      "documentName": "airgap-coinbase-suski",
+      "phase": "before",
+      "status": "running",
+      "sequence": 9,
+      "elapsedNanos": 901952584
+    }
+  ],
+  "observationsDropped": 0,
+  "observationSummary": {
+    "clockOrigin": "walk-start",
+    "attempted": 9,
+    "retained": 9,
+    "omitted": 0,
+    "firstSequence": 1,
+    "lastSequence": 9,
+    "lastObservedSequence": 9,
+    "coverage": "complete"
+  },
+  "runId": "efcead21-a3fb-47de-8aef-bfe9bf065e5a",
+  "programCid": "sha256:bea6ff0bd07674b1ec9bfd3f37def70a53247f335091a81e8bc9126caa1792c1",
+  "timeoutIncludesPauses": true
+}

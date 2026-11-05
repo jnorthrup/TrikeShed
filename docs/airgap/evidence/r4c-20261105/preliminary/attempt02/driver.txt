@@ -1,0 +1,5 @@
+page.waitForFunction: Timeout 30000ms exceeded.
+    at /workspace/airgap-r4c-proof/driver.cjs:34:13 {
+  log: [],
+  name: 'TimeoutError'
+}

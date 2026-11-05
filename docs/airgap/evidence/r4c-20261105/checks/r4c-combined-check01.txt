@@ -1,0 +1,294 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: airgapDocumentInstall jvmTest --tests *.DocumentSpansTest --tests *.LcncConfixSelectionTest --tests *.LcncConsumptionTest --tests *.LlvmScalarTest --tests *.LlvmConfixTest --tests *.LlvmScalarRunTest --tests *.LlvmConfixRunTest --tests *.WorkSelectNodeTest --tests *.FinanceKifPresetExecutionTest --tests *.AceContextNodesTest --tests *.BreadcrumbContextNodesTest --tests *.EnglishCopularPresetExecutionTest --tests *.LcncPinnedBindingTest --tests *.KanbanPinnedDispatchTest --tests *.WorkModelRouteTest --tests *.PropositionAttentionTest --tests *.DocumentEnglishRetainedWireTest --tests *.EnglishTaxonomyCarrierTest --tests *.EnglishTaxonomyExportGuardTest --tests *.ProjectCorpusVisitTest --tests *.CurationReviewedReadTest --tests *.CurationIntakeTest --tests *.CurationIntakeEligibilityTest --tests *.KgKifCommentTest --tests *.LegalRequiredAnchorCoverageTest --tests *.LegalRequiredAnchorCoverageCliTest --tests *.KgPredicateNamespaceTest --tests *.KgRdfFidelityTest --tests *.KgPropositionIdentityTest --tests *.KgRouteErrorTest --tests *.KgRetentionTest --tests *.KgHttpUtf8Test --tests *.LcncConfixPickPathContractTest --tests *.ReviewedTaxonomyProofPathsTest --tests *.ReviewedTaxonomyProofPathsReadTest --tests *.EnglishTaxonomyWireTest --tests *.ProjectDbBindingTest --tests *.ReviewedTaxonomyProofGraphTest --tests *.ReviewedTaxonomyQueryViewTest --tests *.ReviewedTaxonomyQuadQueryWireTest --tests *.ReviewedTaxonomyWireTest --tests *.EnglishCorpusWireTest --tests *.SyntheticNalExperimentTest --tests *.RetainedNalImplicationTest --tests *.SyntheticNalExperimentCliTest muxClasspath
+
+> Configure project :
+The com.github.ben-manes.versions plugin id is deprecated; apply io.github.ben-manes.versions instead.
+w: [33m[1m⚠️ Unused Kotlin Source Sets[0m[0m
+The following Kotlin source sets were configured but not added to any Kotlin compilation:
+ * macosMain
+ * macosTest
+[32m[1mSolution:[0m[0m
+[32m[3mYou can add a source set to a target's compilation by connecting it with the compilation's default source set using 'dependsOn'.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/connecting-source-sets[0m[36m[0m
+
+
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :checkJvmTestComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForCommonTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonTest NO-SOURCE
+> Task :generateResourceAccessorsForCommonTest SKIPPED
+> Task :convertXmlValueResourcesForJvmTest NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmTest NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmTest NO-SOURCE
+> Task :generateResourceAccessorsForJvmTest SKIPPED
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :generateForgeAssets UP-TO-DATE
+> Task :fetchSumoCorpus UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+> Task :assembleJvmTestResources UP-TO-DATE
+> Task :jvmTestProcessResources UP-TO-DATE
+> Task :processJvmTestResources SKIPPED
+> Task :kotlinKotlinNpmCachesSetup
+> Task :kotlinNodeJsSetup UP-TO-DATE
+> Task :kotlinRestoreYarnLock UP-TO-DATE
+> Task :kotlinYarnSetup UP-TO-DATE
+> Task :jsBenchPackageJson UP-TO-DATE
+> Task :jsDocumentsPackageJson UP-TO-DATE
+> Task :jsForgePackageJson UP-TO-DATE
+> Task :jsGraalPackageJson UP-TO-DATE
+> Task :jsHarnessPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPackageJson UP-TO-DATE
+> Task :jsPackageJson UP-TO-DATE
+> Task :jsPagesPackageJson UP-TO-DATE
+> Task :jsSpacegraphPackageJson UP-TO-DATE
+> Task :jsTestPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPackageJson UP-TO-DATE
+> Task :jsViewserverPackageJson UP-TO-DATE
+> Task :jsBenchPublicPackageJson UP-TO-DATE
+> Task :jsDocumentsPublicPackageJson UP-TO-DATE
+> Task :jsForgePublicPackageJson UP-TO-DATE
+> Task :jsGraalPublicPackageJson UP-TO-DATE
+> Task :jsHarnessPublicPackageJson UP-TO-DATE
+> Task :jsJsBenchBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsPagesPublicPackageJson UP-TO-DATE
+> Task :jsPublicPackageJson UP-TO-DATE
+> Task :jsSpacegraphPublicPackageJson UP-TO-DATE
+> Task :jsTestPublicPackageJson UP-TO-DATE
+> Task :jsUringBenchmarkPublicPackageJson UP-TO-DATE
+> Task :jsViewserverPublicPackageJson UP-TO-DATE
+> Task :kotlinPackageJsonUmbrella UP-TO-DATE
+> Task :rootPackageJson UP-TO-DATE
+> Task :kotlinNpmInstall UP-TO-DATE
+> Task :convertXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsSpacegraph NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsSpacegraph NO-SOURCE
+> Task :assembleJsSpacegraphResources UP-TO-DATE
+> Task :unpackSkikoWasmRuntime SKIPPED
+> Task :jsSpacegraphProcessResources UP-TO-DATE
+> Task :checkJsMainComposeLibrariesCompatibility
+> Task :convertXmlValueResourcesForJsMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJsMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJsMain NO-SOURCE
+> Task :generateResourceAccessorsForJsMain SKIPPED
+> Task :generateActualResourceCollectorsForJsMain SKIPPED
+> Task :compileKotlinJvm
+> Task :compileKotlinJs
+e: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/SyntheticNalExperiment.kt:172:20 None of the following candidates is applicable:
+
+fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun <T> List<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> List<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun ByteArray.toSeries(): Join<Int, (Int) -> Byte>:
+  Candidate 'fun ByteArray.toSeries(): Join<Int, (Int) -> Byte>' is inapplicable because of a receiver type mismatch.
+
+fun ShortArray.toSeries(): Join<Int, (Int) -> Short>:
+  Candidate 'fun ShortArray.toSeries(): Join<Int, (Int) -> Short>' is inapplicable because of a receiver type mismatch.
+
+fun IntArray.toSeries(): Join<Int, (Int) -> Int>:
+  Candidate 'fun IntArray.toSeries(): Join<Int, (Int) -> Int>' is inapplicable because of a receiver type mismatch.
+
+fun LongArray.toSeries(): Join<Int, (Int) -> Long>:
+  Candidate 'fun LongArray.toSeries(): Join<Int, (Int) -> Long>' is inapplicable because of a receiver type mismatch.
+
+fun FloatArray.toSeries(): Join<Int, (Int) -> Float>:
+  Candidate 'fun FloatArray.toSeries(): Join<Int, (Int) -> Float>' is inapplicable because of a receiver type mismatch.
+
+fun DoubleArray.toSeries(): Join<Int, (Int) -> Double>:
+  Candidate 'fun DoubleArray.toSeries(): Join<Int, (Int) -> Double>' is inapplicable because of a receiver type mismatch.
+
+fun CharArray.toSeries(): Join<Int, (Int) -> Char>:
+  Candidate 'fun CharArray.toSeries(): Join<Int, (Int) -> Char>' is inapplicable because of a receiver type mismatch.
+
+fun BooleanArray.toSeries(): Join<Int, (Int) -> Boolean>:
+  Candidate 'fun BooleanArray.toSeries(): Join<Int, (Int) -> Boolean>' is inapplicable because of a receiver type mismatch.
+
+fun UIntArray.toSeries(): Join<Int, (Int) -> UInt>:
+  Candidate 'fun UIntArray.toSeries(): Join<Int, (Int) -> UInt>' is inapplicable because of a receiver type mismatch.
+
+fun String.toSeries(): Join<Int, (Int) -> Char>:
+  Candidate 'fun String.toSeries(): Join<Int, (Int) -> Char>' is inapplicable because of a receiver type mismatch.
+
+fun ClosedRange<Int>.toSeries(): Join<Int, (Int) -> Int>:
+  Candidate 'fun ClosedRange<Int>.toSeries(): Join<Int, (Int) -> Int>' is inapplicable because of a receiver type mismatch.
+
+fun <T> Sequence<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Sequence<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun <T> Collection<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Collection<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun <T> Set<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Set<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+e: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/SyntheticNalExperiment.kt:172:67 Unresolved reference 'it'.
+
+> Task :compileKotlinJs FAILED
+
+> Task :compileKotlinJvm
+e: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/SyntheticNalExperiment.kt:172:20 None of the following candidates is applicable:
+
+fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun <T> List<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> List<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun ByteArray.toSeries(): Join<Int, (Int) -> Byte>:
+  Candidate 'fun ByteArray.toSeries(): Join<Int, (Int) -> Byte>' is inapplicable because of a receiver type mismatch.
+
+fun ShortArray.toSeries(): Join<Int, (Int) -> Short>:
+  Candidate 'fun ShortArray.toSeries(): Join<Int, (Int) -> Short>' is inapplicable because of a receiver type mismatch.
+
+fun IntArray.toSeries(): Join<Int, (Int) -> Int>:
+  Candidate 'fun IntArray.toSeries(): Join<Int, (Int) -> Int>' is inapplicable because of a receiver type mismatch.
+
+fun LongArray.toSeries(): Join<Int, (Int) -> Long>:
+  Candidate 'fun LongArray.toSeries(): Join<Int, (Int) -> Long>' is inapplicable because of a receiver type mismatch.
+
+fun FloatArray.toSeries(): Join<Int, (Int) -> Float>:
+  Candidate 'fun FloatArray.toSeries(): Join<Int, (Int) -> Float>' is inapplicable because of a receiver type mismatch.
+
+fun DoubleArray.toSeries(): Join<Int, (Int) -> Double>:
+  Candidate 'fun DoubleArray.toSeries(): Join<Int, (Int) -> Double>' is inapplicable because of a receiver type mismatch.
+
+fun CharArray.toSeries(): Join<Int, (Int) -> Char>:
+  Candidate 'fun CharArray.toSeries(): Join<Int, (Int) -> Char>' is inapplicable because of a receiver type mismatch.
+
+fun BooleanArray.toSeries(): Join<Int, (Int) -> Boolean>:
+  Candidate 'fun BooleanArray.toSeries(): Join<Int, (Int) -> Boolean>' is inapplicable because of a receiver type mismatch.
+
+fun UIntArray.toSeries(): Join<Int, (Int) -> UInt>:
+  Candidate 'fun UIntArray.toSeries(): Join<Int, (Int) -> UInt>' is inapplicable because of a receiver type mismatch.
+
+fun String.toSeries(): Join<Int, (Int) -> Char>:
+  Candidate 'fun String.toSeries(): Join<Int, (Int) -> Char>' is inapplicable because of a receiver type mismatch.
+
+fun ClosedRange<Int>.toSeries(): Join<Int, (Int) -> Int>:
+  Candidate 'fun ClosedRange<Int>.toSeries(): Join<Int, (Int) -> Int>' is inapplicable because of a receiver type mismatch.
+
+fun <T> Sequence<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Sequence<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun <T> Collection<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Collection<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+
+fun <T> Set<T>.toSeries(): Join<Int, (Int) -> T>:
+  Candidate 'fun <T> Set<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+e: file:///workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/SyntheticNalExperiment.kt:172:67 Unresolved reference 'it'.
+
+> Task :compileKotlinJvm FAILED
+
+[Incubating] Problems report is available at: file:///workspace/TrikeShed/build/reports/problems/problems-report.html
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':compileKotlinJs' (registered in build file 'build.gradle.kts').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':compileKotlinJvm' (registered in build file 'build.gradle.kts').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Kotlin compiler: NONE_APPLICABLE
+       Kotlin compiler error
+         None of the following candidates is applicable:
+     
+         fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T>:
+           Candidate 'fun <T> Array<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+     
+         fun <T> List<T>.toSeries(): Join<Int, (Int) -> T>:
+           Candidate 'fun <T> List<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+     
+         fun ByteArray.toSeries(): Join<Int, (Int) -> Byte>:
+           Candidate 'fun ByteArray.toSeries(): Join<Int, (Int) -> Byte>' is inapplicable because of a receiver type mismatch.
+     
+         fun ShortArray.toSeries(): Join<Int, (Int) -> Short>:
+           Candidate 'fun ShortArray.toSeries(): Join<Int, (Int) -> Short>' is inapplicable because of a receiver type mismatch.
+     
+         fun IntArray.toSeries(): Join<Int, (Int) -> Int>:
+           Candidate 'fun IntArray.toSeries(): Join<Int, (Int) -> Int>' is inapplicable because of a receiver type mismatch.
+     
+         fun LongArray.toSeries(): Join<Int, (Int) -> Long>:
+           Candidate 'fun LongArray.toSeries(): Join<Int, (Int) -> Long>' is inapplicable because of a receiver type mismatch.
+     
+         fun FloatArray.toSeries(): Join<Int, (Int) -> Float>:
+           Candidate 'fun FloatArray.toSeries(): Join<Int, (Int) -> Float>' is inapplicable because of a receiver type mismatch.
+     
+         fun DoubleArray.toSeries(): Join<Int, (Int) -> Double>:
+           Candidate 'fun DoubleArray.toSeries(): Join<Int, (Int) -> Double>' is inapplicable because of a receiver type mismatch.
+     
+         fun CharArray.toSeries(): Join<Int, (Int) -> Char>:
+           Candidate 'fun CharArray.toSeries(): Join<Int, (Int) -> Char>' is inapplicable because of a receiver type mismatch.
+     
+         fun BooleanArray.toSeries(): Join<Int, (Int) -> Boolean>:
+           Candidate 'fun BooleanArray.toSeries(): Join<Int, (Int) -> Boolean>' is inapplicable because of a receiver type mismatch.
+     
+         fun UIntArray.toSeries(): Join<Int, (Int) -> UInt>:
+           Candidate 'fun UIntArray.toSeries(): Join<Int, (Int) -> UInt>' is inapplicable because of a receiver type mismatch.
+     
+         fun String.toSeries(): Join<Int, (Int) -> Char>:
+           Candidate 'fun String.toSeries(): Join<Int, (Int) -> Char>' is inapplicable because of a receiver type mismatch.
+     
+         fun ClosedRange<Int>.toSeries(): Join<Int, (Int) -> Int>:
+           Candidate 'fun ClosedRange<Int>.toSeries(): Join<Int, (Int) -> Int>' is inapplicable because of a receiver type mismatch.
+     
+         fun <T> Sequence<T>.toSeries(): Join<Int, (Int) -> T>:
+           Candidate 'fun <T> Sequence<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+     
+         fun <T> Collection<T>.toSeries(): Join<Int, (Int) -> T>:
+           Candidate 'fun <T> Collection<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+     
+         fun <T> Set<T>.toSeries(): Join<Int, (Int) -> T>:
+           Candidate 'fun <T> Set<T>.toSeries(): Join<Int, (Int) -> T>' is inapplicable because of a receiver type mismatch.
+         Location: /workspace/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/SyntheticNalExperiment.kt:172
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.8.2/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 3m 1s
+43 actionable tasks: 6 executed, 37 up-to-date
+Configuration cache entry stored.

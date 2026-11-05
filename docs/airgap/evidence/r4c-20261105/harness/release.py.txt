@@ -1,0 +1,30 @@
+from pathlib import Path
+import subprocess,json,hashlib,os,shutil
+home=Path('/workspace/airgap-r4c-proof');repo=Path('/workspace/TrikeShed');root=home/'rootfs'
+def run(args,name,env=None):
+ with (Path('/workspace')/('r4c-'+name+'.txt')).open('w') as log:p=subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,env=env)
+ assert p.returncode==0,(name,p.returncode)
+ print(name,'PASS',flush=True)
+def record(p):return {'file':str(p),'bytes':p.stat().st_size,'sha256':hashlib.file_digest(p.open('rb'),'sha256').hexdigest()}
+assert json.loads(Path('/workspace/r4c-combined-check03.json').read_text())['exit']==0
+run(['python',str(home/'assemble.py'),'application'],'application-stage')
+profile=json.loads((home/'runtime-profile.json').read_text());libs=list((root/'opt/trikeshed/lib').glob('*.jar'));assert len(libs)==26
+profile['jarBytes']=sum(p.stat().st_size for p in libs);(home/'runtime-profile.json').write_text(json.dumps(profile,indent=2)+'\n')
+run(['python',str(home/'package.py'),'manifest'],'package-manifest')
+run(['python',str(home/'package.py'),'verify'],'package-verify')
+run(['python',str(home/'integrity.py')],'integrity')
+first=Path('/workspace/library-files/airgap-document-r4c-linux-x64-2026-11-05.tar.gz');second=home/'reproducibility-second.tar.gz'
+for p,name in [(first,'archive-first'),(second,'archive-second')]:run(['python',str(home/'package.py'),'archive',str(p)],name)
+a,b=record(first),record(second);assert a['sha256']==b['sha256']
+(home/'reproducibility.json').write_text(json.dumps({'first':a,'second':b,'identical':True,'scope':'Deterministic packaging of the same pinned files; not source-build reproducibility'},indent=2)+'\n')
+unpacked=home/'unpacked';unpacked.mkdir(exist_ok=False)
+run(['tar','-xzpf',str(first),'--no-same-owner','-C',str(unpacked)],'archive-extract')
+env=os.environ.copy();env['TRIKESHED_PROOF_ROOT']=str(unpacked/'airgap-document-rootfs')
+run(['python',str(home/'package.py'),'verify'],'unpacked-verify',env)
+for stage in ['document','scan','selection']:
+ name='interruption-'+stage+'-archive01'
+ run(['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4c-proof','python',str(home/'run.py'),name,stage],name,env)
+ run(['python',str(home/'audit.py'),name],'audit-'+stage)
+accepted='interruption-selection-archive01'
+run(['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4c-proof','python',str(home/'negative.py'),accepted,'negative-attempt01'],'negative-attempt01',env)
+run(['unshare','--user','--map-root-user','--net','sh','-c','ip link set lo up && exec "$@"','r4c-proof','python',str(home/'recovery-negative.py'),accepted,'recovery-negative-attempt01'],'recovery-negative-attempt01',env)

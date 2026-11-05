@@ -1,0 +1,11 @@
+locator.click: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByRole('region', { name: 'Workspace facets' }).getByRole('button', { name: 'Evidence', exact: true })[22m
+
+    at receipt (/workspace/airgap-r4c-proof/driver.cjs:20:187)
+    at async /workspace/airgap-r4c-proof/driver.cjs:42:21 {
+  log: [
+    "  - waiting for getByRole('region', { name: 'Workspace facets' }).getByRole('button', { name: 'Evidence', exact: true })"
+  ],
+  name: 'TimeoutError'
+}

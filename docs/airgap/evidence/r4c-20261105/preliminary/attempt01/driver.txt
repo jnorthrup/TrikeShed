@@ -1,0 +1,13 @@
+AssertionError [ERR_ASSERTION]: /api/lcnc/debug?token=837c580d-685e-4b89-8c68-f55a6038c3da&runId=8ec676bb-d449-4207-8674-aada07e46ae6
+
+404 !== 200
+
+    at get (/workspace/airgap-r4c-proof/driver.cjs:12:79)
+    at async /workspace/airgap-r4c-proof/driver.cjs:28:14 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 404,
+  expected: 200,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

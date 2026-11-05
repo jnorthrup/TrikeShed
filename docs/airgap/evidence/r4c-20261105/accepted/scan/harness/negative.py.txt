@@ -1,0 +1,31 @@
+from pathlib import Path
+import subprocess,json,hashlib,sys
+home=Path('/workspace/airgap-r4c-proof');accepted=home/sys.argv[1]
+packet=json.loads((accepted/'processes.json').read_text())
+base=packet['processes'][0]['command'];out=home/sys.argv[2];out.mkdir(exist_ok=False)
+results=[]
+for name in ['empty-inspection','existing-run','missing-module','changed-module']:
+    state=out/name;state.mkdir()
+    cmd=base.copy()
+    bind=cmd.index('--bind');cmd[bind+1]=str(state)
+    if name=='empty-inspection':cmd[-1]='inspect'
+    if name=='existing-run':(state/'runtime').mkdir();(state/'runtime/owned.txt').write_text('preserve this state\n')
+    if name=='missing-module':
+        at=cmd.index('/opt/trikeshed/bin/airgap-document');cmd[at:at]=['--tmpfs','/opt/trikeshed/modules','--remount-ro','/opt/trikeshed/modules']
+    if name=='changed-module':
+        module=out/'changed-confix.bc';data=bytearray((home/'rootfs/opt/trikeshed/modules/confix.bc').read_bytes());data[-1]^=1;module.write_bytes(data)
+        at=cmd.index('/opt/trikeshed/bin/airgap-document');cmd[at:at]=['--ro-bind',str(module),'/opt/trikeshed/modules/confix.bc']
+    with (out/(name+'.txt')).open('w') as log:
+        result=subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT,timeout=30)
+    text=(out/(name+'.txt')).read_text()
+    assert result.returncode!=0,name
+    assert 'trikeshed-kanban: listening' not in text,name
+    expected={'empty-inspection':'inspect requires an existing runtime','existing-run':'run requires fresh state','missing-module':'confix','changed-module':'Pinned module differs: confix.bc'}[name]
+    if name=='missing-module':expected='add-mlir.bc'
+    assert expected in text,(name,text[-2500:])
+    if name=='existing-run':assert (state/'runtime/owned.txt').read_text()=='preserve this state\n' and len(list((state/'runtime').iterdir()))==1
+    if name in ['missing-module','changed-module']:
+        cleanup=json.loads((state/'cleanup-run.json').read_text());assert all(cleanup.values())
+        assert not (state/'runtime/.kanban').exists()
+    results.append({'case':name,'exit':result.returncode,'listenerOpened':False,'expectedFailure':expected,'result':'PASS'})
+(out/'results.json').write_text(json.dumps(results,indent=2)+'\n');print(json.dumps(results,indent=2))

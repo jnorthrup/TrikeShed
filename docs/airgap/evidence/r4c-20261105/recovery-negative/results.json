@@ -1,0 +1,18 @@
+[
+  {
+    "case": "empty-recovery",
+    "exit": 1,
+    "expectedFailure": "recover requires an existing runtime",
+    "runtimeBytesUnchanged": true,
+    "listenerOpened": false,
+    "result": "PASS"
+  },
+  {
+    "case": "changed-admission-identity",
+    "exit": 1,
+    "expectedFailure": "Project revision changed at startup:",
+    "runtimeBytesUnchanged": true,
+    "listenerOpened": false,
+    "result": "PASS"
+  }
+]

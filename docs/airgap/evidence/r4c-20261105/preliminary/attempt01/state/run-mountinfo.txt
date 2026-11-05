@@ -1,0 +1,12 @@
+85 39 0:27 /workspace/airgap-r4c-proof/rootfs / ro,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/lower-0,upperdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/upper,workdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/work,index=off,metacopy=off
+86 85 0:27 /workspace/airgap-r4c-proof/interruption-attempt01/state /state rw,nosuid,nodev,relatime master:1 - overlay overlay rw,lowerdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/lower-0,upperdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/upper,workdir=/run/kata-containers/erofs-multi-layer/0d6dfba25614480ea24da5733473190c/upper/work,index=off,metacopy=off
+87 85 0:37 / /tmp rw,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+88 85 0:38 / /proc rw,nosuid,nodev,noexec,relatime - proc proc rw
+89 85 0:39 / /dev rw,nosuid,nodev,relatime - tmpfs tmpfs rw,mode=755,uid=1000,gid=1000
+90 89 0:31 /null /dev/null rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+91 89 0:31 /zero /dev/zero rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+92 89 0:31 /full /dev/full rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+93 89 0:31 /random /dev/random rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+94 89 0:31 /urandom /dev/urandom rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+95 89 0:31 /tty /dev/tty rw,nosuid master:3 - tmpfs tmpfs rw,size=65536k,mode=755
+96 89 0:40 / /dev/pts rw,nosuid,noexec,relatime - devpts devpts rw,mode=620,ptmxmode=666

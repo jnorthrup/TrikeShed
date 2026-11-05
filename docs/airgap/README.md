@@ -13,7 +13,8 @@ and D3M integration record. A planned gate is not a completed release.
 | R3b: retained document traversal | Real 12-page PDF, production extraction, bounded passage, LLVM geometry selection, verified source/quotation and reopening without LLVM | [Verified increment](05-document-traversal.md), [final combined evidence](evidence/r3b-cutoff-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r3b.md); dense recursive visualization remains open |
 | R4a: packaged offline runtime | Generated launcher, sealed server filesystem, real PDF traversal and recovery in a second JVM without source assets or LLVM | [Verified increment](06-offline-runtime.md), [219 regressions and packaged proof](evidence/r4a-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4a.md) |
 | R4b: narrower profile and forced-exit recovery | 23 dependency jars, inert named preset, exact receipt recovery after SIGKILL at a completed receipt | [Verified increment](07-runtime-profile-recovery.md), [237 regressions and extracted-archive proof](evidence/r4b-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4b.md) |
-| R4c: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
+| R4c: interrupted execution | SIGKILL at three node boundaries, preserved interrupted receipts, explicit new execution and third-JVM inspection | [Verified increment](08-interrupted-execution.md), [247 regressions and three archive scenarios](evidence/r4c-20261105/verification.json), [D3M record](../d3m/2026-11-05-airgap-r4c.md) |
+| R4d: wider release closure | Complete vendor/native rebuild provenance, arbitrary-write crash recovery and additional deployment environments | Open; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
 The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
 verifies the native inert Documents-to-Panels handoff, ten URL/ownership guards,
@@ -147,6 +148,28 @@ startup/integrity refusals and independent CAS verification pass. D3M retains
 limits. This does not close arbitrary-write crash safety, power-loss
 durability or the full vendor/native source-build gate.
 
+
 ## Retained-source deployment boundary
 
 The [v77 source-promotion checkpoint](evidence/retained-source-promotion-v77-20261105/README.md) verifies actual missing-source refusal, same-CID BLOB promotion and separate-JVM reopening with the old producer directory hidden. It uses the pinned v76 artifact and does not establish the full sealed English host.
+
+## Retained English NAL application
+
+The [v77 retained-English checkpoint](../evidence/2026-11-05/retained-english-nal-v77/README.md) applies the existing NAL operations to one bounded atomic-symbol inspection. It preserves source and premise identities, separates deduction from weak induction hypotheses, refuses guarded or incomplete frames, and performs no live admission. The old zero-argument example remains byte-identical.
+
+## R4c acceptance
+
+Three extracted-archive scenarios kill the actual writer JVM before document
+processing, before native scanning, or after scanning returns. Each recovers
+an interrupted receipt without fabricated outputs, permits an explicit new
+run with a distinct identity, then reopens both rows in a third JVM without
+the miner or LLVM. Twenty-one browser cases, six startup refusals, five
+package-integrity refusals and independent CAS audits pass.
+
+The combined source passes 247 selected JVM tests, with one conditional
+external-native-solver check skipped, plus affected-target compilation.
+D3M retains 540 frozen refs through six merges; both textual conflicts and
+the concurrent NAL assertion overlap have preserved evidence and intent
+resolutions. The [runbook](08-interrupted-execution.md) records archive
+identities and measurements. These are cooperative node-boundary failures;
+arbitrary-write crash safety and vendor/native rebuild closure remain open.
