@@ -1,0 +1,72 @@
+from pathlib import Path
+import hashlib,json,shutil,subprocess,tarfile,struct,os
+root=Path(__file__).resolve().parent
+snapshot=Path('/workspace/library-files/english-corpus-topics-v76-proof/snapshot')
+archive=Path('/workspace/library-files/english-retained-opener-inputs/positive-unmutated-runtime.tar.gz')
+old=Path('/workspace/library-files/english-taxonomy-v68-fresh-proof/runtime/files/english-taxonomy-fresh-profile-proof')
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+assert (snapshot/'source-head.txt').read_text().strip()=='0219223a3846887fe283b93598942de332214cd2'
+assert sha(snapshot/'main.jar')=='d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636'
+cp=(snapshot/'classpath.txt').read_text().strip(); jars=[Path(p) for p in cp.split(':')]
+assert len(jars)==120 and all(p.is_file() and p.suffix=='.jar' for p in jars)
+assert jars[0]==snapshot/'main.jar'
+pins=json.loads((snapshot/'sha256.json').read_text());assert len(pins['dependencies'])==119
+for p in jars[1:]:assert sha(p)==pins['dependencies'][str(p)]
+assert sha(archive)=='51b3526fcfa478b497550014d9c0c5d73a0a42d596ec76303fdb8c0fe58b9acc'
+attempt=root/'attempt2';attempt.mkdir();shutil.copy2(archive,attempt/'original-input.tar.gz')
+with tarfile.open(archive) as t:
+ assert len(t.getmembers())==7 and all(m.isfile() for m in t.getmembers())
+ t.extractall(attempt,filter='data')
+(attempt/'empty-subvm').mkdir()
+pack=attempt/'runtime/cas/pack';shutil.copy2(pack,attempt/'input-cas-prefix.bin')
+original_pack=pack.read_bytes();assert len(original_pack)==7666
+records=[];at=0
+while at<len(original_pack):
+ kind=original_pack[at];length=struct.unpack_from('>i',original_pack,at+1)[0];cid=original_pack[at+5:at+37].hex();payload=original_pack[at+37:at+37+length]
+ row={'offset':at,'kind':kind,'bytes':length,'cid':'sha256:'+cid}
+ if kind==2:row.update(sourcePath=payload[16:].decode(),size=struct.unpack_from('>q',payload,0)[0],mtime=struct.unpack_from('>q',payload,8)[0])
+ else:assert hashlib.sha256(payload).hexdigest()==cid
+ records.append(row);at+=37+length
+assert at==len(original_pack) and records[0]['kind']==2
+oldfile=old/'synthetic taxonomy copular clauses.txt';oldstamp={'bytes':oldfile.stat().st_size,'sha256':sha(oldfile),'mtimeNs':oldfile.stat().st_mtime_ns}
+manifest={'sourceHead':(snapshot/'source-head.txt').read_text().strip(),'mainSha256':sha(snapshot/'main.jar'),'classpath':[{'path':str(p),'sha256':sha(p)} for p in jars],
+ 'inputArchiveSha256':sha(archive),'originalPack':{'bytes':len(original_pack),'sha256':sha(pack),'records':records},'oldProducerBefore':oldstamp,'parentMountNamespace':os.readlink('/proc/self/ns/mnt'),
+ 'scope':'Fresh copied CAS only. Read-only / plus narrowly hidden old producer directory and writable attempt2; not sealed R4a, network isolation or general importer.'}
+(attempt/'protocol.json').write_text(json.dumps(manifest,indent=2)+'\n')
+compiler=next(Path('/workspace/.trikeshed-cloud/gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.4.21').rglob('*.jar'))
+classes=root/'observer-attempt2';classes.mkdir()
+compile_cmd=['java','-Xmx768m','-cp',str(compiler)+':'+cp,'org.jetbrains.kotlin.cli.jvm.K2JVMCompiler','-no-stdlib','-no-reflect','-jvm-target','25','-classpath',cp,'-d',str(classes),str(root/'Observer.kt')]
+with (root/'compile-attempt2.log').open('w') as log:compile_result=subprocess.run(compile_cmd,stdout=log,stderr=subprocess.STDOUT)
+(root/'compile-attempt2.exit').write_text(str(compile_result.returncode)+'\n');assert compile_result.returncode==0,'observer compile failed; preserve attempt2'
+for mode in ['before','promote','after']:
+ output=attempt/(mode+'.json')
+ cmd=['bwrap','--die-with-parent','--ro-bind','/','/','--bind',str(attempt),str(attempt),'--tmpfs',str(old),
+  '--',str(Path(os.environ['JAVA_HOME'])/'bin/java'),'-Xmx768m','-Dtrikeshed.airgap=true','-cp',str(classes)+':'+cp,
+  'proof.sourcepromotion.ObserverKt',mode,str(attempt),str(output),str(snapshot)]
+ (attempt/(mode+'-command.json')).write_text(json.dumps(cmd,indent=2)+'\n')
+ with (attempt/(mode+'.log')).open('w') as log:result=subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT)
+ (attempt/(mode+'.exit')).write_text(str(result.returncode)+'\n')
+ assert result.returncode==0,f'{mode} failed; preserve actual attempt'
+ print((attempt/(mode+'.log')).read_text(),flush=True)
+ assert {'bytes':oldfile.stat().st_size,'sha256':sha(oldfile),'mtimeNs':oldfile.stat().st_mtime_ns}==oldstamp
+records_after=[];data=pack.read_bytes();at=0
+while at<len(data):
+ kind=data[at];n=struct.unpack_from('>i',data,at+1)[0];cid=data[at+5:at+37].hex();payload=data[at+37:at+37+n]
+ row={'offset':at,'kind':kind,'bytes':n,'cid':'sha256:'+cid}
+ if kind==1:assert hashlib.sha256(payload).hexdigest()==cid
+ records_after.append(row);at+=37+n
+assert len(records_after)==5 and records_after[-1]=={'offset':7666,'kind':1,'bytes':41,'cid':'sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883'}
+assert len(data)==7744 and data[:7666]==original_pack
+reports={m:json.loads((attempt/(m+'.json')).read_text()) for m in ['before','promote','after']}
+assert len({r['pid'] for r in reports.values()})==3
+assert all(r['namespace']['mnt']!=manifest['parentMountNamespace'] for r in reports.values())
+assert reports['before']['packBefore']==reports['before']['packAfterClose']
+assert reports['promote']['packAfterClose']==reports['after']['packBefore']==reports['after']['packAfterClose']
+assert all(r['immutableBefore']==r['immutableAfter']==reports['before']['immutableBefore'] for r in reports.values())
+assert reports['after']['selection']==reports['promote']['selection']
+summary={'result':'PASS','scope':manifest['scope'],'sourceHead':manifest['sourceHead'],'mainSha256':manifest['mainSha256'],
+ 'modes':{m:{'pid':r['pid'],'readStatus':r['readStatus'],'mountNamespace':r['namespace']['mnt'],'packBefore':r['packBefore'],'packAfterClose':r['packAfterClose']} for m,r in reports.items()},
+ 'oldProducerAfter':oldstamp,'originalPackPrefixBytes':7666,'sourcePromotionRecord':records_after[-1],'finalPackBytes':len(data),'finalPackSha256':sha(pack),
+ 'selection':reports['after']['selection'],'actualCurrentRow':reports['after']['actualCurrentRow'],'receiptReadback':reports['after']['receiptAfter'],
+ 'observerSources':{p.name:{'bytes':p.stat().st_size,'sha256':sha(p)} for p in [root/'Observer.kt',root/'run.py']}}
+(attempt/'result.json').write_text(json.dumps(summary,indent=2)+'\n');print(json.dumps(summary,indent=2))

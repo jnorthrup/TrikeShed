@@ -146,3 +146,7 @@ startup/integrity refusals and independent CAS verification pass. D3M retains
 [runbook](07-runtime-profile-recovery.md) records hashes, measurements and
 limits. This does not close arbitrary-write crash safety, power-loss
 durability or the full vendor/native source-build gate.
+
+## Retained-source deployment boundary
+
+The [v77 source-promotion checkpoint](evidence/retained-source-promotion-v77-20261105/README.md) verifies actual missing-source refusal, same-CID BLOB promotion and separate-JVM reopening with the old producer directory hidden. It uses the pinned v76 artifact and does not establish the full sealed English host.
