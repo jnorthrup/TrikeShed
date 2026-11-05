@@ -22,6 +22,7 @@ class ReviewedKifWireTest {
     @org.junit.jupiter.api.io.TempDir lateinit var directory: Path
     private var watchedDocument: String? = null
     private var watchedReads = 0
+    private var watchedMutation = 9
 
     @Test fun reviewedKifRetainsExactEvidenceAndInvalidatesOnSourceRevision(): Unit = exercise(null)
 
@@ -41,7 +42,7 @@ class ReviewedKifWireTest {
         val corpus = InMemoryProjectCorpus()
         val observedCorpus = object : ProjectCorpus by corpus {
             override suspend fun document(project: String, id: String): ProjectDoc? {
-                if (id == watchedDocument && ++watchedReads == 9)
+                if (id == watchedDocument && ++watchedReads == watchedMutation)
                     corpus.put(project, id, "(subclass Changed DuringQuery)".encodeToByteArray(), "text/plain")
                 return corpus.document(project, id)
             }
@@ -112,6 +113,7 @@ class ReviewedKifWireTest {
             }
             exerciseWhitespace(corpus, cas, record, token, ::request)
             exercisePartitions(corpus, cas, record, native, token, ::request)
+            if (native != null) exerciseNativeQuads(corpus, cas, record, token, docs.resolve("review.wal"), ::request)
             request("snapshot", _m["kind" j "taxonomy", "receiptCid" j receipt.value, "selection" j _l[ids[0], ids[0]]], status = 409)
             request("snapshot", _m["kind" j "taxonomy", "receiptCid" j receipt.value, "selection" j _l["kif:0:20"]], status = 409)
             val snapshot = request("snapshot", _m["kind" j "taxonomy", "receiptCid" j receipt.value, "selection" j ids])
@@ -231,6 +233,59 @@ class ReviewedKifWireTest {
                 }
             }
         }
+    }
+
+    /** Uses the actual authenticated native owner and bounded visual evaluator; no supplied result callback. */
+    private suspend fun exerciseNativeQuads(corpus: InMemoryProjectCorpus, cas: CasStore, record: DocumentCurationRecord,
+        token: String, wal: Path, call: suspend (String, Map<String, Any?>, String?, Int) -> Map<String, Any?>) {
+        suspend fun request(body: Map<String, Any?>, auth: String? = token, status: Int = 200) = call("taxonomy-query", body, auth, status)
+        val text = "(instance Tenant Person)\n(subclass Person Agent)\n(subclass Unrelated Other)\n"
+        corpus.put("test", "native-proof.kif", text.encodeToByteArray(), "text/plain")
+        val source = DocumentCurationLegos.projectSource(cas, corpus, requireNotNull(corpus.document("test", "native-proof.kif")))
+        val receipt = cas.put(DocumentCuratorCodec.encode(record.copy(source = source)))
+        val ids = DocumentTaxonomyCandidate.projection(source).map { it["id"] as String }
+        val snapshot = call("snapshot", _m["kind" j "taxonomy", "receiptCid" j receipt.value, "selection" j ids], token, 200)
+        val approved = call("decision", _m["snapshotCid" j snapshot["snapshotCid"], "expectedRevision" j snapshot["revision"], "action" j "approve"], token, 200)
+        val body = _m["snapshotCid" j snapshot["snapshotCid"], "expectedRevision" j approved["revision"],
+            "goal" j _m["predicate" j "instance", "subject" j "Tenant", "object" j "Agent"]]
+        val walSize = Files.size(wal)
+        watchedDocument = "native-proof.kif"; watchedReads = 0; watchedMutation = Int.MAX_VALUE
+        try {
+            val plain = request(body); val nativeReads = watchedReads
+            assertEquals("SUPPORTED", plain["status"]); assertFalse("quadQuery" in plain)
+            assertEquals(plain, request(body), "No-program path retains the original payload")
+            val bindings = NativeHornQueryView.starter(plain, bindings = true)
+            val premises = NativeHornQueryView.starter(plain, bindings = false)
+            fun program(starter: NativeHornQueryView.Starter) = reifyMap(LcncProgramConfix.toJson(starter.program))
+            val before = watchedReads
+            val bindingResponse = request(body + _m["program" j program(bindings)])
+            val quadReads = watchedReads - before
+            assertEquals(nativeReads + 4, quadReads, "Two additional reviewed reads check the original and extracted revision before/after visual evaluation")
+            val bindingRows = NativeHornQueryView.answer(plain, bindingResponse, bindings).rows
+            assertEquals(_l["?x", "?y", "?z"], bindingRows.map { (it["variable"] as Map<*, *>)["value"] })
+            assertEquals(_l["Tenant", "Person", "Agent"], bindingRows.map { (it["value"] as Map<*, *>)["value"] })
+            val premiseResponse = request(body + _m["program" j program(premises)])
+            val premiseRows = NativeHornQueryView.answer(plain, premiseResponse, premises).rows
+            assertEquals(_l["0", "1"], premiseRows.map { (it["ordinal"] as Map<*, *>)["value"] })
+            assertEquals(_l["(instance Tenant Person)", "(subclass Person Agent)"], premiseRows.map { (it["form"] as Map<*, *>)["value"] })
+            assertEquals(3, (plain["sourceEvidence"] as Map<*, *>).size, "Unrelated approved evidence remains bound to the projection context")
+            request(body + _m["program" j program(bindings)], auth = null, status = 401)
+            request(body + _m["program" j null], status = 400)
+            request(body + _m["program" j (program(bindings) + _m["controls" j _m["inspectionOnly" j false]])], status = 400)
+            val stale = bindings.program.copy(nodes = bindings.program.nodes α { node ->
+                if (node.type == SparqlGraph.PATTERN) node.copy(params = node.params + _m["graph" j "<urn:wrong:old-frame>"]) else node
+            })
+            val refused = request(body + _m["program" j reifyMap(LcncProgramConfix.toJson(stale))], status = 409)
+            assertEquals("native_horn_projection_changed", refused["code"]); assertFalse("quadQuery" in refused)
+            assertEquals(walSize, Files.size(wal))
+            // The last reviewed read occurs after SPARQL; amend the actual ProjectCorpus at that read.
+            watchedMutation = watchedReads + quadReads - 1
+            val changed = request(body + _m["program" j program(premises)], status = 409)
+            assertTrue((changed["error"] as String).contains("current")); assertFalse("quadQuery" in changed)
+            assertEquals(watchedMutation, watchedReads)
+            assertEquals(walSize, Files.size(wal))
+            request(body, status = 409)
+        } finally { watchedDocument = null; watchedReads = 0; watchedMutation = 9 }
     }
 
     private suspend fun exerciseChain(focus: Map<String, Any?>, token: String,
