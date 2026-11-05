@@ -1,0 +1,66 @@
+This package preserves actual recorded data. Replaying an audit does not execute
+Stanford, Java, a query engine, NAL, network calls or a browser. No parser/runtime
+replay is authorized or needed to inspect these records.
+
+Archive extraction
+Extract records.tar.gz OUTSIDE a source checkout into a fresh directory. All
+members must be ordinary files under records/, with no absolute paths, '..',
+links, device entries or duplicate destinations. The archive is created with
+fixed metadata and was checked with these conditions before safe extraction.
+Materialized receipt .cbor and source .txt files can be read directly; no CAS
+REF resolution, original runtime directory, JAR or model is needed for them.
+
+Original observer audit
+observer-data-audit.py.txt is the exact unchanged Python audit actually run by
+the observer owner. Its CBOR implementation is independent of the JVM codec;
+it is NOT a separate reviewer's audit. Its original report is preserved as
+observer-data-audit-{report.txt,result.json}. The first audit's file:/ versus
+file:/// spelling error and corrected audit are separately retained.
+
+For the root's exact frozen environment, copy that audit text to the extracted
+records directory as audit.py and run:
+  cp PUBLIC/observer-data-audit.py.txt EXTRACTED/records/audit.py
+  python3 EXTRACTED/records/audit.py
+
+It intentionally requires the actual paths recorded in frozen-inputs.json:
+  /workspace/library-files/english-corpus-topics-v76-proof/snapshot
+  /workspace/TrikeShed/utils/subvm/corenlp
+  and the 119 original dependency JAR paths in the frozen classpath.
+Matching binaries are excluded from this documentation archive. Supply those
+exact frozen artifacts locally to repeat artifact-hash checks; absence is not
+a reason to fabricate a passing audit or replace the recorded provenance.
+The script determines its data root from its own location and writes audit-result.json
+there. Its regenerated path strings will name EXTRACTED, while the preserved
+actual report continues to name the original run directory. Byte identity of
+regenerated path strings is not required; compare case data/counts/CIDs instead.
+
+Readback layout
+  records/attempt-first-G01/cases/G01/
+  records/attempt-remaining/cases/{G02..G17,S12}/
+Each contains source.txt, source-row.json, request.json, response.json, status.txt,
+condition-diagnostics.json and cas-readbacks/{CIDhex}.{cbor,txt}. S12 also contains
+nlpcore-axiomatics.json. Canonical CBOR SHA256 exactly equals the inspection CID;
+raw source SHA256 exactly equals the original/extracted CID. All copy identities
+and raw edges are inside both the actual response and canonical receipt.
+
+G01's receipt was valid but its containing observer process exited 1 AFTER it
+was retained, on an incorrect runner-registration assertion. Do not convert
+that attempt to green or pretend the successful producer response was a refusal.
+The later observer only replaced this incorrect invariant with equality of
+actual attached read-only runner instances. No production semantic guard changed.
+The actual first/remaining observer sources, compile/launch text and logs are
+preserved with .txt suffixes. All actual invocations and failure scope remain
+recorded; no new runtime/JVM execution took place during this packaging.
+
+Separate independent recorded-data audit
+independent-audit.py.txt, independent-audit-report.txt and independent-audit-result.json
+are unchanged files from a separate reviewer. The verifier passed against both
+original and safely extracted records with byte-identical results. It accepts a
+record root directly, handles archived .txt source copies, and does not require
+original runtime packs or REF resolution. It still verifies the frozen120JARs
+and29installedmodulefiles at their recorded locations. Copy its text OUTSIDE the
+checkout and run:
+  python3 COPIED_INDEPENDENT_AUDIT EXTRACTED/records --out AUDIT_OUTPUT
+For root's already materialized package check:
+  python3 /workspace/library-files/english-guard-baseline-independent-audit/audit.py /workspace/library-files/english-guard-baseline-v77-package/extracted/records --out FRESH_OUTPUT_DIRECTORY
+No Java/parser/model/query/reasoner invocation is performed by this replay.

@@ -1,0 +1,383 @@
+{
+  "result": "PASS_RECORDED_DATA_CONSISTENCY",
+  "parserRerun": false,
+  "sourceHead": "0219223a3846887fe283b93598942de332214cd2",
+  "mainSha256": "d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636",
+  "artifactFilesHashed": 149,
+  "counts": {
+    "sources": 18,
+    "sentences": 23,
+    "tokens": 201,
+    "nodes": 201,
+    "dependencies": 203,
+    "markers": 48,
+    "copies": 0,
+    "utf8Bytes": 996
+  },
+  "records": [
+    {
+      "id": "G01",
+      "inspectionCid": "sha256:9ee6a4c328fe5bff1dd898019e51ff862032992985f4a3c3270c100f4e4e27c2",
+      "sourceCid": "sha256:33739ec22bf33c7433aee82d0325108428f02a922a840c664746198b7b8fa4b0",
+      "range": {
+        "begin": 0,
+        "end": 39,
+        "totalLength": 39,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 8,
+        "nodes": 8,
+        "dependencies": 8,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G02",
+      "inspectionCid": "sha256:fa3d2d3849ab51a6c5210344c2031a93f31b2cc7d8fbbcd519822eeb048f6f6b",
+      "sourceCid": "sha256:c7d8d37966a4bbeabb3712e475c1da6d1a30b0fd40cb953261c3051c0ab4422b",
+      "range": {
+        "begin": 0,
+        "end": 44,
+        "totalLength": 44,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G03",
+      "inspectionCid": "sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85",
+      "sourceCid": "sha256:c70abbd6df1ad28bb9a6f3acc58f42ec98a20da7e8a8f9d30d4611b6ac9eb93b",
+      "range": {
+        "begin": 0,
+        "end": 43,
+        "totalLength": 43,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G04",
+      "inspectionCid": "sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec",
+      "sourceCid": "sha256:873863564944e2609740f52fb69dfcffc55985f6ad107e26b1ae788b0e115ee1",
+      "range": {
+        "begin": 0,
+        "end": 47,
+        "totalLength": 47,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 3
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G05",
+      "inspectionCid": "sha256:3f6a61f63f1e1c992e26433d28124f1c6b831828b895760696e5f67f37618966",
+      "sourceCid": "sha256:8746e685e05ce171025dd01d6f723b2405967b63e5926090d2a846f99720dc8a",
+      "range": {
+        "begin": 0,
+        "end": 56,
+        "totalLength": 56,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 12,
+        "nodes": 12,
+        "dependencies": 12,
+        "markers": 5
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G06",
+      "inspectionCid": "sha256:a141006cbbcc8dd16ec63b89aac37d0a00e42a1e42ad6acc0548dbb8229f71b1",
+      "sourceCid": "sha256:e8f2cb6cde19bcf7cb08c5a88628365fb31fa225b2346b099b0c4341ae461e09",
+      "range": {
+        "begin": 0,
+        "end": 62,
+        "totalLength": 62,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 11,
+        "markers": 4
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G07",
+      "inspectionCid": "sha256:1899ec44c853e7633ef3bd06c65236806d18defeaf5ec6693fef97a2a5b39608",
+      "sourceCid": "sha256:a01e1f4f42999a26fe8d505a75f35a24c82beb3cf18b82cd1e3d6ab96dc55896",
+      "range": {
+        "begin": 0,
+        "end": 59,
+        "totalLength": 59,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 12,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G08",
+      "inspectionCid": "sha256:cc6273262c54146d75eb3389f0b96a19d5d4f78c903aa05b48a8319b27ede086",
+      "sourceCid": "sha256:15b1e924998c9d497801edc831802082f3d63843381a2eafd2af2b53ab1dcd62",
+      "range": {
+        "begin": 0,
+        "end": 59,
+        "totalLength": 59,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 12,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G09",
+      "inspectionCid": "sha256:ab402d273364ff305b4afc7a6f30f23504f6c4f002616aa2dee8793f6f9dcaac",
+      "sourceCid": "sha256:f852cbbb0a7033f34dc6e4f7f581b77f16ff1bd44f9315ae7c144f8895abc0da",
+      "range": {
+        "begin": 0,
+        "end": 79,
+        "totalLength": 79,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 15,
+        "nodes": 15,
+        "dependencies": 15,
+        "markers": 3
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G10",
+      "inspectionCid": "sha256:585fa8d8599a814b4fcc8be0641ecb0b25aa625b72fcd7c01a88c6f27060a173",
+      "sourceCid": "sha256:f7a8d61b4dc83852865769ccfa14fc8c4cd7355ba5e3ab406172d85eaa2ed538",
+      "range": {
+        "begin": 0,
+        "end": 43,
+        "totalLength": 43,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G11",
+      "inspectionCid": "sha256:352c60ea812a4e508693250f4eb53a8427452952e545a76fdba9cb3898e6d411",
+      "sourceCid": "sha256:5995d8e351d4cad2fb25d12c4886084f90cc90d3c42226c3416fa4f34c4efde6",
+      "range": {
+        "begin": 0,
+        "end": 42,
+        "totalLength": 42,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 3
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G12",
+      "inspectionCid": "sha256:05cf5b172f1e344b3c935295e8749d0b64ec7c6315634cd2fb739d5ffba6561a",
+      "sourceCid": "sha256:3eea29778e9b588d4d0097f10ee960589d35691dd7d320623c9419d0c18ec2d4",
+      "range": {
+        "begin": 0,
+        "end": 37,
+        "totalLength": 37,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G13",
+      "inspectionCid": "sha256:bb487a93ac29498b4e0d8c88f4377005da45b0065034854bc750ac4567afaa39",
+      "sourceCid": "sha256:72e4cea248136d862bd637f94849aa82d055d947d9ddc60b2a5a4243fc45e2b4",
+      "range": {
+        "begin": 0,
+        "end": 60,
+        "totalLength": 60,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 13,
+        "nodes": 13,
+        "dependencies": 13,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G14",
+      "inspectionCid": "sha256:46b56be81b98a04d2dcef74695bdadb311ff752bf09191d0036e5686a4db4dfa",
+      "sourceCid": "sha256:8717ddd3a9b3f3da4dd854da0a7ce3395c9b0fc1b08972667bc4a41b149e57db",
+      "range": {
+        "begin": 0,
+        "end": 48,
+        "totalLength": 48,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 10,
+        "nodes": 10,
+        "dependencies": 10,
+        "markers": 3
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G15",
+      "inspectionCid": "sha256:56ebb71c3c738683877ee5cb3edd5cb7dcf67a299431f190a8bf4c5ec7a1f55b",
+      "sourceCid": "sha256:587b149912575230241d887ac2a592dd06562205a50d11664e6209f69153f3a1",
+      "range": {
+        "begin": 0,
+        "end": 44,
+        "totalLength": 44,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 9,
+        "nodes": 9,
+        "dependencies": 9,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G16",
+      "inspectionCid": "sha256:444c3c09b2b79b1e364176277964e708fbcf76411c45b7ad701c17ef6758f0f3",
+      "sourceCid": "sha256:dc69d52e88735cb38066271d42d663345a9712de00c5499da668954abbaa48dd",
+      "range": {
+        "begin": 0,
+        "end": 66,
+        "totalLength": 66,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 2,
+        "tokens": 14,
+        "nodes": 14,
+        "dependencies": 14,
+        "markers": 2
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "G17",
+      "inspectionCid": "sha256:48593709c7fc945ae540728f47bc11e5cf13c10e2fa1d3256b49b45e72c246ae",
+      "sourceCid": "sha256:02bc8a36e287ef31f140acb15e0a678f3be93450464e7de3154824fc85950d4e",
+      "range": {
+        "begin": 4,
+        "end": 59,
+        "totalLength": 61,
+        "complete": false
+      },
+      "counts": {
+        "sentences": 1,
+        "tokens": 11,
+        "nodes": 11,
+        "dependencies": 11,
+        "markers": 5
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    },
+    {
+      "id": "S12",
+      "inspectionCid": "sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0",
+      "sourceCid": "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac",
+      "range": {
+        "begin": 0,
+        "end": 105,
+        "totalLength": 105,
+        "complete": true
+      },
+      "counts": {
+        "sentences": 5,
+        "tokens": 20,
+        "nodes": 20,
+        "dependencies": 20,
+        "markers": 0
+      },
+      "copyCoverage": "NOT_EXERCISED"
+    }
+  ],
+  "preservedFirstObserverProcessExit": 1,
+  "remainingProcessExit": 0,
+  "copies": "NOT_EXERCISED",
+  "S12": {
+    "candidates": 5,
+    "uniqueRuleCids": 4,
+    "sameSourceRepeatedOccurrence": "not independent evidence",
+    "gammaSurfaceRecords": [
+      {
+        "word": "GAMMA",
+        "lemma": "gamma",
+        "pos": "NN"
+      },
+      {
+        "word": "GAMMA",
+        "lemma": "GAMMA",
+        "pos": "NNP"
+      }
+    ]
+  },
+  "scope": "Independent retained bytes/metadata consistency only. No Stanford accuracy, semantic truth, legal interpretation, parser/runtime/HTTP rerun, NAL execution, query execution, admission or OS airgap claim.",
+  "auditorSha256": "a7a30dfe84160b5bb1ce7fa5bef071c47d243343fdcf26f25d823b9df8408e0a"
+}
