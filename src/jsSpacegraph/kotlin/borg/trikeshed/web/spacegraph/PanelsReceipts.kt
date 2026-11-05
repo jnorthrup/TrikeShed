@@ -111,18 +111,19 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                 if (objectValue(outputs)) {
                     if (run.status == "completed" && run.ok == true)
                         button("Show recorded outputs on matching canvas", {
+                            val activity = panels.trace.reserve()
                             panels.launchJs {
                                 try {
                                     val frozen = content(str(run.programCid))
-                                    if (!current(ticket)) return@launchJs
+                                    if (!current(ticket) || !panels.trace.owns(activity)) return@launchJs
                                     val program = LcncProgramConfix.fromJson(str(run.program), JSON.stringify(frozen))
                                     val document = JSON.stringify(panels.toConfix())
                                     val canvas = LcncProgramConfix.fromJson(str(panels.panelName().value).ifBlank { "canvas" }, document)
                                     require(LcncProgramConfix.sameDefinition(program, canvas)) { "Recorded outputs require the matching frozen program" }
-                                    panels.programOutputs(run, document)
-                                    if (current(ticket)) panels.status("Recorded outputs shown · no execution · current source revisions were not evaluated")
+                                    panels.programOutputs(run, document) { panels.trace.owns(activity) }
+                                    if (current(ticket) && panels.trace.owns(activity)) panels.status("Recorded outputs shown · no execution · current source revisions were not evaluated")
                                 } catch (e: CancellationException) { throw e } catch (e: dynamic) {
-                                    if (current(ticket)) panels.status("Recorded outputs not shown: " + failureText(e))
+                                    if (current(ticket) && panels.trace.owns(activity)) panels.status("Recorded outputs not shown: " + failureText(e))
                                 }
                             }
                         }, output)

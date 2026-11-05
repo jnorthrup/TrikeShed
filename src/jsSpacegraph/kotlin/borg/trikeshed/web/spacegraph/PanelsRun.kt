@@ -90,7 +90,7 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
                 }
                 var displayError = ""
                 try { if (current) {
-                    programOutputs(result, JSON.stringify(toConfix()))
+                    programOutputs(result, JSON.stringify(toConfix())) { trace.owns(activity) }
                     if (result.invocationsCid != null) try {
                         val retained = fetchJson("/api/lcnc/content?cid=" + encodeURIComponent(str(result.invocationsCid)))
                         require(retained.runId == result.runId && retained.programCid == result.programCid) { "Invocation identity changed" }
@@ -138,13 +138,14 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
 }
 
 /** Receipt outputs are presentation only. The daemon's retained frame owns every later input. */
-suspend fun Panels.programOutputs(run: dynamic, document: String) {
+suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {
     val outputs = run.outputs ?: return
     val canvas = graph
     val projected = nodes().filter { !truthy(it._parentScope) }
     val definition = LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, document)
-    fun current(): Boolean = !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(definition,
+    fun current(): Boolean = owned() && !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(definition,
         LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, JSON.stringify(toConfix())))
+    if (!current()) return
     // Replace display snapshots before asynchronous reads; these never feed execution.
     for (n in projected) {
         n._lastOut = undefined
