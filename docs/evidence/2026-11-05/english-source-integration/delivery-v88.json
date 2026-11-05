@@ -56,5 +56,10 @@
   "rootFreshPublicReplay": "PASS exact18355b9dfa9096db5872b7ebcef5b434dd9bce887a7de5a3c0832e6c62a47702",
   "sourceAlreadyPublishedByPeer": "97fbadd1bc018c6daa8410627a79631843fd0b7b viaPR1110; currentmaster259982561e7e95223c310a06483021e06a8c6e00",
   "laterInheritedChanges": "R3f Main/Panels/PanelsReceipts/PanelsRun changes are already public; v88 native evidence remains pinned92510e/f784 and does not certify newer JS. Next root combined build will validate inherited source.",
-  "remaining": "Standalone Documents/review deep link, protected editable native query canvas, Import readiness fix, ordered English relation-frame and Camel child implementation and selected-page furniture projection; semantic16 MISSING16/scored0. Goal remains ACTIVE."
+  "remaining": "Standalone Documents/review deep link, protected editable native query canvas, Import readiness fix, ordered English relation-frame and Camel child implementation and selected-page furniture projection; semantic16 MISSING16/scored0. Goal remains ACTIVE.",
+  "frozenPublicationRefs": 736,
+  "frozenPublicationUniqueTips": 562,
+  "documentationMerge": "06bf2c43e4381730d3080fe1bb4aa0381da55fe5",
+  "inheritedAlreadyPublishedMaster": "259982561e7e95223c310a06483021e06a8c6e00",
+  "productionDifferenceFromAlreadyPublishedMaster": []
 }
