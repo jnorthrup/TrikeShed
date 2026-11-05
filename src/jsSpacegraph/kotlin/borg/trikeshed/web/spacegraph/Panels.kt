@@ -21,6 +21,16 @@ class Panels : PatchSurface {
     internal val page = PanelsPage { status("Page action failed: " + failureText(it)) }
     internal fun launchJs(block: suspend () -> Unit) { page.submit(block) }
     internal fun later(ms: Int, block: () -> Unit): Int = page.later(ms, block)
+    internal var constructionLoad: kotlinx.coroutines.Deferred<Unit>? = null
+    internal fun constructionControls() {
+        val unavailable = page.closing || constructionLoad?.isCompleted != true || keysOf(contracts).isEmpty()
+        byId("importBtn").disabled = unavailable
+        byId("fileIn").disabled = unavailable
+        val execution = unavailable || programRunning || truthy(graph.controls?.inspectionOnly)
+        byId("runBtn").disabled = execution
+        byId("liveBtn")?.disabled = execution
+        byId("debugBtn")?.disabled = execution
+    }
     internal var rdfTimer = 0
     fun close() = page.close()
 
