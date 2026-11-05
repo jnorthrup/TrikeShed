@@ -1,0 +1,30 @@
+from pathlib import Path
+import hashlib, json, tarfile, datetime
+h = Path('/workspace/airgap-r3c-proof')
+rows = []
+archives = {
+    'b': '041d58e32c74ad4998c979f9589f7edf4e2b1c55b38a03f78910bb1dacf032e5',
+    'c': '44cfdf2bea24fd63d3eae88bf8308b62e05601d122e3f46736095fcb2a61817a',
+    'd': 'a0ab4c279c7a59982e46772a6d4fa182598f5a508029fd768af57aeae0b93407',
+    'e': 'a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61',
+}
+def sha(p):
+    with p.open('rb') as f: return hashlib.file_digest(f, 'sha256').hexdigest()
+for release, expected in archives.items():
+    archive = Path(f'/workspace/library-files/airgap-document-r4{release}-sources-2026-11-05.tar.gz')
+    assert sha(archive) == expected
+    sources = list(Path(f'/workspace/airgap-r4{release}-proof/corresponding-source').glob('trikeshed-*.tar.gz'))
+    assert len(sources) == 1, sources
+    source = sources[0]; digest = sha(source); found = []
+    with tarfile.open(archive, 'r|gz') as t:
+        for member in t:
+            if member.isfile() and Path(member.name).name == source.name:
+                with t.extractfile(member) as f: actual = hashlib.file_digest(f, 'sha256').hexdigest()
+                assert actual == digest and member.size == source.stat().st_size
+                found.append(member.name)
+    assert len(found) == 1, found
+    rows.append({'removedScratchCopy':str(source), 'bytes':source.stat().st_size, 'sha256':digest,
+                 'retainedArchive':str(archive),'archiveSha256':expected,'member':found[0]})
+    source.unlink()
+    (h/'scratch-reclamation.json').write_text(json.dumps({'recordedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(), 'copies':rows},indent=2)+'\n')
+    print('Reclaimed verified scratch copy', source.name, flush=True)

@@ -1,0 +1,10 @@
+{
+  "testedSourceCommit": "06da928c627b16db79abc97becaab483874102da",
+  "initialRefs": 545,
+  "publicationRefs": 545,
+  "merges": 0,
+  "conflicts": 0,
+  "allFrozenTipsContained": true,
+  "publication": "Ordinary master push after exact source/evidence checks; publication readback is retained with the exported delivery.",
+  "jimMachine": "unchanged; cloud Linux checkout"
+}

@@ -101,3 +101,23 @@ Reduced-motion mode replaces traveling sparks with directional rate bands and ch
 ## Visual acceptance scenarios
 
 Show a quiet graph with no fake activity; a burst with accurate aggregation; a slow parser with honest elapsed time; a blocked join naming the missing seat; a replay at one-tenth speed; a late event from an old epoch rejected from the current view; and a production invalidation that visibly returns work to analysis. An operator should identify the blocker and recover its exact source within three navigation actions from the selected result. Measure that task with actual users after the first integrated slice.
+
+## Implemented checkpoint: R3c
+
+[R3c](../../airgap/13-human-rate-inspection.md) supplies continuous speed
+changes, presentation-only pause/resume, held-marker camera placement and a
+bounded pinned transfer table. Its table maps accepted observations to the
+matching frozen graph and invalidates on saved definition edits even when
+animation is idle. The real document's eight transfers reopen without LLVM;
+a 65-node native graph shows 19 evidenced transfers and explicit partial
+owner history. These are implemented bounds, not the full L0–L5 design.
+
+The larger run measured p95 33.4 ms and a 1,016.6 ms maximum external browser
+frame interval. The long gap keeps sustained human-rate rendering open.
+Profile receipt output projection, repeated definition checks, rich DOM
+expansion, collision layout and SVG redraw before attributing the stall.
+Future batching must preserve current-owner checks across every yield; future
+level-of-detail aggregation must retain semantic picking and coverage. Do not
+remove owner omissions, fabricate unseen transfers or treat a good percentile
+as proof that controls never stall. The retained fixture has 65 nodes, not the
+planned 10,000/50,000-node acceptance workload.

@@ -1,0 +1,37 @@
+{
+  "recordedAt": "2026-11-05T07:00:53.604763+00:00",
+  "copies": [
+    {
+      "removedScratchCopy": "/workspace/airgap-r4b-proof/corresponding-source/trikeshed-b61a25cd1.tar.gz",
+      "bytes": 102561040,
+      "sha256": "252911d8c32b3afe817cdbb09d9883e1bea1fd3a75e6fb475b4109215e4b1083",
+      "retainedArchive": "/workspace/library-files/airgap-document-r4b-sources-2026-11-05.tar.gz",
+      "archiveSha256": "041d58e32c74ad4998c979f9589f7edf4e2b1c55b38a03f78910bb1dacf032e5",
+      "member": "airgap-document-sources/trikeshed-b61a25cd1.tar.gz"
+    },
+    {
+      "removedScratchCopy": "/workspace/airgap-r4c-proof/corresponding-source/trikeshed-d80e69813.tar.gz",
+      "bytes": 117096258,
+      "sha256": "afc1bd395dbf4c1950fb51be9cb4c833ed80fa1557e5a78d9d276f89812b4e1a",
+      "retainedArchive": "/workspace/library-files/airgap-document-r4c-sources-2026-11-05.tar.gz",
+      "archiveSha256": "44cfdf2bea24fd63d3eae88bf8308b62e05601d122e3f46736095fcb2a61817a",
+      "member": "airgap-document-sources/trikeshed-d80e69813.tar.gz"
+    },
+    {
+      "removedScratchCopy": "/workspace/airgap-r4d-proof/corresponding-source/trikeshed-8579dcad1.tar.gz",
+      "bytes": 148802560,
+      "sha256": "eb891e22c67f9cc47d211a8d2311e6528a93bc269af037fbde8220ff402aa8e2",
+      "retainedArchive": "/workspace/library-files/airgap-document-r4d-sources-2026-11-05.tar.gz",
+      "archiveSha256": "a0ab4c279c7a59982e46772a6d4fa182598f5a508029fd768af57aeae0b93407",
+      "member": "airgap-document-sources/trikeshed-8579dcad1.tar.gz"
+    },
+    {
+      "removedScratchCopy": "/workspace/airgap-r4e-proof/corresponding-source/trikeshed-2c6e55e25.tar.gz",
+      "bytes": 189729208,
+      "sha256": "a0781820eb2f909bcf0bd3c7d999fbe1286d8917936e91d50227a253a0f05eac",
+      "retainedArchive": "/workspace/library-files/airgap-document-r4e-sources-2026-11-05.tar.gz",
+      "archiveSha256": "a5498b6d731182b7678795c737904637c641d42ed55d699c4beae1ad3df0bb61",
+      "member": "airgap-document-sources/trikeshed-2c6e55e25.tar.gz"
+    }
+  ]
+}

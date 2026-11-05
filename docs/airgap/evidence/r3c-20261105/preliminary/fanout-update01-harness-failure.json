@@ -1,0 +1,5 @@
+{
+  "failure": "The audit assumed every HTTP-completed debug read had been applied by the observer. It included a completed-state response whose body contained wires 45\u201363, although the UI had ended live observation and applied the final retained ledger containing wires 54\u201363.",
+  "evidence": "browser.json retains all actual snapshots, displayed rows and final ledger. PanelsDebug.observe checks its owner after response.json and drains stale reads without repaint.",
+  "correction": "Every displayed row must match an actual delivered event and all final retained selections must be represented. Counts must remain stable after late reads. Unmapped HTTP event identities are reported separately; they are not invented into the table. No application code or ownership rule changed."
+}
