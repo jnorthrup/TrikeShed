@@ -290,7 +290,7 @@ object LcncPresets {
             see = "A per-module verdict, and the mismatches if there are any.",
             tweakFirst = "Nothing — read it first; it only reports.",
         ),
-    ) + LcncWorkspacePresets.catalog + EnglishLcncPreset.info + EnglishLcncPreset.copularInfo + EnglishLcncPreset.copularPatternInfo + EnglishNalPreset.info
+    ) + LcncWorkspacePresets.catalog + EnglishLcncPreset.info + EnglishLcncPreset.copularInfo + EnglishLcncPreset.copularPatternInfo + EnglishNalPreset.info + EnglishCorpusPreset.info
 
     /**
      * TURBOHAUL, AS AN ORG CHART — a STRAWMAN, not a release.
@@ -413,6 +413,7 @@ object LcncPresets {
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
         (EnglishNalPreset.NAME j LcncProgramConfix.toJson(EnglishNalPreset.build())).pair,
+        (EnglishCorpusPreset.NAME j LcncProgramConfix.toJson(EnglishCorpusPreset.build())).pair,
         EnglishLcncPreset.NAME to LcncProgramConfix.toJson(EnglishLcncPreset.build()),
         (EnglishLcncPreset.COPULAR_NAME j LcncProgramConfix.toJson(EnglishLcncPreset.buildCopular())).pair,
         (EnglishLcncPreset.COPULAR_PATTERN_NAME j LcncProgramConfix.toJson(EnglishLcncPreset.copularPattern())).pair,
