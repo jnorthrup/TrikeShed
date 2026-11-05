@@ -1,0 +1,152 @@
+{
+  "kind": "retained-english-nal-v77-evidence/1",
+  "frozenSourceHead": "c23dd240190d8023437ba4121485b1c28ea42b89",
+  "mainJarSha256": "b43294535ababc88dc53db415f8cb54639d03bfda2f52c209e1350f910685448",
+  "documentsJsSha256": "a9e86b2ab1f1d65b08b830777644fa9ba710ce7658197012962727e94e99b80d",
+  "spacegraphJsSha256": "2d8701a34a13623179d04e4f109fc851aecb96a22cf8b07647fbbbd232e6a18d",
+  "pagesJsSha256": "4678fdc9798bb36e7ce23e1c9756fcff182436955fdd6767f193114f6e05ead5",
+  "productionClasspathJars": 120,
+  "dependencyJars": 119,
+  "result": "PASS_DIRECT_CLI_AND_RECORDED_DATA_AUDIT",
+  "recordsArchiveSha256": "5dccd87b70e855c51c25bd1e7ee929ffc6c67b8b940c2aed2f06e2e1c3ea316f",
+  "recordedAuditScriptSha256": "8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763",
+  "recordedAuditResultSha256": "40069c72c30fe5b77537b6e39a0392fc502e2322fd716053fc881ca7ecf36ae5",
+  "strictAuditResultSha256": "1fef137911051c2c48dbbd8c7ea5e2144f199a9c5c180386e50d663774a855b7",
+  "zeroArgBytesEqual": true,
+  "S12": {
+    "occurrences": 5,
+    "premises": 4,
+    "attemptedPairs": 12,
+    "derivations": 3,
+    "frameCid": "sha256:bb5ec0a36a32aa2c849bd19871a2c3dd5378d06702ed56d7253fc6897b5fcc7b",
+    "evaluatorCid": "sha256:f3e44150e5c9946b3a42aa0a00083e4d86a9e5d3337f97909f1e7258377eaf3d",
+    "duplicateInflation": false,
+    "recursion": false,
+    "fullSourceBasis": [
+      "sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac"
+    ]
+  },
+  "commands": [
+    {
+      "label": "zeroarg-old-v76",
+      "pid": 118614,
+      "exitCode": 0,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "zeroarg-new-v77",
+      "pid": 118635,
+      "exitCode": 0,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "S12",
+      "pid": 118656,
+      "exitCode": 0,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "G01",
+      "pid": 118681,
+      "exitCode": 0,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "G03",
+      "pid": 118706,
+      "exitCode": 0,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "G04",
+      "pid": 118731,
+      "exitCode": 0,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "G13",
+      "pid": 118756,
+      "exitCode": 0,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "bad-missing-flag",
+      "pid": 118781,
+      "exitCode": 1,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "bad-duplicate-flag",
+      "pid": 118802,
+      "exitCode": 1,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "bad-manual-input",
+      "pid": 118823,
+      "exitCode": 1,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "bad-cid",
+      "pid": 118844,
+      "exitCode": 1,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "missing-receipt",
+      "pid": 118865,
+      "exitCode": 1,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "missing-pack",
+      "pid": 118890,
+      "exitCode": 1,
+      "timedOut": false,
+      "forcedKill": false
+    },
+    {
+      "label": "torn-tail",
+      "pid": 118911,
+      "exitCode": 1,
+      "timedOut": false,
+      "forcedKill": false
+    }
+  ],
+  "scope": "Genuine retained synthetic pilot parser observations; one-level offline historical atomic-symbol hypotheses only, no fresh parser or current-source/semantic/review/independence/admission claim",
+  "referenceDependencies": 18,
+  "packPortability": "Original absolute producer REF targets remain actual JVM execution dependencies; copied pack is not called self-contained or relocated",
+  "buildHistory": {
+    "attempts": [
+      {
+        "sourceHead": "58f1c44d1ac22c1aab22aea62aea627318dfcc6f",
+        "result": "FAILED main compilation: redundant Series.toSeries",
+        "log": "builds/attempt1.log"
+      },
+      {
+        "sourceHead": "b7c05f34474f36a0652ee8392f1def88988bddda",
+        "result": "Production JVM and three JS compiled; FAILED new test helper Series.single compilation",
+        "log": "builds/attempt2.log"
+      },
+      {
+        "sourceHead": "c23dd240190d8023437ba4121485b1c28ea42b89",
+        "result": "PASS 480 tests, no failures/errors/skips; all test sources and three JS builds",
+        "log": "builds/final-passing.log"
+      }
+    ],
+    "scope": "Both failed build attempts preserved; no production assertion weakened or test excluded"
+  }
+}
