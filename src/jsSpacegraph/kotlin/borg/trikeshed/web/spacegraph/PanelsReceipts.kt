@@ -114,7 +114,7 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                             val activity = panels.trace.reserve()
                             panels.launchJs {
                                 try {
-                                    val frozen = content(str(run.programCid))
+                                    val frozen = retainedJson(str(run.programCid))
                                     if (!current(ticket) || !panels.trace.owns(activity)) return@launchJs
                                     val program = LcncProgramConfix.fromJson(str(run.program), JSON.stringify(frozen))
                                     val document = JSON.stringify(panels.toConfix())
@@ -150,7 +150,7 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                                     val before = JSON.stringify(panels.toConfix())
                                     launchJs {
                                         try {
-                                            val frozen = content(str(run.programCid))
+                                            val frozen = retainedJson(str(run.programCid))
                                             require(arr(frozen.nodes).singleOrNull { it.id == id }?.type == "council.seat") {
                                                 "Choose a top-level council seat from the frozen program"
                                             }
@@ -190,7 +190,7 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                                 val activity = panels.trace.reserve()
                                 panels.launchJs {
                                     try {
-                                        val frozen = content(str(run.programCid))
+                                        val frozen = retainedJson(str(run.programCid))
                                         if (!current(ticket) || !panels.trace.owns(activity)) return@launchJs
                                         val program = LcncProgramConfix.fromJson(str(run.program), JSON.stringify(frozen))
                                         val canvas = LcncProgramConfix.fromJson(str(panels.panelName().value).ifBlank { "canvas" }, JSON.stringify(panels.toConfix()))
@@ -261,10 +261,14 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                 for ((label, versions) in arrayOf("Pinned subprogram" to run.programVersions, "Stored prompt" to run.promptVersions)) {
                     if (objectValue(versions)) {
                         details("$label versions", versions)
+                        if (run.outputPreview == true && versions.previewOnly == true) {
+                            reference("Retained $label versions", str(versions.retainedCid), ticket)
+                        } else {
                         val names = keysOf(versions)
                         if (names.size > 32) text("First 32 of ${names.size} $label references below; the immutable receipt JSON retains every version.", output)
                         for (name in names.take(32)) if (versions[name] != run.programCid)
                             reference("$label: $name", str(versions[name]), ticket)
+                        }
                     }
                 }
                 if (run.previousReceiptCid != null) link("Previous state receipt", url(str(run.previousReceiptCid)), output)

@@ -137,6 +137,20 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
     } finally { releaseProgram(selected) }
 }
 
+/** Bounded immutable JSON for display; neither a currentness check nor execution authority. */
+suspend fun retainedJson(cid: String, expectedBytes: Int? = null): dynamic {
+    require(Regex("sha256:[0-9a-f]{64}").matches(cid)) { "Invalid retained JSON content ID" }
+    val response = fetchJs("/api/v0/block/get?arg=" + encodeURIComponent(cid))
+    require(truthy(response.ok)) { "Retained JSON unavailable" }
+    val bytes = PatchRead.bytes(response) // Existing 1 MiB stream bound, including absent/false Content-Length.
+    require(expectedBytes == null || num(bytes.byteLength) == expectedBytes.toDouble()) { "Retained JSON byte count mismatch" }
+    val digest = awaitJs(js("crypto.subtle.digest('SHA-256', bytes)"))
+    val actual: String = "sha256:" + js("Array.from(new Uint8Array(digest), function(b){return b.toString(16).padStart(2,'0')}).join('')")
+    require(actual == cid) { "Retained JSON content identity mismatch" }
+    val retained: String = js("new TextDecoder('utf-8', {fatal:true}).decode(bytes)")
+    return JSON.parse(retained)
+}
+
 /** Receipt outputs are presentation only. The daemon's retained frame owns every later input. */
 suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {
     var outputs = run.outputs ?: return
@@ -169,15 +183,7 @@ suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> B
             num(outputs.bytes) in 1.0..limit.toDouble() && num(outputs.bytes) % 1.0 == 0.0) {
             "Retained node outputs exceed the 1 MiB display read limit or have an invalid byte count"
         }
-        val response = fetchJs("/api/v0/block/get?arg=" + encodeURIComponent(cid))
-        require(truthy(response.ok)) { "Retained node outputs unavailable" }
-        val bytes = PatchRead.bytes(response, limit)
-        require(num(bytes.byteLength) == num(outputs.bytes)) { "Retained node outputs byte count mismatch" }
-        val digest = awaitJs(js("crypto.subtle.digest('SHA-256', bytes)"))
-        val actual: String = "sha256:" + js("Array.from(new Uint8Array(digest), function(b){return b.toString(16).padStart(2,'0')}).join('')")
-        require(actual == cid) { "Retained node outputs content identity mismatch" }
-        val retained: String = js("new TextDecoder('utf-8', {fatal:true}).decode(bytes)")
-        val decoded: dynamic = JSON.parse(retained)
+        val decoded = retainedJson(cid, num(outputs.bytes).toInt())
         require(decoded != null && typeOf(decoded) == "object" && !isArray(decoded)) { "Retained node outputs are not an object" }
         require(current()) { "Program or output owner changed during retained outputs read" }
         outputs = decoded
