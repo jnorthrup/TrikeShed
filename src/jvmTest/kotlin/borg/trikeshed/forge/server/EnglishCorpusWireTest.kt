@@ -115,6 +115,54 @@ class EnglishCorpusWireTest {
         } finally { close(f) }
     }
 
+    @Test fun wiredOptionalTopicsReachTheRegisteredCorpusRunnerWithPresencePrecedence(): Unit = runBlocking {
+        val f = fixture("corpus-topics-port", coroutineContext[Job])
+        try {
+            val text = "Tenant must not assign unless Owner consents."
+            put(f, "agreement.txt", text)
+            val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
+            val config = _m["topics" j 2, "iterations" j 10, "seed" j 7, "alpha" j .1, "beta" j .01]
+            val withTopics = request(f, ids, topics = config)
+            val withoutTopics = request(f, ids)
+            suspend fun wired(topicInputs: Map<String, Any?>, authored: String = "null"): Map<String, Any?> {
+                val nodes = mutableListOf<LcncNode>()
+                nodes.add(LcncNode("receipts", "json.value", _m["value" j jsonOf(ids)]))
+                nodes.add(LcncNode("mode", "text.value", _m["value" j "current"]))
+                val wires = mutableListOf<LcncWire>()
+                wires.add(LcncWire("receipts", "value", "corpus", "receiptCids"))
+                wires.add(LcncWire("mode", "value", "corpus", "mode"))
+                for ((index, input) in topicInputs.entries.withIndex()) {
+                    val id = "topic-input-$index"
+                    nodes.add(LcncNode(id, "json.value", _m["value" j jsonOf(input.value)]))
+                    wires.add(LcncWire(id, "value", "corpus", input.key))
+                }
+                nodes.add(LcncNode("corpus", EnglishCorpusWire.TYPE, _m["topics" j authored]))
+                nodes.add(LcncNode("topics", LcncContracts.SCOPE_OUT, _m["name" j "topics", "kind" j "json"]))
+                nodes.add(LcncNode("topicCid", LcncContracts.SCOPE_OUT, _m["name" j "topicCid", "kind" j "json"]))
+                wires.add(LcncWire("corpus", "topics", "topics", "value"))
+                wires.add(LcncWire("corpus", "topicCid", "topicCid", "value"))
+                val result = LcncRunner(PureNodes.registry { 123L } + f.ctx.lcncRunners)
+                    .runProcedure(LcncProgram("corpus-topics-port", nodes.toSeries(), wires.toSeries()))
+                val output = result.nodeOutputs.getValue("corpus")
+                for (port in s_["topics", "topicCid"].view) {
+                    assertTrue(result.returns.containsKey(port), "Explicit null remains a wired output")
+                    assertEquals(output[port], result.returns[port])
+                }
+                return output
+            }
+            val configured = wired(_m["topics?" j config])
+            assertNotNull(configured["topics"]); assertNotNull(configured["topicCid"])
+            assertEquals(withTopics, configured, "The palette's optional port must match the actual HTTP corpus build and CIDs")
+            assertEquals(withoutTopics, wired(_m["topics?" j null], jsonOf(config)), "Wired optional null must override authored LDA")
+            assertEquals(withoutTopics, wired(_m["topics?" j config, "topics" j null], jsonOf(config)), "Canonical null precedes the optional alias")
+            assertEquals(withTopics, wired(emptyMap(), jsonOf(config)), "Unwired bounded authored JSON decoding remains available")
+            assertEquals(withoutTopics, wired(emptyMap()), "Omitted optional topics remain null")
+            for (invalid in s_[config + _m["topics" j 17], config + _m["extra" j true], "invalid"].view)
+                assertFailsWith<IllegalArgumentException> { wired(_m["topics?" j invalid], jsonOf(config)) }
+            assertTrue(f.ctx.blackboard.snapshot().values.isEmpty())
+        } finally { close(f) }
+    }
+
     @Test fun optionalViewPreservesLegacyRequestsAndHttpAndLcncRefuseExplicitNullOrUnknown(): Unit = runBlocking {
         val f = fixture("corpus-view", coroutineContext[Job])
         try {
