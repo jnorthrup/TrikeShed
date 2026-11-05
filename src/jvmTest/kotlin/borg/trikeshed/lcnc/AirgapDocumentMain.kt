@@ -108,7 +108,10 @@ fun main(args: Array<String>) {
             handle = KanbanModule().open(ctx)
             val finish = CompletableDeferred<Unit>()
             val boot = java.util.UUID.randomUUID().toString()
-            fun report(): Map<String, Any?> = seed + _m[
+            fun report(): Map<String, Any?> {
+                for (name in s_["status", "maps", "mountinfo"].view)
+                    File(root, "$mode-$name.txt").writeText(File("/proc/self/$name").readText())
+                return seed + _m[
                 "mode" j mode, "boot" j boot, "pid" j ProcessHandle.current().pid(),
                 "reopened" j (mode == "inspect"), "llvmInstalled" j (LlvmConfixContract.TYPE in ctx.lcncRunners),
                 "runs" j ctx.blackboard.snapshot().values.filterKeys { it.startsWith("lcnc/run/") },
@@ -116,7 +119,10 @@ fun main(args: Array<String>) {
                 "workspaceVisible" j File("/workspace").exists(), "gradleCacheVisible" j File("/home/agent/.gradle").exists(),
                 "modulesVisible" j File(install, "modules/confix.bc").exists(),
                 "assetsVisible" j File(install, "assets/$id").exists(),
-                "processors" j Runtime.getRuntime().availableProcessors(), "maxHeap" j Runtime.getRuntime().maxMemory()]
+                "processors" j Runtime.getRuntime().availableProcessors(), "maxHeap" j Runtime.getRuntime().maxMemory(),
+                "processCpuNanos" j ProcessHandle.current().info().totalCpuDuration().orElse(java.time.Duration.ZERO).toNanos(),
+                "uptimeMs" j java.lang.management.ManagementFactory.getRuntimeMXBean().uptime]
+            }
             val control: ExtraRoute = { method, path, body, _ ->
                 when {
                     path == "/__proof/state" && method == "GET" -> JvmKanbanServer.HttpResponse(200, jsonOf(report()))
