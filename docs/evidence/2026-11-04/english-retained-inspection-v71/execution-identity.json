@@ -1,0 +1,19 @@
+{
+  "source": "4bdcc227781fa68b07c0105655a19f3e0c11959f",
+  "mainJar": "/workspace/library-files/english-retained-attention-v71-proof/snapshot/main.jar",
+  "mainJarSha256": "6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355",
+  "classpathSha256": "4454247092a6ecdf7979d0def2b18a679788e7b52464c28e996cdc63b288bac8",
+  "sources": {
+    "DocumentEnglishRetainedWireTest.kt": "153900b309767c49b604957842e1cb0b50e573a0a97d2a94df54feaba6793c48",
+    "Runner.kt": "589de8459b6cd983a298c7a625ecb5a865ea5caaa3ad74da1b8b7df41a807d4f"
+  },
+  "productionSourceOverlays": false,
+  "friendAccess": false,
+  "actualParserReads": 0,
+  "modelCalls": 0,
+  "scope": "Exact final-main-JAR retained-English inspection public-route contract proof. Actual Core4.6 and Documents/browser proof remain separately scoped.",
+  "exit": 0,
+  "seconds": 1.117,
+  "methods": 6,
+  "result": "PASS"
+}

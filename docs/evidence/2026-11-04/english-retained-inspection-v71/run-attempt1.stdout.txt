@@ -1,0 +1,13 @@
+SOURCE borg.trikeshed.forge.server.DocumentEnglishWire /workspace/library-files/english-retained-attention-v71-proof/snapshot/main.jar
+SOURCE borg.trikeshed.rdf.EnglishObservationGraph /workspace/library-files/english-retained-attention-v71-proof/snapshot/main.jar
+SOURCE borg.trikeshed.forge.server.EnglishObservationCurrent /workspace/library-files/english-retained-attention-v71-proof/snapshot/main.jar
+SOURCE borg.trikeshed.nlp.EnglishInspection /workspace/library-files/english-retained-attention-v71-proof/snapshot/main.jar
+SOURCE borg.trikeshed.narsese.DocumentSource /workspace/library-files/english-retained-attention-v71-proof/snapshot/main.jar
+SOURCE borg.trikeshed.util.oroboros.FileCasStore /workspace/library-files/english-retained-attention-v71-proof/snapshot/main.jar
+PASS drainWithdrawsBothRoutesAndWaitsForAcceptedInspectionAndRetainedOpening
+PASS missingMalformedTamperedOversizedAndCorruptRetainedBlocksRefuseBoundedlyWithoutInitializingAReader
+PASS retainedOpeningRequiresExactEightFieldsSourceIdentityAndRangeEvenForIdenticalOtherDocuments
+PASS retainedOpeningReturnsTheActualPayloadAndExactOriginalCborWithoutAReaderOrNewReceipt
+PASS staleSourcesAndALateMutationBeforePublicationReturnNoInspection
+PASS validLegacyPayloadKeepsItsOriginalIdentitySpellingWithoutInventingNodes
+PASS 6 retained-open exact-final-JAR methods; no productionoverlays/friend/actualparser/model/browser

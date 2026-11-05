@@ -1,0 +1,10 @@
+{
+  "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncContracts.kt": "d460e50ade72ae8f7dedbbe7ba1733df56d5e6067d91ec5ef60d1487dcbee949",
+  "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefAttentionRequest.kt": "b3531ba0fc68a53274d9e5a0ecade31113a827aeea6c65ebdfef46e32125192d",
+  "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt": "76094428784f394ec067bde7a48042ac59b08cbc4563ea134eb8d996fb6cb2f4",
+  "src/commonMain/kotlin/borg/trikeshed/narsese/BeliefsNodes.kt": "e2191381cc16b6b7233fda57fe575c5d4b4a8de2e51723d75304d9aae86c82b1",
+  "src/commonMain/kotlin/borg/trikeshed/narsese/KgRetention.kt": "08d66222cb9a179662e6e658869f88eeae38ddb5b54d185a19a43b4bdfc14686",
+  "src/jvmMain/kotlin/borg/trikeshed/forge/server/BeliefWire.kt": "d1c5464aeb20fc5e1bac61390f8a5f58045c58747a9dbe08b25bc670e8f6e265",
+  "src/jvmMain/kotlin/borg/trikeshed/lcnc/RouteManifest.kt": "e3ac6335883594806e3ac237b85b7eea1d57190fe69228faaca1484a2e4f2392",
+  "src/jvmTest/kotlin/borg/trikeshed/narsese/PropositionAttentionTest.kt": "e6ceb6a93e13e67c159fd16749f5016f61147434f8edbd932535d434db4e2924"
+}

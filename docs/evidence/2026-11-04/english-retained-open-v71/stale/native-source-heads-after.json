@@ -1,0 +1,29 @@
+{
+  "result": "PASS",
+  "scope": "Original selected source project head/manifest/policy/mirror bytes unchanged from its own actual closed archive. A new separate Manual navigation project was legitimately added; whole-ledger equality is not claimed. Positive and stale heads were never mixed or rewound.",
+  "sourceCurrentAtActualStartup": false,
+  "files": [
+    {
+      "path": "runtime/project-couch/english-taxonomy-reviewed-pilot/HEAD",
+      "sha256": "48bee535f0115c291e92df03558dfdb0268da605d5a014e85dc76c0ed07d420d",
+      "unchanged": true
+    },
+    {
+      "path": "runtime/project-manifests/english-taxonomy-reviewed-pilot.tsv",
+      "sha256": "fab1dea806eff95f9960ce48da8df4ce12cf557bd1575a33776ce911be09bc88",
+      "unchanged": true
+    },
+    {
+      "path": "runtime/project-intake-policy/english-taxonomy-reviewed-pilot.guard",
+      "sha256": "7c03b50c68cea91c5ab9a7999779fb94273c9d1b3b19bd036aff5b2c8d09b6aa",
+      "unchanged": true
+    },
+    {
+      "path": "runtime/files/english-taxonomy-reviewed-pilot/synthetic taxonomy review clauses.txt",
+      "sha256": "aff67b7ec94d303ab5cfd951e14e19ac00467959423396da9a27b705f80430db",
+      "unchanged": true
+    }
+  ],
+  "originalLedgerRowsRetained": true,
+  "archiveSha256": "728a9927a8d98f05f4f615abd5bbfe5daf5b55ba2e587cd9495cc48849414fc8"
+}

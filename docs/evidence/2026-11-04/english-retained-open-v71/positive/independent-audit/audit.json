@@ -1,0 +1,41 @@
+{
+  "result": "PASS",
+  "scope": "Independent data audit of native retained-open positive fixture. Old actual CoreNLP4.6 observations reopened with empty installed/mounted SDK, not a new parse or reauthenticated parser execution; two syntactic joins are not English entailment or approved world facts. Separate operational LCNC board records permitted.",
+  "inputs": {
+    "positive/browser-result.json": "sha256:a41dedd3522dba1cd4972d8e720600aa0c4c9dda89808f60e7c700bf77e5355d",
+    "positive/fixture-evidence.json": "sha256:ca78bef11cb4339d5b40409b7badf932349f857c41cf58455220c70dcbdfefea",
+    "positive/cleanup.json": "sha256:4472409f83a4384fcdea43f1bb2fda1c6a048295054f459f833ef7c8cb43e2fb",
+    "positive/native-artifact-identity-before.json": "sha256:490b163133a32d37e3f858d69591f631196f412656b1905d9ea439339f9858ff",
+    "positive/expected-inspection.json": "sha256:e2d568504f0405d9a0c61e722ecb6823f97c4f837c2ccdf52d991413fac725ba",
+    "positive/setup.json": "sha256:474e09a371d50092da8704f5561f455c28cbd7eae2fecc65565884ff23f44d8b"
+  },
+  "summary": {
+    "storedBlocks": 5,
+    "originalReceiptPreserved": true,
+    "sharedHeadCopularRows": 2,
+    "authoredRuns": 1,
+    "freshInspectPosts": 0
+  },
+  "negativeControls": [
+    {
+      "name": "wrong-receipt",
+      "result": "REFUSED"
+    },
+    {
+      "name": "source-span",
+      "result": "REFUSED"
+    },
+    {
+      "name": "wrong-shared-head",
+      "result": "REFUSED"
+    },
+    {
+      "name": "parser-post-added",
+      "result": "REFUSED"
+    },
+    {
+      "name": "late-response-painted",
+      "result": "REFUSED"
+    }
+  ]
+}

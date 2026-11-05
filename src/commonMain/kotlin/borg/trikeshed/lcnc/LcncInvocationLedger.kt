@@ -1,13 +1,14 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.ValueBudget
 import kotlin.time.TimeSource
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 /** Bounded observations of the existing walk, not another executor. Values are copied at the boundary. */
-class LcncInvocationLedger(val limit: Int = 128) {
-    init { require(limit > 0) }
+class LcncInvocationLedger(val limit: Int = 128, val observationLimit: Int = 128) {
+    init { require(limit > 0 && observationLimit in 1..128) }
 
     class Invocation(val values: MutableMap<String, Any?>) : AbstractCoroutineContextElement(Key) {
         companion object Key : CoroutineContext.Key<Invocation>
@@ -37,10 +38,46 @@ class LcncInvocationLedger(val limit: Int = 128) {
     }
 
     private val entries = ArrayList<Invocation>()
+    private val observations = ArrayList<Map<String, Any?>>()
+    private var sequence = 0L
+    private var started = TimeSource.Monotonic.markNow()
     var attempted: Int = 0
         private set
 
-    fun reset() { entries.clear(); attempted = 0 }
+    fun reset() {
+        entries.clear(); attempted = 0
+        observations.clear(); sequence = 0; started = TimeSource.Monotonic.markNow()
+    }
+
+    /** One walk owns this clock and sequence, including all of its nested frames. No values are inferred. */
+    internal fun observe(fields: Map<String, Any?>) {
+        val event = fields + _m["sequence" j ++sequence, "elapsedNanos" j started.elapsedNow().inWholeNanoseconds]
+        try {
+            if (ValueBudget(maxNodes = 256, maxChars = 4096, maxDepth = 12).violation(event) != null) return
+            @Suppress("UNCHECKED_CAST") val copied = copy(event) as Map<String, Any?>
+            if (observations.size == observationLimit) observations.removeAt(0)
+            observations.add(copied)
+        } catch (_: Exception) { /* The sequence gap records unsupported observation data. */ }
+    }
+
+    /** Selected inputs beyond the bounded selection suffix remain an explicit gap, never invented rows. */
+    internal fun omitObservations(count: Int) { require(count >= 0); sequence += count }
+
+    private fun summary(rows: List<Map<String, Any?>>): Map<String, Any?> = _m[
+        "clockOrigin" j "walk-start", "attempted" j sequence, "retained" j rows.size,
+        "omitted" j sequence - rows.size, "firstSequence" j rows.firstOrNull()?.get("sequence"),
+        "lastSequence" j rows.lastOrNull()?.get("sequence"), "lastObservedSequence" j sequence,
+        "coverage" j if (sequence == rows.size.toLong()) "complete" else "partial",
+    ]
+
+    internal fun observationSnapshot(): Map<String, Any?> {
+        val rows = observations.toMutableList()
+        fun report() = _m["observationSchema" j OBSERVATION_SCHEMA, "observations" j rows.toList(),
+            "observationsDropped" j sequence - rows.size, "observationSummary" j summary(rows)]
+        val budget = ValueBudget(maxNodes = 4096, maxChars = 32768, maxMillis = 250)
+        while (rows.isNotEmpty() && budget.violation(report()) != null) rows.removeAt(0)
+        return report()
+    }
 
     fun begin(ordinal: Int, node: LcncNode, path: List<String>, parent: Int?, iteration: Int?): Invocation? {
         attempted++
@@ -56,15 +93,24 @@ class LcncInvocationLedger(val limit: Int = 128) {
     /** Last admitted invocations, in entry order. A missing parent may have fallen outside the retained window. */
     fun snapshot(): Map<String, Any?> {
         val rows = entries.mapTo(ArrayList()) { it.values.toMap() }
-        fun report() = mapOf("entries" to rows.toList(), "attempted" to attempted,
-            "dropped" to attempted - rows.size, "truncated" to (attempted != rows.size))
+        val events = observations.toMutableList()
+        fun report() = _m["entries" j rows.toList(), "attempted" j attempted,
+            "dropped" j attempted - rows.size, "truncated" j (attempted != rows.size),
+            "observationSchema" j OBSERVATION_SCHEMA, "observations" j events.toList(),
+            "observationsDropped" j sequence - events.size, "observationSummary" j summary(events)]
         // Reserve room for the run identity envelope and keep this independently readable by /lcnc/content.
         val budget = ValueBudget(maxNodes = 4096, maxChars = 65536, maxMillis = 250)
-        while (rows.isNotEmpty() && budget.violation(report()) != null) rows.removeAt(0)
+        while (budget.violation(report()) != null) {
+            // Keep both streams as suffixes. Trimming one never hides omissions in the other.
+            if (rows.isNotEmpty() && (rows.size >= events.size || events.isEmpty())) rows.removeAt(0)
+            else if (events.isNotEmpty()) events.removeAt(0)
+            else break
+        }
         return report()
     }
 
     companion object {
+        const val OBSERVATION_SCHEMA = "lcnc-observations/1"
         /** No host objects, handles, arbitrary toString(), aliases or non-finite JSON numbers enter receipts. */
         private fun copy(value: Any?): Any? = when (value) {
             null, is String, is Boolean, is Byte, is Short, is Int, is Long -> value

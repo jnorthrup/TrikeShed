@@ -1,0 +1,151 @@
+{
+  "kind": "english-combined-checkpoint/71",
+  "at": "2026-11-04T23:25:35.343659+00:00",
+  "testedSource": "4bdcc227781fa68b07c0105655a19f3e0c11959f",
+  "sourceRefFreeze": {
+    "refs": 619,
+    "ordinaryThreeWayMerges": 3,
+    "allContained": true,
+    "tieOrder": "committertimestamp,commitOID,refname"
+  },
+  "publicationRefFreeze": {
+    "refs": 626,
+    "uncontained": 0,
+    "inventorySha256": "0fb7bfe50dea3f05b9bb1b537a3be3f149b22a112cbfe0b19223ae706215ec30"
+  },
+  "build": {
+    "selectedJvmTests": 389,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "allJvmTestSourcesCompiled": true,
+    "allThreeBrowserBuilds": "PASS",
+    "configuredPinnedNativeSolverChecks": "PASS",
+    "confixPinnedRetainedBitcodeRuntimeMethods": 9,
+    "freshConfixAdapterRebuild": "Not attempted; exactClang22.1.8 executable/package unavailable. Source/IR/adapter unchanged from already-publishedConfix milestone."
+  },
+  "artifacts": {
+    "main.jar": "6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355",
+    "documents.js": "2d5eb1391a648c3d46adff6f42818182acfaff188ef6a63d668a9e6157730e94",
+    "spacegraph.js": "449b64d2e884e3b3533695a03abd4185fd7ae558a884af18917651b0b2657d19",
+    "pages.js": "ded11c2d63b300ff59e04a09666c3fb63244f6ca5a02f18348d1b1f647832d4c"
+  },
+  "dependencyJars": 119,
+  "totalClasspathJars": 120,
+  "exactContractReplays": {
+    "retained": {
+      "methods": 6,
+      "productionCodeSources": 6
+    },
+    "narsAttention": {
+      "methods": 6,
+      "productionCodeSources": 26
+    },
+    "overlays": false,
+    "friendAccess": false,
+    "sameCasesAlreadyCountedIn389": true
+  },
+  "nativeRetainedWorkflow": {
+    "positive": "PASS",
+    "stale": "PASS",
+    "browserAttemptsPerProfile": 1,
+    "observerCompileAttempts": 2,
+    "freshInspectionPosts": 0,
+    "guestInstalled": [],
+    "guestMounted": [],
+    "freshReaderAvailable": false,
+    "oldPositiveReceipt": "sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d",
+    "oldStaleReceipt": "sha256:96cf4246c2ac61240d6f1f5ef24c53a6243cbdca65a11f98225ec02618586919",
+    "authoredCurrentLcncRuns": 1,
+    "queryOwnerCalls": 1,
+    "casePreservingSyntaxRows": 2,
+    "positiveStoredBlocksAfterClose": 5,
+    "staleStoredBlocksAfterClose": 2,
+    "sourceHeadsPreservedAgainstOwnArchive": true,
+    "staleHeadRewoundOrMerged": false,
+    "independentPublicAuditTamperControls": 12
+  },
+  "narsAttentionDurability": {
+    "writerPid": "69494",
+    "readerPid": "69530",
+    "finalJarProductionCodeSourcesPerProcess": 18,
+    "actualHttpRequests": 20,
+    "httpStatuses": {
+      "200": 12,
+      "400": 4,
+      "409": 4
+    },
+    "httpAndLcncProcessedAcknowledgement": true,
+    "ackDurability": "processing-only-no-flush-requested",
+    "afterClose": "drain/sync/WALflush/close then separateJVM reopen",
+    "sourceBytes": 28,
+    "sourceCid": "sha256:11314aef9114346b08f0a79aa90e414eb1e3d282e35a2341a92f54a7cee29e0b",
+    "propositionCid": "sha256:fd450f0fd207a25206a870e5576e87c2e7614f58e6dbcb8e702e9a2512783e55",
+    "walBytes": 1499,
+    "rootIndependentlyCrcVerifiedFrames": 12,
+    "expectedDecayedBudgetPersisted": true,
+    "signalEvidencePidSourceDefinitionBytesPreserved": true,
+    "archivedResidentNotRevived": true,
+    "sourceEntailmentOrLegalAuthorityEstablished": false,
+    "rootRawDataAuditTamperControls": 5
+  },
+  "rootPublicAuditReplays": "PASS; allthree native positive/stale/after-close scripts reproduced byte-identical reports; separate rawsource/definition/signalCID and CRC32CWAL audit passed",
+  "verifiedPublicManifests": [
+    {
+      "scope": "retainedcontract6",
+      "manifest": "docs/evidence/2026-11-04/english-retained-inspection-v71/sha256.json",
+      "manifestSha256": "459b458ab30467b60b56fbbde6dd59fbe97d13a8e165514eb08e5f29c5a5c7d3",
+      "files": 6
+    },
+    {
+      "scope": "nativeparserfreeopen",
+      "manifest": "docs/evidence/2026-11-04/english-retained-open-v71/SHA256.json",
+      "manifestSha256": "66cd6b133def5e010d25087562432fec6facf78503b38241bf4a3c5b545318ac",
+      "files": 79
+    },
+    {
+      "scope": "exactattentionanddurability",
+      "manifest": "docs/evidence/2026-11-04/nars-exact-attention-v71/sha256.json",
+      "manifestSha256": "6dd729a32a8c640941c35477ccc8ae233eb0fc25e009670c0f6e77c26aede9ad",
+      "files": 41
+    }
+  ],
+  "verifiedPublicFiles": 126,
+  "proofOwners": "All owned servers/browser/parser/review/bag/CAS/WAL/supervisors drained/closed, exit0",
+  "limits": [
+    "Recorded Stanford metadata is retained evidence; opening it does not re-execute or authenticate the old parser.",
+    "The two returned SPARQL rows are syntax matches, not class assertions or legal conclusions.",
+    "NARS fixtures explicitly ingest manual unreviewed KG declarations; attention does not add evidence or automatically promote English/SUMO statements.",
+    "Different exact propositions at the same natural angular address still refuse; no proposition coexistence or source retraction capability is added.",
+    "Valid KIF beginning with semicolon comments is still refused400 by the format detector. The actual failed input/response is preserved; no comment-compatibility claim.",
+    "Confix scans geometry and does not strictly validate document syntax. Native memory isolation and hard cancellation are not established by these checks.",
+    "Clean-close persistence is not crash or power-loss durability.",
+    "Fixture egress denial and emptySDK proof are scoped observations, not an assertion of universal production containment.",
+    "Manual receipt-ID transfer into the query preset remains; automatic typed source handoff and full visual SPARQL grammar roundtrip are separate work."
+  ],
+  "activeNextSlices": [
+    "Verify newer R3a LCNC consumption/traversal and fence late activity callbacks before next native handoff proof.",
+    "Explicit Documents-to-Panels English inspection handoff with validated source context, inert preset and explicitRun.",
+    "Gold semantic corpus separating identity/admission, complete typed proof premises and recall/hypothesis metrics.",
+    "Bounded KIF format sniffing for leading semicolon comments without dropping original source bytes."
+  ],
+  "laterAlreadyPublishedProductionBase": "fb4d976bb7147f84f36945c519f84708dc9a106e",
+  "upstreamProductionFilesAfterTestedSource": [
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncDebug.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncInvocationLedger.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncRunner.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncScopeFrame.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/OroborosEvidence.kt",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/LcncConsumptionTest.kt",
+    "src/jsMain/kotlin/borg/trikeshed/web/PanelsPage.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsBlip.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDebug.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsLlvm.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsReceipts.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsTrace.kt"
+  ],
+  "newProductionChangesRelativeToConcurrentMaster": [],
+  "publicationScope": "Evidence-only publication relative to concurrent master. All v71 runtime proofs used frozen4bdcc227/main6ae17af7. Later R3a LCNC traversal is preserved from already-published master and is not claimed as executed by these v71 proofs."
+}

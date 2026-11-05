@@ -80,6 +80,8 @@ internal class PanelsPage(private val failed: (Throwable) -> Unit) {
         return handle
     }
 
+    fun cancelFrame(handle: Int) { frames.remove(handle); window.cancelAnimationFrame(handle) }
+
     fun mount(install: () -> Unit) {
         check(startup == null && !closing) { "Page mount already consumed" }
         val opened = scope.async(start = CoroutineStart.LAZY) {

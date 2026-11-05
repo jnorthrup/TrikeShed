@@ -1,0 +1,1 @@
+[{"method":"POST", "path":"/api/beliefs/kg", "request":"; Fresh manual attention durability fixture; unreviewed declared claims.\r\n(pays Tenant Landlord)\r\n", "status":400, "response":{"error":"invalid_kg_input"}}]

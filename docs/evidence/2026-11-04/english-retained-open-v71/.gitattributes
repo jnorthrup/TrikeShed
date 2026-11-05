@@ -1,0 +1,4 @@
+**/cas-readbacks/*.cbor -text -diff
+**/cas-readbacks/*.txt -text -diff
+**/runtime/** -text -diff
+**/*.tar.gz -text -diff

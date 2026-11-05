@@ -1,0 +1,41 @@
+{
+  "sourceHead": "4bdcc227781fa68b07c0105655a19f3e0c11959f",
+  "mainJarSha256": "6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355",
+  "frozenJars": 120,
+  "dependencyHashesVerifiedPerProcess": 119,
+  "publicContractTests": {
+    "passed": 6,
+    "failed": 0
+  },
+  "writerPid": "69494",
+  "reopenerPid": "69530",
+  "separateProductionPackWalProof": "PASS",
+  "loopbackHttpRequests": 20,
+  "httpStatuses": {
+    "200": 12,
+    "400": 4,
+    "409": 4
+  },
+  "sourceCid": "sha256:11314aef9114346b08f0a79aa90e414eb1e3d282e35a2341a92f54a7cee29e0b",
+  "propositionCid": "sha256:fd450f0fd207a25206a870e5576e87c2e7614f58e6dbcb8e702e9a2512783e55",
+  "angular": "4616048923953881095",
+  "evidencePacked": "3865470566400",
+  "preDecayBudgetPacked": "1037628474536597913",
+  "reopenedBudgetPacked": "1010815783981652377",
+  "closedPackBytes": 1499,
+  "closedWalBytes": 1499,
+  "sourceAuthentication": "not established",
+  "reviewAuthority": "not established",
+  "truthPromotion": false,
+  "englishCarrierAdmission": false,
+  "durabilityScope": "clean drain/sync/flush/close and separate-process reopen; no crash or power-loss proof",
+  "preliminarySourceChecks": "retained separately; not substituted for frozen-JAR execution",
+  "leadingCommentLimitation": {
+    "input": "history/leading-comment-source.kif.base64.txt",
+    "productionEndpoint": "POST /api/beliefs/kg",
+    "status": 400,
+    "error": "invalid_kg_input",
+    "reason": "existing format detector does not select KIF when the first non-whitespace character is a semicolon",
+    "scope": "valid commented KIF safely refused; no general leading-comment support claim"
+  }
+}

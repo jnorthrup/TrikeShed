@@ -1,5 +1,6 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.ValueBudget
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reify
@@ -17,7 +18,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
     companion object Key : CoroutineContext.Key<LcncDebug>
     enum class Command { STEP, CONTINUE, SOURCE_INTO, SOURCE_OVER, SOURCE_OUT, SOURCE_LINE }
     enum class Automatic { NONE, FAILURE, SKIP }
-    data class Patch(val inputs: Map<String, Any?>, val bindings: Map<String, Any?>)
+    data class Patch(val inputs: Map<String, Any?>, val bindings: Map<String, Any?>, val sequence: Int? = null)
     class Cancelled : CancellationException("cancelled by user at execution boundary")
     private data class Resume(val command: Command, val line: Int?, val sequence: Int? = null)
 
@@ -47,8 +48,8 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
     private var pauseSequence: Int? = null
     private var cancelSequence: Int? = null
     private val controls = ArrayList<Map<String, Any?>>()
-    private val observations = ArrayList<Map<String, Any?>>()
-    private var observationDrops = 0
+    internal var observationLedger = LcncInvocationLedger()
+        private set
     private val mutationMonitor = OroborosMonitor()
     var intervened: Boolean = false
         private set
@@ -60,9 +61,18 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
             (scope?.let { path.size >= it.size && path.take(it.size) == it } ?: true)
 
     private fun observe(fields: Map<String, Any?>) {
-        if (observations.size == 128) { observations.removeAt(0); observationDrops++ }
-        observations.add(fields.filterKeys { it in setOf("nodeId", "type", "path", "invocationOrdinal",
-            "parent", "iteration", "phase", "status", "reason") })
+        observationLedger.observe(fields.filterKeys { it in _s["nodeId", "type", "path", "invocationOrdinal",
+            "parent", "iteration", "phase", "status", "reason", "frameId", "documentCid", "documentName", "locationOmitted"] })
+    }
+
+    internal suspend fun observeWith(ledger: LcncInvocationLedger) = gate.withLock {
+        ledger.reset(); observationLedger = ledger
+    }
+
+    /** The same gate protects live snapshots and observations emitted by the existing executor. */
+    internal suspend fun consumed(rows: List<Map<String, Any?>>, omitted: Int) = gate.withLock {
+        observationLedger.omitObservations(omitted)
+        rows.forEach(observationLedger::observe)
     }
 
     private fun patchStatus(status: String) {
@@ -112,6 +122,9 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
             observation.capture("bindings", it.bindings)
             observation.capture("outputs", it.outputs)
             fields["depth"] = it.depth
+            fields["frameId"] = it.observationId
+            fields["documentCid"] = it.observationDocumentCid
+            fields["documentName"] = it.observationDocumentName
             val frames = ArrayList<Map<String, Any?>>()
             var owner: LcncScopeFrame? = it
             while (owner != null && frames.size < 8) {
@@ -236,8 +249,9 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
                     (reify(jsonOf(observation)) as Map<String, Any?>)
                 } else mapOf("observationOmitted" to "payload_limit")
                 val before = site.orEmpty()
-                site = data + mapOf("kind" to "source", "nodeId" to nodeId, "invocationOrdinal" to at,
-                    "path" to site?.get("path"), "phase" to "source")
+                site = data + _m["kind" j "source", "nodeId" j nodeId, "invocationOrdinal" j at,
+                    "path" j site?.get("path"), "phase" j "source", "frameId" j site?.get("frameId"),
+                    "documentCid" j site?.get("documentCid"), "documentName" j site?.get("documentName")]
                 val path = (site?.get("path") as? List<*>)?.filterIsInstance<String>().orEmpty()
                 mutationMonitor.observe(path.joinToString("/"), nodeId, "source", before, site.orEmpty())
                 observe(site.orEmpty())
@@ -285,8 +299,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
             "pointcuts" to mapOf("nodeIds" to nodeIds.toList(), "scope" to scope, "automatic" to automatic.name.lowercase()),
             "interventions" to interventions.toList(), "interventionsDropped" to interventionDrops,
             "controls" to controls.toList(), "controlsDropped" to controlDrops,
-            "observations" to observations.toList(), "observationsDropped" to observationDrops,
-            "monitor" to mutationMonitor.snapshot())
+            "monitor" to mutationMonitor.snapshot()) + observationLedger.observationSnapshot()
     }
 
     suspend fun pause(): Boolean = gate.withLock {
@@ -338,11 +351,11 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
             LcncInvocationLedger.Invocation(copied).capture("patch", fields)
             require(copied.containsKey("patch")) { "unsupported_intervention" }
             @Suppress("UNCHECKED_CAST") val copy = copied["patch"] as Map<String, Map<String, Any?>>
-            pending = Patch(copy.getValue("inputs"), copy.getValue("bindings"))
+            val sequence = ++interventionSequence
+            pending = Patch(copy.getValue("inputs"), copy.getValue("bindings"), sequence)
             // Capability was determined from the pre-edit inputs. Re-enter at a later node to
             // inspect source; a pending trust/language edit must not reuse that capability.
             if (inputs.isNotEmpty()) actions = actions.filter { it != Command.SOURCE_INTO }
-            val sequence = ++interventionSequence
             pendingSequence = sequence
             if (interventions.size == 32) { interventions.removeAt(0); interventionDrops++ }
             interventions.add(mapOf("sequence" to sequence, "action" to "intervene", "ordinal" to ordinal, "nodeId" to site?.get("nodeId"),

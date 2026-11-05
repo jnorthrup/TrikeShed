@@ -1,0 +1,362 @@
+{
+  "scope": "Actual production Panels bundle, module routes and LLVM runtimes; synthetic JSON transport fixture",
+  "cases": {
+    "liveTransfer": {
+      "result": "PASS",
+      "first": {
+        "x": "281.3492126464844",
+        "y": "211.76226806640625",
+        "count": "1"
+      },
+      "second": {
+        "x": "295.1763610839844",
+        "y": "210.7728729248047"
+      },
+      "caption": "OBSERVED TRANSFERS\nObserved execution · delayed display · 9034c900-82bc-4f88-bc1f-461b31ce5459 1 represented · 0 display omissions · 0 unmapped · 0 owner omissions Motion lasts 1.2 s at 1×; engine time is unchanged.\nDisplay speed \n0.25×\n1×\n4×\nHide activity"
+    },
+    "durableTransfers": {
+      "result": "PASS",
+      "runId": "9034c900-82bc-4f88-bc1f-461b31ce5459",
+      "programCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+      "transfers": [
+        {
+          "invocationOrdinal": 2,
+          "nodeId": "summary",
+          "type": "vm.llvm.scalar",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-visible-confix",
+          "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 1,
+            "nodeId": "source",
+            "type": "vm.llvm.confix",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-visible-confix",
+            "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 0,
+            "fromNode": "source",
+            "fromPort": "rowCount",
+            "toNode": "summary",
+            "toPort": "left?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "left?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 4,
+          "elapsedNanos": 408811891
+        },
+        {
+          "invocationOrdinal": 3,
+          "nodeId": "confirm",
+          "type": "vm.llvm.scalar",
+          "path": [],
+          "parent": null,
+          "iteration": null,
+          "frameId": 0,
+          "documentName": "airgap-visible-confix",
+          "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+          "origin": "wire",
+          "producer": {
+            "invocationOrdinal": 2,
+            "nodeId": "summary",
+            "type": "vm.llvm.scalar",
+            "path": [],
+            "parent": null,
+            "iteration": null,
+            "frameId": 0,
+            "documentName": "airgap-visible-confix",
+            "documentCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+            "origin": "executed"
+          },
+          "wire": {
+            "index": 1,
+            "fromNode": "summary",
+            "fromPort": "value",
+            "toNode": "confirm",
+            "toPort": "left?"
+          },
+          "phase": "consumed",
+          "status": "delivered",
+          "selection": {
+            "port": "left?",
+            "cardinality": "one",
+            "position": 0,
+            "count": 1,
+            "representation": "scalar"
+          },
+          "evidence": {
+            "status": "unavailable",
+            "reason": "value_identity_not_recorded"
+          },
+          "sequence": 7,
+          "elapsedNanos": 899054123
+        }
+      ],
+      "summary": {
+        "clockOrigin": "walk-start",
+        "attempted": 8,
+        "retained": 8,
+        "omitted": 0,
+        "firstSequence": 1,
+        "lastSequence": 8,
+        "lastObservedSequence": 8,
+        "coverage": "complete"
+      }
+    }
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":4.489874638379945,\"y\":136.27000964320155,\"z\":1.4503375120540019}},\"inputs\":{},\"debugToken\":\"2fe16592-e5e2-4db9-9e15-5e6c42a999f8\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"2fe16592-e5e2-4db9-9e15-5e6c42a999f8\",\"ordinal\":1,\"action\":\"step\",\"runId\":\"9034c900-82bc-4f88-bc1f-461b31ce5459\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"2fe16592-e5e2-4db9-9e15-5e6c42a999f8\",\"ordinal\":2,\"action\":\"step\",\"runId\":\"9034c900-82bc-4f88-bc1f-461b31ce5459\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/run/debug",
+      "method": "POST",
+      "body": "{\"token\":\"2fe16592-e5e2-4db9-9e15-5e6c42a999f8\",\"ordinal\":3,\"action\":\"continue\",\"runId\":\"9034c900-82bc-4f88-bc1f-461b31ce5459\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18763/api/lcnc/workspace",
+      "method": "POST",
+      "body": "{\"name\":\"airgap-visible-confix\",\"document\":{\"name\":\"airgap-visible-confix\",\"nodes\":[{\"id\":\"source\",\"type\":\"vm.llvm.confix\",\"x\":30,\"y\":60,\"params\":{\"format\":\"JSON\",\"data\":\"{\\\"agreement\\\":\\\"Coinbase\\\",\\\"revision\\\":42,\\\"active\\\":true}\"},\"collapsed\":false},{\"id\":\"summary\",\"type\":\"vm.llvm.scalar\",\"x\":430,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"100\"},\"collapsed\":false},{\"id\":\"confirm\",\"type\":\"vm.llvm.scalar\",\"x\":830,\"y\":60,\"params\":{\"left\":\"0\",\"right\":\"1\"},\"collapsed\":false}],\"wires\":[{\"from\":[\"source\",\"rowCount\"],\"to\":[\"summary\",\"left?\"]},{\"from\":[\"summary\",\"value\"],\"to\":[\"confirm\",\"left?\"]}],\"view\":{\"x\":4.489874638379945,\"y\":136.27000964320155,\"z\":1.4503375120540019}},\"path\":[],\"offset\":0,\"limit\":32,\"cursor\":{\"path\":[],\"axes\":[[2]],\"selections\":[],\"offset\":0,\"groupOffset\":0,\"sourceCid\":null}}"
+    }
+  ],
+  "errors": [],
+  "responses": [
+    {
+      "runId": "9034c900-82bc-4f88-bc1f-461b31ce5459",
+      "program": "airgap-visible-confix",
+      "programKey": null,
+      "programCid": "sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+      "inputs": {},
+      "status": "completed",
+      "queuedAtMs": 1793833008128,
+      "queueNamed": false,
+      "queueDeclaredSubnet": null,
+      "queueRequest": {
+        "debugToken": "2fe16592-e5e2-4db9-9e15-5e6c42a999f8",
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "subnet": "local"
+      },
+      "queueDurability": "DURABLE",
+      "executionFamily": "lcnc/run/9034c900-82bc-4f88-bc1f-461b31ce5459",
+      "parentRunId": null,
+      "versionPolicy": "root-at-queue,subprogram-at-first-use",
+      "budgets": {
+        "timeoutMs": 120000,
+        "maxNodes": 10000,
+        "maxPayloadChars": 131072
+      },
+      "jobId": "lcnc/run/9034c900-82bc-4f88-bc1f-461b31ce5459",
+      "sequence": 3,
+      "timelineRevision": 3,
+      "receiptCid": "sha256:506450b534bc9e0d132afc620822aff2b3e5e4c7b72ffd82b1acb631e5fc2dda",
+      "workgroup": "lcnc/program/airgap-visible-confix@sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+      "claimId": 1,
+      "subnet": "local",
+      "claimedAtSubnet": "local",
+      "claimLineage": [
+        {
+          "workgroup": "lcnc/program/airgap-visible-confix@sha256:7879c22d2c0fb4d4d3e4765688264973ecc800da5386b6ef1ea45e5743b0e378",
+          "claimId": 1
+        }
+      ],
+      "parentWorkgroup": null,
+      "parentClaimId": null,
+      "startedAtMs": 1793833008399,
+      "programVersions": {},
+      "previousReceiptCid": "sha256:625f9c9940a3467d8ecf8b5cb7f1e5689c12ff9b223ddbabc0778a869fe8cce9",
+      "returns": {},
+      "outputs": {
+        "source": {
+          "ok": true,
+          "format": "JSON",
+          "sourceCid": "sha256:ca869c6e7d8f1f2f2a031c48230a734814e944e2e30acec663f97d2aabe50573",
+          "sourceBytes": 52,
+          "rowCount": 7,
+          "observedRows": 7,
+          "rows": [
+            {
+              "open": 0,
+              "close": 51,
+              "tag": "IoObject",
+              "depth": 0,
+              "children": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            {
+              "open": 1,
+              "close": 11,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 13,
+              "close": 22,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 24,
+              "close": 33,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 35,
+              "close": 36,
+              "tag": "IoDouble",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 38,
+              "close": 45,
+              "tag": "IoString",
+              "depth": 1,
+              "children": []
+            },
+            {
+              "open": 47,
+              "close": 50,
+              "tag": "IoBoolean",
+              "depth": 1,
+              "children": []
+            }
+          ],
+          "fault": {
+            "code": 0,
+            "name": "none",
+            "at": 0,
+            "atKind": "none"
+          },
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:25225b0b480635499f091e1c09862aa945720eb204b5b06298a7eb652338d0f3",
+            "abi": "confix.flat/1",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-scans",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 44256202,
+            "semanticProfile": "mlir-nix-confix-571b57d3",
+            "strictValidation": false,
+            "copyTransport": "packed-i32",
+            "scanNanos": 17225542,
+            "allocatedBytes": 541064,
+            "rowCapacity": 16384,
+            "guardsVerified": true,
+            "liveBytesAfter": 0,
+            "queueNanos": 2502951,
+            "callNanos": 49175627
+          },
+          "sourceRetained": true
+        },
+        "summary": {
+          "value": 107,
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b",
+            "export": "add",
+            "abi": "i32(i32,i32)",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-calls",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 764737362,
+            "queueNanos": 2619064,
+            "callNanos": 1060286
+          }
+        },
+        "confirm": {
+          "value": 108,
+          "runtime": {
+            "backend": "graalvm-llvm",
+            "moduleCid": "sha256:75c58f04786ec777841e29e185e1c6e59f1efa50afd5f860280b77887674e10b",
+            "export": "add",
+            "abi": "i32(i32,i32)",
+            "engineVersion": "25.3.4.1",
+            "llvmVersion": "22.1.8",
+            "nativeAccess": true,
+            "verifyBitcode": true,
+            "internalProgress": "unobserved",
+            "pauseBoundary": "between-calls",
+            "hardCancellation": false,
+            "nativeMemoryIsolation": false,
+            "loadNanos": 764737362,
+            "queueNanos": 114950,
+            "callNanos": 389248
+          }
+        }
+      },
+      "bindings": [],
+      "bindingsTruncated": false,
+      "promptVersions": {},
+      "consumed": [],
+      "consumedTruncated": false,
+      "inputFingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rootStateCid": "sha256:e0807e8199806e71442d3dcc2a87f8007985b76e53ab3b2d4caa3f513f38df0d",
+      "rootStateFormat": "cbor",
+      "ok": true,
+      "finishedAtMs": 1793833009350,
+      "invocationsCid": "sha256:ef2784f68a26c5bc7fa84e65f8cbe184545c432aae3002cd9f0c3ea12551afa6",
+      "oroborosCid": "sha256:5b0df0f6273e7fc4242a74a7617570aafdb92f655d42a315d410c8eab8a0ea5b",
+      "invocationsAttempted": 3,
+      "invocationsDropped": 0
+    }
+  ],
+  "browser": "154.0.8037.57",
+  "bundle": {
+    "sha256": "d0077d675d01c3ef6e65032ad837ce2427d27d91dff8776d9bf9f922ce7a0a9b",
+    "bytes": 1767359
+  },
+  "failure": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('region', { name: 'Workspace facets' }).locator('summary').filter({ hasText: /#0 · source/ })\u001b[22m\n\n    at /workspace/airgap-r3-proof/driver.cjs:50:67"
+}

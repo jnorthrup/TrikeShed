@@ -1,5 +1,6 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.*
 
 /** Fit retained evidence to the existing content reader, including JSON escaping and UTF-8 expansion. */
@@ -40,11 +41,25 @@ fun oroborosEvidence(runId: String, programCid: String, debug: OroborosState): B
         return true
     }
 
+    fun observationsTrimmed() {
+        if (state["observationSchema"] != LcncInvocationLedger.OBSERVATION_SCHEMA) return
+        val previous = state["observationSummary"] as? Map<*, *> ?: return
+        val attempted = (previous["attempted"] as? Number)?.toLong() ?: return
+        val rows = state["observations"] as? List<*> ?: return
+        if (attempted < rows.size) return
+        state["observationsDropped"] = attempted - rows.size
+        state["observationSummary"] = previous + _m[
+            "retained" j rows.size, "omitted" j attempted - rows.size,
+            "firstSequence" j (rows.firstOrNull() as? Map<*, *>)?.get("sequence"),
+            "lastSequence" j (rows.lastOrNull() as? Map<*, *>)?.get("sequence"),
+            "coverage" j if (attempted == rows.size.toLong()) "complete" else "partial"]
+    }
+
     while (true) {
         encoded()?.let { return it }
         when {
             trim(monitor, "events", "eventsOmitted") -> monitor!!["complete"] = false
-            trim(state, "observations", "observationsOmitted") -> Unit
+            trim(state, "observations", "observationsOmitted") -> observationsTrimmed()
             state["site"] != null && state["stateOmitted"] == null -> {
                 state["site"] = (state["site"] as? Map<*, *>)?.filterKeys {
                     it in setOf("nodeId", "type", "path", "invocationOrdinal", "phase", "status", "depth")

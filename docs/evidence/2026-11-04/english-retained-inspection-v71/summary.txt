@@ -1,0 +1,56 @@
+Exact v71 retained-English inspection contracts — PASS
+=====================================================
+
+Date: 2026-11-04 UTC
+Source: 4bdcc227781fa68b07c0105655a19f3e0c11959f
+Frozen main JAR SHA-256:
+  6ae17af797780fa01aac7db107908241d9066a976628f3711f7cddc4e66c1355
+Classpath: 120 immutable JAR entries (main plus 119 dependencies).
+Result: 6/6 original committed methods PASS on the first exact-artifact attempt.
+Owned JVM exit: 0. Test/fixture scopes and route owners drained by finally paths.
+
+Only DocumentEnglishRetainedWireTest.kt and an external proof runner were compiled.
+The test source hash matches the integrated source. The runner asserted six
+production CodeSources against the frozen main JAR. There was no production
+source overlay, friend access, live build/classes directory, Gradle, actual parser
+execution, generative-model call or browser execution. Compiler warnings remain
+in the retained log; no runtime workaround was applied. Harness scripts remain
+outside the repository.
+
+Verified boundaries
+-------------------
+- The real production producer first creates a source-bound receipt from clearly
+  labelled synthetic annotations. A separate production wire reopens it through
+  the public route, using a reader factory which fails if initialized.
+- The original receipt's canonical CBOR bytes and CID are preserved. Explicit-null
+  optional metadata and legacy dependency spelling survive exactly; legacy nodes
+  are not invented into the stored payload.
+- The response identifies a retained current read, with parserExecuted=false and
+  modelCalled=false. Source/range and quotations stay exact. Opening creates no
+  new CAS files, bag or blackboard changes, and does not touch review authority.
+- Exact eight-field admission, wrong receipt, revision, sequence, range, extra
+  approval data and same-bytes/different-document controls refuse with no partial
+  inspection. GET is 405. A valid read still works after refusal.
+- Stale original sources and source mutation during response preparation refuse
+  before publishing the inspection, including the late currentness control.
+- Missing, malformed, tampered, unknown-field, oversized and corrupt private CAS
+  blocks refuse within existing bounds without initializing a reader. Restoring
+  the original bytes lets the existing owner handle another valid request.
+- Drain withdraws both fresh and retained routes and waits for accepted work.
+  This one fixture deliberately starts a blocking SYNTHETIC fresh reader to test
+  owner lifetime. It is not an actual CoreNLP call or a claim that retained reads
+  initialize the reader.
+
+Scope
+-----
+These are six independent focused exact-main-JAR reruns, not six additional new
+cases beyond the combined build. Annotation production here is synthetic, not
+parser-accuracy evidence. The proof does not execute a browser, exercise layout
+or browser late-response behavior, mount/deny an actual SDK, test extraction/OCR,
+call a public provider or deploy a release. The separate native retained-opener
+browser proof owns its real archived producer inputs and current source heads.
+The stale v70 producer archive is not silently restored or relabelled as current.
+
+This checkpoint does not claim advanced NARS attention or native LLVM execution;
+those share the combined artifact but have separate proofs. The earlier v70
+fresh-parser/UI proof keeps its own source/JAR identity and remains unchanged.

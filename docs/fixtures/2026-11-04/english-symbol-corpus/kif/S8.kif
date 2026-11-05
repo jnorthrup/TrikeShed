@@ -1,0 +1,2 @@
+(=> (and (requested Clerk Record) (not (sealed Record))) (mayRead Clerk Record))
+(requested Clerk Record)

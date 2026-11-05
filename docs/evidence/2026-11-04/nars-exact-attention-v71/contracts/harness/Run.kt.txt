@@ -1,0 +1,85 @@
+import borg.trikeshed.narsese.PropositionAttentionTest
+import borg.trikeshed.parse.jsonOf
+import java.lang.reflect.InvocationTargetException
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import java.time.Instant
+
+fun hash(path: Path): String = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path)).joinToString("") { "%02x".format(it.toInt() and 255) }
+fun main(args: Array<String>) {
+    check(args.size == 4)
+    val snapshot = Path.of(args[0]).toRealPath()
+    val proof = Path.of(args[1]).toRealPath()
+    val expectedSource = args[2]
+    val expectedHash = args[3]
+    val mainJar = snapshot.resolve("main.jar").toRealPath()
+    check(Files.readString(snapshot.resolve("source-head.txt")).trim() == expectedSource)
+    check(hash(mainJar) == expectedHash)
+    val declaredCp = Files.readString(snapshot.resolve("classpath.txt")).trim().split(java.io.File.pathSeparator).map { Path.of(it).toRealPath() }
+    check(declaredCp.size == 120 && declaredCp.toSet().size == 120)
+    check(declaredCp.first() == mainJar)
+    check(declaredCp.all { Files.isRegularFile(it) && it.fileName.toString().endsWith(".jar") })
+    val output = proof.resolve("classes").toRealPath()
+    val actualCp = System.getProperty("java.class.path").split(java.io.File.pathSeparator).map { Path.of(it).toRealPath() }
+    check(actualCp == listOf(output) + declaredCp) { "Runtime classpath differs from observer classes + frozen 120 JAR classpath" }
+    check(actualCp.filter { Files.isDirectory(it) } == listOf(output))
+    val production = listOf(
+        "borg.trikeshed.narsese.BeliefBagElement", "borg.trikeshed.narsese.BeliefIntake",
+        "borg.trikeshed.narsese.BeliefAttention", "borg.trikeshed.narsese.BeliefAdmissionRefused",
+        "borg.trikeshed.narsese.BeliefAttentionRequest", "borg.trikeshed.narsese.BeliefsNodes",
+        "borg.trikeshed.narsese.KgRetention", "borg.trikeshed.narsese.KgNalBridge",
+        "borg.trikeshed.narsese.SignalCodec", "borg.trikeshed.narsese.HijackBeliefBag",
+        "borg.trikeshed.narsese.MomentField", "borg.trikeshed.narsese.DocumentAppendLog",
+        "borg.trikeshed.narsese.DocumentFrameFile", "borg.trikeshed.narsese.TurnReviewElement",
+        "borg.trikeshed.forge.server.BeliefWire", "borg.trikeshed.job.PackCasStore",
+        "borg.trikeshed.job.CasStore", "borg.trikeshed.job.BoundedCasReader",
+        "borg.trikeshed.job.ContentId", "borg.trikeshed.job.CanonicalCbor",
+        "borg.trikeshed.cursor.BudgetCoord", "borg.trikeshed.lcnc.LcncContracts",
+        "borg.trikeshed.lcnc.LcncNode", "borg.trikeshed.lcnc.LcncNodeRunner",
+        "borg.trikeshed.kif.KifSemantic", "borg.trikeshed.parse.ReifyKt"
+    )
+    val loaded = production.map { name ->
+        val cls = Class.forName(name, false, PropositionAttentionTest::class.java.classLoader)
+        val location = Path.of(checkNotNull(cls.protectionDomain.codeSource).location.toURI()).toRealPath()
+        check(location == mainJar) { "$name loaded from $location" }
+        mapOf("class" to name, "codeSource" to location.toString(), "sha256" to expectedHash)
+    }
+    check(Path.of(PropositionAttentionTest::class.java.protectionDomain.codeSource.location.toURI()).toRealPath() == output)
+    check(Path.of(Class.forName("RunKt").protectionDomain.codeSource.location.toURI()).toRealPath() == output)
+    val methods = PropositionAttentionTest::class.java.declaredMethods.filter { it.getAnnotation(org.junit.jupiter.api.Test::class.java) != null }.sortedBy { it.name }
+    check(methods.size == 6 && methods.all { java.lang.reflect.Modifier.isPublic(it.modifiers) && it.parameterCount == 0 })
+    val identity = mapOf(
+        "artifactSource" to expectedSource, "mainJar" to mainJar.toString(), "mainJarSha256" to hash(mainJar),
+        "javaVersion" to System.getProperty("java.version"), "javaHome" to System.getProperty("java.home"),
+        "runtimeClasspath" to actualCp.map(Path::toString), "frozenJarCount" to declaredCp.size,
+        "observerOutput" to output.toString(), "productionCodeSources" to loaded,
+        "testCodeSource" to output.toString(), "friendPaths" to false, "productionSourceOverlay" to false,
+        "testSource" to proof.resolve("PropositionAttentionTest.kt").toString(),
+        "testSourceSha256" to hash(proof.resolve("PropositionAttentionTest.kt")),
+        "runnerSha256" to hash(proof.resolve("Run.kt")), "startedAt" to Instant.now().toString()
+    )
+    Files.writeString(proof.resolve("runtime-identity.json"), jsonOf(identity))
+    println("ARTIFACT_IDENTITY_OK source=$expectedSource main=$expectedHash frozenJars=${declaredCp.size} productionClasses=${loaded.size}")
+    val results = mutableListOf<Map<String, Any?>>()
+    for (method in methods) {
+        val fixture = PropositionAttentionTest()
+        fixture.directory = Files.createTempDirectory(proof.resolve("temporary"), method.name.take(35) + "-")
+        val started = System.nanoTime()
+        try {
+            method.invoke(fixture)
+            results.add(mapOf("method" to method.name, "status" to "PASS", "durationMs" to (System.nanoTime()-started)/1_000_000, "directory" to fixture.directory.toString()))
+            println("PASS ${method.name}")
+        } catch (failure: Throwable) {
+            val cause = if (failure is InvocationTargetException) failure.targetException else failure
+            results.add(mapOf("method" to method.name, "status" to "FAIL", "error" to cause.toString(), "directory" to fixture.directory.toString()))
+            Files.writeString(proof.resolve("results.json"), jsonOf(mapOf("passed" to results.count { it["status"] == "PASS" }, "failed" to 1, "tests" to results)))
+            throw cause
+        }
+    }
+    check(hash(mainJar) == expectedHash)
+    val result = mapOf("artifactSource" to expectedSource, "mainJarSha256" to expectedHash, "passed" to results.size, "failed" to 0, "tests" to results,
+        "finishedAt" to Instant.now().toString(), "scope" to "Exact six public tests compiled alone against the frozen production JARs; manual KG fixture and production append-log behavior. Separate PackCAS writer/reopener proof is outside this runner.")
+    Files.writeString(proof.resolve("results.json"), jsonOf(result))
+    println("EXACT_V71_JAR_TESTS ${results.size} passed; 0 failed; no production overlays or friend paths")
+}

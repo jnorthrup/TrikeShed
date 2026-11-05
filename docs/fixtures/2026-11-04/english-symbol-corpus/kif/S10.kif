@@ -1,0 +1,2 @@
+(ist urn:fixture:agreement:A (subclass Finch Agent))
+(ist urn:fixture:agreement:B (subclass Agent Entity))

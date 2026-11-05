@@ -1,0 +1,2 @@
+(instance urn:fixture:legal:S3:Mira urn:fixture:legal:S3:Tenant)
+(subclass urn:fixture:legal:S3:Tenant urn:fixture:legal:S3:Agent)

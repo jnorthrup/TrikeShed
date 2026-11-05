@@ -1,0 +1,14 @@
+{
+  "case": "stale",
+  "inspectionCid": "sha256:96cf4246c2ac61240d6f1f5ef24c53a6243cbdca65a11f98225ec02618586919",
+  "selection": {
+    "project": "english-taxonomy-reviewed-pilot",
+    "id": "synthetic taxonomy review clauses.txt",
+    "cid": "sha256:efc7434909a40c8650ed56d2d44c44751cc0877c7b867eb252174cfff7053883",
+    "rev": "1-sha256:83883628511f1ef043b3ecb43d9c2c3e70a9b7dd649f89338becc60dadef308e",
+    "seq": 0
+  },
+  "expectedCurrent": false,
+  "sourceArchiveSha256": "728a9927a8d98f05f4f615abd5bbfe5daf5b55ba2e587cd9495cc48849414fc8",
+  "scope": "Private copy of actual closed producer runtime, no row invention, no head rewind or cross-case merging; preparation only, no application runtime started"
+}

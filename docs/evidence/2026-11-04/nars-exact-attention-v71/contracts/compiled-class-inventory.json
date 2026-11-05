@@ -1,0 +1,36 @@
+{
+  "compiledSources": [
+    "/workspace/TrikeShed/src/jvmTest/kotlin/borg/trikeshed/narsese/PropositionAttentionTest.kt",
+    "/workspace/library-files/nars-exact-attention-v71-proof/contracts/Run.kt"
+  ],
+  "productionClassesCompiled": false,
+  "files": {
+    "META-INF/main.kotlin_module": "684885fbb05011b4b993a788ae5d31cae45d2316e9af208521e333eb0a7aa921",
+    "RunKt$main$$inlined$sortedBy$1.class": "6271a4fdc345aea28992f7e704e408d6220347f2cdf17e0f3c1d2bcf27101cb0",
+    "RunKt.class": "5ffc9620ae68f306974b47bf95a3a916840e084498ce2745c8bcdf32955f3949",
+    "borg/trikeshed/narsese/PropositionAttentionTest$Store.class": "c3837df2f38e688b34c486ce42fb41ebebdd852be5a29af94ba5ba1084b3a549",
+    "borg/trikeshed/narsese/PropositionAttentionTest$exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes$1$1$1.class": "b062ba8a103b3a52976a1bf45af100be6baec1157f22953e1cedd29508a021ae",
+    "borg/trikeshed/narsese/PropositionAttentionTest$exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes$1$1.class": "f76755309af8b81508d7e47c78d6db95c9ed829517cba14ef78b6465a4339e9a",
+    "borg/trikeshed/narsese/PropositionAttentionTest$exactAttentionResolvesPartialBudgetInFifoOrderAndPreservesAllSignalAndSourceBytes$1.class": "e30267da6ebbbdebb35e47e1519d1b5cf8c5654aaf3142830992db3dbd0e5efe",
+    "borg/trikeshed/narsese/PropositionAttentionTest$httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409$1$1$1$request$1.class": "b58ead8d52aad77949afe338f31ad6e4917bf01fb386cda51fa4d915a2fd4b30",
+    "borg/trikeshed/narsese/PropositionAttentionTest$httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409$1$1$1.class": "38fad4e6dbc99284d005225d2e3c490d75c4ae0db6dfe71629166b9be1a6eaad",
+    "borg/trikeshed/narsese/PropositionAttentionTest$httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409$1$1.class": "95a9274285b55e723e8d396e02e51b377a34b42a97d26478028bb6b2a6cbcb92",
+    "borg/trikeshed/narsese/PropositionAttentionTest$httpAttentionRejectsInvalidOrWrongIdentityAndKeepsActualAngularCollision409$1.class": "e68872bfd580ba99a70b49fd7a1f6d0fbff2346808be8d7fb0d9c52556dfcb41",
+    "borg/trikeshed/narsese/PropositionAttentionTest$imported$1.class": "3b26bbe4a60791b4731f2b0d0dc8d2aab4e8d3459b31bb48fab7f2c7096fa7d7",
+    "borg/trikeshed/narsese/PropositionAttentionTest$lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity$1$1$1.class": "3451beda328a4ff3305132f34b371556a00eba40322270991268dc74fe35dd32",
+    "borg/trikeshed/narsese/PropositionAttentionTest$lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity$1$1.class": "8ea142b77de6bf3d17deaad2a4e710a08c1b0dfc4f75b3195ecd783aeb56439d",
+    "borg/trikeshed/narsese/PropositionAttentionTest$lcncExactAndLegacyAttentionAcknowledgeProcessingAndBothResonanceModesExposeIdentity$1.class": "91dc21a915714767f1131b620bffbd48b7128ad44c7e937e15a4286c96b839f5",
+    "borg/trikeshed/narsese/PropositionAttentionTest$mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers$1$1$1.class": "e1557355e2edaefb672ec56bae17204a667e274902476459a77d6b1255c5ff1b",
+    "borg/trikeshed/narsese/PropositionAttentionTest$mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers$1$1.class": "2bca72bbb6c2f5d4b02f4a4854a3f7d7cf43bf0cd774de245a9175e603442fd4",
+    "borg/trikeshed/narsese/PropositionAttentionTest$mismatchedUnknownLegacyAndEvictedIdentitiesRefuseWithoutRevivalAndTheWriterRecovers$1.class": "4c8b9b2bac9ec20f5f6bd988ca2d6f1f99ce2b2ce2271b623c6388c336472769",
+    "borg/trikeshed/narsese/PropositionAttentionTest$owner$1.class": "aba6bf5842b4ff944b5f887bc3d22cd95baada9f13d30c3e1b432bb93490caca",
+    "borg/trikeshed/narsese/PropositionAttentionTest$productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence$1$1$1.class": "1565fb3c751f28415a4481afa01e8ef61b5b5ac2aeee7eacd868187697dc8dcd",
+    "borg/trikeshed/narsese/PropositionAttentionTest$productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence$1$1$2.class": "080632750a7ed66df21ab3c57d1b6c4269a0674719c1aeed7fb7831aa08ba9c6",
+    "borg/trikeshed/narsese/PropositionAttentionTest$productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence$1$1.class": "ef0ea74e16cba687349df49a61acb8f91b71aa389cfa870cb43dd7e0fdc9ed5e",
+    "borg/trikeshed/narsese/PropositionAttentionTest$productionWalReplaysProcessedAttentionAndDecayWithoutChangingEvidence$1.class": "75d167a506a1bc70046445defabe59cbeccd6fd1aade42b403ca2c41cb981ce7",
+    "borg/trikeshed/narsese/PropositionAttentionTest$sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer$1$1$1.class": "318b6c5442df6d8d1ff56f732ccf94dfd3604ee0d20fbadb3a927461bd50c28a",
+    "borg/trikeshed/narsese/PropositionAttentionTest$sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer$1$1.class": "6c5ac92197477b0baf79d0f82429b81858895f7cc57b6f3793ff28296dd6554e",
+    "borg/trikeshed/narsese/PropositionAttentionTest$sourceMetadataIsBoundedAndDoesNotGuessWhenSourceOrRolesDiffer$1.class": "ac8793b3a3b3511a88a1161d80282ebaf73940cb8b888a24bffe7ac75ff0a066",
+    "borg/trikeshed/narsese/PropositionAttentionTest.class": "8442f07390b819e02e3bf8477181f32497a330a38b789f7134c1ab6b959ed8a1"
+  }
+}
