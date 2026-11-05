@@ -1,0 +1,23 @@
+from pathlib import Path
+import re
+h=Path('/workspace/airgap-r3f-proof');s=(h/'geometry.cjs').read_text()
+old="const frameWork=page.evaluate(()=>new Promise(resolve=>{const times=[];let first=null;function frame(t){if(first===null)first=t;times.push(t);if(t-first<3000)requestAnimationFrame(frame);else resolve(times.slice(1).map((v,i)=>v-times[i]));}requestAnimationFrame(frame);}));";assert old in s
+new="const frameWork=page.evaluate(()=>new Promise(resolve=>{const times=[];window.__scaleFrameEnd=null;function frame(t){times.push(t);if(window.__scaleFrameEnd===null||t<window.__scaleFrameEnd)requestAnimationFrame(frame);else resolve(times.slice(1).map((v,i)=>v-times[i]));}requestAnimationFrame(frame);}));";s=s.replace(old,new)
+needle="report.controlProbe=await page.evaluate(()=>window.__wireProbe);assert(report.controlProbe.events.length>=4);";assert needle in s;s=s.replace(needle,"await page.evaluate(()=>{window.__scaleFrameEnd=performance.now()+500;});"+needle)
+s=s.replace("External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark","External requestAnimationFrame intervals from native execution continuation through 500 ms after the post-receipt keyboard controls settle; variable-length 65-node window, not isolated preparation time or a 10k/50k graph benchmark")
+s=s.replace('row.nextAnimationFrame=t;row.handlerToFrame=t-row.handlerStart;', 'row.nextAnimationFrame=t;row.callbackAt=performance.now();row.handlerToCallback=row.callbackAt-row.handlerStart;row.handlerToFrame=t-row.handlerStart;')
+
+old="await page.evaluate(()=>{window.__scaleFrameEnd=performance.now()+500;});"
+new="""let outputs=report.receipt.outputs;
+ if(report.receipt.outputPreview&&outputs.previewOnly){assert.match(outputs.retainedCid,/^sha256:[0-9a-f]{64}$/);assert.equal(outputs.contentType,'application/json');assert(Number.isInteger(outputs.bytes)&&outputs.bytes>0&&outputs.bytes<=1048576);const reply=await context.request.get(base+'/api/v0/block/get?arg='+encodeURIComponent(outputs.retainedCid));assert.equal(reply.status(),200);const bytes=await reply.body();assert.equal(bytes.length,outputs.bytes);assert.equal('sha256:'+crypto.createHash('sha256').update(bytes).digest('hex'),outputs.retainedCid);report.retainedMap={cid:outputs.retainedCid,bytes:bytes.length};outputs=JSON.parse(bytes);}
+ report.resolvedOutputs=outputs;
+ await page.waitForFunction(()=>window.G.nodes.length===65&&window.G.nodes.every(n=>n._lastOut?.value===(n.id==='source'?2:Number(n.id.slice(3))+2)&&n.el.classList.contains('ok')));
+ report.canvasOutputs=await page.evaluate(()=>window.G.nodes.map(n=>({id:n.id,value:n._lastOut.value,shown:n.el.querySelector('.result')?.textContent,ok:n.el.classList.contains('ok')})));
+ assert(report.canvasOutputs.every(n=>n.shown&&n.shown.includes(String(n.value))));report.cases.canvasProjection={result:'PASS',nodes:report.canvasOutputs.length,retainedMap:report.retainedMap||null,allActualNodeSnapshots:true,allRenderedResults:true};
+ await page.evaluate(()=>{window.__scaleFrameEnd=performance.now()+500;});"""
+assert old in s;s=s.replace(old,new).replace("report.receipt.outputs['sum'+i].value","report.resolvedOutputs['sum'+i].value")
+s=s.replace('after the post-receipt keyboard controls settle','after both verified canvas projection and post-receipt keyboard controls settle')
+
+(h/'scale65.cjs').write_text(s)
+s=re.sub(r'\b64\b','256',s);s=s.replace('[0-9a-f]{256}', '[0-9a-f]{64}');s=re.sub(r'\b65\b','257',s);s=s.replace('(i%8)*320','(i%16)*320').replace('Math.floor(i/8)*200','Math.floor(i/16)*200');s=s.replace('length===63','length===255').replace('remainingWires:63','remainingWires:255');(h/'scale257.cjs').write_text(s)
+s=(h/'audit.py').read_text();s=s.replace("len(program['nodes'])==65 and len(program['wires'])==64 and ledger['attempted']==65","len(program['nodes'])==257 and len(program['wires'])==256 and ledger['attempted']==257").replace('range(64)','range(256)').replace('len(events)<64','len(events)<256');(h/'audit-scale.py').write_text(s)

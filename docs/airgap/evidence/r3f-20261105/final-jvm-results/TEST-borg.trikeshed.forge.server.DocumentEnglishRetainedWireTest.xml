@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="DocumentEnglishRetainedWireTest[jvm]" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:34:00.800Z" hostname="0d6dfba25614" time="0.355">
+  <properties/>
+  <testcase name="staleSourcesAndALateMutationBeforePublicationReturnNoInspection()[jvm]" classname="borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest" time="0.156"/>
+  <testcase name="retainedOpeningReturnsTheActualPayloadAndExactOriginalCborWithoutAReaderOrNewReceipt()[jvm]" classname="borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest" time="0.055"/>
+  <testcase name="validLegacyPayloadKeepsItsOriginalIdentitySpellingWithoutInventingNodes()[jvm]" classname="borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest" time="0.02"/>
+  <testcase name="drainWithdrawsBothRoutesAndWaitsForAcceptedInspectionAndRetainedOpening()[jvm]" classname="borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest" time="0.023"/>
+  <testcase name="retainedOpeningRequiresExactEightFieldsSourceIdentityAndRangeEvenForIdenticalOtherDocuments()[jvm]" classname="borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest" time="0.026"/>
+  <testcase name="missingMalformedTamperedOversizedAndCorruptRetainedBlocksRefuseBoundedlyWithoutInitializingAReader()[jvm]" classname="borg.trikeshed.forge.server.DocumentEnglishRetainedWireTest" time="0.073"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

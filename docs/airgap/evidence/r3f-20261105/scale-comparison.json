@@ -1,0 +1,315 @@
+{
+  "protocol": "Same final package, six fresh JVM/browser/store runs, 65/257, 257/65, 65/257 order. rAF window begins before Continue and ends 500 ms after both real canvas projection and post-receipt keyboard controls. No build, compression or profiler during these six cases.",
+  "interpretation": "Two cardinalities, not a before/after speedup trial. Larger graph has materially longer frame gaps. Variable-length windows and thresholded keyboard entries do not establish sustained rendering, physical-input latency or dense recursive capacity.",
+  "rows": [
+    {
+      "case": "release-scale65-01",
+      "nodes": 65,
+      "samples": 67,
+      "p50": 16.699999999999818,
+      "p95": 33.400000000000546,
+      "maximum": 116.70000000000073,
+      "windowIntervalSumMs": 1383.3000000000002,
+      "keyboardDurationsMs": [
+        80,
+        72,
+        64,
+        56
+      ],
+      "handlerToCallbackMs": [
+        10.800000004470348,
+        6.100000001490116,
+        13.299999997019768,
+        12.200000002980232
+      ],
+      "cdpRoundTripMs": 12.920441,
+      "geometry": [
+        {
+          "label": "fit",
+          "paths": 64,
+          "eligible": 64,
+          "clipped": 0,
+          "maxError": 5.434072916209426e-05
+        },
+        {
+          "label": "zoom",
+          "paths": 64,
+          "eligible": 25,
+          "clipped": 39,
+          "maxError": 6.121145032509726e-05
+        },
+        {
+          "label": "resize",
+          "paths": 64,
+          "eligible": 17,
+          "clipped": 47,
+          "maxError": 9.716041184702633e-05
+        }
+      ],
+      "observationCount": 29,
+      "ownerOmissions": 165,
+      "mappedWires": 19,
+      "retainedMap": null,
+      "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+    },
+    {
+      "case": "release-scale257-01",
+      "nodes": 257,
+      "samples": 72,
+      "p50": 16.700000000000728,
+      "p95": 50.100000000000364,
+      "maximum": 383.2999999999993,
+      "windowIntervalSumMs": 2199.9040000000005,
+      "keyboardDurationsMs": [
+        96,
+        88,
+        112,
+        112
+      ],
+      "handlerToCallbackMs": [
+        1.5999999940395355,
+        0.3999999985098839,
+        5.700000002980232,
+        7.600000001490116
+      ],
+      "cdpRoundTripMs": 7.244111,
+      "geometry": [
+        {
+          "label": "fit",
+          "paths": 256,
+          "eligible": 256,
+          "clipped": 0,
+          "maxError": 9.110374921703689e-05
+        },
+        {
+          "label": "zoom",
+          "paths": 256,
+          "eligible": 99,
+          "clipped": 157,
+          "maxError": 0.00013758683679562566
+        },
+        {
+          "label": "resize",
+          "paths": 256,
+          "eligible": 51,
+          "clipped": 205,
+          "maxError": 8.762880300243441e-05
+        }
+      ],
+      "observationCount": 29,
+      "ownerOmissions": 741,
+      "mappedWires": 28,
+      "retainedMap": {
+        "cid": "sha256:602f7d6f327c0de5800572825ff01b16bcc6afc754a5dda0505762496898388e",
+        "bytes": 119915
+      },
+      "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+    },
+    {
+      "case": "release-scale257-02",
+      "nodes": 257,
+      "samples": 50,
+      "p50": 16.700000000000728,
+      "p95": 83.39999999999964,
+      "maximum": 383.1999999999989,
+      "windowIntervalSumMs": 1766.5680000000011,
+      "keyboardDurationsMs": [
+        104,
+        96,
+        352,
+        248
+      ],
+      "handlerToCallbackMs": [
+        16.30000000447035,
+        14.700000002980232,
+        48.100000001490116,
+        3.600000001490116
+      ],
+      "cdpRoundTripMs": 2.934844,
+      "geometry": [
+        {
+          "label": "fit",
+          "paths": 256,
+          "eligible": 256,
+          "clipped": 0,
+          "maxError": 9.110374921703689e-05
+        },
+        {
+          "label": "zoom",
+          "paths": 256,
+          "eligible": 110,
+          "clipped": 146,
+          "maxError": 8.872287898237522e-05
+        },
+        {
+          "label": "resize",
+          "paths": 256,
+          "eligible": 54,
+          "clipped": 202,
+          "maxError": 8.419264825029482e-05
+        }
+      ],
+      "observationCount": 29,
+      "ownerOmissions": 741,
+      "mappedWires": 29,
+      "retainedMap": {
+        "cid": "sha256:1aba304c9d775b857101de2c6f872e347a6cae62532a8ee0c6f302b699872466",
+        "bytes": 119935
+      },
+      "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+    },
+    {
+      "case": "release-scale65-02",
+      "nodes": 65,
+      "samples": 63,
+      "p50": 16.699999999999818,
+      "p95": 50,
+      "maximum": 116.69999999999982,
+      "windowIntervalSumMs": 1383.3000000000002,
+      "keyboardDurationsMs": [
+        56,
+        104,
+        72,
+        88
+      ],
+      "handlerToCallbackMs": [
+        0.7000000029802322,
+        0.8999999985098839,
+        6.300000004470348,
+        2.5
+      ],
+      "cdpRoundTripMs": 23.235944,
+      "geometry": [
+        {
+          "label": "fit",
+          "paths": 64,
+          "eligible": 64,
+          "clipped": 0,
+          "maxError": 5.434072916209426e-05
+        },
+        {
+          "label": "zoom",
+          "paths": 64,
+          "eligible": 25,
+          "clipped": 39,
+          "maxError": 7.414566315059786e-05
+        },
+        {
+          "label": "resize",
+          "paths": 64,
+          "eligible": 15,
+          "clipped": 49,
+          "maxError": 9.234782720605737e-05
+        }
+      ],
+      "observationCount": 29,
+      "ownerOmissions": 165,
+      "mappedWires": 19,
+      "retainedMap": null,
+      "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+    },
+    {
+      "case": "release-scale65-03",
+      "nodes": 65,
+      "samples": 53,
+      "p50": 16.699999999999818,
+      "p95": 50,
+      "maximum": 133.39999999999964,
+      "windowIntervalSumMs": 1266.6679999999997,
+      "keyboardDurationsMs": [
+        80,
+        112,
+        120,
+        104
+      ],
+      "handlerToCallbackMs": [
+        4.799999997019768,
+        0.8000000044703484,
+        39.399999998509884,
+        25.69999999552965
+      ],
+      "cdpRoundTripMs": 35.735414,
+      "geometry": [
+        {
+          "label": "fit",
+          "paths": 64,
+          "eligible": 64,
+          "clipped": 0,
+          "maxError": 5.434072916209426e-05
+        },
+        {
+          "label": "zoom",
+          "paths": 64,
+          "eligible": 25,
+          "clipped": 39,
+          "maxError": 0.00012730263532142124
+        },
+        {
+          "label": "resize",
+          "paths": 64,
+          "eligible": 17,
+          "clipped": 47,
+          "maxError": 7.633416176544802e-05
+        }
+      ],
+      "observationCount": 29,
+      "ownerOmissions": 165,
+      "mappedWires": 19,
+      "retainedMap": null,
+      "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+    },
+    {
+      "case": "release-scale257-03",
+      "nodes": 257,
+      "samples": 64,
+      "p50": 16.700000000000728,
+      "p95": 66.70000000000073,
+      "maximum": 350.10000000000036,
+      "windowIntervalSumMs": 2049.8680000000004,
+      "keyboardDurationsMs": [
+        440,
+        232,
+        144,
+        160
+      ],
+      "handlerToCallbackMs": [
+        47.100000001490116,
+        1.0999999940395355,
+        3.600000001490116,
+        3.7000000029802322
+      ],
+      "cdpRoundTripMs": 363.747135,
+      "geometry": [
+        {
+          "label": "fit",
+          "paths": 256,
+          "eligible": 256,
+          "clipped": 0,
+          "maxError": 9.110374921703689e-05
+        },
+        {
+          "label": "zoom",
+          "paths": 256,
+          "eligible": 94,
+          "clipped": 162,
+          "maxError": 0.00010545963710218817
+        },
+        {
+          "label": "resize",
+          "paths": 256,
+          "eligible": 46,
+          "clipped": 210,
+          "maxError": 7.069804533332793e-05
+        }
+      ],
+      "observationCount": 29,
+      "ownerOmissions": 741,
+      "mappedWires": 29,
+      "retainedMap": {
+        "cid": "sha256:010d04cab7eb9c779be09f96f9273affcdbbf0c0c43c759a3b517780391b95e5",
+        "bytes": 119907
+      },
+      "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37"
+    }
+  ]
+}

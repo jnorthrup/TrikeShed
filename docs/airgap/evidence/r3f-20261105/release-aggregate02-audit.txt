@@ -1,0 +1,31 @@
+{
+  "kind": "aggregate-output-ownership",
+  "casObjectsVerified": 32,
+  "walFramesVerified": [
+    {
+      "cid": "sha256:b78057eed3ba0bb07a7b9a0f551b593c141cae5fd0a8f259b4a3ca150dd35d13",
+      "status": "queued"
+    },
+    {
+      "cid": "sha256:8b8056e56c75265a6c0b7f1906e8a012b5016057b16f58b2a319279d3cb65bbf",
+      "status": "running"
+    },
+    {
+      "cid": "sha256:b10a9dd49cd6f4ccf52dc4841f8e2cd00e8f7c2936b9d092aa5413dddfdb40a3",
+      "status": "completed"
+    }
+  ],
+  "runId": "a32d41a8-51f1-42d1-813b-f5491ac394cd",
+  "programCid": "sha256:0ba1b13ab24f05d3fe84705bed3a9ba515891743422f265eac6a0ea76c76ec72",
+  "retainedMapCid": "sha256:024d4d6dbd294190061173fb9f1494bf8a89686fcb41bcba4d1120dfd1776663",
+  "retainedMapBytes": 119878,
+  "actualNativeNodes": 257,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "runSubmissions": 1,
+  "retainedReads": 3,
+  "bundleSha256": "d9f075a28c4be289b2724c08d93abfa5f1813a7d3aa953da81a6373ffd660e37",
+  "scope": "257 real native calls; all values independently checked against the SHA-256 verified retained map and both actual canvas projections. Second GET delayed until an ordinary parameter edit, then continued unchanged; projection refused. Third GET follows restored definition and succeeds. No fabricated response or repeat execution."
+}

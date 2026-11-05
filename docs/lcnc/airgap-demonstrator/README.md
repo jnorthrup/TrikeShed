@@ -34,7 +34,7 @@ refusal preserved. [R3e](../../airgap/15-wire-geometry.md) batches wire geometry
 map-entry hashes used by exact Horn query rows. Its 35 final browser checks
 include fit/zoom/resize alignment, actual wire editing and keyboard controls.
 Matched frame/control timings overlap the baseline; no broad speedup is claimed.
-Sustained frame performance remains open. R2 executes
+[R3f](../../airgap/16-wire-lifetime-and-retained-outputs.md) closes wire editing on page shutdown and verifies retained output maps before projection. All 257 native values display; edits during a delayed read are refused. Its 74 browser checks retain larger-graph maximum gaps of 350–383 ms, so sustained frame performance remains open. R2 executes
 the actual upstream Confix scanner with bounded native ownership; R3a adds
 observed wire sparks and native flyovers; R3b traverses a retained 12-page
 PDF and verifies an exact passage. R4a packages that path and verifies a

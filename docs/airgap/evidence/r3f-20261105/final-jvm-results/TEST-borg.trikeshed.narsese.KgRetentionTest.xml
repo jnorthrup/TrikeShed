@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="KgRetentionTest[jvm]" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-05T10:34:21.253Z" hostname="0d6dfba25614" time="0.063">
+  <properties/>
+  <testcase name="malformedUnicodeRefusesBeforeRetentionAndSourceWordsAreNeverNormalized()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.002"/>
+  <testcase name="countByteAggregateAndIdentityLimitsRefuseBeforeWrites()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.036"/>
+  <testcase name="drainWaitsForAdmittedRetentionAndImmutablePayloadsKeepTheirBytes()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.003"/>
+  <testcase name="httpAndLcncUseTheSameRetentionAndIdentityReadSurfaces()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.005"/>
+  <testcase name="everyArtifactMustReadBackBeforeAnyImportedMintAndRefusalKeepsActorHealthy()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.004"/>
+  <testcase name="lfFramedHttpKeepsTheEntireBodyBeforeAnEmbeddedCrLfSeparator()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.003"/>
+  <testcase name="wrongPutSyncAndCorruptReadbackNeverMintOrStopTheOwner()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.004"/>
+  <testcase name="originalSourceAndExactExistingDefinitionResolveBeforeAdmissionAndAfterArchive()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.003"/>
+  <testcase name="missingCasAndUnboundedCasRefuseBeforeWritesWhileDirectMintStillWorks()[jvm]" classname="borg.trikeshed.narsese.KgRetentionTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,19 @@
+{
+  "integratedCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+  "testedCommit": "9111a78b733dc30736d066b7d2e5fc9ed87e882f",
+  "frozenRefCounts": [
+    557,
+    559
+  ],
+  "latestInventory": {
+    "local": 9,
+    "remoteBranchHeads": 549,
+    "remoteHeadAliases": 1
+  },
+  "merges": 3,
+  "conflictedFiles": 0,
+  "allFrozenTipsAreAncestors": true,
+  "sourceContinuity": "../../../airgap/evidence/r3f-20261105/release-target-source-continuity.json",
+  "localMachine": "Cloud checkout /workspace/TrikeShed; Jim Mac unchanged",
+  "pushPolicy": "Ordinary master push; no force, pruning or branch deletion. Final remote readback recorded separately."
+}

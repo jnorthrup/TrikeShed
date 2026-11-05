@@ -1,0 +1,5 @@
+{
+  "reason": "Aggregate GET arrival was not bounded; attempted SIGTERM to the identified driver after inspecting partial checkpoint. Driver reported exit zero but did not record restoredOutputs; independent audit rejected the incomplete evidence. This is a preliminary incomplete harness attempt, never an accepted pass.",
+  "driverPid": 161383,
+  "scope": "Final harness adds bounded route arrival and failure page text; checks require every case and complete projections."
+}
