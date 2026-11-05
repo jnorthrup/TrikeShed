@@ -1,0 +1,34 @@
+This directory contains an independent recorded-data audit, using only Python's
+standard library. It launches no application, browser, JVM, parser or network.
+
+Run:
+  python3 audit.py NATIVE_ATTEMPT_DIRECTORY SNAPSHOT_DIRECTORY --archive ORIGINAL_ARCHIVE --out AUDIT_DIRECTORY
+
+The selected successful records are:
+  /workspace/library-files/english-query-handoff-final-proof/native-attempt4
+  /workspace/library-files/english-query-handoff-v72-proof/snapshot
+  /workspace/library-files/english-retained-opener-inputs/positive-unmutated-runtime.tar.gz
+
+Exit 0 means PASS, exit 1 means FAIL, and exit 2 means required final records are
+still absent (PENDING). audit-result.json contains checks, rejected mutated-copy
+controls and hashes of the actual read evidence files; report.txt is a short
+human-readable result. The script hash is included in audit-result.json.
+
+The verifier requires original archived source/head bytes, the frozen JAR/JS
+snapshot, actual CAS byte exports, three real completed runs with one literal
+program CID, the original held response bodies, and the production after-close
+reader's matching records. It checks the exact B admitted document restored via
+native Import/Fit before each A run. It does not replace a missing run or ledger
+with fabricated evidence. Failed attempts are preserved elsewhere and excluded.
+
+Eight controls mutate only in-memory copies of the recorded browser result:
+wrong inspection I, source quotation, program CID, run ID, activity owner,
+automatic execution before explicit Run, falsely asserted consumed value
+authority, and automatic execution during Import/Fit. The same verifier must
+reject every copy. Actual evidence files remain unchanged.
+
+This verifies recorded byte identities and the demonstrated native behavior.
+It does not establish semantic entailment, producer authentication, new parser
+execution/authentication, or a global airgap. The labelled injected HTTP 503 is a
+browser transport control following an actual completed A run and actual 200
+invocation-body read; it is not an engine failure.
