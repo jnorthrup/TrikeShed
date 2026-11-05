@@ -1,0 +1,398 @@
+#!/usr/bin/env python3
+"""Independent recorded CLI checks; no JVM, parser, query engine or build is launched."""
+import argparse,base64,copy,hashlib,json,math,re,struct
+from pathlib import Path
+from urllib.parse import urlsplit,unquote
+class AuditError(Exception):pass
+def need(c,m):
+ if not c:raise AuditError(m)
+def sha(b):return hashlib.sha256(b).hexdigest()
+def cid(b):return 'sha256:'+sha(b)
+def b64(s):return base64.b64decode(s,validate=True)
+def load(p):
+ def pairs(rows):
+  out={}
+  for k,v in rows:need(k not in out,'Duplicate JSON key');out[k]=v
+  return out
+ return json.loads(p.read_bytes().decode('utf8',errors='strict'),object_pairs_hook=pairs)
+def utf16(text,begin,end):return text.encode('utf-16-le')[begin*2:end*2].decode('utf-16-le')
+def header(major,n):
+ if n<24:return bytes([major*32+n])
+ for width,ai in [(1,24),(2,25),(4,26),(8,27)]:
+  if n<1<<(width*8):return bytes([major*32+ai])+n.to_bytes(width,'big')
+ raise AuditError('CBOR integer bound')
+def canonical(v):
+ if v is None:return b'\xf6'
+ if isinstance(v,bool):return b'\xf5' if v else b'\xf4'
+ if isinstance(v,int):return header(0,v) if v>=0 else header(1,-1-v)
+ if isinstance(v,float):return b'\xfb'+struct.pack('>d',v)
+ if isinstance(v,str):
+  b=v.encode('utf8',errors='strict');return header(3,len(b))+b
+ if isinstance(v,bytes):return header(2,len(v))+v
+ if isinstance(v,list):return header(4,len(v))+b''.join(map(canonical,v))
+ if isinstance(v,dict):return header(5,len(v))+b''.join(canonical(k)+canonical(v[k]) for k in sorted(v,key=canonical))
+ raise AuditError('Unsupported CBOR value')
+def decode_cbor(data):
+ at=0
+ def read(n):
+  nonlocal at
+  need(at+n<=len(data),'Truncated CBOR');v=data[at:at+n];at+=n;return v
+ def item(depth=0):
+  need(depth<=64,'CBOR depth');tag=read(1)[0];major,ai=tag>>5,tag&31
+  if major==7:
+   if ai in [20,21,22]:return {20:False,21:True,22:None}[ai]
+   if ai==27:return struct.unpack('>d',read(8))[0]
+   raise AuditError('Unsupported CBOR simple')
+  need(ai<28,'Indefinite/reserved CBOR');n=ai if ai<24 else int.from_bytes(read({24:1,25:2,26:4,27:8}[ai]),'big')
+  if major==0:return n
+  if major==1:return -1-n
+  if major==2:return read(n)
+  if major==3:return read(n).decode('utf8',errors='strict')
+  if major==4:return [item(depth+1) for _ in range(n)]
+  if major==5:
+   out={}
+   for _ in range(n):
+    k,v=item(depth+1),item(depth+1);need(isinstance(k,str) and k not in out,'Duplicate/nontext CBOR key');out[k]=v
+   return out
+  raise AuditError('Unsupported CBOR major')
+ out=item();need(at==len(data) and canonical(out)==data,'Noncanonical/trailing CBOR');return out
+PROFILE='retained-English-positive-atomic-implication/1'
+POLICY='recognizer-structural-milli-evidence/1; retain fixed positive weight unchanged, not parser probability or source truth; no duplicate or derived observation units'
+S12='sha256:b8d43e44fd90ed082538dee097f2eaad7f2eddc718baf5148afb5762da9e53f0'
+SCALE=4294967295
+
+def f32(x):return struct.unpack('>f',struct.pack('>f',x))[0]
+def truth(positive,negative):
+ """The existing TruthCoord Float32 arithmetic + UINT32 pack/getter round trip."""
+ w=f32(positive+negative)
+ if w<=0:return 0.0,0.0
+ f=f32(f32(positive)/w);c=f32(w/f32(w+1000.0))
+ def packed_value(value):
+  bits=max(0,min(SCALE,int(float(max(0.0,min(1.0,value)))*SCALE)))
+  return f32(f32(bits)/f32(SCALE))
+ return packed_value(f),packed_value(c)
+def weights(rule,a,b):
+ f1,c1=truth(a['positive'],a['negative']);f2,c2=truth(b['positive'],b['negative'])
+ f=f32(f1*f2);cc=f32(f32(f*c1)*c2)
+ if rule=='DEDUCTION':
+  cc=max(0.0,min(f32(.9999),cc));w=f32(cc/f32(1.0-cc));wp=f32(f*w)
+ else:
+  need(rule=='INDUCTION','Unsupported NAL rule');wp=cc;w=f32(f32(f2*c1)*c2)
+ total=int(f32(max(0.0,w)*1000.0));positive=min(total,int(f32(max(0.0,min(w,wp))*1000.0)))
+ return positive,total-positive
+
+def bind(preimage,expected,cid_value,label):
+ need(preimage==expected and cid(canonical(preimage))==cid_value,label+' full canonical identity')
+
+def check_report(report,body,source,s12=False):
+ """Verify reported identities/applications only; never search for or infer unseen results."""
+ need(report['kind']=='retained-nal-implication-report/1' and report['profile']==PROFILE and
+  report['unitPolicy']==POLICY and report['mode']=='historical-snapshot' and report['currentness']=='not-checked' and
+  report['parserExecution']=='not-reverified' and report['admission']=='not-performed' and
+  report['independence']=='not-established; exact shared source ancestry retained' and
+  report['scope']=='recorded-English atomic-symbol hypotheses; no theorem, calibrated probability, review or live admission','Historical assumption-only report scope')
+ need(report['numericPolicy']=={'unitScale':1000,'truthFunction':'Nal.truthOf','horizonObservations':1,'horizonMilliEvidence':1000,
+  'meaning':'NAL evidence coordinates, not parser confidence or calibrated truth probability'} and
+  report['limits']=={'clauses':64,'orderedPairs':4096,'inferenceDepth':1},'Existing NAL units/horizon/bounds')
+ frame={'kind':'retained-nal-frame/1','profile':PROFILE,'inspectionCid':body['receiptCid'],
+  'originalCid':body['originalCid'],'sourceCid':body['extractedTextCid']}
+ bind(report['framePreimage'],frame,report['frameCid'],'Frame')
+ expected_source={'inspectionCid':body['receiptCid'],'originalCid':body['originalCid'],
+  'extractedTextCid':body['extractedTextCid'],'graphIri':'urn:trikeshed:english:'+body['receiptCid'][7:],
+  'text':source,'graphMeaning':'existing inspection resource namespace; no quad query executed by this experiment',
+  'offsetUnit':'utf16-code-units','endExclusive':True}
+ need(report['source']==expected_source,'Exact historical source/frame namespace')
+ evaluator={'kind':'retained-nal-evaluator/1','frameCid':report['frameCid'],'unitPolicy':POLICY,'rules':['DEDUCTION','INDUCTION'],'inferenceDepth':1}
+ bind(report['evaluatorPreimage'],evaluator,report['evaluatorCid'],'Evaluator')
+ if not s12:
+  need(report['status']=='UNSUPPORTED' and report['issues'] and report['terms']==report['premises']==report['derivations']==[] and report['attemptedPairs']==0,'Genuine unsupported frame must produce no partial hypotheses')
+  return {'status':report['status'],'issues':report['issues']}
+ need(body['receiptCid']==S12 and report['status']=='EVALUATED' and report['issues']==[] and
+  body['range']=={'begin':0,'end':105,'totalLength':105,'complete':True},'Actual full S12 frame evaluation')
+ runtime=body['parser']['runtime'];need(runtime['parserNormalization']=='identity/1' and
+  runtime['sourceTextCid']==runtime['parserInputCid']==body['extractedTextCid'] and
+  body['coverage']['parserNodeIdentityReported'] is True and runtime['dependencyNodeIdentity']=='token-index+copy-count/1','Full reported source/parser identity')
+ terms=report['terms'];need(len(terms)==5 and [t['localId'] for t in terms]==list(range(1,6)) and
+  [t['cid'] for t in terms]==sorted(t['cid'] for t in terms),'Bijective sorted full-CID dictionary')
+ by_term={t['cid']:t for t in terms};need(len(by_term)==len(terms) and {t['surface'] for t in terms}=={'ALPHA','BETA','GAMMA','DELTA','EPSILON'},'Exact surface atoms; no lemma or angular identity')
+ for t in terms:bind(t['preimage'],{'kind':'retained-nal-atom/1','frameCid':report['frameCid'],'surface':t['surface']},t['cid'],'Surface atom')
+ basis=sorted(set([body['originalCid'],body['extractedTextCid']]))
+ premises=report['premises'];need(len(premises)==4 and report['attemptedPairs']==12,'Four unique source propositions and twelve original ordered nonself pairs')
+ by_contribution={p['contributionCid']:p for p in premises};need(len(by_contribution)==4,'Distinct original contributions')
+ occurrences=[]
+ def prop(subject,predicate):return {'kind':'retained-nal-implication/1','frameCid':report['frameCid'],'subject':subject,'predicate':predicate}
+ for p in premises:
+  need(p['subjectCid'] in by_term and p['predicateCid'] in by_term and p['positive']==900 and p['negative']==0 and p['basis']==basis,'Source premise weight and inherited ancestry')
+  bind(p['propositionPreimage'],prop(p['subjectCid'],p['predicateCid']),p['propositionCid'],'Source proposition')
+  need(p['occurrences'],'Every premise retains source occurrence')
+  for o in p['occurrences']:
+   sentence=next(s for s in body['sentences'] if s['index']==o['sentenceIndex']);nodes={n['id']:n for n in sentence['nodes']};edges=sentence['dependencies']
+   need(o['sourceCid']==body['extractedTextCid'] and o['begin']==sentence['begin'] and o['end']==sentence['end'] and
+    o['quote']==sentence['quote']==utf16(source,o['begin'],o['end']),'Exact source occurrence quote/range')
+   occurrence={'kind':'retained-nal-occurrence/1','frameCid':report['frameCid'],'inspectionCid':body['receiptCid'],
+    'sourceCid':body['extractedTextCid'],'sentenceIndex':o['sentenceIndex'],'begin':o['begin'],'end':o['end'],'quote':o['quote']}
+   bind(o['occurrencePreimage'],occurrence,o['occurrenceCid'],'Source occurrence')
+   root=next(e for e in edges if e['governorNode']=='0:0' and e['relation'].lower()=='root')
+   subj=next(e for e in edges if e['governorNode']==root['dependentNode'] and e['relation'].lower()=='nsubj')
+   obj=next(e for e in edges if e['governorNode']==root['dependentNode'] and e['relation'].lower() in ['obj','dobj'])
+   sentence_iri=expected_source['graphIri']+'/sentence/'+str(o['sentenceIndex'])
+   need(o['sentenceIri']==sentence_iri and o['subjectNodeIri']==sentence_iri+'/node/'+subj['dependentNode'] and
+    o['predicateNodeIri']==sentence_iri+'/node/'+root['dependentNode'] and o['objectNodeIri']==sentence_iri+'/node/'+obj['dependentNode'],'Schema-derived full node/role citation identities')
+   need(nodes[subj['dependentNode']]['word']==by_term[p['subjectCid']]['surface'] and
+    nodes[obj['dependentNode']]['word']==by_term[p['predicateCid']]['surface'] and
+    o['predicateLemma']==nodes[root['dependentNode']]['lemma'].lower() and o['predicateLemma'] in ['imply','entail'],'Exact surface subject/object and actual predicate lemma')
+   rule_preimage=by_term[p['subjectCid']]['surface']+'|'+by_term[p['predicateCid']]['surface']+'|IMPLICATION|'+str(900<<32)+'|'+body['extractedTextCid']
+   need(o['recognizerRulePreimageUtf8']==rule_preimage and cid(rule_preimage.encode())==o['recognizerRuleCid'],'Existing recorded recognizer identity')
+   annotation={'kind':'retained-nal-annotation/1','occurrenceCid':o['occurrenceCid'],'propositionCid':p['propositionCid'],
+    'predicateLemma':o['predicateLemma'],'recognizerRuleCid':o['recognizerRuleCid'],'unitPolicy':POLICY}
+   bind(o['annotationPreimage'],annotation,o['annotationCid'],'Source annotation');occurrences.append(o)
+  first=p['occurrences'][0]
+  contribution={'kind':'source-contribution-v1','proposition':p['propositionCid'],'occurrence':first['occurrenceCid'],
+   'extractionReceipt':first['annotationCid'],'basis':basis,'positive':900,'negative':0}
+  bind(p['contributionPreimage'],contribution,p['contributionCid'],'Representative source contribution')
+ need(sorted(o['sentenceIndex'] for o in occurrences)==list(range(5)) and len({o['occurrenceCid'] for o in occurrences})==5 and
+  sorted(len(p['occurrences']) for p in premises)==[1,1,1,2],'All five occurrences remain dependent, not extra evidence units')
+ derivations=report['derivations'];need(len(derivations)==3 and len({d['receiptCid'] for d in derivations})==3,'S12 one-level result set')
+ observed=[]
+ for d in derivations:
+  ids=d['premiseCids'];need(len(ids)==2 and ids[0]!=ids[1] and all(i in by_contribution for i in ids),'Only two ordered original premises; no derived feedback')
+  a,b=[by_contribution[i] for i in ids];rule=d['rule']
+  if rule=='DEDUCTION':
+   need(a['predicateCid']==b['subjectCid'],'Deduction shared middle term');subject,predicate=a['subjectCid'],b['predicateCid'];status='deduced-hypothesis'
+  else:
+   need(rule=='INDUCTION' and a['subjectCid']==b['subjectCid'] and a['predicateCid']!=b['predicateCid'],'Weak induction shared subject')
+   subject,predicate=b['predicateCid'],a['predicateCid'];status='weak-induction-hypothesis'
+  need(d['subjectCid']==subject and d['predicateCid']==predicate and d['status']==status and d['basis']==basis,'Actual rule direction, hypothesis scope and source ancestry')
+  positive,negative=weights(rule,a,b);need((d['positive'],d['negative'])==(positive,negative),'Existing Float32 NAL milli-evidence result')
+  frequency,confidence=truth(positive,negative)
+  need(f32(d['nalFrequency'])==frequency and f32(d['nalConfidence'])==confidence,'Existing packed Float32 NAL truth coordinates')
+  bind(d['propositionPreimage'],prop(subject,predicate),d['propositionCid'],'Derived hypothesis proposition')
+  preimage=str(len(rule))+':'+rule+';'+str(by_term[subject]['localId'])+';'+str(by_term[predicate]['localId'])+';'+ids[0][7:]+';'+ids[1][7:]+';'+str((positive<<32)|negative)+';'+report['evaluatorCid'][7:]+';'
+  need(d['receiptPreimageUtf8']==preimage and cid(preimage.encode())==d['receiptCid'],'Existing ordered DerivationReceipt UTF8 identity')
+  observed.append((rule,by_term[subject]['surface'],by_term[predicate]['surface'],positive,negative))
+ need({x[:3] for x in observed}=={('DEDUCTION','ALPHA','GAMMA'),('INDUCTION','DELTA','GAMMA'),('INDUCTION','GAMMA','DELTA')},'S12 reported deduction/weak-induction directions')
+ return {'status':report['status'],'premises':4,'occurrences':5,'attemptedPairs':12,'results':observed,'basis':basis}
+
+def state(path):
+ with path.open('rb') as stream:digest=hashlib.file_digest(stream,'sha256').hexdigest()
+ return {'bytes':path.stat().st_size,'sha256':digest}
+def matches_state(path,record,label):need(state(path)=={k:record[k] for k in ['bytes','sha256']},label+' actual bytes/hash')
+
+def check_inputs(root,inputs):
+ need(inputs['kind']=='retained-nal-cli-inputs/1' and inputs['producerSourceHead']=='0219223a3846887fe283b93598942de332214cd2' and
+  inputs['producerMainSha256']=='d0a8133b10e4b18e1bd4076c1440688ad94a2eeb2bbcdefe743f4759ace75636','Actual retained producer source/JAR pins')
+ prepared={};dependencies=0
+ for key in ['remaining','firstG01']:
+  runtime=inputs['runtimes'][key];local=root/'inputs'/Path(runtime['copyRoot']).name;pack=(local/'cas/pack').read_bytes()
+  need(len(pack)==runtime['pack']['bytes']==runtime['originalPack']['bytes'] and
+   sha(pack)==runtime['pack']['sha256']==runtime['originalPack']['sha256'],'Exact original/copy closed pack identity')
+  need(set(runtime['originalTree'])==set(runtime['copiedTree']),'Complete copied producer tree membership')
+  for name,row in runtime['copiedTree'].items():
+   matches_state(local/name,row,'Copied input '+name)
+   need(all(row[k]==runtime['originalTree'][name][k] for k in ['bytes','sha256','mtimeMillis']),'Producer/copy byte and stamp identity')
+  records=runtime['packRecords'];at=0;blobs={}
+  for record in records:
+   need(len(pack)-at>=37,'Actual pack complete header');kind=pack[at];size=int.from_bytes(pack[at+1:at+5],'big',signed=True)
+   name='sha256:'+pack[at+5:at+37].hex();need(size>=0 and size<=len(pack)-at-37,'Actual pack complete payload')
+   payload=pack[at+37:at+37+size]
+   need(record['offset']==at and record['cid']==name and record['payloadBytes']==size and
+    record['kind']=={1:'BLOB',2:'REF'}.get(kind),'Actual Pack BLOB/REF header record')
+   if kind==1:need(cid(payload)==name,'Actual BLOB payload identity');blobs[name]=payload
+   else:
+    need(size>=16,'Actual REF framing');count,mtime=struct.unpack('>qq',payload[:16]);target=payload[16:].decode('utf8',errors='strict')
+    need(target==record['target'] and count==record['stampedBytes'] and mtime==record['stampedMtimeMillis'],'Original absolute REF target/stamp')
+    rel=Path(target).relative_to(runtime['originalRoot']);copy=local/rel;actual=record['actualTarget']
+    need(actual['path']==target and actual['bytes']==count and actual['mtimeMillis']==mtime and actual['sha256']==name[7:] and
+     'Original absolute producer path remains required' in record['dependency'],'REF dependency truth, not relocation')
+    matches_state(copy,actual,'Materialized copied REF source');dependencies+=1
+   at+=37+size
+  need(at==len(pack),'No unrecorded trailing pack bytes')
+  prepared[key]={'pack':pack,'blobs':blobs,'local':local}
+ torn=inputs['runtimes']['torn'];torn_path=root/'inputs'/Path(torn['copyRoot']).name/'cas/pack';raw=torn_path.read_bytes()
+ need(raw==prepared['remaining']['pack']+b'\x7f','Exactly one intentional torn tail byte; producer packs unchanged')
+ matches_state(torn_path,torn['pack'],'Torn input')
+ cases={}
+ need([c['id'] for c in inputs['cases']]==['S12','G01','G03','G04','G13'],'Actual selected S12 and four retained guard cases')
+ for item in inputs['cases']:
+  key=item['id'];folder=root/'inputs/cases'/key
+  for name,row in item['files'].items():matches_state(folder/name,row,'Materialized selected input '+key+'/'+name)
+  source=(folder/'source.txt').read_bytes();raw=(folder/'inspection.cbor').read_bytes();body=load(folder/'response.json');request=load(folder/'request.json');row=load(folder/'source-row.json')
+  need(cid(raw)==item['inspectionCid']==body['receiptCid'] and decode_cbor(raw)=={k:v for k,v in body.items() if k!='receiptCid'},'Materialized actual canonical inspection')
+  need(prepared[item['runtimeKey']]['blobs'][item['inspectionCid']]==raw,'Actual selected receipt was already in closed producer pack')
+  need(cid(source)==item['sourceCid']==body['originalCid']==body['extractedTextCid']==row['cid']==request['cid'] and
+   (folder/'source-readback.txt').read_bytes()==source and (folder/'status.txt').read_text().strip()=='200','Materialized actual source/readback/status')
+  need(body['selection']=={k:request[k] for k in ['project','id','cid','rev','seq']} and all(row[k]==v for k,v in body['selection'].items()) and
+   body['sourceSnapshots']==[row] and body['parser']==item['parserMetadata'] and body['range']==item['range'],'Actual source revision/parser/range metadata')
+  runtime=body['parser']['runtime'];need(runtime['manifestCid']=='sha256:3eef3e5150b437e61ce88523c11dbe3c6a75515784ca6327475560695e1dafcd' and
+   runtime['jarSha256']=='277e42b16199e22e023d6b53335b2d633cecb740e0ebc9bedb9d36baf6db5431' and runtime['packageVersion']=='4.6.0','Actual Stanford baseline metadata pins, not reauthentication')
+  cases[key]={'input':item,'body':body,'source':source.decode('utf8',errors='strict')}
+ execution=load(root/'inputs/producer-execution-record.json')
+ need([r['exitCode'] for r in execution['runs']]==[1,0] and
+  load(root/'inputs/producer-attempt-first-G01-cleanup.json')['failed'] is True,'Original valid G01 receipt does not erase failed observer process')
+ return cases,prepared,dependencies
+
+def check_artifact(pin,source_head,main_sha,metadata=None):
+ path=Path(pin['path']);meta=metadata or path;manifest=load(meta/'sha256.json')
+ need(pin['sourceHead']==source_head and pin['mainJarSha256']==main_sha==manifest['main.jar'] and
+  (meta/'source-head.txt').read_text().strip()==source_head and
+  sha((meta/'source-head.txt').read_bytes())==manifest['source-head.txt'],'Exact frozen CLI source/JAR metadata')
+ if metadata is None:need(state(path/'main.jar')['sha256']==main_sha,'Actual frozen main JAR bytes')
+ cp=pin['classpath']
+ need(pin['classpathEntries']==len(cp)==120 and Path(cp[0]).resolve()==(path/'main.jar').resolve() and
+  set(pin['jarSha256'])==set(cp) and len(set(cp))==120,'Production-only120-JAR classpath, no observer overlay')
+ for file in cp:
+  p=Path(file);need(p.suffix=='.jar' and
+   pin['jarSha256'][file]==(main_sha if file==cp[0] else manifest['dependencies'][file]),'Frozen classpath JAR hash metadata')
+  if metadata is None:need(state(p)['sha256']==pin['jarSha256'][file],'Actual frozen classpath JAR bytes')
+ return path
+
+def check_commands(root,out,inputs,execution,new_head,new_main,recorded_only=False):
+ need(execution['kind']=='retained-nal-cli-execution/1' and execution['state']=='PASS' and
+  execution['inputsSha256']==sha((root/'inputs.json').read_bytes()),'Final executed protocol/input binding')
+ old=check_artifact(execution['pins']['old'],inputs['producerSourceHead'],inputs['producerMainSha256'],root/'artifact-metadata/old' if recorded_only else None)
+ new=check_artifact(execution['pins']['new'],new_head,new_main,root/'artifact-metadata/new' if recorded_only else None)
+ if not recorded_only:matches_state(Path(execution['pins']['java']['path']),execution['pins']['java'],'Actual Java executable')
+ labels=['zeroarg-old-v76','zeroarg-new-v77','S12','G01','G03','G04','G13','bad-missing-flag','bad-duplicate-flag','bad-manual-input','bad-cid','missing-receipt','missing-pack','torn-tail']
+ commands=execution['commands'];need([r['label'] for r in commands]==labels and len({r['pid'] for r in commands})==14 and
+  all(type(r['pid']) is int and r['pid']>0 for r in commands),'All14 actual process commands/PIDs')
+ cases={c['id']:c for c in inputs['cases']};main_class='borg.trikeshed.narsese.SyntheticNalExperimentCli'
+ regular_cas=str(Path(inputs['runtimes']['remaining']['copyRoot'])/'cas')
+ allowed_states={}
+ for key,runtime in inputs['runtimes'].items():
+  allowed_states[runtime['pack']['path']]=runtime['pack']
+  if 'originalPack' in runtime:allowed_states[runtime['originalPack']['path']]=runtime['originalPack']
+  for field in ['originalTree','copiedTree']:
+   for row in runtime.get(field,{}).values():allowed_states[row['path']]=row
+  for record in runtime.get('packRecords',[]):
+   if record['kind']=='REF':allowed_states[record['target']]=record['actualTarget']
+ torn_root=Path(inputs['runtimes']['torn']['copyRoot'])
+ for relative,row in inputs['runtimes']['remaining']['copiedTree'].items():
+  target=str(torn_root/relative)
+  if relative!='cas/pack':allowed_states[target]={**row,'path':target}
+ reports={}
+ for i,record in enumerate(commands):
+  label=record['label'];pin=execution['pins']['old' if i==0 else 'new'];folder=out/label
+  need(load(folder/'record.json')==record,'Actual per-command raw record')
+  need(record['timedOut'] is False and record['forcedKill'] is False,'Every process completed without timeout or forced kill')
+  stdout=(folder/'stdout.json').read_bytes();stderr=(folder/'stderr.txt').read_bytes();log=(folder/'class-load.log').read_text()
+  matches_state(folder/'stdout.json',record['stdout'],'Raw stdout');matches_state(folder/'stderr.txt',record['stderr'],'Raw stderr')
+  argv=record['argv'];need(argv[:2]==[execution['pins']['java']['path'],'-Xmx512m'] and
+   argv[2]=='-Xlog:class+load=info:file='+record['classLoadPath'] and argv[3:6]==['-cp',':'.join(pin['classpath']),main_class] and
+   record['elapsedSeconds']>=0,'Actual direct production main/argv/class-load log')
+  if label.startswith('zeroarg'):expected=[]
+  elif label in cases:
+   c=cases[label];expected=['--cas',str(Path(inputs['runtimes'][c['runtimeKey']]['copyRoot'])/'cas'),'--inspection',c['inspectionCid']]
+  else:
+   missing='sha256:'+'0'*64
+   expected={'bad-missing-flag':['--cas',regular_cas], 'bad-duplicate-flag':['--cas',regular_cas,'--cas',regular_cas],
+    'bad-manual-input':['--cas',regular_cas,'--input','manual.json'],'bad-cid':['--cas',regular_cas,'--inspection','sha256:invalid'],
+    'missing-receipt':['--inspection',missing,'--cas',regular_cas],
+    'missing-pack':['--cas',str(Path(record['stdoutPath']).parent.parent/'must-not-be-created'),'--inspection',cases['S12']['inspectionCid']],
+    'torn-tail':['--cas',str(Path(inputs['runtimes']['torn']['copyRoot'])/'cas'),'--inspection',cases['S12']['inspectionCid']]}[label]
+  need(argv[6:]==expected,'Exact case arguments; no manual parse/text/KIF input')
+  requested=record['requestedCasBefore'];need(requested==record['requestedCasAfter'],'Requested CAS directory/pack changed')
+  if label.startswith('zeroarg'):
+   need(requested is None,'Zero-argument experiment has no requested CAS')
+  else:
+   requested_path=expected[expected.index('--cas')+1]
+   need(requested['path']==requested_path and requested['pack']['path']==str(Path(requested_path)/'pack'),'Requested CAS probe matches actual arguments')
+   if label=='missing-pack':
+    need(requested=={'path':requested_path,'exists':False,'isDirectory':False,'pack':{'path':str(Path(requested_path)/'pack'),'exists':False}},'Absent requested directory remains absent')
+   else:
+    expected_pack=allowed_states.get(str(Path(requested_path)/'pack'))
+    need(expected_pack is not None and requested['exists'] is True and requested['isDirectory'] is True and requested['pack']['exists'] is True and
+     all(requested['pack'][k]==expected_pack[k] for k in ['bytes','sha256','mtimeMillis']),'Requested historical pack exact probe')
+  need(record['packBefore']==record['packAfter'] and record['originalPackBefore']==record['originalPackAfter'] and
+   record['sourceAndREFBefore']==record['sourceAndREFAfter'],'Historical pack/source/REF input changed in CLI phase')
+  captured=record['sourceAndREFBefore']
+  need(captured['packs']==record['packBefore'] and captured['originalPacks']==record['originalPackBefore'] and
+   set(captured['packs'])==set(inputs['runtimes']) and set(captured['originalPacks'])=={'remaining','firstG01'} and
+   len(captured['referenceTargets'])==18 and set(captured['runtimeTrees'])=={'remaining-copy','remaining-producer','firstG01-copy','firstG01-producer','torn-copy'},'Complete actual before/after monitored input scope')
+  for key,row in captured['packs'].items():need(row['path']==inputs['runtimes'][key]['pack']['path'],'Phase pack/runtime identity')
+  for key,row in captured['originalPacks'].items():need(row['path']==inputs['runtimes'][key]['originalPack']['path'],'Phase canonical producer identity')
+  expected_refs={record['target'] for runtime in inputs['runtimes'].values() for record in runtime.get('packRecords',[]) if record['kind']=='REF'}
+  need(set(captured['referenceTargets'])==expected_refs,'Complete original REF target set')
+  for role,tree in captured['runtimeTrees'].items():
+   if role=='torn-copy':expected_members=set(inputs['runtimes']['remaining']['copiedTree'])
+   else:
+    key,kind=role.rsplit('-',1);expected_members=set(inputs['runtimes'][key]['copiedTree' if kind=='copy' else 'originalTree'])
+   need(set(tree)==expected_members,'Complete before/after runtime tree scope')
+  actual_rows=list(captured['packs'].values())+list(captured['originalPacks'].values())+list(captured['referenceTargets'].values())
+  actual_rows += [v for tree in captured['runtimeTrees'].values() for v in tree.values()]
+  for row in actual_rows:
+   # Torn tree pack and all ordinary originals/copies are captured explicitly.
+   expected_row=allowed_states.get(row['path'])
+   need(expected_row is not None and row['exists'] is True and
+    all(row[k]==expected_row[k] for k in ['bytes','sha256','mtimeMillis']),'Phase actual pack/source/REF fingerprint does not match closed inputs')
+  origins={}
+  for line in log.splitlines():
+   match=re.search(r'(borg\.trikeshed\.[^ ]+) source: (file:[^ ]+)',line)
+   if match:
+    source=Path(unquote(urlsplit(match.group(2)).path)).resolve();need(source==(Path(pin['path'])/'main.jar').resolve(),'Production class loaded outside pinned main JAR')
+    origins[match.group(1)]=(match.group(2),line)
+  need(main_class in origins and all(name in origins and value['source']==origins[name][0] and value['recordedLine']==origins[name][1]
+   for name,value in record['productionClassOrigins'].items()),'Actual class-load provenance lines')
+  if label=='S12':
+   need({main_class,'borg.trikeshed.narsese.SyntheticNalExperiment','borg.trikeshed.narsese.Nal','borg.trikeshed.narsese.DerivationReceipt','borg.trikeshed.narsese.NlpcoreAxiomatics','borg.trikeshed.rdf.EnglishObservationGraph','borg.trikeshed.job.PackCasStore'}.issubset(origins),'Actual S12 core classes from production final JAR')
+  if i<7:
+   need(record['exitCode']==0,'Successful actual CLI process exit')
+   reports[label]=load(folder/'stdout.json')
+  else:
+   need(record['exitCode']==1 and stdout==b'' and b'IllegalArgumentException' in stderr,'Actual exception refusal, not timeout/kill or synthetic fallback')
+   reason={'bad-missing-flag':b'Usage: SyntheticNalExperimentCli','bad-duplicate-flag':b'Usage: SyntheticNalExperimentCli',
+    'bad-manual-input':b'Usage: SyntheticNalExperimentCli','bad-cid':b'IllegalArgumentException',
+    'missing-receipt':b'Retained English source or receipt unavailable','missing-pack':b'Existing readable CAS pack required',
+    'torn-tail':b'Historical CAS pack has a torn header'}[label]
+   need(reason in stderr,'Actual intended refusal reason')
+ old_bytes=(out/'zeroarg-old-v76/stdout.json').read_bytes();new_bytes=(out/'zeroarg-new-v77/stdout.json').read_bytes()
+ need(execution['zeroArgBytesEqual'] is True and old_bytes==new_bytes and reports['zeroarg-old-v76']['kind']=='synthetic-nal-experiment/1','Exact old/new zero-argument stdout bytes')
+ return reports,{'commands':14,'pids':[r['pid'] for r in commands],'zeroArgBytes':len(old_bytes),'zeroArgSha256':sha(old_bytes)}
+
+def audit(root,execution_dir,head,main_sha,recorded_only=False):
+ if not (execution_dir/'execution.json').is_file():return {'result':'PENDING','scope':'Actual closed production CLI records required; no runtime launched by auditor.'}
+ inputs=load(root/'inputs.json');execution=load(execution_dir/'execution.json')
+ cases,prepared,refs=check_inputs(root,inputs)
+ reports,commands=check_commands(root,execution_dir,inputs,execution,head,main_sha,recorded_only)
+ checked={key:check_report(reports[key],case['body'],case['source'],key=='S12') for key,case in cases.items()}
+ original=reports['S12'];case=cases['S12'];controls=[]
+ def deduction(r):return next(d for d in r['derivations'] if d['rule']=='DEDUCTION')
+ def induction(r):return next(d for d in r['derivations'] if d['rule']=='INDUCTION')
+ mutations=[('wrong-full-term-CID',lambda r:r['terms'][0].__setitem__('cid','sha256:'+'0'*64)),
+  ('reversed-ordered-deduction-premises',lambda r:deduction(r)['premiseCids'].reverse()),
+  ('erased-shared-source-basis',lambda r:deduction(r).__setitem__('basis',[])),
+  ('changed-NAL-weight',lambda r:deduction(r).__setitem__('positive',deduction(r)['positive']+1)),
+  ('weak-induction-upgraded-to-deduction',lambda r:induction(r).__setitem__('status','deduced-hypothesis')),
+  ('structural-point-nine-as-NAL-confidence',lambda r:deduction(r).__setitem__('nalConfidence',.9))]
+ for label,change in mutations:
+  modified=copy.deepcopy(original);change(modified)
+  try:check_report(modified,case['body'],case['source'],True)
+  except AuditError as error:controls.append({'mutation':label,'result':'REJECTED','reason':str(error)})
+  else:raise AuditError('Mutated data accepted: '+label)
+ return {'result':'PASS_RECORDED_NAL_APPLICATION_CONSISTENCY','sourceHead':head,'mainSha256':main_sha,
+  'artifactVerification':'recorded metadata and class-load logs only; external JAR/Java/live REF availability not checked' if recorded_only else 'actual frozen JARs and Java executable rehashed; recorded class-load origins checked',
+  'mode':'recorded-only' if recorded_only else 'local-artifact-strict',
+  'commands':commands,'cases':checked,'originalReferenceDependencies':refs,'mutatedCopyControls':controls,
+  'inputsSha256':sha((root/'inputs.json').read_bytes()),'executionSha256':sha((execution_dir/'execution.json').read_bytes()),
+  'scope':'Recorded production CLI and identity/source/ordered-rule/Float32 NAL application consistency. This auditor launches no JVM/parser/build/query engine, generates no new inference closure, and grants no semantic truth, calibrated probability, current-source authority, independence, admission or OS seal. Original absolute REF targets remain JVM rerun dependencies; static comparisons use exact copied source bytes.'}
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('proof',type=Path);p.add_argument('execution',type=Path)
+ p.add_argument('--recorded-only',action='store_true',help='Check packaged metadata/logs and materialized input bytes; do not access external JARs, Java or live REF paths.')
+ p.add_argument('--source-head',required=True);p.add_argument('--main-sha',required=True);p.add_argument('--out',type=Path,required=True)
+ args=p.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+ try:r=audit(args.proof.resolve(),args.execution.resolve(),args.source_head,args.main_sha,args.recorded_only)
+ except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:r={'result':'FAIL','error':str(error)}
+ r['auditScriptSha256']=sha(Path(__file__).read_bytes());(args.out/'result.json').write_text(json.dumps(r,indent=2,ensure_ascii=False)+'\n')
+ lines=['Independent retained NAL CLI recorded-data audit: '+r['result'],r.get('scope',r.get('error',''))]
+ if r['result'].startswith('PASS'):
+  lines+=['Source: '+r['sourceHead']+'; main SHA256: '+r['mainSha256'],
+   'Artifact verification: '+r['artifactVerification']+'.',
+   '14 direct production CLI process records; old/new zero-argument stdout exactly equal ('+str(r['commands']['zeroArgBytes'])+' bytes).',
+   'S12: 5 exact source occurrences, 4 unique +900/-0 original premises, 12 ordered pairs; one deduction hypothesis and two weak-induction hypotheses.',
+   'Every reported canonical identity, source/node role citation, ordered premise and inherited source basis verified; existing Float32/packed TruthCoord/milli-evidence calculations reproduced.',
+   'Four genuine guard frames produce UNSUPPORTED with no partial premises or results. Malformed/missing/torn input cases refuse with empty stdout and unchanged historical packs/sources/REF targets.',
+   'All original and copied phase fingerprints stay unchanged. '+str(r['originalReferenceDependencies'])+' REF records retain original absolute-path dependencies; no relocation or parser re-execution claimed.',
+   'Six mutated report copies rejected. Same-source duplication and derived ancestry establish no independent evidence or source truth.']
+ (args.out/'report.txt').write_text('\n'.join(lines)+'\n');print(json.dumps({'result':r['result'],'output':str(args.out)}))
+ return 0 if r['result'].startswith('PASS') else (2 if r['result']=='PENDING' else 1)
+if __name__=='__main__':raise SystemExit(main())

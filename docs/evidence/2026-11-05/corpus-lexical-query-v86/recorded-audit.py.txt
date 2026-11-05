@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Recorded source/corpus/query checks only; no JVM/NLP/retrieval engine/LDA sampler/browser."""
+import argparse,copy,hashlib,json,re
+from pathlib import Path
+from urllib.parse import urlsplit,parse_qsl,unquote
+from checks import *
+SOURCE_HEAD='1aa29894aeeb290a5644b3370fd895f261f576d2'
+MAIN='e4fa6c396fbff190d160c084df0ac6991ab35ebac44149c4736a18c59165382a'
+DOCS='4afe537ee61120cca73a57edf28904c20311b417313ea7b75de7a3cc3444e2b1'
+PANELS='9218cc3f29024ff003973ee70b3654937e09d3bd9e784eab8fbeac79651193aa'
+LEGACY='sha256:0e4682987e9d093233fd26f50c8435b3287a6e3ff0b7eec6a7d4dbb1e6d5f38c'
+CORPUS='sha256:b83b2616d8b433e50e184a208c73822fa09fc10f67ab9f466ffde998bb90867e'
+MATRIX='sha256:20b16662f8ce8c402d1a79114d35141de0bbc2fe19a52226f8b6321c5d52faa2'
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def stamp(raw):return {'bytes':len(raw),'sha256':sha(raw)}
+def raw_block(attempt,identity):
+    need(isinstance(identity,str) and re.fullmatch(r'sha256:[a-f0-9]{64}',identity),'Full actual fetched content CID')
+    raw=(attempt/'cas-readbacks'/(identity[7:]+'.bin')).read_bytes();need(cid(raw)==identity,'Actual supplied raw CAS bytes/hash');return raw
+def artifact(attempt,args):
+    go=load(attempt/'GO.json');need(go['GO'] is True and go['source']==SOURCE_HEAD==args.source_head and go['mainSha256']==MAIN==args.main_sha and go['checks']=={'tests':535,'failures':0,'errors':0,'skipped':0},'Explicit final535rootGO/source/main metadata')
+    need(go['artifacts']['documents.js']==DOCS==args.documents_sha and go['artifacts']['spacegraph.js']==PANELS==args.panels_sha,'Explicit final browser asset pins')
+    metadata=attempt/'artifact-metadata';manifest=load(metadata/'sha256.json');need((metadata/'source-head.txt').read_text().strip()==SOURCE_HEAD and sha((metadata/'source-head.txt').read_bytes())==manifest['source-head.txt'] and manifest['main.jar']==MAIN,'Frozen source metadata')
+    cp=load(attempt/'classpath.json');paths=[r['path'] for r in cp['productionClasspath']]
+    need(cp['productionDependencyJars']==120 and cp['totalJarCount']==121 and cp['totalClasspathEntries']==122 and len(paths)==len(set(paths))==120 and len(manifest['dependencies'])==119 and paths[0]==go['snapshot']+'/main.jar','Actual final120productionJARs plus separate observer/asset-onlyJAR')
+    need((metadata/'classpath.txt').read_text().strip().split(':')==paths,'Actual final classpath identities')
+    for row in cp['productionClasspath']:
+        expected=MAIN if row['path']==paths[0] else manifest['dependencies'][row['path']];need(row['sha256']==expected,'Every recorded production JAR hash')
+        if args.check_external_artifacts:need(sha(Path(row['path']).read_bytes())==expected,'Optional actual external JAR bytes')
+    need(set(cp['assetJar']['entries'])=={'web/kotlin/documents/documents.js','web/kotlin/spacegraph/spacegraph.js'},'Asset-only browser entry metadata, no class overlay')
+    for name,pin in [('documents',DOCS),('spacegraph',PANELS)]:
+        need(cp['assetJar']['entries']['web/kotlin/'+name+'/'+name+'.js']['sha256']==pin and manifest[name+'.js']==pin,'Exact frozen actual browser metadata')
+        if args.check_external_artifacts:need(sha(Path(go['snapshot'],name+'.js').read_bytes())==pin,'Optional actual browser bytes')
+    for role,entry in [('writer','FixtureKt'),('reader','ReopenKt')]:
+        command=load(attempt/(role+'-command.json'));index=command.index('-cp');need(command[index+1].split(':')==[cp['observerClasses']]+paths+[cp['assetJar']['path']] and command[index+2]=='proof.corpusquery.'+entry,'Actual final production '+role+' entrypoint/classpath')
+    return go,cp
+def origins(values,main):need(values and all(unquote(urlsplit(v).path)==main for v in values.values()),'Actual production class origins are pinned final main')
+def report(attempt,wire):
+    identity=wire['receiptCid'];raw=raw_block(attempt,identity);body=decode(raw);need(canonical(body)==raw and body=={k:v for k,v in wire.items() if k!='receiptCid'},'Actual canonical retained owner receipt equals response; no source-dictionary relabelling')
+    # Receipt ID is metadata about the exact raw CBOR, never inserted into its preimage.
+    return {**body,'receiptCid':identity}
+def source_mode(response,mode):
+    source=response['source'];need(source['selected']=='english-receipt-corpus' and source['mode']==mode and source['historical']==(mode=='snapshot') and source['currentness']==('not-checked' if mode=='snapshot' else 'checked-before-and-after-build'),'Explicit current vs immutable snapshot owner envelope, no implicit fallback')
+    need(source['reviewStatus']=='unreviewed' and source['parserExecution']=='not-reverified' and source['producerAuthority']=='not-established' and {s['receiptCid'] for s in source['sources']}==set(RANGES),'Old genuine parser observations stay unreviewed/unreexecuted, no authority upgrade')
+def admitted(document):
+    out={k:document.get(k,default) for k,default in [('wires',[]),('controls',{}),('kanban',None),('view',None),('seq',1)]}
+    out['nodes']=[{k:n.get(k,default) for k,default in [('id',None),('type',None),('params',{}),('x',0),('y',0),('width',None),('height',None),('collapsed',False),('subprogram',None),('children',[])]} for n in document['nodes']];return out
+def run_references(attempt,run):
+    http=run['http'];reply=http['response'];complete=run['complete'];need(http['status']==200 and reply['ok'] is True and reply['status']=='completed','Actual explicit completed LCNC run')
+    if reply.get('outputCid'):need(json.loads(raw_block(attempt,reply['outputCid']))==complete,'Actual retained full output reference, no fabricated hydration')
+    else:need(reply==complete and run['contentProbe'] is None,'Ordinary actual inline full result, no large-output claim')
+    command=json.loads(raw_block(attempt,reply['receiptCid']));program=json.loads(raw_block(attempt,reply['programCid']));invocations=json.loads(raw_block(attempt,reply['invocationsCid']))
+    need(program==admitted(http['request']['document']),'Actual admitted program/CID binds public POST including serializer defaults')
+    need(command['jobId']=='lcnc/run/'+reply['runId'] and command['owner']=='lcnc-runner' and command['lcncRun']['runId']==reply['runId'] and command['lcncRun']['programCid']==reply['programCid'] and command['lcncRun']['outputs']==complete['outputs'],'Actual saved full command/run/program outputs, not computed corpus CID used as run receipt')
+    need(all(e['documentCid']==reply['programCid'] for e in invocations['entries']) and len([e for e in invocations['entries'] if e['type']=='document.english.corpus'])==1,'Actual one corpus invocation on final admitted program')
+    node=complete['outputs']['corpus'];need(node==run['ownerReport'],'Actual owner envelope from existing corpus runner')
+    by_id={n['id']:n for n in program['nodes']};need(len(by_id)==len(program['nodes'])==14 and by_id['corpus']['type']=='document.english.corpus' and by_id['corpus']['params']['view']=='all-lexical' and by_id['corpus']['params']['topics']=='null','Actual offered14node explicit all-lexical/no-topics program')
+    types={'instructions':'note','receipts':'json.value','mode':'text.value','query':'json.value','corpus':'document.english.corpus','matches':'display','terms':'display','topics':'display','source':'display','search-out':'scope.out','receipt-out':'scope.out','terms-out':'scope.out','topics-out':'scope.out','source-out':'scope.out'}
+    need({k:n['type'] for k,n in by_id.items()}==types and all(n['children']==[] and n['subprogram'] is None for n in program['nodes']),'Exact offered pure/corpus/display vocabulary; no hidden parser/provider/Camel dispatch')
+    need(json.loads(by_id['receipts']['params']['value'])==sorted(RANGES) and json.loads(by_id['query']['params']['value'])=={'terms':['imply'],'limit':32} and by_id['mode']['params']['value']==run['mode'],'Actual receipt/mode/query controls bind admitted program')
+    need({'from':['query','value'],'to':['corpus','query?']} in program['wires'],'Actual structured JSON optional-query wire, not authored fallthrough')
+    need(json.loads(run['controls']['receipts'])==sorted(RANGES) and json.loads(run['controls']['query'])=={'terms':['imply'],'limit':32} and run['controls']['mode']==run['mode'],'Captured public controls stay copied per run/current versus snapshot')
+    return command
+def href_selection(url,sentence,bodies):
+    parsed=urlsplit(url);items=parse_qsl(parsed.query,keep_blank_values=True);fields=dict(items);need(parsed.path=='/panels' and len(items)==len(fields)==9 and set(fields)=={'load','englishReceipt','englishProject','englishDocument','englishCid','englishRev','englishSeq','englishBegin','englishEnd'},'Exact offered source-navigation grammar, no term/autofilter/program/credential fields')
+    need(fields['load']=='preset-english-copular-query' and fields['englishReceipt']==sentence['receiptCid'],'Original matching inspection selected, not corpus receipt')
+    body=bodies[sentence['receiptCid']];selection=body['selection'];begin,end=RANGES[sentence['receiptCid']]
+    need(fields['englishProject']==selection['project'] and fields['englishDocument']==selection['id'] and fields['englishCid']==selection['cid'] and fields['englishRev']==selection['rev'] and fields['englishSeq']==str(selection['seq']) and fields['englishBegin']==str(begin) and fields['englishEnd']==str(end),'Whole original inspection range/current physical source revision, not sentence range')
+    return {'receiptCid':sentence['receiptCid'],**selection,'begin':begin,'end':end}
+def stale(refusal):
+    need(refusal['http']['status']==refusal['ui']['status']==409 and set(refusal['http']['response'])==set(refusal['ui']['response'])=={'error'} and 'stale' in refusal['http']['response']['error'].lower() and refusal['wordcloudCount']==0,'Actual current-source refusal, no partial search/fallback and old wordcloud cleared')
+def audit(root,args):
+    attempt=root/'native-attempt1';go,cp=artifact(attempt,args);startup=load(attempt/'startup.json');browser=load(attempt/'browser-result.json');o=browser['observed'];cleanup=load(attempt/'cleanup.json');reopen=load(attempt/'reopened.json');config=load(root/'corpus-inputs.json')
+    need(browser['result']==reopen['result']=='PASS' and browser['errors']==browser['external']==[],'Actual closed successful browser/data/reader result')
+    origins(startup['origins'],go['snapshot']+'/main.jar');origins(reopen['origins'],go['snapshot']+'/main.jar');need({'EnglishCorpusWire','EnglishObservationGraph','EnglishCorpus','LcncRunService','CouchWire','CouchWireRouter'}<=set(startup['origins']),'Actual final corpus/search/owner/runtime origins')
+    for name in ['writer.exit','reader.exit','browser.exit','namespace.exit']:need((attempt/name).read_text().strip()=='0','Actual '+name+'=0')
+    source=raw_block(attempt,SOURCE).decode('utf8');need((root/'inputs/retained'/(SOURCE[7:]+'.bin')).read_bytes()==source.encode('utf8'),'Exact allowlisted original source bytes')
+    bodies={identity:receipt(raw_block(attempt,identity),identity,source) for identity in RANGES}
+    for identity in RANGES:need(raw_block(attempt,identity)==(root/'inputs/retained'/(identity[7:]+'.bin')).read_bytes(),'Genuine prior inspectionCBOR copied byte-for-byte, no fresh parser input')
+    need({m['cid'] for m in startup['retainedInspectionMaterializations']}==set(RANGES)|{SOURCE},'Actual retained-source/inspection materialization set')
+    legacy=report(attempt,o['legacyCorpus']['response']);need(o['legacyCorpus']['status']==200 and o['legacyCorpus']['request']=={'receiptCids':sorted(RANGES),'mode':'current','topics':None} and 'view' not in legacy and 'search' not in legacy and legacy['receiptCid']==LEGACY and legacy['corpusCid']==CORPUS and legacy['matrixCid']==MATRIX,'Exact omitted-query/view legacy request retains prior response identity/fields')
+    for identity in [LEGACY,CORPUS,MATRIX]:need(raw_block(attempt,identity)==(root/'inputs/legacy-corpus'/(identity[7:]+'.bin')).read_bytes(),'New owner ACTUALLY reproduces prior canonical bytes; old blocks are verification-only inputs')
+    sentences=core(legacy,bodies,source);source_mode(legacy,'current');reports={};maths={}
+    for name,wire,mode in [('current',o['primaryPresetRun']['ownerReport'],'current'),('topics',o['topicControls'][0]['response'],'current'),('noMatch',o['topicControls'][1]['response'],'current'),('snapshot',o['historicalPresetRun']['ownerReport'],'snapshot')]:
+        response=report(attempt,wire);core(response,bodies,source);source_mode(response,mode);maths[name]=search(response);reports[name]=response
+        need(response['view']=='all-lexical' and response['corpusCid']==CORPUS and response['matrixCid']==MATRIX,'Same immutable core/matrix despite explicit view/query envelope')
+        need(decode(raw_block(attempt,response['corpusCid']))=={k:response[k] for k in CORE_KEYS} and decode(raw_block(attempt,response['matrixCid']))==response['matrix'],'Actual retained core/matrix bytes, not computed-only IDs')
+    need(maths['current']['hits']==maths['topics']['hits']==maths['snapshot']['hits']==5 and maths['noMatch']['hits']==0 and reports['noMatch']['search']['query']['terms']==['NOT_REPORTED_V86'],'Actual five imply lexical hits versus explicit successful lexical-only no-match')
+    topic_summary=topics(reports['topics']);topics(reports['noMatch']);need(reports['topics']['topicCid']==reports['noMatch']['topicCid'] and reports['topics']['topics']==reports['noMatch']['topics'] and decode(raw_block(attempt,topic_summary['topicCid']))==reports['topics']['topics'] and reports['topics']['receiptCid']!=reports['noMatch']['receiptCid'],'Same seed/config/topic identity across query changes, distinct actual query-bound retained receipts')
+    need(reports['current']['topics'] is reports['current']['topicCid'] is reports['snapshot']['topics'] is reports['snapshot']['topicCid'] is None,'Explicit offered topics=null, no hidden LDA fit')
+    commands=[run_references(attempt,r) for r in browser['presetRuns']];need(browser['presetRuns']==[o['primaryPresetRun'],o['historicalPresetRun']] and [r['mode'] for r in browser['presetRuns']]==['current','snapshot'],'Only explicit current then explicit historical14node runs')
+    focus=o['sourceFocus'];need(len(focus['cards'])==5 and {c['id'] for c in focus['cards']}==set(sentences),'Actual five imply concordance source cards')
+    for card in focus['cards']:need(card['sentence']==sentences[card['id']] and card['quote']==card['sentence']['quote'],'Visible exact source sentence/concordance identity');href_selection(card['href'],card['sentence'],bodies)
+    chosen=next(card['sentence'] for card in focus['cards'] if card['sentence']['receiptCid']==focus['wholeInspectionRange']['receiptCid']);selection=href_selection(focus['url'],chosen,bodies)
+    need(focus['opened']['status']==200 and focus['opened']['request']==selection and focus['nodeCount']==10 and focus['wholeInspectionRange']=={'receiptCid':selection['receiptCid'],'begin':selection['begin'],'end':selection['end']} and selection['receiptCid'] in focus['contextText'],'Actual inert offered source popup opens matching whole inspection/current context, no word filter')
+    need(focus['opened']['response']['retrieval']=={'kind':'retained-current-inspection','parserExecuted':False,'modelCalled':False,'currentness':'checked-before-and-after-open'},'Actual source focus reuses retained annotations, no English parser/model')
+    invalid=o['nullQueryControl'];need(invalid['http']['status']==409 and invalid['http']['request']['query'] is None and set(invalid['http']['response'])=={'error'} and invalid['before']['pack']==invalid['after']['pack'],'Actual explicit query:null refusal with no derived CAS write/fallback')
+    amendment=o['sourceAmendment'];new_bytes=amendment['requestUtf8'].encode('utf8');need(new_bytes==(source+config['sourceAmendmentSuffix']).encode('utf8') and cid(new_bytes)==amendment['requestSha256'] and (attempt/'actual-source-amendment-request.txt').read_bytes()==new_bytes and amendment['http']['status']==200,'Exact actual source upload UTF8 preimage, no receipt/revision rewrite')
+    old_row=startup['baseline']['rows']['S12'];new_row=amendment['after']['rows']['S12'];need(new_row==reopen['currentAmendedRow'] and new_row['cid']==cid(new_bytes)!=old_row['cid'] and new_row['rev']!=old_row['rev'] and new_row['seq']!=old_row['seq'],'Actual physical source CID/revision/sequence changed independently of old immutable receipts')
+    need(raw_block(attempt,new_row['cid'])==new_bytes==(attempt/'after-close-readbacks/actual-amended-S12-source.txt').read_bytes(),'Actual amended current REF content was bounded-read/exported and mirror matches')
+    stale(o['currentRefusal']);need(o['currentRefusal']['http']['request']==o['topicControls'][0]['request'],'Same prior explicit current query refuses after actual amendment')
+    need(reports['snapshot']['search']['hits']==reports['current']['search']['hits'] and reports['snapshot']['source']['historical'] is True and reports['snapshot']['receiptCid']!=reports['current']['receiptCid'],'Explicit snapshot returns historical old-source hits, not a new current result')
+    for state in [startup['baseline']]+[r['state'] for r in browser['states']]:
+        need(state['guestInstalled']==state['guestMounted']==[] and state['configuredModelCount']==0 and state['modelEndpointsPresent'] is False and all(state[k] is False for k in ['beliefBagPresent','kifBankPresent','narsRetePresent']),'Actual configured no SDK/provider/bag/NARS planes')
+        need(all(f['partition']=='board' and f['fields']['kind'] in ['now','card'] for f in state['reteFacts']),'Actual operational board/clock facts, not blanket zero or observation admission')
+    posts=[r for r in browser['requests'] if r['method']=='POST'];need(sum(r['path']=='/api/lcnc/run' for r in posts)==2 and all(r['path'] not in ['/api/documents/english','/api/documents/english/query'] for r in posts),'Two actual explicit corpus runs; source popup inert, zero English inspect/copular queries')
+    for record in browser['records']:
+        need(urlsplit(record['url']).path not in ['/api/documents/english','/api/documents/english/query'],'No hidden direct-controller English parse/copular query')
+        need(load(attempt/(record['label']+'-response.json'))==record['response'],'Raw actual HTTP response JSON equals captured structured result')
+    index=load(attempt/'readback-index.json');need(index==browser['reads'] and len(index)==len(reopen['readbacks'])==28 and len({r['cid'] for r in index})==18,'Actual28bounded readbacks/18unique selected blocks')
+    for row,closed in zip(index,reopen['readbacks']):
+        raw=raw_block(attempt,row['cid']);need(row['bytes']==closed['bytes']==len(raw) and row['cid']==row['sha256']==closed['cid'] and closed['sha256']==sha(raw) and row['role']==closed['role'] and (attempt/closed['file']).read_bytes()==raw,'Each exact captured readback/role preserved after close')
+    need(reopen['writerPid']==cleanup['pid']==startup['baseline']['pid'] and reopen['readerPid']!=cleanup['pid'] and all(cleanup[k] is True for k in ['listenerJoined','moduleDrained','englishDrained','scopesDrained','ownerCompleted','casClosed','guestModulesClosed']) and cleanup['remainingChildren']==0,'Distinct actual writer/reader after real graceful owner close')
+    need(all(reopen[k] is True for k in ['boardOwnerCompleted','ownerCompleted','casClosed','guestModulesClosed']) and reopen['remainingChildren']==0 and reopen['beforeOpen']==reopen['afterClose'] and reopen['beforeOpen']['pack']==cleanup['closedPack'],'Actual closed reader leaves CAS/WAL unchanged')
+    wal=(attempt/'after-close-readbacks/board.wal').read_bytes();frames=wal_frames(wal);need(frames==[{'sequence':r['sequence'],'payloadUtf8':r['payloadUtf8'],'payloadSha256':r['sha256']} for r in reopen['frames']] and len(frames)==6 and stamp(wal)==reopen['beforeOpen']['wal'],'Independent6frame WAL1 CRC parse binds actual production replay')
+    latest={}
+    for frame in frames:job,identity=frame['payloadUtf8'].rsplit('\t',1);latest[job]=(frame['sequence'],identity)
+    need(len(reopen['cards'])==len(latest)==2,'Exactly two recovered actual workflow cards')
+    for card,run,command in zip(reopen['cards'],browser['presetRuns'],commands):
+        reply=run['http']['response'];need(card['jobId']==reply['jobId'] and card['commandCid']==reply['receiptCid'] and card['command']==command and latest[card['jobId']]==(card['sequence'],card['commandCid']) and card['column']=='DONE','Actual saved command/run outputs recover from final WAL pointer')
+    need(reopen['sourceFiles']['mirror']==stamp(new_bytes) and reopen['sourceFiles']['ledger']==cleanup['closedSourceFiles']['ledger'],'Reader current physical mirror/ledger hashes')
+    for row in reopen['oldRetainedSources']:need(row['inspectionCid'] in bodies and row['sourceCid']==SOURCE and row['sourceTextSha256']==SOURCE[7:] and row['range']==bodies[row['inspectionCid']]['range'],'Old immutable full source/inspection remains historical after physical amendment')
+    inventory=load(root/'closed-pack-inventory.json');current={};offset=0
+    for row in inventory['records']:
+        need(row['offset']==offset and row['kind'] in ['BLOB','REF'],'Recorded closed pack inventory complete header geometry');offset+=37+row['payloadBytes'];identity=row['cid']
+        if identity not in current or current[identity]['kind']!='BLOB' or row['kind']=='BLOB':current[identity]=row
+    need(offset==cleanup['closedPack']['bytes'] and len(inventory['records'])==inventory['recordCount']==112 and current==inventory['currentIndex'],'Recorded inventory/current-index selection consistent; omitted full pack not independently portable')
+    refs=[r for r in current.values() if r['kind']=='REF'];need(len(refs)==1 and refs[0]['cid']==new_row['cid'] and refs[0]['reference']['bytes']==len(new_bytes) and refs[0]['reference']['path'].endswith('/runtime/files/'+new_row['project']+'/'+new_row['id']),'Actual latest amended-source REF remains external; no promotion or zeroREF claim')
+    need(collections.Counter(r['kind'] for r in inventory['records'])=={'BLOB':94,'REF':18} and collections.Counter(r['kind'] for r in current.values())=={'BLOB':94,'REF':1},'18historical REF records/one current source dependency disclosed')
+    if args.check_external_artifacts:need(stamp((attempt/'runtime/cas/pack').read_bytes())==cleanup['closedPack'],'Optional actual local closed pack bytes')
+    network=load(attempt/'network.json');outside=load(attempt/'controller-before-netns.json');need(network['networkNamespace']!=outside['networkNamespace'] and {r['ifname'] for r in json.loads(network['interfaces'])}=={'lo'} and json.loads(network['routes'])==[] and network['externalTcp']['errno']==101,'Actual loopback-only namespace, not full R4/filesystem seal')
+    controls=[]
+    def rejects(label,fn):
+        try:fn()
+        except (AuditError,ValueError,KeyError,TypeError,StopIteration):controls.append({'mutation':label,'result':'REJECTED'})
+        else:raise AuditError('Mutated copy accepted: '+label)
+    bad=copy.deepcopy(reports['current']);bad['search']['hits'][0]['matches'][0]['begin']+=1;rejects('substituted-original-token-span',lambda:search(bad))
+    bad=copy.deepcopy(reports['current']);bad['search']['matrixCid']='sha256:'+'0'*64;rejects('wrong-selected-query-dataset',lambda:search(bad))
+    bad=copy.deepcopy(reports['current']);bad['search']['hits'][0]['score']+=.1;rejects('BM25-score-as-arbitrary-confidence',lambda:search(bad))
+    bad=copy.deepcopy(reports['snapshot']);bad['source']['mode']='current';rejects('snapshot-relabelled-current',lambda:source_mode(bad,'snapshot'))
+    bad=copy.deepcopy(reports['topics']);bad['topics']['config']['seed']=8;rejects('different-seed-with-same-topic-ID',lambda:topics(bad))
+    bad=copy.deepcopy(o['currentRefusal']);bad['wordcloudCount']=1;bad['http']['response']['search']=reports['current']['search'];rejects('stale-source-reuses-old-hits',lambda:stale(bad))
+    names=['GO.json','startup.json','browser-result.json','cleanup.json','reopened.json','readback-index.json','classpath.json','network.json','writer-command.json','reader-command.json']
+    return {'result':'PASS_RECORDED_CORPUS_LEXICAL_QUERY_CONSISTENCY','sourceHead':SOURCE_HEAD,'mainSha256':MAIN,'documentsSha256':DOCS,'panelsSha256':PANELS,'writerPid':cleanup['pid'],'readerPid':reopen['readerPid'],'genuineInspectionCids':sorted(RANGES),'legacyReceiptCid':LEGACY,'corpusCid':CORPUS,'matrixCid':MATRIX,'queryReceiptCids':{k:r['receiptCid'] for k,r in reports.items()},'searchChecks':maths,'topicChecks':topic_summary,'readbacks':len(index),'uniqueReadbacks':18,'boardFrames':len(frames),'currentSourceCid':new_row['cid'],'currentPackREF':refs[0],'packHistoryKinds':{'BLOB':94,'REF':18},'mutatedCopyControls':controls,'recordSha256':{n:sha((attempt/n).read_bytes()) for n in names}|{'native-summary.json':sha((root/'native-summary.json').read_bytes()),'closed-pack-inventory.json':sha((root/'closed-pack-inventory.json').read_bytes())},'observerSourceSha256':{p.name:sha(p.read_bytes()) for p in sorted((attempt/'observer-inputs').iterdir()) if p.is_file()},'imageSha256':{p.name:sha(p.read_bytes()) for p in sorted(attempt.glob('*.png'))},'externalArtifactVerification':'actual external JAR/browser/local closed pack bytes additionally rehashed' if args.check_external_artifacts else 'recorded artifact/inventory metadata only; external JAR/full-pack/REFpath availability not checked','scope':'Supplied genuine retained CoreNLP4.6 annotations and actual selected corpus lexical retrieval/statistical topic record consistency. BM25 arithmetic checked on five sentence postings, not one corpus source-document frequency; no LDA sampler replay. Old parser provenance is not re-executed/authenticated. Explicit snapshot after actual current-source refusal is historical, not current fallback. Operational workflow writes are expected; no English/NLP/model/provider/Camel/NARS admission or legal/semantic authority upgrade. Full pack omitted and actual amended-source current REF remains external; no portable-pack/fullrootfs claim. Root accepted actual presentation roughness: overview clips right scope-outs and static annotation shows unavailable badge despite completed runs; no cosmetic rerun.'}
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('proof',type=Path);parser.add_argument('--out',type=Path,required=True);parser.add_argument('--check-external-artifacts',action='store_true')
+    for flag in ['source-head','main-sha','documents-sha','panels-sha']:parser.add_argument('--'+flag,required=True)
+    args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    try:result=audit(args.proof,args)
+    except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:result={'result':'FAIL','error':str(error)}
+    result['auditScriptSha256']=sha(Path(__file__).read_bytes());result['supportSha256']={n:sha(Path(__file__).with_name(n).read_bytes()) for n in ['checks.py','receipt-core.py.txt']}
+    (args.out/'result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
+    lines=[result['result'],result.get('scope',result.get('error',''))]
+    if result['result'].startswith('PASS'):
+        lines+=['Source '+SOURCE_HEAD+'; main '+MAIN+'; actual closed writer '+str(result['writerPid'])+' / reader '+str(result['readerPid'])+'. No JVM/NLP/browser/model/search engine run by this Python audit.',
+          'Two genuine retained CoreNLP4.6 inspectionCBORs keep exact original105Bsource, parser-input substring hashes, receipt-local sentence indexes, UTF16sentence/token quotations. No fresh English parser execution or receipt relabelling.',
+          'New omitted-query/view owner response reproduces exact legacy0e468 bytes; coreb83b/matrix20b retain one source document. Explicit14node all-lexical query adds outer receipt fields legitimately; actual program/run/invocation/command references verified.',
+          'Five imply sentence hits conserve every original matching token; BM25 derives N=5/df=5 sentence postings, not corpus documentFrequency1. Existing LUCENE IDF/TFC math omits conventional(k1+1), scores are lexical relevance only.',
+          'Seed7/2topic/8iteration model shares same core/matrix and topicCID across imply and NOT_REPORTED_V86 queries; query-bound receipts differ. Captured count conservation/posterior normalization/CID checks only, no Gibbs sampler replay. Successful empty hits are lexical no-match, not absence/legal truth.',
+          'Five actual wordcloud concordance cards and one inert matching whole-inspection popup retain originalI/source/revision/range; no query term/autofilter/credentials in URL and no automatic Run/parser/copular query.',
+          'Explicit query:null409 leaves CAS hash unchanged. Actual source upload creates134Bcurrent CID/revision/sequence; subsequent current API/Docs409 clear wordcloud0. Explicit snapshot14nodeRun returns old-source5hits with historical/not-checked envelope; no current fallback.',
+          'Actual28bounded readbacks/18unique blocks,6CRC32Cboardframes/two recovered DONE cards and current amended mirror agree after close. Operational workflow facts/writes are expected, no bag/NARS/model/Camel planes. TermPostings directCodeSource is not separately recorded; EnglishCorpus/owner finalmain origins and score arithmetic are checked.',
+          'Recorded closed inventory94BLOB+18historicalREF/current94BLOB+1REF. The current REF names actual134Bamended S12file; its bytes were exported/verified, not promoted. Fullpack/prefix/REFpaths are not a self-contained public data capsule.',
+          'Root accepted supplied UI roughness unchanged: right scope outputs clipped in overview; static note shows unavailable/no-owner badge despite actual completed runs. No fullFit/polish claim or cosmetic rerun.',
+          'Six proportional mutations rejected; '+result['externalArtifactVerification']+'.']
+    (args.out/'report.txt').write_text('\n'.join(lines)+'\n');print(json.dumps({'result':result['result'],'error':result.get('error'),'out':str(args.out)}));raise SystemExit(0 if result['result'].startswith('PASS') else 1)
