@@ -1,0 +1,348 @@
+7a000000-7a001000 ---p 00000000 00:00 0 
+7a001000-7a4af000 rw-p 00001000 00:1b 279206                             /opt/trikeshed/jdk/lib/server/classes.jsa
+7a4af000-7adaa000 rw-p 004af000 00:1b 279206                             /opt/trikeshed/jdk/lib/server/classes.jsa
+7adaa000-7b000000 ---p 00000000 00:00 0 
+7b000000-7b040000 rw-p 00000000 00:00 0 
+7b040000-7b140000 rw-p 00000000 00:00 0 
+7b140000-7b400000 rw-p 00000000 00:00 0 
+7b400000-7b540000 rw-p 00000000 00:00 0 
+7b540000-7b550000 rw-p 00000000 00:00 0 
+7b550000-bb000000 ---p 00000000 00:00 0 
+d0000000-de600000 rw-p 00000000 00:00 0 
+de600000-e1900000 ---p 00000000 00:00 0 
+e1900000-e1a00000 rw-p 00000000 00:00 0 
+e1a00000-ffe00000 ---p 00000000 00:00 0 
+ffe00000-fff44000 rw-p 00dde000 00:1b 279206                             /opt/trikeshed/jdk/lib/server/classes.jsa
+fff44000-100000000 rw-p 00000000 00:00 0 
+56271d1e7000-56271d1e8000 r-xp 00000000 00:1b 278668                     /opt/trikeshed/jdk/bin/java
+56271d1e9000-56271d1ea000 r--p 00001000 00:1b 278668                     /opt/trikeshed/jdk/bin/java
+56271d1ea000-56271d1eb000 rw-p 00002000 00:1b 278668                     /opt/trikeshed/jdk/bin/java
+562733b8f000-562733bd8000 rw-p 00000000 00:00 0                          [heap]
+7f239efff000-7f23a404c000 rw-p 00000000 00:00 0 
+7f23a404c000-7f23a8000000 ---p 00000000 00:00 0 
+7f23a8000000-7f23a8021000 rw-p 00000000 00:00 0 
+7f23a8021000-7f23ac000000 ---p 00000000 00:00 0 
+7f23ac000000-7f23ac021000 rw-p 00000000 00:00 0 
+7f23ac021000-7f23b0000000 ---p 00000000 00:00 0 
+7f23b1f7e000-7f23bbf80000 rw-p 00000000 00:00 0 
+7f23bbf80000-7f23bc000000 ---p 00000000 00:00 0 
+7f23bc000000-7f23bc780000 r--p 012a8000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f23bc780000-7f23bc7de000 rw-p 01a28000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f23bc7de000-7f23bc7e5000 rw-p 00000000 00:00 0 
+7f23bc7e5000-7f23bcc86000 rw-p 01a8d000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f23bcc86000-7f23bd1f0000 r--p 01f2e000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f23bd1f0000-7f23bd200000 ---p 00000000 00:00 0 
+7f23bd200000-7f23be480000 rw-p 00000000 00:00 0 
+7f23be480000-7f2bbbf80000 ---p 00000000 00:00 0 
+7f2bbc000000-7f2bbc05f000 rw-p 00000000 00:00 0 
+7f2bbc05f000-7f2bc0000000 ---p 00000000 00:00 0 
+7f2bc0000000-7f2bc0021000 rw-p 00000000 00:00 0 
+7f2bc0021000-7f2bc4000000 ---p 00000000 00:00 0 
+7f2bc4000000-7f2bc4021000 rw-p 00000000 00:00 0 
+7f2bc4021000-7f2bc8000000 ---p 00000000 00:00 0 
+7f2bc8000000-7f2bc8021000 rw-p 00000000 00:00 0 
+7f2bc8021000-7f2bcc000000 ---p 00000000 00:00 0 
+7f2bcc000000-7f2bcc06a000 rw-p 00000000 00:00 0 
+7f2bcc06a000-7f2bd0000000 ---p 00000000 00:00 0 
+7f2bd0000000-7f2bd0080000 rw-p 00000000 00:00 0 
+7f2bd0080000-7f2bd4000000 ---p 00000000 00:00 0 
+7f2bd4000000-7f2bd4021000 rw-p 00000000 00:00 0 
+7f2bd4021000-7f2bd8000000 ---p 00000000 00:00 0 
+7f2bd8000000-7f2bd8021000 rw-p 00000000 00:00 0 
+7f2bd8021000-7f2bdc000000 ---p 00000000 00:00 0 
+7f2bdc000000-7f2bdc560000 rw-p 00000000 00:00 0 
+7f2bdc560000-7f2be0000000 ---p 00000000 00:00 0 
+7f2be0000000-7f2be0100000 rw-p 00000000 00:00 0 
+7f2be0100000-7f2be4000000 ---p 00000000 00:00 0 
+7f2be4000000-7f2be4021000 rw-p 00000000 00:00 0 
+7f2be4021000-7f2be8000000 ---p 00000000 00:00 0 
+7f2be8000000-7f2be8021000 rw-p 00000000 00:00 0 
+7f2be8021000-7f2bec000000 ---p 00000000 00:00 0 
+7f2bec000000-7f2bec021000 rw-p 00000000 00:00 0 
+7f2bec021000-7f2bf0000000 ---p 00000000 00:00 0 
+7f2bf1a80000-7f2bf1b00000 ---p 00000000 00:00 0 
+7f2bf1b00000-7f2bf2280000 r--p 012a8000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f2bf2280000-7f2bf22de000 rw-p 01a28000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f2bf22de000-7f2bf22e5000 rw-p 00000000 00:00 0 
+7f2bf22e5000-7f2bf2786000 rw-p 01a8d000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f2bf2786000-7f2bf2cf0000 r--p 01f2e000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f2bf2cf0000-7f2bf2d00000 ---p 00000000 00:00 0 
+7f2bf2d00000-7f2bf2f00000 rw-p 00000000 00:00 0 
+7f2bf2f00000-7f33f1a80000 ---p 00000000 00:00 0 
+7f33f1b00000-7f33f1b80000 ---p 00000000 00:00 0 
+7f33f1b80000-7f33f2300000 r--p 012a8000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f33f2300000-7f33f235e000 rw-p 01a28000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f33f235e000-7f33f2365000 rw-p 00000000 00:00 0 
+7f33f2365000-7f33f2806000 rw-p 01a8d000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f33f2806000-7f33f2d70000 r--p 01f2e000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f33f2d70000-7f33f2d80000 ---p 00000000 00:00 0 
+7f33f2d80000-7f33f3100000 rw-p 00000000 00:00 0 
+7f33f3100000-7f33f3500000 rw-p 00000000 00:00 0 
+7f33f3500000-7f33f3580000 ---p 00000000 00:00 0 
+7f33f3580000-7f33f3680000 rw-p 00000000 00:00 0 
+7f33f3680000-7f33f3780000 rw-p 00000000 00:00 0 
+7f33f3780000-7f33f3c80000 ---p 00000000 00:00 0 
+7f33f3c80000-7f33f4700000 rw-p 00000000 00:00 0 
+7f33f4700000-7f33f4800000 ---p 00000000 00:00 0 
+7f33f4800000-7f33f4a22000 rw-p 00000000 00:00 0 
+7f33f4a22000-7f33f4a80000 ---p 00000000 00:00 0 
+7f33f4a80000-7f33f4c00000 rw-p 00000000 00:00 0 
+7f33f4c00000-7f33f4d80000 ---p 00000000 00:00 0 
+7f33f4d80000-7f33f5180000 rw-p 00000000 00:00 0 
+7f33f5180000-7f3bf1b00000 ---p 00000000 00:00 0 
+7f3bf1b3f000-7f3bf1b55000 r--p 00000000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf1b55000-7f3bf1b56000 r-xp 00016000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf1b56000-7f3bf1b5f000 ---p 00017000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf1b5f000-7f3bf2ddb000 r-xp 00017000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf2ddb000-7f3bf2ddf000 ---p 0129c000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf2ddf000-7f3bf2df1000 r--p 01293000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf2df1000-7f3bf2dfe000 ---p 012b2000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf2dfe000-7f3bf2dff000 r--p 012a4000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf2dff000-7f3bf2e02000 rw-p 012a5000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf2e02000-7f3bf2e0f000 ---p 012c3000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf2e0f000-7f3bf3fff000 rw-p 012a8000 00:1b 279179                     /opt/trikeshed/jdk/lib/libjvmcicompiler.so
+7f3bf3fff000-7f3bf428f000 rw-p 00000000 00:00 0 
+7f3bf428f000-7f3bf8000000 ---p 00000000 00:00 0 
+7f3bf8000000-7f3bf9d1a000 rw-p 00000000 00:00 0 
+7f3bf9d1a000-7f3bfc000000 ---p 00000000 00:00 0 
+7f3bfc000000-7f3bfc021000 rw-p 00000000 00:00 0 
+7f3bfc021000-7f3c00000000 ---p 00000000 00:00 0 
+7f3c00000000-7f3c00021000 rw-p 00000000 00:00 0 
+7f3c00021000-7f3c04000000 ---p 00000000 00:00 0 
+7f3c04000000-7f3c04021000 rw-p 00000000 00:00 0 
+7f3c04021000-7f3c08000000 ---p 00000000 00:00 0 
+7f3c08000000-7f3c08021000 rw-p 00000000 00:00 0 
+7f3c08021000-7f3c0c000000 ---p 00000000 00:00 0 
+7f3c0c000000-7f3c0c021000 rw-p 00000000 00:00 0 
+7f3c0c021000-7f3c10000000 ---p 00000000 00:00 0 
+7f3c10000000-7f3c10021000 rw-p 00000000 00:00 0 
+7f3c10021000-7f3c14000000 ---p 00000000 00:00 0 
+7f3c14000000-7f3c14400000 rw-p 00000000 00:00 0 
+7f3c14400000-7f3c14d00000 rw-p 00000000 00:00 0 
+7f3c14d00000-7f3c14e00000 rw-p 00000000 00:00 0 
+7f3c14e00000-7f3c155e0000 rw-p 00000000 00:00 0 
+7f3c155e0000-7f3c15600000 rw-p 00000000 00:00 0 
+7f3c15600000-7f3c157c0000 rw-p 00000000 00:00 0 
+7f3c157c0000-7f3c15800000 rw-p 00000000 00:00 0 
+7f3c15800000-7f3c15b00000 rw-p 00000000 00:00 0 
+7f3c15b00000-7f3c15c00000 rw-p 00000000 00:00 0 
+7f3c15c00000-7f3c15d00000 rw-p 00000000 00:00 0 
+7f3c15d00000-7f3c15e00000 rw-p 00000000 00:00 0 
+7f3c15e00000-7f3c16700000 rw-p 00000000 00:00 0 
+7f3c16700000-7f3c167a0000 rw-p 00000000 00:00 0 
+7f3c167a0000-7f3c16800000 ---p 00000000 00:00 0 
+7f3c16800000-7f3c168e0000 rw-p 00000000 00:00 0 
+7f3c168e0000-7f3c18000000 ---p 00000000 00:00 0 
+7f3c18000000-7f3c18021000 rw-p 00000000 00:00 0 
+7f3c18021000-7f3c1c000000 ---p 00000000 00:00 0 
+7f3c1c000000-7f3c1c021000 rw-p 00000000 00:00 0 
+7f3c1c021000-7f3c20000000 ---p 00000000 00:00 0 
+7f3c20000000-7f3c20021000 rw-p 00000000 00:00 0 
+7f3c20021000-7f3c24000000 ---p 00000000 00:00 0 
+7f3c25e47000-7f3c28021000 rw-p 00000000 00:00 0 
+7f3c28021000-7f3c2c000000 ---p 00000000 00:00 0 
+7f3c2c000000-7f3c2c021000 rw-p 00000000 00:00 0 
+7f3c2c021000-7f3c30000000 ---p 00000000 00:00 0 
+7f3c30000000-7f3c3002c000 rw-p 00000000 00:00 0 
+7f3c3002c000-7f3c34000000 ---p 00000000 00:00 0 
+7f3c34016000-7f3c3401c000 r-xp 00000000 00:1b 279183                     /opt/trikeshed/jdk/lib/libmanagement_ext.so
+7f3c3401c000-7f3c3401d000 r--p 00005000 00:1b 279183                     /opt/trikeshed/jdk/lib/libmanagement_ext.so
+7f3c3401d000-7f3c3401e000 rw-p 00006000 00:1b 279183                     /opt/trikeshed/jdk/lib/libmanagement_ext.so
+7f3c3401e000-7f3c34022000 r-xp 00000000 00:1b 279181                     /opt/trikeshed/jdk/lib/libmanagement.so
+7f3c34022000-7f3c34023000 r--p 00003000 00:1b 279181                     /opt/trikeshed/jdk/lib/libmanagement.so
+7f3c34023000-7f3c34024000 rw-p 00004000 00:1b 279181                     /opt/trikeshed/jdk/lib/libmanagement.so
+7f3c34024000-7f3c34028000 ---p 00000000 00:00 0 
+7f3c34028000-7f3c34124000 rw-p 00000000 00:00 0 
+7f3c34124000-7f3c34128000 ---p 00000000 00:00 0 
+7f3c34128000-7f3c34224000 rw-p 00000000 00:00 0 
+7f3c34224000-7f3c34226000 r-xp 00000000 00:1b 279163                     /opt/trikeshed/jdk/lib/libextnet.so
+7f3c34226000-7f3c34227000 r--p 00001000 00:1b 279163                     /opt/trikeshed/jdk/lib/libextnet.so
+7f3c34227000-7f3c34228000 rw-p 00002000 00:1b 279163                     /opt/trikeshed/jdk/lib/libextnet.so
+7f3c34228000-7f3c3422c000 ---p 00000000 00:00 0 
+7f3c3422c000-7f3c34328000 rw-p 00000000 00:00 0 
+7f3c34328000-7f3c3432c000 rw-s 10000000 00:0d 455337                     anon_inode:[io_uring]
+7f3c3432c000-7f3c3433d000 rw-s 00000000 00:0d 455337                     anon_inode:[io_uring]
+7f3c3433d000-7f3c34341000 ---p 00000000 00:00 0 
+7f3c34341000-7f3c3443d000 rw-p 00000000 00:00 0 
+7f3c3443d000-7f3c34441000 ---p 00000000 00:00 0 
+7f3c34441000-7f3c344dd000 rw-p 00000000 00:00 0 
+7f3c344dd000-7f3c344e1000 ---p 00000000 00:00 0 
+7f3c344e1000-7f3c345dd000 rw-p 00000000 00:00 0 
+7f3c345dd000-7f3c345e1000 ---p 00000000 00:00 0 
+7f3c345e1000-7f3c345ff000 rw-p 00000000 00:00 0 
+7f3c345ff000-7f3c34603000 ---p 00000000 00:00 0 
+7f3c34603000-7f3c346ff000 rw-p 00000000 00:00 0 
+7f3c346ff000-7f3c34703000 ---p 00000000 00:00 0 
+7f3c34703000-7f3c347ff000 rw-p 00000000 00:00 0 
+7f3c347ff000-7f3c34803000 ---p 00000000 00:00 0 
+7f3c34803000-7f3c348ff000 rw-p 00000000 00:00 0 
+7f3c348ff000-7f3c34903000 ---p 00000000 00:00 0 
+7f3c34903000-7f3c349ff000 rw-p 00000000 00:00 0 
+7f3c349ff000-7f3c34a03000 ---p 00000000 00:00 0 
+7f3c34a03000-7f3c34aff000 rw-p 00000000 00:00 0 
+7f3c34aff000-7f3c34b00000 ---p 00000000 00:00 0 
+7f3c34b00000-7f3c34c00000 rw-p 00000000 00:00 0 
+7f3c34c00000-7f3c34c04000 ---p 00000000 00:00 0 
+7f3c34c04000-7f3c34d00000 rw-p 00000000 00:00 0 
+7f3c34d00000-7f3c34d04000 ---p 00000000 00:00 0 
+7f3c34d04000-7f3c34e00000 rw-p 00000000 00:00 0 
+7f3c34e00000-7f3c34e04000 ---p 00000000 00:00 0 
+7f3c34e04000-7f3c35000000 rw-p 00000000 00:00 0 
+7f3c35000000-7f3c35004000 ---p 00000000 00:00 0 
+7f3c35004000-7f3c35200000 rw-p 00000000 00:00 0 
+7f3c35202000-7f3c35204000 r--p 00000000 00:1b 287835                     /state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/5dc05a25edb6ca1cd6e9c82b8311373566bb05a1b676c06ea09ab2295d126c6d/bin/libtrufflenfi.so
+7f3c35204000-7f3c35211000 r-xp 00002000 00:1b 287835                     /state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/5dc05a25edb6ca1cd6e9c82b8311373566bb05a1b676c06ea09ab2295d126c6d/bin/libtrufflenfi.so
+7f3c35211000-7f3c35214000 r--p 0000f000 00:1b 287835                     /state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/5dc05a25edb6ca1cd6e9c82b8311373566bb05a1b676c06ea09ab2295d126c6d/bin/libtrufflenfi.so
+7f3c35214000-7f3c35215000 r--p 00011000 00:1b 287835                     /state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/5dc05a25edb6ca1cd6e9c82b8311373566bb05a1b676c06ea09ab2295d126c6d/bin/libtrufflenfi.so
+7f3c35215000-7f3c35216000 rw-p 00012000 00:1b 287835                     /state/home/.cache/org.graalvm.polyglot/internal_nfi-native/libnfi/5dc05a25edb6ca1cd6e9c82b8311373566bb05a1b676c06ea09ab2295d126c6d/bin/libtrufflenfi.so
+7f3c35216000-7f3c3521a000 ---p 00000000 00:00 0 
+7f3c3521a000-7f3c35238000 rw-p 00000000 00:00 0 
+7f3c35238000-7f3c35276000 r-xp 00000000 00:1b 279193                     /opt/trikeshed/jdk/lib/libsimdsort.so
+7f3c35276000-7f3c35277000 ---p 0003e000 00:1b 279193                     /opt/trikeshed/jdk/lib/libsimdsort.so
+7f3c35277000-7f3c35278000 r--p 0003e000 00:1b 279193                     /opt/trikeshed/jdk/lib/libsimdsort.so
+7f3c35278000-7f3c35279000 rw-p 0003f000 00:1b 279193                     /opt/trikeshed/jdk/lib/libsimdsort.so
+7f3c35279000-7f3c3527d000 ---p 00000000 00:00 0 
+7f3c3527d000-7f3c35379000 rw-p 00000000 00:00 0 
+7f3c35379000-7f3c3537d000 ---p 00000000 00:00 0 
+7f3c3537d000-7f3c35479000 rw-p 00000000 00:00 0 
+7f3c35479000-7f3c3547d000 ---p 00000000 00:00 0 
+7f3c3547d000-7f3c35579000 rw-p 00000000 00:00 0 
+7f3c35579000-7f3c3557d000 ---p 00000000 00:00 0 
+7f3c3557d000-7f3c35679000 rw-p 00000000 00:00 0 
+7f3c35679000-7f3c3567d000 ---p 00000000 00:00 0 
+7f3c3567d000-7f3c35779000 rw-p 00000000 00:00 0 
+7f3c35779000-7f3c3577a000 ---p 00000000 00:00 0 
+7f3c3577a000-7f3c3587a000 rw-p 00000000 00:00 0 
+7f3c3587a000-7f3c358fb000 rw-p 00000000 00:00 0 
+7f3c358fb000-7f3c358fc000 ---p 00000000 00:00 0 
+7f3c358fc000-7f3c359fc000 rw-p 00000000 00:00 0 
+7f3c359fc000-7f3c359fd000 ---p 00000000 00:00 0 
+7f3c359fd000-7f3c35afd000 rw-p 00000000 00:00 0 
+7f3c35afd000-7f3c35afe000 ---p 00000000 00:00 0 
+7f3c35afe000-7f3c35bfe000 rw-p 00000000 00:00 0 
+7f3c35bfe000-7f3c36198000 rw-p 00000000 00:00 0 
+7f3c36198000-7f3c36264000 ---p 00000000 00:00 0 
+7f3c36264000-7f3c36268000 rw-p 00000000 00:00 0 
+7f3c36268000-7f3c369f8000 ---p 00000000 00:00 0 
+7f3c369f8000-7f3c36a00000 rw-p 00000000 00:00 0 
+7f3c36a00000-7f3c36a01000 r-xp 00000000 00:1b 279195                     /opt/trikeshed/jdk/lib/libsyslookup.so
+7f3c36a01000-7f3c36a02000 r--p 00000000 00:1b 279195                     /opt/trikeshed/jdk/lib/libsyslookup.so
+7f3c36a02000-7f3c36a03000 rw-p 00001000 00:1b 279195                     /opt/trikeshed/jdk/lib/libsyslookup.so
+7f3c36a03000-7f3c36a04000 rw-p 00000000 00:00 0 
+7f3c36a04000-7f3c36a05000 r--p 00000000 00:00 0 
+7f3c36a05000-7f3c378a5000 rwxp 00000000 00:00 0 
+7f3c378a5000-7f3c3df3e000 ---p 00000000 00:00 0 
+7f3c3df3e000-7f3c3e1ce000 rwxp 00000000 00:00 0 
+7f3c3e1ce000-7f3c3e4cd000 ---p 00000000 00:00 0 
+7f3c3e4cd000-7f3c3e75d000 rwxp 00000000 00:00 0 
+7f3c3e75d000-7f3c45a06000 ---p 00000000 00:00 0 
+7f3c45a06000-7f3c50000000 r--s 00000000 00:1b 279198                     /opt/trikeshed/jdk/lib/modules
+7f3c50000000-7f3c508d0000 rw-p 00000000 00:00 0 
+7f3c508d0000-7f3c54000000 ---p 00000000 00:00 0 
+7f3c54000000-7f3c54002000 r--p 00000000 00:00 0 
+7f3c54002000-7f3c54003000 rw-p 00000000 00:00 0 
+7f3c54003000-7f3c54004000 r--p 00000000 00:00 0 
+7f3c54004000-7f3c54008000 r--p 00000000 00:1b 287830                     /state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/73eca9f2f6321f37ef6ce019ea92e3723e18ca1de9d44d707476a10dfdbee93b/libsulong-native.so
+7f3c54008000-7f3c5400b000 r-xp 00003000 00:1b 287830                     /state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/73eca9f2f6321f37ef6ce019ea92e3723e18ca1de9d44d707476a10dfdbee93b/libsulong-native.so
+7f3c5400b000-7f3c5400c000 r--p 00005000 00:1b 287830                     /state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/73eca9f2f6321f37ef6ce019ea92e3723e18ca1de9d44d707476a10dfdbee93b/libsulong-native.so
+7f3c5400c000-7f3c5400d000 rw-p 00005000 00:1b 287830                     /state/home/.cache/org.graalvm.polyglot/llvm/libsulong-native/73eca9f2f6321f37ef6ce019ea92e3723e18ca1de9d44d707476a10dfdbee93b/libsulong-native.so
+7f3c5400d000-7f3c5400e000 r--p 00000000 00:1b 287826                     /state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811/bin/libtruffleattach.so
+7f3c5400e000-7f3c5400f000 r-xp 00001000 00:1b 287826                     /state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811/bin/libtruffleattach.so
+7f3c5400f000-7f3c54010000 r--p 00002000 00:1b 287826                     /state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811/bin/libtruffleattach.so
+7f3c54010000-7f3c54011000 r--p 00002000 00:1b 287826                     /state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811/bin/libtruffleattach.so
+7f3c54011000-7f3c54012000 rw-p 00003000 00:1b 287826                     /state/home/.cache/org.graalvm.polyglot/engine/libtruffleattach/07043c29f75f0a29d9fd2aa97ff5592047cae08a67108bdc43e978b30e747811/bin/libtruffleattach.so
+7f3c54012000-7f3c54019000 r-xp 00000000 00:1b 279197                     /opt/trikeshed/jdk/lib/libzip.so
+7f3c54019000-7f3c5401a000 ---p 00007000 00:1b 279197                     /opt/trikeshed/jdk/lib/libzip.so
+7f3c5401a000-7f3c5401b000 r--p 00007000 00:1b 279197                     /opt/trikeshed/jdk/lib/libzip.so
+7f3c5401b000-7f3c5401c000 rw-p 00008000 00:1b 279197                     /opt/trikeshed/jdk/lib/libzip.so
+7f3c5401c000-7f3c54028000 r-xp 00000000 00:1b 279187                     /opt/trikeshed/jdk/lib/libnet.so
+7f3c54028000-7f3c54029000 r--p 0000b000 00:1b 279187                     /opt/trikeshed/jdk/lib/libnet.so
+7f3c54029000-7f3c5402a000 rw-p 0000c000 00:1b 279187                     /opt/trikeshed/jdk/lib/libnet.so
+7f3c5402a000-7f3c5403e000 r-xp 00000000 00:1b 279188                     /opt/trikeshed/jdk/lib/libnio.so
+7f3c5403e000-7f3c5403f000 r--p 00013000 00:1b 279188                     /opt/trikeshed/jdk/lib/libnio.so
+7f3c5403f000-7f3c54040000 rw-p 00014000 00:1b 279188                     /opt/trikeshed/jdk/lib/libnio.so
+7f3c54040000-7f3c540dc000 rw-p 00000000 00:00 0 
+7f3c540dc000-7f3c540dd000 ---p 00000000 00:00 0 
+7f3c540dd000-7f3c541dd000 rw-p 00000000 00:00 0 
+7f3c541dd000-7f3c541de000 ---p 00000000 00:00 0 
+7f3c541de000-7f3c542de000 rw-p 00000000 00:00 0 
+7f3c542de000-7f3c542df000 ---p 00000000 00:00 0 
+7f3c542df000-7f3c543df000 rw-p 00000000 00:00 0 
+7f3c543df000-7f3c5446c000 rw-p 00000000 00:00 0 
+7f3c5446c000-7f3c54485000 ---p 00000000 00:00 0 
+7f3c54485000-7f3c54486000 rw-p 00000000 00:00 0 
+7f3c54486000-7f3c54578000 ---p 00000000 00:00 0 
+7f3c54578000-7f3c545ec000 rw-p 00000000 00:00 0 
+7f3c545ec000-7f3c54605000 ---p 00000000 00:00 0 
+7f3c54605000-7f3c54606000 rw-p 00000000 00:00 0 
+7f3c54606000-7f3c546f8000 ---p 00000000 00:00 0 
+7f3c546f8000-7f3c54901000 rw-p 00000000 00:00 0 
+7f3c54901000-7f3c549e6000 ---p 00000000 00:00 0 
+7f3c549e6000-7f3c549ec000 rw-p 00000000 00:00 0 
+7f3c549ec000-7f3c549f2000 ---p 00000000 00:00 0 
+7f3c549f2000-7f3c54a10000 rw-p 00000000 00:00 0 
+7f3c54a10000-7f3c54add000 ---p 00000000 00:00 0 
+7f3c54add000-7f3c54afd000 r-xp 00000000 00:1b 279170                     /opt/trikeshed/jdk/lib/libjava.so
+7f3c54afd000-7f3c54afe000 r--p 0001f000 00:1b 279170                     /opt/trikeshed/jdk/lib/libjava.so
+7f3c54afe000-7f3c54aff000 rw-p 00020000 00:1b 279170                     /opt/trikeshed/jdk/lib/libjava.so
+7f3c54aff000-7f3c54b00000 rw-p 00000000 00:00 0 
+7f3c54b00000-7f3c54b08000 rw-s 00000000 00:25 3                          /tmp/hsperfdata_demo/2
+7f3c54b08000-7f3c54b09000 ---p 00000000 00:00 0 
+7f3c54b09000-7f3c54b0a000 r--p 00000000 00:00 0 
+7f3c54b0a000-7f3c54b0b000 ---p 00000000 00:00 0 
+7f3c54b0b000-7f3c54b2b000 r-xp 00000000 00:1b 279174                     /opt/trikeshed/jdk/lib/libjimage.so
+7f3c54b2b000-7f3c54b2c000 ---p 00020000 00:1b 279174                     /opt/trikeshed/jdk/lib/libjimage.so
+7f3c54b2c000-7f3c54b2e000 r--p 00020000 00:1b 279174                     /opt/trikeshed/jdk/lib/libjimage.so
+7f3c54b2e000-7f3c54b2f000 rw-p 00022000 00:1b 279174                     /opt/trikeshed/jdk/lib/libjimage.so
+7f3c54b2f000-7f3c54b33000 ---p 00000000 00:00 0 
+7f3c54b33000-7f3c54c2f000 rw-p 00000000 00:00 0 
+7f3c54c2f000-7f3c54c40000 r--p 00000000 00:1b 278612                     /lib/x86_64-linux-gnu/libm.so.6
+7f3c54c40000-7f3c54cbd000 r-xp 00011000 00:1b 278612                     /lib/x86_64-linux-gnu/libm.so.6
+7f3c54cbd000-7f3c54d1d000 r--p 0008e000 00:1b 278612                     /lib/x86_64-linux-gnu/libm.so.6
+7f3c54d1d000-7f3c54d1e000 r--p 000ed000 00:1b 278612                     /lib/x86_64-linux-gnu/libm.so.6
+7f3c54d1e000-7f3c54d1f000 rw-p 000ee000 00:1b 278612                     /lib/x86_64-linux-gnu/libm.so.6
+7f3c54d1f000-7f3c54d20000 r--p 00000000 00:1b 278631                     /lib/x86_64-linux-gnu/librt.so.1
+7f3c54d20000-7f3c54d21000 r-xp 00001000 00:1b 278631                     /lib/x86_64-linux-gnu/librt.so.1
+7f3c54d21000-7f3c54d22000 r--p 00002000 00:1b 278631                     /lib/x86_64-linux-gnu/librt.so.1
+7f3c54d22000-7f3c54d23000 r--p 00002000 00:1b 278631                     /lib/x86_64-linux-gnu/librt.so.1
+7f3c54d23000-7f3c54d24000 rw-p 00003000 00:1b 278631                     /lib/x86_64-linux-gnu/librt.so.1
+7f3c54d24000-7f3c56356000 r-xp 00000000 00:1b 279208                     /opt/trikeshed/jdk/lib/server/libjvm.so
+7f3c56356000-7f3c56442000 r--p 01631000 00:1b 279208                     /opt/trikeshed/jdk/lib/server/libjvm.so
+7f3c56442000-7f3c5646e000 rw-p 0171d000 00:1b 279208                     /opt/trikeshed/jdk/lib/server/libjvm.so
+7f3c5646e000-7f3c564ec000 rw-p 00000000 00:00 0 
+7f3c564ec000-7f3c564ed000 r--p 00000000 00:1b 278629                     /lib/x86_64-linux-gnu/libpthread.so.0
+7f3c564ed000-7f3c564ee000 r-xp 00001000 00:1b 278629                     /lib/x86_64-linux-gnu/libpthread.so.0
+7f3c564ee000-7f3c564ef000 r--p 00002000 00:1b 278629                     /lib/x86_64-linux-gnu/libpthread.so.0
+7f3c564ef000-7f3c564f0000 r--p 00002000 00:1b 278629                     /lib/x86_64-linux-gnu/libpthread.so.0
+7f3c564f0000-7f3c564f1000 rw-p 00003000 00:1b 278629                     /lib/x86_64-linux-gnu/libpthread.so.0
+7f3c564f1000-7f3c564f3000 rw-p 00000000 00:00 0 
+7f3c564f3000-7f3c564f4000 r--p 00000000 00:1b 278588                     /lib/x86_64-linux-gnu/libdl.so.2
+7f3c564f4000-7f3c564f5000 r-xp 00001000 00:1b 278588                     /lib/x86_64-linux-gnu/libdl.so.2
+7f3c564f5000-7f3c564f6000 r--p 00002000 00:1b 278588                     /lib/x86_64-linux-gnu/libdl.so.2
+7f3c564f6000-7f3c564f7000 r--p 00002000 00:1b 278588                     /lib/x86_64-linux-gnu/libdl.so.2
+7f3c564f7000-7f3c564f8000 rw-p 00003000 00:1b 278588                     /lib/x86_64-linux-gnu/libdl.so.2
+7f3c564f8000-7f3c564fb000 r--p 00000000 00:1b 278645                     /lib/x86_64-linux-gnu/libz.so.1
+7f3c564fb000-7f3c5650f000 r-xp 00003000 00:1b 278645                     /lib/x86_64-linux-gnu/libz.so.1
+7f3c5650f000-7f3c56516000 r--p 00017000 00:1b 278645                     /lib/x86_64-linux-gnu/libz.so.1
+7f3c56516000-7f3c56517000 r--p 0001d000 00:1b 278645                     /lib/x86_64-linux-gnu/libz.so.1
+7f3c56517000-7f3c56518000 rw-p 0001e000 00:1b 278645                     /lib/x86_64-linux-gnu/libz.so.1
+7f3c56518000-7f3c56540000 r--p 00000000 00:1b 278582                     /lib/x86_64-linux-gnu/libc.so.6
+7f3c56540000-7f3c566a3000 r-xp 00028000 00:1b 278582                     /lib/x86_64-linux-gnu/libc.so.6
+7f3c566a3000-7f3c566f9000 r--p 0018b000 00:1b 278582                     /lib/x86_64-linux-gnu/libc.so.6
+7f3c566f9000-7f3c566fd000 r--p 001e0000 00:1b 278582                     /lib/x86_64-linux-gnu/libc.so.6
+7f3c566fd000-7f3c566ff000 rw-p 001e4000 00:1b 278582                     /lib/x86_64-linux-gnu/libc.so.6
+7f3c566ff000-7f3c5670c000 rw-p 00000000 00:00 0 
+7f3c5670c000-7f3c5671b000 r-xp 00000000 00:1b 279175                     /opt/trikeshed/jdk/lib/libjli.so
+7f3c5671b000-7f3c5671c000 r--p 0000e000 00:1b 279175                     /opt/trikeshed/jdk/lib/libjli.so
+7f3c5671c000-7f3c5671d000 rw-p 0000f000 00:1b 279175                     /opt/trikeshed/jdk/lib/libjli.so
+7f3c5671d000-7f3c5671f000 rw-p 00000000 00:00 0 
+7f3c5671f000-7f3c56723000 r--p 00000000 00:00 0                          [vvar]
+7f3c56723000-7f3c56725000 r--p 00000000 00:00 0                          [vvar_vclock]
+7f3c56725000-7f3c56727000 r-xp 00000000 00:00 0                          [vdso]
+7f3c56727000-7f3c56728000 r--p 00000000 00:1b 278648                     /lib64/ld-linux-x86-64.so.2
+7f3c56728000-7f3c56750000 r-xp 00001000 00:1b 278648                     /lib64/ld-linux-x86-64.so.2
+7f3c56750000-7f3c5675b000 r--p 00029000 00:1b 278648                     /lib64/ld-linux-x86-64.so.2
+7f3c5675b000-7f3c5675d000 r--p 00034000 00:1b 278648                     /lib64/ld-linux-x86-64.so.2
+7f3c5675d000-7f3c5675e000 rw-p 00036000 00:1b 278648                     /lib64/ld-linux-x86-64.so.2
+7f3c5675e000-7f3c5675f000 rw-p 00000000 00:00 0 
+7fffdc888000-7fffdc8a9000 rw-p 00000000 00:00 0                          [stack]

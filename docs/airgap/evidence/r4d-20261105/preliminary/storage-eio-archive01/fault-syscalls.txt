@@ -1,0 +1,2 @@
+83714 1793852033.850933 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x14} ---
+83714 1793852034.000606 fsync(36</state/runtime/.kanban/board.wal>) = -1 EIO (Input/output error) (INJECTED)

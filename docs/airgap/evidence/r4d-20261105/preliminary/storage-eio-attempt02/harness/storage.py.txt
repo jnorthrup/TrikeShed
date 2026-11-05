@@ -1,0 +1,153 @@
+from pathlib import Path
+import os,sys,subprocess,time,json,socket,errno,urllib.request,hashlib,resource,shutil,signal
+
+home=Path('/workspace/airgap-r4d-proof');root=Path(os.environ.get('TRIKESHED_PROOF_ROOT',str(home/'rootfs')))
+art=home/sys.argv[1];art.mkdir(exist_ok=False)
+crash=True
+stage=sys.argv[2] if len(sys.argv)>2 else 'selection'
+assert stage in ['document','scan','selection']
+(art/'harness').mkdir()
+for name in ['storage.py','storage.cjs','run.py','assemble.py','package.py']:
+    shutil.copyfile(home/name,art/'harness'/(name+'.txt'))
+state=art/'state';state.mkdir()
+network={'namespace':os.readlink('/proc/self/ns/net'),'addresses':json.loads(subprocess.check_output(['ip','-j','address'])),'routes':json.loads(subprocess.check_output(['ip','-j','route']))}
+assert not network['routes'] and all(x['ifname']=='lo' for x in network['addresses'])
+with socket.socket() as p:network['externalConnectErrno']=p.connect_ex(('1.1.1.1',443))
+assert network['externalConnectErrno']==errno.ENETUNREACH
+(art/'network.json').write_text(json.dumps(network,indent=2)+'\n')
+port=18764;base=f'http://127.0.0.1:{port}'
+http=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+processes=[];logs=[];reports=[]
+def launch(mode):
+    cmd=['bwrap','--unshare-user','--uid','0','--gid','0','--unshare-pid','--unshare-ipc','--unshare-uts','--hostname','airgap-r4d','--die-with-parent',
+         '--ro-bind',str(root),'/', '--bind',str(state),'/state','--tmpfs','/tmp','--proc','/proc','--dev','/dev','--clearenv',
+         '--setenv','PATH','/opt/trikeshed/jdk/bin:/usr/bin:/bin','--setenv','JAVA_HOME','/opt/trikeshed/jdk','--setenv','HOME','/state/home','--setenv','LANG','C.UTF-8',
+         '--setenv','TRIKESHED_PDF_ROUTE','layer','--chdir','/state','--cap-drop','ALL']
+    if mode!='inspect':
+        for kind,name in [('SCALAR','add-mlir.bc'),('CONFIX','confix.bc')]:cmd+=['--setenv','TRIKESHED_LLVM_'+kind+'_PROFILE','/state/runtime/'+name+'.json']
+    if mode!='run':
+        paths=['/opt/trikeshed/assets']+(['/opt/trikeshed/modules'] if mode=='inspect' else [])
+        for path in paths:
+            cmd+=['--tmpfs',path,'--remount-ro',path]
+        for path in ['/usr/bin/pdfinfo','/usr/bin/pdftotext']:cmd+=['--ro-bind','/dev/null',path]
+    cmd+=['/opt/trikeshed/bin/airgap-document','/state','/opt/trikeshed',str(port),mode]
+    log=(art/(mode+'.txt')).open('w');logs.append(log)
+    started=time.monotonic();before=resource.getrusage(resource.RUSAGE_CHILDREN)
+    proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT);processes.append(proc)
+    report={'mode':mode,'hostPid':proc.pid,'command':cmd,'startedMonotonic':started,'resourceEvidence':'process-owned snapshot pending'}
+    reports.append(report)
+    return proc,report
+
+def sample(proc,report):
+    # A nested user namespace can conceal children from the host monitor.
+    # Measurements and mount tables come from the JVM itself, not bwrap RSS.
+    report['resourceEvidence']='state/'+report['mode']+'-status.txt; '+('state-before-crash.json' if crash and report['mode']=='run' else 'state/state-'+report['mode']+'.json')+' processCpuNanos'
+
+def ready(proc,report):
+    deadline=time.monotonic()+120
+    while time.monotonic()<deadline:
+        sample(proc,report)
+        if proc.poll() is not None:raise RuntimeError('Fixture exited: '+str(proc.returncode))
+        try:
+            with http.open(base+'/__proof/state',timeout=2) as r:result=json.load(r)
+            report['readySeconds']=time.monotonic()-report['startedMonotonic'];report['boot']=result['boot']
+            (art/(report['mode']+'-ready.json')).write_text(json.dumps(result,indent=2)+'\n')
+            return result
+        except OSError:time.sleep(.2)
+    raise RuntimeError('Not ready')
+
+def finish(proc,report):
+    if proc.poll() is None:
+        try:http.open(urllib.request.Request(base+'/__proof/finish',data=b'',method='POST'),timeout=3).read()
+        except OSError:pass
+        end=time.monotonic()+30
+        while proc.poll() is None and time.monotonic()<end:sample(proc,report);time.sleep(.1)
+        if proc.poll() is None:proc.terminate();proc.wait(timeout=10);report['forcedTermination']=True
+    report['exit']=proc.returncode;report['elapsedSeconds']=time.monotonic()-report['startedMonotonic']
+
+fault=sys.argv[3];assert fault in ['eio','kill'];tracer=None;trace_log=None
+
+def java_pid(parent):
+ children={};names={}
+ for entry in Path('/proc').glob('[0-9]*'):
+  try:
+   fields=(entry/'stat').read_text().rsplit(') ',1)[1].split();pid=int(entry.name);children.setdefault(int(fields[1]),[]).append(pid);names[pid]=(entry/'comm').read_text().strip()
+  except (OSError,ValueError,IndexError):pass
+ pending=[parent];found=[]
+ while pending:
+  pid=pending.pop();pending.extend(children.get(pid,[]))
+  if names.get(pid)=='java':found.append(pid)
+ assert len(found)==1,found
+ command=Path('/proc/'+str(found[0])+'/cmdline').read_bytes().split(b'\0');assert b'borg.trikeshed.lcnc.AirgapDocumentMainKt' in command
+ return found[0]
+
+def attach(proc):
+ global tracer,trace_log
+ pid=java_pid(proc.pid)
+ injection='error=EIO' if fault=='eio' else 'signal=SIGKILL'
+ command=['strace','-f','-yy','-ttt','-s','160','-e','trace=fsync','-P','/state/runtime/.kanban/board.wal','--inject=fsync:'+injection+':when=1','-o',str(art/'fault-syscalls.txt'),'-p',str(pid)]
+ trace_log=(art/'strace.txt').open('w');tracer=subprocess.Popen(command,stdout=trace_log,stderr=subprocess.STDOUT)
+ end=time.monotonic()+10
+ while True:
+  assert tracer.poll() is None,('tracer exited',tracer.returncode)
+  statuses=[]
+  for task in Path('/proc/'+str(pid)+'/task').iterdir():
+   try:statuses.append(int(next(line.split()[1] for line in (task/'status').read_text().splitlines() if line.startswith('TracerPid:'))))
+   except FileNotFoundError:pass
+  if statuses and all(owner==tracer.pid for owner in statuses):break
+  assert time.monotonic()<end, statuses;time.sleep(.05)
+ return {'javaPid':pid,'tracerPid':tracer.pid,'command':command,'allObservedThreadsAttached':True,'threadsAtAttach':len(statuses),'fault':fault}
+
+def detach():
+ if tracer is not None and tracer.poll() is None:
+  tracer.send_signal(signal.SIGINT);tracer.wait(timeout=10)
+ if trace_log is not None:trace_log.close()
+
+writer=None;driver=None;error=None;armed=None;restart=False
+try:
+ writer,run=launch('run');seed=ready(writer,run)
+ env=os.environ.copy();env['PLAYWRIGHT_BROWSERS_PATH']='/workspace/toolchains/playwright';env['TRIKESHED_STORAGE_FAULT']=fault
+ log=(art/'driver.txt').open('w');logs.append(log);driver=subprocess.Popen(['node',str(home/'storage.cjs'),str(art),base],env=env,stdout=log,stderr=subprocess.STDOUT)
+ deadline=time.monotonic()+180
+ while driver.poll() is None and time.monotonic()<deadline:
+  if (art/'arm-request.json').exists() and armed is None:
+   with http.open(base+'/__proof/state',timeout=3) as response:before=json.load(response)
+   assert len(before['runs'])==1;old=next(iter(before['runs'].values()));assert old['status']=='running' and not old.get('invocationsCid')
+   (art/'state-before-crash.json').write_text(json.dumps(before,indent=2)+'\n');shutil.copyfile(state/'runtime/.kanban/board.wal',art/'wal-before.bin')
+   armed=attach(writer);(art/'fault-ready.json').write_text(json.dumps(armed,indent=2)+'\n')
+  if (art/'restart-request.json').exists() and not restart:
+   assert armed is not None
+   if fault=='kill':
+    writer.wait(timeout=15);assert writer.returncode==137 and not Path('/proc/'+str(armed['javaPid'])).exists();assert not (state/'cleanup-run.json').exists()
+    run.update(exit=137,elapsedSeconds=time.monotonic()-run['startedMonotonic'],expectedCrash=True,javaReaped=True,cleanupRan=False,signal='SIGKILL',point='Final receipt WAL fsync after complete frame write')
+   else:
+    assert writer.poll() is None
+    with http.open(base+'/__proof/state',timeout=3) as response:failed=json.load(response)
+    (art/'state-after-eio.json').write_text(json.dumps(failed,indent=2)+'\n')
+   detach();trace=(art/'fault-syscalls.txt').read_text();assert 'board.wal' in trace
+   if fault=='eio':assert 'EIO (Input/output error) (INJECTED)' in trace
+   else:assert 'SIGKILL' in trace
+   shutil.copyfile(state/'runtime/.kanban/board.wal',art/'wal-after-fault.bin')
+   if fault=='eio':
+    assert failed['runs']==before['runs']
+    finish(writer,run);assert writer.returncode==1
+    shutdown=(art/'run.txt').read_text();assert 'Kanban module cleanup failed' in shutdown and 'FSYNC failed: -5' in shutdown
+    run.update(expectedFailure=True,shutdownErrorPropagated=True,cleanupReportAvailable=(state/'cleanup-run.json').exists())
+   inspector,inspection=launch('inspect');last=ready(inspector,inspection);assert last['boot']!=seed['boot']
+   (art/'restart-ready.json').write_text(json.dumps({'firstExit':run['exit'],'fault':fault,'firstBoot':seed['boot'],'secondBoot':last['boot']})+'\n');restart=True
+  time.sleep(.05)
+ if driver.poll() is None:raise RuntimeError('Browser timed out')
+ assert driver.returncode==0 and restart
+except BaseException as e:
+ error=repr(e);(art/'controller-error.json').write_text(json.dumps({'error':error,'processes':reports},indent=2)+'\n');print(error,flush=True)
+finally:
+ detach()
+ if driver is not None and driver.poll() is None:
+  driver.terminate()
+  try:driver.wait(timeout=10)
+  except subprocess.TimeoutExpired:driver.kill();driver.wait(timeout=10)
+ for proc,report in zip(processes,reports):
+  if 'exit' not in report:finish(proc,report)
+ for log in logs:log.close()
+ result={'fault':fault,'error':error,'driverExit':driver.returncode if driver else None,'injection':armed,'processes':reports};(art/'processes.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({**result,'injection':{k:v for k,v in (armed or {}).items() if k!='command'},'processes':[{k:v for k,v in row.items() if k!='command'} for row in reports]},indent=2))
+assert error is None,error

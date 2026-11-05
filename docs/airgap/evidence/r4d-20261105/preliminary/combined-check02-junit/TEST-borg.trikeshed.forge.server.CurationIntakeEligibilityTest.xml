@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="CurationIntakeEligibilityTest[jvm]" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-05T04:29:41.569Z" hostname="0d6dfba25614" time="0.186">
+  <properties/>
+  <testcase name="eligibilityIsRecheckedBeforeQueuedWorkStarts()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeEligibilityTest" time="0.082"/>
+  <testcase name="resumeAndExplicitOffersDoNotAdmitIneligibleProjects()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeEligibilityTest" time="0.086"/>
+  <testcase name="defaultEligibilityStillAdmitsDocuments()[jvm]" classname="borg.trikeshed.forge.server.CurationIntakeEligibilityTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[[INTAKE] secondary/agreement.pdf: null statements from null sections
+[INTAKE] secondary: 1 curated, 0 failed — brief published
+[INTAKE] secondary/agreement.pdf: null statements from null sections
+[INTAKE] secondary: 1 curated, 0 failed — brief published
+]]></system-err>
+</testsuite>

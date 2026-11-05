@@ -1,0 +1,24 @@
+{
+  "javaPid": 83675,
+  "tracerPid": 83879,
+  "command": [
+    "strace",
+    "-f",
+    "-yy",
+    "-ttt",
+    "-s",
+    "160",
+    "-e",
+    "trace=fsync",
+    "-P",
+    "/state/runtime/.kanban/board.wal",
+    "--inject=fsync:error=EIO:when=1",
+    "-o",
+    "/workspace/airgap-r4d-proof/storage-eio-archive01/fault-syscalls.txt",
+    "-p",
+    "83675"
+  ],
+  "allObservedThreadsAttached": true,
+  "threadsAtAttach": 33,
+  "fault": "eio"
+}

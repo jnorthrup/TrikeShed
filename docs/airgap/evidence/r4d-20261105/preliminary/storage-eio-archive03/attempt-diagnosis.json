@@ -1,0 +1,13 @@
+{
+  "accepted": false,
+  "sourceCommit": "8579dcad12d3b22c84ef3017157bf41e9a0fdbaf",
+  "completedBrowserCases": 5,
+  "failure": "apiRequestContext.post: socket hang up\nCall log:\n\u001b[2m  - \u2192 POST http://127.0.0.1:18764/__proof/finish\u001b[22m\n\u001b[2m    - user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36\u001b[22m\n\u001b[2m    - accept: */*\u001b[22m\n\u001b[2m    - accept-encoding: gzip,deflate,br\u001b[22m\n\n    at /workspace/airgap-r4d-proof/storage.cjs:15:2140",
+  "inspectorExit": 0,
+  "inspectorCleanup": {
+    "moduleOwnerCompleted": true,
+    "nativeRootDrained": true,
+    "listenerJoined": true
+  },
+  "diagnosis": "Proof-only finish route completes shutdown before returning its response. Browser POST can lose the connection after all behavioral checks pass. Controller now owns final shutdown and records response or transport error; acceptance requires actual exit 0, no forced termination and complete cleanup record."
+}

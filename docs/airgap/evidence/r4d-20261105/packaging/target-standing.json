@@ -1,0 +1,53 @@
+{
+  "currentSourceCommit": "8579dcad12d3b22c84ef3017157bf41e9a0fdbaf",
+  "previousTestedSourceCommit": "d80e698139c69e70c594940b007a22673b193937",
+  "changedBuildAndSourcePaths": [
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishLcncPreset.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishNalContract.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/EnglishNalPreset.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncNodeKey.kt",
+    "src/commonMain/kotlin/borg/trikeshed/lcnc/LcncPresets.kt",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/EnglishNalPresetTest.kt",
+    "src/commonTest/kotlin/borg/trikeshed/lcnc/PresetAssemblyTest.kt",
+    "src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsDocumentSource.kt",
+    "src/jvmMain/kotlin/borg/trikeshed/forge/server/EnglishObservationWire.kt",
+    "src/jvmMain/kotlin/borg/trikeshed/userspace/nio/file/spi/JvmFileOperations.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishNalPresetExecutionTest.kt",
+    "src/jvmTest/kotlin/borg/trikeshed/userspace/nio/file/spi/FilePublicationTest.kt",
+    "src/jvmTest/resources/english-nal/README.txt",
+    "src/jvmTest/resources/english-nal/guard-inspection.cbor.b64",
+    "src/jvmTest/resources/english-nal/guard-source.txt",
+    "src/jvmTest/resources/english-nal/s12-inspection.cbor.b64",
+    "src/jvmTest/resources/english-nal/s12-source.txt"
+  ],
+  "freshCheck": {
+    "sourceCommit": "8579dcad12d3b22c84ef3017157bf41e9a0fdbaf",
+    "startedAt": "2026-11-05T04:37:14.023100+00:00",
+    "command": [
+      "unshare",
+      "--user",
+      "--map-current-user",
+      "--net",
+      "--keep-caps",
+      "sh",
+      "-c",
+      "ip link set lo up && exec \"$@\"",
+      "airgap-check",
+      "./gradlew",
+      "--offline",
+      "--no-daemon",
+      "--max-workers=2",
+      "-PkotlinJsApps=documents,spacegraph",
+      "stageKotlinJs",
+      "compileKotlinJs",
+      "compileKotlinWasmJs",
+      "compileKotlinWasmWasi",
+      "compileKotlinLinuxX64"
+    ],
+    "cwd": "/workspace/TrikeShed-target-checks",
+    "exit": 0,
+    "finishedAt": "2026-11-05T04:44:58.082171+00:00"
+  },
+  "basis": "Fresh browser, JS, Wasm and Linux target compiles after incoming common/browser production changes; preliminary unchanged-target standing superseded."
+}

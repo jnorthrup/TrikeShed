@@ -1,0 +1,43 @@
+from pathlib import Path
+import json,shutil,hashlib,subprocess,tarfile,gzip,sys
+home=Path('/workspace/airgap-r4d-proof');old=Path('/workspace/airgap-r4-proof');legal=home/'rootfs/opt/trikeshed/legal';out=home/'corresponding-source'
+def put(p,x):p.write_text(json.dumps(x,indent=2)+'\n')
+def digest(p):return hashlib.file_digest(p.open('rb'),'sha256').hexdigest()
+def coord(r):return (r['group'],r['name'],r['version'])
+if sys.argv[1]=='stage':
+ profile=json.loads((home/'runtime-profile.json').read_text());wanted={coord(r) for r in profile['dependencies']}
+ sources=[r for r in json.loads((old/'maven-source-inventory.json').read_text()) if coord(r) in wanted]
+ assert len(sources)==len(wanted)==23
+ for r in profile['dependencies']:
+  s=next(s for s in sources if coord(s)==coord(r));r['correspondingSource']={'file':s['file'],'sha256':s['sha256']}
+  assert digest(home/'rootfs/opt/trikeshed/lib'/r['file'])==r['sha256']
+ keep={'__'.join(c) for c in wanted}
+ for p in (legal/'maven').iterdir():
+  if p.is_dir() and p.name not in keep:shutil.rmtree(p)
+ put(home/'maven-inventory.json',profile['dependencies']);put(legal/'maven/inventory.json',profile['dependencies'])
+ put(home/'maven-source-inventory.json',sources);put(legal/'maven-source-inventory.json',sources);put(home/'runtime-profile.json',profile)
+ out.mkdir(exist_ok=False)
+ for name in ['debian','graal']:shutil.copytree(old/'corresponding-source'/name,out/name)
+ (out/'maven').mkdir()
+ for r in sources:
+  p=old/'corresponding-source/maven'/r['file'];assert digest(p)==r['sha256'];shutil.copy2(p,out/'maven'/p.name)
+ for name in ['debian-source-inventory.json','graal-source-inventory.json','elf-closure.json']:shutil.copy2(old/name,home/name)
+ shutil.copytree(legal,out/'notices-and-inventories')
+ head=subprocess.check_output(['git','rev-parse','HEAD'],cwd='/workspace/TrikeShed',text=True).strip()
+ subprocess.run(['git','archive','--format=tar.gz','--prefix=TrikeShed/','--output='+str(out/('trikeshed-'+head[:9]+'.tar.gz')),head],cwd='/workspace/TrikeShed',check=True)
+ text=(old/'corresponding-source/README.md').read_text().replace('R4a','R4d').replace('all 107','all 23').replace('2323b4f39',head)
+ (out/'README.md').write_text(text)
+ put(out/'SHA256.json',{p.relative_to(out).as_posix():digest(p) for p in sorted(out.rglob('*')) if p.is_file() and p.name!='SHA256.json'})
+ print('23 source jars, 65 Debian source packages, Graal archives and current Git archive staged')
+elif sys.argv[1]=='archive':
+ dest=Path('/workspace/library-files/airgap-document-r4d-sources-2026-11-05.tar.gz')
+ with dest.open('wb') as raw,gzip.GzipFile(filename='',mode='wb',fileobj=raw,mtime=0,compresslevel=6) as compressed,tarfile.open(fileobj=compressed,mode='w|',format=tarfile.PAX_FORMAT) as tar:
+  for p in [out]+sorted(out.rglob('*')):
+   info=tar.gettarinfo(str(p),arcname='airgap-document-sources'+('/'+p.relative_to(out).as_posix() if p!=out else ''))
+   info.uid=info.gid=0;info.uname=info.gname='';info.mtime=0;info.pax_headers={}
+   if p.is_file():
+    with p.open('rb') as stream:tar.addfile(info,stream)
+   else:tar.addfile(info)
+ with tarfile.open(dest,'r:gz') as tar:
+  for name,sha in json.loads((out/'SHA256.json').read_text()).items():assert hashlib.sha256(tar.extractfile('airgap-document-sources/'+name).read()).hexdigest()==sha
+ record={'file':str(dest),'sha256':digest(dest),'bytes':dest.stat().st_size};put(home/'source-archive.json',record);print(json.dumps(record))

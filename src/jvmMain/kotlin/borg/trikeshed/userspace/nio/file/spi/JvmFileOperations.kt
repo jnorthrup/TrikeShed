@@ -196,7 +196,7 @@ class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader, 
         val parent = requireNotNull(target.parent) {
             "Atomic write target has no parent: $target"
         }
-        NioFiles.createDirectories(parent)
+        mkdirs(parent.toString())
         val temp = NioFiles.createTempFile(parent, ".${target.fileName}.", ".tmp")
         try {
             FileChannel.open(
@@ -314,11 +314,29 @@ class JvmFileOperations : FileOperations, BoundedFileReader, ChunkedFileReader, 
         NioFiles.isRegularFile(pathOf(path))
 
     override fun mkdirs(path: String) {
-        NioFiles.createDirectories(pathOf(path))
+        val pending = mutableListOf<Path>()
+        var directory = pathOf(path).toAbsolutePath()
+        while (!NioFiles.exists(directory)) {
+            pending.add(directory)
+            directory = requireNotNull(directory.parent) { "Directory has no existing ancestor: $path" }
+        }
+        if (!NioFiles.isDirectory(directory)) throw java.nio.file.NotDirectoryException(directory.toString())
+        for (entry in pending.asReversed()) {
+            try { NioFiles.createDirectory(entry) }
+            catch (failure: java.nio.file.FileAlreadyExistsException) {
+                if (!NioFiles.isDirectory(entry)) throw failure
+            }
+            // A durable child name needs its parent entry persisted too, before
+            // later CAS/HEAD publication can acknowledge a path through it.
+            FileChannel.open(entry, StandardOpenOption.READ).use { it.force(true) }
+            FileChannel.open(entry.parent, StandardOpenOption.READ).use { it.force(true) }
+        }
     }
 
     override fun createDirectory(path: String) {
-        NioFiles.createDirectory(pathOf(path))
+        val directory = pathOf(path).toAbsolutePath()
+        NioFiles.createDirectory(directory)
+        FileChannel.open(directory.parent, StandardOpenOption.READ).use { it.force(true) }
     }
 
     override fun deleteRecursively(path: String) {

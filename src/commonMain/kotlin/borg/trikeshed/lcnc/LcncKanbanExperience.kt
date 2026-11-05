@@ -242,10 +242,10 @@ class LcncKanbanExperience(
             },
             "confix.pickPath" to LcncNodeRunner { node, inputs ->
                 fun input(port: String): Any? = inputs[port] ?: inputs["$port?"]
-                val value = (input("data") ?: input("json") ?: node.params["json"])
+                val source = (input("data") ?: input("json") ?: node.params["json"])
                     ?: error("confix.pickPath: json input or param required")
-                // Text retains its original byte geometry; structured JSON ports need JSON, not Map.toString().
-                val json = if (value is String) value else jsonOf(value)
+                // Keep supplied text byte-for-byte; serialize structured JSON before geometry validation.
+                val json = if (source is String) source else jsonOf(source)
                 val path = required(node, "path")
                 if (node.params["geometry"] == "native" || inputs.keys.any { it.removeSuffix("?") in _s["rows", "sourceCid", "ok", "format"] })
                     return@LcncNodeRunner LcncConfixSelection.select(json, path, input("rows"), input("sourceCid"), input("ok"), input("format"))

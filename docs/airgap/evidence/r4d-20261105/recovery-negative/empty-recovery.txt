@@ -1,0 +1,2 @@
+Exception in thread "main" java.lang.IllegalArgumentException: recover requires an existing runtime
+	at borg.trikeshed.lcnc.AirgapDocumentMainKt.main(AirgapDocumentMain.kt:32)

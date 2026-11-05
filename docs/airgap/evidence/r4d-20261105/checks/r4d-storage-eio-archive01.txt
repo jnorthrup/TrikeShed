@@ -1,0 +1,30 @@
+AssertionError()
+{
+  "fault": "eio",
+  "error": "AssertionError()",
+  "driverExit": 1,
+  "injection": {
+    "javaPid": 83675,
+    "tracerPid": 83879,
+    "allObservedThreadsAttached": true,
+    "threadsAtAttach": 33,
+    "fault": "eio"
+  },
+  "processes": [
+    {
+      "mode": "run",
+      "hostPid": 83673,
+      "startedMonotonic": 41813.861151721,
+      "resourceEvidence": "state/run-status.txt; state-before-crash.json processCpuNanos",
+      "readySeconds": 3.0387082519955584,
+      "boot": "cbbb7fff-dc37-4fdf-88af-aae7f1bbeb4e",
+      "exit": 1,
+      "elapsedSeconds": 8.426460661998135
+    }
+  ]
+}
+Traceback (most recent call last):
+  File "/workspace/airgap-r4d-proof/storage.py", line 153, in <module>
+    assert error is None,error
+           ^^^^^^^^^^^^^
+AssertionError: AssertionError()

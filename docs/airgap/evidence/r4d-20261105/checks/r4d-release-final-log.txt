@@ -1,0 +1,18 @@
+application-stage-final02 PASS
+package-manifest PASS
+package-verify PASS
+integrity PASS
+archive-first PASS
+archive-second PASS
+archive-extract PASS
+unpacked-verify PASS
+trace-archive02 PASS
+mkdir-archive-audit PASS
+Traceback (most recent call last):
+  File "/workspace/airgap-r4d-proof/release-final.py", line 21, in <module>
+    name='storage-'+fault+('-archive03' if fault=='eio' else '-archive01');run(prefix+[str(h/'storage.py'),name,'selection',fault],name,env);run(['python',str(h/'storage-audit.py'),name],name+'-audit')
+                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/airgap-r4d-proof/release-final.py", line 6, in run
+    assert p.returncode==0,(name,p.returncode)
+           ^^^^^^^^^^^^^^^
+AssertionError: ('storage-eio-archive03', 1)

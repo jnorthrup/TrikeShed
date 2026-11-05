@@ -1,0 +1,12 @@
+from pathlib import Path
+import json,subprocess,hashlib
+h=Path('/workspace/airgap-r4d-proof');out=h/'corresponding-source';repo=Path('/workspace/TrikeShed')
+head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
+previous=json.loads((h/'source-archive.json').read_text());previous['sourceCommit']='b8ed92a2347a01ea1be000c50d10568e765ba1f2';previous['disposition']='Unpublished candidate archive replaced after integration test failure; Git source, archive identity, inventory and failed JUnit records retained.'
+(h/'preliminary-package-identities/source-archive-b8ed92a23.json').write_text(json.dumps(previous,indent=2)+'\n')
+(h/'preliminary-package-identities/source-inventory-b8ed92a23.json').write_bytes((out/'SHA256.json').read_bytes())
+for p in out.glob('trikeshed-*.tar.gz'):p.unlink()
+subprocess.run(['git','archive','--format=tar.gz','--prefix=TrikeShed/','--output='+str(out/('trikeshed-'+head[:9]+'.tar.gz')),head],cwd=repo,check=True)
+p=out/'README.md';s=p.read_text().replace(previous['sourceCommit'],head).replace(previous['sourceCommit'][:9],head[:9]);p.unlink();p.write_text(s)
+p=out/'SHA256.json';p.unlink();p.write_text(json.dumps({p.relative_to(out).as_posix():hashlib.file_digest(p.open('rb'),'sha256').hexdigest() for p in sorted(out.rglob('*')) if p.is_file() and p.name!='SHA256.json'},indent=2)+'\n')
+subprocess.run(['python3',str(h/'sources.py'),'archive'],check=True)

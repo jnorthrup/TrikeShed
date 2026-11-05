@@ -1,0 +1,19 @@
+from pathlib import Path
+import subprocess,json,hashlib,shutil,sys
+home=Path('/workspace/airgap-r4d-proof');accepted=home/sys.argv[1];out=home/sys.argv[2];out.mkdir(exist_ok=False)
+command=json.loads((accepted/'processes.json').read_text())['processes'][1]['command'];results=[]
+def inventory(root):return {p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.rglob('*')) if p.is_file()}
+for name in ['empty-recovery','changed-admission-identity']:
+ state=out/name
+ if name=='empty-recovery':state.mkdir();expected='recover requires an existing runtime'
+ else:
+  shutil.copytree(accepted/'state',state)
+  for p in state.glob('*-recover.json'):p.unlink()
+  p=state/'runtime/admission.json';admission=json.loads(p.read_text());admission['documents'][0]['cid']='sha256:'+'0'*64;p.write_text(json.dumps(admission));expected='Project revision changed at startup:'
+ before=inventory(state/'runtime') if (state/'runtime').exists() else {}
+ cmd=command.copy();i=cmd.index('--bind');cmd[i+1]=str(state)
+ with (out/(name+'.txt')).open('w') as log:result=subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT,timeout=30)
+ text=(out/(name+'.txt')).read_text();assert result.returncode!=0 and expected in text and 'trikeshed-kanban: listening' not in text
+ after=inventory(state/'runtime') if (state/'runtime').exists() else {};assert before==after
+ results.append({'case':name,'exit':result.returncode,'expectedFailure':expected,'runtimeBytesUnchanged':True,'listenerOpened':False,'result':'PASS'})
+(out/'results.json').write_text(json.dumps(results,indent=2)+'\n');print(json.dumps(results,indent=2))

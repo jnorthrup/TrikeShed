@@ -1,0 +1,50 @@
+83350 1793851866.292943 +++ exited with 0 +++
+83349 1793851866.293029 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=3, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83351 1793851866.294832 +++ exited with 0 +++
+83349 1793851866.294860 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=4, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83352 1793851866.295507 +++ exited with 0 +++
+83349 1793851866.295529 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=5, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83354 1793851866.297002 +++ exited with 0 +++
+83353 1793851866.297060 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=7, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83358 1793851866.301923 +++ exited with 0 +++
+83355 1793851866.301966 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=11, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83359 1793851866.304800 +++ exited with 0 +++
+83355 1793851866.304852 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=12, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83360 1793851866.307007 +++ exited with 0 +++
+83355 1793851866.307039 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=13, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83361 1793851866.309216 +++ exited with 0 +++
+83355 1793851866.309250 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=14, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83362 1793851866.311491 +++ exited with 0 +++
+83355 1793851866.311544 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=15, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83355 1793851866.311781 +++ exited with 0 +++
+83353 1793851866.311798 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=8, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83356 1793851866.311876 +++ exited with 0 +++
+83353 1793851866.311893 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=9, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83357 1793851866.312184 +++ exited with 0 +++
+83353 1793851866.312194 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=10, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83353 1793851866.312268 +++ exited with 0 +++
+83349 1793851866.312287 --- SIGCHLD {si_signo=SIGCHLD, si_code=CLD_EXITED, si_pid=6, si_uid=0, si_status=0, si_utime=0, si_stime=0} ---
+83363 1793851866.342370 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=NULL} ---
+83369 1793851866.382370 +++ exited with 0 +++
+83363 1793851866.827022 fsync(17</state/runtime/cas>) = -1 EIO (Input/output error) (INJECTED)
+83370 1793851866.841215 +++ exited with 0 +++
+83367 1793851866.841429 +++ exited with 0 +++
+83368 1793851866.841501 +++ exited with 0 +++
+83365 1793851866.841591 +++ exited with 0 +++
+83371 1793851866.842052 +++ exited with 0 +++
+83374 1793851866.842070 +++ exited with 0 +++
+83363 1793851866.842242 +++ exited with 0 +++
+83381 1793851866.842472 +++ exited with 1 +++
+83380 1793851866.842481 +++ exited with 1 +++
+83379 1793851866.842487 +++ exited with 1 +++
+83378 1793851866.842491 +++ exited with 1 +++
+83377 1793851866.842494 +++ exited with 1 +++
+83376 1793851866.842497 +++ exited with 1 +++
+83372 1793851866.842500 +++ exited with 1 +++
+83366 1793851866.842504 +++ exited with 1 +++
+83373 1793851866.842507 +++ exited with 1 +++
+83364 1793851866.842511 +++ exited with 1 +++
+83375 1793851866.848175 +++ exited with 1 +++
+83349 1793851866.848190 +++ exited with 1 +++
+83347 1793851866.848489 +++ exited with 1 +++
+83348 1793851866.848583 +++ exited with 1 +++
