@@ -7,6 +7,8 @@ import borg.trikeshed.lib.*
 /** A display projection of an existing proof receipt. Validation grants no review authority. */
 object ReviewedTaxonomyProofPaths {
     const val KIND = "reviewed-taxonomy-proof-paths/1"
+    /** Display receipt budget includes UTF-8 expansion and metadata beyond the assertion character profile. */
+    const val MAX_EXPORT_BYTES = 16 * 1024 * 1024
 
     /** Bind ALL projected sources to already authenticated frozen selection records, not a display page. */
     fun validate(value: Map<*, *>, selections: List<Map<*, *>>) {
@@ -88,9 +90,9 @@ object ReviewedTaxonomyProofPaths {
             value["status"] in _s["SUPPORTED", "UNKNOWN", "BOUNDED", "UNSUPPORTED"] && value["truncated"] is Boolean)
         require((value["status"] == "SUPPORTED") == proofs.isNotEmpty()) { "Proof status differs" }
         val export = string(value["export"])
-        require(export.length <= 1048576) { "Proof receipt exceeds bound" }
+        require(export.length <= MAX_EXPORT_BYTES) { "Proof receipt exceeds bound" }
         val bytes = export.encodeToByteArray(throwOnInvalidSequence = true)
-        require(bytes.size <= 1048576 && ContentId.of(bytes).value == cid(value["exportCid"])) { "Proof receipt identity differs" }
+        require(bytes.size <= MAX_EXPORT_BYTES && ContentId.of(bytes).value == cid(value["exportCid"])) { "Proof receipt identity differs" }
         fun StringBuilder.fields(vararg fields: String) {
             for (field in fields) append(field.encodeToByteArray(throwOnInvalidSequence = true).size).append(':').append(field)
         }

@@ -73,6 +73,19 @@ class ReviewedTaxonomyProofPathsTest {
         assertEquals("BOUNDED", bounded["status"]); assertEquals(true, bounded["truncated"])
     }
 
+    @Test fun existingCharacterProfileAdmitsUtf8ReceiptsLargerThanOneMiB() {
+        val formula = "(subclass ${"中".repeat(60_000)} B)"
+        val t = Theory((0 until 16).toSeries().view.map { formula })
+        assertTrue(t.assertions.sumOf { it.text.length } < KifActivationLimits().maxTotalChars)
+        val actual = KifTaxonomySnapshot.create(1, t.assertions).activationPlan("subclass", "B", "B")
+        assertTrue(actual.export().size > 1024 * 1024)
+        val projection = ReviewedTaxonomyProofPaths.project(actual, t.selections)
+        ReviewedTaxonomyProofPaths.validate(projection, t.frozen())
+        assertEquals("SUPPORTED", projection["status"])
+        assertEquals(16, rows(projection["sources"]).size)
+        assertEquals(16, rows(projection["proofs"]).size)
+    }
+
     @Test fun alteredLinksQuotesAndOccurrenceMetadataAreRefused() {
         val t = Theory(_l["(instance Tenant Person)", "(subclass Person Agent)"])
         val plan = t.plan("instance", "Tenant", "Agent")
