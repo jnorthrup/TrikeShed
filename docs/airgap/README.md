@@ -13,6 +13,13 @@ and D3M integration record. A planned gate is not a completed release.
 | R3: visible document traversal | Source intake to scanner/evidence nodes with measured wire activity, pause at supported boundaries and evidence flyovers | Planned; [implementation handoff](03-visible-traversal.md) and [visual acceptance](../lcnc/airgap-demonstrator/07-visualization.md) |
 | R4: offline release closure | Reproducible packaged runtime, verified dependency closure and clean-machine startup without external networking | Planned; [operating procedures](../lcnc/airgap-demonstrator/20-operating-procedures.md) |
 
+The [v72 retained English follow-up](evidence/english-query-handoff-v72-20261105/README.md)
+verifies the native inert Documents-to-Panels handoff, ten URL/ownership guards,
+three exact-program syntax queries, and selected B trace/Evidence ownership when
+older A invocation reads return. It retains its final-JAR identity, original
+inspection, failed attempts, after-close CAS proof and independent audit; it
+does not close the planned R3/R4 gates.
+
 ## R2 acceptance and verification
 
 The upstream candidate is `jnorthrup/mlir-nix` revision

@@ -1,0 +1,25 @@
+# v72 retained English query handoff and activity ownership
+
+**PASS**, using frozen source `c8b7f5e8a5d0dad8e6352d2fc1c733df7d69e563`. The native Documents action opened a source-validated, inert ten-node copular query in Panels. Its original retained CoreNLP 4.6 inspection stayed `sha256:3f958801fe455258b0b4dea29a8cc4b77c26ce508e8988b67055c67cde221a0d`; no new parser or model ran. The root build passed 400 JVM checks with zero failures, errors or skips and built Documents, Panels and Pages.
+
+The selected final attempt made exactly three explicit runs, each returning the two syntax rows `Tenant / Person` and `Person / Agent`. All three retained one literal program CID, `sha256:7a9facce2bb7c40368815fbf56148a28270ec52954c3dfb54a1e17e12d1d8b30`. Each fresh `lcnc-observations/1` ledger contains 27 observations, including eight consumed-wire observations and zero owner omissions. Full parser node IDs, copula/subject edges, exact quotations and source revisions were checked against the original inspection. Nine retained CAS blocks were verified again by the production reader after every live owner drained.
+
+For each A run, its actual invocation GET returned 200 and was held while the user interface replayed recorded B. Releasing A's original success body left B's trace and Evidence selection intact. The second control read and retained the real A 200 body, then injected a clearly labelled browser-only 503; B remained selected. That injection is a transport control, not an engine failure. Consumed-wire metadata explicitly reports value identity unavailable.
+
+Ten native guard cases passed: fully percent-encoded references exceeding the field-count or length budgets; a decoded duplicate alias; malformed UTF-8; an actual 409 for a genuine manually uploaded different document with the same bytes; an explicitly injected wrong response identity/scope; real catalog/retained responses held across native canvas editing/navigation; and separate receipt/mode edits whose restoration did not silently restore the source-origin card. The valid saved-scratch sentinel stayed unchanged. Guard cases and native Import/Fit caused no query, Run, fresh Inspect or provider calls.
+
+The original project HEAD, source mirror, manifest and intake guard stayed byte-identical, and the CAS retained its entire original pack prefix. The SDK home was actually empty, provider count and model calls were zero, the analysis Rete stayed empty and its blackboard stayed unchanged. Operational run records remained separate. All observed production classes originated in the final JAR; observer compilation used the frozen 120-JAR classpath without friends or production overlays. Outbound connect/send syscalls were denied in the fixture and reader processes; this is not a global operating-system sandbox claim.
+
+[Machine summary](summary.json) · [Independent audit](audit-report.txt) · [Eight rejected mutated-copy controls](audit-result.json) · [Compressed exact records](records.tar.gz)
+
+[Inert native handoff](native-retained-handoff-loaded-before-run.png) · [B remains selected after the labelled A transport failure](native-A_failure-cannot-replace-B-activity.png)
+
+Earlier attempts remain explicitly incomplete. Attempt1 stopped on a proof-only navigation selector before any Run. Attempt2 made two real runs but output sizing moved node x coordinates, changing the program CID. Attempt3 restored those nodes through native Import but camera restoration rounded view.x from `3.211786372007367` to `3.2117863720073956`; its exact-CID assertion stopped after two runs. Attempt4 used native Import of B's exact admitted document plus native Fit before each A. All three admitted documents and their returned program CIDs then matched literally, with no automatic execution. No production source changed to obtain this result. The four exploratory runs belong to the preserved failed attempts, not the selected final three-run proof.
+
+The records archive contains the selected attempt's complete structured reports, CAS/readback bytes, protected runtime files, held actual response bodies, exact admitted import bytes and observer inputs; the earlier failure/progress/cleanup records and runtimes; the original seven-file source archive; and frozen build metadata. Large engine/JS binaries are excluded and pinned in [summary.json](summary.json). To repeat the read-only Python standard-library audit, extract the archive and supply the matching frozen snapshot:
+
+```text
+python3 audit.py.txt EXTRACTED/proof/native-attempt4 SNAPSHOT_DIR --archive EXTRACTED/source/positive-unmutated-runtime.tar.gz --out AUDIT_OUTPUT
+```
+
+The independent audit passed seven recorded-data checks and rejected eight mutated in-memory copies. The same verifier also passed against the extracted compressed records. It launches no browser, JVM, parser or network. Syntax observations do not establish semantic entailment, producer authentication, a new parser execution, review approval or NARS world facts. This proof does not close the planned R3/R4 release gates.
