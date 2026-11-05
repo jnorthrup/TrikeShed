@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Recorded v78 visual workflow audit; never launches runtime, parser, browser or build."""
+import argparse,base64,copy,hashlib,json,re
+from pathlib import Path
+from urllib.parse import urlsplit,unquote
+from visual_checks import *
+
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def stamp(path):
+    raw=path.read_bytes();return {'bytes':len(raw),'sha256':sha(raw)}
+def fingerprints(path,expected):need(stamp(path)==expected,'Materialized bytes/hash '+path.name)
+def origins(values,main_path):
+    need(values and all(unquote(urlsplit(v).path)==str(main_path) for v in values.values()),'Actual production class sources use pinned main JAR')
+
+def artifact(attempt,go,args):
+    need(go['rootGreen'] is True and go['sourceHead']==args.source_head and go['mainSha256']==args.main_sha and go['spacegraphSha256']==args.panels_sha and go['documentsSha256']==args.documents_sha,'Explicit final frozen artifact GO/pins')
+    folder=attempt/'artifact-metadata' if args.recorded_only else Path(go['snapshot'])
+    manifest=load(folder/'sha256.json');need((folder/'source-head.txt').read_text().strip()==args.source_head and sha((folder/'source-head.txt').read_bytes())==manifest['source-head.txt'],'Frozen source metadata')
+    for name,wanted in [('main.jar',args.main_sha),('spacegraph.js',args.panels_sha),('documents.js',args.documents_sha)]:
+        need(manifest[name]==wanted,'Recorded final artifact hash metadata')
+        if not args.recorded_only:need(stamp(folder/name)['sha256']==wanted,'Actual frozen artifact bytes')
+    cp=load(attempt/'classpath.json')
+    need(cp['productionDependencyJars']==120 and cp['totalJarCount']==121 and cp['totalClasspathEntries']==122,'Explicit production JAR/observer/assets classpath scope')
+    need(set(cp['assetJar']['entries'])=={'web/kotlin/spacegraph/spacegraph.js','web/kotlin/documents/documents.js'} and cp['assetJar']['entries']['web/kotlin/spacegraph/spacegraph.js']['sha256']==args.panels_sha and cp['assetJar']['entries']['web/kotlin/documents/documents.js']['sha256']==args.documents_sha,'Asset-only browser entry manifest')
+    cp_rows=cp['productionClasspath'];paths=[r['path'] for r in cp_rows]
+    need(len(paths)==len(set(paths))==120 and paths[0]==str(Path(go['snapshot'])/'main.jar') and len(manifest['dependencies'])==119,'Complete actual production classpath path identities')
+    need((folder/'classpath.txt').read_text().strip().split(':')==paths,'Frozen classpath text matches actual command dependency list')
+    for row in cp_rows:
+        wanted=args.main_sha if row is cp_rows[0] else manifest['dependencies'][row['path']]
+        need(row['sha256']==wanted,'Every recorded production dependency hash matches frozen manifest')
+        if not args.recorded_only:need(stamp(Path(row['path']))['sha256']==wanted,'Actual production dependency JAR bytes')
+    for filename,main_class in [('writer-command.json','proof.nalvisual.FixtureKt'),('reader-command.json','proof.nalvisual.ReopenKt')]:
+        command=load(attempt/filename);position=command.index('-cp')
+        need(command[position+1].split(':')==[cp['observerClasses']]+paths+[cp['assetJar']['path']] and command[position+2]==main_class,'Actual observer entrypoint/production dependency/asset-only classpath command')
+    return Path(go['snapshot'])/'main.jar'
+
+def refusal(run,first):
+    need(run['httpStatus']>=400 and run['reply']['status']!='completed' and run['reply'].get('ok') is not True,'Fresh ordinary run refuses')
+    need(not run['complete'].get('outputs',{}).get('evaluate',{}).get('report'),'Fresh refusal cannot borrow an old completed report')
+    need(run['reply']['programCid']==first['reply']['programCid'] and run['reply']['runId']!=first['reply']['runId'],'Same literal current program and new run identity')
+    need(run['after']['englishCurrentnessReads']>run['before']['englishCurrentnessReads'],'Fresh English owner currentness read occurred')
+
+def closed(attempt,start,cleanup,reopen,main_path):
+    need(reopen['result']=='PASS' and reopen['closed'] is True and reopen['writerCleanup']==cleanup,'Separate closed-reader/actual writer cleanup binding')
+    need(type(cleanup['pid']) is int and cleanup['pid']==start['baseline']['pid']==reopen['writerPid'] and type(reopen['readerPid']) is int and reopen['readerPid']!=cleanup['pid'],'Distinct actual writer/after-close reader PIDs')
+    need(all(cleanup[k] is True for k in ['listenerJoined','moduleDrained','englishDrained','scopesDrained','ownerCompleted','casClosed']) and cleanup['remainingChildren']==0,'Actual admitted owners drained and listener joined')
+    need(cleanup['closedPack']==reopen['packBeforeOpen']==reopen['packAfterClose'],'Recorded closed CAS pack unchanged over separate reader')
+    need(reopen['ownerFilesBeforeOpen']==reopen['ownerFilesAfterClose'],'Recorded owner/WAL files unchanged over separate reader')
+    origins(reopen['codeSources'],main_path)
+    actual={p.stem:'sha256:'+p.stem for p in (attempt/'durable-readbacks').glob('*.json')}
+    need({r['cid'] for r in reopen['readbacks']}==set(actual.values()),'Every fetched complete JSON block checked after close')
+    for row in reopen['readbacks']:fingerprints(attempt/'durable-readbacks'/(row['cid'][7:]+'.json'),{'bytes':row['bytes'],'sha256':row['sha256']})
+
+
+def workflow_deltas(deltas,runs):
+    run_ids={r['reply']['runId'] for r in runs};kinds={}
+    for delta in deltas:
+        for change in delta['reteChanges']:
+            for side in ['before','after']:
+                fact=change[side]
+                if fact is None:continue
+                fields=fact['fields'];kind=fields.get('kind');kinds[kind]=kinds.get(kind,0)+1
+                need(kind in ['card','now','lcnc-consumed'],'Observed changed Rete facts must have reviewed workflow/source-consumption kinds')
+                if kind=='card':need(fact['partition']=='board' and fields['jobId']==fact['id'] and fields['owner']=='lcnc-runner' and fact['id'] in {'lcnc/run/'+i for i in run_ids},'Actual Kanban run card, not English/NAL observation admission')
+                elif kind=='now':need(fact['partition']=='board' and fact['id']=='now' and isinstance(fields['ms'],(int,float)),'Actual board clock fact')
+                else:need(fields['runId'] in run_ids and fact['id'].startswith('lcnc/consumed/'),'Actual workflow source-consumption metadata')
+        for key in delta['changedBlackboardKeys']:
+            permitted=key in {'lcnc/run/'+i for i in run_ids} or any(re.fullmatch(r'kanban/committed/lcnc/run/'+re.escape(i)+r'/[0-9]+',key) for i in run_ids)
+            need(permitted,'Changed blackboard key is an actual LCNC run or committed workflow receipt')
+    return kinds
+
+def mutation_controls(runs,cases,attempt,start,cleanup,reopen,main_path):
+    controls=[]
+    def rejects(label,check):
+        try:check()
+        except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:controls.append({'mutation':label,'result':'REJECTED','reason':str(error)})
+        else:raise AuditError('Mutated recorded copy accepted: '+label)
+    body,text=cases['S12'];output=runs[0]['complete']['outputs']['evaluate']
+    wrong=copy.deepcopy(output);wrong['report']['derivations'][0]['positive']+=1
+    rejects('wrong-NAL-milli-weight',lambda:envelope(wrong,body,text,'EVALUATED'))
+    quote=copy.deepcopy(output);quote['passages'][0]['quote']='substituted quotation'
+    rejects('substituted-source-quotation',lambda:envelope(quote,body,text,'EVALUATED'))
+    mode=copy.deepcopy(output);mode['source']['currentness']='not-checked'
+    rejects('unconfirmed-owner-mislabeled-current',lambda:envelope(mode,body,text,'EVALUATED'))
+    frame=copy.deepcopy(runs[6]);frame['reply']['outputCid']=output['frameCid']
+    rejects('computed-frame-as-full-output-receipt',lambda:references(attempt,frame))
+    stale=copy.deepcopy(runs[-1]);stale['complete']['outputs']={'evaluate':copy.deepcopy(output)}
+    rejects('fresh-refusal-borrows-old-completed-report',lambda:refusal(stale,runs[0]))
+    reused=copy.deepcopy(reopen);reused['readerPid']=cleanup['pid']
+    rejects('reader-reuses-live-writer-identity',lambda:closed(attempt,start,cleanup,reused,main_path))
+    return controls
+
+def audit(proof,attempt,args):
+    need((attempt/'GO.json').is_file(),'Final frozen artifact GO required')
+    for name in ['browser-result.json','startup.json','cleanup.json','reopened.json']:
+        if not (attempt/name).is_file():return {'result':'PENDING','reason':'Closed actual native records required; no runtime launched by auditor'}
+    browser=load(attempt/'browser-result.json');observed=browser['observed'];start=load(attempt/'startup.json');cleanup=load(attempt/'cleanup.json');reopen=load(attempt/'reopened.json')
+    need(browser['result']=='PASS' and browser['errors']==browser['external']==[],'Actual browser completion with scoped request/error capture')
+    go=load(attempt/'GO.json');need(start['go']==go,'Writer uses exact final GO')
+    main_path=artifact(attempt,go,args);origins(start['origins'],main_path)
+    need({'SyntheticNalExperiment','Nal','DerivationReceipt','EnglishObservationWire','EnglishObservationGraph','LcncOutputReceipt','LcncRunService','KanbanModule','JvmKanbanServer','CouchWire','CouchWireRouter'}.issubset(start['origins']),'Observed real evaluator/owner/server/module/retention origins')
+    for name in ['browser.exit','writer.exit','reader.exit','namespace.exit']:
+        need((attempt/name).read_text().strip()=='0','Actual closed process exit '+name)
+    network=load(attempt/'network.json');controller=load(attempt/'controller-before-netns.json')
+    interfaces=json.loads(network['interfaces']);routes=json.loads(network['routes'])
+    need(network['networkNamespace']==start['baseline']['networkNamespace'] and network['networkNamespace']!=controller['networkNamespace'] and {i['ifname'] for i in interfaces}=={'lo'} and routes==[] and network['externalTcp']['errno']==101,'Observed loopback-only namespace and external route refusal; not full R4 rootfs')
+    cases={k:original_case(proof,k) for k in ['S12','G03','G04']}
+    for key,(body,text) in cases.items():
+        need(start['baseline']['rows'][key]==body['sourceSnapshots'][0] and start['cases'][key]['inspectionCid']==body['receiptCid'] and start['cases'][key]['text']==text,'Actual initial host corpus equals original retained selection')
+    need(cases['G03'][0]['receiptCid']=='sha256:da73b415ed3d41efa0c0fa992797722f8bc0160adb59af3ce35c04b188181f85' and cases['G04'][0]['receiptCid']=='sha256:f729da2140392817ddf9e019d249a537aacf85220da221983116b6baf26972ec','Exact published genuine guard inspections')
+    posts=[r for r in browser['requests'] if r['method']=='POST' and r['path']=='/api/lcnc/run']
+    need(len(posts)==8,'Exactly eight explicit native Run POST requests')
+    runs=observed['runs'];labels=['S12-passage-'+str(i) for i in range(5)]+['G03-whole-profile-guard','S12-real-large-output','same-current-program-after-source-amendment']
+    need([r['label'] for r in runs]==labels and len({r['reply']['runId'] for r in runs})==8,'Five ordinary UI runs precede guard, separate fanout and fresh refusal')
+    results=[];deltas=[]
+    for i,run in enumerate(runs):
+        need(json.loads(posts[i]['body'])==run['request'] and load(attempt/(run['label']+'-http-response.json'))==run['reply'],'Actual captured native POST/body and raw response')
+        full=references(attempt,run);invocations=run['invocations'];need(invocations['kind']=='lcnc-invocations' and invocations['runId']==run['reply']['runId'] and invocations['programCid']==run['reply']['programCid'] and invocations['observationSchema']=='lcnc-observations/1','Actual run/program/invocation observation binding')
+        entries=[e for e in invocations['entries'] if e['nodeId']=='evaluate'];need(len(entries)==1 and entries[0]['type']=='document.english.nal','Actual registered English NAL invocation')
+        program_shape(run,cases['G03' if i==5 else 'S12'][0]['receiptCid'],i if i<5 else 4 if i==5 else 0,i==6)
+        if i<7:
+            need(run['httpStatus']==200 and run['reply']['status']=='completed' and run['reply']['ok'] is True and entries[0]['status']=='completed','Completed actual production evaluator invocation')
+            key='G03' if i==5 else 'S12';body,text=cases[key]
+            results.append(envelope(full['outputs']['evaluate'],body,text,'UNSUPPORTED' if i==5 else 'EVALUATED'))
+            need(run['after']['englishCurrentnessReads']>=run['before']['englishCurrentnessReads']+2,'Both currentness source checks observed')
+            if i!=5:need(full['outputs']['evaluate']['report']==load(proof/'inputs/S12/prior-v77-common-report.json'),'Unchanged prior genuine retained common report')
+        else:refusal(run,runs[0])
+        deltas.append(state_delta(run['before'],run['after']))
+    need([f['index'] for f in observed['sourceFocus']]==list(range(5)),'All five ordinary source occurrences visibly focused')
+    for i,focus in enumerate(observed['sourceFocus']):
+        source_focus(focus,runs[i],*cases['S12'])
+        need((attempt/('actual-source-response-'+str(i)+'.txt')).read_text()==cases['S12'][1],'Actual native verified source response bytes')
+        need((attempt/('passages-geometry-'+runs[i]['label']+'.json')).read_text()==runs[i]['geometryInputUtf8'],'Captured exact JSON geometry preimage')
+    large=runs[6];raw=(attempt/'durable-readbacks'/(large['reply']['outputCid'][7:]+'.json')).read_bytes()
+    need(len(raw.decode('utf8').encode('utf-16-le'))//2>131072 and large['reply']['outputPreview'] is True,'Separate real full output deterministically exceeds character budget')
+    content=[r for r in observed['contentReads'] if r['cid']==large['reply']['outputCid']]
+    need(content and all(r['lcncStatus']==413 and r['rawBlockStatus']==200 and r['bytes']==len(raw) and r['sha256']==large['reply']['outputCid'] for r in content),'Narrow LCNC content refusal preserved; exact full bytes fetched through production raw block alias')
+    ref=large['reply']['outputs']['evaluate'];need(ref['previewOnly'] is True and ref['contentType']=='application/json' and ref['retainedCid']!=large['complete']['outputs']['evaluate']['frameCid'],'Per-node reference is a persisted JSON output, never computed frame')
+    retained,_=json_block(attempt,ref['retainedCid']);need(retained==large['complete']['outputs']['evaluate'],'Fetched full node report matches actual root output')
+    amended=observed['sourceAmendment'];amend=base64.b64decode(amended['requestBase64'],validate=True)
+    need(amend.decode('utf8')==amended['requestUtf8']==cases['S12'][1]+'\n' and len(amend)==amended['requestBytes'] and cid(amend)==amended['requestCid'],'Actual source amendment request bytes/CID')
+    need(reopen['currentAmendedRow']['cid']==amended['requestCid'] and reopen['currentAmendedRow']['rev']!=cases['S12'][0]['selection']['rev'] and reopen['currentAmendedRow']['seq']!=cases['S12'][0]['selection']['seq'] and reopen['sourceMirror']=={'bytes':len(amend),'sha256':sha(amend)},'Current amended head/mirror is distinct from immutable old report source')
+    need((attempt/'after-close-readbacks/actual-amended-S12-source.txt').read_bytes()==amend,'Actual selected amended mirror bytes are supplied')
+    need(observed['staleDom']['sourceCardCount']==0 and observed['staleDom']['url']==runs[-1]['url'] and 'Program failed' in observed['staleDom']['text'],'Actual failed-run UI clears source card and shows failure')
+    inert=observed['inert'];need(inert['runPosts']==0 and inert['scratchBefore']==inert['scratchAfter'] and all(i['automaticRuns']==0 for i in observed['imports']),'Offered load/import leaves scratch intact and never automatically runs')
+    need(not any(r['method']=='POST' and r['path']=='/api/documents/english' for r in browser['requests']),'No fresh-parser request in captured browser scope')
+    closed(attempt,start,cleanup,reopen,main_path)
+    historical=reopen['historicalReadbacks']
+    expected_history={(key,body[field]) for key,(body,text) in cases.items() for field in ['receiptCid','extractedTextCid']}
+    need(len(historical)==6 and {(row['case'],row['cid']) for row in historical}==expected_history,'All three exact original receipt/source pairs read after close')
+    for row in historical:
+        raw=(attempt/'after-close-readbacks'/(row['cid'][7:]+'.bin')).read_bytes();need(cid(raw)==row['cid'] and len(raw)==row['bytes'] and sha(raw)==row['sha256'],'Actual after-close historical source/receipt bytes')
+    kinds=workflow_deltas(deltas,runs)
+    controls=mutation_controls(runs,cases,attempt,start,cleanup,reopen,main_path)
+    record_hashes={n:sha((attempt/n).read_bytes()) for n in ['GO.json','startup.json','browser-result.json','cleanup.json','reopened.json','classpath.json','network.json','writer-command.json','reader-command.json']}
+    observer=attempt/'observer-inputs'
+    observer_hashes={p.name:sha(p.read_bytes()) for p in observer.iterdir() if p.is_file()} if observer.is_dir() else {}
+    selected_files=[]
+    for key,(body,text) in cases.items():
+        folder=proof/'inputs'/key
+        selected_files += [folder/n for n in ['source.txt','request.json','response.json','source-row.json','status.txt']]
+        selected_files += [folder/'cas-readbacks'/(body['receiptCid'][7:]+'.cbor'),folder/'cas-readbacks'/(body['extractedTextCid'][7:]+'.txt')]
+    selected_files.append(proof/'inputs/S12/prior-v77-common-report.json')
+    selected_hashes={str(p.relative_to(proof)):sha(p.read_bytes()) for p in selected_files}
+    return {'recordSha256':record_hashes,'observerSourceSha256':observer_hashes,'selectedInputSha256':selected_hashes,'writerPid':cleanup['pid'],'readerPid':reopen['readerPid'],'fullOutputBytes':len((attempt/'durable-readbacks'/(large['reply']['outputCid'][7:]+'.json')).read_bytes()),'afterCloseJsonReadbacks':len(reopen['readbacks']),'mutatedCopyControls':controls,'result':'PASS_RECORDED_VISUAL_WORKFLOW_CONSISTENCY','sourceHead':args.source_head,'mainSha256':args.main_sha,'panelsSha256':args.panels_sha,'runs':len(runs),'sourceFocus':5,'reports':results,'stateDeltas':deltas,'changedWorkflowFactKinds':kinds,'artifactVerification':'recorded metadata/class-origin consistency only' if args.recorded_only else 'actual frozen main/browser bytes rehashed plus recorded metadata/class origins','scope':'Recorded selected-source and production-workflow consistency only; no semantic truth/parser authentication/independence/current authority after amendment/live observation admission/global OS seal. Omitted full pack/prefix bytes remain external to this package. Historical REF paths are recorded metadata; they are not asserted active for the selected latest-BLOB reads, nor authenticated as available paths by public replay. No portable CAS availability is established.'}
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('proof',type=Path);parser.add_argument('attempt',type=Path);parser.add_argument('--out',type=Path,required=True)
+    for flag in ['source-head','main-sha','panels-sha','documents-sha']:parser.add_argument('--'+flag,required=True)
+    parser.add_argument('--recorded-only',action='store_true');args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    try:result=audit(args.proof,args.attempt,args)
+    except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:result={'result':'FAIL','error':str(error)}
+    result['auditScriptSha256']=sha(Path(__file__).read_bytes());result['supportScriptSha256']={n:sha(Path(__file__).with_name(n).read_bytes()) for n in ['visual_checks.py','v77-audit.py.txt']};(args.out/'result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
+    lines=['Independent v78 recorded visual workflow audit: '+result['result'],result.get('scope',result.get('error',result.get('reason','')))]
+    if result['result'].startswith('PASS'):
+        lines+=['Source: '+result['sourceHead']+'; main SHA256: '+result['mainSha256'],
+          'Five ordinary source-focus runs, genuine G03 whole-frame UNSUPPORTED, separate oversized fanout retention, and fresh same-program refusal after actual amendment.',
+          'Nested report full-CID identities, ordered original premises and existing Float32 NAL math verified using unchanged v77 core.',
+          'Five exact source quotation projections and native Kotlin JSON geometry verified; route preserved. Actual durable board command, program, invocation, root output and per-node output JSON bytes are CID-bound.',
+          'Oversized output preserves narrow LCNC content413 and production Couch raw-block200; full fetched data is never injected into UI.',
+          'Concrete module workflow Rete/blackboard changes inspected; no blanket zero claim. Old completed frames are historical/as-of after amendment.',
+          'Separate writer/reader closure, selected historical CBOR/text and amended mirror readbacks checked. Omitted full pack/prefix bytes remain external. Historical REF metadata establishes neither current path availability nor active use; no portable CAS is claimed.',
+          'Six mutated recorded copies rejected. Artifact verification: '+result['artifactVerification']+'.']
+    (args.out/'report.txt').write_text('\n'.join(lines)+'\n');print(json.dumps({'result':result['result'],'out':str(args.out)}))
+    raise SystemExit(0 if result['result'].startswith('PASS') else 2 if result['result']=='PENDING' else 1)

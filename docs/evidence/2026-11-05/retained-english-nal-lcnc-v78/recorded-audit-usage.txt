@@ -1,0 +1,68 @@
+V78 retained NAL visual-workflow independent recorded-data audit
+
+Selected native-attempt2 used frozen source
+aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26 after root 489-test/all-source/three-JS GREEN.
+main SHA256 5370a549d963f871d8bdd81328bc28a3f00a064807334d3dabd47e95d6ddf036
+Spacegraph SHA256 fd19345d638b5542c9d36f5ccf1ea6887542368d35dd716984ff01bb23979c3a
+Documents SHA256 f35b8b9991ffb58dba1962a0a021169965f0b560d7f5d1e327ae8e2b6be9639a
+
+This auditor launches no JVM, parser, browser, namespace, application or build.
+It writes only audit results to the requested external output directory.
+Restore public audit.py.txt and visual_checks.py.txt as audit.py and
+visual_checks.py in one fresh directory beside unchanged v77-audit.py.txt.
+The latter SHA256 8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763
+supplies the previously audited canonical identity/source/Float32 NAL checks.
+No independent inference closure, theorem or entailment is generated.
+
+Public replay:
+python3 audit.py PROOF_ROOT PROOF_ROOT/native-attempt2 --recorded-only --source-head aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26 --main-sha 5370a549d963f871d8bdd81328bc28a3f00a064807334d3dabd47e95d6ddf036 --panels-sha fd19345d638b5542c9d36f5ccf1ea6887542368d35dd716984ff01bb23979c3a --documents-sha f35b8b9991ffb58dba1962a0a021169965f0b560d7f5d1e327ae8e2b6be9639a --out FRESH_OUTPUT
+
+Omit --recorded-only to additionally rehash the locally available frozen120-JAR
+classpath and main/browser bytes. Both modes verify recorded class-source/command
+metadata and exact supplied records; public mode does not access external JARs.
+All three script hashes and actual record/input/observer hashes bind each result.
+
+Minimum selected contents: inputs/{S12,G03,G04}/source.txt,request.json,
+response.json,source-row.json,status.txt and exact source.txt/inspection.cbor
+materialized CID readbacks under cas-readbacks; S12/prior-v77-common-report.json.
+The final attempt needs GO/startup/browser/cleanup/reopened/classpath/network/
+controller/command/exit records, artifact-metadata source-head/sha256/classpath,
+all durable-readbacks, after-close-readbacks (six historical blocks and actual
+amended source mirror), actual-source-response-0.txt through -4.txt, passages-geometry JSON files,
+raw run HTTP responses, and exact executed observer-inputs. Extra diagnostics
+are optional; no input file outside those three selected cases is read.
+
+Full original runtime pack/prefix bytes and the other synthetic source cases are
+not required or published. Their recorded hashes are external metadata, not
+independently rehashed portable content. The input pack had 17 historical REF
+records but later BLOBs supplied the selected digests; original REF path metadata
+is not a claim of active dependency, availability, or relocated/self-contained CAS.
+Recorded writer-close/reader-before/reader-after pack and owner/WAL hashes are
+compared; omitted full pack/WAL bytes are not independently replayed by Python.
+
+Five ordinary native source-focus runs precede the separately authored fanout
+whose actual full JSON is 280607 bytes. /api/lcnc/content413 remains visible;
+production CouchWire/CouchWireRouter raw-block200 exports exact retained JSON.
+No fetched full output is privately hydrated into the UI. Computed frame and
+JSON geometry CIDs are not promoted into claims of stored report blocks.
+Every ordered quotation and real Kotlin UTF8-inclusive geometry is checked,
+separately from the source's UTF16 half-open quotation ranges. Fresh ordinary
+same-program execution after actual source amendment refuses; old completed
+frames remain immutable historical/as-of outputs.
+
+Real KanbanModule creates legitimate board/run Rete facts and blackboard workflow
+receipts. The audit checks concrete changed kinds/owners/IDs/keys and reports
+their deltas. It does not require blanket Rete-zero. Absent bag/KIF/NARS engines,
+empty guest modules, no configured intake hooks or provider endpoints, and actual
+captured request scope remain limited host observations. No parser execution is
+reauthenticated, no independent evidence or live observation admission is granted,
+and the loopback-only namespace is not the earlier full R4 sealed filesystem.
+
+Six proportional mutations cover NAL weight, quotation substitution, currentness
+label, frame-as-output receipt, stale-report borrowing, and reader owner identity.
+Initial audit assumption failure is preserved under attempt1-audit: UI defaults
+serialize declared receiptCid/mode blank params even when actual wires override
+them. The corrected validator allows only those declared string params; records
+and production code were unchanged. Prior strict/recorded PASS snapshots are
+retained. Native attempt1 data passed but screenshots were obstructed; final
+attempt2 changes only public presentation actions on the same frozen artifact.
