@@ -1,0 +1,44 @@
+from pathlib import Path
+import json,sys,hashlib,struct,re
+h=Path('/workspace/airgap-r3d-proof');a=h/sys.argv[1];kind=sys.argv[2];b=json.loads((a/'browser.json').read_text());proc=json.loads((a/'processes.json').read_text());cas=a/'state/runtime/cas/sha256';count=0
+def read(cid):
+ d=cid.removeprefix('sha256:');assert re.fullmatch('[0-9a-f]{64}',d);data=(cas/d[0]/d[1]/d[2]/d[3]/d[4:]).read_bytes();assert hashlib.sha256(data).hexdigest()==d;return data
+for p in cas.rglob('*'):
+ if p.is_file():d=''.join(p.relative_to(cas).parts);assert re.fullmatch('[0-9a-f]{64}',d) and hashlib.sha256(p.read_bytes()).hexdigest()==d;count+=1
+def crc(data):
+ c=0xffffffff
+ for byte in data:
+  c^=byte
+  for _ in range(8):c=(c>>1)^(0x82f63b78 if c&1 else 0)
+ return c^0xffffffff
+wal=(a/'state/runtime/.kanban/board.wal').read_bytes();at=0;frames=[]
+while at<len(wal):
+ magic,version,sequence,n=struct.unpack_from('>4sHQI',wal,at);end=at+18+n;assert magic==b'WAL1' and version==1 and sequence==len(frames)+1 and end+4<=len(wal);assert crc(wal[at:end])==struct.unpack_from('>I',wal,end)[0];job,cid=wal[at+18:end].decode().split('\t');command=json.loads(read(cid));assert command['jobId']==job;frames.append({'cid':cid,'status':command['lcncRun']['status']});at=end+4
+assert [r['status'] for r in frames]==['queued','running','completed'];run=json.loads(read(frames[-1]['cid']))['lcncRun'];assert b['receipt']['receiptCid']==frames[-1]['cid'];assert run['runId']==b['receipt']['runId'];assert run['status']=='completed' and run['ok'];ledger=json.loads(read(run['invocationsCid']));program=json.loads(read(run['programCid']));assert ledger==b['ledger'];assert ledger['runId']==run['runId'] and ledger['programCid']==run['programCid']
+assert proc['error'] is None and proc['driverExit']==0 and not b.get('error') and not b['errors'];assert all(p['exit']==0 and not p.get('forcedTermination') for p in proc['processes']);assert len([r for r in b['requests'] if r['url'].endswith('/api/lcnc/run')])==1
+for p in proc['processes']:assert all(json.loads((a/('state/cleanup-'+p['mode']+'.json')).read_text()).values())
+assert b['bundleSha256']==json.loads((a/'identity.json').read_text())['bundleSha256']
+initial=json.loads((a/'run-ready.json').read_text());last=json.loads((a/('state/state-'+proc['processes'][-1]['mode']+'.json')).read_text());assert initial['documents']==last['documents'] and len(last['documents'])==6 and len(last['runs'])==1
+if kind=='document':
+ assert len(proc['processes'])==2 and not last['llvmInstalled'] and not last['minerInstalled'];assert len(b['cases'])==10 and all(v['result']=='PASS' for v in b['cases'].values())
+ quote=run['outputs']['selection']['value'];text=read(quote['extractedTextCid']).decode().encode('utf-16-le');assert quote['begin']==18477 and quote['end']==18654;assert text[int(quote['begin'])*2:int(quote['end'])*2].decode('utf-16-le')==quote['quote'];assert len(read(quote['originalCid']))==111243;assert run['outputs']['scan']['runtime']['liveBytesAfter']==0
+ events=[e for e in ledger['observations'] if e['phase']=='consumed'];assert [e['wire']['index'] for e in events]==list(range(8));rows=b['cases']['retainedTable']['rows'];assert len(rows)==8 and sum(r['count'] for r in rows)==8
+ held=b['cases']['continuousClock']['held'];assert held and all(0<r['progress']<1 for r in held);assert all(r['error']<1 for r in b['cases']['pausedCamera']['alignment']);assert b['cases']['reopenedInspection']['sameReceipt']
+else:
+ assert kind=='fanout' and len(proc['processes'])==1;assert len(program['nodes'])==65 and len(program['wires'])==64 and ledger['attempted']==65;assert run['outputs']['source']['value']==2
+ for i in range(64):assert run['outputs']['sum'+str(i)]['value']==i+2
+ received={}
+ for snapshot in b['observations']+[ledger]:
+  for event in snapshot.get('observations',[]):
+   if event['phase']!='consumed':continue
+   assert event['documentCid']==run['programCid'];key=event['sequence']
+   if key in received:assert received[key]==event
+   received[key]=event
+ rows=b['cases']['measuredFanout']['rows'];events=[e for e in received.values() if any(r['wire']==e['wire']['index'] for r in rows)];assert len(rows)==len(events);assert len(events)<64 and ledger['observationsDropped']>0;assert all(any(r['wire']==e['wire']['index'] for r in rows) for e in ledger['observations'] if e['phase']=='consumed')
+ assert sorted(r['wire'] for r in rows)==sorted(int(e['wire']['index']) for e in events);assert b['cases']['boundedDisplay']['markers']<=128
+for row in rows:
+ es=sorted((e for e in events if e['wire']['index']==row['wire']),key=lambda e:e['sequence']);assert len(es)==row['count'];assert row['sequences']==str(int(es[0]['sequence']))+'–'+str(int(es[-1]['sequence']));assert abs(float(row['lastMs'])-es[-1]['elapsedNanos']/1e6)<.001
+ for e in es:
+  w=program['wires'][row['wire']];assert w['from']==[e['wire']['fromNode'],e['wire']['fromPort']] and w['to']==[e['wire']['toNode'],e['wire']['toPort']]
+result={'kind':kind,'casObjectsVerified':count,'walFramesVerified':frames,'runId':run['runId'],'programCid':run['programCid'],'receiptCid':frames[-1]['cid'],'mappedReceivedSelections':sum(r['count'] for r in rows),'mappedWires':len(rows),'ownerOmissionsInFinalLedger':ledger['observationsDropped'],'allSixDocumentsUnchanged':True,'processExits':[p['exit'] for p in proc['processes']],'oneRunSubmission':True,'bundleSha256':b['bundleSha256'],'frameIntervals':{k:v for k,v in b.get('frameIntervals',{}).items() if k!='raw'},'scope':'Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks.'}
+(a/'independent-audit.json').write_text(json.dumps(result,indent=2)+'\n');print(json.dumps({k:v for k,v in result.items() if k not in ['walFramesVerified','frameIntervals']},indent=2))

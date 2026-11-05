@@ -1,0 +1,18 @@
+{
+  "kind": "document",
+  "casObjectsVerified": 27,
+  "runId": "948e3b38-519c-458e-a828-914c1aaa8191",
+  "programCid": "sha256:346979fe70f6e54c3ac28526bb23d7ec49fc412f3e863ab16a86b91644a540c3",
+  "receiptCid": "sha256:8d15565ffd0296e2d2c2f54c8fb8c69dd86cc85ce1f085df5bea889c954a2f1e",
+  "mappedReceivedSelections": 8,
+  "mappedWires": 8,
+  "ownerOmissionsInFinalLedger": 0,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0,
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}

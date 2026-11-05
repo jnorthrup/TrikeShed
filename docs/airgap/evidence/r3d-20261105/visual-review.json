@@ -1,0 +1,13 @@
+{
+  "inspected": [
+    "accepted/final-fanout01/fanout-observation-coverage.png",
+    "accepted/final-document/transfer-table.png",
+    "accepted/final-ownership/changed-reference-refused.png"
+  ],
+  "findings": [
+    "Final fanout shows separate nodes, source wires and explicit 165 owner omissions; many nodes extend beyond the current viewport.",
+    "Document screenshot shows eight observed transfers and keyboard selection.",
+    "Ownership screenshot shows an edited parameter and changed-source refusal in the status bar; a fitted one-node view is heavily zoomed. It is not a claim of large-graph navigability."
+  ],
+  "figure": "frame-comparison.png: legend repositioned above bars to preserve all measured labels."
+}

@@ -1,0 +1,766 @@
+{
+  "bundleSha256": "7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74",
+  "selfSamples": [
+    {
+      "ms": 1059.038,
+      "id": 10,
+      "function": "(idle)",
+      "url": ""
+    },
+    {
+      "ms": 674.943,
+      "id": 2,
+      "function": "(program)",
+      "url": ""
+    },
+    {
+      "ms": 222.553,
+      "id": 523,
+      "function": "xs",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 195,
+      "column": 9,
+      "name": "resolveTopLevelOverlaps$rect",
+      "text": "fun rect(n: dynamic) = R(num(n.x), num(n.y), if (truthy(n.el.offsetWidth)) num(n.el.offsetWidth) else 200.0, if (truthy(n.el.offsetHeight)) num(n.el.offsetHeight) else 100.0)"
+    },
+    {
+      "ms": 65.708,
+      "id": 144,
+      "function": "(garbage collector)",
+      "url": ""
+    },
+    {
+      "ms": 39.189,
+      "id": 248,
+      "function": "Be",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "compare",
+      "text": ""
+    },
+    {
+      "ms": 36.706,
+      "id": 229,
+      "function": "zh.b2a",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt",
+      "line": 246,
+      "column": 5,
+      "name": "buildTree",
+      "text": "fun buildTree("
+    },
+    {
+      "ms": 36.266,
+      "id": 16,
+      "function": "query",
+      "url": ""
+    },
+    {
+      "ms": 31.249,
+      "id": 249,
+      "function": "Qe",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "add",
+      "text": ""
+    },
+    {
+      "ms": 28.258,
+      "id": 232,
+      "function": "t.$_$.b8",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": null,
+      "text": ""
+    },
+    {
+      "ms": 27.478,
+      "id": 696,
+      "function": "getTotalLength",
+      "url": ""
+    },
+    {
+      "ms": 26.996,
+      "id": 244,
+      "function": "Ke",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "multiply",
+      "text": ""
+    },
+    {
+      "ms": 25.924,
+      "id": 310,
+      "function": "Qe",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "add",
+      "text": ""
+    },
+    {
+      "ms": 24.856,
+      "id": 231,
+      "function": "zh.p",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/lib/PackedIntBuf.kt",
+      "line": 54,
+      "column": 14,
+      "name": "get",
+      "text": "operator fun get(index: Int): Int {"
+    },
+    {
+      "ms": 22.573,
+      "id": 234,
+      "function": "Be",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "compare",
+      "text": ""
+    },
+    {
+      "ms": 21.11,
+      "id": 21,
+      "function": "computeAriaRole",
+      "url": ""
+    },
+    {
+      "ms": 21.06,
+      "id": 562,
+      "function": "getBoundingClientRect",
+      "url": ""
+    },
+    {
+      "ms": 19.273,
+      "id": 276,
+      "function": "Be",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "compare",
+      "text": ""
+    },
+    {
+      "ms": 18.079,
+      "id": 328,
+      "function": "Ye",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "fromNumber",
+      "text": ""
+    },
+    {
+      "ms": 16.334,
+      "id": 602,
+      "function": "getTextAlternativeInternal",
+      "url": ""
+    },
+    {
+      "ms": 16.202,
+      "id": 233,
+      "function": "",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 177,
+      "column": 1,
+      "name": "utf8",
+      "text": "fun utf8(text: CharSequence): ByteArray {"
+    },
+    {
+      "ms": 16.071,
+      "id": 300,
+      "function": "Qe",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "add",
+      "text": ""
+    },
+    {
+      "ms": 13.35,
+      "id": 22,
+      "function": "getAttribute",
+      "url": ""
+    },
+    {
+      "ms": 13.014,
+      "id": 230,
+      "function": "ki",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "sort$lambda",
+      "text": ""
+    },
+    {
+      "ms": 12.988,
+      "id": 217,
+      "function": "zh.b2a",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt",
+      "line": 246,
+      "column": 5,
+      "name": "buildTree",
+      "text": "fun buildTree("
+    },
+    {
+      "ms": 12.914,
+      "id": 277,
+      "function": "Qe",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "add",
+      "text": ""
+    },
+    {
+      "ms": 12.614,
+      "id": 243,
+      "function": "Ke",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "multiply",
+      "text": ""
+    },
+    {
+      "ms": 12.392,
+      "id": 30,
+      "function": "requestAnimationFrame",
+      "url": ""
+    },
+    {
+      "ms": 12.206,
+      "id": 266,
+      "function": "gk",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixKit.kt",
+      "line": 350,
+      "column": 10,
+      "name": "decodeTextSpan",
+      "text": "internal fun decodeTextSpan(src: Series<Byte>, open: Int, close: Int): String {"
+    },
+    {
+      "ms": 11.816,
+      "id": 319,
+      "function": "Qe",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "add",
+      "text": ""
+    },
+    {
+      "ms": 11.502,
+      "id": 664,
+      "function": "query",
+      "url": ""
+    },
+    {
+      "ms": 11.211,
+      "id": 36,
+      "function": "elementsFromPoint",
+      "url": ""
+    },
+    {
+      "ms": 11.196,
+      "id": 24,
+      "function": "dispatchEvent",
+      "url": ""
+    },
+    {
+      "ms": 10.721,
+      "id": 299,
+      "function": "Be",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "compare",
+      "text": ""
+    },
+    {
+      "ms": 9.763,
+      "id": 359,
+      "function": "Be",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "compare",
+      "text": ""
+    },
+    {
+      "ms": 9.737,
+      "id": 301,
+      "function": "Ye",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "fromNumber",
+      "text": ""
+    }
+  ],
+  "inclusiveSamples": [
+    {
+      "ms": 3182.011,
+      "id": 1,
+      "function": "(root)",
+      "url": ""
+    },
+    {
+      "ms": 1133.062,
+      "id": 45,
+      "function": "En.k8",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": null,
+      "text": ""
+    },
+    {
+      "ms": 1133.062,
+      "id": 44,
+      "function": "En.o8",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": null,
+      "text": ""
+    },
+    {
+      "ms": 1133.062,
+      "id": 43,
+      "function": "Pt.vp",
+      "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/common/src/internal/DispatchedTask.kt",
+      "line": 77,
+      "column": 20,
+      "name": "run",
+      "text": ""
+    },
+    {
+      "ms": 1133.062,
+      "id": 42,
+      "function": "Pt.k13",
+      "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/web/src/internal/JSDispatcher.kt",
+      "line": 122,
+      "column": 5,
+      "name": "process",
+      "text": ""
+    },
+    {
+      "ms": 1133.062,
+      "id": 41,
+      "function": "",
+      "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/js/src/JSDispatcher.kt",
+      "line": 55,
+      "column": 36,
+      "name": "WindowMessageQueue$schedule$lambda$lambda",
+      "text": ""
+    },
+    {
+      "ms": 1121.088,
+      "id": 114,
+      "function": "X.l8",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 40,
+      "column": 18,
+      "name": "doResume",
+      "text": "internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynamic {"
+    },
+    {
+      "ms": 1100.536,
+      "id": 187,
+      "function": "X.l8",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 141,
+      "column": 9,
+      "name": "doResume",
+      "text": "suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {"
+    },
+    {
+      "ms": 1100.536,
+      "id": 186,
+      "function": "vv",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 141,
+      "column": 9,
+      "name": "programOutputs",
+      "text": "suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {"
+    },
+    {
+      "ms": 1059.038,
+      "id": 10,
+      "function": "(idle)",
+      "url": ""
+    },
+    {
+      "ms": 818.011,
+      "id": 207,
+      "function": "Uv",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+      "line": 146,
+      "column": 5,
+      "name": "programOutputs$current",
+      "text": "fun current(): Boolean = owned() && !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(definition,"
+    },
+    {
+      "ms": 674.943,
+      "id": 2,
+      "function": "(program)",
+      "url": ""
+    },
+    {
+      "ms": 585.292,
+      "id": 222,
+      "function": "zh.z1z",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/lcnc/LcncProgramConfix.kt",
+      "line": 27,
+      "column": 5,
+      "name": "sameDefinition",
+      "text": "fun sameDefinition(left: LcncProgram, right: LcncProgram): Boolean {"
+    },
+    {
+      "ms": 566.951,
+      "id": 223,
+      "function": "fw",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/lcnc/LcncProgramConfix.kt",
+      "line": 28,
+      "column": 9,
+      "name": "sameDefinition$definition",
+      "text": "fun definition(program: LcncProgram) = reify(toJson(program.copy(nodes = definitionNodes(program.nodes), view = null)))"
+    },
+    {
+      "ms": 540.275,
+      "id": 224,
+      "function": "yM",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 13,
+      "column": 1,
+      "name": "reify",
+      "text": "fun reify(json: CharSequence): Any? = reify(utf8(json))"
+    },
+    {
+      "ms": 524.073,
+      "id": 225,
+      "function": "",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 16,
+      "column": 1,
+      "name": "reify",
+      "text": "fun reify(bytes: ByteArray): Any? = reify(bytes) { it.toDoubleOrNull() }"
+    },
+    {
+      "ms": 522.999,
+      "id": 226,
+      "function": "",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 19,
+      "column": 1,
+      "name": "reify",
+      "text": "fun reify(bytes: ByteArray, number: (String) -> Any?): Any? {"
+    },
+    {
+      "ms": 464.533,
+      "id": 227,
+      "function": "zh.y29",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt",
+      "line": 426,
+      "column": 5,
+      "name": "scanIndex",
+      "text": "fun scanIndex(src: Series<Byte>): ConfixIndex {"
+    },
+    {
+      "ms": 451.09,
+      "id": 228,
+      "function": "zh.z29",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt",
+      "line": 67,
+      "column": 5,
+      "name": "scan0",
+      "text": "fun scan0(src: Series<Byte>): Join<Cursor, FlatIndex> {"
+    },
+    {
+      "ms": 304.111,
+      "id": 229,
+      "function": "zh.b2a",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt",
+      "line": 246,
+      "column": 5,
+      "name": "buildTree",
+      "text": "fun buildTree("
+    },
+    {
+      "ms": 224.573,
+      "id": 522,
+      "function": "X.t3u",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 192,
+      "column": 5,
+      "name": "resolveTopLevelOverlaps",
+      "text": "fun resolveTopLevelOverlaps() {"
+    },
+    {
+      "ms": 223.872,
+      "id": 523,
+      "function": "xs",
+      "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+      "line": 195,
+      "column": 9,
+      "name": "resolveTopLevelOverlaps$rect",
+      "text": "fun rect(n: dynamic) = R(num(n.x), num(n.y), if (truthy(n.el.offsetWidth)) num(n.el.offsetWidth) else 200.0, if (truthy(n.el.offsetHeight)) num(n.el.offsetHeight) else 100.0)"
+    },
+    {
+      "ms": 220.81,
+      "id": 211,
+      "function": "zh.a20",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/lcnc/LcncProgramConfix.kt",
+      "line": 117,
+      "column": 5,
+      "name": "fromJson",
+      "text": "fun fromJson(name: String, json: String): LcncProgram {"
+    },
+    {
+      "ms": 207.894,
+      "id": 212,
+      "function": "yM",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 13,
+      "column": 1,
+      "name": "reify",
+      "text": "fun reify(json: CharSequence): Any? = reify(utf8(json))"
+    },
+    {
+      "ms": 204.654,
+      "id": 214,
+      "function": "",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 19,
+      "column": 1,
+      "name": "reify",
+      "text": "fun reify(bytes: ByteArray, number: (String) -> Any?): Any? {"
+    },
+    {
+      "ms": 204.654,
+      "id": 213,
+      "function": "",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/Reify.kt",
+      "line": 16,
+      "column": 1,
+      "name": "reify",
+      "text": "fun reify(bytes: ByteArray): Any? = reify(bytes) { it.toDoubleOrNull() }"
+    },
+    {
+      "ms": 191.765,
+      "id": 6,
+      "function": "evaluate",
+      "url": ""
+    },
+    {
+      "ms": 191.765,
+      "id": 5,
+      "function": "",
+      "url": ""
+    },
+    {
+      "ms": 189.191,
+      "id": 231,
+      "function": "zh.p",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/lib/PackedIntBuf.kt",
+      "line": 54,
+      "column": 14,
+      "name": "get",
+      "text": "operator fun get(index: Int): Int {"
+    },
+    {
+      "ms": 183.203,
+      "id": 215,
+      "function": "zh.y29",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt",
+      "line": 426,
+      "column": 5,
+      "name": "scanIndex",
+      "text": "fun scanIndex(src: Series<Byte>): ConfixIndex {"
+    },
+    {
+      "ms": 174.568,
+      "id": 216,
+      "function": "zh.z29",
+      "source": "webpack:///../src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt",
+      "line": 67,
+      "column": 5,
+      "name": "scan0",
+      "text": "fun scan0(src: Series<Byte>): Join<Cursor, FlatIndex> {"
+    },
+    {
+      "ms": 164.515,
+      "id": 11,
+      "function": "callMatchedElements",
+      "url": ""
+    },
+    {
+      "ms": 139.651,
+      "id": 13,
+      "function": "_queryEngineAll",
+      "url": ""
+    },
+    {
+      "ms": 139.651,
+      "id": 12,
+      "function": "querySelectorAll",
+      "url": ""
+    },
+    {
+      "ms": 128.515,
+      "id": 244,
+      "function": "Ke",
+      "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+      "line": 1,
+      "column": 1,
+      "name": "multiply",
+      "text": ""
+    }
+  ],
+  "traceInclusiveMilliseconds": {
+    "RunMicrotasks": 1207.995,
+    "Layout": 170.489,
+    "Layerize": 158.679,
+    "Paint": 100.388,
+    "UpdateLayoutTree": 65.003,
+    "MinorGC": 63.731,
+    "V8.GC_SCAVENGER": 60.079,
+    "V8.GC_SCAVENGER_SCAVENGE": 59.193,
+    "FunctionCall": 56.343,
+    "V8.GC_SCAVENGER_BACKGROUND_SCAVENGE_PARALLEL": 54.528,
+    "FireAnimationFrame": 45.899,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL_PHASE": 44.867,
+    "V8.StackGuard": 31.682,
+    "HitTest": 29.388,
+    "V8.GC_SCAVENGER_SCAVENGE_PARALLEL": 24.217,
+    "V8.HandleInterrupts": 23.151,
+    "V8.GC_BACKGROUND_SAFEPOINT": 23.127,
+    "PrePaint": 19.211,
+    "EventDispatch": 18.957,
+    "V8.BytecodeBudgetInterrupt": 14.046,
+    "V8.GC_BACKGROUND_UNPARK": 11.863,
+    "V8.GC_BACKGROUND_YOUNG_ARRAY_BUFFER_SWEEP": 9.5,
+    "V8.GC_HEAP_ENSURE_SWEEPING_COMPLETED": 8.808,
+    "V8.BytecodeBudgetInterruptWithStackCheck": 5.083,
+    "V8.GC_SCAVENGER_SCAVENGE_ROOTS": 4.096
+  },
+  "largestLayoutStacks": [
+    {
+      "ms": 16.394,
+      "stack": [
+        {
+          "function": "xs",
+          "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+          "line": 195,
+          "column": 70,
+          "name": "offsetWidth",
+          "text": "fun rect(n: dynamic) = R(num(n.x), num(n.y), if (truthy(n.el.offsetWidth)) num(n.el.offsetWidth) else 200.0, if (truthy(n.el.offsetHeight)) num(n.el.offsetHeight) else 100.0)"
+        },
+        {
+          "function": "X.t3u",
+          "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/Panels.kt",
+          "line": 200,
+          "column": 25,
+          "name": "resolveTopLevelOverlaps$rect",
+          "text": "val a = rect(sorted[i]); val b = rect(sorted[j])"
+        },
+        {
+          "function": "X.l8",
+          "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+          "line": 211,
+          "column": 20,
+          "name": "t3u",
+          "text": "if (current()) resolveTopLevelOverlaps()"
+        },
+        {
+          "function": "vv",
+          "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+          "line": 1,
+          "column": 1,
+          "name": "$completion",
+          "text": ""
+        },
+        {
+          "function": "X.l8",
+          "source": "webpack:///../src/jsSpacegraph/kotlin/borg/trikeshed/web/spacegraph/PanelsRun.kt",
+          "line": 93,
+          "column": 21,
+          "name": "programOutputs",
+          "text": "programOutputs(result, JSON.stringify(toConfix())) { trace.owns(activity) }"
+        },
+        {
+          "function": "En.k8",
+          "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+          "line": 1,
+          "column": 1,
+          "name": "l8",
+          "text": ""
+        },
+        {
+          "function": "En.o8",
+          "source": "webpack:///NATIVE_IMPLEMENTATIONS.kt/",
+          "line": 1,
+          "column": 1,
+          "name": "k8",
+          "text": ""
+        },
+        {
+          "function": "Pt.vp",
+          "source": "webpack:///src/kotlin/coroutines/Continuation.kt",
+          "line": 45,
+          "column": 5,
+          "name": "o8",
+          "text": ""
+        },
+        {
+          "function": "Pt.k13",
+          "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/web/src/internal/JSDispatcher.kt",
+          "line": 127,
+          "column": 25,
+          "name": "vp",
+          "text": ""
+        },
+        {
+          "function": "",
+          "source": "webpack:///../opt/buildAgent/work/44ec6e850d5c63f0/kotlinx-coroutines-core/js/src/JSDispatcher.kt",
+          "line": 55,
+          "column": 38,
+          "name": "k13",
+          "text": ""
+        }
+      ]
+    },
+    {
+      "ms": 6.092,
+      "stack": []
+    },
+    {
+      "ms": 1.92,
+      "stack": []
+    },
+    {
+      "ms": 1.474,
+      "stack": []
+    },
+    {
+      "ms": 1.062,
+      "stack": []
+    },
+    {
+      "ms": 0.998,
+      "stack": []
+    },
+    {
+      "ms": 0.872,
+      "stack": []
+    },
+    {
+      "ms": 0.796,
+      "stack": []
+    }
+  ],
+  "scope": "Sampled CPU attribution through the exact packaged source map. Inclusive values overlap; timeline categories also overlap. This diagnostic run includes profiler overhead."
+}

@@ -1,0 +1,17 @@
+from pathlib import Path
+import json
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+h=Path('/workspace/airgap-r3d-proof');rows=json.loads((h/'comparison-runs.json').read_text())
+plt.rcParams.update({'font.family':'DejaVu Sans','font.size':11,'svg.fonttype':'none'})
+fig,ax=plt.subplots(figsize=(10.6,4.8));colors={'baseline':'#b05c18','final':'#246d91'}
+for kind,label,offset in [('baseline','R3c baseline',-.18),('final','R3d extracted update',.18)]:
+ a=sorted((r for r in rows if r['kind']==kind),key=lambda r:r['case'])
+ x=[i+offset for i in range(3)];ys=[r['frames']['maximum'] for r in a]
+ bars=ax.bar(x,ys,.32,label=label,color=colors[kind]);ax.bar_label(bars,labels=[f'{v:.1f}' for v in ys],padding=4,fontsize=10)
+ax.set_xticks(range(3),['Repetition 1','Repetition 2','Repetition 3']);ax.set_ylim(0,1200);ax.set_ylabel('Maximum observed frame interval (ms)');ax.grid(axis='y',alpha=.2);ax.set_axisbelow(True);ax.spines[['top','right']].set_visible(False);ax.legend(frameon=False,loc='upper center',bbox_to_anchor=(.5,1.13),ncol=2)
+fig.suptitle('Receipt rendering: smaller stalls, with frame-rate work remaining',fontsize=14,x=.08,ha='left')
+fig.text(.08,.015,'Same 65-node native graph; fresh processes; no profiler. Order: A/B, B/A, A/B.\nExternal requestAnimationFrame gaps over 3 seconds; three repetitions do not establish general performance.',fontsize=9,color='#444444')
+fig.tight_layout(rect=[0,.09,1,.91])
+for ext in ['svg','png','pdf']:fig.savefig(h/('frame-comparison.'+ext),dpi=170,metadata={'Creator':'R3d measured evidence'})

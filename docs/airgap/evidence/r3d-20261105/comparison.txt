@@ -1,0 +1,150 @@
+{
+  "error": null,
+  "driverExit": 0,
+  "exits": [
+    0
+  ]
+}
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "runId": "43bc7f7d-7efd-485c-b9e0-0c469171d93b",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:1a5b6e7130bd9a09c3b4d4785bfa0a39ce6c324fb8fd767c2e5e49f1d2853fc0",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}
+{"case": "baseline-fanout01", "kind": "baseline", "startedAt": "2026-11-05T09:01:56.080337+00:00", "finishedAt": "2026-11-05T09:02:07.527503+00:00", "command": ["unshare", "--user", "--map-root-user", "--net", "sh", "-c", "ip link set lo up && exec \"$@\"", "airgap-r3d", "python3", "/workspace/airgap-r3d-proof/run.py", "baseline-fanout01", "fanout"], "exit": 0, "frames": {"unit": "ms", "samples": 110, "p50": 16.699999999999818, "p95": 33.30000000000018, "maximum": 1049.9000000000005, "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"}, "checks": {"measuredFanout": "PASS", "receivedCoverage": "PASS", "boundedDisplay": "PASS", "outputLayout": "PASS", "frameMeasurement": "RECORDED"}}
+{
+  "error": null,
+  "driverExit": 0,
+  "exits": [
+    0
+  ]
+}
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "runId": "b84601f6-4254-46db-91c3-52739341e7cf",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:9e7b0faba383594f07d5d59befb6f14b600f76c26b9976dc188199dcc741d6b2",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}
+{"case": "final-fanout01", "kind": "final", "startedAt": "2026-11-05T09:02:07.562826+00:00", "finishedAt": "2026-11-05T09:02:19.176149+00:00", "command": ["unshare", "--user", "--map-root-user", "--net", "sh", "-c", "ip link set lo up && exec \"$@\"", "airgap-r3d", "python3", "/workspace/airgap-r3d-proof/run.py", "final-fanout01", "fanout"], "exit": 0, "frames": {"unit": "ms", "samples": 166, "p50": 16.699999999999818, "p95": 16.800000000000182, "maximum": 150, "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"}, "checks": {"measuredFanout": "PASS", "receivedCoverage": "PASS", "boundedDisplay": "PASS", "outputLayout": "PASS", "frameMeasurement": "RECORDED"}}
+{
+  "error": null,
+  "driverExit": 0,
+  "exits": [
+    0
+  ]
+}
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "runId": "5f32d4e9-3f02-487c-b4e9-ddc09dccd721",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:21ecd3adf868c78399f6fb443a6c1f50ae24ba0b47602180e968db6b665ae28b",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}
+{"case": "final-fanout02", "kind": "final", "startedAt": "2026-11-05T09:02:19.213237+00:00", "finishedAt": "2026-11-05T09:02:30.724959+00:00", "command": ["unshare", "--user", "--map-root-user", "--net", "sh", "-c", "ip link set lo up && exec \"$@\"", "airgap-r3d", "python3", "/workspace/airgap-r3d-proof/run.py", "final-fanout02", "fanout"], "exit": 0, "frames": {"unit": "ms", "samples": 163, "p50": 16.699999999999818, "p95": 33.30000000000018, "maximum": 150.10000000000036, "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"}, "checks": {"measuredFanout": "PASS", "receivedCoverage": "PASS", "boundedDisplay": "PASS", "outputLayout": "PASS", "frameMeasurement": "RECORDED"}}
+{
+  "error": null,
+  "driverExit": 0,
+  "exits": [
+    0
+  ]
+}
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "runId": "d7e13c17-075a-49bd-845a-4f82220707fe",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:d49fd31947f56edfcc1fcf2ab55b75343d4e610b93225d5d828bebbb291558b3",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}
+{"case": "baseline-fanout02", "kind": "baseline", "startedAt": "2026-11-05T09:02:30.761449+00:00", "finishedAt": "2026-11-05T09:02:42.176023+00:00", "command": ["unshare", "--user", "--map-root-user", "--net", "sh", "-c", "ip link set lo up && exec \"$@\"", "airgap-r3d", "python3", "/workspace/airgap-r3d-proof/run.py", "baseline-fanout02", "fanout"], "exit": 0, "frames": {"unit": "ms", "samples": 111, "p50": 16.699999999999818, "p95": 33.399999999999636, "maximum": 1000, "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"}, "checks": {"measuredFanout": "PASS", "receivedCoverage": "PASS", "boundedDisplay": "PASS", "outputLayout": "PASS", "frameMeasurement": "RECORDED"}}
+{
+  "error": null,
+  "driverExit": 0,
+  "exits": [
+    0
+  ]
+}
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "runId": "15799acc-0d66-4c57-8252-5d2f1c58056f",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:969c8a1870d9b72d6c83c1273bb35a77c43c2b89ffff61b1d363e378e9de1681",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "7409bc1e3ff7d253f688a0798fc72caf792d0c2060176c0a8b29c073acb50a74",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}
+{"case": "baseline-fanout03", "kind": "baseline", "startedAt": "2026-11-05T09:02:42.211451+00:00", "finishedAt": "2026-11-05T09:02:53.579756+00:00", "command": ["unshare", "--user", "--map-root-user", "--net", "sh", "-c", "ip link set lo up && exec \"$@\"", "airgap-r3d", "python3", "/workspace/airgap-r3d-proof/run.py", "baseline-fanout03", "fanout"], "exit": 0, "frames": {"unit": "ms", "samples": 112, "p50": 16.699999999999818, "p95": 33.399999999999636, "maximum": 983.3000000000002, "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"}, "checks": {"measuredFanout": "PASS", "receivedCoverage": "PASS", "boundedDisplay": "PASS", "outputLayout": "PASS", "frameMeasurement": "RECORDED"}}
+{
+  "error": null,
+  "driverExit": 0,
+  "exits": [
+    0
+  ]
+}
+{
+  "kind": "fanout",
+  "casObjectsVerified": 26,
+  "runId": "1081b6ce-1d68-4ff7-9f71-6659b6fa33df",
+  "programCid": "sha256:bb42494c83550eb974447950a085315c58881b71fd82ac07bb6454389fba432a",
+  "receiptCid": "sha256:56d8667854a0c75e583cdf70ac0087743a772404ef5d04364601186ec2c2f2ce",
+  "mappedReceivedSelections": 19,
+  "mappedWires": 19,
+  "ownerOmissionsInFinalLedger": 165,
+  "allSixDocumentsUnchanged": true,
+  "processExits": [
+    0
+  ],
+  "oneRunSubmission": true,
+  "bundleSha256": "ed364df88b37a6308b0083bfdbcf2a1b1d49d29b7e3df0c564f2f6979249ec63",
+  "scope": "Independent retained CAS/WAL and source identity audit; browser behavior remains the explicitly recorded browser checks."
+}
+{"case": "final-fanout03", "kind": "final", "startedAt": "2026-11-05T09:02:53.617060+00:00", "finishedAt": "2026-11-05T09:03:05.738736+00:00", "command": ["unshare", "--user", "--map-root-user", "--net", "sh", "-c", "ip link set lo up && exec \"$@\"", "airgap-r3d", "python3", "/workspace/airgap-r3d-proof/run.py", "final-fanout03", "fanout"], "exit": 0, "frames": {"unit": "ms", "samples": 168, "p50": 16.699999999999818, "p95": 16.800000000000182, "maximum": 116.70000000000073, "scope": "External requestAnimationFrame intervals during this 65-node headless-browser run; not isolated frame preparation time or a 10k/50k graph benchmark"}, "checks": {"measuredFanout": "PASS", "receivedCoverage": "PASS", "boundedDisplay": "PASS", "outputLayout": "PASS", "frameMeasurement": "RECORDED"}}

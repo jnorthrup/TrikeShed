@@ -436,9 +436,9 @@ class EnglishCorpusWireTest {
             val ids = _l[inspect(f, "agreement.txt", 0, text.length)["receiptCid"] as String]
             val program = EnglishCorpusPreset.build(ids, "current", _l["not"], 8)
             assertTrue(LcncTypeCheck.check(program, LcncContracts.all().associateBy { it.type }, strict = true).isEmpty())
-            val registry = PureNodes.registry { 123L } + f.ctx.lcncRunners +
-                TribunalNodes.registry(TribunalDialog { _, _, _ -> error("Local corpus preset must not call a model") }).filterKeys { it == "display" }
-            val result = LcncRunner(registry).runProcedure(program)
+            val display = TribunalNodes.registry(TribunalDialog { _, _, _ -> error("Local corpus search cannot call a model") })
+                .filterKeys { it == "display" }
+            val result = LcncRunner(PureNodes.registry { 123L } + f.ctx.lcncRunners + display).runProcedure(program)
             val output = result.nodeOutputs.getValue("corpus")
             assertEquals(output["search"], result.returns["search"]); assertEquals(output["receiptCid"], result.returns["receiptCid"])
             assertEquals(output["terms"], result.returns["terms"]); assertEquals(output["source"], result.returns["source"])

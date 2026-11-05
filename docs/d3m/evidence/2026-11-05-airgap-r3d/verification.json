@@ -1,0 +1,17 @@
+{
+  "integratedCommit": "36cc2535d6927ec71aa80545aff62c3e0c37b771",
+  "testedCommit": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+  "integratedTreeMatchesTestedTree": true,
+  "frozenRefCounts": [
+    549,
+    551,
+    553
+  ],
+  "merges": 6,
+  "conflictedFiles": 1,
+  "conflictedHunks": 1,
+  "allFrozenTipsAreAncestors": true,
+  "conflictResolution": "final/resolution.json",
+  "localMachine": "Cloud checkout /workspace/TrikeShed; Jim Mac unchanged",
+  "pushPolicy": "Ordinary master push; no force, pruning, or branch deletion. Final remote readback recorded separately."
+}

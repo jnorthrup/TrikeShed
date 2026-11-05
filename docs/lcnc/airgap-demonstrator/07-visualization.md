@@ -121,3 +121,23 @@ level-of-detail aggregation must retain semantic picking and coverage. Do not
 remove owner omissions, fabricate unseen transfers or treat a good percentile
 as proof that controls never stall. The retained fixture has 65 nodes, not the
 planned 10,000/50,000-node acceptance workload.
+
+
+## Implemented checkpoint: R3d
+
+[R3d](../../airgap/14-receipt-rendering.md) profiles the receipt-rendering stall
+and removes repeated definition reification on identical serialized snapshots.
+Every ownership check still serializes the current canvas, including unsaved
+edits. Top-level overlap passes read dimensions before writing positions, and
+remeasure on later passes for automatically sized nodes. A real delayed CAS
+read is refused after an intervening definition edit and works again after
+restoring that definition.
+
+Three matched repetitions of the 65-node native graph record maximum frame
+gaps of 983–1,050 ms in R3c and 117–150 ms in the extracted R3d update. Final
+p95 intervals are 16.8, 33.3 and 16.8 ms; maxima remain material. Raw frame
+arrays, profiles, received-event counts and source identities are retained.
+This is a bounded improvement; quadratic layout, full-canvas serialization,
+projection batching, control-to-paint latency, culling and recursive scope
+navigation remain explicit work. No synthetic transfer replaces an omitted
+owner observation.
