@@ -222,6 +222,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     ENGLISH_ROUTE(EnglishLcncPreset.ROUTE),
     ENGLISH_EVIDENCE(EnglishLcncPreset.EVIDENCE),
     ENGLISH_QUERY(EnglishObservationContract.TYPE),
+    ENGLISH_NAL(EnglishNalContract.TYPE),
     ENGLISH_CORPUS(EnglishCorpusContract.TYPE),
     ENGLISH_PATTERNS(EnglishLegalPatternsContract.TYPE),
     ENGLISH_LEGAL_QUERY(EnglishLegalQueryContract.TYPE),
