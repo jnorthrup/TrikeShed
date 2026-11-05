@@ -1021,14 +1021,15 @@ object LcncContracts {
             // runner reading the payload — decayRunner ignores all inputs.
             inputKinds = mapOf("trigger" to "trigger", "after" to "json"),
             outputKinds = mapOf("decayed" to "trigger"), isEffect = true),
-        LcncPortContract("nal.recall", "belief recall (top/sample/near)",
-            listOf("trigger?"), listOf("beliefs"),
-            inputKinds = mapOf("trigger" to "trigger"),
-            outputKinds = mapOf("beliefs" to "json"),
-            params = mapOf(
-                "mode" to LcncPortContract.LcncParamSpec(v = "top", opts = listOf("top", "sample", "near")),
-                "k" to LcncPortContract.LcncParamSpec(v = "16"),
-            )),
+        LcncPortContract("nal.recall", "belief recall (geometry or exact source-local roles)",
+            _l["trigger?", "request?"], _l["beliefs", "selection"],
+            inputKinds = _m["trigger" j "trigger", "request" j "json"],
+            outputKinds = _m["beliefs" j "json", "selection" j "json"],
+            params = _m[
+                "mode" j LcncPortContract.LcncParamSpec(v = "top", opts = _l["top", "sample", "near", "exact-role"]),
+                "k" j LcncPortContract.LcncParamSpec(v = "16"),
+                "request" j LcncPortContract.LcncParamSpec(ta = true, ph = "exact-role only: sourceContext CID, predicate, subject, optional object; lexical selection, not inference"),
+            ]),
         LcncPortContract("nl.rules", "describe it: unreviewed parser candidates; class answers deferred",
             listOf("text?", "ask?"), listOf("candidates", "rules", "answers", "answerStatus", "coverage", "unparsed"),
             inputKinds = mapOf("text" to "text", "ask" to "text"),
