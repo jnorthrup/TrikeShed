@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Recorded capsule data audit only; no Java, query engine, container or namespace execution."""
+import argparse,copy,hashlib,json,stat,struct
+from pathlib import Path,PurePosixPath
+from urllib.parse import urlsplit,unquote
+from checks import *
+SOURCE='87e7bb3e945546137c595ff5aaf53781f4168275'
+MAIN='f459698815fdc18e0edb00d06b28cdc503ad085e8b6210ff127166cb5d1347ff'
+RESULT_SHA='6ede5fec0a93966100ca7bf6158d7dcb9041673b56070bda87031b779bbbb0b6'
+VERIFICATION_SHA='92139644ed714b24aa5072709e2c8e8c1d6f9e1976e5ba7b0f21c3c21e38dd64'
+CAPSULE_MANIFEST_SHA='3e026053dad4948be085e5f37c8475a70bf2e8a88df4b4ab193f90c26afce44a'
+FILES={'cas/pack','beliefs.wal','host/.kanban/board.wal'}
+HIDDEN={'native-attempt4/runtime/cas/pack','native-attempt4/runtime/beliefs.wal','native-attempt4/runtime/host/.kanban/board.wal','native-attempt4/cas-readbacks','inputs/C2.kif','observer-attempt4'}
+def sha(raw):return hashlib.sha256(raw).hexdigest()
+def stamp(raw):return {'bytes':len(raw),'sha256':sha(raw)}
+def pack_records(raw):
+    at=0;records=[];payloads={}
+    while at<len(raw):
+        need(len(raw)-at>=37,'Complete37byte CAS pack header')
+        kind,length=struct.unpack_from('>Bi',raw,at);need(kind==1 and 0<=length<=4*1024*1024,'All actual records are bounded BLOBs, not external REF resolvers')
+        end=at+37+length;need(end<=len(raw),'Complete CAS pack payload, no omitted/truncated record')
+        identity='sha256:'+raw[at+5:at+37].hex();payload=raw[at+37:end]
+        need(cid(payload)==identity,'Independent SHA256 of every full pack payload')
+        need(identity not in payloads,'All observed full digests unique')
+        records.append({'offset':at,'kind':'BLOB','payloadBytes':length,'cid':identity});payloads[identity]=payload;at=end
+    need(len(records)==166,'Exact166complete BLOB records')
+    return records,payloads
+def recorded_frames(rows):return [{'sequence':r['sequence'],'payloadUtf8':r['payloadUtf8'],'payloadSha256':r['sha256']} for r in rows]
+def hidden_environment(result,verification,namespace,reader,network,before):
+    old=result['oldProducerRoot'];capsule=result['capsule'];out=reader[-3];proof=str(PurePosixPath(capsule).parent);snapshot=reader[-2]
+    need(old==verification['producerProofRoot'] and verification['producerClosedSnapshot']==old+'/native-attempt4','Mask targets exact WHOLE old producer proof root')
+    need(set(result['oldBefore'])==set(result['oldAfter'])==HIDDEN and result['oldBefore']==result['oldAfter'] and not any(result['oldBefore'].values()),'Six actual old producer path probes absent before and after')
+    mounts={m['mountPoint']:m for m in result['mounts']};need(set(mounts)=={'/',old,capsule,out},'Actual filtered mountinfo covers root, exact oldroot and new capsule/output')
+    need('ro' in mounts['/']['mountOptions'].split(',') and 'rw' not in mounts['/']['mountOptions'].split(',') and mounts[old]['fsType']=='tmpfs','Recorded root RO and whole old-root tmpfs shadow')
+    need(all('rw' in mounts[p]['mountOptions'].split(',') for p in [capsule,out]),'Recorded new capsule/output RW binds')
+    expected=['bwrap','--die-with-parent','--unshare-user','--uid','0','--gid','0','--unshare-net','--cap-add','CAP_NET_ADMIN','--ro-bind','/','/','--tmpfs',old,'--bind',capsule,capsule,'--bind',out,out,'--proc','/proc','--','python3',proof+'/inside.py',out,capsule,proof,snapshot,reader[reader.index('-cp')+1].split(':')[0],old]
+    need(namespace==expected,'Actual bwrap argv retains rootRO/whole mask/new binds/private namespace and scoped network capability')
+    need(reader[-5:]==[capsule,proof+'/verification-manifest.json',out,snapshot,old],'Actual production reader receives new capsule and external expectations; old root is only visibility probe')
+    need(network['controllerPid']==result['parentPid'] and result['pid']!=result['parentPid'] and result['pid']!=before['pid'],'Actual separate JVM/controller PIDs')
+    need(result['namespaces']['mnt']==network['mountNamespace']!=before['mountNamespace'] and result['namespaces']['net']==network['networkNamespace']!=before['networkNamespace'],'Actual reader and inside controller share distinct mount/network namespaces')
+    need({r['ifname'] for r in network['interfaces']}=={'lo'} and 'UP' in network['interfaces'][0]['flags'] and network['routes']==[] and network['externalTcp']['errno']==101,'Recorded only loopbackUP/no routes/ENETUNREACH; no full hostile-escape seal claim')
+def artifacts(root,result,reader,external):
+    need(result['sourceHead']==SOURCE and result['mainSha256']==MAIN,'Exact final v83 source/main used by new capsule reader')
+    metadata=root/'artifact-metadata';manifest=load(metadata/'sha256.json');need((metadata/'source-head.txt').read_text().strip()==SOURCE and sha((metadata/'source-head.txt').read_bytes())==manifest['source-head.txt'] and manifest['main.jar']==MAIN,'Recorded frozen external artifact metadata')
+    cp=load(root/'classpath.json');rows=cp['externalProductionClasspath'];paths=[r['path'] for r in rows]
+    need(cp['productionJars']==120 and cp['totalClasspathEntries']==121 and cp['assetJars']==0 and len(paths)==len(set(paths))==120 and len(manifest['dependencies'])==119,'External120production JARs plus separate observer, no browser asset/model bundle')
+    need((metadata/'classpath.txt').read_text().strip().split(':')==paths,'Actual frozen dependency path metadata')
+    need(reader[reader.index('-cp')+1].split(':')==[cp['observerClasses']]+paths and reader[reader.index('-cp')+2]=='proof.narscapsule.CapsuleReaderKt','Actual single capsule-reader JVM entrypoint, external classpath')
+    need(unquote(urlsplit(result['observerCodeSource']).path).rstrip('/')==cp['observerClasses'],'Actual new observer classes outside old masked root')
+    need(all(unquote(urlsplit(value).path)==paths[0] for value in result['origins'].values()) and paths[0]==reader[-2]+'/main.jar','All reported production owners originate in immutable final main JAR')
+    need({'PackCasStore','DocumentAppendLog','BeliefBagElement','BoardFileWal','BoardStoreElement','NalNodes','KgRetention','SignalCodec','SparqlSurface','QuadStore'}==set(result['origins']),'Actual production read/replay/query owners captured')
+    for row in rows:
+        expected=MAIN if row['path']==paths[0] else manifest['dependencies'][row['path']];need(row['sha256']==expected,'Every recorded production dependency hash')
+        if external:need(sha(Path(row['path']).read_bytes())==expected,'Optional actual external JAR byte hash')
+    return {'jars':120,'observerClasses':cp['observerClasses'],'assetJars':0}
+def audit(root,args):
+    attempt=root/'attempt2';result_raw=(attempt/'result.json').read_bytes();verification_raw=(root/'verification-manifest.json').read_bytes();manifest_raw=(root/'capsule-manifest.json').read_bytes()
+    need(sha(result_raw)==RESULT_SHA and sha(verification_raw)==VERIFICATION_SHA and sha(manifest_raw)==CAPSULE_MANIFEST_SHA,'Exact selected closed result/external verification/capsule manifest pins')
+    result=load(attempt/'result.json');verification=load(root/'verification-manifest.json');capsule_manifest=load(root/'capsule-manifest.json')
+    need(args.source_head==SOURCE and args.main_sha==MAIN and verification['sourceHead']==SOURCE and verification['mainSha256']==MAIN,'Explicit source/main pins; metadata is expectations, not independent authority')
+    need(result['result']=='PASS' and result['manifestSha256']==VERIFICATION_SHA,'Actual successful closed production reader uses exact external verification expectations')
+    need(capsule_manifest['sourceHead']==SOURCE and capsule_manifest['externalMainSha256']==MAIN and capsule_manifest['externalVerificationManifestSha256']==VERIFICATION_SHA and capsule_manifest['observedResultSha256']==RESULT_SHA,'Capsule metadata cross-binds external runtime and actual selected result')
+    for name in ['namespace.exit','reader.exit']:need((attempt/name).read_text().strip()=='0','Actual '+name+'=0')
+    data={name:(root/'capsule'/name).read_bytes() for name in sorted(FILES)};stamps={k:stamp(v) for k,v in data.items()}
+    declared={row['relativePath']:{k:row[k] for k in ['bytes','sha256']} for row in capsule_manifest['inputData']}
+    need(set(declared)==FILES and sum(len(v) for v in data.values())==capsule_manifest['inputBytes']==372953 and stamps==declared==result['beforeOpen']==result['afterClose'],'Exactly three supplied semantic input files and byte-identical recorded before/after state')
+    for path in (root/'capsule').rglob('*'):
+        need(not path.is_symlink(),'No symlink in supplied capsule tree')
+        if not path.is_dir():need(stat.S_ISREG(path.lstat().st_mode) and path.stat().st_nlink==1,'Only independent regular capsule files, no hardlink/symlink dependency')
+    actual_files={str(p.relative_to(root/'capsule')) for p in (root/'capsule').rglob('*') if p.is_file()}
+    need(actual_files in [FILES,FILES|{'host/.kanban/board.wal.lock'}],'No executable/model/source extras in capsule; only optional generated sidecar')
+    before=load(attempt/'controller-before.json');after=load(attempt/'controller-after.json');copies=load(root/'data-copy-manifest.json')
+    need(before['pid']==after['pid'] and before['originalFilesBefore']==after['originalFilesAfter']==after['capsuleDataFiles']==stamps,'Non-owning controller records original and copied files unchanged')
+    summary=load(root/'summary.json');need(summary['resultSha256']==RESULT_SHA and summary['capsuleManifestSha256']==CAPSULE_MANIFEST_SHA and summary['verificationManifestSha256']==VERIFICATION_SHA and summary['inputDataBefore']==summary['inputDataAfter']==stamps and summary['oldBefore']==result['oldBefore'] and summary['oldAfter']==result['oldAfter'] and summary['readerPid']==result['pid'],'Compact summary agrees with actual raw records/data pins')
+    need({row['file'] for row in copies}==FILES and len(copies)==3,'Exactly three copied regular semantic inputs')
+    for row in copies:
+        need({k:row[k] for k in ['bytes','sha256']}==stamps[row['file']] and row['source']==verification['producerClosedSnapshot']+'/runtime/'+row['file'] and row['clone']==result['capsule']+'/'+row['file'] and row['sourceInode']!=row['cloneInode'] and row['cloneLinks']==1,'Recorded new independent regular copy, no transferred hardlink/lease')
+        if args.check_external_artifacts:need(stamp(Path(row['source']).read_bytes())==stamps[row['file']],'Optional current original producer bytes')
+    records,payloads=pack_records(data['cas/pack']);need(records==verification['packRecords'] and capsule_manifest['pack']=={'records':166,'allBlob':True,'referenceRecords':0,'fullDigestUnique':166,'selectedUniqueReadbacks':113},'Independent full166record scan, no REF resolution or omitted record')
+    selected_rows=verification['selectedReadbacks'];selected_ids={row['cid'] for row in selected_rows};need(len(selected_ids)==len(selected_rows)==113,'Exact113unique selected exports')
+    roles={row['cid']:row['roles'] for row in selected_rows};actual=result['actualPayloadReadbacks'];need(len(actual)==166,'Actual public bounded reader resolved ALL166named payloads')
+    for record,read in zip(records,actual):
+        identity=record['cid'];payload=payloads[identity];need(read['cid']==identity and read['bytes']==len(payload) and read['sha256']==sha(payload) and read['selected']==(identity in selected_ids),'Every production bounded read matches independently hashed pack payload')
+        if identity in selected_ids:
+            need(read['file']=='readbacks/'+identity[7:]+'.bin' and read['roles']==roles[identity] and (attempt/read['file']).read_bytes()==payload,'Actual selected exported bytes/roles from relocated pack')
+        else:need(read['file'] is None and read['roles'] is None,'Unselected payloads are verified reads, not invented export claims')
+    source=verification['C2'];need(source==capsule_manifest['sourceC2'] and source['sourceCid']==C2_CID and source['text'].encode()==payloads[C2_CID]==C2 and source['bytes']==46 and source['angular']==c2_angular(),'Exact original manual C2 source inside new pack, no old source-file fallback')
+    definition(payloads[source['paysPid']],C2_CID,'pays','Tenant','Landlord');definition(payloads[source['owesPid']],C2_CID,'owes','Tenant','Landlord')
+    belief=frames(data['beliefs.wal'],True);board=frames(data['host/.kanban/board.wal']);need(belief==recorded_frames(result['beliefFrames']) and board==recorded_frames(result['boardFrames']),'Independent configured DocumentAppendLog/BoardWal version/sequence/CRC32C parses match actual production replay')
+    minted=next(f['payloadUtf8'].split(':',2)[2].encode() for f in belief if f['payloadUtf8'].startswith('B:'));fields=signal_fields(minted)
+    need(fields[0]==source['angular'] and int(fields[1])==900<<32 and fields[2]=='MATCH' and fields[3]==C2_CID and fields[4:10]==['']*6 and fields[10]=='0' and fields[11]==source['paysPid'],'Actual exact admitted manual source signal bytes, not a new proposition or routing-role identity')
+    projection=belief_projection(belief,minted,source['angular']);need(payloads[cid(minted)]==minted and result['finalReplayedBagRows']==[],'Actual E/spill record and full hash-verified payload justify empty replay, no fresh-bag shortcut')
+    budgets=[int(f['payloadUtf8'].split(':',2)[1 if f['payloadUtf8'].startswith('B:') else 2]) for f in belief if f['payloadUtf8'].startswith(('B:','A:'))]
+    need(len(budgets)==3 and len({b&((1<<40)-1) for b in budgets})==1 and [b>>40 for b in budgets[1:]]==[int(f32(f32(p)*f32(SCALE))) for p in [.95,.1]],'Exact persisted explicit P20 priorities, unchanged D/Q, no revived active priority claim')
+    last={}
+    for frame in board:
+        job,identity=frame['payloadUtf8'].rsplit('\t',1);need(identity in payloads,'Every board WAL pointer resolves inside copied pack')
+        command=json.loads(payloads[identity]);need(command['jobId']==job,'Actual stored board command matches WAL job pointer');last[job]=(frame['sequence'],identity)
+    need(len(board)==42 and len(last)==14 and len(result['recoveredCards'])==14,'Actual42board frames and14recovered committed cards')
+    expected_cards={row['jobId']:row for row in verification['expectedCards']}
+    for card in result['recoveredCards']:
+        expected=expected_cards[card['jobId']];need(all(card[k]==v for k,v in expected.items()) and last[card['jobId']]==(card['sequence'],card['commandCid']),'Actual recovered card equals final WAL command/expectation identity')
+        command=json.loads(payloads[card['commandCid']]);saved=command['lcncRun'];need(saved['runId']==card['runId'] and saved['programCid']==card['programCid'] and saved['status']==card['status'] and saved['ok']==card['ok'] and card['programCid'] in payloads,'Recovered saved run/program/status resolves entirely in new data')
+    query=result['query'];need(query['before']==query['after']==stamps,'Actual registered read-only query writes no copied CAS/belief/board data')
+    output=query['nodeOutputs'];need(typed_target(output) is None,'Actual no resident typed target or belief revival')
+    selected(output['selection'],C2_CID,'pays','Tenant','Landlord',2,'MATCH_NOT_RESIDENT',source['angular'],source['paysPid'])
+    need(query['request']==output['selection']['request']=={'sourceContext':C2_CID,'predicate':'pays','subject':'Tenant'},'Exact actual single local role query request')
+    reader=load(attempt/'reader-command.json');namespace=load(attempt/'namespace-command.json');network=load(attempt/'network.json');hidden_environment(result,verification,namespace,reader,network,before);runtime=artifacts(root,result,reader,args.check_external_artifacts)
+    need(result['leaseAbsentBeforeOpen'] is True and result['newLeaseWhileHeld']==result['newLeaseAfterClose'] and result['newLeaseWhileHeld']['path']==result['capsule']+'/host/.kanban/board.wal.lock' and result['newLeaseWhileHeld']['bytes']==0 and 'sha256' not in result['newLeaseWhileHeld'],'New zero-byte sidecar, stat-only while held, no transferred lock or descriptor-close sabotage')
+    need(after['newSidecar']==stamp(b'') and all(result['closed'][k] is True for k in ['board','bag','bagWorker','owner','cas','guestModules']) and result['closed']['remainingChildren']==0,'Actual new lease/owners/CAS closed and zero remaining children')
+    reuse=load(attempt/'compile-reuse.json');source_raw=(attempt/'observer-inputs/CapsuleReader.kt').read_bytes();need(sha(source_raw)==reuse['compiledSourceSha256'] and reuse['originalCompileExit']==0 and source_raw==(root/'attempt1/observer-inputs/CapsuleReader.kt').read_bytes() and (root/'attempt1/compile.exit').read_text().strip()=='0','Actual compiled observer source reused unchanged after controller-only capability correction')
+    controls=[]
+    def rejects(label,fn):
+        try:fn()
+        except (AuditError,ValueError,KeyError,TypeError,StopIteration):controls.append({'mutation':label,'result':'REJECTED'})
+        else:raise AuditError('Mutated copy accepted: '+label)
+    bad=copy.deepcopy(result);bad['oldBefore']['native-attempt4/runtime/cas/pack']=True;rejects('old-producer-path-still-visible',lambda:hidden_environment(bad,verification,namespace,reader,network,before))
+    bad=bytearray(data['cas/pack']);bad[37]^=1;rejects('changed-pack-payload',lambda:pack_records(bytes(bad)))
+    bad=bytearray(data['beliefs.wal']);bad[30]^=1;rejects('changed-belief-WAL-frame',lambda:frames(bytes(bad),True))
+    bad=copy.deepcopy(output);bad['angular']=source['angular'];bad['propositionCid']=source['paysPid'];rejects('typed-target-revives-evicted-documentary-match',lambda:typed_target(bad))
+    filenames=['capsule-manifest.json','verification-manifest.json','data-copy-manifest.json','classpath.json','authorization.json','summary.json']
+    return {'result':'PASS_RECORDED_DATA_CAPSULE_CONSISTENCY','sourceHead':SOURCE,'mainSha256':MAIN,'readerPid':result['pid'],'semanticInputFiles':3,'semanticInputBytes':372953,'inputData':stamps,'pack':{'records':len(records),'BLOB':len(records),'REF':0,'fullDigestUnique':len(payloads),'actualBoundedReads':len(actual),'selectedUniqueExports':len(selected_ids)},'beliefFrames':len(belief),'beliefProjection':projection,'boardFrames':len(board),'recoveredCards':len(last),'queryStatus':output['selection']['status'],'residentStatus':output['selection']['matches'][0]['residentStatus'],'typedTargets':{'angular':output['angular'],'propositionCid':output['propositionCid']},'maskedOldPathProbes':len(HIDDEN),'runtime':runtime,'mutatedCopyControls':controls,'recordSha256':{name:sha((root/name).read_bytes()) for name in filenames}|{'attempt2/'+name:sha((attempt/name).read_bytes()) for name in ['result.json','controller-before.json','controller-after.json','namespace-command.json','network.json','reader-command.json','compile-reuse.json']},'observerSourceSha256':{p.name:sha(p.read_bytes()) for p in sorted((attempt/'observer-inputs').iterdir()) if p.is_file()},'originalDataVerification':'captured independent-controller before/after hashes agree with capsule bytes; original paths are not opened in default audit mode','externalArtifactVerification':'actual external JAR and current original-data bytes additionally rehashed' if args.check_external_artifacts else 'recorded metadata only; external executable/runtime/original-path availability not checked','scope':'Independent supplied-data and recorded-observation consistency for local relocation, production replay and one typed documentary query while old producer root is masked. Three semantic input files are complete for this observed case, not an executable/model bundle. Java/main+119JARs/new observer and verification metadata remain external. No new admission/attention/revival, English/NLP/model use, source authentication/currentness/review/semantic truth, fullrootfs/hostileescape/hardware/crash guarantee or IPFS/network federation claim.'}
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('proof',type=Path);parser.add_argument('--source-head',required=True);parser.add_argument('--main-sha',required=True);parser.add_argument('--out',required=True,type=Path);parser.add_argument('--check-external-artifacts',action='store_true');args=parser.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    try:result=audit(args.proof,args)
+    except (AuditError,ValueError,KeyError,TypeError,OSError,StopIteration) as error:result={'result':'FAIL','error':str(error)}
+    result['auditScriptSha256']=sha(Path(__file__).read_bytes());result['supportSha256']={n:sha(Path(__file__).with_name(n).read_bytes()) for n in ['checks.py','receipt-core.py.txt']}
+    (args.out/'result.json').write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n')
+    lines=[result['result'],result.get('scope',result.get('error',''))]
+    if result['result'].startswith('PASS'):
+        lines+=['Source '+SOURCE+'; external main '+MAIN+'; actual reader PID '+str(result['readerPid'])+'. No new JVM/container/query was launched by this Python audit.',
+          'Three regular copied semantic data files total372953bytes: CASpack366478, beliefWAL637, boardWAL5838. A new zero-byte sidecar is runtime bookkeeping, not a fourth transferred input/lease.',
+          'Independent full pack scan:166complete BLOB records,166unique verified SHA256 payloads,0REF. All166actual production bounded reads and113selected exported byte blocks agree.',
+          'Both WAL formats independently verify big-endian framing, strict sequence and CRC32C. Actual R,B,A,A,D,E plus exact spilled SignalCodec bytes justify final empty production belief replay; explicit priorities preserve D/Q and evidence.',
+          'All42board pointers resolve in the copied pack;14actual recovered cards agree with final command/run/program identities. No old producer data paths are needed by the audited supplied-data checks.',
+          'Actual NalNodes source-local pays/Tenant query returns typed literal Landlord, full source-scoped PID, MATCH_NOT_RESIDENT, beliefs[] and null angular/PID targets. Query leaves all three data-file hashes unchanged; no revival or source authority upgrade.',
+          'Recorded bwrap argv/mountinfo bind rootRO, whole oldproofroot tmpfs shadow, new capsule/outputRW and private namespace setup. Six old path probes remain absent; onlyloUP/routes[]/externalENETUNREACH. Standard /proc and external runtime remain; this is not full R4/hostile escape evidence.',
+          'Captured non-owning controller hashes show original three files unchanged. New sidecar observed by stat only while held; production board/bag/worker/CAS/parent close with zero children.',
+          'Four proportional mutations reject visible old path, changed pack payload, changed WAL frame and typed-target revival. '+result['externalArtifactVerification']+'.']
+    (args.out/'report.txt').write_text('\n'.join(lines)+'\n');print(json.dumps({'result':result['result'],'error':result.get('error'),'out':str(args.out)}));raise SystemExit(0 if result['result'].startswith('PASS') else 1)
