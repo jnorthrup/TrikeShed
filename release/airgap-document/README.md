@@ -18,6 +18,14 @@ also carry the exact JDK, executable/library closure, licenses and source
 provenance, and be checked from an empty filesystem namespace. The Gradle
 archive alone does not demonstrate that closure.
 
+The sealed Linux filesystem must include glibc's `/usr/lib/locale/C.utf8`
+data and start with `LANG=C.UTF-8`. The packaged entry refuses a non-UTF-8
+JVM `native.encoding` before opening state. JDK `file.encoding=UTF-8` alone
+does not protect command-line values or filesystem paths: without locale
+data, the OS argument decoder can already have replaced Unicode before
+`main` receives it. Preserve the locale package identity and corresponding
+glibc source alongside the runtime library inventory.
+
 For an installation at `/opt/trikeshed` and writable state at `/state`, set
 `JAVA_HOME` to the packaged JDK and `TRIKESHED_PDF_ROUTE=layer`. In `run` mode,
 set `TRIKESHED_LLVM_SCALAR_PROFILE=/state/runtime/add-mlir.bc.json` and
