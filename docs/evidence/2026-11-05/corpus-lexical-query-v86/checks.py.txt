@@ -1,0 +1,102 @@
+"""Prepared immutable source/corpus/lexical score checks; no NLP/retrieval/model execution."""
+from pathlib import Path
+import collections,hashlib,json,math,runpy,struct
+CORE=Path(__file__).with_name('receipt-core.py.txt')
+assert hashlib.sha256(CORE.read_bytes()).hexdigest()=='8236cc40432334f746a4ff5e8e9d80845ae92c09b720ed4cc50840826324d763'
+C=runpy.run_path(str(CORE));need=C['need'];cid=C['cid'];canonical=C['canonical'];decode=C['decode_cbor'];load=C['load'];utf16=C['utf16'];AuditError=C['AuditError']
+SOURCE='sha256:2d357e82bb8d7c51254eb88f162eaa5ba1dca5d2049ebd75f8b2ed58a166f3ac'
+RANGES={'sha256:06d92d927fc2dc66ac7416843195a5400686adeddfd2ff017501f52b906e0824':(0,40),'sha256:d975ba82ffa563a80fedbc6c7d7f5b8f777430301555890882bd11691d122b1a':(40,105)}
+CORE_KEYS=['schema','reviewStatus','authority','legalMeaning','countsAreEvidenceConfidence','coverage','matrixCid','matrix','rawTokenCount','retrieval','terms','sentences','occurrences']
+def receipt(raw,identity,source):
+    need(cid(raw)==identity and identity in RANGES,'Exact genuine retained inspection CID')
+    body=decode(raw);need(canonical(body)==raw,'Original canonical inspection bytes, no dictionary/receipt relabelling')
+    need(body['originalCid']==body['extractedTextCid']==SOURCE==cid(source.encode('utf8')),'Exact full original/extracted S12 source identity')
+    begin,end=RANGES[identity];need(body['range']=={'begin':begin,'end':end,'totalLength':105,'complete':False},'Original whole inspection range remains partial individually')
+    runtime=body['parser']['runtime'];part=utf16(source,begin,end).encode('utf8')
+    need(runtime['parserInputCid']==runtime['sourceTextCid']==cid(part)!=SOURCE,'Genuine parser input was exact substring, not whole source or new parser execution')
+    for sentence in body['sentences']:
+        need(begin<=sentence['begin']<sentence['end']<=end and sentence['quote']==utf16(source,sentence['begin'],sentence['end']),'Exact original absolute UTF16 sentence quote/range')
+        for token in sentence['tokens']:need(token['word']==utf16(source,token['begin'],token['end']),'Original reported lexical token exact source substring')
+    return body
+def core(response,bodies,source):
+    need(response['schema']=='trikeshed.english-corpus.v1' and response['authority']=='statistics-of-reported-parser-observations' and response['legalMeaning']=='not-established' and response['countsAreEvidenceConfidence'] is False,'Corpus is descriptive parser observations only')
+    need(response['receiptCids']==sorted(bodies) and cid(canonical(response['matrix']))==response['matrixCid'] and cid(canonical({k:response[k] for k in CORE_KEYS}))==response['corpusCid'],'Exact selected receipt list and canonical matrix/core identity domains')
+    matrix=response['matrix'];need(len(matrix['documents'])==1,'Two inspection ranges are one original/extracted source document')
+    document=matrix['documents'][0];need(document['originalCid']==document['extractedTextCid']==SOURCE and document['totalLength']==105,'Matrix source identity/length')
+    need([(r['begin'],r['end']) for r in document['ranges']]==[(0,40),(40,105)] and {r['receiptCid'] for r in document['ranges']}==set(bodies),'Exact original disjoint inspection ranges')
+    for r in document['ranges']:need(r['selection']==bodies[r['receiptCid']]['selection'],'Original physical selection/revision is preserved')
+    sentences={}
+    for row in response['sentences']:
+        original=next(s for s in bodies[row['receiptCid']]['sentences'] if s['index']==row['index'])
+        need(row['begin']==original['begin'] and row['end']==original['end'] and row['quote']==original['quote']==utf16(source,row['begin'],row['end']) and row['selection']==bodies[row['receiptCid']]['selection'],'All corpus sentences join exact original receipt-local source indexes/quotes')
+        need(cid(canonical({'receiptCid':row['receiptCid'],'sentence':row['index'],'begin':row['begin'],'end':row['end']}))==row['id'] and row['id'] not in sentences,'Canonical receipt-scoped sentence identity')
+        sentences[row['id']]=row
+    need(len(sentences)==sum(len(b['sentences']) for b in bodies.values())==5,'Every original sentence present once')
+    terms=collections.Counter();seen=set()
+    for occurrence in response['occurrences']:
+        sentence=sentences[occurrence['sentenceId']];body=bodies[occurrence['receiptCid']];original=next(s for s in body['sentences'] if s['index']==sentence['index']);token=next(t for t in original['tokens'] if t['index']==occurrence['index'])
+        key=(occurrence['receiptCid'],occurrence['sentenceId'],occurrence['index']);need(key not in seen,'No duplicated invented token occurrence');seen.add(key)
+        need(occurrence['receiptCid']==sentence['receiptCid'] and all(occurrence[k]==token[k] for k in ['begin','end','word','lemma','pos']) and occurrence['word']==utf16(source,occurrence['begin'],occurrence['end']),'Every occurrence joins exact actual retained token/spans')
+        need(occurrence['term']==token['lemma'] and occurrence['included']==any(ch.isalnum() for ch in token['lemma']),'Explicit all-lexical case-preserving inclusion, not hidden term substitution/filter')
+        if occurrence['included']:terms[occurrence['term']]+=1
+    need(len(response['occurrences'])==response['rawTokenCount']==sum(len(s['tokens']) for b in bodies.values() for s in b['sentences']),'Original lexical token inventory conserved')
+    need({t['lemma']:t['frequency'] for t in response['terms']}==dict(terms) and matrix['vocabulary']==[t['lemma'] for t in response['terms']] and document['counts']==[terms[t] for t in matrix['vocabulary']] and matrix['tokenCount']==sum(terms.values()),'Wordcloud frequencies/matrix coordinates use same included reported lemmas')
+    return sentences
+def search(response):
+    value=response['search'];need(value['schema']=='trikeshed.english-corpus-search.v1' and value['dataset']=='english-selected-corpus-retrieval' and value['authority']=='lexical-match-only' and value['countsAreEvidenceConfidence'] is False,'Explicit selected corpus lexical-only retrieval envelope')
+    need(value['corpusCid']==response['corpusCid'] and value['matrixCid']==response['matrixCid'] and value['receiptCids']==response['receiptCids'] and value['source']==response['source'] and value['policy']==response['matrix']['policy'] and value['retrieval']==response['retrieval'],'Search/statistics/source/policy share exact selected dataset identities')
+    query=value['query'];need(set(query)=={'terms','limit'} and 1<=len(query['terms'])<=64 and 1<=query['limit']<=256,'Actual bounded exact lexical request')
+    policy=value['policy'];need(policy['caseFold'] is False and policy['stopWords']==[] and policy['posPrefixes']==[],'Actual explicit all-lexical policy, no hidden stemming/case folding')
+    params=value['retrieval'];need(params=={'unit':'included-lexical-sentence','method':'LUCENE','idfMethod':'LUCENE','k1':1.5,'b':.75,'delta':.5},'Existing concrete BM25 score policy')
+    occurrences=collections.defaultdict(list)
+    for token in response['occurrences']:
+        if token['included']:occurrences[token['sentenceId']].append(token)
+    rows=[s for s in response['sentences'] if occurrences[s['id']]];n=len(rows);average=sum(len(occurrences[s['id']]) for s in rows)/n;weights=collections.Counter(query['terms']);scores=[]
+    for ordinal,sentence in enumerate(rows):
+        own=occurrences[sentence['id']];frequencies=collections.Counter(o['term'] for o in own);score=0.;matched=False
+        for term,weight in weights.items():
+            tf=frequencies[term]
+            if not tf:continue
+            df=sum(any(o['term']==term for o in occurrences[s['id']]) for s in rows);idf=math.log(1+(n-df+.5)/(df+.5));norm=params['k1']*(1-params['b'])+params['k1']*params['b']/average*len(own);score+=weight*idf*tf/(norm+tf);matched=True
+        if matched:scores.append((score,ordinal,sentence))
+    expected=sorted(scores,key=lambda v:(-v[0],v[1]))[:query['limit']];need(len(value['hits'])==len(expected),'Exactly ranked lexical matches, no partial/fallback/global rows')
+    for hit,(score,ordinal,sentence) in zip(value['hits'],expected):
+        need(hit['sentence']==sentence and hit['originalCid']==hit['extractedTextCid']==SOURCE and hit['authority']=='lexical-match-only','Every hit binds exact returned source sentence')
+        need(math.isfinite(hit['score']) and math.isclose(hit['score'],score,rel_tol=1e-12,abs_tol=1e-14),'Existing BM25 IDF/TFC weighted score, no extra(k1+1) or confidence interpretation')
+        expected_tokens=[o for o in response['occurrences'] if o['sentenceId']==sentence['id'] and o['included'] and o['term'] in weights]
+        need(hit['matches']==expected_tokens,'All matching original token occurrences retained in hit source order')
+    return {'hits':len(expected),'sentencePostings':n,'queryTerms':query['terms'],'idfUnit':'included lexical sentences, distinct from corpus source-document frequency'}
+def topics(response):
+    model=response['topics'];need(model is not None and cid(canonical(model))==response['topicCid'],'Actual canonical seeded model identity, no independent fit')
+    need(model['schema']=='trikeshed.english-lda.v1' and model['corpusCid']==response['corpusCid'] and model['matrixCid']==response['matrixCid'],'Topics share exact corpus/matrix dataset')
+    config=model['config'];need(config=={'topics':2,'iterations':8,'seed':7,'alpha':.1,'beta':.01},'Explicit actual bounded seeded topic configuration')
+    need(model['algorithm']=='collapsed-gibbs-symmetric-dirichlet/1' and model['random']=='splitmix64/1' and model['reviewStatus']=='unreviewed' and model['authority']=='descriptive-statistics-only' and model['legalMeaning']=='not-established' and model['countsAreEvidenceConfidence'] is False,'Statistical topic metadata gives no evidence/semantic authority')
+    matrix=response['matrix'];vocabulary=matrix['vocabulary'];need(model['vocabulary']==vocabulary and model['tokenCount']==matrix['tokenCount'] and model['conditionalWeights']==model['tokenCount']*16,'Same actual included vocabulary/token work bound')
+    words=model['topicWordCounts'];documents=model['documentTopicCounts'];totals=model['topicTotals'];need(len(words)==len(totals)==2 and len(documents)==len(matrix['documents']) and all(len(w)==len(vocabulary) and all(isinstance(c,int) and c>=0 for c in w) for w in words),'Finite nonnegative topic count dimensions')
+    need([sum(w) for w in words]==totals and sum(totals)==matrix['tokenCount'] and [sum(w[i] for w in words) for i in range(len(vocabulary))]==[sum(d['counts'][i] for d in matrix['documents']) for i in range(len(vocabulary))],'Observed topic counts conserve original selected tokens; no resampling claim')
+    for index,(row,doc,mixture) in enumerate(zip(documents,matrix['documents'],model['documentTopics'])):
+        need(len(row)==2 and sum(row)==doc['includedTokens'] and mixture['document']==index and mixture['tokens']==sum(row) and mixture['priorOnly']==(sum(row)==0),'Observed document-topic row remains same source unit')
+        expected=[(count+.1)/(sum(row)+.2) for count in row];need(len(mixture['probabilities'])==2 and all(math.isclose(a,b,rel_tol=1e-12,abs_tol=1e-14) for a,b in zip(mixture['probabilities'],expected)),'Posterior normalization from actual captured counts, not new sampling')
+    for index,row in enumerate(model['topics']):
+        need(row['topic']==index and row['tokens']==totals[index],'Actual topic index/count')
+        order=sorted(range(len(vocabulary)),key=lambda i:(-words[index][i],i))[:32]
+        need(len(row['terms'])==len(order),'Reported top vocabulary bound')
+        for term,word in zip(row['terms'],order):
+            expected=(words[index][word]+.01)/(totals[index]+len(vocabulary)*.01)
+            need(term['index']==word and term['lemma']==vocabulary[word] and term['count']==words[index][word] and math.isclose(term['probability'],expected,rel_tol=1e-12,abs_tol=1e-14),'Topic term probabilities bind exact vocabulary/counts, not confidence')
+    return {'topicCid':response['topicCid'],'config':config,'tokenCount':matrix['tokenCount'],'verification':'captured-count/posterior/CID consistency only; no Gibbs sampler replay'}
+def wal_frames(raw):
+    at=0;previous=0;rows=[]
+    def crc32c(value):
+        crc=0xffffffff
+        for byte in value:
+            crc^=byte
+            for _ in range(8):crc=(crc>>1)^(0x82f63b78 if crc&1 else 0)
+        return crc^0xffffffff
+    while at<len(raw):
+        need(len(raw)-at>=22,'Complete board WAL1 header/payload')
+        magic,version,sequence,length=struct.unpack_from('>4sHqi',raw,at);end=at+18+length
+        need(magic==b'WAL1' and version==1 and sequence>previous and 0<=length<=10*1024*1024 and end+4<=len(raw),'Actual board WAL1 version/order/bound')
+        need(crc32c(raw[at:end])==struct.unpack_from('>I',raw,end)[0],'Independent board WAL1 CRC32C')
+        payload=raw[at+18:end];rows.append({'sequence':sequence,'payloadUtf8':payload.decode('utf8'),'payloadSha256':cid(payload)[7:]});at=end+4;previous=sequence
+    return rows
