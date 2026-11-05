@@ -20,7 +20,7 @@ Compiler and parser child/wrapper exits are recorded as zero. Each stage recorde
 From this directory, using only Python's standard library:
 
 ```sh
-python3 replay-recorded.py --extract /tmp/english-pcfg-recorded-v80
+python3 replay-recorded.py.txt --extract /tmp/english-pcfg-recorded-v80
 ```
 
 Choose a nonexistent destination. The script checks `SHA256.json`, validates the entire archive file set and headers before extraction, rejects links/devices/directories/traversal/duplicate paths, extracts ordinary files, and independently checks source/CBOR hashes, all token UTF-16 spans, tree leaves/POS/constituent spans, exact POS differences, classpath metadata, recorded network state and process/log hashes. It writes `recorded-replay-result.json` into the extraction directory. It never imports or executes the archived observer, launcher, compiler, JVM or parser.

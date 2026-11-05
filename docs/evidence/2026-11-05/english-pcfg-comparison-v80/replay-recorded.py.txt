@@ -69,7 +69,7 @@ parser.add_argument('--verify-external', action='store_true', help='Optionally r
 args = parser.parse_args()
 outer = read(package/'SHA256.json')
 assert outer['schema'] == 'english-pcfg-public-package/1'
-assert {x['file'] for x in outer['files']} == {'README.md','replay-recorded.py','records-manifest.json','records.tar.gz'}
+assert {x['file'] for x in outer['files']} == {'README.md','replay-recorded.py.txt','records-manifest.json','records.tar.gz'}
 for item in outer['files']:
     assert pathlib.PurePosixPath(item['file']).name == item['file']
     pin(package/item['file'], item)
