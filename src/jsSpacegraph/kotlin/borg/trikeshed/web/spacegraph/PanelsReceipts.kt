@@ -127,6 +127,10 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                                 }
                             }
                         }, output)
+                    if (run.outputPreview == true && outputs.previewOnly == true) {
+                        text("Node outputs are retained separately. Show recorded outputs reads and verifies up to 1 MiB for the matching canvas.", output)
+                        reference("Retained node outputs", str(outputs.retainedCid), ticket)
+                    } else {
                     val ids = keysOf(outputs).filter { nodeId == null || it == nodeId }
                     val rows = document.createElement("section").asDynamic(); output.appendChild(rows)
                     var offset = 0
@@ -171,6 +175,7 @@ fun PanelsFacets.receipts(workspace: dynamic, inspectedRequest: String) {
                         if (offset + 32 < ids.size) button("Next node outputs", { offset += 32; render() }, rows)
                     }
                     render()
+                    }
                 } else text("No node output snapshot in this receipt. Earlier effects cannot be inferred from that absence.", output)
                 if (run.invocationsCid != null) {
                     reference("Node invocations", str(run.invocationsCid), ticket) { evidence, target ->

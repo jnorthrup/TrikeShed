@@ -139,7 +139,7 @@ internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynam
 
 /** Receipt outputs are presentation only. The daemon's retained frame owns every later input. */
 suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> Boolean = { true }) {
-    val outputs = run.outputs ?: return
+    var outputs = run.outputs ?: return
     val canvas = graph
     val projected = nodes().filter { !truthy(it._parentScope) }
     val definition = LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, document)
@@ -159,6 +159,29 @@ suspend fun Panels.programOutputs(run: dynamic, document: String, owned: () -> B
         return matching
     }
     if (!current()) return
+    if (run.outputPreview == true && outputs.previewOnly == true) {
+        val cid = str(outputs.retainedCid)
+        val limit = 1024 * 1024
+        require(Regex("sha256:[0-9a-f]{64}").matches(cid) && outputs.contentType == "application/json") {
+            "Invalid retained node outputs reference"
+        }
+        require(typeOf(outputs.bytes) == "number" && num(outputs.bytes).isFinite() &&
+            num(outputs.bytes) in 1.0..limit.toDouble() && num(outputs.bytes) % 1.0 == 0.0) {
+            "Retained node outputs exceed the 1 MiB display read limit or have an invalid byte count"
+        }
+        val response = fetchJs("/api/v0/block/get?arg=" + encodeURIComponent(cid))
+        require(truthy(response.ok)) { "Retained node outputs unavailable" }
+        val bytes = PatchRead.bytes(response, limit)
+        require(num(bytes.byteLength) == num(outputs.bytes)) { "Retained node outputs byte count mismatch" }
+        val digest = awaitJs(js("crypto.subtle.digest('SHA-256', bytes)"))
+        val actual: String = "sha256:" + js("Array.from(new Uint8Array(digest), function(b){return b.toString(16).padStart(2,'0')}).join('')")
+        require(actual == cid) { "Retained node outputs content identity mismatch" }
+        val retained: String = js("new TextDecoder('utf-8', {fatal:true}).decode(bytes)")
+        val decoded: dynamic = JSON.parse(retained)
+        require(decoded != null && typeOf(decoded) == "object" && !isArray(decoded)) { "Retained node outputs are not an object" }
+        require(current()) { "Program or output owner changed during retained outputs read" }
+        outputs = decoded
+    }
     // Replace display snapshots before asynchronous reads; these never feed execution.
     for (n in projected) {
         n._lastOut = undefined
