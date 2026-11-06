@@ -13,3 +13,5 @@ This codebase bases its standards on zero-cost taxonomical abstractions. First t
 have no place in the naming of code.  
 
 Wildcard package imports (`import borg.trikeshed.lib.*`) are preferred. `Cursor` is `Series<RowVec>`, so a Cursor extension shadows the Series one of the same name (`get`, `view`, …) under both wildcards; where that overload resolves wrong, import the intended function explicitly beside the wildcards.
+
+On this Mac you run the 4-bit MLX Jeva quant only: `~/.local/share/TrikeShed/jeva/releases/jeva-4b-mlx-q4g32-dist` (Hugging Face `jnorthrup/jeva-4b-mlx-q4g32-dist`). Run no other Jeva build on this Mac, and download none.
