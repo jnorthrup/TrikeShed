@@ -12,7 +12,8 @@ object ProcessEnvironment {
         "DYLD_", "PYTHONPATH", "PYTHONHOME", "NODE_OPTIONS",
         "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "BASH_FUNC",
         "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND",
-        "PROXY", "TLS", "SSL", "SOCKS",
+        "PROXY", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
+        "TLS", "SSL", "SOCKS", "CURL_CA_BUNDLE", "SSL_CERT_FILE", "SSL_CERT_DIR",
     ]
 
     fun curated(): Map<String, String> = fixed
