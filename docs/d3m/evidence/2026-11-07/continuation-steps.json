@@ -1,0 +1,26 @@
+[
+  {
+    "ref": "refs/remotes/origin/sentinel-block-proxy-ca-env-vars-3639796855996924805",
+    "commit": "77f9e80a18d11c4266c43089ff6eca3c975df7fe",
+    "time": 1794100927,
+    "before": "72e20a9b1882065eb1dcaf0ed7bb89e7e1d8f6c9",
+    "bases": [
+      "0e4b5199469ecf01cdf95da81b9a1cd4948e0e93"
+    ],
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../borg/trikeshed/userspace/nio/channels/spi/ProcessEnvironment.kt    | 3 ++-\n 1 file changed, 2 insertions(+), 1 deletion(-)\n",
+    "after": "4aba9fa6bde7f88396a4f32f8812f1b2da02dea9"
+  },
+  {
+    "ref": "refs/remotes/origin/jules-10033078381912758791-b816ed20",
+    "commit": "375c4af3920b0d0215aa2d9000d69fa22bde3808",
+    "time": 1794101047,
+    "before": "4aba9fa6bde7f88396a4f32f8812f1b2da02dea9",
+    "bases": [
+      "0e4b5199469ecf01cdf95da81b9a1cd4948e0e93"
+    ],
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n src/commonMain/resources/web/allocation-inspector.css | 4 ++--\n 1 file changed, 2 insertions(+), 2 deletions(-)\n",
+    "after": "767b0c8a4b6916d532c30ab65b41ed3a2bec46fd"
+  }
+]

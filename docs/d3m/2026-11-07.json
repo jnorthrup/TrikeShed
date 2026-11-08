@@ -261,76 +261,148 @@
     "allFrozenTipsAncestors": true,
     "unmergedIndexEntries": 0,
     "kotlinConflictMarkers": 0,
-    "file": "integrate-final.txt"
+    "file": "integrate-final.txt",
+    "publicationCandidate": {
+      "head": "767b0c8a4b6916d532c30ab65b41ed3a2bec46fd",
+      "tree": "2954628dce190fbdb08a2b0312733d9f2ffbfaad"
+    }
   },
   "verification": {
-    "gradle": "BUILD SUCCESSFUL",
-    "exit": 0,
-    "testedHead": "d52d97611cdaf9e532f0d9f2e742310beb5741d4",
-    "testedTree": "624b1e136efb2b49be8090e51946ecdcb9d403ea",
-    "jvmTest": {
-      "total": {
-        "tests": 77,
-        "failures": 0,
-        "errors": 0,
-        "skipped": 0
-      },
-      "classes": {
-        "CurationInstalledLinkTest[jvm]": {
-          "tests": 1,
+    "merge": {
+      "gradle": "BUILD SUCCESSFUL",
+      "exit": 0,
+      "testedHead": "d52d97611cdaf9e532f0d9f2e742310beb5741d4",
+      "testedTree": "624b1e136efb2b49be8090e51946ecdcb9d403ea",
+      "jvmTest": {
+        "total": {
+          "tests": 77,
           "failures": 0,
           "errors": 0,
-          "skipped": 0,
-          "timestamp": "2026-11-08T01:27:19.291Z"
+          "skipped": 0
         },
-        "CurationIntakeTest[jvm]": {
-          "tests": 37,
-          "failures": 0,
-          "errors": 0,
-          "skipped": 0,
-          "timestamp": "2026-11-08T01:27:19.720Z"
-        },
-        "CurationRemovalOwnershipTest[jvm]": {
-          "tests": 1,
-          "failures": 0,
-          "errors": 0,
-          "skipped": 0,
-          "timestamp": "2026-11-08T01:27:22.689Z"
-        },
-        "LinkGrabRetryTest[jvm]": {
-          "tests": 11,
-          "failures": 0,
-          "errors": 0,
-          "skipped": 0,
-          "timestamp": "2026-11-08T01:27:22.738Z"
-        },
-        "ProjectCorpusVisitTest[jvm]": {
-          "tests": 27,
-          "failures": 0,
-          "errors": 0,
-          "skipped": 0,
-          "timestamp": "2026-11-08T01:27:23.101Z"
+        "classes": {
+          "CurationInstalledLinkTest[jvm]": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:27:19.291Z"
+          },
+          "CurationIntakeTest[jvm]": {
+            "tests": 37,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:27:19.720Z"
+          },
+          "CurationRemovalOwnershipTest[jvm]": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:27:22.689Z"
+          },
+          "LinkGrabRetryTest[jvm]": {
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:27:22.738Z"
+          },
+          "ProjectCorpusVisitTest[jvm]": {
+            "tests": 27,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:27:23.101Z"
+          }
         }
-      }
+      },
+      "compiled": [
+        "compileKotlinJvm",
+        "compileTestKotlinJvm",
+        "compileKotlinJs",
+        "compileDocumentsKotlinJs",
+        "compilePagesKotlinJs",
+        "compileSpacegraphKotlinJs",
+        "compileKotlinWasmJs",
+        "compileKotlinWasmWasi",
+        "compileKotlinMacos",
+        "compileTestKotlinMacos"
+      ],
+      "rerun": "each listed compile task and jvmTest ran with --rerun",
+      "notRun": [
+        "macosTest",
+        "native link",
+        "webpack production bundles"
+      ]
     },
-    "compiled": [
-      "compileKotlinJvm",
-      "compileTestKotlinJvm",
-      "compileKotlinJs",
-      "compileDocumentsKotlinJs",
-      "compilePagesKotlinJs",
-      "compileSpacegraphKotlinJs",
-      "compileKotlinWasmJs",
-      "compileKotlinWasmWasi",
-      "compileKotlinMacos",
-      "compileTestKotlinMacos"
-    ],
-    "rerun": "each listed compile task and jvmTest ran with --rerun",
-    "notRun": [
-      "macosTest",
-      "native link",
-      "webpack production bundles"
-    ]
+    "continuation": {
+      "gradle": "BUILD SUCCESSFUL",
+      "exit": 0,
+      "testedHead": "767b0c8a4b6916d532c30ab65b41ed3a2bec46fd",
+      "testedTree": "2954628dce190fbdb08a2b0312733d9f2ffbfaad",
+      "worktree": "/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/d3m-verify-20261107 (clean detached worktree; only the known case-fold phantom differs on disk)",
+      "jvmTest": {
+        "total": {
+          "tests": 77,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "classes": {
+          "CurationInstalledLinkTest[jvm]": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "CurationIntakeTest[jvm]": {
+            "tests": 37,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "CurationRemovalOwnershipTest[jvm]": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "LinkGrabRetryTest[jvm]": {
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "ProjectCorpusVisitTest[jvm]": {
+            "tests": 27,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        }
+      },
+      "compiled": [
+        "compileKotlinJvm",
+        "compileTestKotlinJvm",
+        "compileKotlinJs",
+        "compileDocumentsKotlinJs",
+        "compilePagesKotlinJs",
+        "compileSpacegraphKotlinJs",
+        "compileKotlinWasmJs",
+        "compileKotlinWasmWasi",
+        "compileKotlinMacos",
+        "compileTestKotlinMacos"
+      ],
+      "notRun": [
+        "macosTest",
+        "native link",
+        "webpack production bundles",
+        "JevaNativeFootprintTest (gated on synthetic Jeva worker paths)"
+      ]
+    },
+    "concurrentWriter": "another process created untracked src/commonMain/kotlin/narchy/spacegraph/RenderModel.kt and src/commonMain/kotlin/borg/trikeshed/export/OpenApiExport.kt in the main checkout after the first build; they are not part of this integration and were left untouched; the continuation build used a clean detached worktree"
   },
   "localArchive": ".git/d3m/d3m-20261107-191424/",
   "stageEvidence": {
@@ -341,11 +413,51 @@
   },
   "evidencePacket": {
     "dir": "evidence/2026-11-07/",
-    "sha256Manifest": "854daa471f78d14004579ba19fd217f1b00d716927ab92c5922084e970fb7f8b"
+    "sha256Manifest": "5897b801a2873570e6db6d821bb56b78f1e53cf1ac9f8c33a762e96248c7590e"
   },
   "deletions": {
     "branches": 0,
     "worktreesPruned": 0,
     "forcePush": false
+  },
+  "continuation": {
+    "reason": "publication re-fetch found two origin heads created during the run",
+    "inventory": {
+      "recordedAt": "2026-11-08T01:29:34.484754+00:00",
+      "head": "72e20a9b1882065eb1dcaf0ed7bb89e7e1d8f6c9",
+      "refs": 612,
+      "distinctTips": 600,
+      "file": "publication-inputs.json"
+    },
+    "merges": [
+      {
+        "step": 2,
+        "ref": "refs/remotes/origin/sentinel-block-proxy-ca-env-vars-3639796855996924805",
+        "commit": "77f9e80a18d11c4266c43089ff6eca3c975df7fe",
+        "committerTime": 1794100927,
+        "before": "72e20a9b1882065eb1dcaf0ed7bb89e7e1d8f6c9",
+        "mergeBase": [
+          "0e4b5199469ecf01cdf95da81b9a1cd4948e0e93"
+        ],
+        "after": "4aba9fa6bde7f88396a4f32f8812f1b2da02dea9",
+        "conflicts": 0,
+        "reviewed": "ProcessEnvironment.toxic gains HTTP_PROXY, HTTPS_PROXY, ALL_PROXY, NO_PROXY, CURL_CA_BUNDLE, SSL_CERT_FILE, SSL_CERT_DIR; master never touched the file after 0e4b51994"
+      },
+      {
+        "step": 3,
+        "ref": "refs/remotes/origin/jules-10033078381912758791-b816ed20",
+        "commit": "375c4af3920b0d0215aa2d9000d69fa22bde3808",
+        "committerTime": 1794101047,
+        "before": "4aba9fa6bde7f88396a4f32f8812f1b2da02dea9",
+        "mergeBase": [
+          "0e4b5199469ecf01cdf95da81b9a1cd4948e0e93"
+        ],
+        "after": "767b0c8a4b6916d532c30ab65b41ed3a2bec46fd",
+        "conflicts": 0,
+        "reviewed": "allocation-inspector.css adds summary:focus-visible beside button/input; master never touched the file after 0e4b51994"
+      }
+    ],
+    "allPublicationTipsAncestors": true,
+    "file": "integrate-continuation.txt"
   }
 }

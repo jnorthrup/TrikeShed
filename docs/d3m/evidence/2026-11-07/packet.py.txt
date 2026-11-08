@@ -28,6 +28,11 @@ copies = {
     'casefold-phantom.diff': 'casefold-phantom.diff.txt',
     'verify-identity.txt': None, 'verify-gradle.log': 'verify-gradle.log.txt', 'verify-results.json': None,
     'integrate-final.txt': None,
+    'publication-remote-heads.json': None, 'publication-fetch.json': None, 'publication-inputs.json': None,
+    'integrate-continuation.py': 'integrate-continuation.py.txt', 'integrate-continuation.txt': None,
+    'continuation-steps.json': None, 'verify-continuation.sh': 'verify-continuation.sh.txt',
+    'verify-continuation-identity.txt': None, 'verify-continuation-gradle.log': 'verify-continuation-gradle.log.txt',
+    'verify-continuation-results.json': None,
     f'conflict-index-{incoming}.txt': None,
 }
 for src, dst in copies.items():
