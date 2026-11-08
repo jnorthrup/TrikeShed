@@ -1,6 +1,0 @@
-From https://github.com/jnorthrup/TrikeShed
- * [new branch]          codex/nal-historical-inspection-cli-20261105 -> origin/codex/nal-historical-inspection-cli-20261105
- * [new branch]          codex/retained-nal-english-integration-20261105 -> origin/codex/retained-nal-english-integration-20261105
- * [new branch]          codex/retained-nal-implication-20261105 -> origin/codex/retained-nal-implication-20261105
- * [new branch]          codex/retained-source-promotion-v77-evidence-20261105 -> origin/codex/retained-source-promotion-v77-evidence-20261105
- * [new branch]          docs/english-guard-baseline-v77-20261105 -> origin/docs/english-guard-baseline-v77-20261105

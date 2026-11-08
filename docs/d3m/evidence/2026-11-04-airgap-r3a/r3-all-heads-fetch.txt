@@ -1,9 +1,0 @@
-From https://github.com/jnorthrup/TrikeShed
- * [new branch]          codex/documents-english-taxonomy-v70-evidence-20261104 -> origin/codex/documents-english-taxonomy-v70-evidence-20261104
-   243db15b7..b6e066524  codex/english-copular-integration-20261104 -> origin/codex/english-copular-integration-20261104
- * [new branch]          codex/english-retained-attention-integration-20261104 -> origin/codex/english-retained-attention-integration-20261104
- * [new branch]          codex/english-retained-open-20261104 -> origin/codex/english-retained-open-20261104
- * [new branch]          codex/english-taxonomy-v70-evidence-20261104 -> origin/codex/english-taxonomy-v70-evidence-20261104
- * [new branch]          codex/nars-exact-attention-20261104 -> origin/codex/nars-exact-attention-20261104
- * [new branch]          docs/panels-evidence-lifecycle-v70-20261104 -> origin/docs/panels-evidence-lifecycle-v70-20261104
-   3e3d6aa4b..b6e066524  master     -> origin/master

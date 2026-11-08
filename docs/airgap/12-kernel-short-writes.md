@@ -173,7 +173,7 @@ The successful continuation's first capture and its accepted visual follow-up
 also remain distinct. Raw source extraction and `/proc` whitespace is retained
 byte-for-byte, verified by the evidence manifest rather than reformatted.
 
-[D3M](../d3m/2026-11-05-airgap-r4g.md) freezes 545 refs, all already ancestors
+[D3M](../../../../../../tmp/d3m/2026-11-05-airgap-r4g.md) freezes 545 refs, all already ancestors
 of the published R4f master. No new branch merge or conflict occurs. Evidence
 and documentation are committed and ordinarily pushed after ancestry and
 manifest checks. Jim's Mac remains unchanged; this is the cloud Linux work.

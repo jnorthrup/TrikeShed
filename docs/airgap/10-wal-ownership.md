@@ -131,7 +131,7 @@ not establish arbitrary-write or power-loss safety.
 
 ## D3M and evidence standing
 
-The [D3M record](../d3m/2026-11-05-airgap-r4e.md) retains the chronological
+The [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r4e.md) retains the chronological
 integration, including both textual conflicts and every base/left/right
 stage. Both conflicts concern independently implemented versions of the same
 Confix input correction: preserve encoded strings and serialize structured

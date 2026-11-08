@@ -145,5 +145,5 @@ The release test programme adds full Kotlin geometry comparisons, malformed
 and capacity cases, cancellation/drain, immutable admitted input, exact source
 CAS retention and a two-engine whole-program receipt. The [exact evidence packet](evidence/r2-20261104/README.md) records the final
 combined-source checks, CAS identities, conditional skips and reproduction.
-The [D3M record](../d3m/2026-11-04-airgap-r2.md) retains ordered branch inputs,
+The [D3M record](../../../../../../tmp/d3m/2026-11-04-airgap-r2.md) retains ordered branch inputs,
 merge identities and source equivalence.

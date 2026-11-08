@@ -184,7 +184,7 @@ Follow the [runtime launch instructions](../../release/airgap-document/README.md
 with the packaged locale, preserved modes and isolated networking. The host
 kernel, namespace tools, browser, strace and verification controller remain
 external inputs. The [verification packet](evidence/r4f-20261105/verification.json)
-and [D3M record](../d3m/2026-11-05-airgap-r4f.md) retain exact identities and
+and [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r4f.md) retain exact identities and
 scope. Complete vendor JDK patch/native-resource rebuild provenance, broader
 deployment environments, general Nix evaluation and dense recursive LCNC
 visualization remain open. Raw native allocations still require explicit

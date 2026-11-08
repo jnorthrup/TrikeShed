@@ -230,7 +230,7 @@ fixture sources, runtime hashes and network observations are retained.
 [Live wire screenshot](evidence/r3a-20261104/accepted/live-consumed-wire.png) ·
 [Native flyover](evidence/r3a-20261104/accepted/native-flyover.png) ·
 [Exact manifest](evidence/r3a-20261104/verification.json) ·
-[D3M integration](../d3m/2026-11-04-airgap-r3a.md).
+[D3M integration](../../../../../../tmp/d3m/2026-11-04-airgap-r3a.md).
 
 The final D3M inventory contains 503 remote branches, eight local branches
 and origin/HEAD. All 512 refs are ancestors of the release. No textual merge

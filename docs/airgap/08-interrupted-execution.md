@@ -117,7 +117,7 @@ the documents/evidence bundle.
 
 ## D3M and retained NAL work
 
-The [D3M record](../d3m/2026-11-05-airgap-r4c.md) preserves two release-index
+The [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r4c.md) preserves two release-index
 conflicts with their original index stages and base/left/right blobs. Both
 independent sections survive. A later virtual-base conflict concerned only
 a blank separator. The merged NAL refusal path also needed a compilation
@@ -207,6 +207,6 @@ deterministic packaging, not reproducible vendor/source compilation.
 
 The [verification packet](evidence/r4c-20261105/verification.json) identifies
 all accepted and failed attempts, exact harnesses, original logs, native
-ownership evidence and source hashes. The [D3M packet](../d3m/evidence/2026-11-05-airgap-r4c/SHA256.json)
+ownership evidence and source hashes. The [D3M packet](../../../../../../tmp/d3m/evidence/2026-11-05-airgap-r4c/SHA256.json)
 preserves the two textual conflict stage sets and concurrent test-fix intent.
 Publication verifies the tested source equivalence and every frozen tip.

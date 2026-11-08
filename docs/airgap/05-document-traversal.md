@@ -6,7 +6,7 @@ inspection. This is a document traversal increment. It does not decide the
 legal dispute, evaluate a Nix expression or replace the curator's managed NLP
 and review owners. The bounded Linux x86-64 increment is verified; its
 [final combined evidence](evidence/r3b-cutoff-20261105/verification.json) and
-[D3M record](../d3m/2026-11-05-airgap-r3b.md) distinguish accepted runs,
+[D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r3b.md) distinguish accepted runs,
 failed attempts and remaining gates.
 
 ## Source and interpretation boundary

@@ -1,7 +1,0 @@
-head 767b0c8a4b6916d532c30ab65b41ed3a2bec46fd
-tree 2954628dce190fbdb08a2b0312733d9f2ffbfaad
-worktree /Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/d3m-verify-20261107
-status-lines        1
-2026-11-08T01:31:24Z
-exit 0
-status-after        1

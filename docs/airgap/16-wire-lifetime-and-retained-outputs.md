@@ -9,7 +9,7 @@ Execution, retained-state ownership and observation budgets remain unchanged.
 
 The [verification packet](evidence/r3f-20261105/verification.json) records the
 exact package, source, native values, CAS/WAL audits and failed attempts. The
-[D3M record](../d3m/2026-11-05-airgap-r3f.md) identifies the integrated heads.
+[D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r3f.md) identifies the integrated heads.
 This increment extends the [R3e geometry contract](15-wire-geometry.md) and
 corrects its earlier description of direct wire listeners as page-owned.
 

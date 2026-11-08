@@ -1,6 +1,0 @@
-{
-  "origin": {
-    "exit": 0,
-    "output": "From https://github.com/jnorthrup/TrikeShed\n * [new branch]          codex/native-horn-bindings-v85-evidence-20261105 -> origin/codex/native-horn-bindings-v85-evidence-20261105\n   bafb47f3b..edc9d3621  codex/native-horn-role-integration-20261105 -> origin/codex/native-horn-role-integration-20261105\n * [new branch]          feat/english-corpus-lexical-query-20261105 -> origin/feat/english-corpus-lexical-query-20261105\n   e15683f35..edc9d3621  master     -> origin/master\n"
-  }
-}

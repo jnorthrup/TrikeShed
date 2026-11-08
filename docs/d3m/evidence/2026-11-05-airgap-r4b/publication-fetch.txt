@@ -1,4 +1,0 @@
-From https://github.com/jnorthrup/TrikeShed
-   0219223a3..4e57df1da  codex/reviewed-proof-query-integration-20261105 -> origin/codex/reviewed-proof-query-integration-20261105
- * [new branch]          codex/reviewed-proof-query-v75-evidence-20261105 -> origin/codex/reviewed-proof-query-v75-evidence-20261105
-   d563bd6fc..4e57df1da  master     -> origin/master

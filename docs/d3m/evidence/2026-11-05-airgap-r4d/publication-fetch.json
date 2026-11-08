@@ -1,7 +1,0 @@
-[
-  {
-    "remote": "origin",
-    "exit": 0,
-    "output": "From https://github.com/jnorthrup/TrikeShed\n   c23dd2401..21e70d7d6  codex/retained-nal-english-integration-20261105 -> origin/codex/retained-nal-english-integration-20261105\n * [new branch]          feat/retained-nal-lcnc-20261105 -> origin/feat/retained-nal-lcnc-20261105\n   5102281c1..21e70d7d6  master     -> origin/master\n"
-  }
-]

@@ -13,7 +13,7 @@ This is a bounded continuation of [R3a](04-observed-transfers.md) and the
 runtime with rebuilt JVM and browser jars after D3M integration. It does not close recursive scope navigation,
 large-graph rendering or the whole [visualization blueprint](../lcnc/airgap-demonstrator/07-visualization.md).
 The [verification packet](evidence/r3c-20261105/verification.json) and
-[D3M record](../d3m/2026-11-05-airgap-r3c.md) retain exact inputs and limits.
+[D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r3c.md) retain exact inputs and limits.
 
 ## Operator workflow
 

@@ -1,2 +1,0 @@
-From https://github.com/jnorthrup/TrikeShed
- * [new branch]          codex/english-retained-open-v71-evidence-20261104 -> origin/codex/english-retained-open-v71-evidence-20261104

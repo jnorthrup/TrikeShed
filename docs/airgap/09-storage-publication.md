@@ -154,7 +154,7 @@ require the exact run chain, frame CRCs and known quotation boundaries.
 
 ## Scope and reproduction
 
-The [D3M record](../d3m/2026-11-05-airgap-r4d.md) binds this correction to the
+The [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r4d.md) binds this correction to the
 combined source. A publication fetch added the retained-English NAL LCNC node
 and a geometry-label correction after the first successful JVM build. The
 combined source therefore requires fresh JVM, browser and affected-target

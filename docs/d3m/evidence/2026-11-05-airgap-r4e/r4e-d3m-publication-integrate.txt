@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/workspace/airgap-r4e-proof/integrate-publication.py", line 26, in <module>
-    raise RuntimeError('Conflicts retained for intent review. '+result.stdout)
-RuntimeError: Conflicts retained for intent review. Auto-merging src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt
-CONFLICT (content): Merge conflict in src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt
-Automatic merge failed; fix conflicts and then commit the result.
-

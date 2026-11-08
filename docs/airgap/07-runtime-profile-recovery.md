@@ -91,7 +91,7 @@ heap setting and two reported processors remain JVM settings, not OS quotas.
 
 ## D3M and compatibility
 
-The [D3M record](../d3m/2026-11-05-airgap-r4b.md) freezes 534 refs and retains
+The [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r4b.md) freezes 534 refs and retains
 five sequential merges without textual conflicts. Publication then freezes
 535 refs and preserves two additional documentation/evidence merges, with
 all tested source and build inputs unchanged. Incoming work projects

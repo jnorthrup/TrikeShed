@@ -8,7 +8,7 @@ their failed verification attempts and the reason for each correction.
 
 The [verification packet](evidence/r3e-20261105/verification.json) separates
 unprofiled comparisons, diagnostic profiles, preliminary runtime failures and
-final extracted-runtime checks. The [D3M record](../d3m/2026-11-05-airgap-r3e.md)
+final extracted-runtime checks. The [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r3e.md)
 identifies every frozen branch and integrated tip. The prior
 [R3d runbook](14-receipt-rendering.md) owns the exact-comparison reuse and
 batched node-overlap mechanics retained by this increment.

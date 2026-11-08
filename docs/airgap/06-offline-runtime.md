@@ -194,7 +194,7 @@ The [immutable verification packet](evidence/r4a-20261105/verification.json)
 records combined source `2323b4f39e7b19f37168c014fa15bf1fe5832346`, 219 selected
 JVM regressions with no failures or skips, the listed platform compiles, ten
 browser cases, four startup refusal cases and five integrity refusal cases.
-The [D3M record](../d3m/2026-11-05-airgap-r4a.md) covers 529 frozen refs and
+The [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r4a.md) covers 529 frozen refs and
 nine sequential merges with no conflicts. The [independent CAS audit](evidence/r4a-20261105/packaging/independent-cas-audit.json)
 verifies all 27 retained CAS objects, identical run rows across the two JVMs,
 the receipt/program/invocation identities, all eight consumed wires and the

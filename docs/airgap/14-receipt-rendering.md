@@ -9,7 +9,7 @@ visualization gate; sustained frame-rate acceptance remains open.
 
 The [verification packet](evidence/r3d-20261105/verification.json) separates
 diagnostic profiles, preliminary candidate runs, final extracted-runtime
-checks and frame measurements. The [D3M record](../d3m/2026-11-05-airgap-r3d.md)
+checks and frame measurements. The [D3M record](../../../../../../tmp/d3m/2026-11-05-airgap-r3d.md)
 retains the incoming branch inventories and one equivalent-fix conflict.
 The previous [R3c workflow](13-human-rate-inspection.md) describes display
 pause, pinned observations and receipt reopening.
