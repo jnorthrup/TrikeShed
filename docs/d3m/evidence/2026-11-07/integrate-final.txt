@@ -1,0 +1,13 @@
+{
+  "head": "d52d97611cdaf9e532f0d9f2e742310beb5741d4",
+  "refs": 610,
+  "merges": 1,
+  "steps": [
+    {
+      "ref": "refs/heads/codex/d3m-working-trikeshed-grab-lifecycle",
+      "commit": "5dad15b012473bf5cd1367eac5e74260873dcfe1",
+      "after": null,
+      "exit": 1
+    }
+  ]
+}

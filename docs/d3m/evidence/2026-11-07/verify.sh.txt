@@ -1,0 +1,18 @@
+#!/bin/bash
+# D3M step 6 verification for d3m-20261107-191424 (tested tree = HEAD tree recorded below)
+cd /Users/jim/work/TrikeShed || exit 2
+R=.git/d3m/d3m-20261107-191424
+{ echo "head $(git rev-parse HEAD)"; echo "tree $(git rev-parse HEAD^{tree})"; echo "status-lines $(git status --porcelain | wc -l)"; date -u +%FT%TZ; } > $R/verify-identity.txt
+./gradlew --offline --console=plain --continue --max-workers=2 \
+  compileKotlinJvm --rerun compileTestKotlinJvm --rerun \
+  compileKotlinJs --rerun compileDocumentsKotlinJs --rerun compilePagesKotlinJs --rerun compileSpacegraphKotlinJs --rerun \
+  compileKotlinWasmJs --rerun compileKotlinWasmWasi --rerun \
+  compileKotlinMacos --rerun compileTestKotlinMacos --rerun \
+  jvmTest --rerun \
+    --tests borg.trikeshed.forge.server.CurationIntakeTest \
+    --tests borg.trikeshed.forge.server.CurationInstalledLinkTest \
+    --tests borg.trikeshed.forge.server.LinkGrabRetryTest \
+    --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest \
+    --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest \
+  > $R/verify-gradle.log 2>&1
+echo "exit $?" >> $R/verify-identity.txt

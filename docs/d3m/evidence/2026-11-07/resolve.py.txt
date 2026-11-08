@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+# D3M step 5 helper: per conflict block, record base / HEAD (accumulated master) /
+# incoming text and the intent decision, and build the resolved file text.
+# The decision for each block is written in DECISIONS below after manual review;
+# this script only applies it and checks the result against the pre-merge master blob.
+from pathlib import Path
+import subprocess, json, sys, hashlib
+
+repo = Path('/Users/jim/work/TrikeShed')
+out = Path(__file__).resolve().parent
+incoming = '5dad15b012473bf5cd1367eac5e74260873dcfe1'
+equivalent = '86eb95a0266fdcc8ff8dc0f258023387cdd95c2f'   # same patch-id, already in master
+premerge = '90e82d3b5a389fbf0a2ff9080ff9309dbfacddef'
+cdir = out / 'conflicts' / incoming
+
+# Reviewed intent, block by block (1-based within each file).
+# Every incoming block is byte-identical to the corresponding region at 86eb95a02
+# (same patch-id; the five touched paths are identical between the two commits).
+# The HEAD side is that same change after later master commits refined it.
+DECISIONS = {
+    'src/jvmMain/kotlin/borg/trikeshed/forge/server/CurationIntake.kt': [
+        dict(block=1, region='CurationIntake.resume',
+             incoming='per-document cancellation check and link-mode re-offer with the selected provider while resuming',
+             head='same per-document ensureActive and link-mode offer, now through bounded corpus.visit with ProjectVisitUnavailable reported instead of aborting resume',
+             later=['a89c1ce68'],
+             decision='HEAD text: it contains the incoming intent unchanged and adds the bounded visitor'),
+        dict(block=2, region='CurationIntake admission grab capacity',
+             incoming='acquire grabCapacity for decision-provider admissions and record the permit',
+             head='same acquisition, then scope.coroutineContext.ensureActive() so a grab cancelled during the capacity handoff is not admitted',
+             later=['3902443d7'],
+             decision='HEAD text: incoming acquisition retained verbatim; adds the post-handoff cancellation check'),
+        dict(block=3, region='CurationIntake install: onRemoved + resume',
+             incoming='replace the launched intake.resume() with intake.resumeOwned(); onRemoved unchanged from base',
+             head='intake.resumeOwned() as incoming; onRemoved forgets with unverifiedOwnership=true and no longer calls nodes.leave (a removed upload does not prove ownership of a same-named global book)',
+             later=['d7216e115', '3f192ade5'],
+             decision='HEAD text: incoming resumeOwned retained; onRemoved change is a later master decision the incoming side never touched'),
+    ],
+    'src/jvmMain/kotlin/borg/trikeshed/forge/server/LinkGrab.kt': [
+        dict(block=1, region='LinkGrab.Held / held map',
+             incoming='held becomes a map of CompletableDeferred<Held> (single-flight index scan)',
+             head='same CompletableDeferred map; Held also carries its ProjectDb owner and pending work claims',
+             later=['2459644ae'],
+             decision='HEAD text: superset of incoming'),
+        dict(block=2, region='LinkGrab.held(project)',
+             incoming='single-flight scan; waiters retry when the initial scanner was cancelled; failed scans are evicted; ensureActive per document',
+             head='identical single-flight, cancellation-retry and eviction structure, plus owner identity re-check, corpus.visit, and heldBytes/claim verification before a held listing can suppress retrieval',
+             later=['a89c1ce68', '2459644ae', '9abcf7f5f'],
+             decision='HEAD text: every incoming statement is retained in place; additions are later verification'),
+        dict(block=3, region='LinkGrab link loop',
+             incoming='rethrow CancellationException when the caller is no longer active',
+             head='same rethrow; dedup moves from h.works.add to a retryable work claim',
+             later=['2459644ae'],
+             decision='HEAD text: incoming rethrow retained verbatim'),
+        dict(block=4, region='LinkGrab.land publication',
+             incoming='pass admit through to uploadPut so landed links follow admission',
+             head='admit passed through scopes.importLink(owner, ..., admit) under a digest claim with ensureActive (conditional project-owned publication)',
+             later=['2459644ae'],
+             decision='HEAD text: admission propagation retained through importLink'),
+    ],
+    'src/jvmTest/kotlin/borg/trikeshed/forge/server/CurationIntakeTest.kt': [
+        dict(block=1, region='appended regressions (both sides added the same tests)',
+             incoming='310 lines of new regressions (drain/backpressure/cancellation/link index sharing)',
+             head='the same 310 lines plus a ProjectVisitUnavailable eviction case in concurrentLinkIndexReadersShareAndRetryCancelledInitialization',
+             later=['a89c1ce68'],
+             decision='HEAD text: diff(incoming, HEAD) is a pure 10-line insertion'),
+    ],
+}
+
+
+def blocks(text):
+    """Split diff3-marked text into segments: ('plain', lines) or ('conflict', ours, base, theirs)."""
+    segs, cur, state, ours, base, theirs = [], [], None, [], [], []
+    for line in text.splitlines(keepends=True):
+        if state is None and line.startswith('<<<<<<< '):
+            segs.append(('plain', cur)); cur = []; state = 'ours'; ours, base, theirs = [], [], []
+        elif state == 'ours' and line.startswith('||||||| '):
+            state = 'base'
+        elif state in ('ours', 'base') and line.rstrip('\n') == '=======':
+            state = 'theirs'
+        elif state == 'theirs' and line.startswith('>>>>>>> '):
+            segs.append(('conflict', ours, base, theirs)); state = None
+        elif state == 'ours': ours.append(line)
+        elif state == 'base': base.append(line)
+        elif state == 'theirs': theirs.append(line)
+        else: cur.append(line)
+    assert state is None
+    segs.append(('plain', cur))
+    return segs
+
+
+def show(rev, path):
+    return subprocess.check_output(['git', 'show', f'{rev}:{path}'], cwd=repo, text=True)
+
+
+record = []
+resolved = {}
+for path, decisions in DECISIONS.items():
+    marked = (cdir / (path + '.marked')).read_text()
+    segs = blocks(marked)
+    conflicts = [s for s in segs if s[0] == 'conflict']
+    assert len(conflicts) == len(decisions), (path, len(conflicts))
+    eq_text = show(equivalent, path)
+    assert eq_text == show(incoming, path), path
+    text = []
+    n = 0
+    for s in segs:
+        if s[0] == 'plain':
+            text += s[1]
+            continue
+        _, ours, base, theirs = s
+        d = decisions[n]; n += 1
+        # the incoming text must appear verbatim in the already-integrated commit
+        assert ''.join(theirs) in eq_text, (path, d['block'])
+        text += ours
+        record.append(dict(path=path, **d,
+                           lines=dict(head=len(ours), base=len(base), incoming=len(theirs)),
+                           sha256=dict(head=hashlib.sha256(''.join(ours).encode()).hexdigest(),
+                                       base=hashlib.sha256(''.join(base).encode()).hexdigest(),
+                                       incoming=hashlib.sha256(''.join(theirs).encode()).hexdigest()),
+                           incomingVerbatimIn=equivalent))
+    resolved[path] = ''.join(text)
+    same = resolved[path] == show(premerge, path)
+    record.append(dict(path=path, resolvedEqualsPremergeMaster=same))
+    print(path, 'blocks', n, 'resolved == pre-merge master blob:', same)
+
+(out / 'intent-resolution.json').write_text(json.dumps(record, indent=2) + '\n')
+if '--apply' in sys.argv:
+    for path, text in resolved.items():
+        (repo / path).write_text(text)
+    print('applied')

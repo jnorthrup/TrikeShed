@@ -1,0 +1,95 @@
+[
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmMain/kotlin/borg/trikeshed/forge/server/CurationIntake.kt.stage1",
+    "mode": "100644",
+    "stage": 1,
+    "gitObjectId": "0305a4a96cfa91ff21edf56e17b4beadb491a748",
+    "sha256": "120a0ea3285d2d35dbf6915dd4362f4da80fee97596502224f671dd78a7bc4b4",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmMain/kotlin/borg/trikeshed/forge/server/CurationIntake.kt.stage2",
+    "mode": "100644",
+    "stage": 2,
+    "gitObjectId": "e3fec981253e7da78c7264f22d60bb6833aceb5a",
+    "sha256": "51b6063d0e9313ac1cb39cb9d56db59dbe5aeb4b8d2c4ec594c9ccd2a05110e0",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmMain/kotlin/borg/trikeshed/forge/server/CurationIntake.kt.stage3",
+    "mode": "100644",
+    "stage": 3,
+    "gitObjectId": "e0ab834273c25db22e39f979e7526eb25353cc63",
+    "sha256": "56a312f10248b6d5a96454884e61e5f7b8df4400724c633bbc9be51654dab84a",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmMain/kotlin/borg/trikeshed/forge/server/LinkGrab.kt.stage1",
+    "mode": "100644",
+    "stage": 1,
+    "gitObjectId": "bac49e32d578c80cb2706e26c171e815e5923259",
+    "sha256": "a91666b4044bc6acf4f0197f9db476006b2c201535fea6d457b2e060e07a0cb0",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmMain/kotlin/borg/trikeshed/forge/server/LinkGrab.kt.stage2",
+    "mode": "100644",
+    "stage": 2,
+    "gitObjectId": "d1fda964a57b9803745a71899d8f8189ed2b5cf5",
+    "sha256": "6f7d368895a631531f980ae3ccc8e1b2f9066fd1fc07a9b4b7e113994045414d",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmMain/kotlin/borg/trikeshed/forge/server/LinkGrab.kt.stage3",
+    "mode": "100644",
+    "stage": 3,
+    "gitObjectId": "989b03ab8ce087c18c670682f31db808f1a8354d",
+    "sha256": "23221bc20956bdcbdd8708b1097d79eeb7bc4e2499f3d1a09ccf95fc967d4a17",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmTest/kotlin/borg/trikeshed/forge/server/CurationIntakeTest.kt.stage1",
+    "mode": "100644",
+    "stage": 1,
+    "gitObjectId": "f87cea6c93d8d9ba54687c7835e5db79c50c66ae",
+    "sha256": "a95eee33caf6d5c2881739e07e31cd030dd912e468cfb6c81b0b1d6762fb2dce",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmTest/kotlin/borg/trikeshed/forge/server/CurationIntakeTest.kt.stage2",
+    "mode": "100644",
+    "stage": 2,
+    "gitObjectId": "108ed25e57ba39e5becc0946259feedc48f359d9",
+    "sha256": "d7bf9c3e3098ac668c672b8ea4bcc7802641389c4f48b10a5cd31dd170b0bec8",
+    "matchesConflictIndex": true
+  },
+  {
+    "file": "conflicts/5dad15b012473bf5cd1367eac5e74260873dcfe1/src/jvmTest/kotlin/borg/trikeshed/forge/server/CurationIntakeTest.kt.stage3",
+    "mode": "100644",
+    "stage": 3,
+    "gitObjectId": "25860edccd128e943ffa5f827293a1349b9d6892",
+    "sha256": "b5ca21fbfd88f2de75f601b27c2209297a49e2fdf9abb050439d3f62d773ad98",
+    "matchesConflictIndex": true
+  },
+  {
+    "markedWorkingFile": "src/jvmMain/kotlin/borg/trikeshed/forge/server/CurationIntake.kt",
+    "carrier": "d05857be235dcc49756866fec3121dfcd4b8d68a",
+    "sha256": "47b7e3b846fff663bfaf973bd137beca2913c242c55678adfd23f34afa154a05",
+    "matchesCarrierBlob": true,
+    "conflictBlocks": 3
+  },
+  {
+    "markedWorkingFile": "src/jvmMain/kotlin/borg/trikeshed/forge/server/LinkGrab.kt",
+    "carrier": "d05857be235dcc49756866fec3121dfcd4b8d68a",
+    "sha256": "39c0812b41f1bf2549ca50fbf50724f2d3d17d980adefd64ce9c982c5130cd7c",
+    "matchesCarrierBlob": true,
+    "conflictBlocks": 4
+  },
+  {
+    "markedWorkingFile": "src/jvmTest/kotlin/borg/trikeshed/forge/server/CurationIntakeTest.kt",
+    "carrier": "d05857be235dcc49756866fec3121dfcd4b8d68a",
+    "sha256": "020534bec9063a083fac5a5aeb8e9b003178835720c9bd671a1f83bc71a788a2",
+    "matchesCarrierBlob": true,
+    "conflictBlocks": 1
+  }
+]
