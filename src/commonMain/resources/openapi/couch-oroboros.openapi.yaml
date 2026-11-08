@@ -15,18 +15,6 @@ info:
 servers:
   - url: http://127.0.0.1:8888
 paths:
-  /:
-    get:
-      summary: Vhost root — `_design/forge.rewrites["/"]` attachment, else the welcome document
-      responses:
-        "200": { description: attachment bytes or `{couchdb, version, vendor}` }
-  /{path}:
-    get:
-      summary: Vhost — any path not owned by `/api/…` or `/{db}` is rewritten to an attachment
-      parameters: [{ name: path, in: path, required: true, schema: { type: string } }]
-      responses:
-        "200": { description: attachment bytes with its stored content type }
-        "404": { description: no rewrite matched }
   /trikeshed:
     get:
       summary: Database info

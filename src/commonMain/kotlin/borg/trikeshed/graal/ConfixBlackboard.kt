@@ -23,7 +23,8 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  * - Reactor-form change stream via [changes] (SharedFlow<ConfixDoc>)
  * - Provenance tracking for each entry
  *
- * Reactor/lifecycle notes (CCEK-style):
+ * Reactor/lifecycle notes (not yet a CCEK element: mutators are synchronous and emission is a lossy
+ * `tryEmit`, where PRELOAD.md § Lifecycle wants admission by channel send and drain):
  * - [snapshot] is the authoritative full view, atomically joining values,
  *   provenance and revision. [revisions] is a conflated monotonic wakeup;
  *   [replay] supplies ordered changes or an explicit history-gap reset.

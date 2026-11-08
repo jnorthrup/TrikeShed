@@ -30,6 +30,13 @@ private fun parseScalar(raw: Series<Char>?): Any? {
     return value.asString()
 }
 
+/** A mapping key as YAML reads it: a quoted key (`"200":`, `'404':`) loses its quotes, as a quoted scalar does. */
+val Series<Char>.yamlKey: String
+    get() {
+        val key = trim()
+        return if (key.isQuoted('"') || key.isQuoted('\'')) key.slice(1, key.size - 1).asString() else key.asString()
+    }
+
 /** AST node types used by DescriptorFragments.describeYamlNode */
 sealed interface YamlNode {
     val span: YamlSpan
@@ -86,7 +93,7 @@ data class YamlMappingNode(
         val evidence = TypeEvidence.sample("{}".toSeries())
         nodeEvidence.add(evidence)
         rowVecCallback(evidence.toRowVec())
-        return entries.view.associate { it.key.asString() to it.value.reify(nodeEvidence, rowVecCallback) }
+        return entries.view.associate { it.key.yamlKey to it.value.reify(nodeEvidence, rowVecCallback) }
     }
 }
 
@@ -227,7 +234,8 @@ class DirectYamlParser(val lines: List<String>) {
             
             if (rest.isNotEmpty()) {
                 val colonIdx = findColon(rest)
-                if (colonIdx >= 0) {
+                // `- { name: id, in: query }` is a flow mapping item, not a block mapping whose key is `{ name`.
+                if (colonIdx >= 0 && !rest.startsWith("[") && !rest.startsWith("{")) {
                     val savedLines = lines.toMutableList()
                     val savedIdx = lineIdx
                     savedLines[savedIdx - 1] = " ".repeat(indent + 2) + rest

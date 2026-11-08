@@ -408,8 +408,10 @@ class JvmKanbanServer(
             }
         }
         // ── dynamic module claims: exact-path, consulted before everything else ──
-        moduleRoutes?.match(path)?.let { claim ->
-            claim.route(method, path, text, null)?.let { return it }
+        // A2A discovery reads the agent card at the origin's well-known path; the card itself is a module claim.
+        val claimed = if (path.substringBefore('?') == borg.trikeshed.export.AgentExport.CARD_PATH) borg.trikeshed.export.AgentExport.CARD_ROUTE else path
+        moduleRoutes?.match(claimed)?.let { claim ->
+            claim.route(method, claimed, text, null)?.let { return it }
         }
         // ── commonMain PORTABLE tier (ForgeRoutes) — no VM required ──
         ForgeRoutes.match(method, path)?.let { meta ->

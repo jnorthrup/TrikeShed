@@ -52,7 +52,7 @@ data class LitebikeFanoutEvent(
 )
 
 /**
- * Heuristic: the CCEK shape preferred by this codebase (`HtxElement`,
+ * The CCEK composition every asynchronous component follows (PRELOAD.md; required, not a preference) (`HtxElement`,
  * `SctpElement`, `LitebikeListenerElement`) accepts subscribers as
  * `CoroutineContext.Element`s and matches those that implement a duck-typed
  * sink by name (`onFanoutEvent`). This file keeps the explicit interface

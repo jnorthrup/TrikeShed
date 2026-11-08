@@ -983,6 +983,23 @@ tasks.register<JavaExec>("printForgeGallery") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// The route gate and export writer: RouteManifest, the wires' matched paths and the openapi/ specs must agree
+// (borg.trikeshed.export.ExportGate), and the documents the daemon serves are written from the same pass.
+val exportDocuments = layout.buildDirectory.dir("generated/exports")
+val exportGate = tasks.register<JavaExec>("exportGate") {
+    group = "verification"
+    description = "Fail when RouteManifest, the wires and the openapi/ specs disagree; write build/generated/exports."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.export.ExportGateKt")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    inputs.dir("src/jvmMain/kotlin")
+    inputs.dir("src/commonMain/kotlin")
+    inputs.dir("src/commonMain/resources/openapi")
+    outputs.dir(exportDocuments)
+    args("--root", projectDir.absolutePath, "--output", exportDocuments.get().asFile.absolutePath, "--version", project.version.toString(), "--check")
+}
+tasks.named("check") { dependsOn(exportGate) }
+
 // Frozen SUMO: full taxonomy + WordNet noun lexicon as one binary resource, built once.
 val sumoFrozenDir = layout.buildDirectory.dir("generated/sumo-frozen")
 val freezeSumo = tasks.register<JavaExec>("freezeSumo") {
@@ -1252,6 +1269,7 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
         "confix/job-nexus.schema.json",
         "openapi/htx-general.openapi.yaml",
         "openapi/forge-host.openapi.yaml",
+        "openapi/couch-oroboros.openapi.yaml",
         // Immutable WikiSkill trainer 1A. Keep every asset in the common bundle so
         // JVM, browser, Worker, and native evaluate the same bytes.
         "hermes/wiki-trainer/1A/manifest.json",

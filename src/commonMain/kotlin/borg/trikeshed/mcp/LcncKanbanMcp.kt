@@ -33,7 +33,7 @@ class LcncKanbanMcp(
     /** The LCNC registry. The ONLY write path — see the class note. */
     private val tools: Map<String, LcncNodeRunner>,
     private val reads: KanbanReadPort,
-    private val serverVersion: String = "0.1.0",
+    val serverVersion: String = "0.1.0",
 ) {
 
     companion object {
