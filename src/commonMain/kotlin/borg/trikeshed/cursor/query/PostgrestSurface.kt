@@ -642,24 +642,46 @@ fun decodeQuery(query: String): List<Pair<String, String>> = query.split('&').fi
     percentDecode(pair.substringBefore('=')) to percentDecode(pair.substringAfter('=', ""))
 }
 
+// Bolt: Fast-path zero-allocation check for unencoded strings and direct byte copying for ASCII characters
 fun percentDecode(text: String): String {
-    val bytes = ArrayList<Byte>(text.length)
+    if ('%' !in text && '+' !in text) return text
+    val out = ByteArray(text.length * 3)
+    var n = 0
     var i = 0
     while (i < text.length) {
         val c = text[i]
-        val hi = if (c == '%' && i + 2 < text.length) text[i + 1].digitToIntOrNull(16) else null
-        val lo = if (hi != null) text[i + 2].digitToIntOrNull(16) else null
         when {
-            c == '+' -> { bytes += ' '.code.toByte(); i++ }
-            hi != null && lo != null -> { bytes += (hi * 16 + lo).toByte(); i += 3 }
+            c == '%' && i + 2 < text.length -> {
+                val hi = hexVal(text[i + 1])
+                val lo = hexVal(text[i + 2])
+                if (hi >= 0 && lo >= 0) {
+                    out[n++] = ((hi shl 4) or lo).toByte()
+                    i += 3
+                } else {
+                    out[n++] = c.code.toByte()
+                    i++
+                }
+            }
+            c == '+' -> { out[n++] = ' '.code.toByte(); i++ }
+            c.code < 0x80 -> {
+                out[n++] = c.code.toByte()
+                i++
+            }
             else -> {
                 val width = if (c.isHighSurrogate() && i + 1 < text.length) 2 else 1
-                for (b in text.substring(i, i + width).encodeToByteArray()) bytes += b
-                i += width
+                val bytes = text.substring(i, i + width).encodeToByteArray()
+                bytes.copyInto(out, n); n += bytes.size; i += width
             }
         }
     }
-    return bytes.toByteArray().decodeToString()
+    return out.decodeToString(0, n)
+}
+
+private fun hexVal(c: Char): Int = when (c) {
+    in '0'..'9' -> c - '0'
+    in 'a'..'f' -> c - 'a' + 10
+    in 'A'..'F' -> c - 'A' + 10
+    else -> -1
 }
 
 /** [text] split on [separator] outside parentheses and double quotes. */
