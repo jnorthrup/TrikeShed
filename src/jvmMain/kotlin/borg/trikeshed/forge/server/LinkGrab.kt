@@ -43,20 +43,11 @@ class LinkGrab(
     private val admit: ((String, String, DecisionProvider?) -> Unit)? = null,
 ) {
     /** Per group, the works it holds: canonical addresses ([work]) and content digests, read once from its notes. */
-<<<<<<< HEAD
     private class Held(val owner: ProjectDb?, val works: MutableSet<String>, val digests: MutableSet<String>) {
         val pending = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
     }
     private val held = ConcurrentHashMap<String, CompletableDeferred<Held>>()
-||||||| 777887620
-    private class Held(val works: MutableSet<String>, val digests: MutableSet<String>)
-    private val held = ConcurrentHashMap<String, Held>()
-=======
-    private class Held(val works: MutableSet<String>, val digests: MutableSet<String>)
-    private val held = ConcurrentHashMap<String, CompletableDeferred<Held>>()
->>>>>>> 5dad15b012473bf5cd1367eac5e74260873dcfe1
 
-<<<<<<< HEAD
     private suspend fun held(project: String): Held {
         while (true) {
             val owner = scopes.linkOwner(project)
@@ -148,42 +139,6 @@ class LinkGrab(
                 h.pending.remove(key, reply)
                 reply.complete(accepted)
             }
-||||||| 777887620
-    private suspend fun held(project: String): Held = held[project] ?: run {
-        val h = Held(ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet())
-        for (d in corpus.docs(project, limit = Int.MAX_VALUE)) {
-            val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: continue
-            listOfNotNull(n["url"], n["requested"]).forEach { h.works.add(work(it)) }
-            n["sha256"]?.let { h.digests.add(it) }
-=======
-    private suspend fun held(project: String): Held {
-        while (true) {
-            val created = CompletableDeferred<Held>()
-            val existing = held.putIfAbsent(project, created)
-            if (existing != null) {
-                try { return existing.await() }
-                catch (cancelled: CancellationException) {
-                    if (!currentCoroutineContext().isActive) throw cancelled
-                    // The initial scanner was cancelled; a live caller can retry.
-                    continue
-                }
-            }
-            try {
-                val h = Held(ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet())
-                for (d in corpus.docs(project, limit = Int.MAX_VALUE)) {
-                    currentCoroutineContext().ensureActive()
-                    val n = corpus.read(project, d.id + ProjectNodes.NOTES_SUFFIX, 4096)?.text?.let(ProjectNodes::conventions) ?: continue
-                    listOfNotNull(n["url"], n["requested"]).forEach { h.works.add(work(it)) }
-                    n["sha256"]?.let { h.digests.add(it) }
-                }
-                created.complete(h)
-                return h
-            } catch (failure: Throwable) {
-                held.remove(project, created)
-                created.completeExceptionally(failure)
-                throw failure
-            }
->>>>>>> 5dad15b012473bf5cd1367eac5e74260873dcfe1
         }
     }
 
@@ -202,7 +157,6 @@ class LinkGrab(
         var landed = 0; var echoes = 0
         for (l in links) {
             val href = l["href"].toString().substringBefore('#')
-<<<<<<< HEAD
             val key = work(href)
             runCatching {
                 val accepted = claim(h, "work:$key", { key in h.works }) {
@@ -214,18 +168,6 @@ class LinkGrab(
                     if (it is CancellationException && !currentCoroutineContext().isActive) throw it
                     System.err.println("[GRAB] $href: ${it.message ?: it}")
                 }
-||||||| 777887620
-            if (!h.works.add(work(href))) { echoes++; continue }
-            runCatching { if (land(project, href, l["anchor"]?.toString().orEmpty(), citing, "$project/$id", depth + 1, asOf, provider, h)) landed++ else echoes++ }
-                .onFailure { System.err.println("[GRAB] $href: ${it.message ?: it}") }
-=======
-            if (!h.works.add(work(href))) { echoes++; continue }
-            runCatching { if (land(project, href, l["anchor"]?.toString().orEmpty(), citing, "$project/$id", depth + 1, asOf, provider, h)) landed++ else echoes++ }
-                .onFailure {
-                    if (it is CancellationException && !currentCoroutineContext().isActive) throw it
-                    System.err.println("[GRAB] $href: ${it.message ?: it}")
-                }
->>>>>>> 5dad15b012473bf5cd1367eac5e74260873dcfe1
         }
         System.err.println("[GRAB] $project/$id: ${links.size} referenced, $landed landed, $echoes held already (depth ${depth + 1})")
     }
@@ -296,7 +238,6 @@ class LinkGrab(
             if (anchor.isNotBlank()) append("anchor: ").append(anchor.replace('\n', ' ')).append('\n')
             append("depth: ").append(depth).append('\n')
         }
-<<<<<<< HEAD
         val accepted = claim(h, "digest:$digest", { digest in h.digests }) {
             currentCoroutineContext().ensureActive()
             scopes.importLink(owner, doc, bytes, twin.encodeToByteArray(), provider, admit)
@@ -308,15 +249,6 @@ class LinkGrab(
             if (!archived) h.works.add(work(at))
         }
         return accepted
-||||||| 777887620
-        scopes.uploadPut(project, doc + ProjectNodes.NOTES_SUFFIX, twin.encodeToByteArray(), provider)
-        scopes.uploadPut(project, doc, bytes, provider)
-        return true
-=======
-        scopes.uploadPut(project, doc + ProjectNodes.NOTES_SUFFIX, twin.encodeToByteArray(), provider)
-        scopes.uploadPut(project, doc, bytes, provider, admit = admit)
-        return true
->>>>>>> 5dad15b012473bf5cd1367eac5e74260873dcfe1
     }
 
     /** [url]'s bytes, content type and final address, following redirects over the daemon's HTX route. */

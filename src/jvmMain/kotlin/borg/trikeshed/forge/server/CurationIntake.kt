@@ -228,7 +228,6 @@ class CurationIntake(
         for (p in corpus.projects()) {
             currentCoroutineContext().ensureActive()
             if (!eligible(p.name)) continue
-<<<<<<< HEAD
             try {
                 corpus.visit(p.name) { d ->
                     currentCoroutineContext().ensureActive()
@@ -238,15 +237,6 @@ class CurationIntake(
             } catch (unavailable: ProjectVisitUnavailable) {
                 System.err.println("[INTAKE] ${unavailable.message}")
             }
-||||||| 777887620
-            for (d in corpus.docs(p.name, limit = Int.MAX_VALUE)) offer(p.name, d.id)
-=======
-            for (d in corpus.docs(p.name, limit = Int.MAX_VALUE)) {
-                currentCoroutineContext().ensureActive()
-                if (link) offer(p.name, d.id, selectedProvider(p.name, d.id), null, true)
-                else offer(p.name, d.id)
-            }
->>>>>>> 5dad15b012473bf5cd1367eac5e74260873dcfe1
         }
     }
 
@@ -445,7 +435,6 @@ class CurationIntake(
             }
             if (d.mode is Mode.Blocked) error("Intake policy blocked: ${d.mode.reason}")
             selectedCurrent()
-<<<<<<< HEAD
             if (d.decisionProvider != null) {
                 grabCapacity.acquire()
                 permit = grabCapacity
@@ -453,13 +442,6 @@ class CurationIntake(
             // A cancelled grab can release capacity before cancellation reaches this consumer.
             // The owning scope must still admit work; finally already owns any acquired permit.
             scope.coroutineContext.ensureActive()
-||||||| 777887620
-=======
-            if (d.decisionProvider != null) {
-                grabCapacity.acquire()
-                permit = grabCapacity
-            }
->>>>>>> 5dad15b012473bf5cd1367eac5e74260873dcfe1
             val root = constellations()
             // A removal observed before a later stage stops that stage.
             fun discarded(orphan: Boolean = false): Boolean = synchronized(admission) {
@@ -765,18 +747,10 @@ class CurationIntake(
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
             scopes.onExplicitDocument = { selected, provider -> intake.offerSelected(selected, provider) }
             scopes.onTextForReview = { selected -> intake.offerTextForReview(selected) }
-<<<<<<< HEAD
             // A removed upload does not establish ownership of a same-named global book.
             // Retain uncertain derived membership and expose it through intake status.
             scopes.onRemoved = { project, id -> intake.forget(project, id, unverifiedOwnership = true) }
             intake.resumeOwned()
-||||||| 777887620
-            scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
-            scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
-=======
-            scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
-            intake.resumeOwned()
->>>>>>> 5dad15b012473bf5cd1367eac5e74260873dcfe1
             ctx.routes.claim("language", "/api/intake") { method, _, _, _ ->
                 if (method != "GET") borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 else borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, borg.trikeshed.parse.jsonOf(intake.status()))
