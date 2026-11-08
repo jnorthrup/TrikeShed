@@ -1,4 +1,4 @@
-package borg.trikeshed.collections.associative
+package borg.trikeshed.parse.confix
 
 import borg.trikeshed.lib.j
 

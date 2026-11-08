@@ -1,6 +1,6 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.collections.associative.CborLimitException
+import borg.trikeshed.parse.confix.CborLimitException
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
 

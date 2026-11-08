@@ -1,7 +1,7 @@
 package borg.trikeshed.ipns
 
-import borg.trikeshed.collections.associative.Cbor
-import borg.trikeshed.collections.associative.Item
+import borg.trikeshed.parse.confix.Cbor
+import borg.trikeshed.parse.confix.Item
 import kotlin.time.Instant
 
 typealias IpnsSequence = ULong

@@ -9,9 +9,9 @@ import borg.trikeshed.reactor.ReactorEndpoint
 import borg.trikeshed.reactor.ReactorAction
 import borg.trikeshed.reactor.ReactorResult
 import borg.trikeshed.lib.j
-import borg.trikeshed.collections.associative.Cbor
-import borg.trikeshed.collections.associative.Item
-import borg.trikeshed.collections.associative.itemArrayOf
+import borg.trikeshed.parse.confix.Cbor
+import borg.trikeshed.parse.confix.Item
+import borg.trikeshed.parse.confix.itemArrayOf
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.Nonce
 import borg.trikeshed.context.nuid.Subnet

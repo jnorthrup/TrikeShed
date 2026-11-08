@@ -13,7 +13,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.confix.rootCell
-import borg.trikeshed.collections.associative.toAny
+import borg.trikeshed.parse.confix.toAny
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.StandardOpenOption

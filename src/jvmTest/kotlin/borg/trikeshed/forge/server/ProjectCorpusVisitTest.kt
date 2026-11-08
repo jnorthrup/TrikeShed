@@ -32,6 +32,10 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
+import borg.trikeshed.parse.confix.Cbor
+import borg.trikeshed.parse.confix.Item
+import borg.trikeshed.parse.confix.itemArrayOf
+import borg.trikeshed.parse.confix.itemMapOf
 
 class ProjectCorpusVisitTest {
     private class StopVisit : RuntimeException()

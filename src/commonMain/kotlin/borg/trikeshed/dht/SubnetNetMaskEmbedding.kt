@@ -1,7 +1,7 @@
 package borg.trikeshed.dht
 
-import borg.trikeshed.collections.associative.Cbor
-import borg.trikeshed.collections.associative.Item
+import borg.trikeshed.parse.confix.Cbor
+import borg.trikeshed.parse.confix.Item
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.NuidFanoutElement
 import borg.trikeshed.context.nuid.Subnet

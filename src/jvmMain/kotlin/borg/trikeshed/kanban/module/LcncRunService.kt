@@ -29,6 +29,8 @@ import kotlin.coroutines.CoroutineContext
 import java.lang.System
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import borg.trikeshed.parse.confix.Cbor
+import borg.trikeshed.parse.confix.toAny
 
 /** Execution resources belong to the caller; receipts project the existing durable work log. */
 internal class LcncRunService(
