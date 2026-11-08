@@ -33,6 +33,11 @@ copies = {
     'continuation-steps.json': None, 'verify-continuation.sh': 'verify-continuation.sh.txt',
     'verify-continuation-identity.txt': None, 'verify-continuation-gradle.log': 'verify-continuation-gradle.log.txt',
     'verify-continuation-results.json': None,
+    'publication2-remote-heads.json': None, 'publication2-fetch.json': None, 'publication2-inputs.json': None,
+    'integrate-continuation2.py': 'integrate-continuation2.py.txt', 'integrate-continuation2.txt': None,
+    'continuation2-steps.json': None, 'verify-continuation2.sh': 'verify-continuation2.sh.txt',
+    'verify-continuation2-identity.txt': None, 'verify-continuation2-gradle.log': 'verify-continuation2-gradle.log.txt',
+    'verify-continuation2-results.json': None,
     f'conflict-index-{incoming}.txt': None,
 }
 for src, dst in copies.items():

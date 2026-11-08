@@ -263,8 +263,8 @@
     "kotlinConflictMarkers": 0,
     "file": "integrate-final.txt",
     "publicationCandidate": {
-      "head": "767b0c8a4b6916d532c30ab65b41ed3a2bec46fd",
-      "tree": "2954628dce190fbdb08a2b0312733d9f2ffbfaad"
+      "head": "b15579d2d1e76da8cbffff9899c73e3a5908c836",
+      "tree": "504cf7df8c02d6245b0b16905e4d6f14dd4cbfb9"
     }
   },
   "verification": {
@@ -402,7 +402,83 @@
         "JevaNativeFootprintTest (gated on synthetic Jeva worker paths)"
       ]
     },
-    "concurrentWriter": "another process created untracked src/commonMain/kotlin/narchy/spacegraph/RenderModel.kt and src/commonMain/kotlin/borg/trikeshed/export/OpenApiExport.kt in the main checkout after the first build; they are not part of this integration and were left untouched; the continuation build used a clean detached worktree"
+    "concurrentWriter": "another process created untracked src/commonMain/kotlin/narchy/spacegraph/RenderModel.kt and src/commonMain/kotlin/borg/trikeshed/export/OpenApiExport.kt in the main checkout after the first build, then removed them and created worktree /Users/jim/work/TrikeShed-exports on new branch exports/ui-bottle at 767b0c8a4; none of that work is part of this integration and it was left untouched; continuation builds used a clean detached worktree",
+    "continuation2": {
+      "gradle": "BUILD SUCCESSFUL",
+      "exit": 0,
+      "testedHead": "b15579d2d1e76da8cbffff9899c73e3a5908c836",
+      "testedTree": "504cf7df8c02d6245b0b16905e4d6f14dd4cbfb9",
+      "worktree": "/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/d3m-verify-20261107 (clean detached worktree; only the known case-fold phantom differs on disk)",
+      "jvmTest": {
+        "total": {
+          "tests": 81,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "classes": {
+          "CurationInstalledLinkTest[jvm]": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:44:39.212Z"
+          },
+          "CurationIntakeTest[jvm]": {
+            "tests": 37,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:44:40.169Z"
+          },
+          "CurationRemovalOwnershipTest[jvm]": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:44:43.209Z"
+          },
+          "LinkGrabRetryTest[jvm]": {
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:44:43.254Z"
+          },
+          "ProjectCorpusVisitTest[jvm]": {
+            "tests": 27,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:44:43.517Z"
+          },
+          "VastCatalogTest[jvm]": {
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "timestamp": "2026-11-08T01:44:43.805Z"
+          }
+        }
+      },
+      "compiled": [
+        "compileKotlinJvm",
+        "compileTestKotlinJvm",
+        "compileKotlinJs",
+        "compileDocumentsKotlinJs",
+        "compilePagesKotlinJs",
+        "compileSpacegraphKotlinJs",
+        "compileKotlinWasmJs",
+        "compileKotlinWasmWasi",
+        "compileKotlinMacos",
+        "compileTestKotlinMacos"
+      ],
+      "notRun": [
+        "macosTest",
+        "native link",
+        "webpack production bundles"
+      ]
+    }
   },
   "localArchive": ".git/d3m/d3m-20261107-191424/",
   "stageEvidence": {
@@ -413,7 +489,7 @@
   },
   "evidencePacket": {
     "dir": "evidence/2026-11-07/",
-    "sha256Manifest": "5897b801a2873570e6db6d821bb56b78f1e53cf1ac9f8c33a762e96248c7590e"
+    "sha256Manifest": "da7c82f57b86525c99de7a66892e7802723042e83515e2bdae2e423887835e52"
   },
   "deletions": {
     "branches": 0,
@@ -459,5 +535,33 @@
     ],
     "allPublicationTipsAncestors": true,
     "file": "integrate-continuation.txt"
+  },
+  "continuation2": {
+    "reason": "second publication re-fetch found one more origin head created during the run; it also froze refs/heads/exports/ui-bottle, which another process created at 767b0c8a4 (already an ancestor)",
+    "inventory": {
+      "recordedAt": "2026-11-08T01:38:24.747009+00:00",
+      "head": "33ef336516541929a1e250ff2ffeabaaae7ba803",
+      "refs": 614,
+      "distinctTips": 602,
+      "file": "publication2-inputs.json"
+    },
+    "merges": [
+      {
+        "step": 4,
+        "ref": "refs/remotes/origin/bolt-optimize-postgrest-percent-decode-10152804141492056564",
+        "commit": "26de74b1fb41814f0408e9473f28920d425c80f0",
+        "committerTime": 1794101607,
+        "before": "33ef336516541929a1e250ff2ffeabaaae7ba803",
+        "mergeBase": [
+          "0e4b5199469ecf01cdf95da81b9a1cd4948e0e93"
+        ],
+        "after": "b15579d2d1e76da8cbffff9899c73e3a5908c836",
+        "conflicts": 0,
+        "reviewed": "percentDecode: fast path returns text with no % or +; decodes into a ByteArray sized 3x input (UTF-8 of BMP chars <= 3 bytes, surrogate pairs 4 bytes for 2 chars); hex digits now ASCII-only (digitToIntOrNull also accepted non-ASCII Unicode digits); invalid % sequences still pass through as %; master never touched the file after 0e4b51994"
+      }
+    ],
+    "allInventoryTipsAncestors": true,
+    "file": "integrate-continuation2.txt",
+    "finalFreeze": "publication2 is the last frozen inventory of this run; heads created after it belong to the next D3M"
   }
 }

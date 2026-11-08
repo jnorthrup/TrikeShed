@@ -1,0 +1,21 @@
+#!/bin/bash
+# D3M continuation verification in a clean detached worktree of the publication candidate.
+# The main checkout holds another process's untracked sources; this run excludes them by construction.
+cd /Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/d3m-verify-20261107 || exit 2
+R=/Users/jim/work/TrikeShed/.git/d3m/d3m-20261107-191424
+{ echo "head $(git rev-parse HEAD)"; echo "tree $(git rev-parse HEAD^{tree})"; echo "worktree $(pwd)"; echo "status-lines $(git status --porcelain | wc -l)"; date -u +%FT%TZ; } > $R/verify-continuation2-identity.txt
+./gradlew --offline --console=plain --continue --max-workers=2 \
+  compileKotlinJvm --rerun compileTestKotlinJvm --rerun \
+  compileKotlinJs --rerun compileDocumentsKotlinJs --rerun compilePagesKotlinJs --rerun compileSpacegraphKotlinJs --rerun \
+  compileKotlinWasmJs --rerun compileKotlinWasmWasi --rerun \
+  compileKotlinMacos --rerun compileTestKotlinMacos --rerun \
+  jvmTest --rerun \
+    --tests borg.trikeshed.forge.server.CurationIntakeTest \
+    --tests borg.trikeshed.forge.server.CurationInstalledLinkTest \
+    --tests borg.trikeshed.forge.server.LinkGrabRetryTest \
+    --tests borg.trikeshed.forge.server.CurationRemovalOwnershipTest \
+    --tests borg.trikeshed.forge.server.ProjectCorpusVisitTest \
+    --tests borg.trikeshed.vast.VastCatalogTest \
+  > $R/verify-continuation2-gradle.log 2>&1
+echo "exit $?" >> $R/verify-continuation2-identity.txt
+echo "status-after $(git status --porcelain | wc -l)" >> $R/verify-continuation2-identity.txt

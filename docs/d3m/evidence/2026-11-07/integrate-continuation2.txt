@@ -1,0 +1,13 @@
+{
+  "head": "b15579d2d1e76da8cbffff9899c73e3a5908c836",
+  "refs": 614,
+  "merges": 1,
+  "steps": [
+    {
+      "ref": "refs/remotes/origin/bolt-optimize-postgrest-percent-decode-10152804141492056564",
+      "commit": "26de74b1fb41814f0408e9473f28920d425c80f0",
+      "after": "b15579d2d1e76da8cbffff9899c73e3a5908c836",
+      "exit": 0
+    }
+  ]
+}

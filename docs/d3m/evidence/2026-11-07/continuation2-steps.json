@@ -1,0 +1,14 @@
+[
+  {
+    "ref": "refs/remotes/origin/bolt-optimize-postgrest-percent-decode-10152804141492056564",
+    "commit": "26de74b1fb41814f0408e9473f28920d425c80f0",
+    "time": 1794101607,
+    "before": "33ef336516541929a1e250ff2ffeabaaae7ba803",
+    "bases": [
+      "0e4b5199469ecf01cdf95da81b9a1cd4948e0e93"
+    ],
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../trikeshed/cursor/query/PostgrestSurface.kt     | 38 +++++++++++++++++-----\n 1 file changed, 30 insertions(+), 8 deletions(-)\n",
+    "after": "b15579d2d1e76da8cbffff9899c73e3a5908c836"
+  }
+]
