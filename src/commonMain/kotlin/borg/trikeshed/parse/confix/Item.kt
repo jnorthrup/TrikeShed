@@ -1,6 +1,6 @@
 @file:Suppress("UNCHECKED_CAST")
 
-package borg.trikeshed.collections.associative
+package borg.trikeshed.parse.confix
 
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series

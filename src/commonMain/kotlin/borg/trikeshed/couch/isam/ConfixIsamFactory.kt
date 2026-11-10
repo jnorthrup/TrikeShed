@@ -4,7 +4,6 @@ import borg.trikeshed.couch.*
 import borg.trikeshed.context.*
 import borg.trikeshed.couch.persistence.CouchCommitStore
 import borg.trikeshed.couch.persistence.asLocalBacking
-import borg.trikeshed.collections.associative.toAny
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.IOMemento

@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import borg.trikeshed.lib.emptySeries
+import borg.trikeshed.parse.confix.Item
 val couchStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
@@ -390,13 +391,13 @@ object CouchStoreFactory {
     private fun captureValue(value: Any?, path: MutableList<Any>, depth: Int) {
         require(depth <= CAPTURE_DEPTH) { "Couch value exceeds capture depth $CAPTURE_DEPTH" }
         when (value) {
-            is borg.trikeshed.collections.associative.Item.Tag -> captureContainer(value, path) {
+            is Item.Tag -> captureContainer(value, path) {
                 captureValue(value.item, path, depth + 1)
             }
-            is borg.trikeshed.collections.associative.Item.Arr -> captureContainer(value, path) {
+            is Item.Arr -> captureContainer(value, path) {
                 for (item in value.items.view) captureValue(item, path, depth + 1)
             }
-            is borg.trikeshed.collections.associative.Item.Map -> captureContainer(value, path) {
+            is Item.Map -> captureContainer(value, path) {
                 for (entry in value.entries.view) captureValue(entry.b, path, depth + 1)
             }
             is Array<*> -> captureContainer(value, path) {

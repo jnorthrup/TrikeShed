@@ -2,7 +2,6 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.CanonicalCbor
-import borg.trikeshed.collections.associative.toAny
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*

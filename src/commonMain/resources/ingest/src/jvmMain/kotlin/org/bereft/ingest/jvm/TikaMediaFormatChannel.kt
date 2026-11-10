@@ -1,7 +1,7 @@
 package org.bereft.ingest.jvm
 
-import borg.trikeshed.collections.associative.Item
-import borg.trikeshed.collections.associative.toItem
+import borg.trikeshed.parse.confix.Item
+import borg.trikeshed.parse.confix.toItem
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.confix.ConfixDoc
@@ -17,6 +17,7 @@ import org.bereft.ingest.MediaFormatChannel
 import org.bereft.ingest.MediaFormatInfo
 import java.io.File
 import java.util.Locale
+import borg.trikeshed.parse.confix.Cbor
 
 class TikaMediaFormatChannel(
     private val casStore: CasStore
@@ -129,7 +130,7 @@ class TikaMediaFormatChannel(
     private fun mapToConfixDoc(map: Map<Item, Item>): ConfixDoc {
         // Tika uses java.util.Map to hold string/list values.
         // We use CanonicalCbor.encode and Confix Parser from trikeshed.
-        val canonicalCborBytes = borg.trikeshed.collections.associative.Cbor.encode(map.toItem())
+        val canonicalCborBytes = Cbor.encode(map.toItem())
         return parseCanonicalCborToConfixDoc(canonicalCborBytes)
     }
 

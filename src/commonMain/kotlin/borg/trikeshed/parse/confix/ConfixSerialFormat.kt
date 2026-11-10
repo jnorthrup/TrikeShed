@@ -1,9 +1,5 @@
 package borg.trikeshed.parse.confix
 
-import borg.trikeshed.collections.associative.Cbor
-import borg.trikeshed.collections.associative.Item
-import borg.trikeshed.collections.associative.itemArrayOf
-import borg.trikeshed.collections.associative.itemMapOf
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
@@ -98,7 +94,7 @@ private val HEX_DIGITS = "0123456789abcdef".toCharArray()
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Encoder: SerializationStrategy<T> → Item tree → Cbor.encode
-// Single CBOR path: collections.associative.Cbor.
+// Single CBOR path: Cbor, this package's RFC 8949 codec.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ConfixItemEncoder : AbstractEncoder() {
@@ -256,7 +252,7 @@ class ConfixItemDecoder(private val root: Item) : AbstractDecoder() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ConfixFormat — the single BinaryFormat entry point.
-// CBOR via collections.associative.Cbor (the one RFC 8949 implementation).
+// CBOR via Cbor (the one RFC 8949 implementation).
 // JSON via Item.toJsonString.
 // ─────────────────────────────────────────────────────────────────────────────
 

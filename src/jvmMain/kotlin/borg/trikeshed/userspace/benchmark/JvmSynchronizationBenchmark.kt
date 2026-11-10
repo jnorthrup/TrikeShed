@@ -1,6 +1,5 @@
 package borg.trikeshed.userspace.benchmark
 
-import borg.trikeshed.collections.associative.toItem
 import borg.trikeshed.context.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*

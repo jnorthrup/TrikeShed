@@ -1,11 +1,11 @@
 package borg.trikeshed.job
 
-import borg.trikeshed.collections.associative.Cbor
-import borg.trikeshed.collections.associative.Item
-import borg.trikeshed.collections.associative.itemArrayOf
-import borg.trikeshed.collections.associative.itemMapOf
-import borg.trikeshed.collections.associative.toItem
-import borg.trikeshed.collections.associative.toAny
+import borg.trikeshed.parse.confix.Cbor
+import borg.trikeshed.parse.confix.Item
+import borg.trikeshed.parse.confix.itemArrayOf
+import borg.trikeshed.parse.confix.itemMapOf
+import borg.trikeshed.parse.confix.toItem
+import borg.trikeshed.parse.confix.toAny
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size

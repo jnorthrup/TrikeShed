@@ -4,7 +4,6 @@ import borg.trikeshed.graal.subvm.VmLanguages
 import borg.trikeshed.graal.subvm.CamelSource
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.CanonicalCbor
-import borg.trikeshed.collections.associative.Cbor
 import borg.trikeshed.couch.isam.descriptor
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
