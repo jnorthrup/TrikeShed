@@ -3,11 +3,11 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.lib.*
 
 /**
- * The registered route manifest, written once at each wire's definition site
- * and consumed by [RouteParityGate] and RouteManifestParityTest. A route that
- * starts serving without a manifest line FAILS the gate — the manifest is the
- * single author of "what does this daemon answer", and the gate is what keeps
- * it honest.
+ * The registered route manifest, written once at each wire's definition site: the single author of "what does
+ * this daemon answer". `ExportGate` (jvmMain, Gradle `exportGate`, run by `check`) fails the build when a manifest
+ * line names a route no wire source serves, when a wire claims a path no line lists, or when a hand-written spec
+ * documents a path no line covers. `borg.trikeshed.export.OpenApiExport` turns these lines into the daemon's
+ * OpenAPI 3.1 document, and every other export face (TypeScript client, SpaceGraph surface) is read from it.
  *
  * Manifest shape: `METHOD PATH` where PATH may carry:
  * - ellipsis (…) wildcard meaning "any continuation" (prefix match, mirrors startsWith)
@@ -32,6 +32,8 @@ object RouteManifest {
     val entries: Map<String, List<RouteEntry>> = mapOf(
         // -- PatchWire: mux/projects/panels/LCNC --
         "PatchWire" to listOf(
+            RouteEntry("GET", "/v1/models", "OpenAI-compatible model list over the mux catalog"),
+            RouteEntry("POST", "/v1/chat/completions", "OpenAI-compatible chat completion through the mux"),
             RouteEntry("GET", "/api/mux/models", "discovered provider roster"),
             RouteEntry("GET", "/api/mux/catalog", "full operator catalog including provider-qualified model ids"),
             RouteEntry("GET", "/api/mux/keys", "full roster with key-presence flags"),
@@ -174,6 +176,13 @@ object RouteManifest {
             RouteEntry("GET", "/api/lcnc/council", "council case read-back: index fact + transcript/verdict from CAS (?caseId=<id>)"),
             RouteEntry("GET", "/api/mcp", "MCP server card: protocol versions, tools, resource URIs"),
             RouteEntry("POST", "/api/mcp", "MCP JSON-RPC: the LCNC Kanban board as tools and resources"),
+            RouteEntry("GET", "/api/exports", "where each export face is served: OpenAPI, TypeScript, SpaceGraph, MCP, A2A, OpenAI"),
+            RouteEntry("GET", "/api/exports/openapi.json", "OpenAPI 3.1 document of every manifest route, with the hand-written specs' schemas"),
+            RouteEntry("GET", "/api/exports/client.ts", "dependency-free TypeScript client generated from the OpenAPI document"),
+            RouteEntry("GET", "/api/exports/spacegraph", "the route surface as a SpaceGraphJS RenderModel: wires as groups, routes as cards"),
+            RouteEntry("GET", "/api/exports/openai-tools", "the MCP tools as OpenAI function tools"),
+            RouteEntry("GET", "/api/exports/agent-card.json", "A2A agent card: the MCP tools as skills"),
+            RouteEntry("POST", "/api/a2a", "A2A JSON-RPC: message/send runs a skill through MCP tools/call"),
         ),
         // -- GraalWire: console + terrain + ingest + capsule + occupy --
         "GraalWire" to listOf(
@@ -200,6 +209,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/graal/aot/blob", "HotSpot AOT archive bytes"),
             RouteEntry("POST", "/api/graal/aot/capture", "land AOT archive into CAS"),
             RouteEntry("GET", "/api/graal/events", "SSE: compile/deopt/gc/cpu + store commits"),
+            RouteEntry("POST", "/api/graal/sync", "reconcile worktree files and await document and memory index updates"),
             RouteEntry("POST", "/api/graal/ingest", "raw bytes through Tika/OCR to store citizen"),
             RouteEntry("GET", "/api/graal/capsule/list", "list hermes capsules"),
             RouteEntry("POST", "/api/graal/capsule/spawn", "spawn a hermes capsule"),
@@ -313,7 +323,9 @@ object RouteManifest {
         ),
         // -- BuiltIn: daemon infrastructure --
         "BuiltIn" to listOf(
+            RouteEntry("GET", "/", "board page: the app port's root (the couch ddoc vhost does not ride this port)"),
             RouteEntry("GET", "/api/health", "server health check"),
+            RouteEntry("GET", "/.well-known/agent-card.json", "A2A discovery: alias of /api/exports/agent-card.json"),
             RouteEntry("GET", "/api/cap", "server capabilities"),
             RouteEntry("GET", "/api/metrics", "flywheel metrics (retired)"),
             RouteEntry("GET", "/harness", "blackboard harness surface"),

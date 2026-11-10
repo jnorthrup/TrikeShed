@@ -2,6 +2,7 @@ package borg.trikeshed.kanban.module
 
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
+import narchy.spacegraph.json as renderJson
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.context.nuid.*
@@ -653,6 +654,50 @@ class KanbanModule : ForgeModule {
             }
         }
 
+        // Export faces (borg.trikeshed.export). RouteManifest and the MCP server above are the only authors: the
+        // OpenAPI document, its TypeScript client and SpaceGraph surface read the manifest, and the A2A agent and
+        // OpenAI function tools read this server's tools/list and call its tools/call, so a route or a tool is on
+        // every face or on none. The server also answers the card at /.well-known/agent-card.json for discovery.
+        val agents = borg.trikeshed.export.AgentExport(
+            name = "TrikeShed oroboros",
+            description = "The Oroboros LCNC Kanban board. Skills are its MCP tools: send a data part {skill, arguments}.",
+            version = mcp.serverVersion,
+            mcp = { request -> mcp.handle(request) },
+        )
+        val openApi = lazy {
+            borg.trikeshed.export.OpenApiExport.document(
+                borg.trikeshed.export.OpenApiExport.SPECS α { key ->
+                    key j (borg.trikeshed.platform.CommonResources.bytes(key)?.decodeToString() ?: error("spec $key is not a common resource"))
+                },
+                version = mcp.serverVersion,
+            )
+        }
+        val notAllowed = JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+        claim(id, borg.trikeshed.export.AgentExport.INDEX_PATH) { method, _, _, _ ->
+            if (method == "GET") JvmKanbanServer.HttpResponse(200, jsonOf(borg.trikeshed.export.AgentExport.INDEX)) else notAllowed
+        }
+        claim(id, "/api/exports/openapi.json") { method, _, text, _ ->
+            if (method == "GET") JvmKanbanServer.HttpResponse(
+                200, jsonOf(openApi.value + ("servers" to _l[_m["url" j origin(text)]])), "application/openapi+json; charset=utf-8",
+            ) else notAllowed
+        }
+        claim(id, "/api/exports/client.ts") { method, _, _, _ ->
+            if (method == "GET") JvmKanbanServer.HttpResponse(200, borg.trikeshed.export.TypeScriptExport.client(openApi.value), "text/plain; charset=utf-8")
+            else notAllowed
+        }
+        claim(id, "/api/exports/spacegraph") { method, _, _, _ ->
+            if (method == "GET") JvmKanbanServer.HttpResponse(200, borg.trikeshed.export.OpenApiExport.surface().renderJson()) else notAllowed
+        }
+        claim(id, "/api/exports/openai-tools") { method, _, _, _ ->
+            if (method == "GET") JvmKanbanServer.HttpResponse(200, jsonOf(agents.openAiTools().view.toList())) else notAllowed
+        }
+        claim(id, borg.trikeshed.export.AgentExport.CARD_ROUTE) { method, _, text, _ ->
+            if (method == "GET") JvmKanbanServer.HttpResponse(200, jsonOf(agents.agentCard(origin(text)))) else notAllowed
+        }
+        claim(id, borg.trikeshed.export.AgentExport.A2A_PATH) { method, _, text, _ ->
+            if (method == "POST") JvmKanbanServer.HttpResponse(200, agents.a2a(rawBody(text))) else notAllowed
+        }
+
         claim(id, "/api/lcnc/kanban") { method, _, _, _ ->
             if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             else JvmKanbanServer.HttpResponse(200, jsonOf(lcnc.activeSheets()))
@@ -1209,6 +1254,10 @@ class KanbanModule : ForgeModule {
         text.lineSequence()
             .takeWhile { it.isNotBlank() }
             .any { it.startsWith("accept:", ignoreCase = true) && "text/event-stream" in it.lowercase() }
+
+    /** The request's origin from its Host header, for faces that must name absolute URLs (the A2A card). */
+    fun origin(text: String): String = "http://" + (text.lineSequence().takeWhile { it.isNotBlank() }
+        .firstOrNull { it.startsWith("host:", ignoreCase = true) }?.substringAfter(':')?.trim()?.takeIf { it.isNotEmpty() } ?: "localhost")
 
     private fun rawBody(text: String): String = when {
         "\r\n\r\n" in text -> text.substringAfter("\r\n\r\n")

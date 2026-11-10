@@ -1371,6 +1371,15 @@ class/resource, agent/environment, and runtime deltas become CAS/Couch citizens,
 ordered change facts, and peer-replicable state. See
 `doc/rewire.md` § “North star — the CCEK city and the unified grand blackboard.”
 
+**CCEK is the composition, not a layer.** CCEK (Coroutine, Context, Element, Key) is how every asynchronous
+box below is built, not one of the boxes and not an option a surface picks. The element is the mutable,
+constructed instance; its `companion object Key` is the static factory that returns only an opened element.
+Admission is the bounded channel send, completion is the owning `SupervisorJob`, and drain closes the input,
+lets the worker empty it, joins the worker, then completes and joins the supervisor. It is required in all
+asynchronous code and in at least half the codebase, through the userspace NIO/uring facade in `commonMain`
+(`PRELOAD.md` § CCEK composition mandate, § RULES). Every UI or protocol face (`/api/exports`, MCP, A2A,
+OpenAI `/v1`, SpaceGraph) sits on these elements and reads from them; none is a tier that could skip CCEK.
+
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  FORGE / KANBAN / BLACKBOARD   (user-facing surfaces)               │
@@ -1380,7 +1389,7 @@ ordered change facts, and peer-replicable state. See
 │  - BoardStoreElement = its one durable card-state owner            │
 │  - KanbanModule = Oroboros composition and route mount             │
 │  - ForgeBoardFSM legacy UI; KanbanFSM reactor telemetry only       │
-│  - CCEK choreography (channels, projections, agents)                │
+│  - ArticulatedNode: Forge signals in, SharedFlow projections out    │
 │  - Gallery / blackboard 2.5D/3D spatial layout                      │
 │  - BlackboardSurface projection: `confixDoc(persistedJson)` → `BlackboardSurface.project(...)` → seed rows; the `ForgeAppState` DTO family was removed (commit `1e8fd692`) │
 │  - Static HTML/CSS/JS shell consolidated under src/commonMain/resources/web/; `generateForgeAssets` task bakes them into the `ForgeAssets` Kotlin object so `ForgeApp.kt` references the asset by symbol, not by resource lookup │
@@ -1620,14 +1629,15 @@ descriptors. `SplatChannelRunner` serves the separate motion-model API.
 - Kanban FSM **consumes** `kanbanEvents`; it never owns the stream
 - External callers `ingestTaxonomyEvents` / `lookupModel` / `cacheModel` — reactor is the single writer
 
-### 7.5 CCEK → async-reactor CCEK — unfinished adaptation graph
+### 7.5 CCEK obligations and the elements that still miss them
 
-The CCEK object model is a reactive context (`Context → Element → Key →
-CoroutineContext`). The async reactor contract it must satisfy, and the
-real-world gaps where current code still violates it:
+CCEK (`Coroutine, Context, Element, Key`) is the required composition for all
+asynchronous code (`PRELOAD.md`). The obligations below bind now; they are not a
+target. The table lists elements that still miss them: debt being paid down, not
+precedent to copy.
 
 ```
-                      Async-reactor CCEK constraints (target)
+                      CCEK obligations (binding)
 ─────────────────────────────────────────────────────────────────────
 1. Every blocking IO call has a JVM-level timeout
 2. No ProcessBuilder().waitFor() without waitFor(N, TimeUnit)
@@ -1676,10 +1686,12 @@ The reactor is single-source-of-truth, but several still-imperative call
 sites slip through `ProcessBuilder.waitFor()`, `synchronized {}`, and
 `System.*`/`java.*` references in `commonMain`. Each is a CCEK-role element
 that needs to forward through the CCEK context (suspending coroutines)
-instead of running on the caller's stack. The merge path is to wrap every
-blocking operation in `withContext(Dispatchers.IO)` plus a real
-`waitFor/timeout`, then route its result through `NioSupervisor` /
-`MuxReactorElement` so the coroutine scheduler owns cancellation.
+instead of running on the caller's stack. The fix is not `withContext(Dispatchers.IO)`
+around a blocking call: each operation moves behind the `commonMain` userspace
+NIO/uring facade (`NioSupervisor`, `FunctionalUringFacade`) as a submitted op
+that is a child Job of the element's supervisor, completed by its CQE or by the
+emulated backend, so drain waits on the kernel (`PRELOAD.md` § Lifecycle,
+§ uring gating).
 
 ---
 
@@ -1770,7 +1782,7 @@ Nuid = Join<Capability, Join<Nonce, Subnet>>
   - Nonce: RandomBytes + Derived (causal chaining)
 
 NuidFanoutElement
-  - CCEK lifecycle (CREATED→OPEN→ACTIVE→DRAINING→CLOSED)
+  - Lifecycle: admission is the bounded inbox send, completion is the owning SupervisorJob; no lifecycle enum or flag
   - Concentric narrowing: matching capabilities and containing subnet prefixes, deepest prefix first
   - Escalation: a full or closed nearer inbox yields to an eligible ancestor within escalationBudget prefix edges
   - Claim: one bounded dispatcher admits each claim to one workgroup; admission alone is not completed work
@@ -1919,7 +1931,7 @@ JvmKanbanServer
   - No server framework; CCEK fanout all the way down
 ```
 
-### 8.2 CCEK (choreography for Forge)
+### 8.2 ArticulatedNode (Forge signals and projections)
 
 ```
 ArticulatedNode
@@ -1930,6 +1942,8 @@ ArticulatedNode
 ```
 
 Signals flow **into** `ArticulatedNode`; projections flow **out** via `SharedFlow`. No dual-mutable truth.
+ArticulatedNode is one element. It sits beside `ccek/CCEK.kt`, the definition note, but CCEK is the composition
+every asynchronous element follows (§2), not this package or this Forge choreography.
 
 ### 8.1c ProcessReactorEndpoint (NUID-authorized exec)
 
