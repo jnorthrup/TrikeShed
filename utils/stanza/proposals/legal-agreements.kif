@@ -1,0 +1,138 @@
+;; Candidate SUMO axioms from the Stanza legal-frame pass (utils/stanza). Unreviewed proposals.
+;;
+;; Each block answers one class of failing check against the pinned corpus
+;; (ontologyportal/sumo 25bb366, utils/sumo/sumo-full-corpus.pins). Run
+;;   run.py MANIFEST OUT --overlay proposals/legal-agreements.kif
+;; to type the same frames again with these axioms added; gaps.overlay.json shows what they close
+;; and what they leave open. Nothing here is legal advice or a reading of any one agreement.
+
+;; P1. Legal persons.
+;; holdsObligation, holdsRight, confersRight, confersObligation (Merge.kif), accountHolder and
+;; signedBy (FinancialOntology.kif) all require a CognitiveAgent. Organization is only an
+;; AutonomousAgent, and Merge.kif keeps (subclass Organization CognitiveAgent) commented out, so
+;; no corporation can bear a duty, hold a right, be granted one, or hold an account. Rather than
+;; make organizations cognitive, name the legal status the deontic relations need.
+(subclass LegalPerson AutonomousAgent)
+(documentation LegalPerson EnglishLanguage "An &%AutonomousAgent the law treats as able to hold
+rights, bear obligations, own property, contract, and sue or be sued in its own name: a &%Human,
+or an &%Organization incorporated or chartered as an entity.")
+(subclass Human LegalPerson)
+(subclass Corporation LegalPerson)
+(subclass BankFinancialOrganization LegalPerson)
+
+(instance legalObligation BinaryPredicate)
+(domain legalObligation 1 LegalPerson)
+(domain legalObligation 2 Formula)
+(documentation legalObligation EnglishLanguage "(&%legalObligation ?AGENT ?FORMULA) means the
+&%LegalPerson ?AGENT is legally bound to bring it about that ?FORMULA is true. It extends
+&%holdsObligation to bearers that are not &%CognitiveAgents, such as corporations.")
+(instance legalRight BinaryPredicate)
+(domain legalRight 1 LegalPerson)
+(domain legalRight 2 Formula)
+(documentation legalRight EnglishLanguage "(&%legalRight ?AGENT ?FORMULA) means the &%LegalPerson
+?AGENT is legally entitled to bring it about that ?FORMULA is true; &%holdsRight for any legal person.")
+(instance confersLegalRight TernaryPredicate)
+(domain confersLegalRight 1 Entity)
+(domain confersLegalRight 2 LegalPerson)
+(domain confersLegalRight 3 Formula)
+(instance confersLegalObligation TernaryPredicate)
+(domain confersLegalObligation 1 Entity)
+(domain confersLegalObligation 2 LegalPerson)
+(domain confersLegalObligation 3 Formula)
+
+;; P2. Ownership of what is not a physical object.
+;; possesses requires an Object (Merge.kif). The California Civil Code reaches further: there may
+;; be ownership "of all obligations; ... the good will of a business, trade marks and signs, and of
+;; rights created or granted by statute" (§ 655); "a thing in action is a right" (§ 953) that "may be
+;; transferred by the owner" (§ 954). SUMO's own WordNet mapping sends property.n.01, "something
+;; owned; any tangible or intangible possession", to Attribute, which possesses can never take.
+;; Minimal relaxation: an ownership relation over any Entity, with possesses as its physical case.
+(instance owns BinaryPredicate)
+(domain owns 1 LegalPerson)
+(domain owns 2 Entity)
+(documentation owns EnglishLanguage "(&%owns ?AGENT ?PROPERTY) means ?AGENT holds title to
+?PROPERTY, which may be a physical &%Object or an intangible: an obligation owed to ?AGENT, a
+right created by statute, goodwill, a mark, a balance owed by a bank or broker, or a digital asset.")
+(=> (possesses ?AGENT ?OBJ) (owns ?AGENT ?OBJ))
+
+(subclass DigitalAsset FinancialAsset)
+(documentation DigitalAsset EnglishLanguage "A digital representation of value recorded by a
+cryptographic protocol of a computer network, held and transferred by changing that record.")
+(termFormat EnglishLanguage DigitalAsset "digital asset")
+(termFormat EnglishLanguage DigitalAsset "virtual currency")
+(termFormat EnglishLanguage DigitalAsset "cryptocurrency")
+(subclass Stablecoin DigitalAsset)
+(termFormat EnglishLanguage Stablecoin "stablecoin")
+(subclass ThingInAction NormativeAttribute)
+(documentation ThingInAction EnglishLanguage "A right to recover money or other personal property
+by a judicial proceeding (Cal. Civ. Code § 953); it may be owned and transferred.")
+(termFormat EnglishLanguage ThingInAction "thing in action")
+
+;; P3. Custody: holding property for an owner who keeps title.
+;; SUMO has Keeping (a process at a location) and possesses (ownership), but no relation for a
+;; custodian, bailee or securities intermediary holding what another owns. WordNet's senses of
+;; "custody" are guardianship of a child and police detention; "custodian" is a janitor.
+(instance custodian TernaryPredicate)
+(domain custodian 1 LegalPerson)
+(domain custodian 2 Entity)
+(domain custodian 3 LegalPerson)
+(documentation custodian EnglishLanguage "(&%custodian ?HOLDER ?PROPERTY ?OWNER) means ?HOLDER
+holds ?PROPERTY for ?OWNER, who keeps title, and may move it only on ?OWNER's instruction or as
+their agreement allows.")
+(=> (custodian ?HOLDER ?PROPERTY ?OWNER) (owns ?OWNER ?PROPERTY))
+
+;; P4. Trusts, including trusts by operation of law.
+(instance trustee TernaryPredicate)
+(domain trustee 1 LegalPerson)
+(domain trustee 2 Entity)
+(domain trustee 3 LegalPerson)
+(documentation trustee EnglishLanguage "(&%trustee ?TRUSTEE ?PROPERTY ?BENEFICIARY) means ?TRUSTEE
+holds ?PROPERTY for the benefit of ?BENEFICIARY, whether the trust was declared or arises by law.")
+(subclass WithholdingProperty Keeping)
+(documentation WithholdingProperty EnglishLanguage "A &%Keeping in which the &%agent keeps a thing
+from a person entitled to possess it. WordNet's senses of detain are confining a person and delaying.")
+;; The text of Cal. Civ. Code § 2223 as a rule, for testing: "One who wrongfully detains a thing is
+;; an involuntary trustee thereof, for the benefit of the owner." Whether a detention is wrongful
+;; stays an input; nothing here decides it.
+(=> (and (instance ?D WithholdingProperty) (agent ?D ?X) (patient ?D ?THING) (owns ?OWNER ?THING)
+         (attribute ?D WrongfulAct))
+    (trustee ?X ?THING ?OWNER))
+(instance WrongfulAct NormativeAttribute)
+
+;; P5. Rules that make one thing count as another (constitutive rules).
+;; An e-sign attestation giving an electronic signature the effect of a written one, or the UA's
+;; "Title to Supported Digital Assets shall at all times remain with you". These bind no agent;
+;; modalAttribute and confersNorm attach a deontic attribute to a formula, and SUMO has no
+;; counts-as relation.
+(instance countsAs TernaryPredicate)
+(domain countsAs 1 Entity)
+(domain countsAs 2 Entity)
+(domain countsAs 3 Entity)
+(documentation countsAs EnglishLanguage "(&%countsAs ?X ?Y ?CONTEXT) means that within ?CONTEXT
+(an agreement, a statute) ?X has the legal effect of ?Y.")
+
+;; P6. Consumer reports and electronic signatures (vocabulary with no SUMO term).
+(subclass ConsumerReport Report)
+(termFormat EnglishLanguage ConsumerReport "background report")
+(termFormat EnglishLanguage ConsumerReport "consumer report")
+(subclass ConsumerReportingAgency Corporation)
+(termFormat EnglishLanguage ConsumerReportingAgency "consumer reporting agency")
+(subclass ElectronicSignature ContentBearingPhysical)
+(documentation ElectronicSignature EnglishLanguage "An electronic sound, symbol or process attached
+to a record and adopted with intent to sign it. Broader than &%DigitalSignature, which SUMO defines as
+an image file of a handwritten signature.")
+(termFormat EnglishLanguage ElectronicSignature "electronic signature")
+
+;; Not expressible as an overlay (axioms only add): FinancialAccount is a subclass of Agreement
+;; (FinancialOntology.kif, so Abstract) and of Account (ComputingBrands.kif, a ContentBearingObject,
+;; so Physical), and Merge.kif partitions Entity into Physical and Abstract. No account can exist.
+;; run.py --retract "subclass FinancialAccount Account" shows the effect of dropping one edge.
+
+;; P7. Hosted wallets are accounts. WordNet's only wallet is "a pocket-size case for holding papers
+;; and paper money" (Artifact), so "your Digital Asset Wallet is a securities account" joins a physical
+;; case to an account. (Accounts themselves stay unsatisfiable until the FinancialAccount edge above is fixed.)
+(subclass DigitalAssetWallet FinancialAccount)
+(documentation DigitalAssetWallet EnglishLanguage "A &%FinancialAccount through which a provider records,
+holds and transfers &%DigitalAssets for a customer; not a physical wallet.")
+(termFormat EnglishLanguage DigitalAssetWallet "digital asset wallet")
+(termFormat EnglishLanguage DigitalAssetWallet "hosted wallet")
