@@ -1,0 +1,12 @@
+[
+  {
+    "ref": "refs/remotes/origin/codex/retained-nal-lcnc-integration-20261105",
+    "commit": "aec6bcfa6aac7d0f5278c89616ffc1ed87cbba26",
+    "time": 1793853677,
+    "before": "cc95d456ffd5b1da6abd6af3ccf9a17bea532729",
+    "exit": 1,
+    "output": "Auto-merging src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt\nCONFLICT (content): Merge conflict in src/commonMain/kotlin/borg/trikeshed/lcnc/LcncKanbanExperience.kt\nAutomatic merge failed; fix conflicts and then commit the result.\n",
+    "after": "8a04bd4244951cb4056bd4c3413db80d5316312c",
+    "resolution": "Same serialization intent in both branches; retain structured input name value, existing cast/fallback expression, raw-text byte preservation and incoming Unicode/quote/array/null geometry coverage. No blanket side preference."
+  }
+]

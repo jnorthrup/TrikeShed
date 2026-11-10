@@ -1,0 +1,17 @@
+Merge made by the 'ort' strategy.
+ .../borg/trikeshed/lcnc/EnglishLcncPreset.kt       |  66 ++++++++++
+ .../kotlin/borg/trikeshed/lcnc/LcncPresets.kt      |   4 +-
+ .../trikeshed/lcnc/EnglishCopularPresetTest.kt     |  50 ++++++++
+ .../borg/trikeshed/lcnc/PresetAssemblyTest.kt      |   1 +
+ .../lcnc/EnglishCopularPresetExecutionTest.kt      | 142 +++++++++++++++++++++
+ .../resources/english-copular/.gitattributes       |   3 +
+ src/jvmTest/resources/english-copular/README.txt   |  21 +++
+ .../resources/english-copular/inspection.cbor      | Bin 0 -> 16093 bytes
+ src/jvmTest/resources/english-copular/source.txt   | Bin 0 -> 228 bytes
+ 9 files changed, 286 insertions(+), 1 deletion(-)
+ create mode 100644 src/commonTest/kotlin/borg/trikeshed/lcnc/EnglishCopularPresetTest.kt
+ create mode 100644 src/jvmTest/kotlin/borg/trikeshed/lcnc/EnglishCopularPresetExecutionTest.kt
+ create mode 100644 src/jvmTest/resources/english-copular/.gitattributes
+ create mode 100644 src/jvmTest/resources/english-copular/README.txt
+ create mode 100644 src/jvmTest/resources/english-copular/inspection.cbor
+ create mode 100644 src/jvmTest/resources/english-copular/source.txt

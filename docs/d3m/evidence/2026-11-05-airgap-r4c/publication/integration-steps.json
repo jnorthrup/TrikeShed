@@ -1,0 +1,12 @@
+[
+  {
+    "ref": "refs/remotes/origin/codex/retained-nal-english-integration-20261105",
+    "commit": "c23dd240190d8023437ba4121485b1c28ea42b89",
+    "time": 1793849416,
+    "before": "4887e7fd8fafe94b3a13296ab5cb53e6c78c7177",
+    "exit": 0,
+    "output": "Auto-merging src/commonTest/kotlin/borg/trikeshed/narsese/RetainedNalImplicationTest.kt\nAutomatic merge went well; stopped before committing as requested\n",
+    "resolution": "Concurrent production fix is byte-identical. Both test changes repair singleton access; preserve Series projection and existing view.single assertions under PRELOAD, without extra List materialization. Final source tree equals tested d80e69813.",
+    "after": "4ef53ef2ad893f698bd0a335a70e671e9f234267"
+  }
+]

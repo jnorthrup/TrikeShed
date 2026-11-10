@@ -1,0 +1,20 @@
+[
+  {
+    "ref": "refs/remotes/origin/codex/english-query-handoff-v72-evidence-20261105",
+    "commit": "d267ac70b1a788156474fcdd644fe39106b09bf5",
+    "time": 1793837783,
+    "before": "f4313674c264d5649ec1906f9de31bf611c53abb",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n docs/airgap/README.md                              |   7 +\n .../english-query-handoff-v72-20261105/README.md   |  25 ++\n .../audit-report.txt                               |  13 +\n .../audit-result.json                              | 382 +++++++++++++++++\n .../audit-usage.txt                                |  34 ++\n .../audit.py.txt                                   | 470 +++++++++++++++++++++\n .../extracted-records-audit-result.json            | 382 +++++++++++++++++\n .../manifest.json                                  |  47 +++\n .../native-A_failure-cannot-replace-B-activity.png | Bin 0 -> 327180 bytes\n .../native-retained-handoff-loaded-before-run.png  | Bin 0 -> 240565 bytes\n .../records.tar.gz                                 | Bin 0 -> 669277 bytes\n .../summary.json                                   | 211 +++++++++\n 12 files changed, 1571 insertions(+)\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/README.md\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/audit-report.txt\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/audit-result.json\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/audit-usage.txt\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/audit.py.txt\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/extracted-records-audit-result.json\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/manifest.json\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/native-A_failure-cannot-replace-B-activity.png\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/native-retained-handoff-loaded-before-run.png\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/records.tar.gz\n create mode 100644 docs/airgap/evidence/english-query-handoff-v72-20261105/summary.json\n",
+    "after": "73edf6904b378669c29df81fbc30fe0113305623"
+  },
+  {
+    "ref": "refs/remotes/origin/HEAD",
+    "commit": "d55dff57de5150e898a5459a57f8add31243d956",
+    "time": 1793838235,
+    "before": "73edf6904b378669c29df81fbc30fe0113305623",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n .../integration-v72.json                           | 213 +++++++\n .../verification-v72.json                          | 688 +++++++++++++++++++++\n 2 files changed, 901 insertions(+)\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/integration-v72.json\n create mode 100644 docs/evidence/2026-11-05/english-source-integration/verification-v72.json\n",
+    "after": "052e85580cdd0b22daf92ed6ce7134f7a2be684f"
+  }
+]

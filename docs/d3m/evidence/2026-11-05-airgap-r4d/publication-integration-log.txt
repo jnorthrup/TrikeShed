@@ -1,0 +1,17 @@
+{
+  "head": "b8ed92a2347a01ea1be000c50d10568e765ba1f2",
+  "refs": 542,
+  "merges": 2,
+  "steps": [
+    {
+      "ref": "refs/remotes/origin/HEAD",
+      "commit": "21e70d7d65d29f633c0132e2e03e8716f93c42ae",
+      "after": "b4a0f08eb33977ff7362b2ae7e9af3c62db6ce68"
+    },
+    {
+      "ref": "refs/remotes/origin/feat/retained-nal-lcnc-20261105",
+      "commit": "4c59f409b91e1d09c3a375f3b0d7ff6c1827ecc7",
+      "after": "b8ed92a2347a01ea1be000c50d10568e765ba1f2"
+    }
+  ]
+}

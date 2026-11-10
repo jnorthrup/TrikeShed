@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+# D3M publication continuation (PRELOAD.md): ascending, unbiased three-way merge of every frozen tip
+# that is not already an ancestor of HEAD. Order: committer time, then commit ID,
+# then ref name. No rerere, diff3 markers, --no-ff. On conflict, archive the
+# unmerged index (stages 1/2/3) and the marked working files, then stop for intent
+# review. Rerun after the reviewed resolution is committed; contained tips are skipped.
+from pathlib import Path
+import subprocess, json, shutil
+
+repo = Path('/Users/jim/work/TrikeShed')
+out = Path(__file__).resolve().parent
+
+
+def git(*args, check=True):
+    r = subprocess.run(['git', *args], cwd=repo, text=True,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if check and r.returncode:
+        raise RuntimeError(r.stdout)
+    return r
+
+
+assert not git('status', '--porcelain', '--untracked-files=no').stdout, 'tracked files must be clean'
+assert git('rev-parse', '--abbrev-ref', 'HEAD').stdout.strip() == 'master'
+packet = json.loads((out / 'publication2-inputs.json').read_text())
+refs = packet['refs']
+stepsf = out / 'continuation2-steps.json'
+steps = json.loads(stepsf.read_text()) if stepsf.exists() else []
+seen = set()
+for r in sorted(refs, key=lambda r: (r['time'], r['commit'], r['ref'])):
+    if r['commit'] in seen:
+        continue
+    seen.add(r['commit'])
+    if git('merge-base', '--is-ancestor', r['commit'], 'HEAD', check=False).returncode == 0:
+        continue
+    before = git('rev-parse', 'HEAD').stdout.strip()
+    base = git('merge-base', 'HEAD', r['commit']).stdout.split()
+    result = git('-c', 'rerere.enabled=false', '-c', 'merge.conflictStyle=diff3',
+                 'merge', '--no-ff', '--no-edit', '-m',
+                 'D3M 2026-11-07 continuation 2: ' + r['ref'], r['commit'], check=False)
+    step = dict(**r, before=before, bases=base, exit=result.returncode, output=result.stdout)
+    steps.append(step)
+    stepsf.write_text(json.dumps(steps, indent=2) + '\n')
+    if result.returncode:
+        index = git('ls-files', '-u').stdout
+        (out / ('conflict-index-' + r['commit'] + '.txt')).write_text(index)
+        cdir = out / 'conflicts' / r['commit']
+        for line in index.splitlines():
+            metadata, path = line.split('\t')
+            mode, oid, stage = metadata.split()
+            b = cdir / path
+            b.parent.mkdir(parents=True, exist_ok=True)
+            Path(str(b) + '.stage' + stage).write_bytes(
+                subprocess.check_output(['git', 'cat-file', 'blob', oid], cwd=repo))
+        for path in sorted({l.split('\t')[1] for l in index.splitlines()}):
+            src = repo / path
+            if src.exists():
+                dst = cdir / (path + '.marked')
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(src, dst)
+        raise SystemExit('CONFLICTS retained for intent review: ' + r['ref'] + '\n' + result.stdout)
+    step['after'] = git('rev-parse', 'HEAD').stdout.strip()
+    stepsf.write_text(json.dumps(steps, indent=2) + '\n')
+
+head = git('rev-parse', 'HEAD').stdout.strip()
+ancestors = set(git('rev-list', head).stdout.splitlines())
+missing = [r for r in refs if r['commit'] not in ancestors]
+assert not missing, missing
+print(json.dumps(dict(head=head, refs=len(refs), merges=len(steps),
+                      steps=[{k: s.get(k) for k in ('ref', 'commit', 'after', 'exit')} for s in steps]),
+                 indent=2))

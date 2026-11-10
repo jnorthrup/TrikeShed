@@ -1,0 +1,22 @@
+[
+  {
+    "ref": "refs/remotes/origin/fix/english-corpus-query-fixtures-20261105",
+    "commit": "fdc30302f34307c318621136c394f4891dc3d4a2",
+    "time": 1793868256,
+    "before": "81438b1290c417318b1ad9c2d51c73aaa07564f5",
+    "exit": 1,
+    "output": "Auto-merging src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishCorpusWireTest.kt\nCONFLICT (content): Merge conflict in src/jvmTest/kotlin/borg/trikeshed/forge/server/EnglishCorpusWireTest.kt\nAutomatic merge failed; fix conflicts and then commit the result.\n",
+    "after": "723f60cd2dd775f3b736d1371e8c066141c7d363",
+    "resolved": true,
+    "resolution": "resolution.json"
+  },
+  {
+    "ref": "refs/remotes/origin/HEAD",
+    "commit": "1aa29894aeeb290a5644b3370fd895f261f576d2",
+    "time": 1793868297,
+    "before": "723f60cd2dd775f3b736d1371e8c066141c7d363",
+    "exit": 0,
+    "output": "Merge made by the 'ort' strategy.\n",
+    "after": "36cc2535d6927ec71aa80545aff62c3e0c37b771"
+  }
+]

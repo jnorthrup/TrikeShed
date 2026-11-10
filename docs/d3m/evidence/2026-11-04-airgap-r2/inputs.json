@@ -1,0 +1,57 @@
+{
+  "base": "26d5bf3dbb936fb65597b3ef42d349a9a091f8b5",
+  "refs": [
+    {
+      "ref": "refs/heads/codex/airgap-confix-20261104",
+      "commit": "79212a964cffc0ef6b45233758fcb53ffd170722",
+      "time": 1793829689,
+      "containedBefore": false
+    },
+    {
+      "ref": "refs/heads/codex/d3m-sulong-publication-20261104",
+      "commit": "0ae529c1a7fc1cd8f289b15e23d8e87f86d82760",
+      "time": 1793827885,
+      "containedBefore": true
+    },
+    {
+      "ref": "refs/heads/codex/lcnc-sulong-milestones-20261104",
+      "commit": "84c96ba1ae87990456350f9fcb73187e9d542cc6",
+      "time": 1793826125,
+      "containedBefore": true
+    },
+    {
+      "ref": "refs/heads/master",
+      "commit": "26d5bf3dbb936fb65597b3ef42d349a9a091f8b5",
+      "time": 1793828536,
+      "containedBefore": true
+    },
+    {
+      "ref": "refs/heads/work",
+      "commit": "8a0e8603c19160f2bb68f4c0222041dc70da8d32",
+      "time": 1793822549,
+      "containedBefore": true
+    },
+    {
+      "ref": "refs/remotes/origin/HEAD",
+      "commit": "26d5bf3dbb936fb65597b3ef42d349a9a091f8b5",
+      "time": 1793828536,
+      "containedBefore": true
+    },
+    {
+      "ref": "refs/remotes/origin/master",
+      "commit": "26d5bf3dbb936fb65597b3ef42d349a9a091f8b5",
+      "time": 1793828536,
+      "containedBefore": true
+    }
+  ],
+  "schedule": [
+    {
+      "ref": "refs/heads/codex/airgap-confix-20261104",
+      "commit": "79212a964cffc0ef6b45233758fcb53ffd170722",
+      "time": 1793829689,
+      "containedBefore": false
+    }
+  ],
+  "worktrees": "worktree /workspace/TrikeShed\nHEAD 79212a964cffc0ef6b45233758fcb53ffd170722\nbranch refs/heads/codex/airgap-confix-20261104\n\nworktree /workspace/TrikeShed-target-checks\nHEAD 79212a964cffc0ef6b45233758fcb53ffd170722\ndetached",
+  "conflicts": []
+}
