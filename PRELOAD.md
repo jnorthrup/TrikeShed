@@ -1,5 +1,5 @@
-below is the project's kernel fp concepts we use in our kotlin-common projects.
 
+below is the project's kernel fp concepts we use in our kotlin-common projects.
 > **Lineage.** This algebra is a clean-room Kotlin expression of four
 > well-established traditions. Read each primitive through the matching lens:
 >
@@ -453,15 +453,22 @@ completion. This file is the implementation contract.
 
 D3M is the endorsed integration technique for distributed branch work. 
 
-1 git fetch
-2 git add . 
-3 git commit wip 
-4 git 3-way merge all unmerged branches in ascending order by time; UNBIASED
-  UNBIASED means you do not keep existing, or keep new, you merge all, and retain all conflicts. 
-5 at the end you identify the intent of each conflict or blocks of conflicts for the intent and the fix.
-6 fix compilation and tests.  tests older than 30 days are no longer considered current tests.  better to delete them than fix them.  
-7 git push to origin master.  
-8 do not delete remote or local branches after merge or push,
+
+ 1. git fetch
+
+ 2. git add . 
+
+ 3. git commit wip 
+
+ 4. git 3-way merge all unmerged branches in ascending order by time; UNBIASED.  UNBIASED means you do not keep existing, or keep new, you merge all, and retain all conflicts. 
+
+ 5. at the end you identify the intent of each conflict or blocks of conflicts for the intent and the fix.
+
+ 6. fix compilation and tests.  tests older than 30 days are no longer considered current tests.  better to delete them than fix them.  
+
+ 7. git push to origin master.  
+
+ 8. do not delete remote or local branches after merge or push,
 
 For step 1, enumerate every remote with `git ls-remote --heads <remote>` and
 fetch all branch heads explicitly with
