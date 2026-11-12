@@ -1,0 +1,551 @@
+#!/bin/sh
+# oroboros-launch — POSIX sh launcher for the TrikeShed OroborosDaemon (kanban board on :8888).
+#
+# Runs under sh/dash/bash/zsh (`sh utils/oroboros-launch`, or exec it), locally or
+# on a remote host over ssh. Splits the terminal with a divider:
+#
+#   ┌ header: kitty-graphics logo + live daemon/board status (polled over HTTP) ┐
+#   ├━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ divider ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┤
+#   └ lower pane: your bash/zsh/sh   (--shell none: the daemon's own output)    ┘
+#
+# Mode (auto): if /api/health already answers at the board URL, ATTACH (read-only,
+# no second daemon). Otherwise START the daemon like utils/oroboros does: jar
+# snapshot in a temp dir, java -cp ... borg.trikeshed.daemon.OroborosDaemon.
+# Graphics use the kitty protocol (kitty, Ghostty); detected from env, else probed
+# over the tty (works through ssh); off under tmux/screen. Children get TERM=xterm-256color.
+#
+# Inside cmux (or a clone speaking the same CLI/socket: CMUX_WORKSPACE_ID or
+# CMUX_SOCKET_PATH set, `cmux ping` ok) the DECSTBM header is replaced by native
+# cmux UI: sidebar status pills + progress, notifications on health changes, a
+# browser split on the board page, and a log split for the daemon.
+
+VERSION=0.3.0
+HDR=5            # header rows (divider is row HDR+1, lower pane starts HDR+2)
+GFX_ID=7
+MAIN_CLASS=borg.trikeshed.daemon.OroborosDaemon
+
+usage() {
+cat <<EOF
+Usage: oroboros-launch [options] [-- forgeHome [repoDir]]
+
+Mode:
+      --attach             require a live daemon at --url; never start one
+      --start              start a daemon; refuse if the board port already answers
+      (default auto: attach if /api/health answers, else start)
+      --url URL            board base URL for status/attach (default http://127.0.0.1:<kanban-port>)
+
+Daemon flags (forwarded in start mode; --kanban-port also sets the default --url):
+      --kanban-port N  --pg-port N  --interval-ms N  --max-slots N  --agents LIST
+      --project P  --module M  --mux-pool SPEC  --hermes-root P  --hermes-sleeve P
+      --once --watch --airgap --belief-bag --hermes-console --hermes-native-worker
+
+cmux (or clone):
+      --mux WHICH          auto|cmux|none                 (default auto: cmux if running inside it)
+      --mux-bin PATH       cmux-compatible CLI (else \$CMUX_BIN, PATH, /Applications/cmux.app/...)
+      --no-browser         do not open the board in a cmux browser split
+
+Launcher:
+  -s, --shell WHICH        auto|bash|zsh|sh|none          (default auto: \$SHELL if bash/zsh)
+      --gfx MODE           auto|kitty|none                (default auto)
+      --term TERM          TERM for children, or 'keep'   (default xterm-256color)
+      --root DIR           TrikeShed checkout (default: parent of this script's dir)
+      --java PATH          java binary (else \$JAVA_HOME, sdkman, PATH)
+      --ssh [USER@]HOST    run this launcher on HOST (pushes the script, ssh -t)
+      --ssh-opt OPT        extra ssh word, repeatable     (also \$OROBOROS_SSH_OPTS)
+  -n, --dry-run            show mode/health/java command, change nothing
+  -h, --help   -V, --version
+
+Start mode needs a build:  ./gradlew -q --no-daemon jvmJar stageDaemonLib   and JULES_API_KEY set.
+Env: CMUX_BIN, OROBOROS_SSH_OPTS.  Pane env: OROBOROS_LAUNCHER=1  OROBOROS_URL=<board url>  OROBOROS_LOG=<daemon log, start mode>
+EOF
+}
+
+die() { printf 'oroboros-launch: %s\n' "$*" >&2; exit 2; }
+# quote one argument for re-parsing by a POSIX shell
+q() { printf '%s\n' "$1" | sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/'/"; }
+need() { [ $# -ge 2 ] || die "option $1 needs a value"; }
+
+# ---- argument parsing --------------------------------------------------------
+MODE_REQ=auto URL= PORT=8888
+SHELL_SEL=auto GFX=auto TERM_REQ=xterm-256color ROOT_ARG= JAVA_ARG= DRY=0
+MUX_REQ=auto MUX_BIN_ARG= NOBROWSER=0
+SSH_HOST= SSH_OPTS=${OROBOROS_SSH_OPTS:-}
+FWD=        # launcher args forwarded to the remote copy (everything but --ssh*)
+DARGS=      # quoted daemon flags
+EXTRA=      # quoted positionals for the daemon
+while [ $# -gt 0 ]; do
+  case $1 in
+    -h|--help) usage; exit 0;;
+    -V|--version) echo "oroboros-launch $VERSION"; exit 0;;
+    --ssh)     need "$@"; SSH_HOST=$2; shift 2; continue;;
+    --ssh-opt) need "$@"; SSH_OPTS="$SSH_OPTS $2"; shift 2; continue;;
+    -n|--dry-run) DRY=1; FWD="$FWD $(q "$1")"; shift; continue;;
+    --mux)     need "$@"; MUX_REQ=$2; shift 2; continue;;      # not forwarded: remote autodetects
+    --mux-bin) need "$@"; MUX_BIN_ARG=$2; shift 2; continue;;
+    --no-browser) NOBROWSER=1; shift; continue;;
+    --attach|--start) MODE_REQ=${1#--}; FWD="$FWD $(q "$1")"; shift; continue;;
+    --once|--watch|--airgap|--belief-bag|--hermes-console|--hermes-native-worker)
+      DARGS="$DARGS $(q "$1")"; FWD="$FWD $(q "$1")"; shift; continue;;
+    --)        shift; for a in "$@"; do EXTRA="$EXTRA $(q "$a")"; FWD="$FWD $(q --) $(q "$a")"; done; break;;
+    --url|--kanban-port|--pg-port|--interval-ms|--max-slots|--agents|--project|--module|--mux-pool|\
+    --hermes-root|--hermes-sleeve|-s|--shell|--gfx|--term|--root|--java)
+      need "$@"; opt=$1; val=$2; shift 2
+      FWD="$FWD $(q "$opt") $(q "$val")"
+      case $opt in
+        --url) URL=$val;;
+        --kanban-port) PORT=$val; DARGS="$DARGS $(q "$opt") $(q "$val")";;
+        --pg-port|--interval-ms|--max-slots|--agents|--project|--module|--mux-pool|--hermes-root|--hermes-sleeve)
+          DARGS="$DARGS $(q "$opt") $(q "$val")";;
+        -s|--shell) SHELL_SEL=$val;; --gfx) GFX=$val;; --term) TERM_REQ=$val;;
+        --root) ROOT_ARG=$val;; --java) JAVA_ARG=$val;;
+      esac; continue;;
+    --*=*) o=${1%%=*}; v=${1#*=}; shift; set -- "$o" "$v" "$@"; continue;;
+    *) die "unknown option: $1 (try --help; positionals go after --)";;
+  esac
+done
+case $SHELL_SEL in auto|bash|zsh|sh|none) ;; *) die "--shell: auto|bash|zsh|sh|none";; esac
+case $GFX in auto|kitty|none) ;; *) die "--gfx: auto|kitty|none";; esac
+case $MUX_REQ in auto|cmux|none) ;; *) die "--mux: auto|cmux|none";; esac
+case $PORT in ''|*[!0-9]*) die "--kanban-port must be a number";; esac
+[ -n "$URL" ] || URL=http://127.0.0.1:$PORT
+URL=${URL%/}
+
+# env-based kitty/ghostty sniffing (TERM_PROGRAM, TERM, vendor vars, forwarded hint)
+kitty_env() {
+  [ "${OROBOROS_GFX_HINT:-}" = kitty ] && return 0
+  [ -n "${KITTY_WINDOW_ID:-}${GHOSTTY_RESOURCES_DIR:-}${GHOSTTY_BIN_DIR:-}" ] && return 0
+  case ${TERM_PROGRAM:-} in ghostty|kitty) return 0;; esac
+  case ${TERM:-} in xterm-kitty|xterm-ghostty) return 0;; esac
+  return 1
+}
+
+# ---- ssh mode: push self, run remotely with a tty ---------------------------
+if [ -n "$SSH_HOST" ]; then
+  [ -f "$0" ] || die "--ssh needs to run from a script file (got '$0')"
+  hint=; kitty_env && hint=kitty
+  if [ "$DRY" = 1 ]; then
+    echo "ssh$SSH_OPTS $SSH_HOST 'cat > <tmp>' < $0"
+    echo "ssh -t$SSH_OPTS $SSH_HOST \"OROBOROS_GFX_HINT=${hint:-} sh <tmp>$FWD\""
+    exit 0
+  fi
+  # shellcheck disable=SC2086
+  rf=$(ssh $SSH_OPTS "$SSH_HOST" 'f=$(mktemp "${TMPDIR:-/tmp}/oroboros-launch.XXXXXX") && cat >"$f" && printf "%s\n" "$f"' <"$0") \
+    || die "could not push launcher to $SSH_HOST"
+  [ -n "$rf" ] || die "remote mktemp failed"
+  # shellcheck disable=SC2086
+  ssh -t $SSH_OPTS "$SSH_HOST" "OROBOROS_GFX_HINT=${hint:-} sh $(q "$rf")$FWD; rc=\$?; rm -f $(q "$rf"); exit \$rc"
+  exit $?
+fi
+
+# ---- http helpers -----------------------------------------------------------
+fetch() {
+  if command -v curl >/dev/null 2>&1; then curl -fsS -m 2 "$1" 2>/dev/null
+  elif command -v wget >/dev/null 2>&1; then wget -qO- -T 2 "$1" 2>/dev/null
+  else return 127; fi
+}
+healthy() { case $(fetch "$URL/api/health") in *'"ok":true'*) return 0;; esac; return 1; }
+
+# status cache: one "key value" per line; written by poll_status, read by draw_header
+poll_status() {
+  out=$1
+  if ! h=$(fetch "$URL/api/health"); then printf 'health down\n' >"$out"; return; fi
+  case $h in *'"ok":true'*) hs=ok;; *) hs=bad;; esac
+  b=$(fetch "$URL/api/board")
+  title=$(printf '%s' "$b" | sed -n 's/^{"title":"\([^"]*\)".*/\1/p')
+  seq=$(printf '%s' "$b" | sed -n 's/.*"sequence":\([0-9][0-9]*\).*/\1/p')
+  cols=$(printf '%s' "$b" | sed 's/"items".*//' | tr '}' '\n' \
+         | sed -n 's/.*"id":"\([^"]*\)".*"count":\([0-9][0-9]*\).*/\1:\2/p' | tr '\n' ' ')
+  printf 'health %s\ntitle %s\nseq %s\ncols %s\n' "$hs" "${title:-?}" "${seq:-?}" "${cols:-?}" >"$out"
+}
+stat_get() { sed -n "s/^$1 //p" "$2" 2>/dev/null | head -n 1; }
+
+# ---- mode -------------------------------------------------------------------
+if healthy; then LIVE=1; else LIVE=0; fi
+case $MODE_REQ in
+  attach) [ $LIVE = 1 ] || die "no daemon answering at $URL/api/health";;
+  start)  [ $LIVE = 0 ] || die "a daemon already answers at $URL; use --attach or another --kanban-port";;
+esac
+if [ "$MODE_REQ" = auto ]; then [ $LIVE = 1 ] && MODE=attach || MODE=start; else MODE=$MODE_REQ; fi
+
+# ---- start mode: root, java, classpath -------------------------------------
+self=$0
+while [ -L "$self" ]; do   # resolve symlinks without readlink -f
+  l=$(readlink "$self"); case $l in /*) self=$l;; *) self=${self%/*}/$l;; esac
+done
+case $self in */*) HERE=$(cd "${self%/*}" 2>/dev/null && pwd -P);; *) HERE=$(pwd -P);; esac
+ROOT=${ROOT_ARG:-$(cd "$HERE/.." 2>/dev/null && pwd -P)}
+JAVA=
+if [ "$MODE" = start ]; then
+  if [ -n "$JAVA_ARG" ]; then JAVA=$JAVA_ARG
+  elif [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then JAVA=$JAVA_HOME/bin/java
+  elif [ -x "$HOME/.sdkman/candidates/java/current/bin/java" ]; then JAVA=$HOME/.sdkman/candidates/java/current/bin/java
+  else JAVA=$(command -v java 2>/dev/null); fi
+  MAINJAR=$ROOT/build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar
+  if [ "$DRY" = 0 ]; then
+    [ -n "$JAVA" ] && [ -x "$JAVA" ] || die "java not found; use --java or JAVA_HOME"
+    [ -f "$MAINJAR" ] || die "missing $MAINJAR — build: (cd $ROOT && ./gradlew -q --no-daemon jvmJar stageDaemonLib)"
+    [ -n "${JULES_API_KEY:-}" ] || printf 'oroboros-launch: warning: JULES_API_KEY is unset (the daemon requires it)\n' >&2
+  fi
+fi
+
+# ---- terminal environment ---------------------------------------------------
+ORIG_TERM=${TERM:-}
+if [ "$TERM_REQ" = keep ]; then TERM_OUT=${ORIG_TERM:-xterm-256color}; else TERM_OUT=$TERM_REQ; fi
+if ! infocmp "$TERM_OUT" >/dev/null 2>&1 && [ "$TERM_OUT" != xterm-256color ]; then
+  TERM_OUT=xterm-256color   # this host lacks terminfo for it
+fi
+
+pick_shell() {
+  case $SHELL_SEL in
+    none) return;;
+    auto)
+      case ${SHELL:-} in */bash|*/zsh) [ -x "$SHELL" ] && { echo "$SHELL"; return; };; esac
+      for s in bash zsh sh; do p=$(command -v "$s" 2>/dev/null) && { echo "$p"; return; }; done;;
+    *) command -v "$SHELL_SEL" 2>/dev/null || die "shell '$SHELL_SEL' not found";;
+  esac
+}
+SHBIN=$(pick_shell)
+[ "$MODE" = attach ] && [ -z "$SHBIN" ] && die "--shell none needs a daemon to run in the lower pane; use --start or pick a shell"
+
+# ---- cmux detection ---------------------------------------------------------
+MUXB=
+find_cmux() {
+  for c in "$MUX_BIN_ARG" "${CMUX_BIN:-}" "$(command -v cmux 2>/dev/null)" \
+           /Applications/cmux.app/Contents/Resources/bin/cmux; do
+    [ -n "$c" ] && [ -x "$c" ] && { echo "$c"; return; }
+  done
+}
+mx() { "$MUXB" "$@" 2>/dev/null; }
+if [ "$MUX_REQ" != none ]; then
+  inside=0; [ -n "${CMUX_WORKSPACE_ID:-}${CMUX_SOCKET_PATH:-}" ] && inside=1
+  if [ "$MUX_REQ" = cmux ] || [ $inside = 1 ]; then
+    cand=$(find_cmux)
+    if [ -z "$cand" ]; then
+      [ "$MUX_REQ" = cmux ] && die "--mux cmux: no cmux CLI found (use --mux-bin)"
+    elif MUXB=$cand mx ping >/dev/null; then MUXB=$cand
+    elif [ "$MUX_REQ" = cmux ]; then die "cmux socket not reachable (is this shell inside cmux?)"
+    else printf 'oroboros-launch: cmux CLI found but its socket is unreachable; using the built-in split\n' >&2; fi
+  fi
+fi
+
+# ---- tty helpers ------------------------------------------------------------
+is_tty() { [ -t 0 ] && [ -t 1 ]; }
+
+probe_kitty() {   # kitty graphics query + DA1; reply seen => supported
+  is_tty || return 1
+  old=$(stty -g 2>/dev/null) || return 1
+  stty raw -echo min 0 time 3 2>/dev/null || return 1
+  printf '\033_Gi=31,s=1,v=1,a=q,t=d,f=24;AAAA\033\\\033[c'
+  reply= n=0
+  while [ $n -lt 5 ]; do
+    chunk=$(dd bs=256 count=1 2>/dev/null | tr '\033' '@')
+    reply="$reply$chunk"
+    case $reply in *'[?'*c) break;; esac
+    n=$((n+1))
+  done
+  stty "$old" 2>/dev/null
+  case $reply in *_Gi=31\;OK*) return 0;; esac
+  return 1
+}
+
+gfx_mode=none
+if [ "$GFX" = kitty ]; then gfx_mode=kitty
+elif [ "$GFX" = auto ] && is_tty && [ -z "${TMUX:-}${STY:-}" ]; then
+  if kitty_env; then gfx_mode=kitty; elif probe_kitty; then gfx_mode=kitty; fi
+fi
+
+LAYOUT=split
+is_tty || LAYOUT=plain
+[ -n "$MUXB" ] && [ "$LAYOUT" = split ] && LAYOUT=cmux
+if [ "$LAYOUT" = split ]; then
+  sz=$(stty size 2>/dev/null); ROWS=${sz%% *}; COLS=${sz##* }
+  case $ROWS$COLS in *[!0-9]*|'') LAYOUT=plain;; esac
+  [ "$LAYOUT" = split ] && { [ "$ROWS" -ge 14 ] && [ "$COLS" -ge 40 ] || LAYOUT=plain; }
+fi
+
+# daemon argv (start mode)
+if [ "$MODE" = start ]; then
+  set --
+  [ -n "$DARGS" ] && eval "set -- \"\$@\" $DARGS"
+  [ -n "$EXTRA" ] && eval "set -- \"\$@\" $EXTRA"
+fi
+
+if [ "$DRY" = 1 ]; then
+  echo "mode:    $MODE${MODE_REQ:+ (requested: $MODE_REQ)}"
+  echo "board:   $URL  health=$([ $LIVE = 1 ] && echo up || echo down)"
+  if [ $LIVE = 1 ]; then poll_status "${TMPDIR:-/tmp}/oro-dry.$$"; sed 's/^/  /' "${TMPDIR:-/tmp}/oro-dry.$$"; rm -f "${TMPDIR:-/tmp}/oro-dry.$$"; fi
+  if [ "$MODE" = start ]; then
+    echo "java:    ${JAVA:-<not found>}"
+    echo "root:    $ROOT  (main jar $([ -f "$MAINJAR" ] && echo present || echo MISSING))"
+    echo "argv:    $MAIN_CLASS $*"
+    echo "env:     JULES_API_KEY $([ -n "${JULES_API_KEY:-}" ] && echo set || echo UNSET)"
+  fi
+  echo "shell:   ${SHBIN:-none}"
+  echo "gfx:     $gfx_mode"
+  echo "TERM:    $TERM_OUT (was ${ORIG_TERM:-unset})"
+  echo "layout:  $LAYOUT${ROWS:+ ${COLS}x${ROWS}}"
+  if [ "$LAYOUT" = cmux ]; then
+    echo "cmux:    $MUXB  (status pills, progress, notify$([ $NOBROWSER = 0 ] && echo ', browser split on '"$URL"'/')$([ "$MODE" = start ] && [ -n "$SHBIN" ] && echo ', log split'))"
+  fi
+  exit 0
+fi
+
+# ---- state dir, lifecycle ---------------------------------------------------
+STATE=$(mktemp -d "${TMPDIR:-/tmp}/oroboros-launch.XXXXXX") || die "mktemp failed"
+LOG=$STATE/daemon.log
+STATUS=$STATE/status
+START=$(date +%s)
+DPID= UPD= RC=0
+OLD_STTY=$(stty -g 2>/dev/null)
+
+cleanup() {
+  trap - EXIT INT QUIT HUP TERM
+  [ -n "$UPD" ] && { kill "$UPD" 2>/dev/null; wait "$UPD" 2>/dev/null; }
+  if [ -n "$DPID" ] && kill -0 "$DPID" 2>/dev/null; then
+    kill -TERM "$DPID" 2>/dev/null
+    n=0   # let the JVM's shutdown hooks drain (the daemon owns durable state)
+    while kill -0 "$DPID" 2>/dev/null && [ $n -lt 30 ]; do sleep 1; n=$((n+1)); done
+    kill -0 "$DPID" 2>/dev/null && kill -KILL "$DPID" 2>/dev/null
+  fi
+  wait 2>/dev/null
+  if [ "$LAYOUT" = cmux ]; then
+    for k in oroboros oroboros_board; do mx clear-status "$k" >/dev/null; done
+    mx clear-progress >/dev/null
+    for f in browser.ref logsplit.ref; do
+      r=$(cat "$STATE/$f" 2>/dev/null); case $r in surface:*|panel:*) mx close-surface --surface "$r" >/dev/null;; esac
+    done
+  fi
+  if [ "$LAYOUT" = split ]; then
+    printf '\033[r\033_Ga=d,q=2\033\\\033[?25h\033[%d;1H\n' "$ROWS"
+  fi
+  [ -n "$OLD_STTY" ] && stty "$OLD_STTY" 2>/dev/null
+  rm -rf "$STATE"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 143' TERM
+trap ':' INT QUIT   # caught, not ignored: children keep default handlers, we outlive ^C
+
+start_daemon() {   # background JVM on a jar snapshot (gradle overwrites jars in place)
+  RT=$STATE/rt; mkdir -p "$RT" || die "cannot create $RT"
+  CP=
+  for j in "$MAINJAR" "$ROOT"/build/staging/lib/*.jar; do
+    [ -f "$j" ] || continue
+    t=$RT/${j##*/}
+    cp -c "$j" "$t" 2>/dev/null || cp "$j" "$t" || die "cannot snapshot $j"   # APFS clone first
+    CP=${CP:+$CP:}$t
+  done
+  ( cd "$ROOT" && exec "$JAVA" -Xmx24g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED \
+      -cp "$CP" "$MAIN_CLASS" "$@" ) >"$LOG" 2>&1 </dev/null &
+  DPID=$!
+}
+
+export TERM=$TERM_OUT OROBOROS_LAUNCHER=1 OROBOROS_URL=$URL
+
+# ---- plain (non-tty / tiny terminal) ----------------------------------------
+if [ "$LAYOUT" = plain ]; then
+  if [ "$MODE" = attach ]; then
+    poll_status "$STATUS"; echo "oroboros @ $URL"; cat "$STATUS"; exit 0
+  fi
+  start_daemon "$@"
+  OROBOROS_LOG=$LOG; tail -f "$LOG" 2>/dev/null &
+  TAILP=$!
+  trap 'kill -TERM "$DPID" 2>/dev/null' INT TERM HUP
+  while kill -0 "$DPID" 2>/dev/null; do wait "$DPID"; RC=$?; done
+  kill "$TAILP" 2>/dev/null; exit $RC
+fi
+
+run_lower() {   # the lower/foreground pane: a shell, or the daemon's own log
+  if [ -n "$SHBIN" ]; then
+    [ "$MODE" = start ] && export OROBOROS_LOG=$LOG
+    "$SHBIN" -i; RC=$?
+  else
+    # --shell none (start mode): daemon is the pane; Ctrl-C asks it to shut down
+    trap 'kill -TERM "$DPID" 2>/dev/null' INT TERM HUP
+    tail -f "$LOG" 2>/dev/null &
+    TAILP=$!
+    while kill -0 "$DPID" 2>/dev/null; do wait "$DPID"; RC=$?; done
+    kill "$TAILP" 2>/dev/null
+  fi
+}
+
+# ---- logo (kitty graphics payload: 96x96 RGBA PNG, base64) ------------------
+logo_b64() { cat <<'LOGO_EOF'
+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
+RK5CYII=
+LOGO_EOF
+}
+LOGO=$(logo_b64 | tr -d '\n')
+GFX_C=10 GFX_R=$HDR
+if [ "$gfx_mode" = kitty ]; then TEXT_COL=$((GFX_C+3)); else TEXT_COL=3; fi
+
+# ---- cmux backend: native sidebar/notifications/splits instead of the drawn header
+if [ "$LAYOUT" = cmux ]; then
+  PREVH= LASTKEY=
+  mx_push() {
+    poll_status "$STATUS"
+    hs=$(stat_get health "$STATUS"); sq=$(stat_get seq "$STATUS"); cl=$(stat_get cols "$STATUS")
+    if [ -n "$DPID" ] && ! kill -0 "$DPID" 2>/dev/null; then txt="daemon exited" col='#ff5f5f'
+    elif [ "$hs" = ok ]; then txt="up seq $sq" col='#5fd787'
+    else txt="down" col='#ff5f5f'; fi
+    key="$txt|$cl"
+    if [ "$key" != "$LASTKEY" ]; then
+      LASTKEY=$key
+      mx set-status oroboros "$MODE :$PORT $txt" --color "$col" >/dev/null
+      nz=$(printf '%s' "$cl" | tr ' ' '\n' | grep -v ':0$' | tr '\n' ' ')
+      [ -n "$nz" ] && mx set-status oroboros_board "$nz" --color '#8aa4ff' >/dev/null
+      prog=$(printf '%s' "$cl" | tr ' ' '\n' | awk -F: 'NF==2 && $1!="archived"{t+=$2} $1=="done"{d=$2} END{if(t>0) printf "%.2f %d/%d", d/t, d, t}')
+      [ -n "$prog" ] && mx set-progress "${prog%% *}" --label "${prog#* } done" >/dev/null
+    fi
+    if [ -n "$PREVH" ] && [ "$PREVH" != "$txt" ]; then   # transitions only
+      mx log --source oroboros "$txt (was $PREVH)" >/dev/null
+      case $txt in down|daemon*) mx notify --title oroboros --body "$txt at $URL" >/dev/null;; esac
+    fi
+    PREVH=$txt
+    if [ "$hs" = ok ] && [ "$NOBROWSER" = 0 ] && [ ! -e "$STATE/browser.ref" ]; then
+      out=$(mx browser open "$URL/" --focus false)
+      r=$(printf '%s' "$out" | grep -o 'surface:[0-9][0-9]*' | head -n 1)
+      printf '%s\n' "${r:-opened}" >"$STATE/browser.ref"
+    fi
+  }
+  [ "$MODE" = start ] && start_daemon "$@"
+  mx rename-workspace "oroboros :$PORT" >/dev/null
+  if [ "$MODE" = start ] && [ -n "$SHBIN" ]; then
+    out=$(mx new-split down --command "exec tail -n 200 -f $(q "$LOG")")
+    printf '%s\n' "$(printf '%s' "$out" | grep -o 'surface:[0-9][0-9]*' | head -n 1)" >"$STATE/logsplit.ref"
+  fi
+  mx_push
+  PARENT=$$
+  ( while kill -0 "$PARENT" 2>/dev/null; do sleep 3; mx_push; done ) &
+  UPD=$!
+  if [ "$gfx_mode" = kitty ]; then   # logo inline above the prompt (the ghostty/kitty surface renders it)
+    printf '\n\n\n\n\n\033[5A\033_Ga=T,f=100,t=d,i=%d,p=2,c=%d,r=%d,C=1,q=2;%s\033\\\033[5B' "$GFX_ID" "$GFX_C" "$GFX_R" "$LOGO"
+  fi
+  printf '\033[1;38;5;114moroboros\033[0m  %s  (%s)\n' "$URL" "$MODE"
+  run_lower
+  exit $RC
+fi
+
+# ---- drawing ----------------------------------------------------------------
+UTF=0; case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in *[Uu][Tt][Ff]-8*|*[Uu][Tt][Ff]8*) UTF=1;; esac
+if [ $UTF = 1 ]; then BAR=━ DOT=● OFF=○; else BAR=- DOT='*' OFF=o; fi
+
+fit() { printf '%s' "$1" | tr -cd '[:print:]' | cut -c1-"$2"; }
+put() { printf '\033[%d;%dH\033[K%s' "$1" "$2" "$3"; }   # row col text
+
+draw_divider() {
+  label=" oroboros $MODE :$PORT $DIV_LABEL "
+  pre=; i=0; while [ $i -lt 3 ]; do pre="$pre$BAR"; i=$((i+1)); done
+  rest=$((COLS-3-${#label})); post=; i=0
+  while [ $i -lt "$rest" ]; do post="$post$BAR"; i=$((i+1)); done
+  printf '\033[%d;1H\033[38;5;71m%s\033[1;38;5;114m%s\033[0;38;5;71m%s\033[0m' \
+    $((HDR+1)) "$pre" "$label" "$post"
+}
+
+draw_header() {
+  w=$((COLS-TEXT_COL-8)); [ $w -lt 4 ] && w=4
+  hs=$(stat_get health "$STATUS")
+  case $hs in
+    ok) dot="\033[38;5;114m$DOT up\033[0m";;
+    '') dot="\033[38;5;179m$OFF polling\033[0m";;
+    *)  dot="\033[38;5;203m$OFF down\033[0m";;
+  esac
+  if [ -n "$DPID" ]; then
+    if kill -0 "$DPID" 2>/dev/null; then who="started, pid $DPID"; else who="\033[38;5;203mdaemon exited\033[0m"; fi
+  else who="attached"; fi
+  up=$(( $(date +%s) - START ))
+  put 1 "$TEXT_COL" "$(printf '\033[1;38;5;114moroboros\033[0m  %b  %b  \033[2m%ds\033[0m' "$dot" "$who" "$up")"
+  put 2 "$TEXT_COL" "$(printf '\033[2mboard\033[0m  %s  seq %s' "$(fit "$URL" $((w-12)))" "$(stat_get seq "$STATUS")")"
+  put 3 "$TEXT_COL" "$(printf '\033[2mcols \033[0m  %s' "$(fit "$(stat_get cols "$STATUS")" $w)")"
+  if [ -n "$DPID" ]; then last=waiting; [ -s "$LOG" ] && last=$(tail -n 1 "$LOG" 2>/dev/null)
+    put 4 "$TEXT_COL" "$(printf '\033[2mlog  \033[0m  %s' "$(fit "$last" $w)")"
+  else
+    put 4 "$TEXT_COL" "$(printf '\033[2mtitle\033[0m  %s' "$(fit "$(stat_get title "$STATUS")" $w)")"
+  fi
+  put 5 "$TEXT_COL" "$(printf '\033[2m%s\033[0m' "$(fit "term $TERM_OUT  gfx $gfx_mode  shell ${SHBIN##*/}${SSH_CONNECTION:+  ssh}" $((w+8)))")"
+}
+
+gfx_place() {  # transmit once (send) or just re-place
+  [ "$gfx_mode" = kitty ] || return 0
+  printf '\033[1;1H'
+  if [ "$1" = send ]; then
+    printf '\033_Ga=T,f=100,t=d,i=%d,p=1,c=%d,r=%d,C=1,q=2;%s\033\\' "$GFX_ID" "$GFX_C" "$GFX_R" "$LOGO"
+  else
+    printf '\033_Ga=p,i=%d,p=1,c=%d,r=%d,C=1,q=2\033\\' "$GFX_ID" "$GFX_C" "$GFX_R"
+  fi
+}
+
+layout() {  # $1 = send|place
+  printf '\0337'
+  gfx_place "$1"
+  draw_header; draw_divider
+  printf '\033[%d;%dr' $((HDR+2)) "$ROWS"   # scroll region = lower pane
+  printf '\0338'
+}
+
+# ---- run --------------------------------------------------------------------
+[ "$MODE" = start ] && start_daemon "$@"
+if [ -n "$SHBIN" ]; then DIV_LABEL="│ ${SHBIN##*/}"; [ $UTF = 1 ] || DIV_LABEL="- ${SHBIN##*/}"; else DIV_LABEL="foreground"; fi
+
+poll_status "$STATUS" &   # first paint without waiting a full tick
+wait $!
+printf '\033]0;oroboros\007\033[2J\033[H'
+layout send
+printf '\033[%d;1H' $((HDR+2))
+
+PARENT=$$
+(
+  tick=0; lr=$ROWS; lc=$COLS
+  while kill -0 "$PARENT" 2>/dev/null; do
+    sleep 1; tick=$((tick+1))
+    sz=$(stty size </dev/tty 2>/dev/null); ROWS=${sz%% *}; COLS=${sz##* }   # bg jobs get stdin=/dev/null
+    case $ROWS$COLS in *[!0-9]*|'') continue;; esac
+    [ $((tick % 3)) -eq 0 ] && poll_status "$STATUS"
+    if [ "$ROWS" != "$lr" ] || [ "$COLS" != "$lc" ]; then
+      lr=$ROWS lc=$COLS; layout send
+    else
+      layout place
+    fi
+  done
+) &
+UPD=$!
+
+run_lower
+exit $RC
