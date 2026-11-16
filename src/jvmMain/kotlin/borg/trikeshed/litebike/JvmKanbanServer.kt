@@ -329,7 +329,16 @@ class JvmKanbanServer(
                 // client behind it. The single-consumer slot stays the only
                 // reader; handling is forked per message.
                 httpScope.launch {
-                    answer(msg, routeHttp(payload))
+                    val resp = try {
+                        routeHttp(payload)
+                    } catch (c: kotlinx.coroutines.CancellationException) {
+                        throw c
+                    } catch (t: Throwable) {
+                        // A class file crashed (bad hotswap generation, removed class, failed initializer):
+                        // answer with the guru and the responsible class loader instead of leaving the client hanging.
+                        if (borg.trikeshed.daemon.GuruMeditation.isClassFileCrash(t)) guruResponse(t, payload) else throw t
+                    }
+                    answer(msg, resp)
                 }
             }
         }
@@ -365,6 +374,17 @@ class JvmKanbanServer(
     }
 
     // ── routes (single worker, hand-rolled) ──────────────────────────────
+
+    private fun guruResponse(t: Throwable, payload: ByteArray): HttpResponse {
+        val report = borg.trikeshed.daemon.GuruMeditation.describe(t)
+        System.err.println("[GURU] " + report.code + " on " + requestLine(payload) + "\n" + borg.trikeshed.daemon.GuruMeditation.text(report))
+        val head = String(payload, 0, minOf(payload.size, 2048), StandardCharsets.ISO_8859_1).lowercase()
+        val wantsHtml = head.lineSequence().any { it.startsWith("accept:") && "text/html" in it }
+        return if (wantsHtml) HttpResponse(500, borg.trikeshed.daemon.GuruMeditation.html(report), "text/html; charset=utf-8",
+            headers = mapOf("X-Guru-Meditation" to report.code))
+        else HttpResponse(500, borg.trikeshed.daemon.GuruMeditation.json(report), "application/json; charset=utf-8",
+            headers = mapOf("X-Guru-Meditation" to report.code))
+    }
 
     private suspend fun answer(msg: LitebikeListenerElement.ChannelMessage, resp: HttpResponse) {
         val payload = resp.payloadBytes

@@ -71,12 +71,23 @@ object HotSwapAgent {
             }
         }
 
+        private fun reportCrash(t: Throwable, cls: Class<*>) {
+            val text = try {
+                GuruMeditation.text(GuruMeditation.describe(t, cls, cls.classLoader))
+            } catch (g: Throwable) {
+                // hotswap-agent.jar built before GuruMeditation existed: say so rather than lose the crash
+                "Guru Meditation (report unavailable: ${g.javaClass.simpleName}) ${t.javaClass.simpleName}: ${t.message?.take(200)} class=${cls.name}"
+            }
+            System.err.println("[HOTSWAP-AGENT] class file crashed: ${cls.name}\n$text")
+        }
+
         private fun redefineAll(prevGenMtime: Long) {
             try {
                 val generation = genFile.readText().trim()
                 
                 var retransformed = 0
                 var skipped = 0
+                var crashed = 0
 
                 val loadedClasses = inst.allLoadedClasses
 
@@ -108,13 +119,18 @@ object HotSwapAgent {
                                 retransformed++
                             } catch (e: UnsupportedOperationException) {
                                 skipped++
+                            } catch (t: Throwable) {
+                                // VerifyError, ClassFormatError, UnsupportedClassVersionError, NoClassDefFoundError...
+                                // The JVM keeps the previous bytes; name the loader and carry on with the rest of the generation.
+                                crashed++
+                                reportCrash(t, cls)
                             } finally {
                                 inst.removeTransformer(transformer)
                             }
                         }
                     }
                 }
-                println("[HOTSWAP-AGENT] generation $generation: retransformed $retransformed classes, skipped $skipped (schema change).")
+                println("[HOTSWAP-AGENT] generation $generation: retransformed $retransformed classes, skipped $skipped (schema change), crashed $crashed (previous bytes kept).")
             } catch (t: Throwable) {
                 System.err.println("[HOTSWAP-AGENT] redefineAll FAILED: ${t.javaClass.simpleName}: ${t.message?.take(200)}")
             }

@@ -27,6 +27,7 @@ enum class MlirDialect(val namespace: String) {
     VECTOR("vector"),       // vector.load, vector.store, vector.transfer_read
     SPIRV("spirv"),         // spirv.func, spirv.module
     STABLEHLO("stablehlo"), // stablehlo.add, stablehlo.softmax, stablehlo.convolution
+    KIF("kif"),             // kif.theory, kif.atom, kif.var, kif.list, kif.fact, kif.rule (mlir-nix Kif.td)
     ;
 
     /** Fully qualified op name: "func.func", "arith.addf", etc. */
@@ -165,4 +166,14 @@ object AffineOps {
     val store      = MlirOp(MlirDialect.AFFINE, "store")
     val yield      = MlirOp(MlirDialect.AFFINE, "yield")
     val apply      = MlirOp(MlirDialect.AFFINE, "apply")
+}
+
+/** kif dialect ops (mlir-nix `include/NixDialect/Kif.td`) — SUO-KIF terms, facts and rules; lowered by [kifToNix]. */
+object KifOps {
+    val theory     = MlirOp(MlirDialect.KIF, "theory")
+    val atom       = MlirOp(MlirDialect.KIF, "atom")
+    val variable   = MlirOp(MlirDialect.KIF, "var")
+    val list       = MlirOp(MlirDialect.KIF, "list")
+    val fact       = MlirOp(MlirDialect.KIF, "fact")
+    val rule       = MlirOp(MlirDialect.KIF, "rule")
 }

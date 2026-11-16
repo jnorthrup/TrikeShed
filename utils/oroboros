@@ -2,8 +2,16 @@
 # Launch OroborosDaemon straight on the JVM: no Gradle in the run path. Build first with
 #   ./gradlew -q --no-daemon jvmJar stageDaemonLib
 # Env passes through (TRIKESHED_BELIEF_BAG=1 turns on the belief bag the Curate page needs).
+# Class hotswap is ON by default (-javaagent:hotswap-agent.jar=build/live; publish with ./gradlew hotswapFeed).
+# Opt out with --no-hotswap or OROBOROS_HOTSWAP=0. A missing agent jar warns and starts without it.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+HOTSWAP=1
+[ "${OROBOROS_HOTSWAP:-1}" = 0 ] && HOTSWAP=0
+ARGS=()
+for a in "$@"; do
+  if [ "$a" = --no-hotswap ]; then HOTSWAP=0; else ARGS+=("$a"); fi
+done
 JAVA="${JAVA_HOME:-$HOME/.sdkman/candidates/java/current}/bin/java"
 # Gradle overwrites these jars in place. A running ZipFile retains offsets into
 # the old bytes, so each daemon owns a snapshot until its shutdown has drained.
@@ -22,9 +30,23 @@ for j in "$ROOT/build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar" "$ROOT"/build/stagi
   if ! cp -c "$j" "$target" 2>/dev/null; then cp "$j" "$target"; fi
   CP="${CP:+$CP:}$target"
 done
+AGENT=()
+if [ "$HOTSWAP" = 1 ]; then
+  if [ -f "$ROOT/build/libs/hotswap-agent.jar" ]; then
+    # Snapshot the agent jar too: Gradle rewrites it in place, same hazard as the classpath jars.
+    mkdir -p "$ROOT/build/live"
+    agent="$RUNTIME/hotswap-agent.jar"
+    RUNTIME_JARS+=("$agent")
+    if ! cp -c "$ROOT/build/libs/hotswap-agent.jar" "$agent" 2>/dev/null; then cp "$ROOT/build/libs/hotswap-agent.jar" "$agent"; fi
+    AGENT=("-javaagent:$agent=$ROOT/build/live")
+  else
+    echo "oroboros: build/libs/hotswap-agent.jar missing (./gradlew hotswapAgentJar); starting without hotswap" >&2
+  fi
+fi
 cd "$ROOT"
-"$JAVA" -Xmx24g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED -cp "$CP" \
-  borg.trikeshed.daemon.OroborosDaemon "$@" &
+"$JAVA" -Xmx24g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED \
+  ${AGENT[@]+"${AGENT[@]}"} -cp "$CP" \
+  borg.trikeshed.daemon.OroborosDaemon ${ARGS[@]+"${ARGS[@]}"} &
 DAEMON_PID=$!
 forward_signal() { kill -s "$1" "$DAEMON_PID" 2>/dev/null || true; }
 trap 'forward_signal TERM' TERM

@@ -28,16 +28,31 @@ usage() {
 cat <<EOF
 Usage: oroboros-launch [options] [-- forgeHome [repoDir]]
 
+RESTART REQUIRED - daemon flags (start mode). The daemon reads these once at startup;
+changing any of them means stopping and starting it (and a new jar needs a rebuild first):
+      --once | --watch     one cycle then exit | loop forever (default)
+      --airgap             disable remote Jev/LLM calls; keep local BERT
+      --interval-ms N      poll cadence (default 30000)     --max-slots N   live session cap (default 15)
+      --kanban-port N      board/Couch HTTP port (default 8888; also sets the default --url)
+      --pg-port N          pg wire (default 5433; 0 = ephemeral)
+      --agents LIST        --project P   --module M   --mux-pool SPEC   (repeatable where noted by the daemon)
+      --belief-bag         enable the belief bag
+      --no-hotswap         start without the hotswap agent (also OROBOROS_HOTSWAP=0)
+      --hermes-console     boot the GraalPy Hermes VM panel at startup (otherwise opened on demand)
+      --hermes-native-worker  --hermes-root PATH  --hermes-sleeve PATH
+  Needs JULES_API_KEY. Build first: ./gradlew -q --no-daemon jvmJar stageDaemonLib
+  Attach mode starts nothing: a running daemon keeps the flags it was started with.
+
+APPLIED LIVE - no restart: Hermes profile changes (brain/model mux rebuild), board and LCNC graph edits,
+and class hotswap (ON by default: -javaagent hotswap-agent.jar watching build/live; publish with
+./gradlew hotswapFeed; schema changes are skipped and need a restart). A class file that crashes keeps
+its old bytes and is reported as a Guru Meditation naming the class loader; HTTP requests that hit it get a 500.
+
 Mode:
       --attach             require a live daemon at --url; never start one
       --start              start a daemon; refuse if the board port already answers
       (default auto: attach if /api/health answers, else start)
       --url URL            board base URL for status/attach (default http://127.0.0.1:<kanban-port>)
-
-Daemon flags (forwarded in start mode; --kanban-port also sets the default --url):
-      --kanban-port N  --pg-port N  --interval-ms N  --max-slots N  --agents LIST
-      --project P  --module M  --mux-pool SPEC  --hermes-root P  --hermes-sleeve P
-      --once --watch --airgap --belief-bag --hermes-console --hermes-native-worker
 
 cmux (or clone):
       --mux WHICH          auto|cmux|none                 (default auto: cmux if running inside it)
@@ -55,7 +70,6 @@ Launcher:
   -n, --dry-run            show mode/health/java command, change nothing
   -h, --help   -V, --version
 
-Start mode needs a build:  ./gradlew -q --no-daemon jvmJar stageDaemonLib   and JULES_API_KEY set.
 Env: CMUX_BIN, OROBOROS_SSH_OPTS.  Pane env: OROBOROS_LAUNCHER=1  OROBOROS_URL=<board url>  OROBOROS_LOG=<daemon log, start mode>
 EOF
 }
@@ -68,7 +82,8 @@ need() { [ $# -ge 2 ] || die "option $1 needs a value"; }
 # ---- argument parsing --------------------------------------------------------
 MODE_REQ=auto URL= PORT=8888
 SHELL_SEL=auto GFX=auto TERM_REQ=xterm-256color ROOT_ARG= JAVA_ARG= DRY=0
-MUX_REQ=auto MUX_BIN_ARG= NOBROWSER=0
+MUX_REQ=auto MUX_BIN_ARG= NOBROWSER=0 HOTSWAP=1
+[ "${OROBOROS_HOTSWAP:-1}" = 0 ] && HOTSWAP=0
 SSH_HOST= SSH_OPTS=${OROBOROS_SSH_OPTS:-}
 FWD=        # launcher args forwarded to the remote copy (everything but --ssh*)
 DARGS=      # quoted daemon flags
@@ -83,6 +98,7 @@ while [ $# -gt 0 ]; do
     --mux)     need "$@"; MUX_REQ=$2; shift 2; continue;;      # not forwarded: remote autodetects
     --mux-bin) need "$@"; MUX_BIN_ARG=$2; shift 2; continue;;
     --no-browser) NOBROWSER=1; shift; continue;;
+    --no-hotswap) HOTSWAP=0; FWD="$FWD $(q "$1")"; shift; continue;;
     --attach|--start) MODE_REQ=${1#--}; FWD="$FWD $(q "$1")"; shift; continue;;
     --once|--watch|--airgap|--belief-bag|--hermes-console|--hermes-native-worker)
       DARGS="$DARGS $(q "$1")"; FWD="$FWD $(q "$1")"; shift; continue;;
@@ -278,6 +294,7 @@ if [ "$DRY" = 1 ]; then
     echo "java:    ${JAVA:-<not found>}"
     echo "root:    $ROOT  (main jar $([ -f "$MAINJAR" ] && echo present || echo MISSING))"
     echo "argv:    $MAIN_CLASS $*"
+    echo "hotswap: $([ "$HOTSWAP" = 1 ] && { [ -f "$ROOT/build/libs/hotswap-agent.jar" ] && echo "on (build/live)" || echo "on, but build/libs/hotswap-agent.jar is missing"; } || echo off)"
     echo "env:     JULES_API_KEY $([ -n "${JULES_API_KEY:-}" ] && echo set || echo UNSET)"
   fi
   echo "shell:   ${SHBIN:-none}"
@@ -335,8 +352,19 @@ start_daemon() {   # background JVM on a jar snapshot (gradle overwrites jars in
     cp -c "$j" "$t" 2>/dev/null || cp "$j" "$t" || die "cannot snapshot $j"   # APFS clone first
     CP=${CP:+$CP:}$t
   done
+  AGENT=
+  if [ "$HOTSWAP" = 1 ]; then   # on by default; --no-hotswap or OROBOROS_HOTSWAP=0 opts out
+    if [ -f "$ROOT/build/libs/hotswap-agent.jar" ]; then
+      mkdir -p "$ROOT/build/live"
+      cp -c "$ROOT/build/libs/hotswap-agent.jar" "$RT/hotswap-agent.jar" 2>/dev/null \
+        || cp "$ROOT/build/libs/hotswap-agent.jar" "$RT/hotswap-agent.jar" || die "cannot snapshot hotswap-agent.jar"
+      AGENT=-javaagent:$RT/hotswap-agent.jar=$ROOT/build/live
+    else
+      printf 'oroboros-launch: build/libs/hotswap-agent.jar missing (./gradlew hotswapAgentJar); starting without hotswap\n' >&2
+    fi
+  fi
   ( cd "$ROOT" && exec "$JAVA" -Xmx24g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED \
-      -cp "$CP" "$MAIN_CLASS" "$@" ) >"$LOG" 2>&1 </dev/null &
+      ${AGENT:+"$AGENT"} -cp "$CP" "$MAIN_CLASS" "$@" ) >"$LOG" 2>&1 </dev/null &
   DPID=$!
 }
 

@@ -274,6 +274,8 @@ object OroborosDaemon {
                 hermesSleeve = a[i]
                 i + 1
             },
+            // Consumed by the launchers (utils/oroboros, oroboros-launch) before the JVM starts; accepted here so a direct run does not read it as forgeHome.
+            ForgeCliArgs.Flag(name = "--no-hotswap") { _, i -> i + 1 },
             ForgeCliArgs.Flag(name = "--hermes-console") { _, i ->
                 hermesConsole = true
                 i + 1
@@ -3130,20 +3132,47 @@ object OroborosDaemon {
 
     private fun usage() {
         HostSystem.err(
-            """usage: OroborosDaemon [--once | --watch] [--airgap] [--interval-ms N] [--max-slots N] [--kanban-port N] [--pg-port N]
-              [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [--hermes-native-worker] [--mux-pool SPEC] [forgeHome] [repoDir]
-              --airgap: disable remote Jev/LLM calls; keep local BERT
-              --mux-pool: repeat pool=capacity:key:<id> or pool=capacity:endpoint:<URL without trailing slash>
-                  Bindings with the same pool share its concurrency cap in this daemon.
-              --hermes-native-worker: enable OWN-trust native Hermes worker (not a sandbox; incompatible with --airgap)
-              env: JULES_API_KEY (required)
-                   HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)
-                   TRIKESHED_AIRGAP (or JVM property trikeshed.airgap) also enables airgap;
-                   the curator is airgapped unless it is set off (TRIKESHED_AIRGAP=off)
-              forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
-              repoDir  default: cwd
-              kanban-port default: 8888
-              pg-port default: 5433 (the pg wire: psql, pgjdbc; 0 for an ephemeral port)"""
+            """usage: OroborosDaemon [flags] [forgeHome] [repoDir]
+
+RESTART REQUIRED - every flag and environment variable below is read once at startup;
+changing any of them means stopping and starting the daemon.
+  --once | --watch         one cycle then exit | loop forever (default)
+  --airgap                 disable remote Jev/LLM calls; keep local BERT
+  --interval-ms N          poll cadence (default 30000)
+  --max-slots N            live session cap (default 15)
+  --kanban-port N          board and Couch HTTP port (default 8888)
+  --pg-port N              pg wire for psql/pgjdbc (default 5433; 0 for an ephemeral port)
+  --agents LIST            comma-separated agent set (default: TRIKESHED_AGENTS, else the registry default)
+  --project P              repeatable
+  --module M               repeatable
+  --mux-pool SPEC          repeatable: pool=capacity:key:<id> or pool=capacity:endpoint:<URL without trailing slash>
+                           bindings with the same pool share its concurrency cap in this daemon
+  --belief-bag             enable the belief bag the Curate page needs (or TRIKESHED_BELIEF_BAG=1)
+  --no-hotswap             launcher flag: start without the hotswap agent (also OROBOROS_HOTSWAP=0)
+  --hermes-console         boot the GraalPy Hermes VM panel (xterm-256color) at startup instead of on demand
+  --hermes-native-worker   OWN-trust native Hermes worker (not a sandbox; incompatible with --airgap)
+  --hermes-root PATH       GraalPy Hermes source checkout (or HERMES_SOURCE_ROOT)
+  --hermes-sleeve PATH     GraalPy-safe overlay root (or HERMES_GRAAL_SLEEVE)
+  env: JULES_API_KEY (required), TRIKESHED_AIRGAP (or JVM property trikeshed.airgap; the curator is
+       airgapped unless it is set off with TRIKESHED_AIRGAP=off), TRIKESHED_CAS, TRIKESHED_COUCH_FORMAT,
+       TRIKESHED_NO_KANBAN_MODULE, FLYWHEEL_CYCLE_INTERVAL, HERMES_PROFILE, HERMES_ARCHIVE_PROFILE
+
+NEW CODE - a rebuilt jar only takes effect after a restart:
+  ./gradlew -q --no-daemon jvmJar stageDaemonLib, then restart.
+  utils/oroboros runs from a jar snapshot, so a rebuild never disturbs a running daemon.
+
+APPLIED LIVE - no restart:
+  Hermes profile changes (state.db, auth.json, .env under HERMES_PROFILE or ~/.hermes) rebuild the brain and model mux
+  class hotswap: ON by default under utils/oroboros and oroboros-launch (-javaagent:build/libs/hotswap-agent.jar=build/live).
+    ./gradlew hotswapFeed publishes compiled classes and advances build/live/.generation.
+    Opt out with --no-hotswap or OROBOROS_HOTSWAP=0. Schema changes (fields or methods added or removed) are skipped: restart.
+    A class file that crashes keeps its previous bytes and is reported as a Guru Meditation naming the class loader
+    (stderr; HTTP requests that hit a crashed class get status 500 with an X-Guru-Meditation header).
+  board and LCNC graph edits made in the web UI
+
+POSITIONAL (must come last)
+  forgeHome                default: ~/.local/forge (ForgeHome.defaultHome)
+  repoDir                  default: cwd"""
         )
     }
 }

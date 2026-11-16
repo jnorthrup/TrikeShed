@@ -1242,6 +1242,7 @@ tasks.register<Jar>("hotswapAgentJar") {
     
     from(layout.buildDirectory.dir("classes/kotlin/jvm/main")) {
         include("borg/trikeshed/daemon/HotSwapAgent*.class")
+        include("borg/trikeshed/daemon/GuruMeditation*.class")
     }
     
     manifest {
