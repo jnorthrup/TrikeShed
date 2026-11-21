@@ -2,7 +2,9 @@
 
     cd utils/stanza && python3 -m unittest discover -s tests
 """
+import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -193,6 +195,23 @@ class SumoTests(unittest.TestCase):
         self.assertEqual(sorted(self.s.incoherent('FinancialAccount')['between']), ['Abstract', 'Physical'])
         self.assertEqual(self.s.commented_about('Organization', 'CognitiveAgent')[0][1], '(subclass Organization CognitiveAgent)')
         self.assertTrue(self.s.path('Human', 'AutonomousAgent')[0]['where'].startswith('Tiny.kif:'))
+
+    def test_disjoint_witness_does_not_depend_on_the_string_hash_seed(self):
+        """FinancialAccount is both an Object and (through Agreement) Abstract, so two pairs witness that it is
+        no Process: Object/Process and Abstract/Physical. Every process must report the same one."""
+        probe = ('import json, os, sys\n'
+                 'sys.path.insert(0, sys.argv[1]); sys.path.insert(0, os.path.join(sys.argv[1], "tests"))\n'
+                 'from test_legalframes import KIF, sumo_from\n'
+                 'print(json.dumps(sumo_from(KIF).disjoint_witness("FinancialAccount", "Keeping")))\n')
+        root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+        seen = set()
+        for seed in ('1', '2', '3', '4', '5', '6', '7', '8'):
+            done = subprocess.run([sys.executable, '-c', probe, root], capture_output=True, text=True,
+                                  env=dict(os.environ, PYTHONHASHSEED=seed))
+            self.assertEqual(done.returncode, 0, done.stderr)
+            seen.add(done.stdout.strip())
+        self.assertEqual(len(seen), 1, seen)
+        self.assertEqual(json.loads(seen.pop())['between'], ['Abstract', 'Physical'])    # first pair in sorted order
 
 
 class FrameAndInferenceTests(unittest.TestCase):

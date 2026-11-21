@@ -126,8 +126,10 @@ class Sumo:
         return term == cls or cls in self.ancestors(term)
 
     def disjoint_witness(self, a: str, b: str):
-        left = self.ancestors(a) | {a}
-        right = self.ancestors(b) | {b}
+        # sorted: set order follows the per-process string hash, and several pairs can witness the same
+        # disjointness; the report must name the same one on every run
+        left = sorted(self.ancestors(a) | {a})
+        right = sorted(self.ancestors(b) | {b})
         for x in left:
             for y in right:
                 w = self.disjoint.get(frozenset((x, y)))

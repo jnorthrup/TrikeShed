@@ -1,0 +1,30 @@
+{
+  "fixture": "q4bert-pin",
+  "kind": "adapter-pin-and-reference-observations",
+  "note": "The encoder lane is pinned to one bundle: checkpoint, tokenizer, sequence limit, head, quantization and normalization. utils/q4bert/quantize.py reproduces the bundle byte for byte from the float32 checkpoint named here, so the weights digest is a pin and not a download. The observations are single masked positions observed on 2026-11-19 with this bundle; they check that the lane still returns what it returned, and say nothing about accuracy.",
+  "identity": "q4bert:nlpaueb/legal-bert-base-uncased:b4g32:6dc270f890b9dfc1",
+  "weightsSha256": "6dc270f890b9dfc1f68fb413a31558823f2475caaca9afb9cb7e50e86f32134c",
+  "tokenizerSha256": "3aaa02f2e3a397eee0f813caa567c87cddab1045a4a6b8ac6261f0cc799efb8f",
+  "checkpoint": {
+    "name": "nlpaueb/legal-bert-base-uncased",
+    "snapshot": "418b58a010be042386a2ad50f350a9881ef3c578",
+    "float32Sha256": "dd6f8b9e457e8cddd191f8ac505f1313fa44fc29223d540e7801d6b551c103b2"
+  },
+  "maxSequenceTokens": 512,
+  "tolerance": 0.005,
+  "observations": [
+    {"operator": "remedy-conditional", "cue": "if", "p": 0.872146, "rank": 1, "preferredClass": "condition", "triage": "cue-supported"},
+    {"operator": "remedy-negation", "cue": "not", "p": 0.999927, "rank": 1, "preferredClass": "negation", "triage": "cue-supported"},
+    {"operator": "amendment-permission", "cue": "may", "p": 0.923888, "rank": 1, "preferredClass": "possibility", "triage": "cue-supported"},
+    {"operator": "loss-causation", "cue": "result", "p": 0.998654, "rank": 1, "preferredClass": "causation", "triage": "cue-supported"},
+    {"operator": "protocol-reason", "cue": "result", "p": 0.95677, "rank": 1, "preferredClass": "causation", "triage": "cue-supported"},
+    {"operator": "additional-terms-may", "cue": "may", "p": 0.395533, "rank": 1, "preferredClass": "future", "triage": "cue-contested",
+     "why": "\"may\" is the single likeliest word, yet will/would together outweigh may/can/might/could: the context reads as a prediction. The deterministic lane read permission. Routed to review."},
+    {"operator": "register-must", "cue": "must", "p": 0.116448, "rank": 4, "preferredClass": "possibility", "triage": "cue-contested",
+     "why": "The context alone would have said \"may\"; the source says \"must\". Contested does not mean wrong: here the obligation rests on that one word, which is why a reviewer should see it."}
+  ],
+  "refusal": {
+    "repeatSentence": 40,
+    "expectReason": "limit is 512; truncation is disabled"
+  }
+}

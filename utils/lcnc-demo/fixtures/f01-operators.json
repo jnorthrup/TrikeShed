@@ -1,0 +1,131 @@
+{
+  "fixture": "F01-operators",
+  "kind": "reference-observations",
+  "note": "Declared expectations for operator candidates on the retained F01 slice: the construction that licenses each operator, both weights, and what stays unresolved. Each is selected by a marker inside its sentence plus class and construction, never by position. They are regression pins observed on 2026-11-19 with Stanza 1.15.0 and SUMO 25bb366f, not a benchmark and not a claim that the reading is legally right: two of them (additional-terms-may, loss-causation) are kept because the deterministic lane's first reading is doubtful there.",
+  "operators": [
+    {
+      "id": "remedy-conditional",
+      "sentenceMarker": "sole and exclusive remedy",
+      "class": "condition",
+      "construction": "mark(if)+advcl",
+      "expected": {
+        "operator": "IMPLIES",
+        "cue": "If",
+        "form": "(=> <agree> <terminate>)",
+        "deterministic": 0.8,
+        "level": "explicit",
+        "ontological": 1.0,
+        "anySense": 1.0,
+        "operandQuotes": {
+          "antecedent": "you do not agree with any such modification",
+          "consequent": "your sole and exclusive remedy is to terminate your use of the Services and close your account"
+        },
+        "unresolvedIncludes": "guard-scope-not-established"
+      }
+    },
+    {
+      "id": "remedy-negation",
+      "sentenceMarker": "sole and exclusive remedy",
+      "class": "negation",
+      "construction": "advmod(not)+advcl",
+      "expected": {
+        "operator": "NOT",
+        "cue": "not",
+        "form": "(not <agree>)",
+        "deterministic": 0.8,
+        "ontological": 1.0,
+        "operandQuotes": {"operand": "you do not agree with any such modification"},
+        "unresolvedIncludes": "negation-scope-not-established"
+      }
+    },
+    {
+      "id": "amendment-permission",
+      "sentenceMarker": "We may amend or modify this Agreement",
+      "class": "modal",
+      "construction": "aux(may)+root",
+      "expected": {
+        "operator": "PERMISSION",
+        "cue": "may",
+        "form": "(holdsRight <We> <amend>)",
+        "deterministic": 0.5,
+        "level": "ambiguous",
+        "ontological": 0.6667,
+        "readingRule": "agentive-subject",
+        "unresolvedIncludes": "modal-reading-by-rule:agentive-subject"
+      }
+    },
+    {
+      "id": "loss-causation",
+      "sentenceMarker": "Any attempted transactions in such items will result in loss of the item",
+      "class": "cause",
+      "construction": "result+obl(in)",
+      "expected": {
+        "operator": "CAUSES",
+        "cue": "result",
+        "deterministic": 0.9,
+        "level": "lexical",
+        "ontological": 0.3333,
+        "anySense": 1.0,
+        "disjoint": true,
+        "operandQuotes": {"cause": "Any attempted transactions in such items", "effect": "loss of the item"}
+      },
+      "why": "First mapped senses fail `causes` (transactions: the written record; loss: the thing lost); another mapped sense of each satisfies it. The pair 0.3333 / 1.0 is the point of the fixture."
+    },
+    {
+      "id": "protocol-reason",
+      "sentenceMarker": "As a result of our security protocols",
+      "class": "reason",
+      "construction": "case(as a result of)+obl",
+      "expected": {
+        "operator": "CAUSES",
+        "cue": "result",
+        "deterministic": 0.8,
+        "level": "explicit",
+        "ontological": 0.3333,
+        "anySense": 0.3333,
+        "disjoint": true,
+        "operandQuotes": {"reason": "our security protocols"}
+      },
+      "why": "No mapped sense of the operands is a Process: SUMO's `causes` does not fit; the operator needs another relation."
+    },
+    {
+      "id": "additional-terms-may",
+      "sentenceMarker": "You may have to agree to additional terms",
+      "class": "modal",
+      "construction": "aux(may)+root",
+      "expected": {
+        "operator": "PERMISSION",
+        "cue": "may",
+        "form": "(holdsRight <You> <have>)",
+        "deterministic": 0.5,
+        "level": "ambiguous",
+        "readingRule": "agentive-subject"
+      },
+      "why": "The agentive-subject rule reads permission; a reader takes \"may have to\" as possibility of a requirement. Kept to show the ambiguous base and the review route, not as a correct reading."
+    },
+    {
+      "id": "register-must",
+      "sentenceMarker": "You must register for a Coinbase account",
+      "class": "modal",
+      "construction": "aux(must)+root",
+      "expected": {
+        "operator": "OBLIGATION",
+        "cue": "must",
+        "form": "(holdsObligation <You> <register>)",
+        "deterministic": 0.8,
+        "level": "explicit",
+        "ontological": 1.0
+      }
+    }
+  ],
+  "derivedConditional": {
+    "operator": "remedy-conditional",
+    "note": "Evidence states over the conditional the operator lane read from the source. The operator is an unadmitted candidate, so every evaluation is hypothetical; the premises are authored and synthetic.",
+    "evidenceStates": [
+      {"id": "derived-missing", "premises": [], "expected": "pending"},
+      {"id": "derived-affirmed", "premises": [{"polarity": true, "context": "hypothetical", "source": "synthetic-objection-notice"}], "expected": "eligible"},
+      {"id": "derived-denied", "premises": [{"polarity": false, "context": "hypothetical", "source": "synthetic-acceptance-notice"}], "expected": "ineligible"},
+      {"id": "derived-conflict", "premises": [{"polarity": true, "context": "hypothetical", "source": "synthetic-objection-notice"}, {"polarity": false, "context": "hypothetical", "source": "synthetic-acceptance-notice"}], "expected": "conflict"}
+    ]
+  }
+}

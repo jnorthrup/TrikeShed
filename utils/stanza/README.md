@@ -37,6 +37,34 @@ by kind and key with verbatim examples), `summary.json` (parser and model hashes
 hashes, counts). With `--overlay`, the same frames are typed again against SUMO plus the overlay
 (`*.overlay.*`), so a proposal's effect is measured on the same evidence.
 
+## Operator logic
+
+    python operators.py manifest.json out           # after run.py on the same manifest and out dir
+
+Reads the parse `run.py` cached (no parser is loaded) and writes the sentence's logical skeleton as the
+tree states it: a `mark` under an `advcl` (if, unless, because, before), a causal verb with its oblique
+(`result in`, `arise out of`, `lead to`), a fixed preposition (`as a result of`, `due to`, `in the event
+of`), a modal `aux` with the reading the frame inference selected, a norm predicate, a negator, a
+coordinator between predicates. Each operator names its construction and the edges it read, its cue and
+operands as source quotes, a SUMO form, what stays unresolved, and two weights:
+
+- `deterministic` = base × resolved / required roles. Base is 0.9 for a causal verb that is the clause's
+  own predicate, 0.8 for a cue with one standing reading, 0.5 for one with two (`may`, `or`, `when`,
+  `where`, `since`, bare `to`). A role filled by inheritance, ellipsis or an anaphor is unresolved.
+- `ontological` = SUMO checks entailed / total for the operator's relation on these operands (`causes`
+  wants two Processes, `holdsObligation` a CognitiveAgent), on the first mapped sense. `anySense` is the
+  ratio when another mapped sense of the same word may stand in; the pair shows how much of a low weight
+  is sense choice and how much is the ontology not fitting.
+
+Outputs: `operators.jsonl`, `logic.jsonl` (one composed form per sentence; scope is a stated convention),
+`masks.jsonl` (one masked-cue request per operator whose cue has a lexical class, for `utils/q4bert`),
+`operators.summary.json`. Operators are candidates: none is admitted, and none establishes legal force.
+
+This step loads no model (its input is the parser's tree), and the same inputs give the same bytes in a
+new process. That last property needed
+a fix in `sumo.disjoint_witness`, which walked two sets in hash order and so named a different witness
+pair from run to run; it now walks them sorted, and a test runs it under eight hash seeds.
+
 ## Typing order
 
 1. the document's own party aliases and pronouns (“Coinbase, Inc. (“Coinbase”, “we”, “us”)”);

@@ -1,0 +1,89 @@
+{
+  "fixture": "F01/F03-lite",
+  "kind": "retained-private-source-reference",
+  "note": "Private exhibit material stays OUTSIDE public git: this manifest references the local capture by path; the runner retains its bytes in the run CAS (run root is outside the repo). Coverage is the preamble-through-account-terms slice; the whole capture remains navigable.",
+  "source": {
+    "path": "~/Documents/coinbase/research/user-agreement/user-agreement-2026-08-01-fulltext.txt",
+    "name": "Coinbase User Agreement (2026-08-01 wayback fulltext)",
+    "mediaType": "text/plain",
+    "origin": "https://www.coinbase.com/legal/user_agreement (wayback 2026-08-01, local exhibit copy)",
+    "slice": {
+      "beginMarker": "Welcome to Coinbase!",
+      "endMarker": "Any attempted transactions in such items will result in loss of the item.",
+      "endOffsetFromBegin": 13929,
+      "layout": "paragraphs",
+      "note": "The range runs from beginMarker through the last endMarker found within endOffsetFromBegin characters. A bare character count cut the next sentence in half (\"You acknowledge and agree that other than as set forth in this\"), and a parser reads half a sentence as if it were whole."
+    },
+    "preambleRequired": true,
+    "preambleNote": "Bounded ranges MUST include the party-definition preamble; without the alias antecedent, 'We may...' reads as epistemic possibility instead of deontic permission."
+  },
+  "questionFamilies": [
+    {
+      "id": "QF-amendment",
+      "clauseMarker": "We may amend or modify this Agreement",
+      "questions": {
+        "amend_right": {
+          "decision_type": "noul",
+          "question": "Does this clause give Coinbase the right to change the agreement?",
+          "options": [
+            "false",
+            "true"
+          ],
+          "allow_null": false
+        },
+        "reading": {
+          "decision_type": "choice",
+          "question": "What kind of modality does this clause express?",
+          "options": [
+            "deontic-permission: The platform is permitted to amend the agreement.",
+            "epistemic-possibility: Amendment is merely described as possible.",
+            "obligation: The platform must amend the agreement."
+          ],
+          "allow_null": false
+        }
+      },
+      "expected": {
+        "stanzaReading": "permission",
+        "modelReadingArgmax": "obligation",
+        "modelNoulRange": [
+          0.9,
+          1.0
+        ],
+        "note": "Reference observations from the 2026-11-19 LCNC demo run on the TRUE amendment clause (marker+rule selected). The model affirms the amendment right (noul 0.969) yet reads the modality as obligation over permission, diverging from Stanza's permission reading: proposals must not auto-admit. Earlier scratch numbers (noul~0.36) were the 'governs...may be offered' sentence mislabeled as amendment; see CORRECTION.md in the scratch run dir."
+      }
+    },
+    {
+      "id": "QF-remedy",
+      "clauseMarker": "sole and exclusive remedy",
+      "questions": {
+        "remedy": {
+          "decision_type": "choice",
+          "question": "According to this clause, what is the user's sole remedy if they reject a modification?",
+          "options": [
+            "terminate-and-close: End use of the Services and close the account.",
+            "arbitration: Submit the dispute to binding arbitration.",
+            "litigation: Sue Coinbase in court.",
+            "refund: Demand a refund of fees.",
+            "none: The clause does not state a remedy."
+          ],
+          "allow_null": true
+        },
+        "is_conditional": {
+          "decision_type": "noul",
+          "question": "Does this clause state a condition with a consequence for the user?",
+          "options": [
+            "false",
+            "true"
+          ],
+          "allow_null": false
+        }
+      },
+      "expected": {
+        "modelChoice": "terminate-and-close",
+        "modelNullMin": 0.2,
+        "modelConditionalMin": 0.99,
+        "note": "Correct option with substantial open-set null mass; null is never renormalized away."
+      }
+    }
+  ]
+}
