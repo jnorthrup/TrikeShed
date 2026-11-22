@@ -21,6 +21,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.s_
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
@@ -131,6 +132,9 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
         return if (i >= 0 && i + 1 < args.size) args[i + 1] else null
     }
 
+    /** The OS effects a login lane needs: the Keychain read of Claude Code's login and `claude --version`. */
+    private val processOps = JvmProcessOperations()
+
     // ── credential identity without the credential ──────────────────────
     /**
      * A key's public identity: how long it is and what it hashes to. Enough to
@@ -204,7 +208,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
         val fileOps = JvmFileOperations()
         val keyMux = buildKeyMux(fileOps)
         return withMuxRuntime { htx, reactor ->
-            withContext(Dispatchers.IO + fileOps + htx + reactor) {
+            withContext(Dispatchers.IO + fileOps + processOps + htx + reactor) {
                 val mux = ModelMux(keyMux) {
                     model(id = model, caps = setOf("chat"), baseUrl = row.baseUrl, provider = provider)
                 }
@@ -245,7 +249,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
         val keyMux = buildKeyMux(fileOps)
         // withContext(IO) because the harness/hermes lanes hit the filesystem,
         // and FileOperations rides the context for the non-explicit sources.
-        return withContext(Dispatchers.IO + fileOps) {
+        return withContext(Dispatchers.IO + fileOps + processOps) {
             providersOf(only).map { p ->
                 val keyResult = runCatching { keyMux.getWithSource("llm.${p.id}.key") }.getOrNull()
                 val secret = keyResult?.a
@@ -341,7 +345,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
         val keyMux = buildKeyMux(fileOps)
         val rows = resolveRows(null)
         val routable = rows.filter { it.present && it.probeModel != null }
-        val mux = withContext(Dispatchers.IO + fileOps) { buildProbeMux(keyMux, rows) }
+        val mux = withContext(Dispatchers.IO + fileOps + processOps) { buildProbeMux(keyMux, rows) }
         val cards = mux.listModels("chat")
         if (json) {
             println((0 until cards.size).joinToString(",\n  ", "[\n  ", "\n]") { i ->
@@ -425,7 +429,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
             model(id = model, caps = setOf("chat"), baseUrl = baseUrl, provider = prov)
         }
         val outcome = withMuxRuntime(keyMux, { mux }) { htx, reactor ->
-            withContext(Dispatchers.IO + fileOps + htx + reactor) {
+            withContext(Dispatchers.IO + fileOps + processOps + htx + reactor) {
                 val binding = ccekReactorBinding(currentCoroutineContext())
                 val program = LcncProgram("mux.chat", s_[LcncNode("chat", "prompt.chat", params = mapOf(
                     "model" to model, "prompt" to prompt, "maxTokens" to maxTokens.toString(), "temperature" to "0.2",
@@ -779,7 +783,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
                 val mux = ModelMux(keyMux) {
                     model(id = probeModel, caps = setOf("chat"), baseUrl = r.baseUrl, provider = r.provider)
                 }
-                withContext(Dispatchers.IO + fileOps + htx + reactor) {
+                withContext(Dispatchers.IO + fileOps + processOps + htx + reactor) {
                     val messages: Series<AcpMessage> = 1 j { _: Int -> "user" j "Reply with the single word: ok" }
                     val t0 = System.currentTimeMillis()
                     val res = runCatching {

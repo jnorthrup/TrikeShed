@@ -1,0 +1,13 @@
+name	type
+record_kind	string
+meta_category	string
+graph_kind	string
+label	string
+legal_id	string
+node_id	string
+src	string
+dst	string
+logic_role	string
+in_formula	bool
+admitted	bool
+formalized	bool

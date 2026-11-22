@@ -163,8 +163,10 @@ fun HtxRequest.withHeader(name: String, value: String): HtxRequest {
     return copy(headers = (preserved + (name j value)).toSeries())
 }
 
+/** Cloudflare answers a request with no User-Agent 403 (Nous Portal's inference host does), so every exchange names itself. */
 fun HtxRequest.withTransportDefaults(): HtxRequest =
-    if (headerValue("Accept-Encoding") != null) this else withHeader("Accept-Encoding", "identity")
+    (if (headerValue("Accept-Encoding") != null) this else withHeader("Accept-Encoding", "identity"))
+        .let { if (it.headerValue("User-Agent") != null) it else it.withHeader("User-Agent", "TrikeShed") }
 
 fun parseHtxResponse(payload: HtxBody): HtxResponse {
     val bytes = payload.toArray()

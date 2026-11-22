@@ -95,6 +95,9 @@ open class BrainClient(
         /** Outer timeout: if every provider fails to respond within this window, abort the whole call. */
         const val OUTER_TIMEOUT_MS = 60_000L
 
+        /** Shown where a roster row would name its environment variable: the key of a [rosterInto] login row is an OAuth login. */
+        const val OAUTH_LOGIN = "OAuth login (Hermes)"
+
         /** The [keymux.HarnessRegistry] provider id whose [keymux.HarnessProvider.envVars] contains [envVar], if any. */
         private fun providerTagFor(envVar: String): String? {
             for (i in 0 until HarnessRegistry.providers.size) {
@@ -298,7 +301,10 @@ open class BrainClient(
         fun add(name: String, envVar: String, base: String, model: String) {
             if (seen.add("$name:$base:$model")) out.add(EndpointSpec(name, envVar, base.trim(), model.trim()))
         }
-        rosterInto(::add)
+        fun login(name: String, provider: String, base: String, model: String) {
+            if (seen.add("$name:$base:$model")) out.add(EndpointSpec(name, OAUTH_LOGIN, base.trim(), model.trim(), provider))
+        }
+        rosterInto(::add, ::login)
         return out
     }
 
@@ -626,8 +632,17 @@ open class BrainClient(
         return out
     }
 
-    /** ONE provider table, two consumers: discovery (key-gated) and status (ungated). */
-    private fun rosterInto(add: (String, String, String, String) -> Unit) {
+    /**
+     * ONE provider table, two consumers: discovery (key-gated) and status (ungated).
+     *
+     * [login] rows name no environment variable: the key is an OAuth login that Hermes holds, resolved per call by KeyMux
+     * under `llm.<provider>.key`. Only a KeyMux can say such a login is present, so the standalone discovery, which asks the
+     * environment, leaves them out.
+     */
+    private fun rosterInto(
+        add: (String, String, String, String) -> Unit,
+        login: (String, String, String, String) -> Unit = { _, _, _, _ -> },
+    ) {
 
         val nvidia = "https://integrate.api.nvidia.com/v1"
         // NVIDIA retires model ids with HTTP 410 and a dated successor. Probed
@@ -675,6 +690,18 @@ open class BrainClient(
         add("opencode-go", "OPENCODE_GO_API_KEY", "https://api.opencode.ai/v1", "opencode/go-1")
         add("opencode-zen", "OPENCODE_ZEN_API_KEY", "https://api.opencode.ai/v1", "opencode/zen-1")
         add("opencode", "OPENCODE_API_KEY", "https://api.opencode.ai/v1", "opencode/default")
+        // ── The logins Hermes holds. Each id below answered one real chat through KeyMux and ModelMux on 2026-11-22. ──
+        // Nous Portal prices these ids at 0 in its public /v1/models (the `:free` ids); qwen4-max flaps with 429
+        // "temporarily at capacity upstream", the others answered every time. Anthropic speaks Messages and Codex speaks
+        // Responses: see [borg.trikeshed.agent.modelmux.Wire].
+        val nous = "https://inference-api.nousresearch.com/v1"
+        login("nous-hy4-flash", "nous", nous, "tencent/hy4-flash:free")
+        login("nous-step-flash", "nous", nous, "stepfun/step-3.7-flash:free")
+        login("nous-longcat", "nous", nous, "meituan/longcat-2.5:free")
+        login("nous-solar-mini", "nous", nous, "upstage/solar-mini4:free")
+        login("nous-qwen4-max", "nous", nous, "qwen/qwen4-max:free")
+        login("codex-luna", "openai-codex", "https://chatgpt.com/backend-api/codex", "gpt-6-luna")
+        add("anthropic-haiku", "ANTHROPIC_API_KEY", "https://api.anthropic.com", "claude-haiku-5-5")
     }
 
     /** JSON string escaping — handles ", \, \n, \r, \t. Used for log entries. */

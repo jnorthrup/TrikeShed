@@ -150,7 +150,9 @@ class HermesCredentialSource(
         val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         val expiry = long(entry["expires_at_ms"]).takeIf { it > 0L } ?: epochMs(entry["expires_at"])
         if (expiry != null && expiry <= now) return null // Hermes owns OAuth refresh.
-        return str(entry["access_token"])?.takeIf { it.isNotBlank() }
+        val token = str(entry["access_token"])?.takeIf { it.isNotBlank() } ?: return null
+        // Nous and Codex rows carry no expires_at; their JWT's exp is the deadline, and Hermes renews two minutes ahead.
+        return token.takeUnless { OAuth.expiresAtMs(it)?.let { exp -> exp - 120_000L <= now } == true }
     }
 
     override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {

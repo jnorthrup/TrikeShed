@@ -126,6 +126,12 @@ class LlmSession(
         keyId == other.keyId && authKey == other.authKey && baseUrl == other.baseUrl &&
             model.a == other.model.a && model.b.providerTag == other.model.b.providerTag && model.b.wireName == other.model.b.wireName
 
+    /** The headers and the body of this session's request in the dialect [wire] its destination speaks. */
+    internal fun wireHeaders(wire: Wire): Series<Join<String, String>> =
+        if (wire == Wire.CHAT) authHeaders() else wire.headers(authKey).toSeries()
+
+    internal fun wireRequest(wire: Wire, openai: String): String = wire.request(openai, authKey)
+
     /** Build HTTP headers with auth */
     fun authHeaders(): Series<Join<String, String>> {
         if (authKey == null) return s_["Content-Type" j "application/json"]
@@ -562,12 +568,14 @@ class ModelMux internal constructor(
             }
 
             val htx = currentCoroutineContext()[HtxKey] ?: throw IllegalStateException("No HtxKey found in coroutine context")
-            val url = "${session.baseUrl.trimEnd('/')}/chat/completions"
-            val htxHeaders = htxHeaders(*session.authHeaders().toArray())
+            val wire = Wire.of(session.baseUrl)
+            if (wire == Wire.MESSAGES) OAuth.detectClaudeCode()
+            val url = wire.url(session.baseUrl)
+            val htxHeaders = htxHeaders(*session.wireHeaders(wire).toArray())
             val htxReq = parseHtxRequest(
                 url = url,
                 method = HtxMethod.POST,
-                body = ByteSeries(json.encodeToByteArray())
+                body = ByteSeries(session.wireRequest(wire, json).encodeToByteArray())
             ).copy(headers = htxHeaders, timeoutMs = timeoutMs)
 
             Airgap.requireRemote()
@@ -601,14 +609,15 @@ class ModelMux internal constructor(
                         }
                     }
                     val usage = if (httpStatus in 200..299 && httpStatus != 202)
-                        runCatching { AcpCodec.parseResponse(response.body.toArray().decodeToString()).b }.getOrNull() else null
+                        runCatching { AcpCodec.parseResponse(wire.reply(response.body.toArray().decodeToString())).b }.getOrNull() else null
                     quotaLegion?.applyUsage(quotaId(session), card.providerTag ?: card.id, httpStatus,
                         usage?.a ?: 0, usage?.b ?: 0, kotlinx.datetime.Clock.System.now().toEpochMilliseconds())
                     observeQuota(session, httpStatus, responseHeaders)
                 }
               }
             }
-            val respBody = resp.body.toArray().decodeToString()
+            val answered = httpStatus in 200..299 && httpStatus != 202
+            val respBody = resp.body.toArray().decodeToString().let { if (answered) wire.reply(it) else it }
 
             if (reactor != null && (httpStatus !in 200..299 || httpStatus == 202)) {
                 reactor.recordProviderHealth(

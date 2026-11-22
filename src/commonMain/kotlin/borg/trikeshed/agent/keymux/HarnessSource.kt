@@ -66,9 +66,10 @@ object HarnessRegistry {
             "gpt-4o-mini",
             baseUrlEnvVar = "OPENAI_BASE_URL"
         ),
-        // No defaultBaseUrl and no probeModel: anthropic's wire protocol is
-        // /v1/messages, which the ModelMux /chat/completions lane does not speak.
-        borg.trikeshed.agent.keymux.HarnessProvider("anthropic", s_["ANTHROPIC_API_KEY"]),
+        // /v1/messages ([borg.trikeshed.agent.modelmux.Wire.MESSAGES]): a Console key rides as x-api-key; with none, the
+        // Claude Code login ([ClaudeCodeSource]) rides as a bearer.
+        // `claude setup-token` prints a long-lived OAuth bearer that is kept in CLAUDE_CODE_OAUTH_TOKEN (or ANTHROPIC_TOKEN).
+        borg.trikeshed.agent.keymux.HarnessProvider("anthropic", s_["ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"], "https://api.anthropic.com", "claude-haiku-5-5"),
         borg.trikeshed.agent.keymux.HarnessProvider(
             "xai",
             s_["XAI_API_KEY"],
@@ -186,6 +187,10 @@ object HarnessRegistry {
             "nousresearch/hermes-3-llama-3.1-405b",
             baseUrlEnvVar = "HERMES_BASE_URL"
         ),
+        // OAuth logins that Hermes holds (`credential_pool.<id>` in auth.json): no variable names their key.
+        // Nous Portal's free tier is the zero-priced rows of its public /v1/models (the `:free` ids); Codex speaks Responses.
+        borg.trikeshed.agent.keymux.HarnessProvider("nous", emptySeriesOf(), "https://inference-api.nousresearch.com/v1", "tencent/hy4-flash:free"),
+        borg.trikeshed.agent.keymux.HarnessProvider("openai-codex", emptySeriesOf(), "https://chatgpt.com/backend-api/codex", "gpt-6-luna"),
     ]
 
     fun byId(id: String): borg.trikeshed.agent.keymux.HarnessProvider? {

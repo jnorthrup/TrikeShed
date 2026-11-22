@@ -18,7 +18,9 @@ import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
  *  2. [borg.trikeshed.agent.keymux.EnvSource] — the legacy raw-env lane (`LLM_OPENAI_KEY` shape).
  *  3. [borg.trikeshed.agent.keymux.HermesCredentialSource] — hermes' OWN pool (`credential_pool`:
  *     priority-ordered, with cooldowns, following its `env:<VAR>` indirection).
- *  4. [borg.trikeshed.agent.keymux.HarnessSource] — remaining dotenv and harness credentials. A pool's
+ *  4. [borg.trikeshed.agent.keymux.ClaudeCodeSource] — `llm.anthropic.key` from Claude Code's own OAuth login, after the env
+ *     keys, as in Hermes' `resolve_anthropic_token`.
+ *  5. [borg.trikeshed.agent.keymux.HarnessSource] — remaining dotenv and harness credentials. A pool's
  *     HTTP exhaustion cannot be bypassed by rereading its same dotenv token.
  *
  * The pool is read on every resolution. Remaining harness files carry [ttlMs];
@@ -38,6 +40,7 @@ fun operatorKeyMux(
     // Uncached on purpose: a key rotated in auth.json or .env is used on the
     // very next call. The source itself re-reads its files per call.
     bind("llm.*.*", borg.trikeshed.agent.keymux.HermesCredentialSource(hermesHome, fileOps))
+    bind("llm.anthropic.key", borg.trikeshed.agent.keymux.ClaudeCodeSource(fileOps))
     cached(
         "*",
         borg.trikeshed.agent.keymux.HarnessSource(

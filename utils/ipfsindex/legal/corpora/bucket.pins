@@ -1,0 +1,6 @@
+bucket=hf://buckets/jim8vsiwest/open-us-law-bucket
+origin=hf://buckets/justicedao/open-us-law-bucket
+files=114
+bytes=1140186125
+copied=2026-11-22
+visibility=private
