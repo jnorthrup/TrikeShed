@@ -352,7 +352,7 @@ class PgSession(val surface: PostgrestSurface, val pid: Int, val secret: Int) {
             "BEGIN", "START" -> PgResult.Command("BEGIN").also { if (!describing) transaction = 'T' }
             "COMMIT", "END" -> PgResult.Command(if (transaction == 'E') "ROLLBACK" else "COMMIT").also { if (!describing) transaction = 'I' }
             "ROLLBACK", "ABORT" -> PgResult.Command("ROLLBACK").also { if (!describing) transaction = 'I' }
-            "DISCARD" -> PgResult.Command("DISCARD " + (words.getOrNull(1)?.uppercase() ?: "ALL"))
+            "DISCARD" -> discard(words.getOrNull(1)?.uppercase() ?: throw PostgrestError(400, "42601", "syntax error at end of input"), describing)
             "DEALLOCATE" -> PgResult.Command("DEALLOCATE").also { if (!describing) words.getOrNull(1)?.let { if (it.uppercase() == "ALL") statements.clear() else statements.remove(it.trim('"')) } }
             "CREATE" -> if (words.getOrNull(1)?.uppercase() == "TABLE") PgResult.Command("CREATE TABLE").also { if (!describing) surface.createTable(statement) }
                 else throw PostgrestError(400, "0A000", "CREATE ${words.getOrNull(1)?.uppercase()} is not supported")
@@ -419,6 +419,16 @@ class PgSession(val surface: PostgrestSurface, val pid: Int, val secret: Int) {
         val key = SETTINGS.keys.firstOrNull { it.equals(name, ignoreCase = true) } ?: name
         SETTINGS[key]?.let { settings[key] = it } ?: settings.remove(key)
         return PgResult.Command("RESET", if (key in REPORTED) listOf(PgBackend.parameterStatus(key, settings.getValue(key))) else emptyList())
+    }
+
+    /** `DISCARD ALL` resets the settings as `RESET ALL` and forgets the statements and portals; this session keeps no plans, sequences or temporaries. */
+    private fun discard(what: String, describing: Boolean): PgResult {
+        when (what) {
+            "ALL" -> if (!describing) { settings.clear(); settings.putAll(SETTINGS); statements.clear(); portals.clear() }
+            "PLANS", "SEQUENCES", "TEMP", "TEMPORARY" -> Unit
+            else -> throw PostgrestError(400, "42601", "syntax error at or near \"${what.take(40)}\"")
+        }
+        return PgResult.Command("DISCARD $what")
     }
 
     /** A SET value: one quoted string, or the bare text with its quoted list members kept as written. */
