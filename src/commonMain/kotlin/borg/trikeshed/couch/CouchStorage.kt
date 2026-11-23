@@ -23,6 +23,9 @@ enum class CouchStorageFormat(val id: String) {
 data class CouchConversion(val sourceRoot: ContentId, val destinationRoot: ContentId,
                            val revisions: Int, val localDocuments: Int)
 
+data class CouchPurge(val sourceRoot: ContentId, val destinationRoot: ContentId,
+                      val revisions: Int, val purged: Int, val localDocuments: Int)
+
 /** One database and writer lifetime, shared by HTTP, attachments and dense inspection.
  * Selecting a format never converts, replaces or imports an existing database.
  * NONE requires caller-serialized access and close; durable writer leases and lower-level CAS/file locks remain.
@@ -167,6 +170,44 @@ class CouchStorage private constructor(
                                 "revisions" to result.revisions, "localDocuments" to result.localDocuments))
                             result
                         }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Offline purge of a commit-format database on its own durable CAS: a new log at [destination] holds every
+         * revision but those of the document ids [purged] accepts, with sequences, revisions and bodies unchanged,
+         * and the whole local history. The log's newest revision is kept whatever its id, so sequences never run back.
+         * The source leases are held through verification and the source HEAD is never changed. The destination path
+         * must be new; a failure leaves what was written for inspection. Nothing opens the destination in the source's place.
+         */
+        fun purge(cas: CasStore, files: FileOperations, source: String, destination: String,
+                  synchronization: Synchronization = Synchronization.MONITOR, purged: (String) -> Boolean): CouchPurge {
+            require(source.isNotBlank() && destination.isNotBlank()) { "Purge paths must be explicit" }
+            require(cas.durability == StorageDurability.DURABLE && files.durability == StorageDurability.DURABLE) {
+                "Couch purge requires durable CAS and filesystem storage"
+            }
+            val sourceDirectory = files.canonicalPath(source)
+            val destinationDirectory = files.canonicalPath(destination)
+            val sourceHead = files.resolvePath(sourceDirectory, "HEAD")
+            require(files.exists(sourceHead) && !files.exists(files.resolvePath("$sourceDirectory.store", "HEAD"))) {
+                "Purge source must be an existing commit-format database"
+            }
+            require(!files.exists(destinationDirectory)) { "Purge destination must be new" }
+            return files.acquireExclusiveLease(files.resolvePath(sourceDirectory, ".format.lock")).use {
+                CouchCommitStore(cas, StorageDurability.DURABLE, files, sourceDirectory,
+                    requireCompleteHistory = true, synchronization = synchronization).use { original ->
+                    val root = files.readAllBytes(sourceHead)
+                    original.purgeInto(destinationDirectory, purged)
+                    CouchCommitStore(cas, StorageDurability.DURABLE, files, destinationDirectory,
+                        requireCompleteHistory = true, synchronization = synchronization).use { restored ->
+                        val locals = original.verifyPurge(restored, purged)
+                        check(root.contentEquals(files.readAllBytes(sourceHead))) { "Purge source root changed" }
+                        val revisions = restored.recoveredFrames.size
+                        CouchPurge(ContentId.of(root),
+                            ContentId.of(files.readAllBytes(files.resolvePath(destinationDirectory, "HEAD"))),
+                            revisions, original.recoveredFrames.size - revisions, locals)
                     }
                 }
             }

@@ -74,7 +74,7 @@ class LcncInvocationLedger(val limit: Int = 128, val observationLimit: Int = 128
         val rows = observations.toMutableList()
         fun report() = _m["observationSchema" j OBSERVATION_SCHEMA, "observations" j rows.toList(),
             "observationsDropped" j sequence - rows.size, "observationSummary" j summary(rows)]
-        val budget = ValueBudget(maxNodes = 4096, maxChars = 32768, maxMillis = 250)
+        val budget = ValueBudget(maxNodes = 4096, maxChars = 65536, maxMillis = 250)
         while (rows.isNotEmpty() && budget.violation(report()) != null) rows.removeAt(0)
         return report()
     }

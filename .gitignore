@@ -168,4 +168,6 @@ nal_projection.txt
 # by machine and by run, and nothing reads them. `git add -f` one to publish it.
 /docs/subvm/capabilities-*.json
 /docs/subvm/capability-matrix.md
+# The 4-bit MLX Jeva bundle (AGENTS.md) sits in the default guest-module root: weights, tokenizer and config are not source.
+/utils/subvm/jeva-4b-mlx-q4g32-dist/
 .jules

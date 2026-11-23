@@ -134,19 +134,7 @@ class CouchCommitStore(
         synchronize(destination.gate) {
             destination.operational()
             require(destination.count == 0L) { "Conversion destination is not empty" }
-            val events = mutableListOf<ContentId>()
-            var cursor = head
-            var remaining = count
-            while (remaining > 0) {
-                val cid = requireNotNull(cursor) { "Incomplete Couch history" }
-                val event = decode(readVerified(cid))
-                require(event["format"] == EVENT_FORMAT && integer(event, "index") == remaining)
-                events.add(cid)
-                cursor = nullableCid(event, "previous")
-                remaining--
-            }
-            require(cursor == null) { "Couch history exceeds its root" }
-            for (cid in events.asReversed()) {
+            for (cid in history()) {
                 val event = decode(readVerified(cid))
                 when (event["kind"]) {
                     "frame" -> {
@@ -180,6 +168,63 @@ class CouchCommitStore(
             }
             locals.size
         }
+    }
+
+    /** The complete history's event ids, oldest first. */
+    fun history(): List<ContentId> = synchronize(gate) {
+        operational()
+        val events = mutableListOf<ContentId>()
+        var cursor = head
+        var remaining = count
+        while (remaining > 0) {
+            val cid = requireNotNull(cursor) { "Incomplete Couch history" }
+            val event = decode(readVerified(cid))
+            require(event["format"] == EVENT_FORMAT && integer(event, "index") == remaining)
+            events.add(cid)
+            cursor = nullableCid(event, "previous")
+            remaining--
+        }
+        require(cursor == null) { "Couch history exceeds its root" }
+        events.asReversed()
+    }
+
+    /**
+     * Offline purge on the same CAS: a new commit store at [directory] receives this history re-linked without the
+     * frames of the document ids [purged] accepts. A kept event keeps its sequence, revision and body, and the local
+     * history is kept whole. The newest frame is kept whatever its id: the next commit's sequence follows it, so a
+     * follower's checkpoint never lies ahead of a later commit. The new root is published once, after the last event;
+     * this store's root is not changed.
+     */
+    fun purgeInto(directory: String, purged: (String) -> Boolean): Unit = synchronize(gate) {
+        operational()
+        require(durability == StorageDurability.DURABLE)
+        CouchCommitStore(cas, durability, fileOps, directory, requireCompleteHistory = true, synchronization = synchronization).use { destination ->
+            require(destination.count == 0L) { "Purge destination is not empty" }
+            var linked: ContentId? = null
+            var size = 0L
+            for (cid in history()) {
+                val event = decode(readVerified(cid))
+                if (event["kind"] == "frame" && purged(string(event, "id")) && integer(event, "sequence") != frameSequence) continue
+                size++
+                linked = destination.putVerified(CanonicalCbor.encodeMap(event + mapOf("index" to size, "previous" to linked?.value)))
+            }
+            destination.publishRoot(linked, size)
+        }
+    }
+
+    /** [destination], opened after [purgeInto], holds the revisions that purge keeps, bodies included, and this local state. */
+    fun verifyPurge(destination: CouchCommitStore, purged: (String) -> Boolean): Int = synchronize(gate) {
+        operational()
+        synchronize(destination.gate) {
+            destination.operational()
+            var at = 0
+            for (kept in recovered) if (!purged(kept.a.docId) || kept.a.sequence == frameSequence) {
+                val other = destination.recovered.getOrNull(at++) ?: error("Couch revision lost during purge")
+                check(other.a == kept.a && other.b == kept.b) { "Couch revision changed during purge" }
+            }
+            check(at == destination.recovered.size) { "Couch purge kept an unknown revision" }
+        }
+        verifyLocals(destination)
     }
 
     override fun close(): Unit = synchronize(gate) {

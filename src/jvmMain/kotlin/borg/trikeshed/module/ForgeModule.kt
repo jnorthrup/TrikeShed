@@ -93,6 +93,9 @@ class ModuleContext(
     @Volatile var camelRoutes: borg.trikeshed.lcnc.CamelRouteElement? = null
     /** Shared document authority; the root owns its WAL and drain, modules only borrow it. */
     @Volatile var documentReview: borg.trikeshed.lcnc.CurationReview? = null
+    /** The daemon's one quad store and the gate its writers and `/sparql` take: SPARQL Update, `DB.DBA.RDF_QUAD` and the constellations' RDF share it. */
+    val quads = borg.trikeshed.rdf.QuadStore()
+    val quadGate = kotlinx.coroutines.sync.Mutex()
 
     private val councilCasesLock = Any()
     private var councilCasesStopped = false

@@ -1,7 +1,11 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 
 enum class JevaRuntime { KOTLIN, PYTHON }
 
@@ -28,6 +32,8 @@ data class JevaConfig(
     val mlxMaxFootprintBytes: Long? = null,
     /** Optional parent-side sampled OS memory and worker lifetime limits. */
     val hostLimit: JevaHostLimit? = null,
+    /** Why this host has no model to load: its schema's refusal, reported as the lane's unavailability. */
+    val refusal: String? = null,
 ) {
     init {
         require(python.isNotBlank() && model.isNotBlank() && device.isNotBlank())
@@ -67,9 +73,37 @@ data class JevaConfig(
     val identity: String get() = jsonOf(fields())
 
     companion object {
-        fun configured(property: (String) -> String?, environment: (String) -> String?): JevaConfig {
-            fun value(name: String) = property("trikeshed.jeva.$name")?.takeIf { it.isNotBlank() }
+        fun value(property: (String) -> String?, environment: (String) -> String?, name: String): String? =
+            property("trikeshed.jeva.$name")?.takeIf { it.isNotBlank() }
                 ?: environment("TRIKESHED_JEVA_${name.uppercase()}")?.takeIf { it.isNotBlank() }
+
+        /**
+         * [configured], with this host's model schema standing where no model is configured:
+         * `mlnix eval --json utils/mlnix/model.nix -A jeva` answers the TRIKESHED_JEVA_* settings of the hardware, or its refusal.
+         */
+        suspend fun host(property: (String) -> String?, environment: (String) -> String?, processes: ProcessOperations): JevaConfig {
+            if (value(property, environment, "model") != null) return configured(property, environment)
+            val definition = value(property, environment, "schema") ?: Jeva.SCHEMA
+            val settings = try {
+                // The child sees no host variable but these, which the schema's cache reads.
+                val forwarded = s_["HOME", "HF_HOME", "HF_HUB_CACHE", "TRIKESHED_SUBVM_HOME"]
+                    .filter { !environment(it).isNullOrBlank() }.view.associateWith { environment(it)!! }
+                val evaluated = withTimeoutOrNull(30_000) {
+                    processes.exec(value(property, environment, "mlnix") ?: Jeva.MLNIX,
+                        _l["eval", "--json", definition, "-A", "jeva"], env = forwarded)
+                } ?: error("mlnix exceeded 30 s")
+                check(evaluated.exitCode == 0) { evaluated.stderr.decodeToString().lineSequence().firstOrNull().orEmpty() }
+                reifyMap(evaluated.stdout.decodeToString()).mapValues { (name, text) -> Jeva.text(text, name) }
+            } catch (failure: Exception) {
+                if (failure is CancellationException) throw failure
+                _m["refusal" j (failure.message ?: failure.toString())]
+            }
+            settings["refusal"]?.let { return configured(property, environment).copy(refusal = "Jeva model schema $definition: $it") }
+            return configured(property) { name -> environment(name)?.takeIf { it.isNotBlank() } ?: settings[name] }
+        }
+
+        fun configured(property: (String) -> String?, environment: (String) -> String?): JevaConfig {
+            fun value(name: String) = value(property, environment, name)
             val hostNames = _a["host_min_free_bytes", "host_max_swap_bytes", "host_max_free_drop_bytes",
                 "host_max_swap_increase_bytes", "host_sample_ms", "host_lifetime_ms"]
             val hostValues = hostNames.map { name ->

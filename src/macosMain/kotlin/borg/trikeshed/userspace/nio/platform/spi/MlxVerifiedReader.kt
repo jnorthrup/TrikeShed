@@ -256,21 +256,30 @@ class MlxVerifiedReader internal constructor(
 
 private fun COpaquePointer.reader() = asStableRef<MlxVerifiedReader>().get()
 
-/** MLX retains the reader behind lazy arrays and calls free only after its final reference. */
+/**
+ * MLX retains the reader behind lazy arrays and calls free only after its final reference.
+ * mlx-c 0.8 reads a status from seek and a byte count from read, and raises a short count through its error handler,
+ * whose default ends the process. The latch stays this reader's failure channel: a failed read is zeroed and counted whole.
+ */
 fun MlxVerifiedReader.handle(): CValue<mlx_io_reader_> {
     val ref = StableRef.create(this)
     val vtable = cValue<mlx_io_vtable_> {
         is_open = staticCFunction { pointer: COpaquePointer? -> pointer != null }
         good = staticCFunction { pointer: COpaquePointer? -> try { pointer?.reader()?.good() ?: false } catch (_: Throwable) { false } }
         tell = staticCFunction { pointer: COpaquePointer? -> try { pointer?.reader()?.tell() ?: 0uL } catch (_: Throwable) { 0uL } }
-        seek = staticCFunction { pointer: COpaquePointer?, offset: Long, whence: Int -> try { pointer?.reader()?.seek(offset, whence) } catch (_: Throwable) {} }
+        seek = staticCFunction { pointer: COpaquePointer?, offset: Long, whence: Int ->
+            try { pointer?.reader()?.seek(offset, whence) } catch (_: Throwable) {}
+            0
+        }
         read = staticCFunction { pointer: COpaquePointer?, data: CPointer<ByteVar>?, count: ULong ->
             try { if (pointer == null) { if (data != null) memset(data, 0, count) } else pointer.reader().read(data, count, null) }
             catch (_: Throwable) { if (data != null) memset(data, 0, count) }
+            count
         }
         read_at_offset = staticCFunction { pointer: COpaquePointer?, data: CPointer<ByteVar>?, count: ULong, offset: ULong ->
             try { if (pointer == null) { if (data != null) memset(data, 0, count) } else pointer.reader().read(data, count, offset) }
             catch (_: Throwable) { if (data != null) memset(data, 0, count) }
+            count
         }
         write = null
         label = staticCFunction { pointer: COpaquePointer? -> try { pointer?.reader()?.label() } catch (_: Throwable) { null } }

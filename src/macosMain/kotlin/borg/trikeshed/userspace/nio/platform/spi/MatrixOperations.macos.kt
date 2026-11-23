@@ -604,7 +604,8 @@ class MlxMatrixSession internal constructor(
         val stream = gpu()
         val none = cValue<mlx_array_> { ctx = null }
         return derived("attention") {
-            mlx_fast_scaled_dot_product_attention(it, queries.handle, keys.handle, values.handle, scale, "causal", none, none, stream)
+            // force_fused (mlx-c 0.8) stays MLX's own default: the library picks the kernel.
+            mlx_fast_scaled_dot_product_attention(it, queries.handle, keys.handle, values.handle, scale, "causal", none, none, false, stream)
         }
     }
 

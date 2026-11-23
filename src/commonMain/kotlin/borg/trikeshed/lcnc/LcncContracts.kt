@@ -68,6 +68,10 @@ data class LcncPortContract(
          * actually route to right now; `board.get#items[].id` lists the cards
          * that actually exist. A stale option is then impossible by
          * construction, because there is no list to go stale.
+         *
+         * On a LIST ([cols]) the last path segment names one field per leading
+         * column (`models[].name,model`): those cells are picked from the
+         * source's rows, each narrowed by the cells before it, and never typed.
          */
         val optsFrom: String = "",
         /** Omission differs from an explicit value (including empty text); editors must preserve it. */
@@ -77,6 +81,14 @@ data class LcncPortContract(
         /** Executable source presentation; editing never grants evaluation authority. */
         val code: Boolean = false,
     ) {
+        /** A LIST's live columns: [optsFrom] once per field its last path segment names, in column order. */
+        val colsFrom: Series<String> get() {
+            val hash = optsFrom.indexOf('#')
+            if (hash < 0) return emptySeriesOf()
+            val tail = maxOf(hash, optsFrom.lastIndexOf('.')) + 1
+            return optsFrom.substring(tail).split(',').toSeries() α { optsFrom.substring(0, tail) + it }
+        }
+
         fun columns(params: Map<String, String>): List<String> {
             if (colsParam.isEmpty()) return cols
             val raw = params[colsParam].orEmpty()
@@ -110,6 +122,11 @@ object LcncContracts {
         borg.trikeshed.vm.VmTrust.entries.map { it.name }
     /** One spelling of a boolean picklist; it was written both ways, nine times. */
     val BOOLEAN_OPTIONS: List<String> = listOf("false", "true")
+    /**
+     * The roster's [borg.trikeshed.modelmux.EndpointModel] rows, live. A seat's `key` and `model` cells are
+     * picked from them: a typed `key` cell takes a pasted credential into the stored program.
+     */
+    const val ENDPOINT_MODELS = "http.get?path=/api/mux/models#json.models[].name,model"
 
     /** Concentric-scope vocabulary (spec §4): the call, the binding, the return. */
     const val SCOPE = "scope"
@@ -695,9 +712,9 @@ object LcncContracts {
                 // lawyer/agent/worker/scribe/curator seats all author it here.
                 // Shared by LCNC and /api/mux/chat; keys identify roster entries,
                 // never credential values. Empty uses ordinary roster failover.
-                "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")),
+                "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model"), optsFrom = ENDPOINT_MODELS),
                 "strengths" to LcncPortContract.LcncParamSpec(cols = _l["key", "model", "strength"], optional = true,
-                    ph = "operator-declared strengths; not measured or used for routing"),
+                    ph = "operator-declared strengths; not measured or used for routing", optsFrom = ENDPOINT_MODELS),
             ), isEffect = true),
         LcncPortContract(WorkSelectNode.MODEL, "work model (selected route)",
             _l["selection", "prompt?", "system?"], _l["content", "model", "prompt"],
@@ -709,9 +726,9 @@ object LcncContracts {
                 "maxTokens" j LcncPortContract.LcncParamSpec(v = "512"),
                 "temperature" j LcncPortContract.LcncParamSpec(v = "0.2"),
                 "brief" j LcncPortContract.LcncParamSpec(ph = "root frame binding when no prompt is wired"),
-                "models" j LcncPortContract.LcncParamSpec(cols = _l["key", "model"]),
+                "models" j LcncPortContract.LcncParamSpec(cols = _l["key", "model"], optsFrom = ENDPOINT_MODELS),
                 "strengths" j LcncPortContract.LcncParamSpec(cols = _l["key", "model", "strength"], optional = true,
-                    ph = "operator-declared strengths; not measured or used for routing"),
+                    ph = "operator-declared strengths; not measured or used for routing", optsFrom = ENDPOINT_MODELS),
             ], isEffect = true),
 
         // ── project / scope ──────────────────────────────────────────
@@ -1642,9 +1659,9 @@ object LcncContracts {
                 "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id (roster failover behind it)"),
                 "maxTokens" to LcncPortContract.LcncParamSpec(v = "512"),
                 "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
-                "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model")),
+                "models" to LcncPortContract.LcncParamSpec(cols = listOf("key", "model"), optsFrom = ENDPOINT_MODELS),
                 "strengths" to LcncPortContract.LcncParamSpec(cols = _l["key", "model", "strength"], optional = true,
-                    ph = "operator-declared strengths; not measured or used for routing"),
+                    ph = "operator-declared strengths; not measured or used for routing", optsFrom = ENDPOINT_MODELS),
                 "contextId" to LcncPortContract.LcncParamSpec(ph = "council/<caseId>/<panel>/<seat> spend receipt"),
                 "caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"),
             ), isEffect = true),

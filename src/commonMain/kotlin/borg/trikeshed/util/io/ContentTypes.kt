@@ -33,6 +33,7 @@ object ContentTypes {
             path.endsWith(".yaml") || path.endsWith(".yml") -> "application/yaml"
             path.endsWith(".toml") -> "application/toml"
             path.endsWith(".csv") -> "text/csv"
+            path.endsWith(".parquet") -> "application/vnd.apache.parquet"
             path.endsWith(".png") -> "image/png"
             path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
             path.endsWith(".gif") -> "image/gif"

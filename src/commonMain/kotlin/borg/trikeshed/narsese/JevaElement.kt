@@ -282,6 +282,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
     private suspend fun resolve(): Map<String, Any?> {
         // Request failures do not revoke a resolved runtime; a failed load or changed identity does.
         resolvedMetadata = null
+        config.refusal?.let { error(it) }
         val fields: Map<String, Any?>
         if (config.worker != null) {
             channel()

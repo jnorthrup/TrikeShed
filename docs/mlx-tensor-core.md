@@ -154,6 +154,20 @@ acceptance gate (section 6) is built to catch them.
   - Not yet done: the gated-delta kernel and profiling, the removals of section 7 (`JevaProcess`, `JevaRuntime.PYTHON`,
     the `device == "mlx"` check in `McpStdio`), relocating the dylibs off
     Homebrew paths, and the other targets (which keep the Python or CPU lanes).
+  - Rechecked 2026-11-23, after Homebrew moved to `mlx-c 0.8.0` over `mlx 0.32.4`. Two declarations this backend calls
+    had changed: `mlx_fast_scaled_dot_product_attention` takes `force_fused` before the stream, and the `mlx_io_vtable`
+    callbacks answer (`seek` a status, `read` and `read_at_offset` a byte count; a short count is raised through the
+    error handler). The worker linked on 3 November, before that upgrade, exited 255 at load with `[mlx_io_reader]
+    unable to read 8 bytes (read 4391057152 instead)`. Ported: `force_fused` is `false`, MLX's default, and the reader
+    counts every read whole, its latch staying the failure channel (section 5). The worker linked from the port answered
+    the reference case recorded in `docs/jeva-layout.txt`. `utils/mlnix/model.nix` names the mlx-c version this backend
+    is written against and refuses a host whose library or worker differs. 0.8.0 also declares
+    `mlx_fast_gated_delta_update`, the kernel of section 4's recurrence row; nothing here calls it yet.
+  - Sampled the same day (`/usr/bin/sample`, two 10 s windows of the debug worker's main thread during that case): 50%
+    and 66% of the samples were under `JevaMatrix.read`, in its cell-by-cell branch (`tensorIndex`, then the tensor's
+    oracle), which the `head.pt` tensors take because they are not `JevaWeight`; `JevaDecision` had 12% to 32%, and
+    `MlxBackbone.encode` under 10%. In this case the time is the head's host reads, not the stepped recurrence the
+    measurement above suspected. A debug link, one case; no release link was sampled.
 - mlx-c is C with explicit `_free`; the session owns its handles (section 5). Some functions return status codes;
   the default mlx-c error handler can terminate the process before a status is returned (section 5).
 - `expect`/`actual` stays inside the userspace-nio SPI (PRELOAD): the new surface is a sibling of `MatrixOperations`,
@@ -275,6 +289,9 @@ export TRIKESHED_JEVA_WORKER="$PWD/build/bin/macos/jevaWorkerReleaseExecutable/j
 # export TRIKESHED_MLX_CHECKPOINT_LIMIT_BYTES=<nonnegative limit>
 # export TRIKESHED_MLX_MAX_FOOTPRINT_BYTES=<positive limit>
 ```
+
+The daemon needs neither those three exports nor `TRIKESHED_JEVA_MODEL`: with no model configured its lane takes all
+four from `utils/mlnix/model.nix` (`JevaConfig.host`, `docs/jeva-layout.txt`). The limits stay explicit.
 
 The parent sends bounded line-framed requests to the worker. Model load and each question have a configured
 exchange deadline (600,000 ms by default); a timed-out, failed or malformed exchange retires the child before a

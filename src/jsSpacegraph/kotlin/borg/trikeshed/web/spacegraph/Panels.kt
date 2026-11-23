@@ -45,6 +45,8 @@ class Panels : PatchSurface {
     val mmx: dynamic = mm.getContext("2d")
 
     var contracts: dynamic = obj()
+    /** A LIST source's page-wide read and the column vectors it fills, by [LcncPortContract.LcncParamSpec.optsFrom]. */
+    val liveCols = HashMap<String, Join<kotlinx.coroutines.Deferred<Unit>?, MutableList<List<String>>>>()
     var portContracts: Map<String, LcncPortContract> = emptyMap()
     var kindAcceptance: Map<String, List<String>> = emptyMap()
     var kindRefinements: Array<dynamic> = emptyArray()

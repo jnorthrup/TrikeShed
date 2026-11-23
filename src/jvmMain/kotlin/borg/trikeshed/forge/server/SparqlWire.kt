@@ -28,10 +28,10 @@ import kotlinx.coroutines.sync.withLock
  * A static extra route, as PostgrestWire: module claims are exact `/api/` paths. [live] is read on
  * each request — the fact plane's triples — and searched beside the store's own quads. Requests run
  * one at a time under [gate]: the store is not synchronised, and an update may not interleave a read.
+ * Whoever else writes the store takes the same [gate].
  */
-class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, val live: (suspend () -> Cursor)? = null) {
-    val gate = Mutex()
-
+class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, val live: (suspend () -> Cursor)? = null,
+                 val gate: Mutex = Mutex()) {
     suspend fun route(
         method: String,
         path: String,

@@ -1,0 +1,37 @@
+Parquet in the document intake
+==============================
+
+A .parquet file landed in a project is offered to the curator like a PDF: the miner reads it into the extract twin, book.curate cuts the
+extract into sections, constellation.join joins the book. Nothing is OCR'd: the columns are read from the file's own pages.
+
+What is read
+------------
+borg.trikeshed.parse.parquet (commonMain) reads the footer through a ByteRange, so the byte-range index of every column chunk is the footer's
+own (ParquetFooter.chunks: begin, length, codec, values), then the columns asked for, chunk by chunk. Each page is decoded into a SeriesBuffer
+that is drained as the chunk's Series; levels and dictionary indices fill an IntColumn. Flat columns; plain, dictionary and (booleans) RLE
+pages; data pages v1 and v2. Codecs: UNCOMPRESSED, SNAPPY (Snappy.kt) and ZSTD (tilting/zran) in commonMain, GZIP through the JDK
+(ParquetInflate). A repeated column (list, map), another encoding or another codec is refused, never skipped.
+
+What is made of it
+------------------
+The conventions of the file's notes twin (`<id>.notes.md`, `key: value` lines) name the columns and the rows; nothing is inferred from the data:
+
+  heading: column              the section heading (default: the first text column)
+  text: column                 the section body (default: the text column of the most bytes by the footer's sizes)
+  where: column=a|b; column=c  keep the rows whose column is one of the values, every condition holding
+
+The extract is `# file`, then `## heading` and the text of each kept row. A selection over 5000 rows is refused, not cut: narrow it with where:.
+Put the notes twin before the parquet: the extraction reads it once, when the parquet lands.
+
+Verification — 2026-11-22
+-------------------------
+ParquetFileTest: 300 rows written by pyarrow four ways (snappy v1; zstd v2 in 3 row groups; plain; gzip with 256-byte pages), every column read
+back equal; the footer's byte ranges lie inside the file and follow one another; a repeated column is refused. 3 tests, 0 failures.
+Through the daemon: the Tennessee Constitution (148 rows) and two slices of us_tn_statutes.parquet (21 MB, ZSTD: title 6 chapter 54, 114 rows;
+title 13 chapter 7, 57 rows), put with their notes twins; each extract twin has the sha256 of the markdown pyarrow's reading of the same file
+gives under the same conventions.
+
+Not done
+--------
+Reading a bucket's file over HTTP range: ParquetFile takes a ByteRange, so a range source plugs in, but none is wired. Nested columns. LZ4,
+Brotli and LZO pages. Loading a graph table (entities, relationships, nodes, edges) into the quad store.

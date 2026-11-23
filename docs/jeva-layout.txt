@@ -22,7 +22,22 @@ TRIKESHED_JEVA_DEVICE and TRIKESHED_JEVA_RUNTIME select configuration. Setting
 only MODEL does not select the MLX backend. No automatic download, conversion,
 Python switch or replacement model is performed.
 
-The user's Mac checkpoint was not mounted in this workspace and remains
-unverified. Synthetic loader tests and the coordinated JVM build passed; no real
-4B/Q4 inference or model-quality result is claimed. Documents manual uploads do
-not require this model to be available.
+With no model configured, the daemon's lane (JevaConfig.host) takes this host's
+model schema instead of the LIQIIIII/Jeva-4B identifier: utils/mlnix/model.nix,
+attribute jeva, evaluated by mlnix (../mlir-nix/build/bin/mlnix, or
+TRIKESHED_JEVA_MLNIX; TRIKESHED_JEVA_SCHEMA names another definition). On Apple
+silicon it answers the 4-bit MLX checkpoint under utils/subvm, device mlx and
+the linked jevaWorker.kexe. It refuses, and the lane reports the refusal as its
+unavailability, when no cache holds the files, when the installed mlx-c is not
+the version src/macosMain is written against, when no worker was linked since
+that library, or when the hardware's build (GGUF, off Apple silicon) has no
+runtime in this checkout. The same file carries each file's sha256 (-A verify),
+its Xet addresses and an aria2 input file; evaluating jeva fetches nothing.
+
+Measured 2026-11-23 on an M3 Pro with Homebrew mlx-c 0.8.0 over MLX 0.32.4: the
+worker linked from this tree answered the published reference case from the
+schema's checkpoint with outage 0.9150 and engineering 0.5910; the Python MLX
+lane's recorded run gives 0.9184 and 0.5927. Load and both questions took 114 s
+to 178 s over three runs of the debug worker, with a peak physical footprint of
+3.4 GB. That is one case, not a model-quality result. Documents manual uploads
+do not require this model to be available.

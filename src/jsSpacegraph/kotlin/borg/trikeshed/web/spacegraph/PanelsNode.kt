@@ -4,6 +4,7 @@ import borg.trikeshed.landscape.LandscapeNavigation
 import borg.trikeshed.lcnc.LcncPortContract
 import borg.trikeshed.lcnc.SparqlGraph
 import borg.trikeshed.lcnc.SqlGraph
+import borg.trikeshed.lib.*
 import borg.trikeshed.web.*
 import borg.trikeshed.web.patch.PatchKinds
 import kotlinx.browser.document
@@ -327,10 +328,33 @@ fun Panels.buildNode(n: dynamic) {
     })
 }
 
-/** LIST widget: rows of {col:value}; the param VALUE is the JSON array text; a drop target for dragged values. */
+/**
+ * LIST widget: rows of {col:value}; the param VALUE is the JSON array text; a drop target for dragged values.
+ * A live column ([LcncPortContract.LcncParamSpec.colsFrom]) is a picklist over its source's rows.
+ */
 private fun Panels.listWidget(n: dynamic, k: String, def: dynamic, refresh: (() -> Unit) -> Unit): dynamic {
     val spec = LcncPortContract.LcncParamSpec(
-        cols = arr(def.cols).map { str(it) }, colsParam = str(def.colsParam ?: ""))
+        cols = arr(def.cols).map { str(it) }, colsParam = str(def.colsParam ?: ""), optsFrom = str(def.optsFrom ?: ""))
+    // One page action reads a source for every widget declaring it: a page admits 64 actions and a council seats more lists.
+    val colsFrom = spec.colsFrom
+    val (read, vectors) = liveCols[spec.optsFrom] ?: run {
+        val vectors = mutableListOf<List<String>>()
+        val read = if (colsFrom.size == 0) null else page.submit {
+            try { colsFrom.view.map { livePicklist(it, null) }.takeIf { v -> v.all { it.size == v[0].size } }?.let(vectors::addAll) }
+            catch (e: CancellationException) { throw e } catch (e: dynamic) {}
+        }
+        (read j vectors).also { entry ->
+            if (read != null) { liveCols[spec.optsFrom] = entry; read.invokeOnCompletion { if (vectors.isEmpty()) liveCols.remove(spec.optsFrom) } }
+        }
+    }
+    /** The source rows where [row]'s first [width] live cells hold. */
+    fun where(cols: List<String>, row: dynamic, width: Int): List<Int> =
+        (vectors.firstOrNull()?.indices ?: IntRange.EMPTY).filter { at -> (0 until width).all { vectors[it][at] == str(row[cols[it]] ?: "") } }
+    fun put(row: dynamic, c: String, value: String) {
+        val descriptor = obj(); descriptor.value = value
+        descriptor.enumerable = true; descriptor.writable = true; descriptor.configurable = true
+        js("Object.defineProperty")(row, c, descriptor)
+    }
     val wrap = document.createElement("div").asDynamic(); wrap.className = "plist"
     val table = document.createElement("div").asDynamic(); wrap.appendChild(table)
     val details = document.createElement("details").asDynamic()
@@ -381,20 +405,36 @@ private fun Panels.listWidget(n: dynamic, k: String, def: dynamic, refresh: (() 
         head.appendChild(document.createElement("span")); table.appendChild(head)
         arr(rows).forEachIndexed { ri, row ->
             val r = document.createElement("div").asDynamic(); r.className = "plr"
-            for (c in cols) {
-                val input = document.createElement("input").asDynamic()
+            cols.forEachIndexed { ci, c ->
+                val live = ci < colsFrom.size
+                val input = document.createElement(if (live) "select" else "input").asDynamic()
                 val own = c in keysOf(row)
                 val textual = !own || typeOf(row[c]) == "string"
-                input.value = if (!own) "" else if (textual) row[c] else JSON.stringify(row[c])
+                val value = if (!own) "" else if (textual) str(row[c]) else JSON.stringify(row[c])
+                if (live) {
+                    // The options are the source rows where the cells before this one hold; any other value survives, marked stale.
+                    input.classList.add("live")
+                    val opts = if (ci < vectors.size) where(cols, row, ci).map { vectors[ci][it] }.distinct() else emptyList()
+                    for (o in (_l[""] + opts + value).distinct()) {
+                        val option = document.createElement("option").asDynamic()
+                        option.value = o; option.textContent = o.ifEmpty { "Choose $c…" }
+                        if (o.isNotEmpty() && o !in opts) option.dataset.stale = "1"
+                        input.appendChild(option)
+                    }
+                }
+                input.value = value
                 input.disabled = !textual
                 input.setAttribute("aria-label", "$k row ${ri + 1} $c")
                 if (!textual) input.title = "Non-text value preserved; edit JSON to change its type"
                 on(input, "input", {
                     val current = rowsOf()
-                    val descriptor = obj(); descriptor.value = input.value
-                    descriptor.enumerable = true; descriptor.writable = true; descriptor.configurable = true
-                    js("Object.defineProperty")(current[ri], c, descriptor)
+                    put(current[ri], c, str(input.value))
+                    // A live cell moves its row to the first source row where the cells through it hold; the live cells after it follow.
+                    if (live) where(cols, current[ri], ci + 1).firstOrNull()?.let { at ->
+                        for (cj in ci + 1 until vectors.size) put(current[ri], cols[cj], vectors[cj][at])
+                    }
                     commit(current)
+                    if (live) { paint(); table.querySelector("[aria-label='$k row ${ri + 1} $c']")?.focus() }
                 })
                 r.appendChild(input)
             }
@@ -440,6 +480,7 @@ private fun Panels.listWidget(n: dynamic, k: String, def: dynamic, refresh: (() 
     })
     refresh(paint)
     paint()
+    if (read?.isCompleted == false) read.invokeOnCompletion { paint() }
     return wrap
 }
 

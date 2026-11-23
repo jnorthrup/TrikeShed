@@ -1,0 +1,8 @@
+repo=hf://datasets/justicedao/american_municipal_law
+revision=44cdb8d3199cadd1f06d4da88facc5ea6798cd28
+subpath=municipal_laws_parquet_cid/STATE-TN*
+files=9
+bytes=16358951
+pulled=2026-11-22
+local=~/.local/share/TrikeShed/legal/justicedao/american_municipal_law
+visibility=public

@@ -16,6 +16,9 @@ typealias JevaQuestions = Map<String, JevaQuestion>
 /** Jev's finite judgments on Jeva's local Python API. Native null is the existing `none` outcome. */
 object Jeva {
     const val MODEL = "LIQIIIII/Jeva-4B"
+    /** The model schemas of a checkout and the mlnix of its sibling (`mlirNix.dir` in build.gradle.kts), from the working directory. */
+    const val SCHEMA = "utils/mlnix/model.nix"
+    const val MLNIX = "../mlir-nix/build/bin/mlnix"
     const val MAX_QUESTIONS = 200
     const val MAX_TEXT_CHARS = 1_048_576
     const val NONE = "none"

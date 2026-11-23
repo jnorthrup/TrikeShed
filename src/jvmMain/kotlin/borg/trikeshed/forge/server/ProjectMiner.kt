@@ -91,15 +91,16 @@ class ProjectMiner(
         }
         /** Markup read as its markup declares it ([borg.trikeshed.narsese.MarkupStreams]): no print, no OCR, no Tika. */
         val MARKUP = setOf("html", "htm", "xhtml")
-        /** Formats automatically offered for curation: PDF pages, markup, and other Tika inputs. */
+        /** Formats automatically offered for curation: PDF pages, markup, parquet columns, and other Tika inputs. */
         val MINEABLE = setOf(
             "pdf", "docx", "doc", "rtf", "odt", "pptx", "ppt", "xlsx", "epub",
             "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp",
-        ) + MARKUP
+        ) + MARKUP + "parquet"
     }
 
-    /** A document's text by its format: PDF pages by [PDF_ROUTE], markup by its declared structure, the rest through Tika. */
+    /** A document's text by its format: PDF pages by [PDF_ROUTE], markup by its declared structure, parquet by [ParquetText], the rest through Tika. */
     private suspend fun textOf(name: String, id: String, src: File, originalCid: ContentId): Pair<String?, List<DocumentAnchor>> = when (id.substringAfterLast('.', "").lowercase()) {
+        "parquet" -> ParquetText.of(src, conventionsOf(name, id)) to emptyList()
         "pdf" -> readPages(name, id, src, PDF_ROUTE, originalCid)?.let { b ->
             putTwin(name, id + FOOTNOTES_SUFFIX, borg.trikeshed.narsese.PageStreams.notesTsv(b.notes).encodeToByteArray(), "project-miner", "page-streams")
             val prefix = "# ${id.substringAfterLast('/')}\n\n"
@@ -113,6 +114,10 @@ class ProjectMiner(
         }
         else -> runCatching { JvmTikaIngestAdapter.extractToMarkdown(src.toPath()) }.getOrNull() to emptyList()
     }
+
+    /** The `key: value` conventions of a document's notes twin, read at extraction: what a format that names its own columns and rows is told by. */
+    fun conventionsOf(name: String, id: String): Map<String, String> =
+        registry.get(name)?.gateway?.getAttachment(id + ProjectNodes.NOTES_SUFFIX)?.second?.decodeToString()?.let(ProjectNodes::conventions).orEmpty()
 
     /**
      * Lands a twin beside a document the way the store keeps it: an upload scope through its upload
@@ -345,7 +350,7 @@ class ProjectMiner(
             if (body.isBlank()) return@withContext mapOf("verdict" to "no_text", "id" to id)
             putExtraction(name, id, source.contentId, sourceRev, body, anchors)
             mapOf("verdict" to "ingested", "id" to id, "chars" to body.length,
-                "route" to when { ext == "pdf" -> "pdf pages (${PDF_ROUTE.name.lowercase()})"; ext in MARKUP -> "markup"; else -> "tika" },
+                "route" to when { ext == "pdf" -> "pdf pages (${PDF_ROUTE.name.lowercase()})"; ext in MARKUP -> "markup"; ext == "parquet" -> "parquet columns"; else -> "tika" },
                 "ms" to (System.currentTimeMillis() - began))
         } finally { dir.deleteRecursively() }
     } }

@@ -373,7 +373,7 @@ body.pointer,body.pointer *{cursor:none!important}
 /* the LIST widget: rows of typed columns; a drop target for dragged values */
 .plist{border:1px solid var(--line);border-radius:4px;padding:4px;background:var(--bg)}
 .plist .plr{display:flex;gap:4px;margin:2px 0;align-items:center}
-.plist .plr input{flex:1;min-width:0}
+.plist .plr :is(input,select){flex:1;min-width:0}
 .plist .plh span{flex:1;font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
 .plist .plr s{cursor:pointer;color:var(--err);text-decoration:none;padding:0 3px}
 .plist .pladd{cursor:pointer;color:var(--ok);font-size:10px;padding:2px 4px}

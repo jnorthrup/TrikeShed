@@ -11,22 +11,31 @@ import kotlin.math.*
 
 /**
  * The curator scope as a law library in perspective. Each project is a shelf unit with its ladder, the
- * units stepping back in depth; each book stands on its shelf as a book, and close up is a circle packed with
- * its sections (each a circle of its statements) and the documents it cites, those filed in its `<book>.<x>/`
- * folder, so a document's references stand inside it rather than beside it; the shared SUMO concept pool is its own unit, a circle of class
- * circles holding concept stars sized by how much of the text rests on them. A book opens toward the
- * camera and fans its sections out as pages carrying what curation read; it closes back onto its shelf.
+ * units stepping back in depth; each book stands on its shelf as a book, and stays one at any zoom until the operator
+ * opens it. Opened, it is a circle packed with its sections (each a circle of its statements) and the documents it
+ * cites, those filed in its `<book>.<x>/` folder, so a document's references stand inside it rather than beside it;
+ * the shared SUMO concept pool is its own unit, opened a circle of class circles holding concept stars sized by how
+ * much of the text rests on them. A section opens its book toward the camera to be read: the sections fan out as
+ * pages carrying what curation read, and the book closes back onto its shelf.
  * The wood of the shelves never hides a book: the books stand flush with the front of their bay and the wood is painted
  * before everything else (see [Bay]).
- * Relations are thin bundles routed through the hierarchy (Holten's hierarchical edge bundling): between
- * shelves as aggregates, per statement only for the node in hand, past the snap depth, or while fresh.
  *
- * Level of detail is one rule: a circle splits into its children once its screen radius reaches the
- * median book's at the snap zoom [snapPercent]; circles under a pixel are carried by their container.
+ * Relations are told by where the circles stand before they are drawn. [layout] takes the top circles off their
+ * shelves and places them by the relations between them ([Layout], [DistanceMapping]); the relations that count are
+ * the kinds switched on in the tally row (cites, conflicts, shared, reads). A relation is drawn as a straight line
+ * between two circles. The lines drawn are the layout's own links between the top circles, under them, and the
+ * relations of the circle in hand, over them: each from the circle in hand to the circle that carries its other end.
+ * A closed book carries everything in it and an opened one hands the end to the circle drawn for it, so opening a
+ * circle refines the lines that reach it and closing it gathers them; a part of the circle in hand, taken in hand,
+ * refines the near end.
+ *
+ * Inside an opened circle, level of detail is one rule: a circle splits into its children once they are as large on
+ * screen as the median book's sections are at the snap zoom [snapPercent]; circles under a pixel are carried by their
+ * container.
  *
  * Platform adapters feed [drain] with `/api/lcnc/trail` values, [shelve] with each project's documents
  * and [read] with `/api/curation/section` values for [wanted]; they route input to [pan]/[wheel]/[pick]/
- * [select]/[turn] and draw [frame]'s plan. The camera follows a run only while it is producing and the
+ * [select]/[turn]/[back] and draw [frame]'s plan. The camera follows a run only while it is producing and the
  * operator has not touched the camera since that production began; a finished run never pulls it.
  */
 class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
@@ -36,7 +45,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     var followRun = -1
     var selected = -1
     var hovered = -1
-    /** Snap depth on the [zoomPercent] scale: at this zoom the median book splits into its sections. */
+    /** Snap depth on the [zoomPercent] scale: inside an opened circle, a circle splits once its children are as large on screen as the median book's sections are at this zoom. */
     var snapPercent = 50.0
     /** The current zoom on the detail scale (log of [LandscapeNavigation.minZoom]..[LandscapeNavigation.detailZoom], 0..100). */
     val zoomPercent: Double get() = percentOf(zoom)
@@ -66,16 +75,19 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         return min(evHead, cap.toLong()).toInt() j { (head - 1 - it) and (cap - 1) }
     }
 
-    // ── relations: statement → concept by role or force, section → section by citation or conflict ──
+    // ── relations: statement → concept by role or force, section → section by citation or conflict, statement → the statement another book stated first ──
     private val linkFrom = IntColumn(); private val linkTo = IntColumn(); private val linkLabel = ArrayList<String>()
-    private val linkAt = DoubleColumn()
+    /** Per relation: its kind ([CITES], [CONFLICT], [SHARED], [READS]); parsed at intake, never in the frame loop. */
+    private val linkKind = IntColumn()
+    /** Relations by kind, counted as they arrive. */
+    private val related = IntArray(4)
     /** Per node, how many relations touch it: a concept's degree is how much of the text rests on it. */
     private val degree = IntColumn()
     /** Sections on either side of a conflict. */
     private val conflicted = HashSet<Int>()
     /** Between two top circles (book or pool, low ordinal first): counts by [CITES], [CONFLICT], [SHARED], [READS]. */
     private val bundles = HashMap<Long, IntArray>()
-    /** Statement text → the book that first stated it; a second book stating it shares it. */
+    /** Statement text → the statement that first stated it; a second book stating it shares it. */
     private val statedIn = HashMap<String, Int>()
 
     var cursor = 0L; private set
@@ -123,6 +135,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         val run = value["run"] as? List<*> ?: emptyList<Any>()
         val node = value["node"] as? List<*> ?: emptyList<Any>()
         val note = value["note"] as? List<*> ?: emptyList<Any>()
+        val links = linkFrom.n
         for (i in t.indices) {
             val at = num(t[i]) + offset; val k = num(kind[i]).toInt(); val r = num(run[i]).toInt(); val n = num(node[i]).toInt()
             val s = evHead.toInt() and (cap - 1)
@@ -135,22 +148,17 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 val note0 = note[i]?.toString() ?: continue
                 val to = note0.substringBefore('|').toIntOrNull()?.takeIf { it in 0 until keys.size } ?: continue
                 val label = note0.substringAfter('|')
-                linkFrom.add(n); linkTo.add(to); linkLabel.add(label); linkAt.add(at)
                 degree[n] = degree[n] + 1; degree[to] = degree[to] + 1
                 if (lastBegin[to] < at) lastBegin[to] = at
-                val a = top(n); val b = top(to)
-                when {
-                    label.startsWith("conflict") -> { conflicted.add(n); conflicted.add(to); if (a != b) bundle(a, b)[CONFLICT]++ }
-                    label == "cites" -> if (a != b) bundle(a, b)[CITES]++
-                    types[to] == "concept" && a != b -> bundle(a, b)[READS]++
-                }
+                if (label.startsWith("conflict")) { conflicted.add(n); conflicted.add(to) }
+                relate(n, to, label, when { label.startsWith("conflict") -> CONFLICT; label == "cites" -> CITES; else -> READS })
                 continue
             }
             lastKind[n] = k
             note[i]?.let { text ->
                 if (lastNote[n] == null && types[n] == "book.statement") {
-                    val b = top(n); val first = statedIn.getOrPut(text.toString()) { b }
-                    if (first != b) bundle(first, b)[SHARED]++
+                    val first = statedIn.getOrPut(text.toString()) { n }
+                    if (top(first) != top(n)) relate(n, first, BUNDLE_NAMES[SHARED], SHARED)
                 }
                 lastNote[n] = text.toString()
                 forces[n] = FORCES.indexOf(text.toString().split(" · ").getOrNull(1))
@@ -169,25 +177,31 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         dropped += (value["dropped"] as? Number)?.toLong() ?: 0L
         lastDrained = t.size
         if (t.isNotEmpty() || nk.isNotEmpty()) { panelValue = null; count() }
-        if (keys.size != laidOut) layout()
+        if (keys.size != laidOut) layOut() else if (linkFrom.n != links && layout != Layout.SHELF) arrange()
+    }
+
+    /** Records a relation of [kind] from [n] to [to], and counts it between their books (or the pool) when those differ. */
+    private fun relate(n: Int, to: Int, label: String, kind: Int) {
+        linkFrom.add(n); linkTo.add(to); linkLabel.add(label); linkKind.add(kind); related[kind]++
+        val a = top(n); val b = top(to)
+        if (a != b) bundle(a, b)[kind]++
     }
 
     /** Statements by force (must, must-not, may, presumed), then statements, concepts, sections: counted per drain, not per frame. */
     private val tally = IntArray(7)
-    /** Categories masked out of the scope, one bit per tally ([FORCES] ordinals, [CONCEPTS], [SECTIONS], [RELATIONS]). */
+    /** Categories masked out of the scope, one bit per tally ([FORCES] ordinals, [CONCEPTS], [SECTIONS], [KINDS] + a relation's kind). */
     var hidden = 0
     private val toggles = ArrayList<Join<Int, Rect>>()
-    /** Looms opened to their strands, by key (`b` bundle predicate × 2 + concept pool, `r` relation label), where each stood last frame, their click targets and bands. */
-    private val loomsOpen = HashSet<String>(); private val loomAt = HashMap<String, Vec3>()
-    private val loomHits = ArrayList<Join<Rect, () -> Unit>>(); private val loomRects = ArrayList<Rect>()
-    /** Two nodes a loom row asked the camera to frame together. */
-    private var both = IntArray(0)
 
-    /** Flips the category whose tally is under ([sx], [sy]), or closes the open book at its close box; false when neither is there. */
+    /** Flips the category whose tally is under ([sx], [sy]), or closes the book being read at its close box; false when neither is there. */
     fun toggle(sx: Double, sy: Double): Boolean {
         closer?.let { if (it.contains(Vec3(sx, sy))) { selected = -1; close(); return true } }
-        for (t in toggles) if (t.b.contains(Vec3(sx, sy))) { hidden = hidden xor (1 shl t.a); return true }
-        for (h in loomHits) if (h.a.contains(Vec3(sx, sy))) { h.b.invoke(); return true }
+        for (t in toggles) if (t.b.contains(Vec3(sx, sy))) {
+            hidden = hidden xor (1 shl t.a)
+            // The kinds switched on are the edges of the layout.
+            if (t.a >= KINDS) arrange()
+            return true
+        }
         return false
     }
     private var closer: Rect? = null
@@ -214,10 +228,13 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         panelValue = null
         trailHead = -1L
         keys.clear(); keyIndex.clear(); types.clear(); lastNote.clear(); linkLabel.clear(); conflicted.clear(); bundles.clear(); statedIn.clear()
-        names = SegmentIndex(); target = -1; up = IntArray(0)
+        names = SegmentIndex(); aimed = IntArray(0); up = IntArray(0)
+        // The library stands empty until the next layout: no circle of the old ring is drawn, carried over or picked.
+        units.clear(); tops = IntArray(0); disc = IntArray(0); topOf = IntArray(0); mapping = null; opened.clear()
+        related.fill(0); lineN.clear(); lineAt = IntArray(0); linesAt = 0
         readings.clear(); asked.clear(); pageLines.clear()
-        for (c in listOf(born, lastBegin, lastEnd, activeSince, spent, linkAt)) c.reset()
-        for (c in listOf(parents, runs, lastKind, forces, degree, linkFrom, linkTo)) c.reset()
+        for (c in listOf(born, lastBegin, lastEnd, activeSince, spent)) c.reset()
+        for (c in listOf(parents, runs, lastKind, forces, degree, linkFrom, linkTo, linkKind, lineTo)) c.reset()
 
         evHead = 0; cursor = 0; laidOut = 0; if (renewed) fitted = false; lastRun = -1; lastEventAt = -1e18; burstFrom = -1e18; selected = -1; hovered = -1; runNames = emptyList()
         open = -1; closing = -1; page = 0
@@ -233,8 +250,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     // ── the finding aids: a name index, the ordered contents, a triple-pattern query, and goto ──
     /** Every named node (book, section, class, concept) keyed by [nameKey]: name order, then ring order. */
     private var names = SegmentIndex()
-    /** The node the camera is easing onto after [goto]; -1 when none. */
-    private var target = -1
+    /** The circles [aim] eases the camera onto: the one [goto] named, or every top circle after a change of [layout]. Empty: the book being read, else the production. */
+    private var aimed = IntArray(0)
 
     private fun name(i: Int): String = if (isBook(i)) bookName(i).substringAfterLast('/') else keys[i].substringAfterLast('/')
 
@@ -302,14 +319,18 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         return out
     }
 
-    /** Takes the camera to [i]: a statement or section opens its book at that page, anything else is framed. */
+    /** Takes the camera to [i]: a statement or section opens its book to be read at that page; anything else is framed, the books (or the pool) around it opened. */
     fun goto(i: Int) {
         if (i !in keys.indices) return
         pinned = true; touched = now
         when (types[i]) {
             "book.statement" -> { select(parents[i]); selected = i }
             "book.section" -> select(i)
-            else -> { if (!isBook(i)) close(); select(i); target = if (isBook(i)) -1 else i; aim = true }
+            else -> {
+                close()
+                for (n in chain(i)) if (isBook(n) || isPool(n)) opened.add(n)
+                selected = i; aimed = _a[i]; aim = true
+            }
         }
     }
 
@@ -340,9 +361,18 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         "presumed" -> Rgba(150, 160, 180); else -> Rgba(206, 214, 226)
     }
 
-    // ── layout: circles packed bottom-up, then top circles stood on their units' shelves ──
+    // ── layout: circles packed bottom-up, then the top circles placed: stood on their units' shelves, or by the relations between them ──
+    /** Where the top circles stand; a change moves them to their new places, and the camera to frame them. */
+    var layout = Layout.SHELF
+        set(value) {
+            if (field == value) return
+            field = value
+            close(); arrange(); aimed = tops; aim = true
+        }
     /** Per node: its container circle ([TOP] for a book or the pool, [UNPLACED] outside the library). */
     private var disc = IntArray(0)
+    /** Per node: the top circle around it (itself for a top circle); -1 outside the library. */
+    private var topOf = IntArray(0)
     /** Per node: the circle holding it ([holder]): its ring parent, or the book whose folder (`<book>.<x>/`) files it. */
     private var up = IntArray(0)
     /** Per node: its center, relative to its container's (absolute for a top circle), and its radius. */
@@ -350,18 +380,25 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     private var kidStart = IntArray(1); private var kidList = IntArray(0)
     /** One shelving bay per project, and one for the concept pool. */
     private val units = ArrayList<Bay>()
-    private var unitOf = HashMap<Int, Int>()
+    /** The top circles in shelf order, and the place the layout gives each ([arrange]); [ox], [oy] and [oz] step there ([place]). */
+    private var tops = IntArray(0)
+    private var tx = DoubleArray(0); private var ty = DoubleArray(0); private var tz = DoubleArray(0)
+    /** Off the shelf: the top circles (each its index in [tops]) placed by the relations between them, and per edge its relations by kind. */
+    private var mapping: DistanceMapping? = null
+    private var edges: Series<IntArray> = emptySeriesOf()
+    /** True while top circles are on their way to their places; the force layout's temperature. */
+    private var moving = false
+    private var temp = 0.0
     /** The median book's radius and its sections' mean radius: the reference the snap depth speaks of. */
     private var refR = 100.0
     private var refKid = 10.0
     /** Per node: the mean radius of the circles packed in it. */
     private var meanKid = DoubleArray(0)
     private var maxConcept = 1
-    private var apex = Vec3.ZERO
 
     private fun kidCount(i: Int) = kidStart[i + 1] - kidStart[i]
 
-    private fun layout() {
+    private fun layOut() {
         panelValue = null
         val n = keys.size
         // A book filed in another book's folder (`<book>.<x>/…`) is a document that book cites: it stands inside it.
@@ -374,6 +411,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         for (i in 0 until n) kidStart[i + 1] += kidStart[i]
         kidList = IntArray(kidStart[n]); val fill = kidStart.copyOf()
         for (i in 0 until n) { val p = up[i]; if (p >= 0) kidList[fill[p]++] = i }
+        // Where the top circles stood: they go to their new places from there.
+        val was = disc; val wx = ox; val wy = oy; val wz = oz
         disc = IntArray(n) { UNPLACED }; meanKid = DoubleArray(n); ox = DoubleArray(n); oy = DoubleArray(n); oz = DoubleArray(n); rad = DoubleArray(n)
         /** Packs [members] (radii already in [rad]) inside [container], centers relative to it. */
         fun pack(container: Int, members: IntArray) {
@@ -385,7 +424,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             meanKid[container] = if (members.isEmpty()) 0.0 else members.sumOf { rad[it] } / members.size
         }
         fun kids(i: Int) = IntArray(kidCount(i)) { kidList[kidStart[i] + it] }
-        val tops = ArrayList<Int>()
+        val roots = ArrayList<Int>()
         maxConcept = 1
         // Deepest first: a cited document is packed before the book that cites it, and packs into it beside its sections.
         for (i in (0 until n).filter(::isBook).sortedByDescending { b -> bookName(b).count { it == '/' } }) {
@@ -396,7 +435,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 pack(s, st)
             }
             pack(i, sections + kids(i).filter(::isBook).toIntArray())
-            if (up[i] == parents[i]) tops.add(i)
+            if (up[i] == parents[i]) roots.add(i)
         }
         for (i in 0 until n) if (isPool(i)) {
             val classes = kids(i).filter { types[it] == "scope" }.toIntArray()
@@ -405,27 +444,82 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 for (a in atoms) { rad[a] = STAR * sqrt(1.0 + degree[a]); maxConcept = max(maxConcept, degree[a]) }
                 pack(c, atoms)
             }
-            pack(i, classes); tops.add(i)
+            pack(i, classes); roots.add(i)
         }
-        for (t in tops) disc[t] = TOP
-        tops.filter(::isBook).sortedBy { rad[it] }.let { m -> if (m.isNotEmpty()) { refR = rad[m[m.size / 2]]; refKid = meanKid[m[m.size / 2]] } }
+        for (t in roots) disc[t] = TOP
+        topOf = IntArray(n) { var t = it; while (disc[t] >= 0) t = disc[t]; if (disc[t] == TOP) t else -1 }
+        roots.filter(::isBook).sortedBy { rad[it] }.let { m -> if (m.isNotEmpty()) { refR = rad[m[m.size / 2]]; refKid = meanKid[m[m.size / 2]] } }
         // Units: one per project (books not yet shelved share one), the concept pool last.
         val byUnit = LinkedHashMap<String, MutableList<Int>>()
-        for (t in tops.filter(::isBook).sortedBy { shelfOf[bookName(it)] ?: "\uFFFF" })
+        for (t in roots.filter(::isBook).sortedBy { shelfOf[bookName(it)] ?: "\uFFFF" })
             byUnit.getOrPut(shelfOf[bookName(t)] ?: "unshelved") { ArrayList() }.add(t)
-        tops.filter(::isPool).forEach { byUnit.getOrPut("concepts") { ArrayList() }.add(it) }
-        units.clear(); unitOf = HashMap()
-        val maxR = tops.maxOfOrNull { rad[it] } ?: 100.0
-        var left = 0.0
-        for ((name, discs) in byUnit) {
-            val u = Bay(name, discs.toIntArray()); val k = units.size
-            val at = u.stand({ rad[discs[it]] }, left, -k * maxR * 2.2)
-            for ((j, b) in discs.withIndex()) { ox[b] = at[j].x; oy[b] = at[j].y; oz[b] = at[j].z; unitOf[b] = k }
-            units.add(u); left = u.x1 + maxR * .6
-        }
-        apex = Vec3(left / 2, (units.maxOfOrNull { it.h } ?: 0.0) * 1.35, units.map { it.z }.average().takeIf { it.isFinite() } ?: 0.0)
+        roots.filter(::isPool).forEach { byUnit.getOrPut("concepts") { ArrayList() }.add(it) }
+        units.clear()
+        for ((name, discs) in byUnit) units.add(Bay(name, discs.toIntArray()))
+        tops = IntArray(roots.size).also { var s = 0; for (u in units) for (b in u.discs) it[s++] = b }
+        val stood = BooleanArray(tops.size) { val t = tops[it]; t < was.size && was[t] == TOP }
+        for ((s, t) in tops.withIndex()) if (stood[s]) { ox[t] = wx[t]; oy[t] = wy[t]; oz[t] = wz[t] }
+        arrange()
+        // A circle that stood nowhere yet appears at its place; the force layout takes it in from the origin.
+        if (layout != Layout.FORCE) for ((s, t) in tops.withIndex()) if (!stood[s]) { ox[t] = tx[s]; oy[t] = ty[s]; oz[t] = tz[s] }
         laidOut = keys.size
-        if (!fitted && tops.isNotEmpty()) { fitted = true; fitAll() }
+        if (!fitted && tops.isNotEmpty()) { fitted = true; place(1.0); fitAll() }
+    }
+
+    /**
+     * The place of every top circle: on its bay's shelf, or off the shelves in the plane z = 0 where the relations
+     * switched on put it ([DistanceMapping]). Two top circles share an edge when a relation of a kind switched on
+     * runs between them, as heavy as the logs of its kinds' counts.
+     */
+    private fun arrange() {
+        if (tx.size != tops.size) { tx = DoubleArray(tops.size); ty = DoubleArray(tops.size); tz = DoubleArray(tops.size) }
+        val maxR = tops.maxOfOrNull { rad[it] } ?: 100.0
+        var left = 0.0; var s = 0
+        for ((k, u) in units.withIndex()) {
+            for (p in u.stand({ rad[u.discs[it]] }, left, -k * maxR * 2.2)) { tx[s] = p.x; ty[s] = p.y; tz[s] = p.z; s++ }
+            left = u.x1 + maxR * .6
+        }
+        mapping = null; edges = emptySeriesOf(); moving = true
+        if (layout == Layout.SHELF) return
+        val slot = IntArray(disc.size) { -1 }
+        for ((j, t) in tops.withIndex()) slot[t] = j
+        val pairs = HashMap<Long, IntArray>()
+        for ((pair, n) in bundles) {
+            val a = topOf[(pair ushr 32).toInt()]; val b = topOf[(pair and 0xffffffffL).toInt()]
+            if (a < 0 || b < 0 || a == b) continue
+            val sum = pairs.getOrPut(min(slot[a], slot[b]).toLong() shl 32 or max(slot[a], slot[b]).toLong()) { IntArray(4) }
+            for (k in 0 until 4) if (hidden and (1 shl (KINDS + k)) == 0) sum[k] += n[k]
+        }
+        // In pair order, so the same relations give the same places.
+        val on = pairs.keys.filter { pair -> pairs[pair]!!.any { it > 0 } }.sorted()
+        edges = on.map { pairs[it]!! }.toSeries()
+        val m = DistanceMapping(DoubleArray(tops.size) { rad[tops[it]] }, IntArray(on.size) { (on[it] ushr 32).toInt() },
+            IntArray(on.size) { (on[it] and 0xffffffffL).toInt() }, DoubleArray(on.size) { e -> edges[e].sumOf { ln(1.0 + it) } }, refR * CLEAR)
+        val aspect = viewport.width / max(1.0, viewport.height - HUD)
+        when (layout) {
+            Layout.TREE -> m.tree(aspect)
+            Layout.RADIAL -> m.radial(aspect)
+            else -> { for ((j, t) in tops.withIndex()) { m.x[j] = ox[t]; m.y[j] = oy[t] }; temp = max(temp, WARM) }
+        }
+        for (j in tops.indices) { tx[j] = m.x[j]; ty[j] = m.y[j]; tz[j] = 0.0 }
+        mapping = m
+    }
+
+    /** Each top circle a step ([q] = 1: all the way) to its place. The force layout moves them in its own way: a step of its model while it is warm. */
+    private fun place(q: Double) {
+        val m = mapping
+        if (layout == Layout.FORCE && m != null) {
+            if (temp >= COLD) { m.step(temp); temp *= COOLING }
+            for ((s, t) in tops.withIndex()) { ox[t] = m.x[s]; oy[t] = m.y[s]; oz[t] += (tz[s] - oz[t]) * q }
+            moving = temp >= SETTLED
+            return
+        }
+        var far = false
+        for ((s, t) in tops.withIndex()) {
+            ox[t] += (tx[s] - ox[t]) * q; oy[t] += (ty[s] - oy[t]) * q; oz[t] += (tz[s] - oz[t]) * q
+            if (abs(tx[s] - ox[t]) + abs(ty[s] - oy[t]) + abs(tz[s] - oz[t]) > refR * 1e-3) far = true
+        }
+        moving = far
     }
 
     private fun bookName(i: Int) = keys[i].removePrefix("book.curate/")
@@ -456,14 +550,16 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         return doubleArrayOf((x0 + x1) / 2, (y0 + y1) / 2, z.coerceIn(LandscapeNavigation.minZoom, DEEPEST), near)
     }
 
-    // ── an opened book: lifted toward the camera, its sections fanned out as pages ──
-    /** The open book, the one closing (animating back onto its shelf), and the section on the right-hand page. */
+    // ── opening: a book or the pool into its circles, where it stands; a book to be read, lifted toward the camera, its sections fanned out as pages ──
+    /** The books and the concept pool the operator opened into their circles, in the order opened. A closed one stands whole at any zoom. */
+    private val opened = LinkedHashSet<Int>()
+    /** The book being read, the one closing (animating back onto its shelf), and the section on the right-hand page. */
     var open = -1; private set
     private var closing = -1
     var page = 0; private set
     private var openedAt = -1e18; private var closedAt = -1e18
     private var leaves = IntArray(0)
-    /** While true the camera eases once onto the open book (or the production, after [follow]); it stops on
+    /** While true the camera eases once onto [aimed], the book being read, or the production (after [follow]); it stops on
      *  arrival or at operator input. */
     private var aim = false
 
@@ -472,22 +568,35 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         val u = t.coerceIn(0.0, 1.0); return 1 - (1 - u).pow(3)
     }
 
-    /** Selects [i]: a book opens, a section opens its book at that page; anything else is only selected. */
+    /** A book or the pool that the operator has not opened. */
+    private fun shut(i: Int) = (isBook(i) || isPool(i)) && i !in opened
+
+    /** The outermost shut book (or the shut pool) around [i], which stands for [i] while it is whole; [i] itself when all of them are opened. */
+    private fun whole(i: Int): Int = chain(i).lastOrNull(::shut) ?: i
+
+    /** Selects [i]: a book or the pool opens into its circles where it stands, or opened closes; a section opens its book to be read at that page; anything else is only selected. */
     fun select(i: Int) {
         selected = i
         if (i !in keys.indices) return
-        val book = when { isBook(i) -> i; types[i] == "book.section" && parents[i] >= 0 && isBook(parents[i]) -> parents[i]; else -> return }
+        if (isBook(i) || isPool(i)) {
+            close()
+            if (!opened.remove(i)) opened.add(i)
+            return
+        }
+        val book = if (types[i] == "book.section" && parents[i] >= 0 && isBook(parents[i])) parents[i] else return
         if (book != open) {
             if (open >= 0) { closing = open; closedAt = now }
             open = book; openedAt = now
             leaves = IntArray(kidCount(book)) { kidList[kidStart[book] + it] }.filter { types[it] == "book.section" }.toIntArray()
-            page = 0
         }
-        if (i != book) page = leaves.indexOf(i).coerceAtLeast(0)
+        page = leaves.indexOf(i).coerceAtLeast(0)
         aim = true
     }
 
-    /** Closes the open book back onto its shelf. */
+    /** Closes the book being read, else the circle opened last. */
+    fun back() { if (open >= 0) close() else opened.lastOrNull()?.let(opened::remove) }
+
+    /** Closes the book being read back onto its shelf. */
     fun close() { if (open < 0) return; closing = open; closedAt = now; open = -1; aim = false }
 
     /** Turns [spreads] two-page spreads forward (negative: back). */
@@ -624,13 +733,15 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     // ── what the last frame drew, for picking: circles (screen center, radius) and pages (screen quads) ──
     private var drawnId = IntArray(4096); private var drawnX = DoubleArray(4096); private var drawnY = DoubleArray(4096); private var drawnR = DoubleArray(4096)
     private var drawn = 0
-    /** Node ordinals already index the ring; relation visibility needs no per-frame hash table. */
-    private var shown = BooleanArray(0)
+    /** Per node: one more than its place among the circles drawn, 0 when it was not drawn. Node ordinals already index the ring; a relation finds the circles that carry its ends without a per-frame hash table. */
+    private var shown = IntArray(0)
+    /** What the circles drawn come to, in order: when it changes, the lines of the circle in hand are counted again. */
+    private var shownSum = 0
     private val drawnPages = ArrayList<Join<Int, Rect>>()
     private fun mark(i: Int, p: Vec3, r: Double) {
         if (drawn == drawnId.size) { drawnId = drawnId.copyOf(drawn * 2); drawnX = drawnX.copyOf(drawn * 2); drawnY = drawnY.copyOf(drawn * 2); drawnR = drawnR.copyOf(drawn * 2) }
-        shown[i] = true
         drawnId[drawn] = i; drawnX[drawn] = p.x; drawnY[drawn] = p.y; drawnR[drawn] = r; drawn++
+        shown[i] = drawn; shownSum = shownSum * 31 + i
     }
 
     /** The node under screen point ([sx], [sy]): a page of the open book, else the smallest circle drawn there, or -1. */
@@ -679,44 +790,53 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         return out
     }
 
-    /** The top of a shelf unit, where bundles between shelves gather. */
-    private fun unitTop(u: Bay) = Vec3((u.x0 + u.x1) / 2, u.h, u.z + u.d / 2)
-
-    /** Holten's hierarchical route from [a] to [b]: up through their containers to the least common one
-     *  (or across shelf tops and the library's apex), straightened by [BUNDLE]. World control points. */
-    private fun route(a: Int, b: Int): List<Vec3> {
-        val ca = chain(a); val cb = chain(b)
-        if (ca.isEmpty() || cb.isEmpty()) return emptyList()
-        val pts = ArrayList<Vec3>()
-        if (ca.last() == cb.last()) {
-            var ia = ca.size - 1; var ib = cb.size - 1
-            while (ia > 0 && ib > 0 && ca[ia - 1] == cb[ib - 1]) { ia--; ib-- }
-            for (k in 0..ia) pts.add(center(ca[k])!!)
-            for (k in ib - 1 downTo 0) pts.add(center(cb[k])!!)
-        } else {
-            for (n in ca) pts.add(center(n)!!)
-            val ua = unitOf[ca.last()]; val ub = unitOf[cb.last()]
-            if (ua != null) pts.add(unitTop(units[ua]))
-            if (ua != ub) { pts.add(apex); if (ub != null) pts.add(unitTop(units[ub])) }
-            for (n in cb.asReversed()) pts.add(center(n)!!)
-        }
-        if (pts.size < 3) return pts
-        val p0 = pts.first(); val pn = pts.last()
-        return pts.mapIndexed { k, p -> p * BUNDLE + p0.lerp(pn, k / (pts.size - 1.0)) * (1 - BUNDLE) }
+    // ── relations as lines: from the circle in hand to the circle that carries the other end, counted per kind ──
+    /** The circle that carries [i] in this frame: itself when it is drawn, else the nearest circle around it that is, else its top circle; -1 outside the library. */
+    private fun carrier(i: Int): Int {
+        var n = i
+        while (shown[n] == 0 && disc[n] >= 0) n = disc[n]
+        return if (disc[n] == UNPLACED) -1 else n
     }
 
-    /** A clamped uniform cubic B-spline through [ctl], projected; points behind the eye are dropped. */
-    private fun spline(ctl: List<Vec3>, cam: GraphCamera): List<Vec3> {
-        if (ctl.size < 2) return emptyList()
-        val c = listOf(ctl.first(), ctl.first()) + ctl + listOf(ctl.last(), ctl.last())
-        val out = ArrayList<Vec3>()
-        for (s in 0 until c.size - 3) for (k in 0 until SPLINE) {
-            val t = k / SPLINE.toDouble(); val t2 = t * t; val t3 = t2 * t
-            val b0 = (1 - t).pow(3) / 6; val b1 = (3 * t3 - 6 * t2 + 4) / 6; val b2 = (-3 * t3 + 3 * t2 + 3 * t + 1) / 6; val b3 = t3 / 6
-            cam.project(c[s] * b0 + c[s + 1] * b1 + c[s + 2] * b2 + c[s + 3] * b3, viewport)?.let(out::add)
+    /** Whether [i] is [h] or stands inside it. */
+    private fun holds(h: Int, i: Int): Boolean {
+        var n = i
+        while (n >= 0) { if (n == h) return true; n = disc[n] }
+        return false
+    }
+
+    /** The lines of the circle in hand: the circle that carries the far end of each and, per line, its relations by kind and then the last of them. */
+    private val lineTo = IntColumn(); private val lineN = ArrayList<IntArray>()
+    /** Per node: one more than its line among [lineTo], 0 where no line ends. */
+    private var lineAt = IntArray(0)
+    /** What the lines stand counted for: the circle in hand, the relations and their mask, the circles drawn. */
+    private var linesAt = 0
+
+    /**
+     * Counts every relation with one end in [hand] into the line from [hand] to the circle that carries its other end,
+     * unless the lines stand counted for [hand] and for what is drawn. A relation with both ends in [hand] is no line.
+     */
+    private fun gather(hand: Int) {
+        val at = ((hand * 31 + linkFrom.n) * 31 + hidden) * 31 + shownSum
+        if (at == linesAt) return
+        linesAt = at
+        for (j in 0 until lineTo.n) lineAt[lineTo[j]] = 0
+        lineTo.reset(); lineN.clear()
+        if (lineAt.size < disc.size) lineAt = IntArray(disc.size)
+        val top = topOf[hand]
+        for (l in 0 until linkFrom.n) {
+            val k = linkKind[l]
+            if (hidden and (1 shl (KINDS + k)) != 0) continue
+            val from = linkFrom[l]; val to = linkTo[l]
+            val near = topOf[from] == top && (hand == top || holds(hand, from))
+            if (near == (topOf[to] == top && (hand == top || holds(hand, to)))) continue
+            if (!visible(from) || !visible(to)) continue
+            val far = carrier(if (near) to else from)
+            if (far < 0) continue
+            if (lineAt[far] == 0) { lineTo.add(far); lineN.add(IntArray(5)); lineAt[far] = lineTo.n }
+            val n = lineN[lineAt[far] - 1]
+            n[k]++; n[4] = l
         }
-        cam.project(ctl.last(), viewport)?.let(out::add)
-        return out
     }
 
     /** Advances the camera to [localNow] and plans the frame. */
@@ -725,15 +845,18 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         now = max(now, localNow)
         glide()
         if (closing >= 0 && openness(closing) <= 0) closing = -1
-        if (!aim) { target = -1; both = IntArray(0) }
+        if (moving || layout == Layout.FORCE && temp >= COLD) place(1 - exp(-EASE))
+        if (!aim) aimed = IntArray(0)
         if (units.isNotEmpty() && (aim || following())) {
-            val focus = if (open >= 0) listOf(open) else if (both.isNotEmpty()) both.toList() else if (target >= 0) listOf(target) else trail(FOLLOW).view.map { if (types[it] == "book.statement") parents[it] else it }.filter { disc.getOrElse(it) { UNPLACED } != UNPLACED }
+            // The production is followed where it shows: inside an opened book at its sections, and for a book not opened at the bay it stands in.
+            val focus = if (open >= 0) listOf(open) else if (aimed.isNotEmpty()) aimed.toList() else trail(FOLLOW).view.map { if (types[it] == "book.statement") parents[it] else it }.filter { disc.getOrElse(it) { UNPLACED } != UNPLACED }
+                .flatMap { n -> whole(n).let { w -> units.firstOrNull { u -> shut(w) && w in u.discs }?.discs?.toList() ?: listOf(w) } }
                 .ifEmpty { if (aim) units.flatMap { it.discs.toList() } else emptyList() }
             if (focus.isNotEmpty()) {
                 val b = frameOf(focus)
                 val k = 1 - exp(-(EASE))
                 cx += (b[0] - cx) * k; cy += (b[1] - cy) * k; zoom *= (b[2] / zoom).pow(k); cz += (b[3] - cz) * k
-                if (aim && abs(ln(b[2] / zoom)) < .01 && hypot(b[0] - cx, b[1] - cy) * zoom < 1 && abs(b[3] - cz) * zoom < 1 && (open < 0 || openness(open) >= 1)) aim = false
+                if (aim && !moving && abs(ln(b[2] / zoom)) < .01 && hypot(b[0] - cx, b[1] - cy) * zoom < 1 && abs(b[3] - cz) * zoom < 1 && (open < 0 || openness(open) >= 1)) aim = false
             } else aim = false
         }
         val cam = camera(); val eye = cam.position; val f = focal()
@@ -741,14 +864,14 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         val items = ArrayList<Join<Double, DrawItem>>()
         /** The shelves' wood: painted before everything else of the scene (see [Bay]). */
         val timber = ArrayList<Join<Double, DrawItem>>()
+        /** The layout's own links: under every circle. */
+        val under = ArrayList<DrawItem>()
         val over = ArrayList<DrawItem>()
         val labels = ArrayList<DrawItem>()
-        /** Loom bands: over every path of the scene, open pages included, under all text. */
-        val plates = ArrayList<DrawItem>()
-        if (shown.size < nodes) shown = BooleanArray(nodes)
-        else for (k in 0 until drawn) shown[drawnId[k]] = false
-        drawn = 0; drawnPages.clear()
-        /** Children show once they would be as large on screen as a section is when the median book snaps. */
+        if (shown.size < nodes) shown = IntArray(nodes)
+        else for (k in 0 until drawn) shown[drawnId[k]] = 0
+        drawn = 0; shownSum = 0; drawnPages.clear()
+        /** Inside an opened circle, children show once they would be as large on screen as the median book's sections are at the snap zoom. */
         val split = max(MIN_SPLIT_PX, refKid * snap)
         /** Screen cells a circle's label already covers: a circle is labelled whenever its label lands on free cells. */
         val cols = (vp.width / CELL).toInt() + 1; val rows = (vp.height / CELL).toInt() + 1
@@ -784,9 +907,9 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 labels.add(DrawItem.Text(id, text, at, color, size, maxWidth = LABEL_W, font = if (mono) "monospace" else "sans-serif"))
         }
 
-        // Shelf units: posts, boards, back and ladder as lit solids; faces turned away are not drawn.
+        // Shelf units: posts, boards, back and ladder as lit solids; faces turned away are not drawn. Off the shelf there is no wood.
         val light = Vec3(-.35, .8, .5).normalized()
-        for ((k, u) in units.withIndex()) {
+        if (layout == Layout.SHELF) for ((k, u) in units.withIndex()) {
             val wood = if (u.name == "concepts") Rgba(52, 64, 86) else Rgba(92, 64, 40)
             val ladder = u.ladder
             for ((si, b) in u.solids().withIndex()) for (fi in 0..5) {
@@ -809,14 +932,14 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             }
         }
 
-        // Circles: a top circle and, where it is large enough on screen, its children, recursively.
+        // Circles: a top circle and, where it is opened and large enough on screen, its children, recursively.
         val maxDeg = max(1, maxConcept)
         fun circle(i: Int, c: Vec3, key: Double) {
             val p = cam.project(c, viewport)
             if (p == null) {
                 // Deep in, a large circle's center can fall behind the tilted eye while its children fill the view:
                 // walk on into the children that reach the view instead of dropping the whole circle.
-                if (kidCount(i) == 0 || hypot(c.x - cx, c.y - cy) > rad[i] + hypot(vp.width, vp.height) / zoom) return
+                if (kidCount(i) == 0 || shut(i) || hypot(c.x - cx, c.y - cy) > rad[i] + hypot(vp.width, vp.height) / zoom) return
                 for (k in kidStart[i] until kidStart[i + 1]) { val q = kidList[k]; if (disc[q] == i) circle(q, Vec3(c.x + ox[q], c.y + oy[q], c.z), key) }
                 return
             }
@@ -828,7 +951,9 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             val heat = heat(i)
             val hot = i == hovered || i == selected
             val kids = kidCount(i)
-            val splits = kids > 0 && meanKid[i] * f / p.z >= split && i != open
+            val book = isBook(i); val pool = isPool(i); val section = type == "book.section"
+            // A book and the pool split when the operator opened them; the circles inside split by their size on screen.
+            val splits = kids > 0 && i != open && if (book || pool) i in opened else meanKid[i] * f / p.z >= split
             val sides = (r * .8).toInt().coerceIn(8, 40)
             when (type) {
                 "concept" -> {
@@ -849,7 +974,6 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                     return
                 }
             }
-            val book = isBook(i); val pool = isPool(i); val section = type == "book.section"
             // A masked section draws nothing of its own; its statements still stand where it would.
             val bare = section && !visible(i)
             val base = when { book -> Rgba(96, 72, 44); pool -> Rgba(34, 52, 78); section -> Rgba(70, 60, 44); else -> Rgba(40, 62, 92) }
@@ -857,24 +981,21 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             val rim = when { hot -> Rgba(255, 255, 255); activeSince[i] >= 0 -> Rgba(255, 220, 120); i in conflicted -> Rgba(230, 80, 90, .8); else -> Rgba(lit.red + 30, lit.green + 30, lit.blue + 30, .55) }
             val cited = if (book) (kidStart[i] until kidStart[i + 1]).count { isBook(kidList[it]) } else 0
             if (book && !splits) {
-                // From a distance a book is a book: a cover standing on its board with its spine band and title plate,
-                // its corners rounding into the circle it opens into as it nears the size where its contents split out.
-                val near = if (kids > 0) (meanKid[i] * f / p.z / split).coerceIn(0.0, 1.0) else 0.0
-                val round = ((near - ROUNDING) / (1 - ROUNDING)).coerceIn(0.0, 1.0); val face = 1 - round
-                val hw = r * (COVER + (1 - COVER) * round); val hh = r * .97
+                // A book that is not opened is a book at any zoom: a cover standing on its board with its spine band and title plate.
+                val hw = r * COVER; val hh = r * .97
                 val tone = mix(leather(i), Rgba(240, 214, 150), heat * .6)
-                items.add(key j DrawItem.Path("d-$i", cover(p, hw, hh, round), fill = tone, stroke = rim, width = if (hot) 1.6 else .8))
-                if (activeSince[i] >= 0) items.add(key - .001 j DrawItem.Path("pulse-$i", cover(p, hw * 1.06, hh * 1.04, round), stroke = Rgba(255, 240, 200, .9), width = 1.4))
+                items.add(key j DrawItem.Path("d-$i", cover(p, hw, hh), fill = tone, stroke = rim, width = if (hot) 1.6 else .8))
+                if (activeSince[i] >= 0) items.add(key - .001 j DrawItem.Path("pulse-$i", cover(p, hw * 1.06, hh * 1.04), stroke = Rgba(255, 240, 200, .9), width = 1.4))
                 // The cover carries the document's own title, its first heading; hovered, the shelf reads its name and contents.
                 val title = (kidStart[i] until kidStart[i + 1]).firstOrNull { types[kidList[it]] == "book.section" }?.let { keys[kidList[it]].substringAfterLast('/') }
                     ?: name(i).substringBeforeLast('.')
-                if (face > 0 && hh >= 2) {
+                if (hh >= 2) {
                     items.add(key - .001 j DrawItem.Path("sp-$i", box(Rect(p.x - hw, p.y - hh, hw * .2, 2 * hh)),
-                        fill = Rgba(tone.red * 2 / 3, tone.green * 2 / 3, tone.blue * 2 / 3, face)))
+                        fill = Rgba(tone.red * 2 / 3, tone.green * 2 / 3, tone.blue * 2 / 3)))
                     for ((k, y) in doubleArrayOf(p.y - hh * .62, p.y + hh * .58).withIndex())
-                        items.add(key - .0011 j DrawItem.Path("rb-$i-$k", box(Rect(p.x - hw, y, hw * .2, max(.6, hh * .035))), fill = Rgba(226, 204, 150, .7 * face)))
+                        items.add(key - .0011 j DrawItem.Path("rb-$i-$k", box(Rect(p.x - hw, y, hw * .2, max(.6, hh * .035))), fill = Rgba(226, 204, 150, .7)))
                     val plate = Rect(p.x - hw * .66, p.y - hh * .6, hw * 1.52, hh * .62)
-                    items.add(key - .001 j DrawItem.Path("pl-$i", box(plate), fill = Rgba(232, 216, 176, .92 * face)))
+                    items.add(key - .001 j DrawItem.Path("pl-$i", box(plate), fill = Rgba(232, 216, 176, .92)))
                     // The title rides its plate where it is legible there; smaller, the plate stands for it, as on a far shelf.
                     val s = min(plate.height / 3.9, 14.0)
                     if (s >= TITLE_PX) {
@@ -977,135 +1098,61 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             over.add(DrawItem.Path("close-x2", s_[PathPart.Move(Vec3(x + s - 6, y + 6)), PathPart.Line(Vec3(x + 6, y + s - 6))], stroke = Rgba(240, 214, 150), width = 1.6))
         }
 
-        // Bundles between shelves: citations, conflicts, shared statements and readings as thin strands, woven through looms.
-        val relations = hidden and (1 shl RELATIONS) == 0
-        // Per-relation strands: for the node in hand, among what is split open on screen, or while fresh; one loom per predicate.
-        val focus = if (hovered >= 0) hovered else selected
-        var strands = 0
-        class Links(val tone: Rgba) { val says = ArrayList<String>(); val ls = IntColumn(); val pts = ArrayList<List<Vec3>>(); val alpha = ArrayList<Double>(); var sx = 0.0; var sy = 0.0 }
-        val byLabel = LinkedHashMap<String, Links>()
-        for (l in (if (relations) linkFrom.n - 1 else -1) downTo 0) {
-            if (strands >= LINKS) break
-            val a0 = linkFrom[l]; val b0 = linkTo[l]
-            if (!visible(a0) || !visible(b0)) continue
-            val fresh = exp(-(now - linkAt[l]) / GLOW_MS)
-            val focused = focus >= 0 && (a0 == focus || b0 == focus || parents[a0] == focus || parents[b0] == focus)
-            val visible = shown[a0] && shown[b0]
-            if (!focused && !visible && fresh < .35) continue
-            val ctl = route(a0, b0); if (ctl.size < 2) continue
-            val pts = spline(ctl, cam); if (pts.size < 3) continue
-            strands++
-            val label = linkLabel[l]
-            val tone = when { label.startsWith("conflict") -> BUNDLE_TONES[CONFLICT]; label == "cites" -> BUNDLE_TONES[CITES]; label == "subject" -> Rgba(120, 190, 240)
-                else -> forceColor(label.substringBefore(' ')) }
-            // One loom per predicate: conflicts, cites, subject, or the force a statement's modality names.
-            val predicate = when { label.startsWith("conflict") -> BUNDLE_NAMES[CONFLICT]; label == "cites" -> BUNDLE_NAMES[CITES]; else -> label.substringBefore(' ').substringBefore(':') }
-            val g = byLabel.getOrPut(predicate) { Links(tone) }; g.says.add(label)
-            val m = pts[pts.size / 2]
-            g.ls.add(l); g.pts.add(pts); g.alpha.add(if (focused) .55 else (.08 + .5 * fresh)); g.sx += m.x; g.sy += m.y
+        /** Circle [i] on screen: its center and, in z, its radius there; null behind the eye. */
+        fun spot(i: Int): Vec3? {
+            val k = shown[i] - 1
+            if (k >= 0) return Vec3(drawnX[k], drawnY[k], drawnR[k])
+            val p = cam.project(center(i) ?: return null, viewport) ?: return null
+            return Vec3(p.x, p.y, rad[i] * f / p.z)
         }
-        val links = byLabel.map { (label, g) ->
-            Warp("r$label", label, g.tone, Vec3(g.sx / g.ls.n, g.sy / g.ls.n)).also { w ->
-                for (k in 0 until g.ls.n) { w.threads.add(g.pts[k]); w.from.add(linkFrom[g.ls[k]]); w.to.add(linkTo[g.ls[k]]); w.weight.add(1); w.alpha.add(g.alpha[k]); w.says.add(g.says[k]) }
+        /** The relations counted in [n] between circles [a] and [b], as lines from rim to rim, a lane for each kind. One relation alone takes [tone]. */
+        fun tie(id: String, a: Int, b: Int, n: IntArray, tone: Rgba?, alpha: Double, out: MutableList<DrawItem>) {
+            val p = spot(a) ?: return; val q = spot(b) ?: return
+            val dx = q.x - p.x; val dy = q.y - p.y; val d = hypot(dx, dy)
+            if (d <= p.z + q.z) return
+            val ux = dx / d; val uy = dy / d
+            var lane = (1 - (0 until 4).count { n[it] > 0 }) / 2.0
+            for (k in 0 until 4) {
+                if (n[k] == 0) continue
+                val sx = -uy * lane * LANE; val sy = ux * lane * LANE; lane++
+                val c = tone ?: BUNDLE_TONES[k]
+                out.add(DrawItem.Path("$id-$k", s_[PathPart.Move(Vec3(p.x + ux * p.z + sx, p.y + uy * p.z + sy)), PathPart.Line(Vec3(q.x - ux * q.z + sx, q.y - uy * q.z + sy))],
+                    stroke = Rgba(c.red, c.green, c.blue, alpha), width = (.6 + .25 * ln(1.0 + n[k])).coerceAtMost(2.2)))
             }
         }
-        if (relations) {
-            loom(cam, over, plates, labels, links)
-            // Scene text under a loom band is dropped, not overprinted: text rides its own layer over every path.
-            labels.removeAll { t -> t is DrawItem.Text && !t.entityId.startsWith("lt-") && !t.entityId.startsWith("ln-") &&
-                Rect(t.position.x, t.position.y - t.size, min(t.maxWidth ?: 1e9, t.text.length * t.size * .56), t.size * 1.3).let { b -> loomRects.any { b.intersection(it) != null } } }
-        } else { loomHits.clear(); loomRects.clear() }
-        // The trail: the followed run's path, older segments fading.
-        val path = trail(TRAIL).view.mapNotNull { n -> center(n)?.let { cam.project(it, viewport) } }
+        // The layout's own links, under the circles: what each circle hangs from, the rings round each hub; the force layout shows every edge.
+        mapping?.let { m ->
+            for ((hub, radii) in m.rings) {
+                val c = center(tops[hub]) ?: continue
+                for ((d, radius) in radii.withIndex()) {
+                    val ring = ((0 until RING_POINTS).toSeries() α { k -> cam.project(Vec3(c.x + radius * cos(k * 2 * PI / RING_POINTS), c.y + radius * sin(k * 2 * PI / RING_POINTS), c.z), viewport) }).view.filterNotNull()
+                    if (ring.size == RING_POINTS) under.add(DrawItem.Path("ring-$hub-$d", (RING_POINTS + 1) j { k: Int -> if (k == RING_POINTS) PathPart.Close else if (k == 0) PathPart.Move(ring[0]) else PathPart.Line(ring[k]) },
+                        stroke = Rgba(120, 132, 150, .25), width = 1.0))
+                }
+            }
+            for (e in 0 until edges.size) if (layout == Layout.FORCE || m.link[e]) tie("e$e", tops[m.a[e]], tops[m.b[e]], edges[e], null, .4, under)
+        }
+        // The relations of the circle in hand, over the circles: each a line from it (from the circle that carries it) to the circle that carries the other end.
+        val hand = if (hovered >= 0) hovered else selected
+        if (hand in topOf.indices && topOf[hand] >= 0) {
+            gather(hand)
+            val near = carrier(hand)
+            for (j in 0 until lineTo.n) {
+                val n = lineN[j]
+                // A statement's one reading keeps the colour of what it says: its subject, or the force of its predicate.
+                val said = if (n[READS] == 1 && n[CITES] + n[CONFLICT] + n[SHARED] == 0) linkLabel[n[4]] else null
+                tie("r$j", near, lineTo[j], n, said?.let { if (it == "subject") Rgba(120, 190, 240) else forceColor(it.substringBefore(' ')) }, .55, over)
+            }
+        }
+        // The trail: the followed run's path between the circles that stand for its steps, older segments fading.
+        val path = trail(TRAIL).view.mapNotNull { n -> center(whole(n))?.let { cam.project(it, viewport) } }
         for (k in 1 until path.size) {
             val age = (path.size - k).toDouble() / path.size
             over.add(DrawItem.Path("trail-$k", s_[PathPart.Move(path[k - 1]), PathPart.Line(path[k])],
                 stroke = Rgba(255, 214, 120, (0.7 * (1 - age)).coerceIn(.06, .7)), width = 1.2))
         }
         spikes(over, labels)
-        return FramePlan(viewport, (timber.sortedByDescending { it.a }.map { it.b } + items.sortedByDescending { it.a }.map { it.b } + over + plates + labels).toSeries(), Rgba(11, 14, 20))
-    }
-
-    // ── the looms: every strand drawn between two places passes a [WireLoom] band, one per predicate ──
-    /** One loom's warp: its strands (projected, with their ends and weight), where it stands, and what its rows read. */
-    private class Warp(val key: String, val title: String, val tone: Rgba, val anchor: Vec3) {
-        val threads = ArrayList<List<Vec3>>(); val from = IntColumn(); val to = IntColumn(); val says = ArrayList<String>()
-        val weight = IntColumn(); val alpha = ArrayList<Double>()
-    }
-
-    /**
-     * Bundles between shelves gather one loom per predicate and per what their far end is (another book, or the
-     * concept pool), standing at the count-weighted mean of their routes; the per-relation strands of the node in
-     * hand (or fresh) gather one loom per predicate, at the mean of their screen middles. All looms relax apart
-     * together; one label per loom replaces a label per strand; opened, a loom lists its strands' ends, heaviest
-     * first, and a row zooms onto both.
-     */
-    private fun loom(cam: GraphCamera, strands: MutableList<DrawItem>, plates: MutableList<DrawItem>, labels: MutableList<DrawItem>, links: List<Warp>) {
-        val warps = ArrayList<Warp>()
-        class Sum(val kind: Int, val pool: Boolean) { val pairs = ArrayList<Long>(); val routes = ArrayList<List<Vec3>>(); var wx = 0.0; var wy = 0.0; var wz = 0.0; var w = 0.0 }
-        val sums = LinkedHashMap<Int, Sum>()
-        for ((pair, n) in bundles) {
-            val a = (pair ushr 32).toInt(); val b = (pair and 0xffffffffL).toInt()
-            val ctl = route(a, b); if (ctl.size < 2) continue
-            val mid = ctl[ctl.size / 2].lerp(ctl[(ctl.size - 1) / 2], .5)
-            for (kind in 0 until 4) {
-                if (n[kind] == 0) continue
-                val pool = isPool(a) || isPool(b)
-                val u = sums.getOrPut(kind * 2 + if (pool) 1 else 0) { Sum(kind, pool) }
-                val wt = ln(1.0 + n[kind]); u.pairs.add(pair); u.routes.add(ctl); u.wx += mid.x * wt; u.wy += mid.y * wt; u.wz += mid.z * wt; u.w += wt
-            }
-        }
-        for ((key, u) in sums) {
-            val at = cam.project(Vec3(u.wx / u.w, u.wy / u.w, u.wz / u.w), viewport) ?: continue
-            val w = Warp("b$key", BUNDLE_NAMES[u.kind] + if (u.pool) " · concepts" else "", BUNDLE_TONES[u.kind], at)
-            for ((k, pair) in u.pairs.withIndex()) {
-                val pts = spline(u.routes[k], cam); if (pts.size < 3) continue
-                val n = bundles[pair]!![u.kind]
-                w.threads.add(pts); w.from.add((pair ushr 32).toInt()); w.to.add((pair and 0xffffffffL).toInt()); w.weight.add(n); w.says.add("")
-                w.alpha.add((.12 + .06 * ln(1.0 + n)).coerceAtMost(.5))
-            }
-            if (w.threads.isNotEmpty()) warps.add(w)
-        }
-        warps.addAll(links.filter { it.threads.isNotEmpty() })
-        loomHits.clear(); loomRects.clear()
-        if (warps.isEmpty()) return
-        // A closed loom is one line; an opened one a row per strand, each strand pinned to its row.
-        warps.sortBy { it.key }
-        val sizes = warps.map { Vec3(if (it.key in loomsOpen) LOOM_OPEN_W else LOOM_W, LOOM_ROW * (1 + if (it.key in loomsOpen) min(it.threads.size, LOOM_ROWS) else 0)) }
-        // Eased from where each loom stood last frame, so a loom glides to its place rather than jumping to it.
-        val centers = WireLoom.relax(warps.map { it.anchor }, sizes, warps.map { loomAt[it.key] }).mapIndexed { q, c ->
-            loomAt[warps[q].key]?.let { p -> p.lerp(c, LOOM_EASE) } ?: c }
-        for ((q, w) in warps.withIndex()) {
-            val c = centers[q]; loomAt[w.key] = c
-            val band = Rect(c.x - sizes[q].x / 2, c.y - sizes[q].y / 2, sizes[q].x, sizes[q].y); loomRects.add(band)
-            val tone = w.tone; val ink = Rgba(tone.red, tone.green, tone.blue, .85)
-            val open = w.key in loomsOpen
-            val order = w.threads.indices.sortedByDescending { w.weight[it] }
-            // Opened, the heaviest strands take a row each under the header; the rest pass the header row.
-            val rows = if (open) IntArray(w.threads.size).also { r -> order.forEachIndexed { k, t -> r[t] = if (k < LOOM_ROWS) k + 1 else 0 } } else null
-            val gap = if (open) LOOM_ROW else LOOM_ROW / max(1, w.threads.size)
-            for ((t, flow) in WireLoom.weave(w.threads, if (open) band else Rect(band.x, band.y, band.width, LOOM_ROW), gap, rows).withIndex()) {
-                val n = w.weight[t]
-                strands.add(DrawItem.Path("lw-${w.key}-$t", flow.size j { k: Int -> if (k == 0) PathPart.Move(flow[0]) else PathPart.Line(flow[k]) },
-                    stroke = Rgba(tone.red, tone.green, tone.blue, w.alpha[t]), width = (.6 + .25 * ln(1.0 + n)).coerceAtMost(2.2)))
-            }
-            plates.add(DrawItem.Path("loom-${w.key}", box(band), fill = Rgba(14, 18, 26, if (open) .88 else .7), stroke = Rgba(tone.red, tone.green, tone.blue, .6), width = .8))
-            fun text(id: String, s: String, y: Double, n: Int?, color: Rgba) {
-                labels.add(DrawItem.Text("lt-$id", s, Vec3(band.x + 4, y + LOOM_ROW - 4), color, 10.0, font = "monospace", maxWidth = band.width - 48))
-                if (n != null) "$n".let { labels.add(DrawItem.Text("ln-$id", it, Vec3(band.x + band.width - it.length * 6.0 - 4, y + LOOM_ROW - 4), color, 10.0, font = "monospace")) }
-            }
-            var total = 0; for (t in w.threads.indices) total += w.weight[t]
-            text(w.key, (if (open) "▾ " else "▸ ") + w.title + " · ${w.threads.size}", band.y, total, ink)
-            val key = w.key
-            loomHits.add(Rect(band.x, band.y, band.width, LOOM_ROW) j { if (!loomsOpen.remove(key)) loomsOpen.add(key) })
-            if (!open) continue
-            for ((k, t) in order.take(LOOM_ROWS).withIndex()) {
-                val a = w.from[t]; val b = w.to[t]; val y = band.y + (k + 1) * LOOM_ROW
-                val says = w.says[t].takeIf { it.isNotEmpty() && it != w.title }?.let { "$it: " }.orEmpty()
-                text("$key-$t", "$says${name(a).take(20)} ⇄ ${name(b).take(20)}", y, w.weight[t].takeIf { it > 1 }, Rgba(200, 208, 220, .9))
-                loomHits.add(Rect(band.x, y, band.width, LOOM_ROW) j { selected = -1; close(); both = intArrayOf(a, b); aim = true })
-            }
-        }
+        return FramePlan(viewport, (timber.sortedByDescending { it.a }.map { it.b } + under + items.sortedByDescending { it.a }.map { it.b } + over + labels).toSeries(), Rgba(11, 14, 20))
     }
 
     // ── the fill/drain sparkline: events per 250 ms over 30 s, a spike is a bin over 3× the mean ──
@@ -1143,7 +1190,9 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             }
             cell("sections", SECTIONS, sections, Rgba(233, 226, 206)); cell("must", 0, must, forceColor("must")); cell("must not", 1, mustNot, forceColor("must-not"))
             cell("may", 2, may, forceColor("may")); cell("presumed", 3, presumed, forceColor("presumed"))
-            cell("concepts", CONCEPTS, concepts, Rgba(140, 210, 255)); cell("relations", RELATIONS, linkFrom.n, Rgba(240, 190, 110))
+            cell("concepts", CONCEPTS, concepts, Rgba(140, 210, 255))
+            // The relations by kind: the kinds switched on are drawn, and are the edges the layout places by.
+            for (k in 0 until 4) cell(BUNDLE_NAMES[k], KINDS + k, related[k], BUNDLE_TONES[k])
         }
         labels.add(DrawItem.Text("hud", "ring ${cursor}  ·  ${rate}/s  ·  drained $lastDrained  ·  lost $dropped  ·  " +
             (if (pinned) "pinned — F follows" else if (following()) "following ${runNames.getOrNull(followed()) ?: "—"}" else if (now - lastEventAt < LIVE_MS) "yours — F follows" else "idle — F frames the library"),
@@ -1197,14 +1246,11 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         if (k == n) PathPart.Close else Vec3(c.x + cos(k * 2 * PI / n) * r, c.y + sin(k * 2 * PI / n) * r).let { if (k == 0) PathPart.Move(it) else PathPart.Line(it) }
     }
 
-    /** A book's outline about [c], half-width [hw] by half-height [hh]: [round] 0 is a cover with eased corners, 1 the ellipse it opens into. */
-    private fun cover(c: Vec3, hw: Double, hh: Double, round: Double): Series<PathPart> {
-        val e = 2 / (2 + 18 * (1 - round) * (1 - round))
-        return (COVER_POINTS + 1) j { k: Int ->
-            if (k == COVER_POINTS) PathPart.Close else {
-                val t = k * 2 * PI / COVER_POINTS; val ct = cos(t); val st = sin(t)
-                Vec3(c.x + hw * sign(ct) * abs(ct).pow(e), c.y + hh * sign(st) * abs(st).pow(e)).let { if (k == 0) PathPart.Move(it) else PathPart.Line(it) }
-            }
+    /** A book's cover about [c], half-width [hw] by half-height [hh], its corners eased. */
+    private fun cover(c: Vec3, hw: Double, hh: Double): Series<PathPart> = (COVER_POINTS + 1) j { k: Int ->
+        if (k == COVER_POINTS) PathPart.Close else {
+            val t = k * 2 * PI / COVER_POINTS; val ct = cos(t); val st = sin(t)
+            Vec3(c.x + hw * sign(ct) * abs(ct).pow(.1), c.y + hh * sign(st) * abs(st).pow(.1)).let { if (k == 0) PathPart.Move(it) else PathPart.Line(it) }
         }
     }
 
@@ -1258,13 +1304,14 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         const val YIELD = 5; const val TURN = 6; const val FAIL = 7; const val LINK = 8
         /** [disc] markers: a book or the concept pool stands on a shelf; a node outside the library is not placed. */
         const val TOP = -1; const val UNPLACED = -2
-        /** Bundle kinds between top circles. */
+        /** A relation's kind; between two top circles the relations are counted by it. */
         const val CITES = 0; const val CONFLICT = 1; const val SHARED = 2; const val READS = 3
         val BUNDLE_NAMES = listOf("cites", "conflicts", "shared", "reads")
         val BUNDLE_TONES = listOf(Rgba(110, 200, 230), Rgba(240, 90, 100), Rgba(240, 200, 110), Rgba(120, 150, 220))
         val FORCES = listOf("must", "must-not", "may", "presumed")
-        /** Mask bits beside the force ordinals 0..3: a set bit hides that category in the scope. */
-        const val CONCEPTS = 5; const val SECTIONS = 6; const val RELATIONS = 7
+        /** Mask bits beside the force ordinals 0..3: a set bit hides that category in the scope. [KINDS] + a relation's kind hides that kind,
+         *  and takes it out of the edges the layout places by. */
+        const val CONCEPTS = 5; const val SECTIONS = 6; const val KINDS = 7
         /** Name index key: the first [NAME_CHARS] characters at 6 bits each over the ordinal's [ORDINAL_BITS]. */
         const val NAME_CHARS = 7; const val ORDINAL_BITS = 21; const val ORDINAL = (1L shl ORDINAL_BITS) - 1
         private const val ALPHABET = " 0123456789abcdefghijklmnopqrstuvwxyz"
@@ -1279,10 +1326,13 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             }
             return (k shl ORDINAL_BITS) or (ordinal.toLong() and ORDINAL)
         }
-        /** A loom band: width closed and opened, and one row's height. */
-        const val LOOM_W = 170.0; const val LOOM_OPEN_W = 300.0; const val LOOM_ROW = 14.0; const val LOOM_ROWS = 24; const val LOOM_EASE = .2
-        /** Relation strands drawn per frame, newest first. */
-        const val LINKS = 1500
+        /** Between two circles, the lines of two kinds of relation run this far apart; points around a ring of the radial layout. */
+        const val LANE = 3.0; const val RING_POINTS = 64
+        /** Clear space between two top circles placed by relation, as a share of the median book's radius. */
+        const val CLEAR = .5
+        /** The force layout's temperature: [WARM] when its circles or edges change, cooled by [COOLING] a step, at rest under [COLD];
+         *  under [SETTLED] its circles count as arrived and the camera lets go of them. */
+        const val WARM = .3; const val COOLING = .992; const val COLD = .004; const val SETTLED = .05
         /** World radius of a leaf star before its degree; packing gap between circles. */
         const val STAR = 2.0; const val PAD = 1.0
         /** Books per shelf. */
@@ -1295,9 +1345,9 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         const val LABEL_R = 2.0; const val CELL = 6.0; const val LABEL_W = 220.0
         /** A statement or concept circle this large on screen holds its text inside. */
         const val INSIDE_R = 60.0
-        /** A far book: its cover's half-width as a share of its circle's radius; past this share of its split size it rounds into
-         *  that circle; a title on its plate under this size is drawn as the plate alone; points around its outline. */
-        const val COVER = .72; const val ROUNDING = .5; const val TITLE_PX = 7.0; const val COVER_POINTS = 32
+        /** A book not opened: its cover's half-width as a share of its circle's radius; a title on its plate under this size is drawn
+         *  as the plate alone; points around its outline. */
+        const val COVER = .72; const val TITLE_PX = 7.0; const val COVER_POINTS = 32
         val LEATHER = listOf(Rgba(112, 42, 36), Rgba(44, 58, 98), Rgba(46, 84, 58), Rgba(142, 102, 58), Rgba(92, 36, 54), Rgba(68, 74, 84), Rgba(106, 74, 42))
         /** However low the snap depth, children under this mean screen radius stay aggregated in their container. */
         const val MIN_SPLIT_PX = 2.0
@@ -1307,8 +1357,6 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         const val FAN = 12; const val FAN_STEP = 5.0; const val FAN_MAX = 80.0
         /** Lines a page holds at body size. */
         const val PAGE_LINES = 46.0
-        /** Holten's bundling strength; spline samples per control span. */
-        const val BUNDLE = .85; const val SPLINE = 6
         /** The eye stands above the plane it looks at by this share of its distance. */
         const val TILT = .18
         const val HUD = 70.0

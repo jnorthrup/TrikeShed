@@ -27,6 +27,7 @@ import borg.trikeshed.rdf.TurtleRdf
 import java.io.File
 import java.lang.System
 import borg.trikeshed.agent.modelmux.Airgap
+import kotlinx.coroutines.sync.withLock
 
 /**
  * `book.curate` and `constellation.join`: a book's text becomes a frozen [Book] (sections, statements,
@@ -1687,8 +1688,8 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         }
     }
 
-    /** Every saved constellation stands in the ring again, as its members were last joined. */
-    fun restore() {
+    /** Every saved constellation stands in the ring again, as its members were last joined, and its RDF stands in [rdfSink]. */
+    suspend fun restore() {
         // The sense memory stands before the books load, so their bearers and concepts are typed by the overlay.
         if (SENSES_ENABLED) memory()
         val saved = root.listFiles { f -> f.isFile && f.name.endsWith(".members") }.orEmpty()
@@ -1698,7 +1699,10 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             for (i in c.books.indices) for (j in i + 1 until c.books.size) if (c.books[i].work == c.books[j].work) {
                 if (c.books[i].date <= c.books[j].date) c.align(i, j) else c.align(j, i)
             }
-            if (c.books.isNotEmpty()) stand(c, borg.trikeshed.lcnc.LcncTrail.live.run("$JOIN/${c.name}"))
+            if (c.books.isNotEmpty()) {
+                stand(c, borg.trikeshed.lcnc.LcncTrail.live.run("$JOIN/${c.name}"))
+                publishRdf(c)
+            }
         }
     }
 
@@ -1751,9 +1755,11 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             mapOf("antecedent" to s.antecedent, "consequent" to s.consequent, "copula" to "==>", "discount" to c.truth(id).confidence)
         }
         bank?.let { tell(it, c, admissible) }
+        val turtle = rdf(c)
+        publishRdf(c, turtle)
         mapOf("constellation" to name, "books" to c.books.size, "statements" to c.statements.size,
             "restated" to c.restated().size, "conflicts" to c.conflicts().size, "rules" to rules,
-            "rdf" to rdf(c), "frontier" to frontier, "tasks" to tasks(c),
+            "rdf" to turtle, "frontier" to frontier, "tasks" to tasks(c),
             "unresolved" to (c.conflicts().isNotEmpty() || c.open().isNotEmpty()))
     }
 
@@ -2195,6 +2201,23 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         return TurtleRdf.emit(RdfGraph(emptyList(), quads))
     }
 
+    /**
+     * Where a constellation's RDF goes ([publishRdf]): the quads whose subjects start with `replacing` are dropped and
+     * `turtle` is loaded in their place, so a member curated again leaves no earlier reading standing.
+     */
+    var rdfSink: (suspend (replacing: String, turtle: String) -> Unit)? = null
+
+    /**
+     * [turtle] (by default [c]'s concept atoms) into [rdfSink], in place of the atoms an earlier reading of [c] put
+     * there. The projection is the daemon's, not the join's: a load that fails is reported and the join stands.
+     */
+    suspend fun publishRdf(c: Constellation, turtle: String = rdf(c)) {
+        val sink = rdfSink ?: return
+        try { sink("<${RdfVocab.FORGE}constellation/${c.name}/", turtle) }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (failed: Exception) { System.err.println("[OROBOROS] constellation ${c.name} rdf load failed: $failed") }
+    }
+
     private fun sectionRef(c: Constellation, g: Int): Map<String, Any?> {
         val b = c.books[g ushr 20]
         return mapOf("book" to b.name, "section" to b.headings.getOrElse(g and 0xFFFFF) { "#${g and 0xFFFFF}" })
@@ -2314,7 +2337,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         }
 
         /** The language lane's LCNC nodes, registered in one call so the daemon's boot method stays under the JVM method limit. */
-        fun registerLanguageNodes(ctx: borg.trikeshed.module.ModuleContext, bank: borg.trikeshed.kif.KifKnowledgeBase,
+        suspend fun registerLanguageNodes(ctx: borg.trikeshed.module.ModuleContext, bank: borg.trikeshed.kif.KifKnowledgeBase,
                                   liveRete: CausalityReteElement? = null): ConstellationNodes {
             val provider = DecisionProvider.of(System.getProperty(DecisionProvider.PROPERTY)
                 ?: System.getenv(DecisionProvider.ENVIRONMENT))
@@ -2330,12 +2353,19 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                     ctx.scope.coroutineContext[Airgap]?.enabled == true || ctx.muxContext[Airgap]?.enabled == true) it + Airgap() else it
             }
             val modelScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext + decisionContext)
-            val jeva = JevaElement(modelScope, JevaConfig.configured(System::getProperty, System::getenv))
+            // java.lang.System by name: under the lib wildcard, System.getProperty is lib.System's, which reads the environment.
+            val jeva = JevaElement(modelScope, JevaConfig.host(java.lang.System::getProperty, System::getenv,
+                ctx.scope.coroutineContext[borg.trikeshed.userspace.nio.channels.spi.ProcessOperations]
+                    ?: borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations()))
             val jev = decisionContext + jeva
             val decisionScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext + jev)
             val nodes = ConstellationNodes(ctx.stateDir, ctx.blackboard, bank, liveRete, bert,
                 ctx.scope.coroutineContext[borg.trikeshed.userspace.nio.file.spi.FileOperations]
-                    ?: borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), provider, decisionScope, cas = ctx.casStore).also { it.register(ctx.lcncRunners) }
+                    ?: borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), provider, decisionScope, cas = ctx.casStore).also {
+                it.register(ctx.lcncRunners)
+                // The curated law stands in the daemon's quad store: /sparql reads what the constellations join.
+                it.rdfSink = { replacing, turtle -> ctx.quadGate.withLock { ctx.quads.drop(replacing); ctx.quads.load(turtle) } }
+            }
             ctx.routes.claim("language", "/api/curation/providers") { method, _, _, _ ->
                 if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val catalog = kotlinx.coroutines.withContext(jev) {

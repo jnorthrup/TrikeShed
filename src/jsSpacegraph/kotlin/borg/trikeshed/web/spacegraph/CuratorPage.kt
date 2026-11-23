@@ -7,6 +7,7 @@ import borg.trikeshed.web.*
 import kotlinx.browser.document
 import kotlinx.browser.window
 import narchy.spacegraph.CuratorScope
+import narchy.spacegraph.Layout
 import narchy.spacegraph.Viewport
 import narchy.spacegraph.graphics.spi.DrawItem
 import narchy.spacegraph.graphics.spi.FrameTriangles
@@ -71,6 +72,7 @@ object CuratorPage {
         program()
         input()
         detail()
+        layout()
         fold()
         finder()
         ask()
@@ -116,7 +118,8 @@ object CuratorPage {
             if (d != null) { scope.release(t()); if (kotlin.math.hypot(p[0] - d[0], p[1] - d[1]) < 3 && !scope.toggle(p[0], p[1])) scope.select(scope.pick(p[0], p[1])) } })
         page.on(host, "pointerleave", { _: dynamic -> scope.hovered = -1 })
         page.on(document, "keydown", { e: dynamic ->
-            if (str(e.target?.tagName) == "INPUT") return@on
+            val tag = str(e.target?.tagName)
+            if (tag == "INPUT" || tag == "SELECT") return@on
             when (str(e.key)) {
                 "f", "F" -> { scope.selected = -1; scope.follow() }
                 "ArrowRight", "PageDown" -> scope.turn(1)
@@ -124,9 +127,15 @@ object CuratorPage {
                 " " -> { e.preventDefault(); if (scope.pinned) scope.follow() else scope.pin() }
                 "+", "=" -> scope.wheel(-120.0, 0, host.clientWidth / 2.0, host.clientHeight / 2.0, window.performance.now())
                 "-" -> scope.wheel(120.0, 0, host.clientWidth / 2.0, host.clientHeight / 2.0, window.performance.now())
-                "Escape" -> { scope.selected = -1; scope.close() }
+                "Escape" -> { scope.selected = -1; scope.back() }
             }
         })
+    }
+
+    /** The layout switch: its value names [CuratorScope.layout]. */
+    private fun layout() {
+        val switch = document.getElementById("curator-layout").asDynamic() ?: return
+        page.on(switch, "change", { _: dynamic -> scope.layout = Layout.valueOf(str(switch.value)) })
     }
 
     /** The detail slider: its value is [CuratorScope.snapPercent]; the tick on its track is [CuratorScope.zoomPercent]. */

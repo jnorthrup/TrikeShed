@@ -1018,6 +1018,8 @@ object OroborosDaemon {
             excludedSegments = setOf(
                 "hermes-agent", "bin", "cache", "image_cache", "audio_cache", "lsp", "plugins",
                 "scratch", "sandboxes", "venv", "node_modules", "__pycache__", ".git", ".curator_backups",
+                // Hermes' dependency environments and Python toolchains: reinstallable, and they churn by the thousand.
+                "installs", "tools",
             ),
             excludedPath = borg.trikeshed.util.oroboros.HermesCorpus::isTrace,
         )
@@ -2715,8 +2717,9 @@ object OroborosDaemon {
             kif = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
             productions = { reteProductions.all() },
         )
-        // Virtuoso's quad store: SPARQL Update fills it, /sparql and SPASQL read it beside the fact plane's triples.
-        val quadStore = borg.trikeshed.rdf.QuadStore()
+        // Virtuoso's quad store: SPARQL Update and every constellation's join fill it (the module context owns it, so a
+        // restore at boot lands before this wire exists), /sparql and SPASQL read it beside the fact plane's triples.
+        val quadStore = moduleContext.quads
         val sparqlWire = borg.trikeshed.forge.server.SparqlWire(
             borg.trikeshed.rdf.SparqlSurface(quadStore),
             borg.trikeshed.rdf.CypherSurface(quadStore),
@@ -2725,6 +2728,7 @@ object OroborosDaemon {
                     rete.snapshot().view.flatMap { borg.trikeshed.dag.PlaneFacts.toTriples(it).view },
                 )).scan()
             },
+            gate = moduleContext.quadGate,
         )
         // Supabase's data API over SQL tables kept in the primary Couch (/rest/v1/*, /pg/query), plus DB.DBA.RDF_QUAD,
         // the breadcrumbs of every session and, when the belief bag runs, its beliefs; the pg wire reads the same catalog.
