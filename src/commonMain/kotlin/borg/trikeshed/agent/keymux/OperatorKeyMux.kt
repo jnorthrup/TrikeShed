@@ -34,13 +34,14 @@ fun operatorKeyMux(
     fileOps: FileOperations,
     hermesHome: String = borg.trikeshed.agent.keymux.defaultHermesHome(),
     ttlMs: Long = 5 * 60_000L,
+    processOps: borg.trikeshed.userspace.nio.channels.spi.ProcessOperations? = null,
 ): borg.trikeshed.agent.keymux.KeyMux = borg.trikeshed.agent.keymux.KeyMux {
     cached("*", borg.trikeshed.agent.keymux.HarnessSource(processEnvOnly = true))
     cached("*", borg.trikeshed.agent.keymux.EnvSource())
     // Uncached on purpose: a key rotated in auth.json or .env is used on the
     // very next call. The source itself re-reads its files per call.
     bind("llm.*.*", borg.trikeshed.agent.keymux.HermesCredentialSource(hermesHome, fileOps))
-    bind("llm.anthropic.key", borg.trikeshed.agent.keymux.ClaudeCodeSource(fileOps))
+    bind("llm.anthropic.key", borg.trikeshed.agent.keymux.ClaudeCodeSource(fileOps, processOps))
     cached(
         "*",
         borg.trikeshed.agent.keymux.HarnessSource(

@@ -15,7 +15,10 @@ import kotlinx.datetime.Clock
  * only unexpired one wins, else the later `expiresAt`. A token inside its last 60 s is expired, as in Hermes. Never written:
  * the refresh token is single-use and belongs to whichever of Claude Code and Hermes rotates it.
  */
-class ClaudeCodeSource(private val explicitFileOps: FileOperations? = null) : KeySource() {
+class ClaudeCodeSource(
+    private val explicitFileOps: FileOperations? = null,
+    private val explicitProcessOps: ProcessOperations? = null,
+) : KeySource() {
     override val name = "claude-code-oauth"
 
     private class Login(val access: String, val expiresAt: Long) {
@@ -46,7 +49,7 @@ class ClaudeCodeSource(private val explicitFileOps: FileOperations? = null) : Ke
     }
 
     private suspend fun keychain(): Login? {
-        val ops = currentCoroutineContext()[ProcessOperations.Key] ?: return null
+        val ops = explicitProcessOps ?: currentCoroutineContext()[ProcessOperations.Key] ?: return null
         val out = runCatching { ops.exec("security", listOf("find-generic-password", "-s", "Claude Code-credentials", "-w")) }.getOrNull()
             ?: return null
         return if (out.exitCode == 0) login(out.stdout.decodeToString().trim()) else null

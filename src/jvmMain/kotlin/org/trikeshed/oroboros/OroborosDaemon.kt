@@ -716,7 +716,11 @@ object OroborosDaemon {
         // reads THIS, not keyMux, so a repin never resolves through its own
         // previous pin (self-referential freeze). keyMux (reactor/catalog
         // identity) is the one wrapper, built once, on top of it.
-        val baseKeyMux = borg.trikeshed.agent.keymux.operatorKeyMux(fileOps = fileOps, hermesHome = borg.trikeshed.agent.keymux.defaultHermesHome())
+        val baseKeyMux = borg.trikeshed.agent.keymux.operatorKeyMux(
+            fileOps = fileOps, hermesHome = borg.trikeshed.agent.keymux.defaultHermesHome(),
+            // The Claude Code login's fresh copy is in the Keychain; its file is usually expired.
+            processOps = borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations(),
+        )
         val hermesCredentials = borg.trikeshed.agent.keymux.HermesCredentialSource(borg.trikeshed.agent.keymux.defaultHermesHome(), fileOps)
         val keyMux = baseKeyMux.withBinding("*", hermesPinOverlay)
         // Probe early so a missing key aborts before opening the HTX reactor.
