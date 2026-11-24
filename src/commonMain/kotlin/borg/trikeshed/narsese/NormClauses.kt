@@ -414,7 +414,7 @@ object NormClauses {
      * or qualified claim to an unconditional positive premise; it never mints negative evidence.
      * Some affirmative facts will be omitted, and unrecognized language can still pass the filter.
      */
-    internal fun maySupplyPositivePremise(doc: NlpDocument, sentence: NlpSentence): Boolean {
+    internal fun maySupplyPositivePremise(doc: NlpDocument, sentence: NlpSentence, pastTense: Boolean = false): Boolean {
         if (doc.projectionIssue(sentence) != null) return false
         if (sentence.begin < 0 || sentence.end <= sentence.begin || sentence.end > doc.text.length) return false
         val text = doc.text.substring(sentence.begin, sentence.end)
@@ -429,12 +429,15 @@ object NormClauses {
             "assert", "argue", "deny", "dispute", "appear", "seem", "speculate", "hardly", "scarcely", "barely", "false"]
         val words = Regex("[A-Za-z]+(?:['’][A-Za-z]+)?").findAll(text)
             .map { it.value.lowercase().replace('’', '\'') }
-        if (words.any { it in excluded || it.endsWith("n't") } ||
+        // A past-tense fact is a positive premise when the caller allows it; the other exclusions still apply.
+        val excludedHere = if (pastTense) excluded - _s["were", "was", "had", "did"] else excluded
+        if (words.any { it in excludedHere || it.endsWith("n't") } ||
             Regex("\\bsubject\\s+to\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)) return false
         for (token in sentence.tokens.values()) {
             val word = token.word.lowercase().replace('’', '\'')
-            if (token.tag in _s["MD", "VBD", "VBN"] || word in excluded ||
-                token.lemma.lowercase() in excluded || word.endsWith("n't")) return false
+            val pastTags = if (pastTense) _s["MD"] else _s["MD", "VBD", "VBN"]
+            if (token.tag in pastTags || word in excludedHere ||
+                token.lemma.lowercase() in excludedHere || word.endsWith("n't")) return false
         }
         if (sentence.dependencies.values().any { it.relation.lowercase().startsWith("neg") }) return false
         return true
