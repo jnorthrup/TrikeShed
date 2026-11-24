@@ -26,7 +26,7 @@ private data class Cluster(
     override val clusterOf: List<String>? = null,
 ) : ClusterNode
 
-private data class Stop(override val at: Double, override val id: String) : RungStop
+private data class LadderStop(override val at: Double, override val id: String) : RungStop
 
 private val STOPS = listOf(
     ScaleStop(at = 0.0, id = "dot", importance = 0.0, transitionDuration = 0.2),
@@ -131,7 +131,7 @@ class RepresentationLadderTest {
     @Test
     fun derivesRungsFromScaleStopsAndSkipsRungsWithoutABuilder() {
         val registry = ladderFromStops<LadderNode, String>(
-            STOPS.map { Stop(it.at, it.id) },
+            STOPS.map { LadderStop(it.at, it.id) },
             mapOf(
                 "dot" to build("dot"),
                 "glyph" to build("glyph"),
