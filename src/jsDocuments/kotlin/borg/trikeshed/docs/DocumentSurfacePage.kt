@@ -93,6 +93,11 @@ object DocumentSurfacePage {
         render(keepLocation = true)
         window.addEventListener("popstate", { MainScope().launch { openLocation() } })
         openLocation()
+        // Links to the transfers asked for by the document in view (context id `<project>/<document>`).
+        val transfers = document.createElement("aside") as HTMLElement
+        transfers.style.cssText = "position:fixed;right:12px;bottom:12px;z-index:60;font:12px system-ui,sans-serif"
+        document.body?.append(transfers)
+        borg.trikeshed.web.TransferLinkBar(transfers, "document") { doc?.let { d -> project?.let { "$it/${d.id}" } } }.start()
         js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { documentSurface: true })")
     }
 

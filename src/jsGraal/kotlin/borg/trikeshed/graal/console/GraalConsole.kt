@@ -82,7 +82,8 @@ object GraalConsole {
     var HEAP_TERRAIN: Boolean = localStorage.getItem("heapTerrain") == "1"
 
     var skin: String = try { localStorage.getItem("graal.skin") ?: "ops" } catch (_: Throwable) { "ops" }
-    var mode = "map"
+    /** The ground (SUMO homes, tilt and turn, the transfers in flight) first; M cycles to the territory map and the others. */
+    var mode = "ground"
     var fog = false
     /** territory path → last activity ms */
     val heat = HashMap<String, Double>()
@@ -133,7 +134,7 @@ object GraalConsole {
         bindChrome()
         window.setInterval({ recentCommits = 0 }, 1000)
         resize(); crumb("drop lane v2 armed — drag a folder anywhere")
-        loadMap(); loadHeap(); pollVitals(); pollVms(); loadAot(); connectSse(); boardRefresh()
+        loadMap(); loadHeap(); pollVitals(); pollVms(); loadAot(); connectSse(); boardRefresh(); loadGround()
         window.requestAnimationFrame { draw() }
     }
 
@@ -341,14 +342,16 @@ object GraalConsole {
     fun targetNode(): TerrainNode? = hover ?: sel ?: root
 
     fun cycleMode() {
-        mode = if (mode == "map") "graph" else if (mode == "graph") "tree" else if (mode == "tree") "notion" else "map"
+        mode = if (mode == "ground") "map" else if (mode == "map") "graph" else if (mode == "graph") "tree" else if (mode == "tree") "notion" else "ground"
         if (mode == "graph") buildGraph()
         if (mode == "notion") for (id in EXCLUSIVE_PANELS) q(id).style.display = "none"
         q("notion").style.display = if (mode == "notion") "flex" else "none"
         if (mode == "notion") buildNotion()
         val t = targetNode()
         crumb("mode: " + mode + (if (mode == "graph") " — force DAG (hubs + edges), drag nodes" else if (mode == "tree") " — radial drilldown of " + (if (t === root) "/" else pathOf(t))
-            else if (mode == "notion") " — database flavor: sort by header, filter, click to inspect" else " — territory map"))
+            else if (mode == "notion") " — database flavor: sort by header, filter, click to inspect"
+            else if (mode == "ground") " — SUMO ground: territories at their class homes, transfers in flight; right-drag or Q/E turn, PgUp/PgDn tilt, ↑↓←→ hyperarchy (1–9 a parent), ⌫ back, Home the class in hand, 0 the whole ground"
+            else " — territory map"))
     }
 
     fun buildGraph() {
@@ -378,6 +381,7 @@ object GraalConsole {
     private fun bindInput() {
         map.addEventListener("mousedown", { ev ->
             val e = ev as MouseEvent
+            if (mode == "ground") { groundDown(e); return@addEventListener }
             killMomentum()
             if (mode == "graph") {
                 val wx = cam.ox + e.clientX / cam.s; val wy = cam.oy + e.clientY / cam.s
@@ -387,11 +391,13 @@ object GraalConsole {
             dragging = true; moved = 0.0; lx = e.clientX.toDouble(); ly = e.clientY.toDouble(); velX = 0.0; velY = 0.0; velT = perfNow(); map.classList.add("drag")
         })
         window.addEventListener("mouseup", {
+            if (mode == "ground") groundUp()
             if (dragging && !reduced && perfNow() - velT < 80) { momVx = velX; momVy = velY } // recent flick → glide
             dragging = false; gDrag = null; map.classList.remove("drag")
         })
         map.addEventListener("mousemove", { ev ->
             val e = ev as MouseEvent
+            if (mode == "ground") { groundMove(e); return@addEventListener }
             val g = gDrag
             if (g != null) { g.x = cam.ox + e.clientX / cam.s; g.y = cam.oy + e.clientY / cam.s; return@addEventListener }
             if (dragging) {
@@ -408,6 +414,7 @@ object GraalConsole {
         map.addEventListener("wheel", { ev ->
             val e = ev as WheelEvent
             e.preventDefault()
+            if (mode == "ground") { groundWheel(e); return@addEventListener }
             if (e.deltaY == 0.0) return@addEventListener
             val f = if (e.deltaY < 0) 1.4 else 1 / 1.4
             val wx = cam.ox + e.clientX / cam.s; val wy = cam.oy + e.clientY / cam.s
@@ -420,6 +427,7 @@ object GraalConsole {
         }, passive)
         map.addEventListener("dblclick", { ev ->
             val e = ev as MouseEvent
+            if (mode == "ground") return@addEventListener
             if (mode == "graph") {
                 val wx = cam.ox + e.clientX / cam.s; val wy = cam.oy + e.clientY / cam.s
                 val g = graph.at(wx, wy)
@@ -431,6 +439,7 @@ object GraalConsole {
         })
         map.addEventListener("click", { ev ->
             val e = ev as MouseEvent
+            if (mode == "ground") return@addEventListener
             if (moved > 4) return@addEventListener
             val n = hit(e.clientX.toDouble(), e.clientY.toDouble())
             if (n != null && n.leaf) openDoc(n.id!!)
@@ -438,6 +447,7 @@ object GraalConsole {
         /* right-click a project-db territory: HIERARCHY KILL — unmount db + ledger + clone (CAS blobs stay) */
         map.addEventListener("contextmenu", { ev ->
             val e = ev as MouseEvent
+            if (mode == "ground") { e.preventDefault(); return@addEventListener }
             val n = hit(e.clientX.toDouble(), e.clientY.toDouble()) ?: return@addEventListener
             var top: TerrainNode = n
             while (top.parent != null && top.parent !== root) top = top.parent!!
@@ -472,6 +482,7 @@ object GraalConsole {
         if ((e.key == "Enter" || e.key == " ") && target?.getAttribute("role") == "button" && target.classList.contains("x")) {
             e.preventDefault(); target.click(); return
         }
+        if (mode == "ground" && groundKey(e)) return
         when (e.key) {
             "0" -> fit()
             "p", "P" -> togglePoints()

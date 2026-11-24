@@ -166,6 +166,8 @@ object RouteManifest {
             RouteEntry("POST", "/api/lcnc/run", "generic runner dispatch"),
             RouteEntry("GET", "/api/lcnc/content", "bounded immutable LCNC content by cid; raw JSON or shared sheet projection"),
             RouteEntry("GET", "/api/lcnc/trail", "the LCNC activity ring drained from ?since=<seq>&nodes=<known>: packed begin/end/ring/yield/turn/skip/fail events, new node rows, and how many events the reader lost"),
+            RouteEntry("GET", "/api/transfers", "the transfers every transport reports, one row each: id, name, protocol, state, total, completed, down, up, pieces, sources, context, content, class, error"),
+            RouteEntry("GET", "/api/sumo/hyperarchy", "SUMO's classes and subclass edges from the frozen image: the ground's homes and hyperarchy navigation are built from them"),
             RouteEntry("GET", "/api/lcnc/runs", "the head run for a program's current version and canonical inputs (?program=&inputs=&show=): what a page's lcnc-run block shows — lamp, reason, receipt cid, rebuildOf, and the stale marker naming the moved documents"),
             RouteEntry("POST", "/api/lcnc/run/cancel", "cancel an active scoped run; receipt lands on the durable work timeline"),
             RouteEntry("GET", "/api/lcnc/run/debug", "read an active run's transient node-boundary pause by debug token"),

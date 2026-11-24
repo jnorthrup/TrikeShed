@@ -22,6 +22,9 @@ private fun boot() {
     if (document.getElementById("stages") != null) {
         StagesPage.mount(); window.asDynamic().closePanels = { StagesPage.close() }; return
     }
+    if (document.getElementById("transfers") != null) {
+        TransfersPage.mount(); window.asDynamic().closePanels = { TransfersPage.close() }; return
+    }
     if (document.getElementById("world") == null) return
     val p = Panels()
     p.page.mount {

@@ -77,6 +77,10 @@ object CuratorPage {
         finder()
         ask()
         shelve()
+        // Links to the transfers asked for by the book in view.
+        val transfers = document.createElement("span") as HTMLElement
+        document.querySelector("header")?.append(transfers)
+        TransferLinkBar(transfers, "book") { bookInView() }.also { bar -> bar.start(); page.own { bar.stop() } }
         resizeObserver = jsNew(js("ResizeObserver"), { _: dynamic -> if (!page.closing) resize() })
         resizeObserver.observe(host)
         resize()
@@ -423,6 +427,13 @@ object CuratorPage {
     }
 
     private fun status(s: String) { document.getElementById("curator-status")?.textContent = s }
+
+    /** The curated book in view (a book, or the book of a section in view), by the name its ring key carries; null otherwise. */
+    fun bookInView(): String? {
+        val p = scope.panel() ?: return null
+        val key = p["key"]?.toString()?.takeIf { it.startsWith("book.curate/") }?.removePrefix("book.curate/") ?: return null
+        return when (p["type"]) { "book.section" -> key.substringBeforeLast('/'); "scope" -> key; else -> null }
+    }
 
     /** The illustrative panel: redrawn only when what it shows changes. */
     private var readingKey = ""
