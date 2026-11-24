@@ -25,6 +25,8 @@ data class DefinitionProofStep(
     val dependency: String,
     val sign: EvidenceSign,
     val equalLemma: String?,
+    /** The agreement rule that joined the fact's relation to the element's, when the two relations differ; null when equal. */
+    val joinedBy: String?,
 )
 
 data class SetAsideFact(val fact: String, val reason: String)
@@ -41,6 +43,15 @@ data class DefinitionApplication(
     val withoutEvidence: List<DefinitionElement>,
     val setAside: List<SetAsideFact>,
 )
+
+/** Elements are read from the definition's parse; this rule set decides which fact relations meet an element relation. */
+internal fun agreement(element: String, fact: String): String? = when {
+    element == fact -> "same relation"
+    element.startsWith("nmod:") && fact == "obl:" + element.removePrefix("nmod:") -> "case marker: nmod:X with obl:X"
+    element == "nmod:of" && fact == "obj" -> "of-phrase is the verb's object"
+    element == "nmod:of" && fact == "nsubj:pass" -> "of-phrase is the verb's passive subject"
+    else -> null
+}
 
 /** Applies a parsed definition to parsed fact sentences. Equal lemmas are an input; nothing else links a verb to a noun. */
 object DefinitionProof {
@@ -70,7 +81,9 @@ object DefinitionProof {
                 andHeads.flatMap { elementsAt(it, relation) }
         }
 
-        return deps.filter { it.governor == genusIndex && tokens[it.dependent]?.let(::content) == true }
+        // A word that is a conj:or member of another dependent is one alternative of that element, not an element of its own.
+        val orMembers = deps.filter { it.relation.equals("conj:or", ignoreCase = true) }.map { it.dependent }.toSet()
+        return deps.filter { it.governor == genusIndex && it.dependent !in orMembers && tokens[it.dependent]?.let(::content) == true }
             .flatMap { elementsAt(it.dependent, it.relation.lowercase()) }
     }
 
@@ -99,14 +112,14 @@ object DefinitionProof {
                 d.relation.lowercase().startsWith("neg") ||
                     (d.relation.lowercase() == "advmod" || d.relation.lowercase() == "det") && tokens[d.dependent]?.lemma?.lowercase() in negators
             }.map { it.governor }.toSet()
-            val positiveShape = NormClauses.maySupplyPositivePremise(doc, sentence)
+            val positiveShape = NormClauses.maySupplyPositivePremise(doc, sentence, pastTense = true)
             var spoke = false
             for (element in elements) {
                 for (dep in deps) {
                     val g = tokens[dep.governor] ?: continue
                     val d = tokens[dep.dependent] ?: continue
+                    val rule = agreement(element.relation, dep.relation.lowercase()) ?: continue
                     val meeting = when {
-                        dep.relation.lowercase() != element.relation -> continue
                         canon(g.lemma) == element.genus && canon(d.lemma) in element.alternatives -> g to d
                         canon(d.lemma) == element.genus && canon(g.lemma) in element.alternatives -> d to g
                         else -> continue
@@ -127,6 +140,7 @@ object DefinitionProof {
                     steps += DefinitionProofStep(
                         element, text, "${g.lemma} ${dep.relation.lowercase()} ${d.lemma}", sign,
                         changed?.let { "${it.lemma.lowercase()}=${canon(it.lemma)}" },
+                        rule.takeIf { dep.relation.lowercase() != element.relation },
                     )
                 }
             }
