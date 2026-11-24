@@ -36,11 +36,18 @@ data class RenderNode(
     val parent: String? = null,
     /** Serializable values only: no library objects cross the boundary. */
     val data: Map<String, Any?>? = null,
+    /** Additive salience score in [0, 1]. Backends that ignore it render exactly as before. */
+    val emphasis: Double? = null,
+    /** Widget descriptor ids requested for this node; empty means every eligible registered widget. */
+    val widgets: List<String>? = null,
+    /** Slots a host allows for this node; a backend that cannot host widgets ignores them. */
+    val widgetSlots: List<String>? = null,
 ) {
     init {
         require(id.isNotBlank()) { "a render node needs an id" }
         require(parent != id) { "a node cannot be its own group" }
         require(position.finite && size?.finite != false) { "render coordinates must be finite" }
+        require(emphasis == null || emphasis in 0.0..1.0) { "emphasis is a score in [0, 1]" }
     }
 }
 
@@ -54,8 +61,15 @@ data class RenderEdge(
     val visible: Boolean? = null,
     val directed: Boolean? = null,
     val style: EdgeStyle? = null,
+    /** Additive salience score in [0, 1], mapped to thickness by hosts that honour it. */
+    val emphasis: Double? = null,
+    /** Serializable values only: no library objects cross the boundary. */
+    val data: Map<String, Any?>? = null,
 ) {
-    init { require(id.isNotBlank() && source.isNotBlank() && target.isNotBlank()) { "a render edge needs id, source and target" } }
+    init {
+        require(id.isNotBlank() && source.isNotBlank() && target.isNotBlank()) { "a render edge needs id, source and target" }
+        require(emphasis == null || emphasis in 0.0..1.0) { "emphasis is a score in [0, 1]" }
+    }
 }
 
 data class RenderExtent(val width: Double, val height: Double, val depth: Double? = null)
@@ -88,12 +102,14 @@ val RenderNode.wire: Map<String, Any?>
         "id" j id, "kind" j kind, "label" j label, "summary" j summary, "html" j html,
         "position" j position.wire.view, "size" j size?.wire?.view, "status" j status?.wire,
         "visible" j visible, "interactive" j interactive, "shape" j shape?.wire, "parent" j parent, "data" j data,
+        "emphasis" j emphasis, "widgets" j widgets, "widgetSlots" j widgetSlots,
     ].filterValues { it != null }
 
 val RenderEdge.wire: Map<String, Any?>
     get() = _m[
         "id" j id, "source" j source, "target" j target, "kind" j kind, "label" j label,
         "confidence" j confidence?.wire, "visible" j visible, "directed" j directed, "style" j style?.wire,
+        "emphasis" j emphasis, "data" j data,
     ].filterValues { it != null }
 
 val RenderExtent.wire: Map<String, Any?>
@@ -115,8 +131,8 @@ fun RenderModelPatch.json(): String = jsonOf(wire)
 
 /**
  * The difference between two models, as upstream `diffRenderModels` (`packages/adapter/src/diff.ts`) computes it,
- * except that a change is any field differing. Upstream's fingerprint leaves out a node's `visible`,
- * `interactive`, `parent` and `data`, so a node hidden or regrouped there is never sent as changed.
+ * except that a change is any field differing. Upstream's fingerprint (since `25dda4b`) covers every redrawn field,
+ * so both sides report the same changes; the port's whole-record comparison needs no fingerprint.
  */
 fun diffRenderModels(previous: RenderModel, next: RenderModel): RenderModelPatch {
     val beforeNodes = previous.nodes.view.associateBy { it.id }
