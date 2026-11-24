@@ -2,6 +2,8 @@ package borg.trikeshed.torrent
 
 import borg.trikeshed.htx.client.ipfs.BlockStore
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 import borg.trikeshed.transfer.Transfer
@@ -23,6 +25,8 @@ class TorrentEngine(
     private val blockStore: BlockStore,
     scope: CoroutineScope,
     private val listenAddress: PeerAddress? = PeerAddress("0.0.0.0", 6881),
+    /** DHT bootstrap nodes (BEP 5); each session looks its peers up from them. Empty: no DHT. */
+    private val dht: Series<PeerAddress> = emptySeriesOf(),
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<TorrentEngine>
     override val key: CoroutineContext.Key<*> get() = Key
@@ -57,8 +61,8 @@ class TorrentEngine(
         val session = registry.withLock {
             check(!closed.isCompleted) { "Torrent engine closed" }
             sessions.value[magnet.infoHash]?.also { existing = true } ?: run {
-                require(magnet.peers.view.any() || magnet.trackers.view.any()) {
-                    "Magnet requires a tracker (tr) or direct peer (x.pe); BitTorrent DHT discovery is not implemented"
+                require(magnet.peers.view.any() || magnet.trackers.view.any() || dht.size > 0) {
+                    "Magnet requires a tracker (tr), a direct peer (x.pe) or DHT bootstrap nodes"
                 }
                 ensureListener(); install(null, magnet, destinationDir)
             }
@@ -77,7 +81,7 @@ class TorrentEngine(
     private fun install(file: TorrentFile?, magnet: MagnetUri?, destinationDir: String?): TorrentSession {
         check(sessions.value.size < 64) { "Torrent session limit" }
         val session = TorrentSession(file, magnet, blockStore, scope, peerId,
-            listenAddress?.port, destinationDir, ::observe)
+            listenAddress?.port, destinationDir, ::observe, dht)
         sessions.value = sessions.value + (session.infoHash to session)
         session.start()
         observe()

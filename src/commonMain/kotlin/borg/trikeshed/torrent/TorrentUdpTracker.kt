@@ -162,7 +162,7 @@ internal class TorrentDatagram private constructor(private val ring: TorrentSock
     }
 }
 
-private fun datagramSockaddr(peer: PeerAddress): ByteArray {
+fun datagramSockaddr(peer: PeerAddress): ByteArray {
     require(peer.port in 1..65535)
     val parts = peer.host.split('.')
     require(parts.size == 4) { "UDP requires a numeric IPv4 endpoint" }

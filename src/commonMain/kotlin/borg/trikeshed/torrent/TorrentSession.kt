@@ -11,6 +11,8 @@ import borg.trikeshed.lib._l
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.transfer.*
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.FileChannel
@@ -35,12 +37,16 @@ class TorrentSession internal constructor(
     private val listenPort: Int?,
     val destinationDir: String?,
     private val onObservation: () -> Unit,
+    /** DHT bootstrap nodes; empty, no lookup. */
+    val dht: Series<PeerAddress> = emptySeriesOf(),
 ) : TorrentHandle, CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<TorrentSession> {
         /** Pieces a transfer asks for ahead of its write. */
         const val AHEAD = 16
         /** How long a wanted piece waits for a source to start it before it fails. */
         const val WAIT_MILLIS = 120_000L
+        /** How often the DHT is asked again for peers. */
+        const val LOOKUP_MILLIS = 600_000L
     }
     override val key: CoroutineContext.Key<*> get() = Key
     override val infoHash: InfoHash = file?.infoHash ?: requireNotNull(magnet).infoHash
@@ -90,6 +96,9 @@ class TorrentSession internal constructor(
     var content: String? = null
     /** The SUMO class of this transfer's content; set by its caller. */
     var contentClass: String? = null
+    /** The last DHT lookup, while [lookups] runs. */
+    var lookup: TorrentDht.Lookup? = null
+    var lookups: Job? = null
 
     internal fun start() {
         check(worker == null)
@@ -97,6 +106,19 @@ class TorrentSession internal constructor(
         discovery = scope.launch {
             magnet?.peers?.view?.let { addresses ->
                 runCatching { addPeers(addresses.toList()) }.onFailure(::report)
+            }
+        }
+        if (dht.size > 0) lookups = scope.launch {
+            while (isActive) {
+                try {
+                    val found = TorrentDht.peers(infoHash, dht)
+                    lookup = found
+                    if (found.peers.size > 0) addPeers(found.peers.view.take(32))
+                } catch (failure: Throwable) {
+                    if (failure is CancellationException) currentCoroutineContext().ensureActive()
+                    report(failure)
+                }
+                delay(LOOKUP_MILLIS)
             }
         }
         val urls = ((fileTrackers()) + (magnet?.trackers?.view ?: emptyList())).distinct()
@@ -534,7 +556,7 @@ class TorrentSession internal constructor(
     /** Repeatable: peers, uTP and the owner each close once. */
     suspend fun close() = withContext(NonCancellable) {
         work.close()
-        tracker?.cancelAndJoin(); discovery?.join()
+        tracker?.cancelAndJoin(); lookups?.cancelAndJoin(); discovery?.join()
         peerMutex.withLock { connections.values.toList() }.joinAll()
         worker?.join()
         var failure: Throwable? = null
