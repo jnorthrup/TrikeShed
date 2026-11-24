@@ -47,6 +47,8 @@ class TorrentSession internal constructor(
         const val WAIT_MILLIS = 120_000L
         /** How often the DHT is asked again for peers. */
         const val LOOKUP_MILLIS = 600_000L
+        /** Pieces kept checked for serving. */
+        const val SERVING = 4
     }
     override val key: CoroutineContext.Key<*> get() = Key
     override val infoHash: InfoHash = file?.infoHash ?: requireNotNull(magnet).infoHash
@@ -60,6 +62,8 @@ class TorrentSession internal constructor(
     private val connections = mutableMapOf<PeerAddress, Deferred<Unit>>()
     private val peerMutex = Mutex()
     private val pieces = mutableMapOf<Int, CID>()
+    /** Pieces checked for serving, the last used last; under [storeMutex]. */
+    val serving = LinkedHashMap<Int, ByteArray>()
     private val storeMutex = Mutex()
     private val priorities = MutableStateFlow<Map<Int, Int>>(emptyMap())
     data class PieceWork(val index: Int, val reply: CompletableDeferred<ByteArray>)
@@ -198,8 +202,7 @@ class TorrentSession internal constructor(
         val traffic = SourceTraffic()
         val peer = TorrentPeer(stream, infoHash, peerId, metadata.value, scope, traffic,
             serveBlock = { request ->
-                val data = stored(request.pieceIndex)
-                data?.copyOfRange(request.offset, request.offset + request.length)?.also {
+                storeMutex.withLock { verified(request.pieceIndex)?.copyOfRange(request.offset, request.offset + request.length) }?.also {
                     observationMutex.withLock {
                         uploaded += it.size; up.add(it.size.toLong())
                         traffic.served += it.size; traffic.up.add(it.size.toLong())
@@ -245,13 +248,21 @@ class TorrentSession internal constructor(
     override suspend fun haveBitfield(): BitField = storeMutex.withLock {
         BitField.empty(numPieces).also { field -> pieces.keys.forEach { field[it] = true } }
     }
-    private suspend fun stored(index: Int): ByteArray? = storeMutex.withLock {
-        val cid = pieces[index] ?: return@withLock null
-        val data = blockStore.get(cid)
+    private suspend fun stored(index: Int): ByteArray? = storeMutex.withLock { verified(index)?.copyOf() }
+    /**
+     * Under [storeMutex]: the stored bytes of piece [index], checked against the metainfo. A peer asks for a piece
+     * block by block, so the last [SERVING] pieces checked are kept and a piece is hashed once, not once a block.
+     */
+    suspend fun verified(index: Int): ByteArray? {
+        serving.remove(index)?.let { serving[index] = it; return it }
+        val cid = pieces[index] ?: return null
+        val data = blockStore.get(cid)?.copyOf()
         if (data == null || !torrentFile.verifyPiece(index, data)) {
             pieces.remove(index); throw IllegalStateException("Stored torrent piece failed verification")
         }
-        data.copyOf()
+        serving[index] = data
+        if (serving.size > SERVING) serving.remove(serving.keys.first())
+        return data
     }
     private suspend fun store(index: Int, bytes: ByteArray) {
         require(torrentFile.verifyPiece(index, bytes)) { "Torrent piece $index failed hash verification" }
