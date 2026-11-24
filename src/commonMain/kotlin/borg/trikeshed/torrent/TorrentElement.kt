@@ -6,6 +6,8 @@ import borg.trikeshed.context.Drain
 import borg.trikeshed.htx.client.ipfs.BlockStore
 import borg.trikeshed.htx.client.ipfs.MemoryBlockStore
 import borg.trikeshed.htx.client.ipfs.CID
+import borg.trikeshed.lib.Series
+import borg.trikeshed.transfer.Transfer
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
@@ -66,6 +68,8 @@ class TorrentElement(
 
     val activeTorrents: Map<String, TorrentHandle> get() = engine.getAllTorrents().associateBy { it.infoHash.hex() }
     val stats: StateFlow<TorrentEngineStats> get() = engine.stats
+    /** The current transfer rows, one a torrent. */
+    suspend fun transfers(): Series<Transfer> = engine.transfers()
 
     suspend fun open() { worker.start() }
     private suspend fun <T> command(body: suspend TorrentElement.() -> T): T {

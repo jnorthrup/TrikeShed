@@ -32,12 +32,15 @@ object TorrentBencode {
     const val MAX_DEPTH = 64
     const val MAX_NODES = 262_144
 
-    fun decode(bytes: ByteArray): BencodeValue = decodePrefix(bytes).let {
+    fun decode(bytes: ByteArray): BencodeValue = decode(bytes, canonical = true)
+    /** With [canonical] false a dictionary's keys may come in any order, still unique: peers and trackers do not all sort them on the wire. */
+    fun decode(bytes: ByteArray, canonical: Boolean): BencodeValue = decodePrefix(bytes, canonical).let {
         require(it.b == bytes.size) { "Trailing bencode data" }; it.a
     }
-    fun decodePrefix(bytes: ByteArray): Join<BencodeValue, Int> {
+    fun decodePrefix(bytes: ByteArray): Join<BencodeValue, Int> = decodePrefix(bytes, canonical = true)
+    fun decodePrefix(bytes: ByteArray, canonical: Boolean): Join<BencodeValue, Int> {
         require(bytes.size <= MAX_BYTES) { "Bencode size limit" }
-        val reader = Reader(bytes)
+        val reader = Reader(bytes, canonical)
         return reader.read(0) j reader.position
     }
     fun dictionary(vararg entries: Pair<String, BencodeValue>): BencodeValue.Dictionary =
@@ -83,7 +86,7 @@ object TorrentBencode {
         }
         return a.size.compareTo(b.size)
     }
-    private class Reader(val bytes: ByteArray) {
+    private class Reader(val bytes: ByteArray, val canonical: Boolean) {
         var position = 0
         var nodes = 0
         fun peek(): Int { require(position < bytes.size) { "Truncated bencode" }; return bytes[position].toInt() and 255 }
@@ -112,7 +115,8 @@ object TorrentBencode {
                     while (peek() != 101) {
                         val key = read(depth + 1) as? BencodeValue.Bytes ?: throw IllegalArgumentException("Dictionary key is not bytes")
                         val raw = key.bytes
-                        previous?.let { require(compare(it, raw) < 0) { "Unsorted or duplicate dictionary key" } }
+                        if (canonical) previous?.let { require(compare(it, raw) < 0) { "Unsorted or duplicate dictionary key" } }
+                        else require(values.none { it.a.contentEquals(raw) }) { "Duplicate dictionary key" }
                         previous = raw
                         values += raw j read(depth + 1)
                     }

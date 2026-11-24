@@ -34,10 +34,13 @@ object PeerExtensions {
     const val METADATA_ID = 1
     const val MAX_METADATA = 4 * 1024 * 1024
     const val METADATA_BLOCK = 16384
+    /** Requests from one peer served at once, and the "reqq" the handshake names: v1 has no reject, so a request past it is lost to the asker. */
+    const val REQUESTS = 250
     fun handshake(metadataSize: Int? = null): PeerWireMessage.Extension {
         metadataSize?.let { require(it in 1..MAX_METADATA) }
         val entries = mutableListOf<Pair<String, BencodeValue>>("m" to TorrentBencode.dictionary("ut_metadata" to BencodeValue.Integer(METADATA_ID.toLong())))
         metadataSize?.let { entries += "metadata_size" to BencodeValue.Integer(it.toLong()) }
+        entries += "reqq" to BencodeValue.Integer(REQUESTS.toLong())
         return PeerWireMessage.Extension(0, TorrentBencode.encode(TorrentBencode.dictionary(*entries.toTypedArray())))
     }
     fun metadata(id: Int, type: Int, piece: Int, totalSize: Int? = null, bytes: ByteArray = byteArrayOf()): PeerWireMessage.Extension {
@@ -355,11 +358,11 @@ class PeerWireHandler(
     private suspend fun upload(request: PeerWireMessage.Request) {
         val block = request.block
         validateBlock(block)
-        if (localChoked || serveBlock == null || uploads.size >= 16) {
+        if (localChoked || serveBlock == null || uploads.size >= PeerExtensions.REQUESTS) {
             if (expectedInfoHash.isV2) transmit(PeerWireMessage.Reject(block.pieceIndex, block.offset, block.length).encode())
             return
         }
-        require(block !in uploads) { "Duplicate upload request" }
+        if (block in uploads) return // asked again while in flight: the one answer serves both
         // Lazy start installs the pending upload before even an immediate storage callback can finish.
         val job = CoroutineScope(context).launch(start = CoroutineStart.LAZY) {
             val result = runCatching { serveBlock.invoke(request) }
@@ -392,7 +395,7 @@ class PeerWireHandler(
     private suspend fun extension(message: PeerWireMessage.Extension) {
         require(framer.handshake?.extensions == true) { "Unnegotiated peer extension" }
         if (message.id == 0) {
-            val dict = TorrentBencode.decode(message.payload) as? BencodeValue.Dictionary ?: error("Extension handshake must be a dictionary")
+            val dict = TorrentBencode.decode(message.payload, canonical = false) as? BencodeValue.Dictionary ?: error("Extension handshake must be a dictionary")
             val map = dict["m"] as? BencodeValue.Dictionary
             if (map != null) {
                 val ids = mutableSetOf<Int>()
@@ -412,7 +415,7 @@ class PeerWireHandler(
             return
         }
         if (message.id != PeerExtensions.METADATA_ID) return
-        val parsed = TorrentBencode.decodePrefix(message.payload)
+        val parsed = TorrentBencode.decodePrefix(message.payload, canonical = false)
         require(parsed.b <= 1024) { "Metadata header exceeds bound" }
         val dict = parsed.a as? BencodeValue.Dictionary ?: error("Metadata header must be a dictionary")
         val type = (dict["msg_type"] as? BencodeValue.Integer)?.value ?: error("Metadata message has no type")
