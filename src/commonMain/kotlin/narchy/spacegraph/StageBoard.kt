@@ -156,8 +156,12 @@ object StageBoard {
             val known = challenge?.let { said(it.states) + ", confidence " + weight(it.confidence) } ?: "no known outcome"
             val persons = if (challenge?.author == Expectation.MODEL) challenges.filter { it.author == Expectation.PERSON && it.claim == challenge.claim } else emptyList()
             val held = persons.joinToString("") { p -> " · a person: " + said(p.states) + if (p.states == challenge?.states) ", agrees" else ", differs" }
+            // A miss is parameter-fixable when a variant gets the claim further (the row's `further`), else code-only as far as the variants read go.
+            val further = (row["further"] as? List<*>).orEmpty()
+            val measured = settings[0].blame(row)?.let { "lost at $it · " + if (further.isEmpty()) "code-only under the variants read" else "parameter-fixable: " + further.joinToString(", ") }
+                ?: "found at every stage"
             put("key.c$c", "key", 0.0, keyTop - LINE * (c + 1.5), across - 16, LINE - 4,
-                "${c + 1} · ${challenge?.origin ?: row["author"]} · ${row["claim"]} · $known$held", _m["kind" j "key", "claim" j c, "color" j "#ffffff"])
+                "${c + 1} · ${challenge?.origin ?: row["author"]} · ${row["claim"]} · $known$held · $measured", _m["kind" j "key", "claim" j c, "color" j "#ffffff"])
         }
 
         settings.forEachIndexed { w, setting ->
