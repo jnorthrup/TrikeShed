@@ -592,20 +592,21 @@ object StageBoard {
             pen.text(line, CX0 + 22, y + 4, 18.0, if (tally.origin == Expectation.PERSON) PERSON else MODEL, 700); y += 26
         }
         y += 10
-        val clip = pen.rect(CX0 + 4, 18.0, w - 8, 770.0)
-        val roomy = drop.balls.size <= 5
+        // Every ball is listed whole. Reasons are given for all when there is room, else for the balls the machine lost, else for none.
+        fun why(b: Ball) = b.blame?.let { wrap(IngestStages.reason(it, b.evidence[it].orEmpty(), b.claim), 15.0, w - 100).take(3) }.orEmpty()
+        fun tall(b: Ball, level: Int) = 16 + wrap(b.claim, 17.0, w - 100, true).size * 22 + 20 + (if (level == 0 || level == 1 && (b.paid ?: 0.0) < 0) why(b).size * 19 else 0) + 6
+        val level = (0..2).firstOrNull { l -> y + drop.balls.sumOf { tall(it, l) } <= 786 } ?: 2
         for (b in drop.balls) {
-            if (y > 760) break
+            if (y + tall(b, level) > 790) break
             pen.line(listOf(Vec3(CX0 + 22, y - 6), Vec3(CX1 - 22, y - 6)), EDGE, 1.0)
             ball(pen, CX0 + 38, y + 20, b)
             b.paid?.let { mark(pen, CX0 + 49, y + 9, it) }
             var ly = y + 16
-            for (l in wrap(b.claim, 17.0, w - 100, true).take(2)) { pen.text(l, CX0 + 66, ly, 17.0, INK, 700, clip = clip); ly += 22 }
+            for (l in wrap(b.claim, 17.0, w - 100, true)) { pen.text(l, CX0 + 66, ly, 17.0, INK, 700); ly += 22 }
             val said = b.challenge?.let { "said ${if (it.states) "it is stated" else "it is not stated"}" } ?: "no known outcome"
             val pay = b.paid?.let { if (it > 0) "paid ${two(it)}" else "lost ${two(-it)}" } ?: "unscored"
-            pen.text("$said · ${drop.where(b)} · $pay", CX0 + 66, ly, 15.0, b.paid?.let { if (it > 0) GO else STOP } ?: DIM, 700, clip = clip); ly += 20
-            val why = b.blame?.let { IngestStages.reason(it, b.evidence[it].orEmpty(), b.claim) }
-            if (why != null) for (l in wrap(why, 15.0, w - 100).take(if (roomy) 3 else 2)) { pen.text(l, CX0 + 66, ly, 15.0, DIM, clip = clip); ly += 19 }
+            pen.text("$said · ${drop.where(b)} · $pay", CX0 + 66, ly, 15.0, b.paid?.let { if (it > 0) GO else STOP } ?: DIM, 700); ly += 20
+            if (level == 0 || level == 1 && (b.paid ?: 0.0) < 0) for (l in why(b)) { pen.text(l, CX0 + 66, ly, 15.0, DIM); ly += 19 }
             y = ly + 6
         }
     }
