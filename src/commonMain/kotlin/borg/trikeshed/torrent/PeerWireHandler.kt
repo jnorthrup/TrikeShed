@@ -392,7 +392,7 @@ class PeerWireHandler(
     private suspend fun extension(message: PeerWireMessage.Extension) {
         require(framer.handshake?.extensions == true) { "Unnegotiated peer extension" }
         if (message.id == 0) {
-            val dict = TorrentBencode.decode(message.payload) as? BencodeValue.Dictionary ?: error("Extension handshake must be a dictionary")
+            val dict = TorrentBencode.decode(message.payload, canonical = false) as? BencodeValue.Dictionary ?: error("Extension handshake must be a dictionary")
             val map = dict["m"] as? BencodeValue.Dictionary
             if (map != null) {
                 val ids = mutableSetOf<Int>()
@@ -412,7 +412,7 @@ class PeerWireHandler(
             return
         }
         if (message.id != PeerExtensions.METADATA_ID) return
-        val parsed = TorrentBencode.decodePrefix(message.payload)
+        val parsed = TorrentBencode.decodePrefix(message.payload, canonical = false)
         require(parsed.b <= 1024) { "Metadata header exceeds bound" }
         val dict = parsed.a as? BencodeValue.Dictionary ?: error("Metadata header must be a dictionary")
         val type = (dict["msg_type"] as? BencodeValue.Integer)?.value ?: error("Metadata message has no type")

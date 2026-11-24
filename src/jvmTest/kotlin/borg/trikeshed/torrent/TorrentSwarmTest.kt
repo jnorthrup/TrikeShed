@@ -124,6 +124,17 @@ class TorrentSwarmTest {
         } finally { leech.a.close(); fast.a.close(); slow.server.close() }
     }
 
+    /** A peer whose extension handshake (BEP 10) lists its keys unsorted, as some clients send it, is kept and serves the content. */
+    @Test fun unsortedExtensionHandshake(): Unit = runBlocking {
+        val leech = engine()
+        val peer = HandSeed(corrupt = false, extension = "d1:v4:hand1:md11:ut_metadatai3eee")
+        try {
+            val session = leech.a.addTorrent(metainfo) as TorrentSession
+            session.addPeers(_l[PeerAddress("127.0.0.1", peer.server.localPort)])
+            assertContentEquals(content, withTimeout(30_000) { session.downloadAll() })
+        } finally { leech.a.close(); peer.server.close() }
+    }
+
     /** Two seeds connected at once both serve the one download; at its end a piece may come from both (endgame). */
     @Test fun twoSeedsAtOnce(): Unit = runBlocking {
         val first = engine(); val second = engine(); val leech = engine()
@@ -223,9 +234,10 @@ class TorrentSwarmTest {
 
     /**
      * A peer written by hand: [pieces], unchoked; each requested block answered after [delayMillis], with its first
-     * byte changed when [corrupt]. [requested] lists the requested pieces in order.
+     * byte changed when [corrupt]; when [extension] is given, it is the peer's extension handshake (BEP 10), sent
+     * after its own handshake. [requested] lists the requested pieces in order.
      */
-    inner class HandSeed(val corrupt: Boolean, val delayMillis: Long = 0, val pieces: IntRange = 0 until 9) {
+    inner class HandSeed(val corrupt: Boolean, val delayMillis: Long = 0, val pieces: IntRange = 0 until 9, val extension: String? = null) {
         val server = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
         val requested: MutableList<Int> = java.util.Collections.synchronizedList(mutableListOf())
         val dropped = CompletableDeferred<Unit>()
@@ -236,7 +248,9 @@ class TorrentSwarmTest {
                         val input = DataInputStream(socket.getInputStream()); val output = socket.getOutputStream()
                         fun send(bytes: ByteArray) = synchronized(output) { output.write(bytes) }
                         input.readFully(ByteArray(68))
-                        send(_a[19.toByte()] + "BitTorrent protocol".encodeToByteArray() + ByteArray(8) + infoHash + "-XX0001-handseed0001".encodeToByteArray())
+                        send(_a[19.toByte()] + "BitTorrent protocol".encodeToByteArray() + ByteArray(8).also { if (extension != null) it[5] = 0x10 } +
+                            infoHash + "-XX0001-handseed0001".encodeToByteArray())
+                        extension?.let { send(frame(20, _a[0.toByte()] + it.encodeToByteArray())) }
                         send(frame(5, ByteArray(2).also { bits -> for (k in pieces) bits[k / 8] = (bits[k / 8].toInt() or (128 ushr (k % 8))).toByte() }))
                         send(frame(1, ByteArray(0)))
                         while (true) {

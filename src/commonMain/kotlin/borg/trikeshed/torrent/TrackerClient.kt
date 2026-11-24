@@ -19,7 +19,7 @@ class TrackerClient(private val timeoutMillis: Long = 15000) : CoroutineContext.
     companion object Key : CoroutineContext.Key<TrackerClient> {
         fun parseResponse(bytes: ByteArray): TrackerAnnounce {
             require(bytes.size <= 2 * 1048576) { "Tracker response too large" }
-            val dict = TorrentBencode.decode(bytes) as? BencodeValue.Dictionary
+            val dict = TorrentBencode.decode(bytes, canonical = false) as? BencodeValue.Dictionary
                 ?: throw IllegalArgumentException("Tracker response must be a dictionary")
             (dict["failure reason"] as? BencodeValue.Bytes)?.let { throw IllegalStateException(it.text()) }
             val interval = (dict["interval"] as? BencodeValue.Integer)?.value

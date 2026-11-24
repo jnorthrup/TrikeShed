@@ -50,7 +50,7 @@ object TorrentDht {
                     async { node j runCatching { ring.query(node, query, QUERY_MILLIS) }.getOrNull() }
                 }.awaitAll()
                 for (reply in replies) {
-                    val answer = reply.b?.let { bytes -> runCatching { (TorrentBencode.decode(bytes) as BencodeValue.Dictionary)["r"] as BencodeValue.Dictionary }.getOrNull() }
+                    val answer = reply.b?.let { bytes -> runCatching { (TorrentBencode.decode(bytes, canonical = false) as BencodeValue.Dictionary)["r"] as BencodeValue.Dictionary }.getOrNull() }
                     if (answer == null) { known.remove(reply.a); continue }
                     answered++
                     known[reply.a] = (answer["id"] as? BencodeValue.Bytes)?.bytes?.takeIf { it.size == 20 }
