@@ -489,6 +489,37 @@ class TorrentSession internal constructor(
             connected.count { peer -> (0 until numPieces).all { peer.handler.peerState.value.hasPiece(it) } })
         onObservation()
     }
+    /**
+     * This session as a transfer row. [Transfer.total] and [Transfer.completed] count the pieces whose priority is
+     * not 0, so a selection of files shows its own progress; the sources are the connected peers and the web seeds.
+     */
+    suspend fun row(): Transfer {
+        val file = metadata.value
+        val held = storeMutex.withLock { pieces.keys.toSet() }
+        val wanted = if (file == null) emptyList() else (0 until file.numPieces).filter { (priorities.value[it] ?: 1) != 0 }
+        val connected: List<PieceSource> = peers.value
+        return observationMutex.withLock {
+            val state = when {
+                paused -> TransferState.PAUSED
+                file != null && wanted.all { it in held } -> TransferState.COMPLETE
+                busy.isNotEmpty() -> TransferState.ACTIVE
+                pieceFailure != null -> TransferState.ERROR
+                else -> TransferState.WAITING
+            }
+            val sources = (connected + webSeeds).map { source ->
+                TransferSource(source.address, source.protocol, source.transport, when {
+                    source in busy || source.traffic.up.now() > 0 -> TransferState.ACTIVE
+                    source.traffic.failure != null -> TransferState.ERROR
+                    else -> TransferState.WAITING
+                }, source.traffic.down.now(), source.traffic.up.now(), source.traffic.completed)
+            }
+            Transfer(infoHash.hex(), name, TransferProtocol.BITTORRENT, state,
+                file?.let { metainfo -> wanted.sumOf { metainfo.pieceLength(it).toLong() } },
+                file?.let { metainfo -> wanted.filter { it in held }.sumOf { metainfo.pieceLength(it).toLong() } } ?: 0L,
+                down.now(), up.now(), file?.let { TransferPieces(it.numPieces, held.size, it.pieceSize) },
+                sources.toSeries(), context, content, contentClass, pieceFailure.takeIf { state == TransferState.ERROR })
+        }
+    }
     /** Repeatable: peers, uTP and the owner each close once. */
     suspend fun close() = withContext(NonCancellable) {
         work.close()

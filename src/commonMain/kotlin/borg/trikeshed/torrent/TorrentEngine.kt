@@ -1,7 +1,10 @@
 package borg.trikeshed.torrent
 
 import borg.trikeshed.htx.client.ipfs.BlockStore
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
+import borg.trikeshed.transfer.Transfer
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -137,6 +140,8 @@ class TorrentEngine(
     }
     fun getTorrent(infoHash: InfoHash): TorrentHandle? = sessions.value[infoHash]
     fun getAllTorrents(): List<TorrentHandle> = sessions.value.values.toList()
+    /** The current transfer rows, one a session. */
+    suspend fun transfers(): Series<Transfer> = sessions.value.values.map { it.row() }.toSeries()
     fun pauseAll() { sessions.value.values.forEach { it.pause() } }
     fun resumeAll() { sessions.value.values.forEach { it.resume() } }
     suspend fun removeTorrent(infoHash: InfoHash) = registry.withLock {

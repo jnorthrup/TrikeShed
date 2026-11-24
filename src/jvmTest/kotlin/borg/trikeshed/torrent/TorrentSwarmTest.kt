@@ -3,6 +3,7 @@ package borg.trikeshed.torrent
 import borg.trikeshed.htx.client.ipfs.MemoryBlockStore
 import borg.trikeshed.htx.openHtxClientReactorElement
 import borg.trikeshed.lib.*
+import borg.trikeshed.transfer.*
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
@@ -84,7 +85,10 @@ class TorrentSwarmTest {
         } finally { for (e in _l[leech, second, first]) e.a.close() }
     }
 
-    /** Two files, a piece across their edge, and one peer and one web seed (BEP 19) feeding one picker. */
+    /**
+     * Two files, a piece across their edge, one peer and one web seed (BEP 19) feeding one picker; the row after it
+     * holds both sources and the whole as verified.
+     */
     @Test fun webSeedAndPeerFeedOnePicker(): Unit = runBlocking {
         val a = ByteArray(40000) { (it % 251).toByte() }
         val b = ByteArray(50000) { (it % 241 + 7).toByte() }
@@ -101,6 +105,13 @@ class TorrentSwarmTest {
             session.addPeers(_l[seed.b])
             assertContentEquals(a + b, withTimeout(60_000) { session.downloadAll() })
             assertTrue(http.ranges.get() > 0 && seeding.stats.value.uploadedBytes > 0, "ranges ${http.ranges.get()}, uploaded ${seeding.stats.value.uploadedBytes}")
+            val row = session.row()
+            assertEquals(TransferState.COMPLETE, row.state)
+            assertEquals(90000L, row.total); assertEquals(90000L, row.completed)
+            assertEquals(TransferPieces(3, 3, 32768), row.pieces)
+            assertEquals(_l["127.0.0.1:${seed.b.port} BITTORRENT TCP", "${http.url} HTTP TCP"],
+                row.sources.view.map { "${it.address} ${it.protocol} ${it.transport}" })
+            assertEquals(90000L, row.sources.view.sumOf { it.completed })
         } finally { leech.close(); seed.a.close(); client.close(); supervisor.close(); http.server.close() }
     }
 
