@@ -37,6 +37,15 @@ directory (`/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/goals/spaceg
 | `narchy/spacegraph/layout/Strategies.kt` | `src/layout/strategies.ts` | Ported at `125b369` (round three, row 5). Upstream test: `test/layout/strategies.test.ts` (15 cases). Not yet ported; unchecked beyond the gate compile. |
 | `narchy/spacegraph/representations/EdgeLadder.kt` | `src/edges/ladder.ts` | Ported at `125b369` (round three, row 6). Upstream test: `test/edge-ladder.test.ts` (6 cases). Not yet ported; unchecked beyond the gate compile. Deviation: `EdgeRungStyle` is a data class of nullable fields. |
 
+Upstream tests ported after the rows above were written (they supersede "not yet ported" and "no upstream test" in the
+table): `test/layout/scope.test.ts` (18 cases), `scope-policy.test.ts` (6), `field-projection.test.ts` (3),
+`scope-simulation.test.ts` (17), `force-core.test.ts` (2), `force.test.ts` (10), `strategies.test.ts` (18 with its three
+`it.each`), `test/zoom.test.ts` (6 of 10; the other 4 need `CameraControls`), `test/representation-ladder.test.ts` (9),
+`representation-playback.test.ts` (5), `edge-ladder.test.ts` (6). All pass against the port as it was; no ported file
+changed for them. Compiled only, with no upstream test ported: `ScopeLayout.kt`, `zoom/Zoom.kt`, `CameraVerbs.kt`
+beyond `MotionTest` (`test/camera-controls.test.ts` and `test/camera-fit.test.ts` exercise `CameraControls.ts` and
+`calculateFitView`, which are not ported).
+
 ## Not ported
 
 - `368b9d0` (`feat(scopes)`): the opt-in animated recursive scope engine (`ScopesPlugin`). A new Kotlin subsystem: lead.
