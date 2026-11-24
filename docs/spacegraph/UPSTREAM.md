@@ -23,6 +23,11 @@ directory (`/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/goals/spaceg
 | `narchy/spacegraph/zoom/Zoom.kt` | `src/core/zoom.ts` | Ported at `125b369` (round three, row 2). No upstream test; unchecked beyond the gate compile. |
 | `narchy/spacegraph/zoom/ZoomBands.kt` | `src/zoom/ZoomBands.ts` | Ported at `125b369` (round three, row 2). Tests: `test/zoom-bands.test.ts`, 8 cases in `ZoomBandsTest.kt`. Deviation: `ConfigurationError` is a local class; timestamp from `kotlinx.datetime`. |
 | `narchy/spacegraph/zoom/ScaleDomain.kt` | `src/zoom/ScaleDomain.ts` | Ported at `125b369` (round three, row 2). No upstream test; unchecked beyond the gate compile. |
+| `narchy/spacegraph/representations/Rung.kt` | `src/core/rung.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. |
+| `narchy/spacegraph/representations/LadderBase.kt` | `src/core/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `LadderBase` takes the hysteresis as a nullable Double. |
+| `narchy/spacegraph/representations/RepresentationLadder.kt` | `src/representations/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `LadderNode` extends `LadderEntry`; `build` is a lambda. |
+| `narchy/spacegraph/representations/Playback.kt` | `src/representations/playback.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: ease is a string key into the curve map. |
+| `narchy/spacegraph/representations/EdgeLadder.kt` | `src/edges/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `EdgeRungStyle` is a data class of nullable fields. |
 
 ## Not ported
 
