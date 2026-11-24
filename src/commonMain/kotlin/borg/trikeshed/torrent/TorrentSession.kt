@@ -56,7 +56,7 @@ class TorrentSession internal constructor(
     private val metadata = MutableStateFlow(file)
     val torrentFile: TorrentFile get() = requireNotNull(metadata.value) { "Torrent metadata not acquired" }
     private val metadataMutex = Mutex()
-    private val peers = MutableStateFlow<List<TorrentPeer>>(emptyList())
+    internal val peers = MutableStateFlow<List<TorrentPeer>>(emptyList())
     private val connections = mutableMapOf<PeerAddress, Deferred<Unit>>()
     private val peerMutex = Mutex()
     private val pieces = mutableMapOf<Int, CID>()
@@ -282,8 +282,9 @@ class TorrentSession internal constructor(
 
     /**
      * The picker. It admits piece requests and starts each wanted piece on an idle source that holds it: highest
-     * priority first, and among equals the piece fewest connected peers hold (rarest first). A source with nothing
-     * new to take starts a piece already in flight on one other source, and the first verified copy wins (endgame).
+     * priority first, and among equals the piece fewest connected peers hold (rarest first). Once every piece whose
+     * priority is not 0 is held or in flight (endgame), a source with nothing new to take starts a piece already in
+     * flight on one other source, and the first verified copy wins.
      * A source whose piece fails is passed over for that piece; a peer whose piece fails verification is closed and
      * not dialled again. A piece fails when every source has failed it, or when no source started it for
      * [WAIT_MILLIS]. While paused nothing starts. Closing the input fails the pieces not in flight; those in flight finish.
@@ -298,7 +299,10 @@ class TorrentSession internal constructor(
                 select<Unit> {
                     if (open) work.onReceiveCatching { result ->
                         val request = result.getOrNull()
-                        if (request != null) admit(wants, request) else {
+                        if (request != null) {
+                            admit(wants, request)
+                            while (true) admit(wants, work.tryReceive().getOrNull() ?: break)
+                        } else {
                             open = false
                             val closed = CancellationException("Torrent piece channel closed")
                             for (want in wants.values.filter { it.fetches.isEmpty() }) { wants.remove(want.index); want.replies.forEach { it.completeExceptionally(closed) } }
@@ -335,11 +339,15 @@ class TorrentSession internal constructor(
         if (wants.isEmpty()) return
         val connected = peers.value
         val active = observationMutex.withLock { busy.toSet() }
+        val held = storeMutex.withLock { pieces.keys.toSet() }
+        // Endgame: every piece whose priority is not 0 is held or in flight.
+        val endgame = (0 until file.numPieces).none { (priorities.value[it] ?: 1) != 0 && it !in held && wants[it]?.fetches.isNullOrEmpty() }
         val order = compareBy<Want>({ -(priorities.value[it.index] ?: 1) }, { want -> connected.count { it.handler.peerState.value.hasPiece(want.index) } }, { it.index })
         for (source in connected + webSeeds) {
             if (source in active) continue
             val open = wants.values.filter { source.holds(it.index) && source !in it.tried && source !in it.fetches }
-            val want = open.filter { it.fetches.isEmpty() }.minWithOrNull(order) ?: open.filter { it.fetches.size == 1 }.minWithOrNull(order) ?: continue
+            val want = open.filter { it.fetches.isEmpty() }.minWithOrNull(order)
+                ?: (if (endgame) open.filter { it.fetches.size == 1 }.minWithOrNull(order) else null) ?: continue
             val job = launch(start = CoroutineStart.LAZY) {
                 val outcome = runCatching {
                     val bytes = source.piece(want.index, file.pieceLength(want.index)) { count ->

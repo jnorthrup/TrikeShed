@@ -16,6 +16,7 @@ import java.net.Socket
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
+import kotlin.time.TimeSource
 import kotlin.test.*
 
 /** Engines of this tree in one swarm on loopback: real sockets, no outside network. */
@@ -61,16 +62,66 @@ class TorrentSwarmTest {
     /** A seed that changes one byte of every block it sends is passed over for an honest one. */
     @Test fun corruptSeedPassedOver(): Unit = runBlocking {
         val honest = engine(); val leech = engine()
-        val corrupt = CorruptSeed()
+        val corrupt = HandSeed(corrupt = true)
         try {
             honest.a.seedTorrent(metainfo, content)
             val session = leech.a.addTorrent(metainfo) as TorrentSession
             session.addPeers(_l[PeerAddress("127.0.0.1", corrupt.server.localPort)])
             session.addPeers(_l[honest.b])
             assertContentEquals(content, withTimeout(60_000) { session.downloadAll() })
-            assertTrue(corrupt.requests.get() > 0, "the corrupt seed was asked for a block")
+            assertTrue(corrupt.requested.isNotEmpty(), "the corrupt seed was asked for a block")
             withTimeout(10_000) { corrupt.dropped.await() }
         } finally { leech.a.close(); honest.a.close(); corrupt.server.close() }
+    }
+
+    /** A leech that knows only a magnet (the info-hash and the seed's address) takes the metadata from the seed (BEP 9), then the content. */
+    @Test fun magnetMetadataFromPeer(): Unit = runBlocking {
+        val seed = engine(); val leech = engine()
+        try {
+            seed.a.seedTorrent(metainfo, content)
+            val hex = infoHash.joinToString("") { "%02x".format(it) }
+            val session = withTimeout(60_000) { leech.a.addMagnet("magnet:?xt=urn:btih:$hex&dn=swarm.bin&x.pe=127.0.0.1:${seed.b.port}") } as TorrentSession
+            assertEquals("swarm.bin", session.torrentFile.info.name)
+            assertEquals(9, session.torrentFile.numPieces)
+            assertContentEquals(content, withTimeout(60_000) { session.downloadAll() })
+        } finally { leech.a.close(); seed.a.close() }
+    }
+
+    /**
+     * Wanted: all nine pieces. A slow peer that holds 0-3 is busy with piece 0 when a peer that holds all nine comes:
+     * that one is first asked for piece 4, the rarest it holds, where index order would ask it for piece 1.
+     */
+    @Test fun rarestFirst(): Unit = runBlocking {
+        val leech = engine()
+        val partial = HandSeed(corrupt = false, delayMillis = 2_000, pieces = 0 until 4)
+        val full = HandSeed(corrupt = false)
+        try {
+            val session = leech.a.addTorrent(metainfo) as TorrentSession
+            val download = async { withTimeout(60_000) { session.downloadAll() } }
+            delay(300)
+            session.addPeers(_l[PeerAddress("127.0.0.1", partial.server.localPort)])
+            delay(300)
+            session.addPeers(_l[PeerAddress("127.0.0.1", full.server.localPort)])
+            assertContentEquals(content, download.await())
+            assertEquals(0, partial.requested.first())
+            assertEquals(4, full.requested.first())
+        } finally { leech.a.close(); partial.server.close(); full.server.close() }
+    }
+
+    /** The last piece in flight on a peer that answers after 20 s is taken again from a faster seed (endgame). */
+    @Test fun endgame(): Unit = runBlocking {
+        val fast = engine(); val leech = engine()
+        val slow = HandSeed(corrupt = false, delayMillis = 20_000)
+        try {
+            fast.a.seedTorrent(metainfo, content)
+            val session = leech.a.addTorrent(metainfo) as TorrentSession
+            session.addPeers(_l[PeerAddress("127.0.0.1", slow.server.localPort)])
+            session.addPeers(_l[fast.b])
+            val started = TimeSource.Monotonic.markNow()
+            assertContentEquals(content, withTimeout(60_000) { session.downloadAll() })
+            assertTrue(slow.requested.isNotEmpty(), "the slow peer was asked")
+            assertTrue(started.elapsedNow().inWholeMilliseconds < 10_000, "finished in ${started.elapsedNow()}")
+        } finally { leech.a.close(); fast.a.close(); slow.server.close() }
     }
 
     /** Two seeds connected at once both serve the one download; at its end a piece may come from both (endgame). */
@@ -170,31 +221,37 @@ class TorrentSwarmTest {
         }
     }
 
-    /** Every piece, unchoked, and each block answered with its first byte changed. */
-    inner class CorruptSeed {
+    /**
+     * A peer written by hand: [pieces], unchoked; each requested block answered after [delayMillis], with its first
+     * byte changed when [corrupt]. [requested] lists the requested pieces in order.
+     */
+    inner class HandSeed(val corrupt: Boolean, val delayMillis: Long = 0, val pieces: IntRange = 0 until 9) {
         val server = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
-        val requests = AtomicInteger()
+        val requested: MutableList<Int> = java.util.Collections.synchronizedList(mutableListOf())
         val dropped = CompletableDeferred<Unit>()
         init {
             thread(isDaemon = true) {
                 try {
                     server.accept().use { socket ->
                         val input = DataInputStream(socket.getInputStream()); val output = socket.getOutputStream()
+                        fun send(bytes: ByteArray) = synchronized(output) { output.write(bytes) }
                         input.readFully(ByteArray(68))
-                        output.write(_a[19.toByte()] + "BitTorrent protocol".encodeToByteArray() + ByteArray(8) + infoHash + "-XX0001-corruptseed!".encodeToByteArray())
-                        output.write(frame(5, _a[(-1).toByte(), 0x80.toByte()]))
-                        output.write(frame(1, ByteArray(0)))
+                        send(_a[19.toByte()] + "BitTorrent protocol".encodeToByteArray() + ByteArray(8) + infoHash + "-XX0001-handseed0001".encodeToByteArray())
+                        send(frame(5, ByteArray(2).also { bits -> for (k in pieces) bits[k / 8] = (bits[k / 8].toInt() or (128 ushr (k % 8))).toByte() }))
+                        send(frame(1, ByteArray(0)))
                         while (true) {
                             val length = input.readInt()
                             if (length == 0) continue
                             val id = input.readByte().toInt()
                             val payload = ByteArray(length - 1).also { input.readFully(it) }
                             if (id != 6) continue
-                            requests.incrementAndGet()
                             val index = int(payload, 0); val begin = int(payload, 4); val size = int(payload, 8)
+                            if (begin == 0) requested += index
                             val at = index * pieceLength + begin
-                            val block = content.copyOfRange(at, at + size).also { it[0] = (it[0] + 1).toByte() }
-                            output.write(frame(7, payload.copyOfRange(0, 8) + block))
+                            val block = content.copyOfRange(at, at + size).also { if (corrupt) it[0] = (it[0] + 1).toByte() }
+                            val reply = frame(7, payload.copyOfRange(0, 8) + block)
+                            if (delayMillis == 0L) send(reply)
+                            else thread(isDaemon = true) { Thread.sleep(delayMillis); runCatching { send(reply) } }
                         }
                     }
                 } catch (ended: Exception) { dropped.complete(Unit) }
