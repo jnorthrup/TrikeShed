@@ -83,7 +83,9 @@ object GraalConsole {
 
     var skin: String = try { localStorage.getItem("graal.skin") ?: "ops" } catch (_: Throwable) { "ops" }
     /** The ground (SUMO homes, tilt and turn, the transfers in flight) first; M cycles to the territory map and the others. */
-    var mode = "ground"
+    var mode: String = try { localStorage.getItem("graal.mode")?.takeIf { it in setOf("ground", "map", "graph", "tree", "notion") } ?: "ground" } catch (_: Throwable) { "ground" }
+    /** The last non-ontology form shown; N goes between the ontology ground and it. */
+    var form: String = try { localStorage.getItem("graal.form")?.takeIf { it in setOf("map", "graph", "tree", "notion") } ?: "map" } catch (_: Throwable) { "map" }
     var fog = false
     /** territory path → last activity ms */
     val heat = HashMap<String, Double>()
@@ -342,7 +344,15 @@ object GraalConsole {
     fun targetNode(): TerrainNode? = hover ?: sel ?: root
 
     fun cycleMode() {
-        mode = if (mode == "ground") "map" else if (mode == "map") "graph" else if (mode == "graph") "tree" else if (mode == "tree") "notion" else "ground"
+        toForm(if (mode == "ground") "map" else if (mode == "map") "graph" else if (mode == "graph") "tree" else if (mode == "tree") "notion" else "ground")
+    }
+
+    /** Shows the form `next`: builds it, shows its panel, writes the crumb, and records the form and the address. */
+    fun toForm(next: String) {
+        mode = next
+        if (mode != "ground") form = mode
+        try { localStorage.setItem("graal.mode", mode); localStorage.setItem("graal.form", form) } catch (_: Throwable) {}
+        if (mode != "ground") window.history.replaceState(null, "", window.location.pathname + window.location.search) else GraalGround.moved()
         if (mode == "graph") buildGraph()
         if (mode == "notion") for (id in EXCLUSIVE_PANELS) q(id).style.display = "none"
         q("notion").style.display = if (mode == "notion") "flex" else "none"
@@ -351,7 +361,8 @@ object GraalConsole {
         crumb("mode: " + mode + (if (mode == "graph") " — force DAG (hubs + edges), drag nodes" else if (mode == "tree") " — radial drilldown of " + (if (t === root) "/" else pathOf(t))
             else if (mode == "notion") " — database flavor: sort by header, filter, click to inspect"
             else if (mode == "ground") " — SUMO ground: territories at their class homes, transfers in flight; right-drag or Q/E turn, PgUp/PgDn tilt, ↑↓←→ hyperarchy (1–9 a parent), ⌫ back, Home the class in hand, 0 the whole ground"
-            else " — territory map"))
+            else " — territory map") +
+            (if (mode == "ground") " · N the " + form + " form (its layers 1/2/3, fog F, fit 0) · M every form" else " · N the ontology ground · M next form"))
     }
 
     fun buildGraph() {
@@ -494,6 +505,7 @@ object GraalConsole {
             "l", "L" -> ledger()
             "b", "B" -> cycleSkin()
             "m", "M" -> cycleMode()
+            "n", "N" -> toForm(if (mode == "ground") form else "ground")
             "y", "Y" -> { toggleArrange(); crumb("arrangement: " + ARRANGE + (if (ARRANGE == "similarity") " — split by AngularCodec rings (satellite)" else " — split by id path (positional)")) }
             "x", "X" -> toggleHeapTerrain()
             "g", "G" -> toggleGc()

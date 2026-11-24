@@ -88,6 +88,7 @@ fun GraalConsole.loadGround() {
         }
     }
     poll()
+    if (mode != "ground") toForm(mode)
 }
 
 fun GraalConsole.drawGround() {
