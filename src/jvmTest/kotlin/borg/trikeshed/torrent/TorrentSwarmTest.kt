@@ -1,6 +1,8 @@
 package borg.trikeshed.torrent
 
+import borg.trikeshed.cas.IpfsBridge
 import borg.trikeshed.htx.client.ipfs.MemoryBlockStore
+import borg.trikeshed.job.CasStore
 import borg.trikeshed.htx.openHtxClientReactorElement
 import borg.trikeshed.lib.*
 import borg.trikeshed.transfer.*
@@ -113,6 +115,21 @@ class TorrentSwarmTest {
                 row.sources.view.map { "${it.address} ${it.protocol} ${it.transport}" })
             assertEquals(90000L, row.sources.view.sumOf { it.completed })
         } finally { leech.close(); seed.a.close(); client.close(); supervisor.close(); http.server.close() }
+    }
+
+    /** A leech's download lands in the IPFS store under the root Kubo 0.43.1 names the same bytes by, and its row says so. */
+    @Test fun landsInIpfsStore(): Unit = runBlocking {
+        val seed = engine(); val leech = engine()
+        try {
+            seed.a.seedTorrent(metainfo, content)
+            val session = leech.a.addTorrent(metainfo) as TorrentSession
+            session.addPeers(_l[seed.b])
+            val store = IpfsBridge(CasStore.inMemory())
+            val root = withTimeout(60_000) { session.downloadFile("swarm.bin", store) }
+            assertEquals("bafybeidhrbmd7gycz7lp7nldz7go4dhnwy5cohvkih3llwdzuuacr4nocy", root.toString())
+            assertContentEquals(content, store.getFile(root))
+            assertEquals(root.toString(), session.row().content)
+        } finally { leech.a.close(); seed.a.close() }
     }
 
     fun CoroutineScope.engine(): Join<TorrentEngine, PeerAddress> {

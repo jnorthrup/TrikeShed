@@ -2,6 +2,8 @@ package borg.trikeshed.torrent
 
 import borg.trikeshed.htx.client.ipfs.BlockStore
 import borg.trikeshed.htx.client.ipfs.CID
+import borg.trikeshed.cas.IpfsBridge
+import borg.trikeshed.ipns.IpnsCid
 import borg.trikeshed.lib.view
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
@@ -429,6 +431,15 @@ class TorrentSession internal constructor(
         var position = 0
         transfer(_l[entry]) { bytes -> bytes.copyInto(output, position); position += bytes.size }
         return output
+    }
+    /**
+     * The torrent's file at [path], every piece verified, put into [store] as an IPFS file; its root CID is returned
+     * and becomes this transfer's [content].
+     */
+    suspend fun downloadFile(path: String, store: IpfsBridge): IpnsCid {
+        val root = store.putFile(downloadFile(path), path.substringAfterLast('/'), context, contentClass)
+        content = root.toString()
+        return root
     }
     suspend fun downloadTo(path: String) {
         val metainfo = awaitMetadata()
