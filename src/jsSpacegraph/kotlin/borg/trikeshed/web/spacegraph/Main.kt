@@ -19,6 +19,9 @@ private fun boot() {
     if (document.getElementById("curator") != null) {
         CuratorPage.mount(); window.asDynamic().closePanels = { CuratorPage.close() }; return
     }
+    if (document.getElementById("stages") != null) {
+        StagesPage.mount(); window.asDynamic().closePanels = { StagesPage.close() }; return
+    }
     if (document.getElementById("world") == null) return
     val p = Panels()
     p.page.mount {
