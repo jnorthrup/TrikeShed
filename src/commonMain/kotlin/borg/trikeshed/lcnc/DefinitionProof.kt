@@ -27,11 +27,16 @@ data class DefinitionProofStep(
     val equalLemma: String?,
     /** The agreement rule that joined the fact's relation to the element's, when the two relations differ; null when equal. */
     val joinedBy: String?,
+    /** The exception that made this step, where no rule did: [dependency] is then empty. */
+    val exception: DefinitionException? = null,
 )
 
 data class SetAsideFact(val fact: String, val reason: String)
 
-/** A definition applied to parsed facts. [named] holds the steps that decide [conclusion]. */
+/**
+ * A definition applied to parsed facts. [named] holds the steps that decide [conclusion]; [exceptions] are the ones
+ * the caller handed in for an element of this definition, so a conclusion that rests on one says so.
+ */
 data class DefinitionApplication(
     val source: DictionarySource,
     val headword: String,
@@ -42,6 +47,7 @@ data class DefinitionApplication(
     val named: List<DefinitionProofStep>,
     val withoutEvidence: List<DefinitionElement>,
     val setAside: List<SetAsideFact>,
+    val exceptions: List<DefinitionException> = emptyList(),
 )
 
 /** Elements are read from the definition's parse; this rule set decides which fact relations meet an element relation. */
@@ -93,6 +99,7 @@ object DefinitionProof {
         definition: NlpDocument,
         facts: List<NlpDocument>,
         equalLemmas: Map<String, String>,
+        exceptions: List<DefinitionException> = emptyList(),
     ): DefinitionApplication {
         val elements = elements(definition)
         require(elements.isNotEmpty()) { "Definition of $headword has no elements" }
@@ -147,11 +154,18 @@ object DefinitionProof {
             if (!spoke) setAside += SetAsideFact(text, "speaks to no element")
         }
 
+        // An exception stands where a rule could not: a fact that meets its element is a positive step, an element that
+        // requires nothing asks for no evidence.
+        val taken = exceptions.filter { it.element in elements }
+        for (e in taken) if (e.kind == DefinitionExceptionKind.MEETS)
+            steps += DefinitionProofStep(e.element, e.fact.orEmpty(), "", EvidenceSign.POSITIVE, null, null, e)
+        val void = taken.filter { it.kind == DefinitionExceptionKind.VOID }.map { it.element }.toSet()
+
         val byElement = elements.associateWith { e -> steps.filter { it.element == e } }
         fun has(e: DefinitionElement, s: EvidenceSign) = byElement.getValue(e).any { it.sign == s }
         val conflicted = elements.firstOrNull { has(it, EvidenceSign.POSITIVE) && has(it, EvidenceSign.NEGATIVE) }
         val denied = elements.firstOrNull { has(it, EvidenceSign.NEGATIVE) && !has(it, EvidenceSign.POSITIVE) }
-        val withoutEvidence = elements.filter { byElement.getValue(it).isEmpty() }
+        val withoutEvidence = elements.filter { byElement.getValue(it).isEmpty() && it !in void }
         val (conclusion, named) = when {
             conflicted != null -> DefinitionConclusion.CONFLICTED to byElement.getValue(conflicted)
             denied != null -> DefinitionConclusion.DOES_NOT_APPLY to byElement.getValue(denied).filter { it.sign == EvidenceSign.NEGATIVE }
@@ -159,7 +173,7 @@ object DefinitionProof {
             else -> DefinitionConclusion.CANNOT_BE_TOLD to emptyList()
         }
         return DefinitionApplication(
-            source, headword, definition.text.trim(), elements, conclusion, steps.toList(), named, withoutEvidence, setAside.toList(),
+            source, headword, definition.text.trim(), elements, conclusion, steps.toList(), named, withoutEvidence, setAside.toList(), taken,
         )
     }
 }

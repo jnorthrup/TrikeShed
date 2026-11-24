@@ -165,4 +165,49 @@ class DefinitionProofTest {
         assertEquals(listOf("Rex delivers goods in trust."), application.setAside.map { it.fact }.distinct())
         assertTrue(application.setAside.all { it.reason == "speaks to no element" })
     }
+
+    private val smith = "Rex delivered the goods to Smith in trust upon a contract."
+    private fun chosen(option: String, probability: Double, options: List<String>) = mapOf("type" to "choice", "choice" to option,
+        "confidence" to probability, "probabilities" to options.associateWith { if (it == option) probability else 0.0 })
+
+    @Test fun aModelIsAskedOnlyWhereItsAnswersCouldSettleTheConclusion() {
+        val two = DefinitionProof.apply(source, "BAILMENT", definition, listOf(deliveredSmith), equalDeliver)
+        assertEquals(emptyMap(), DefinitionExceptions.questions(two, listOf(smith)), "two elements lack evidence and one may be asked")
+        val cleared = DefinitionExceptions.questions(two, listOf(smith), asks = 2)
+        assertEquals(setOf("e3", "e4"), cleared.keys)
+        assertEquals(setOf("f0", "void", "none"), (cleared.getValue("e3")["criteria"] as Map<*, *>).keys)
+        assertEquals("delivery amod express or imply", (cleared.getValue("e3")["instructions"] as Map<*, *>)["element"])
+        assertEquals(mapOf("f0" to smith), DefinitionExceptions.state(two, listOf(smith))["facts"])
+
+        val one = DefinitionProof.apply(source, "BAILMENT", orDefinition, listOf(deliveredOnly), equalDeliver)
+        assertEquals(listOf("nmod:in"), one.withoutEvidence.map { it.relation })
+        assertEquals(setOf("e1"), DefinitionExceptions.questions(one, listOf("Rex delivered the goods to Smith.")).keys)
+
+        val decided = DefinitionProof.apply(source, "BAILMENT", definition, listOf(notDeliver), equalDeliver)
+        assertEquals(emptyMap(), DefinitionExceptions.questions(decided, listOf("Rex did not deliver the goods."), asks = 9), "the rules decided")
+    }
+
+    @Test fun anAnswerAssignsAnExceptionAndOnlyTheCallerAppliesIt() {
+        val ruled = DefinitionProof.apply(source, "BAILMENT", definition, listOf(deliveredSmith), equalDeliver)
+        val questions = DefinitionExceptions.questions(ruled, listOf(smith), asks = 2)
+        val options = listOf("f0", "void", "none")
+        val assigned = DefinitionExceptions.assigned(ruled, listOf(smith), questions,
+            mapOf("e3" to chosen("void", 0.75, options), "e4" to chosen("f0", 0.5, options)), "model-x")
+        assertEquals(listOf(DefinitionExceptionKind.VOID, DefinitionExceptionKind.MEETS), assigned.map { it.kind })
+        assertEquals(listOf(null, smith), assigned.map { it.fact })
+        assertEquals(listOf(0.75, 0.5), assigned.map { it.probability })
+        assertEquals(listOf("model-x", "model-x"), assigned.map { it.author })
+        assertEquals(emptyList(), DefinitionExceptions.assigned(ruled, listOf(smith), questions,
+            mapOf("e3" to chosen("none", 0.9, options), "e4" to chosen("none", 0.9, options)), "model-x"), "none assigns nothing")
+
+        assertEquals(DefinitionConclusion.CANNOT_BE_TOLD, ruled.conclusion, "an assignment moves nothing by itself")
+        val applied = DefinitionProof.apply(source, "BAILMENT", definition, listOf(deliveredSmith), equalDeliver, assigned)
+        assertEquals(DefinitionConclusion.APPLIES, applied.conclusion)
+        assertEquals(assigned, applied.exceptions)
+        assertEquals(listOf(assigned[1]), applied.steps.mapNotNull { it.exception }, "the step a model made names it")
+        assertEquals(ruled.steps, applied.steps.filter { it.exception == null }, "the rules' own steps are as they were")
+        val half = DefinitionProof.apply(source, "BAILMENT", definition, listOf(deliveredSmith), equalDeliver, assigned.take(1))
+        assertEquals(DefinitionConclusion.CANNOT_BE_TOLD, half.conclusion)
+        assertEquals(listOf("dep"), half.withoutEvidence.map { it.relation })
+    }
 }
