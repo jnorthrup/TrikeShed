@@ -89,6 +89,8 @@ class PanelsOroboros(val panels: Panels) {
         button("Close viewer", header, "data-oroboros-close")
         button("Refresh", header, "data-oroboros-refresh")
         button("Inspect current work", header, "data-oroboros-current")
+        // Links to the transfers asked for by the run in hand.
+        TransferLinkBar(element("span", "", header), "run") { runId.ifEmpty { null } }.also { bar -> bar.start(); bindings.add { bar.stop() } }
         element("p", "Live executions owned by this host. Select a run, scope, and work pointcut. Closing this viewer leaves execution and its monitor running.")
         mark(element("p", "Reading executions…"), "status").setAttribute("role", "status")
         val layout = mark(element("div"), "layout")

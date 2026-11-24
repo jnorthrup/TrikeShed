@@ -46,6 +46,9 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
     /** Lines of the screen-space figure, top left. */
     var figure: Series<String> = emptySeriesOf()
     var selected: String? = null
+    /** Screen margins above the figure and below the hyperarchy panel, for a page whose own chrome covers the edges. */
+    var top = 12.0
+    var bottom = 12.0
     /** A view read before the hyperarchy arrived, applied when it does. */
     var pending: GroundView? = null
 
@@ -69,7 +72,7 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         for (s in stands.view) byRoom.getOrPut(h.room(s.path)) { ArrayList() }.add(s)
         for ((room, inRoom) in byRoom) {
             inRoom.sortBy { it.id }
-            val n = inRoom.size; val foot = room.r * min(.42, .78 / sqrt(n.toDouble()))
+            val n = inRoom.size; val foot = room.r * min(.36, .55 / sqrt(n.toDouble()))
             for ((k, s) in inRoom.withIndex()) {
                 val d = if (n == 1) 0.0 else room.r * .62 * sqrt((k + .5) / n); val a = k * GOLDEN
                 val at = Disc(room.x + d * cos(a), room.y + d * sin(a), foot)
@@ -138,8 +141,8 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
             "ArrowLeft" -> n != null && n.sibling(-1)
             "Backspace" -> n != null && n.back()
             "1", "2", "3", "4", "5", "6", "7", "8", "9" -> n != null && n.parents().let { ps -> name.toInt() <= ps.size && n.up(ps[name.toInt() - 1]) }
-            "h", "H" -> { home(); return true }
-            "Home", "0" -> { root(); return true }
+            "h", "H", "Home" -> { home(); return true }
+            "0" -> { root(); return true }
             "q", "Q" -> { camera = camera.turn(TURN_STEP); return true }
             "e", "E" -> { camera = camera.turn(-TURN_STEP); return true }
             "PageUp" -> { camera = camera.tilt(TILT_STEP); return true }
@@ -203,35 +206,37 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         drawn.clear(); shown.clear(); offered.clear()
         val cols = (vp.width / CELL).toInt() + 1; val rows = (vp.height / CELL).toInt() + 1
         val taken = BooleanArray(cols * rows)
-        fun claim(b: Rect): Boolean {
+        fun claim(b: Rect, force: Boolean = false): Boolean {
             val c0 = (b.x / CELL).toInt(); val c1 = (b.right / CELL).toInt(); val r0 = (b.y / CELL).toInt(); val r1 = (b.bottom / CELL).toInt()
             if (c1 < 0 || r1 < 0 || c0 >= cols || r0 >= rows) return false
-            for (y in max(0, r0)..min(rows - 1, r1)) for (x in max(0, c0)..min(cols - 1, c1)) if (taken[y * cols + x]) return false
+            if (!force) for (y in max(0, r0)..min(rows - 1, r1)) for (x in max(0, c0)..min(cols - 1, c1)) if (taken[y * cols + x]) return false
             for (y in max(0, r0)..min(rows - 1, r1)) for (x in max(0, c0)..min(cols - 1, c1)) taken[y * cols + x] = true
             return true
         }
         fun text(id: String, s: String, x: Double, y: Double, color: Rgba, size: Double, weight: Int = 400, force: Boolean = false): Boolean {
             val w = s.length * size * .56
-            if (!force && !claim(Rect(x, y - size, w, size * 1.3))) return false
+            if (!claim(Rect(x, y - size, w, size * 1.3), force) && !force) return false
             labels.add(DrawItem.Text(id, s, Vec3(x, y), color, size, weight = weight, maxWidth = max(w, 1.0)))
             return true
         }
-        /** [lines] from baseline [y] down, claimed as one block kept inside the view: the first line in [color], bold, the rest dimmer. */
-        fun block(id: String, lines: List<String>, x0: Double, y0: Double, color: Rgba, force: Boolean) {
-            if (lines.isEmpty()) return
+        /** [lines] from baseline [y] down, claimed as one block kept inside the view: the first line in [color], bold, the rest
+         *  dimmer. False, and nothing drawn, when the block's cells are taken and it is not forced. */
+        fun block(id: String, lines: List<String>, x0: Double, y0: Double, color: Rgba, force: Boolean): Boolean {
+            if (lines.isEmpty()) return false
             val w = lines.maxOf { it.length } * 11.0 * .56
             val x = x0.coerceIn(4.0, max(4.0, vp.width - w - 4)); val y = y0.coerceIn(16.0, max(16.0, vp.height - LINE * lines.size))
-            if (!force && !claim(Rect(x, y - 12, w, LINE * lines.size + 2))) return
+            if (!claim(Rect(x, y - 12, w, LINE * lines.size + 2), force) && !force) return false
             for ((i, s) in lines.withIndex()) labels.add(DrawItem.Text(id, s, Vec3(x, y + i * LINE), if (i == 0) color else Rgba(176, 188, 204),
                 if (i == 0) 12.0 else 10.5, weight = if (i == 0) 600 else 400, maxWidth = max(w, 1.0)))
+            return true
         }
         /** Class names wait until what stands has claimed its labels. */
         val names = ArrayList<() -> Unit>()
         val h = hyperarchy
-        if (h == null) {
-            figureItems(labels, h)
-            return FramePlan(viewport, (labels.size) j { i: Int -> labels[i] }, BACKGROUND)
-        }
+        /** The screen panels, planned first so that no label is placed under them, and drawn last. */
+        val hud = ArrayList<DrawItem>()
+        figureItems(hud, h) { claim(it, true) }
+        if (h == null) return FramePlan(viewport, (hud.size) j { i: Int -> hud[i] }, BACKGROUND)
         place(h)
         val eye = camera.eye(viewport); val f = camera.focal(viewport)
         val inHand = navigation?.current ?: -1
@@ -362,8 +367,12 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
             if (s.marks > 0 && px >= 18) ring(s.id, d, s.marks, s.held, s.color)
             val head = camera.project(Vec3(d.x, d.y, top), viewport) ?: c
             if (px >= (if (satellite) 22.0 else 9.0) || hot) {
+                // the whole label where it fits, else its first line right or left of the head, at its height or two lines up
                 val lines = if (px >= 46 || hot) s.label.view.toList() else listOf(s.label[0])
-                block(s.id, lines, head.x + 6, head.y - 6 - (lines.size - 1) * LINE, Rgba(236, 240, 246), force = hot)
+                val name = listOf(s.label[0]); val wide = s.label[0].length * 11.0 * .56; val clear = px * .42 + 6
+                if (!block(s.id, lines, head.x + clear, head.y - 6 - (lines.size - 1) * LINE, Rgba(236, 240, 246), force = hot))
+                    for (k in 0 until 4) if (block(s.id, name, if (k % 2 == 0) head.x + clear else head.x - clear - wide, head.y - 6 - (k / 2) * 2 * LINE,
+                            Rgba(236, 240, 246), force = false)) break
             }
             if (!satellite) for (t in s.satellites.view) {
                 val e = placed[t.id] ?: continue
@@ -402,23 +411,23 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         for (name in names) name()
 
         solids.sortByDescending { it.a }
-        figureItems(labels, h)
-        val items = ArrayList<DrawItem>(ground.size + solids.size + labels.size)
-        items.addAll(ground); for (s in solids) items.add(s.b); items.addAll(labels)
+        val items = ArrayList<DrawItem>(ground.size + solids.size + labels.size + hud.size)
+        items.addAll(ground); for (s in solids) items.add(s.b); items.addAll(labels); items.addAll(hud)
         return FramePlan(viewport, items.size j { i: Int -> items[i] }, BACKGROUND)
     }
 
-    /** The figure (top left) and the path in hand with its offered parents (bottom left), in screen space. */
-    fun figureItems(labels: ArrayList<DrawItem>, h: SumoHyperarchy?) {
+    /** The figure (top left) and the path in hand with its offered parents (bottom left), in screen space; [reserve] is given each panel's box. */
+    fun figureItems(labels: ArrayList<DrawItem>, h: SumoHyperarchy?, reserve: (Rect) -> Unit = {}) {
         fun panel(id: String, lines: List<String>, x: Double, y: Double, size: Double) {
             if (lines.isEmpty()) return
             val w = lines.maxOf { it.length } * size * .58 + 16; val tall = lines.size * size * 1.45 + 10
-            labels.add(DrawItem.Path(id, SceneProjection.rectangle(Rect(x, y, w, tall)), Rgba(14, 18, 26, .86), Rgba(52, 62, 80), 1.0))
+            reserve(Rect(x, y, w, tall))
+            labels.add(DrawItem.Path(id, SceneProjection.rectangle(Rect(x, y, w, tall)), Rgba(14, 18, 26), Rgba(52, 62, 80), 1.0))
             for ((i, s) in lines.withIndex()) labels.add(DrawItem.Text(id, s, Vec3(x + 8, y + 5 + (i + 1) * size * 1.45 - size * .35),
                 if (i == 0) GOLD else Rgba(220, 226, 236), size, weight = if (i == 0) 600 else 400, maxWidth = w - 16))
         }
-        panel("figure", figure.view.toList(), 12.0, 12.0, 13.0)
-        if (h == null) { panel("hyperarchy", listOf("SUMO hyperarchy: loading…"), 12.0, viewport.height - 40.0, 12.0); return }
+        panel("figure", figure.view.toList(), 12.0, top, 13.0)
+        if (h == null) { panel("hyperarchy", listOf("SUMO hyperarchy: loading…"), 12.0, viewport.height - 28 - bottom, 12.0); return }
         val n = navigation ?: return
         val lines = ArrayList<String>()
         lines.add(if (n.path.isEmpty()) "SUMO hyperarchy · ${h.size} classes · ↓ to a root" else n.names.joinToString(" › "))
@@ -426,8 +435,8 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         val parentLine = if (ps.isEmpty()) "" else "↑ " + ps.withIndex().joinToString("   ") { (i, p) -> "${i + 1} ${h.names[p]}" }
         if (parentLine.isNotEmpty()) lines.add(parentLine)
         val cs = n.children(); val ss = n.siblings(); val at = ss.indexOf(n.current)
-        lines.add("↓ ${cs.size} children" + (if (at >= 0) "   ←→ ${at + 1} of ${ss.size}" else "") + "   ⌫ back   H home   0 root   Q/E turn   PgUp/PgDn tilt")
-        val size = 12.0; val tall = lines.size * size * 1.45 + 10; val y = viewport.height - tall - 12
+        lines.add("↓ ${cs.size} children" + (if (at >= 0) "   ←→ ${at + 1} of ${ss.size}" else "") + "   ⌫ back   Home the class   0 root   Q/E turn   PgUp/PgDn tilt")
+        val size = 12.0; val tall = lines.size * size * 1.45 + 10; val y = viewport.height - tall - bottom
         panel("hyperarchy", lines, 12.0, y, size)
         if (parentLine.isNotEmpty()) {
             // each offered parent's words in the second line: a box the pointer can take

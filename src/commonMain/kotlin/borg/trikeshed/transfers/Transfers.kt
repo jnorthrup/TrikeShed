@@ -1,8 +1,10 @@
 package borg.trikeshed.transfers
 
+import borg.trikeshed.docs.DocumentSurface
 import borg.trikeshed.graal.console.Terrain
-import borg.trikeshed.landscape.ActivityState
+import borg.trikeshed.landscape.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.wiki.WikiSurface
 import narchy.spacegraph.*
 import narchy.spacegraph.graphics.spi.Rgba
 
@@ -90,6 +92,38 @@ object TransferReports {
 }
 
 /**
+ * Links between the transfers panel and the pages that show what asked for a transfer, each in the form that page
+ * already reads ([context]); every page links back to a transfer as [transfer]. A context's id is the page's own key:
+ * a stored document `<project>/<document>`, an LCNC node what [LandscapeNavigation.node] writes after `node:` (the
+ * pair `["<program>", "<node>"]`, as the board writes the node it focuses), a run its run id, a curated book its name.
+ */
+object TransferLinks {
+    val KINDS: Series<String> = s_["run", "node", "book", "document"]
+
+    /**
+     * Where [c] is shown: a document on the documents page (`/documents#<project>/<document>`, which selects it; /graal
+     * reads no document from a URL); a node on the board (`/harness#x=…&y=…&z=…&focus=node:[…]`, which keeps the focus
+     * and selects no node); a run on /panels and a book on /curator, which read neither from a URL and open alone.
+     */
+    fun context(c: TransferContext): String? = when (c.kind) {
+        "document" -> c.id.substringBefore('/', "").takeIf { it.isNotEmpty() }?.let { project ->
+            "/documents#" + DocumentSurface.projectFragment(project) + "/" + WikiSurface.encode(c.id.substringAfter('/'))
+        }
+        "node" -> "/harness" + LandscapeNavigation.encode(LandscapeCamera(0.0, 0.0, 1.0), "node:" + c.id)
+        "run" -> "/panels"
+        "book" -> "/curator"
+        else -> null
+    }
+
+    /** The transfers panel on transfer [id]. */
+    fun transfer(id: String): String = "/transfers?transfer=" + LandscapeNavigation.formEscape(id)
+
+    /** The rows asked for by the context ([kind], [id]). */
+    fun matching(rows: Series<TransferRow>, kind: String, id: String): Series<TransferRow> =
+        rows.filter { it.context?.kind == kind && it.context.id == id }
+}
+
+/**
  * The transfers on the ground ([GroundScene]): a transfer stands in the room of the class its content is typed by
  * (the untyped room without one), its sources round it and its pieces about its foot; each protocol is a territory
  * induced under SUMO's [NETWORK] with its transports' territories inside it, and a ground line joins each transfer to
@@ -140,15 +174,15 @@ object TransferGround {
     fun territories(rows: Series<TransferRow>): Series<Territory> {
         val all = ArrayList<TransferSource>()
         for (r in rows.view) for (s in r.sources.view) all.add(s)
-        val protocols = sortedSetOf<String>()
-        for (r in rows.view) if (r.protocol.isNotEmpty()) protocols.add(r.protocol)
-        for (s in all) if (s.protocol.isNotEmpty()) protocols.add(s.protocol)
+        val named = LinkedHashSet<String>()
+        for (r in rows.view) if (r.protocol.isNotEmpty()) named.add(r.protocol)
+        for (s in all) if (s.protocol.isNotEmpty()) named.add(s.protocol)
         val out = ArrayList<Territory>()
-        for (p in protocols) {
+        for (p in named.sorted()) {
             val roll = TransferRollup.of(rows.filter { it.protocol == p })
             out.add(Territory("protocol/$p", s_[NETWORK, p], s_[p, count(roll.transfers, "transfer") + " · ${done(roll.completed, if (roll.untotalled > 0) null else roll.total)}", rate(roll.down, roll.up)], PROTOCOL))
             val over = all.filter { it.protocol == p }
-            for (t in over.map { it.transport }.filter { it.isNotEmpty() }.toSortedSet()) {
+            for (t in over.map { it.transport }.filter { it.isNotEmpty() }.distinct().sorted()) {
                 val on = over.filter { it.transport == t }
                 out.add(Territory("protocol/$p/$t", s_[NETWORK, p, t], s_["$p over $t", count(on.size, "source"), rate(on.sumOf { it.down }, on.sumOf { it.up })], TRANSPORT))
             }

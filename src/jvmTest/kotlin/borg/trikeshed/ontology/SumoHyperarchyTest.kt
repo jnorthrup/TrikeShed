@@ -150,6 +150,30 @@ class SumoHyperarchyTest {
     }
 
     @Test
+    fun keysMoveThroughTheHyperarchyAndTheCameraGoesHome() {
+        val h = real()
+        val viewport = Viewport(1280, 800)
+        val scene = GroundScene(viewport); scene.load(h)
+        val n = scene.navigation!!
+        n.goto(h.at("Downloading"))
+        // "2" takes the second parent offered, ITProcess; the camera frames its home, the URL carries the path
+        assertTrue(scene.key("2"))
+        assertEquals("ITProcess", h.names[n.current])
+        val home = h.home(h.at("ITProcess"))
+        assertEquals(home.x, scene.camera.x); assertEquals(home.y, scene.camera.y)
+        assertEquals(scene.camera, scene.camera.frame(home.x, home.y, home.r, viewport))
+        assertTrue(scene.key("ArrowRight")); assertTrue(scene.key("Backspace")); assertEquals("ITProcess", h.names[n.current])
+        assertTrue(scene.key("Backspace")); assertEquals("Downloading", h.names[n.current])
+        val view = assertNotNull(GroundView.decode(scene.hash()))
+        assertEquals(_l["Entity", "Physical", "Process", "IntentionalProcess", "ITProcess", "Downloading"], view.path)
+        // tilt and turn keys keep the ground point in the middle
+        val middle = scene.camera.x to scene.camera.y
+        assertTrue(scene.key("q")); assertTrue(scene.key("PageUp"))
+        assertEquals(middle, scene.camera.x to scene.camera.y)
+        assertEquals(15.0, scene.camera.yaw); assertEquals(10.0, scene.camera.pitch)
+    }
+
+    @Test
     fun pathReadsBackFromTheUrl() {
         val h = real(); val n = HyperarchyNavigation(h)
         n.goto(h.at("DataTransfer")); n.down(h.at("NetworkCommunication"))

@@ -112,5 +112,9 @@ private fun boot() {
     })
     window.addEventListener("resize", { Patch.applyView(); Patch.redraw(); Patch.Landscape.schedule() })
     window.addEventListener("pagehide", { h.stream?.close(); window.clearTimeout(h.reconnectTimer) })
+    // Links to the transfers asked for by the LCNC node in focus: its context id is the pair LandscapeNavigation.node writes after "node:".
+    val transfers = document.createElement("span")
+    q("#bar").appendChild(transfers)
+    borg.trikeshed.web.TransferLinkBar(transfers, "node") { h.focusKey.takeIf { it.startsWith("node:") }?.removePrefix("node:") }.start()
     GlobalScope.launch { h.connect() }
 }

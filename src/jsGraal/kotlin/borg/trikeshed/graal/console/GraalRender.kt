@@ -17,6 +17,7 @@ import kotlin.random.Random
 /* ── render ─────────────────────────────────────────────── */
 
 fun GraalConsole.draw() {
+    if (mode == "ground") { drawGround(); window.requestAnimationFrame { draw() }; return }
     tickMomentum() // kinetic pan/zoom glide (no-op when still, off under reduced motion)
     val dpr = window.devicePixelRatio
     ctx.setTransform(dpr, 0.0, 0.0, dpr, 0.0, 0.0)
