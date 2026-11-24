@@ -34,6 +34,7 @@ directory (`/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/goals/spaceg
 | `narchy/spacegraph/depth/Continuum.kt` | `src/depth/continuum.ts` | Ported at `125b369` (round three, row 3). Tests: `test/depth-continuum.test.ts`, in `narchy/spacegraph/depth/DepthTest.kt`. |
 | `narchy/spacegraph/layout/Octaves.kt` | `src/layout/octaves.ts` | Ported at `125b369` (round three, row 5). Deviation: `Position` is `Vec3`; `shape` is an enum. Tests: `test/layout/octaves.test.ts`, 4 cases in `narchy/spacegraph/layout/OctavesTest.kt`. |
 | `narchy/spacegraph/layout/Ergonomics.kt` | `src/layout/ergonomics.ts` | Ported at `125b369` (round three, row 5). Deviations: `ErgonomicsViewport` takes Double sizes and `solveErgonomicLayout` returns null where upstream returns undefined. Tests: `test/layout/ergonomics.test.ts`, 7 cases in `narchy/spacegraph/layout/ErgonomicsTest.kt`. |
+| `narchy/spacegraph/layout/Strategies.kt` | `src/layout/strategies.ts` | Ported at `125b369` (round three, row 5). No upstream test imports it; nothing checks it beyond the compile gate. |
 | `narchy/spacegraph/representations/EdgeLadder.kt` | `src/edges/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `EdgeRungStyle` is a data class of nullable fields. |
 
 ## Not ported
