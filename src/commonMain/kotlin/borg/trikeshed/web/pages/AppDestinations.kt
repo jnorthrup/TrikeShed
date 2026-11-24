@@ -13,6 +13,7 @@ object AppDestinations {
         AppDestination("documents", "Documents", "/documents", listOf("/documents.html")),
         AppDestination("wiki", "Wiki", "/wiki", listOf("/wiki.html")),
         AppDestination("graal", "Graal", "/graal", emptyList()),
+        AppDestination("transfers", "Transfers", "/transfers", listOf("/transfers.html")),
         AppDestination("panels", "Panels", "/panels", listOf("/panels.html")),
         AppDestination("headhunter", "Job agent", "/headhunter", listOf("/headhunter.html")),
         AppDestination("kanban", "Kanban", "/kanban", listOf("/kanban.html")),

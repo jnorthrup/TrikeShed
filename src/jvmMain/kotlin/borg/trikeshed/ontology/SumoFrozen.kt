@@ -50,6 +50,9 @@ object SumoFrozen {
         return Image(taxonomy, strings(d), ints(d), ints(d), ints(d), ints(d))
     }
 
+    /** The subclass hyperarchy of the image on the classpath (the ground's homes and navigation), or null without it. */
+    val hyperarchy: SumoHyperarchy? by lazy { SumoFrozen::class.java.classLoader.getResourceAsStream(RESOURCE)?.use(::read)?.let { SumoHyperarchy.of(it.taxonomy) } }
+
     private fun strings(out: DataOutputStream, a: Array<String>) {
         out.writeInt(a.size)
         for (s in a) { val b = s.encodeToByteArray(); out.writeInt(b.size); out.write(b) }

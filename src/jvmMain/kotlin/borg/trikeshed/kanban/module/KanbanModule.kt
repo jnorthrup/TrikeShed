@@ -58,6 +58,9 @@ import kotlin.coroutines.CoroutineContext
 class KanbanModule : ForgeModule {
     override val id: String = "kanban"
 
+    /** `/api/sumo/hyperarchy`'s body, built once from the frozen image; null without the image. */
+    val sumoHyperarchyJson: String? by lazy { borg.trikeshed.ontology.SumoFrozen.hyperarchy?.let { jsonOf(it.wire()) } }
+
     override suspend fun open(ctx: ModuleContext): ModuleHandle {
         val store = BoardStoreElement(
             wal = JvmBoardWal(File(ctx.stateDir, ".kanban")),
@@ -979,6 +982,20 @@ class KanbanModule : ForgeModule {
             JvmKanbanServer.HttpResponse(200, jsonOf(borg.trikeshed.lcnc.LcncTrail.live.since(
                 query["since"]?.toLongOrNull() ?: 0L, query["nodes"]?.toIntOrNull() ?: 0,
                 query["epoch"]?.toLongOrNull() ?: 0L)))
+        }
+
+        // The transfers every transport reports (TransferReports), in the row shape the /transfers panel reads.
+        claim(id, "/api/transfers") { method, _, _, _ ->
+            if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            JvmKanbanServer.HttpResponse(200, jsonOf(borg.trikeshed.transfers.TransferReports.rows()))
+        }
+
+        // SUMO's classes and subclass edges from the frozen image: the browser builds the ground's homes and its
+        // hyperarchy navigation from them (SumoHyperarchy.of(wire)).
+        claim(id, "/api/sumo/hyperarchy") { method, _, _, _ ->
+            if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            sumoHyperarchyJson?.let { JvmKanbanServer.HttpResponse(200, it) }
+                ?: JvmKanbanServer.HttpResponse(503, """{"error":"sumo_image_missing","resource":"${borg.trikeshed.ontology.SumoFrozen.RESOURCE}"}""")
         }
 
         claim(id, "/api/lcnc/runs") { method, path, _, _ ->
