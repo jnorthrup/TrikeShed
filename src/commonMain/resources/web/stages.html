@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/application-nav.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ingest stages · challenges · trikeshed</title>
+<link rel="icon" href="/icons/forge-icon.svg">
+<style>
+:root{--line:#d5dbe3;--ink:#17212b;--dim:#5b6676;--panel:#f1f4f8}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:var(--ink);font:13px/1.45 system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}
+header{display:flex;gap:14px;align-items:baseline;padding:8px 14px;border-bottom:1px solid var(--line)}
+header b{font-size:16px}
+header span{color:var(--dim)}
+#stages-status{margin-left:auto;font:12px ui-monospace,monospace}
+main{flex:1;display:flex;min-height:0}
+#stages-input,#stages-panel{width:340px;background:var(--panel);padding:12px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+#stages-input{border-right:1px solid var(--line)}
+#stages-panel{border-left:1px solid var(--line);display:block}
+#stages{flex:1;position:relative;overflow:hidden;cursor:grab;touch-action:none}
+#stages:active{cursor:grabbing}
+#stages svg{display:block}
+label{display:flex;flex-direction:column;gap:3px;color:var(--dim)}
+textarea,input,select{font:12px ui-monospace,monospace;padding:4px 6px;border:1px solid var(--line);border-radius:4px;color:var(--ink);background:#fff}
+form{display:flex;flex-direction:column;gap:5px;border:1px solid var(--line);border-radius:6px;padding:8px;background:#fff}
+button{cursor:pointer;padding:4px 10px;border:1px solid var(--line);border-radius:4px;background:#fff}
+#stages-challenges{margin:0;padding-left:20px;font-size:12px}
+#stages-challenges button{padding:0 6px;margin-left:4px}
+#stages-panel h3{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 4px}
+#stages-panel h4{margin:8px 0 2px;font-size:12px}
+#stages-panel ul{margin:0;padding-left:18px}
+#stages-panel .miss{color:#b91c1c}
+#stages-panel dl{display:grid;grid-template-columns:70px 1fr;gap:2px 8px;font-size:12px}
+#stages-panel dt{color:var(--dim)} #stages-panel dd{margin:0;word-break:break-word}
+</style>
+</head>
+<body data-app-page="stages">
+<header><b>Ingest stages</b><span>pachinko: each challenge drops through the stages a passage is read by and rests on the first that loses it, or falls to the found row; each further board is the same drop under another setting · wheel and drag move the view, closer shows deeper evidence · click a circle to read it</span><span id="stages-status">no board yet</span></header>
+<main>
+<nav id="stages-input">
+<label>Passage <textarea id="stages-passage" rows="7" placeholder="the passage the challenges are about"></textarea></label>
+<form id="stages-challenge">
+<textarea name="claim" rows="2" placeholder="a claim about the passage" aria-label="Claim"></textarea>
+<select name="states" aria-label="Outcome"><option value="true">the passage states it</option><option value="false">the passage does not state it</option></select>
+<label>confidence in that <input name="confidence" type="number" min="0.01" max="1" step="0.01" value="1"></label>
+<select name="author" aria-label="Author"><option value="person">a person's outcome (the truth)</option><option value="model">a model's outcome (a candidate)</option></select>
+<input name="model" placeholder="the model's id" aria-label="Model id">
+<button type="submit">Add the challenge</button>
+</form>
+<label>A model's challenges, as rows <textarea id="stages-rows" rows="4" placeholder='[{"author": "model", "model": "id", "claim": "…", "states": true, "confidence": 0.8}]'></textarea></label>
+<button id="stages-add-rows" type="button">Add the rows</button>
+<ol id="stages-challenges"></ol>
+<label>Parsers, the first read as the board <input id="stages-parsers"></label>
+<label>Generic subjects <input id="stages-generic"></label>
+<button id="stages-read" type="button">Read through the stages</button>
+<label>A run record, or a stages output <textarea id="stages-record" rows="3" placeholder="the JSON /api/lcnc/run answered"></textarea></label>
+<button id="stages-load" type="button">Show it</button>
+</nav>
+<div id="stages" aria-label="Ingest stages boards"></div>
+<aside id="stages-panel" aria-live="polite"></aside>
+</main>
+<script src="/kotlin/spacegraph/spacegraph.js" defer></script>
+</body>
+</html>

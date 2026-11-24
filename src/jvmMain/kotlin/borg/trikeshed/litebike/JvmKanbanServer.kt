@@ -541,6 +541,9 @@ class JvmKanbanServer(
         // the curator scope: live LCNC activity grown as a tree, drained from /api/lcnc/trail
         "/curator" to ("web/curator.html" to "text/html; charset=utf-8"),
         "/curator.html" to ("web/curator.html" to "text/html; charset=utf-8"),
+        // the ingest stages against challenges: each board one setting, drawn by commonMain's StageBoard
+        "/stages" to ("web/stages.html" to "text/html; charset=utf-8"),
+        "/stages.html" to ("web/stages.html" to "text/html; charset=utf-8"),
         "/wiki.css" to ("web/wiki.css" to "text/css; charset=utf-8"),
         // the blackboard harness draws board territories and LCNC typed cables
         "/harness.html" to ("web/harness.html" to "text/html; charset=utf-8"),
