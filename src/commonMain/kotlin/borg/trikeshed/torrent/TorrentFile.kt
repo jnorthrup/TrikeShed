@@ -2,11 +2,14 @@ package borg.trikeshed.torrent
 
 import borg.trikeshed.job.sha256
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.s_
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.α
 
 /** Validated metainfo retaining the exact info-dictionary substring used by BEP 3/52. */
 class TorrentFile private constructor(
@@ -18,6 +21,8 @@ class TorrentFile private constructor(
     val comment: String?,
     val createdBy: String?,
     val encoding: String?,
+    /** BEP 19 `url-list`: URLs that serve the torrent's files over HTTP. */
+    val webSeeds: Series<String>,
     private val v1Files: List<TorrentFileEntry>,
     private val v2Files: List<TorrentFileEntry>,
     private val v1Hashes: ByteArray?,
@@ -54,7 +59,7 @@ class TorrentFile private constructor(
     /** v2 metadata acquired by BEP 9 becomes piece-verifiable after authenticated layers arrive. */
     fun withPieceLayers(pieceLayers: Map<InfoHash, ByteArray>): TorrentFile {
         validateLayers(v2Files, pieceSize, pieceLayers, required = true)
-        return TorrentFile(raw, info, announce, announceList, creationDate, comment, createdBy, encoding,
+        return TorrentFile(raw, info, announce, announceList, creationDate, comment, createdBy, encoding, webSeeds,
             v1Files, v2Files, v1Hashes, pieceLayers, infoHash)
     }
 
@@ -198,9 +203,14 @@ class TorrentFile private constructor(
                 node["length"]?.integer(), version?.toInt(), tree?.let(::fileTree),
                 if (node["files"] != null) v1 else null, node["source"]?.text(), privateFlag?.toInt())
             val tiers = outer?.get("announce-list")?.list()?.view?.map { tier -> tier.list().view.map { it.text() } } ?: emptyList()
+            val seeds: Series<String> = when (val urls = outer?.get("url-list")) {
+                null -> emptySeriesOf()
+                is BencodeValue.ListValue -> urls.values α { it.text() }
+                else -> s_[urls.text()]
+            }
             return TorrentFile(raw, info, outer?.get("announce")?.text(), tiers,
                 outer?.get("creation date")?.integer(), outer?.get("comment")?.text(),
-                outer?.get("created by")?.text(), outer?.get("encoding")?.text(), v1, v2Files, v1Hashes, layers ?: emptyMap(), requested)
+                outer?.get("created by")?.text(), outer?.get("encoding")?.text(), seeds, v1, v2Files, v1Hashes, layers ?: emptyMap(), requested)
         }
 
         private fun readV1(info: BencodeValue.Dictionary, name: String, pieceSize: Int): List<TorrentFileEntry> {

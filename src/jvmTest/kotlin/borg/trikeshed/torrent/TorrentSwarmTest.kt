@@ -1,12 +1,15 @@
 package borg.trikeshed.torrent
 
 import borg.trikeshed.htx.client.ipfs.MemoryBlockStore
+import borg.trikeshed.htx.openHtxClientReactorElement
 import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
@@ -67,9 +70,76 @@ class TorrentSwarmTest {
         } finally { leech.a.close(); honest.a.close(); corrupt.server.close() }
     }
 
+    /** Two seeds connected at once both serve the one download; at its end a piece may come from both (endgame). */
+    @Test fun twoSeedsAtOnce(): Unit = runBlocking {
+        val first = engine(); val second = engine(); val leech = engine()
+        try {
+            val one = first.a.seedTorrent(metainfo, content) as TorrentSession
+            val two = second.a.seedTorrent(metainfo, content) as TorrentSession
+            val session = leech.a.addTorrent(metainfo) as TorrentSession
+            session.addPeers(_l[first.b, second.b])
+            assertContentEquals(content, withTimeout(60_000) { session.downloadAll() })
+            assertTrue(one.stats.value.uploadedBytes > 0 && two.stats.value.uploadedBytes > 0,
+                "uploaded ${one.stats.value.uploadedBytes} and ${two.stats.value.uploadedBytes}")
+        } finally { for (e in _l[leech, second, first]) e.a.close() }
+    }
+
+    /** Two files, a piece across their edge, and one peer and one web seed (BEP 19) feeding one picker. */
+    @Test fun webSeedAndPeerFeedOnePicker(): Unit = runBlocking {
+        val a = ByteArray(40000) { (it % 251).toByte() }
+        val b = ByteArray(50000) { (it % 241 + 7).toByte() }
+        val http = WebSeedServer(_m["swarm/a.txt" j a, "swarm/b.bin" j b])
+        val both = metainfo("swarm", _l["a.txt" j a, "b.bin" j b], 32768, http.url)
+        val supervisor = NioSupervisor(); supervisor.open()
+        val client = openHtxClientReactorElement(nioSupervisor = supervisor)
+        val seed = engine()
+        val address = PeerAddress("127.0.0.1", ServerSocket(0).use { it.localPort })
+        val leech = TorrentEngine(MemoryBlockStore(), CoroutineScope(coroutineContext + client), address)
+        try {
+            val seeding = seed.a.seedTorrent(both, a + b) as TorrentSession
+            val session = leech.addTorrent(both) as TorrentSession
+            session.addPeers(_l[seed.b])
+            assertContentEquals(a + b, withTimeout(60_000) { session.downloadAll() })
+            assertTrue(http.ranges.get() > 0 && seeding.stats.value.uploadedBytes > 0, "ranges ${http.ranges.get()}, uploaded ${seeding.stats.value.uploadedBytes}")
+        } finally { leech.close(); seed.a.close(); client.close(); supervisor.close(); http.server.close() }
+    }
+
     fun CoroutineScope.engine(): Join<TorrentEngine, PeerAddress> {
         val address = PeerAddress("127.0.0.1", ServerSocket(0).use { it.localPort })
         return TorrentEngine(MemoryBlockStore(), this, address) j address
+    }
+
+    /** Ranges of [files] under /seed/ over HTTP/1.1, one exchange a connection; it counts the ranges it served. */
+    class WebSeedServer(val files: Map<String, ByteArray>) {
+        val server = ServerSocket(0, 16, InetAddress.getLoopbackAddress())
+        val ranges = AtomicInteger()
+        val url = "http://127.0.0.1:${server.localPort}/seed/"
+        init {
+            thread(isDaemon = true) {
+                while (true) {
+                    val socket = try { server.accept() } catch (closed: Exception) { break }
+                    thread(isDaemon = true) { socket.use { exchange(it) } }
+                }
+            }
+        }
+        fun exchange(socket: Socket) {
+            val input = socket.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+            val target = (input.readLine() ?: return).split(' ')[1]
+            var range: String? = null
+            while (true) {
+                val line = input.readLine() ?: break
+                if (line.isEmpty()) break
+                if (line.startsWith("Range:", ignoreCase = true)) range = line.substringAfter(':').trim().removePrefix("bytes=")
+            }
+            val body = files[target.removePrefix("/seed/")]
+            val output = socket.getOutputStream()
+            if (body == null || range == null) { output.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encodeToByteArray()); return }
+            val from = range.substringBefore('-').toInt(); val to = range.substringAfter('-').toInt()
+            ranges.incrementAndGet()
+            output.write("HTTP/1.1 206 Partial Content\r\nContent-Range: bytes $from-$to/${body.size}\r\nContent-Length: ${to - from + 1}\r\nConnection: close\r\n\r\n".encodeToByteArray())
+            output.write(body, from, to - from + 1)
+            output.flush()
+        }
     }
 
     /** Every piece, unchoked, and each block answered with its first byte changed. */
@@ -113,6 +183,20 @@ class TorrentSwarmTest {
             return ByteArrayOutputStream().apply {
                 write("d4:infod6:lengthi${content.size}e4:name${name.length}:${name}12:piece lengthi${pieceLength}e6:pieces${hashes.size()}:".encodeToByteArray())
                 write(hashes.toByteArray()); write("ee".encodeToByteArray())
+            }.toByteArray()
+        }
+        /** A multi-file v1 metainfo with one web seed, bencoded by hand: keys in their sorted order. */
+        fun metainfo(name: String, files: List<Join<String, ByteArray>>, pieceLength: Int, webSeed: String): ByteArray {
+            val sha1 = MessageDigest.getInstance("SHA-1")
+            val whole = files.fold(ByteArray(0)) { bytes, file -> bytes + file.b }
+            val hashes = ByteArrayOutputStream()
+            for (at in 0 until whole.size step pieceLength) hashes.write(sha1.digest(whole.copyOfRange(at, minOf(whole.size, at + pieceLength))))
+            return ByteArrayOutputStream().apply {
+                write("d4:infod5:filesl".encodeToByteArray())
+                for (file in files) write("d6:lengthi${file.b.size}e4:pathl${file.a.length}:${file.a}ee".encodeToByteArray())
+                write("e4:name${name.length}:${name}12:piece lengthi${pieceLength}e6:pieces${hashes.size()}:".encodeToByteArray())
+                write(hashes.toByteArray())
+                write("e8:url-listl${webSeed.length}:${webSeed}ee".encodeToByteArray())
             }.toByteArray()
         }
         fun frame(id: Int, payload: ByteArray): ByteArray = int(payload.size + 1) + _a[id.toByte()] + payload
