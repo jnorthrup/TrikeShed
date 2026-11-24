@@ -18,17 +18,20 @@ typealias BearerTyper = (NormClause, Set<String>, Set<Int>) -> Int
  * own words. Nothing here is taken from the passage's reading as truth.
  *
  * The stages, in the order a text passes them:
- * - [TOKEN]: one sentence of the passage holds every content lemma of the claim (noun, adjective, number, and any
- *   verb but `be`). That sentence, the one sharing most with the claim, is the one [DEPENDENCY] reads.
- * - [SECTION]: one section of the passage's cut holds every content lemma of the claim, so the cut did not split it.
+ * - [TOKEN]: the passage holds every content lemma of the claim (noun, adjective, number, and any verb but `be`).
+ * - [SECTION]: one section of the passage's cut holds them all, so the cut did not split the claim.
+ * - [SENTENCE]: one sentence holds them all. That sentence, the one sharing most with the claim, is the one
+ *   [DEPENDENCY] reads.
  * - [DEPENDENCY]: it holds every dependency the claim's parse draws between two content words; a claim of several
  *   content words whose parse draws none does not pass.
  * - [PARTY]: every party the claim defines (a personal pronoun bound to a quoted term) is defined by the passage too.
  *   A claim that defines no party passes this stage with nothing wanted.
  * - [CLAUSE]: the claim reads to a clause, and the passage to one with the same subject, verb and object.
- * - [BEARER]: each of the claim's statements the typer classes is classed the same by the passage.
+ * - [BEARER]: a bearer the typer classes in the claim is classed the same wherever the passage names it; a bearer
+ *   the passage does not name is [STATEMENT]'s to miss.
  * - [STATEMENT]: the passage states each of the claim's statements under the same key, force included.
- * - [JOIN]: joined as two books, the passage and the claim restate each of the claim's statements.
+ * - [JOIN]: joined as two books, the passage and the claim restate each of the claim's statements; `truth` is the
+ *   belief the join holds for each one it carries.
  * - [QUAD]: the join's Turtle, loaded into a store of this stage's own, holds each restated claim statement as a norm.
  *
  * A claim is blamed on the first stage that does not pass. Every claim is then read again under each variant of
@@ -41,6 +44,7 @@ object IngestStages {
     const val NAME = "preset-ingest-stages"
     const val TOKEN = "token"
     const val SECTION = "section"
+    const val SENTENCE = "sentence"
     const val DEPENDENCY = "dependency"
     const val PARTY = "party"
     const val CLAUSE = "clause"
@@ -48,7 +52,7 @@ object IngestStages {
     const val STATEMENT = "statement"
     const val JOIN = "join"
     const val QUAD = "quad"
-    val STAGES = listOf(TOKEN, SECTION, DEPENDENCY, PARTY, CLAUSE, BEARER, STATEMENT, JOIN, QUAD)
+    val STAGES = listOf(TOKEN, SECTION, SENTENCE, DEPENDENCY, PARTY, CLAUSE, BEARER, STATEMENT, JOIN, QUAD)
 
     /** A text as the stages leave it: its sections, each one's parse, each one's clauses and typed statements. */
     class Reading(val sections: List<String>, val documents: List<NlpDocument>, val clauses: List<List<NormClause>>,
@@ -88,6 +92,7 @@ object IngestStages {
         val edges = wanted.flatMap { it.edges }.toSet()
         val best = source.documents.flatMap(::sentences).maxWithOrNull(compareBy({ s -> lemmas.count { it in s.lemmas } }, { s -> edges.count { it in s.edges } }))
         val lacking = lemmas - source.documents.flatMap(::sentences).flatMap { it.lemmas }.toSet()
+        val apart = lemmas - best?.lemmas.orEmpty()
         val undrawn = edges - best?.edges.orEmpty()
         val sectionLemmas = source.documents.map { d -> sentences(d).flatMap { it.lemmas }.toSet() }
         val holding = sectionLemmas.indices.maxByOrNull { i -> lemmas.count { it in sectionLemmas[i] } }?.let { sectionLemmas[it] }.orEmpty()
@@ -98,9 +103,9 @@ object IngestStages {
         val clauses = claim.clauses.flatten()
         val found = source.clauses.flatten()
         val unread = clauses.filter { c -> found.none { it.subject == c.subject && it.verb == c.verb && it.obj == c.obj } }
-        val held = source.statements.associate { it.key to it.bearerClass }
+        val held = source.statements.groupBy({ it.bearer }, { it.bearerClass })
         val classed = claim.statements.filter { it.bearerClass >= 0 }
-        val misclassed = classed.filter { held[it.key] != it.bearerClass }
+        val misclassed = classed.filter { c -> held[c.bearer]?.let { c.bearerClass !in it } == true }
         val stated = source.statements.associateBy { it.key }
         val unstated = claim.statements.filter { it.key !in stated }
         val opposed = claim.statements.filter { c -> source.statements.any { it.proposition == c.proposition && it.modality.opposes(c.modality) } }
@@ -114,17 +119,20 @@ object IngestStages {
             !stored.getOrThrow().contains(RdfTerm.Iri(normOf + s.id).toTurtle(), RdfVocab.rdf("type").toTurtle(), RdfVocab.forge("Norm").toTurtle())
         } else claim.statements
         return linkedMapOf(
-            TOKEN to linkedMapOf("pass" to (lemmas.isNotEmpty() && lacking.isEmpty()), "wanted" to lemmas.sorted(), "lacking" to lacking.sorted(), "sentence" to best?.text),
+            TOKEN to linkedMapOf("pass" to (lemmas.isNotEmpty() && lacking.isEmpty()), "wanted" to lemmas.sorted(), "lacking" to lacking.sorted()),
             SECTION to linkedMapOf("pass" to (lemmas.isNotEmpty() && split.isEmpty()), "wanted" to lemmas.sorted(), "lacking" to split.sorted()),
+            SENTENCE to linkedMapOf("pass" to (lemmas.isNotEmpty() && apart.isEmpty()), "wanted" to lemmas.sorted(), "lacking" to apart.sorted(), "sentence" to best?.text),
             DEPENDENCY to linkedMapOf("pass" to (best != null && undrawn.isEmpty() && (edges.isNotEmpty() || lemmas.size < 2)), "wanted" to edges.sorted(), "lacking" to undrawn.sorted()),
             PARTY to linkedMapOf("pass" to unparted.isEmpty(), "wanted" to parties.sorted(), "lacking" to unparted.sorted()),
             CLAUSE to linkedMapOf("pass" to (clauses.isNotEmpty() && unread.isEmpty()), "claim" to clauses.map(::clause), "lacking" to unread.map(::clause)),
             BEARER to linkedMapOf("pass" to misclassed.isEmpty(), "wanted" to classed.map { "${it.bearer}=${it.bearerClass}" },
-                "lacking" to misclassed.map { "${it.bearer}=${held[it.key] ?: "unstated"}" }),
+                "lacking" to misclassed.map { "${it.bearer}=${held.getValue(it.bearer).distinct().joinToString("/")}" }),
             STATEMENT to linkedMapOf("pass" to (claim.statements.isNotEmpty() && unstated.isEmpty()), "claim" to claim.statements.map { it.key },
                 "lacking" to unstated.map { it.key }, "opposed" to opposed.map { it.key }),
             JOIN to linkedMapOf("pass" to (claim.statements.isNotEmpty() && claim.statements.all { it.key in restated }), "restated" to restated.sorted(),
-                "conflicts" to joined.conflicts().map { (a, b) -> listOf(joined.statements[a].key, joined.statements[b].key) }),
+                "conflicts" to joined.conflicts().map { (a, b) -> listOf(joined.statements[a].key, joined.statements[b].key) },
+                "truth" to claim.statements.mapNotNull { c -> joined.statements.indexOfFirst { it.key == c.key }.takeIf { it >= 0 }?.let { id ->
+                    joined.truth(id).let { linkedMapOf("statement" to c.key, "frequency" to it.frequency, "confidence" to it.confidence) } } }),
             QUAD to linkedMapOf("pass" to (claim.statements.isNotEmpty() && missing.isEmpty()), "wanted" to claim.statements.map { it.key },
                 "lacking" to missing.map { it.key }, "error" to stored.exceptionOrNull()?.message),
         )
@@ -152,7 +160,10 @@ object IngestStages {
 
         fun reading(sectionTexts: List<String>, docs: List<NlpDocument>, subjects: Set<String>, known: Set<Int>): Reading {
             val nouned = nouns(docs)
-            return Reading(sectionTexts, docs, docs.map { NormClauses.extract(it, subjects) }) { c -> typer(c, nouned, known) }
+            // A party a section defines stands for the sections after it, as curation reads them.
+            val parties = LinkedHashMap<String, PartyAliases.Party>()
+            val clauses = docs.map { d -> for ((alias, party) in PartyAliases.of(d)) parties.putIfAbsent(alias, party); NormClauses.extract(d, subjects, parties) }
+            return Reading(sectionTexts, docs, clauses) { c -> typer(c, nouned, known) }
         }
         fun passage(parser: String, subjects: Set<String>, known: Set<Int>) =
             reading(sections, parsed.getValue(parser).take(sections.size), subjects, known)

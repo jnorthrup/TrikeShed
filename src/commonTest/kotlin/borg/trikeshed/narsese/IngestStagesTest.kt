@@ -66,6 +66,9 @@ class IngestStagesTest {
         assertNull(found["blame"])
         assertTrue(IngestStages.STAGES.all { stage(found, it)["pass"] == true })
         assertEquals(listOf("must|bailee|return|goods|"), stage(found, IngestStages.JOIN)["restated"])
+        val belief = (stage(found, IngestStages.JOIN)["truth"] as List<*>).single() as Map<*, *>
+        assertEquals("must|bailee|return|goods|", belief["statement"])
+        assertEquals(1f, belief["frequency"], "the passage and the claim both state it and nothing opposes it")
 
         val absent = row(out["board"], parsed(money).text)
         assertEquals(IngestStages.TOKEN, absent["blame"])
@@ -114,6 +117,16 @@ class IngestStagesTest {
         assertEquals(true, stages.getValue(IngestStages.TOKEN)["pass"], "the passage as a whole holds every word")
     }
 
+    /** The words are in the passage and in one section of it, in two sentences: no sentence holds the claim's words together. */
+    @Test fun sentenceStageBlamesAClaimWhoseWordsNoOneSentenceHolds() {
+        val source = IngestStages.Reading(listOf("one"), listOf(parsed(holds, money, edges = false)), listOf(emptyList()))
+        val claim = IngestStages.Reading(listOf("c"), listOf(parsed(returns, edges = false)), listOf(emptyList()))
+        val stages = IngestStages.judge(source, claim, ::typedNorms)
+        assertEquals(IngestStages.SENTENCE, IngestStages.blame(stages))
+        assertEquals(true, stages.getValue(IngestStages.SECTION)["pass"])
+        assertEquals(listOf("return"), stages.getValue(IngestStages.SENTENCE)["lacking"], "the first sentence shares bailee and goods, and has no return")
+    }
+
     /** The claim defines a party by a quoted term; the passage does not define it: the party stage lacks it. */
     @Test fun partyStageBlamesAClaimDefiningAPartyTheDocumentDoesNotDefine() {
         val mentioned = parsed("The/the/DT customer/customer/NN holds/hold/VBZ the/the/DT goods/goods/NNS" to "3>2>nsubj 3>5>obj")
@@ -135,6 +148,10 @@ class IngestStagesTest {
         assertEquals(false, bearer["pass"])
         assertEquals(listOf("bailee=9"), bearer["wanted"])
         assertEquals(listOf("bailee=7"), bearer["lacking"])
+        val elsewhere = IngestStages.Reading(listOf("c"), listOf(parsed(money)), listOf(NormClauses.extract(parsed(money))), typedAs(7))
+        val unstated = IngestStages.judge(source, elsewhere, ::typedNorms)
+        assertEquals(true, unstated.getValue(IngestStages.BEARER)["pass"], "the bearer is classed alike; what the passage does not state is not the typer's miss")
+        assertEquals(listOf("must|bailee|return|money|"), unstated.getValue(IngestStages.STATEMENT)["lacking"])
     }
 
     /** The claim's norm is absent from the join's Turtle (empty here): the quad stage lacks it. */
