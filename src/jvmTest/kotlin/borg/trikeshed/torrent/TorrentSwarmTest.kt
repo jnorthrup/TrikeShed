@@ -135,6 +135,44 @@ class TorrentSwarmTest {
         } finally { leech.a.close(); peer.server.close() }
     }
 
+    /** A peer that asks for all seventeen blocks at once, as a client that pipelines deeply does, is sent every one. */
+    @Test fun deepRequestQueueServed(): Unit = runBlocking {
+        val seed = engine()
+        try {
+            seed.a.seedTorrent(metainfo, content)
+            val received = withContext(Dispatchers.IO) {
+                Socket("127.0.0.1", seed.b.port).use { socket ->
+                    socket.soTimeout = 10_000
+                    val input = DataInputStream(socket.getInputStream()); val output = socket.getOutputStream()
+                    output.write(_a[19.toByte()] + "BitTorrent protocol".encodeToByteArray() + ByteArray(8) + infoHash + "-XX0001-handleech001".encodeToByteArray())
+                    input.readFully(ByteArray(68))
+                    output.write(frame(2, ByteArray(0)))
+                    while (true) {
+                        val length = input.readInt()
+                        if (length == 0) continue
+                        val id = input.readByte().toInt(); input.readFully(ByteArray(length - 1))
+                        if (id == 1) break
+                    }
+                    val blocks = (0 until content.size step 16384).toList()
+                    for (at in blocks) output.write(frame(6, int(at / pieceLength) + int(at % pieceLength) + int(minOf(16384, content.size - at))))
+                    val bytes = ByteArray(content.size)
+                    var pieces = 0
+                    while (pieces < blocks.size) {
+                        val length = input.readInt()
+                        if (length == 0) continue
+                        val id = input.readByte().toInt()
+                        val payload = ByteArray(length - 1).also { input.readFully(it) }
+                        if (id != 7) continue
+                        payload.copyInto(bytes, int(payload, 0) * pieceLength + int(payload, 4), 8, payload.size)
+                        pieces++
+                    }
+                    bytes
+                }
+            }
+            assertContentEquals(content, received)
+        } finally { seed.a.close() }
+    }
+
     /** Two seeds connected at once both serve the one download; at its end a piece may come from both (endgame). */
     @Test fun twoSeedsAtOnce(): Unit = runBlocking {
         val first = engine(); val second = engine(); val leech = engine()
