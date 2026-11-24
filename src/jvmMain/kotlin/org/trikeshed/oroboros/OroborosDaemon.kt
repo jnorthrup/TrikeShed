@@ -18,6 +18,7 @@ import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.torrent.TorrentElement
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.j
+import borg.trikeshed.transfer.wire
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
@@ -925,6 +926,7 @@ object OroborosDaemon {
             reactorContext = htxElement + muxReactor + nioSupervisor,
         )
         torrentElement.open()
+        borg.trikeshed.transfers.TransferReports.reporters.add { torrentElement.transfers() α { it.wire } }
         HostSystem.err("[OROBOROS] TorrentElement open — torrent:// via HTX/TLS + uTP datagrams")
 
         // ── The store: CAS-collapsed Couch (rev hash = body blob CID) over the forge-home CAS ──

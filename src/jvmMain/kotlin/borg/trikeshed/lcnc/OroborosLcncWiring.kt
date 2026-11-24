@@ -7,6 +7,7 @@ import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.withContext
 import borg.trikeshed.kernel.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.transfer.wire
 
 /**
  * JVM wiring for the daemon's LCNC store legos (PromptNodes/PromptStore/
@@ -127,8 +128,13 @@ object OroborosLcncWiring {
         val http = borg.trikeshed.htx.openHtxClientReactorElement(
             nioSupervisor = checkNotNull(scope[borg.trikeshed.userspace.nio.spi.NioSupervisor]), parentJob = scope[kotlinx.coroutines.Job])
         ownCleanup { http.close() }
+        // A fetch in flight is a row of /api/transfers for as long as it runs.
+        val fetching = java.util.concurrent.ConcurrentHashMap.newKeySet<borg.trikeshed.cli.htx.HtxAria2Engine>()
+        borg.trikeshed.transfers.TransferReports.reporters.add { fetching.toList().map { it.row().wire }.toSeries() }
         moduleContext.lcncRunners.putAll(BookReview.registry { uris ->
-            borg.trikeshed.cli.htx.HtxAria2Engine(borg.trikeshed.cli.htx.Aria2Options(uris = uris), http, files).fetch()
+            val engine = borg.trikeshed.cli.htx.HtxAria2Engine(borg.trikeshed.cli.htx.Aria2Options(uris = uris), http, files)
+            fetching.add(engine)
+            try { engine.fetch() } finally { fetching.remove(engine) }
         })
         return kernel
     }

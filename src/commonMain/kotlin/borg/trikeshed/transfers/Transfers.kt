@@ -86,9 +86,9 @@ class TransferRollup(
  * A transport registers its reporter when it starts; with none registered the route serves an empty list.
  */
 object TransferReports {
-    val reporters = ArrayList<() -> Series<Map<String, Any?>>>()
+    val reporters = ArrayList<suspend () -> Series<Map<String, Any?>>>()
 
-    fun rows(): List<Map<String, Any?>> = reporters.flatMap { it().view }
+    suspend fun rows(): List<Map<String, Any?>> = reporters.toList().flatMap { it().view }
 }
 
 /**
