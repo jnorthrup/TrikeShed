@@ -8,7 +8,7 @@ data class DictionaryEntry(val headword: String, val definition: String)
 
 /** Reads the entries of a dictionary text. A headword is a paragraph that opens with capitals, a full stop and the definition. */
 object DictionaryEntries {
-    private val headword = Regex("^([A-Z][A-Z .,&'-]{1,60}?)\\.\\s+(.*)$", RegexOption.DOT_MATCHES_ALL)
+    private val headword = Regex("^([A-Z][A-Z .,&'-]{1,60}?)\\.\\s+([\\s\\S]*)$")
     private val blankLine = Regex("\\n[ \\t\\u00A0]*\\n")
     private val space = Regex("[ \\t\\u00A0\\r\\n]+")
 

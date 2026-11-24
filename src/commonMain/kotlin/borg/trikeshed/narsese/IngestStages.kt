@@ -162,7 +162,7 @@ object IngestStages {
             val nouned = nouns(docs)
             // A party a section defines stands for the sections after it, as curation reads them.
             val parties = LinkedHashMap<String, PartyAliases.Party>()
-            val clauses = docs.map { d -> for ((alias, party) in PartyAliases.of(d)) parties.putIfAbsent(alias, party); NormClauses.extract(d, subjects, parties) }
+            val clauses = docs.map { d -> for ((alias, party) in PartyAliases.of(d)) if (alias !in parties) parties[alias] = party; NormClauses.extract(d, subjects, parties) }
             return Reading(sectionTexts, docs, clauses) { c -> typer(c, nouned, known) }
         }
         fun passage(parser: String, subjects: Set<String>, known: Set<Int>) =

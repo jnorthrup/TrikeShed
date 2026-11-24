@@ -9,6 +9,7 @@ package narchy.spacegraph.layout
 import narchy.spacegraph.Vec3
 import narchy.spacegraph.util.clamp
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.ln
@@ -148,7 +149,7 @@ fun chooseColumns(count: Int, viewport: ErgonomicsViewport, maxColumns: Int = 4)
     if (count < 1) return 1
     val aspect = viewport.width / maxOf(viewport.height, 1.0)
     val ideal = sqrt(count * aspect)
-    return clamp(Math.round(ideal).toDouble(), 1.0, maxOf(1, maxColumns).toDouble()).toInt()
+    return clamp(floor(ideal + 0.5), 1.0, maxOf(1, maxColumns).toDouble()).toInt()
 }
 
 private fun overlapsFor(
@@ -196,7 +197,7 @@ fun solveErgonomicLayout(
 
     var best: ErgonomicLayout? = null
     for (columns in 1..minOf(maxColumns, nodes.size)) {
-        val rows = Math.ceil(nodes.size.toDouble() / columns).toInt()
+        val rows = ceil(nodes.size.toDouble() / columns).toInt()
         val card = clamp((viewport.width - gap * (columns - 1)) / columns, minCard.first, maxCard.first) to
             clamp((viewport.height - gap * (rows - 1)) / rows, minCard.second, maxCard.second)
         val order = refineBySwaps(proximity, edges, columns, passes)

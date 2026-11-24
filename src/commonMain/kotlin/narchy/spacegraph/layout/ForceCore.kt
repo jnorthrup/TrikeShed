@@ -109,7 +109,7 @@ class ForceCore(config: ForceCoreConfig = ForceCoreConfig()) {
         val nodeById = HashMap<String, ForceNode>()
         for (node in nodes) {
             forces[node.id] = SimVector()
-            nodeById.putIfAbsent(node.id, node)
+            if (node.id !in nodeById) nodeById[node.id] = node
         }
 
         // Precompute radii (used as mass for Barnes-Hut)
