@@ -1,21 +1,27 @@
 # SpaceGraphJS port ledger
 
 Upstream: [autonull/spacegraphjs7](https://github.com/autonull/spacegraphjs7).
-Pin: `ead8c84` (2026-11-07, "cleanup").
+Pin: `125b369` (2026-11-23, "plan"). Previous pin: `ead8c84` (2026-11-07, "cleanup").
 
-The port began on 2026-09-07 (`f71991b59`, "Add SpaceGraph shadow projection to LCNC panels"). Upstream has
-185 commits since then: 2 in September, 121 in October and 63 in November through the pin. Of those, 34 touch
-the contract files below (`src/types`, `packages/renderer/src`, `packages/adapter/src/diff.ts`).
+The port began on 2026-09-07 (`f71991b59`, "Add SpaceGraph shadow projection to LCNC panels"). Counted by
+command from the previous pin `ead8c84` to `main` `125b369` (259 commits, `git log --oneline ead8c84..main | wc -l`):
+20 touch the contract files below (`git log --oneline ead8c84..main -- src/types packages/renderer/src packages/adapter/src/diff.ts | wc -l`),
+90 have a subject starting `feat`. The per-commit verdicts are in `commits.tsv` and `features.tsv` in the scratch goal
+directory (`/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/goals/spacegraph/`).
 
 ## Mapping
 
 | Port (TrikeShed) | Upstream at the pin | State |
 |---|---|---|
-| `src/commonMain/kotlin/narchy/spacegraph/RenderModel.kt` | `packages/renderer/src/index.ts` (`RenderNode`, `RenderEdge`, `RenderModel`, `RenderModelPatch`, `NodeStatus`), `packages/renderer/src/patch.ts` (`mergeRenderModelPatch`), `packages/adapter/src/diff.ts` (`diffRenderModels`) | Current at the pin. The diff counts any differing field as a change; upstream's fingerprint leaves out a node's `visible`, `interactive`, `parent` and `data`. |
+| `src/commonMain/kotlin/narchy/spacegraph/RenderModel.kt` | `packages/renderer/src/index.ts` (`RenderNode`, `RenderEdge`, `RenderModel`, `RenderModelPatch`, `NodeStatus`), `packages/renderer/src/patch.ts` (`mergeRenderModelPatch`), `packages/adapter/src/diff.ts` (`diffRenderModels`) | Current at `125b369`. `RenderNode` and `RenderEdge` carry `emphasis`, and `RenderNode` carries `widgets` and `widgetSlots` (ported in `711b868`). `RenderEdge` carries `data`. The diff counts any differing field as a change; since `25dda4b` upstream's fingerprint covers `visible`, `interactive`, `parent`, `data` and edge fields too, so both sides report the same changes. |
 | `narchy/spacegraph/Graph.kt` (`NodeKind`, `EdgeKind`, `NodeSpec`, `EdgeSpec`, `GraphSpec`, `GraphCommand`) | `src/types/spec.ts`, `src/nodes`, `src/edges` (full-engine path) | Catalogs match: 43 `NodeKind` entries for upstream's concrete nodes (`Object3DNode`, `BaseContentNode` and `BaseInstancedNode` are abstract; `MermaidNode` is registered from `src/core/TypeRegistry.ts`, not `src/nodes`) and all 10 edges. The spec diverges: upstream `type` is an open string where `kind` is a closed enum; upstream has `parameters` and no `parent`; the camera is `{position, target}` against `GraphCamera(center, zoom, mode)`; `GraphCommand` removes by id where `SpecUpdate` only patches. |
 | `narchy/spacegraph/Geometry.kt`, `SceneProjection.kt`, `SpatialView.kt`, `FrameJson.kt`, `CirclePacking.kt` | THREE.js scene, camera and layout code | Reimplemented in Kotlin, not tracked line by line. |
 
 ## Not ported
+
+- `368b9d0` (`feat(scopes)`): the opt-in animated recursive scope engine (`ScopesPlugin`). A new Kotlin subsystem: lead.
+- Renderer-side commits (`e47fe6d`, `cd27d94`, `f449190`, `e248f39`, `534c28c`, `bdeb13c`, `9c83535`, `07e9bad`, `fba09bd`): skipped, see `commits.tsv`.
+- The remaining `feat` commits are app or pi UI work (`features.tsv`): no contract field, or a new design (lead).
 
 - Renderer side of the contract: `GraphRenderer`, `RendererCapabilities`, `RendererViewport`, `FitOptions`,
   `RenderTheme`, `RendererEventMap`. These belong to whichever contract renderer draws the model; the host needs
@@ -29,7 +35,8 @@ the contract files below (`src/types`, `packages/renderer/src`, `packages/adapte
 `README.md` (§ Renderer contract) and `docs/host-integration.md` still tell hosts to call
 `negotiateContract(version)` against `CONTRACT_VERSION`. Upstream removed both in `1c72fd5` (2026-10-25,
 "Remove contract version negotiation"), and `docs/capabilities.md` says there is no `CONTRACT_VERSION`. The port
-follows the code.
+follows the code. At `125b369` the constant `LIBRARY_CONTRACT_VERSION = '1.4.0'` is still exported from
+`packages/config/src/library.ts`, a name the port does not carry.
 
 ## Moving the pin
 
