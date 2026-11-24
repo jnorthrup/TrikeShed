@@ -32,6 +32,7 @@ directory (`/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/goals/spaceg
 | `narchy/spacegraph/motion/CameraVerbs.kt` | `src/motion/camera.ts` | Ported at `125b369` (round three, row 3). Adds `CAMERA_VERBS`. Tests: `test/motion.test.ts`, in `narchy/spacegraph/motion/MotionTest.kt`. |
 | `narchy/spacegraph/depth/DepthCues.kt` | `src/depth/DepthCues.ts` | Ported at `125b369` (round three, row 3). Deviation: `DepthProjection` uses `orthographic`/`perspective`, the values the treatments take. Tests: `test/depth.test.ts`, in `narchy/spacegraph/depth/DepthTest.kt`. |
 | `narchy/spacegraph/depth/Continuum.kt` | `src/depth/continuum.ts` | Ported at `125b369` (round three, row 3). Tests: `test/depth-continuum.test.ts`, in `narchy/spacegraph/depth/DepthTest.kt`. |
+| `narchy/spacegraph/layout/Octaves.kt` | `src/layout/octaves.ts` | Ported at `125b369` (round three, row 5). Deviation: `Position` is `Vec3`; `shape` is an enum. Tests: `test/layout/octaves.test.ts`, 4 cases in `narchy/spacegraph/layout/OctavesTest.kt`. |
 | `narchy/spacegraph/representations/EdgeLadder.kt` | `src/edges/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `EdgeRungStyle` is a data class of nullable fields. |
 
 ## Not ported
