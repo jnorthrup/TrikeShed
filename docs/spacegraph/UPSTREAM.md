@@ -27,6 +27,11 @@ directory (`/Users/jim/.hermes/profiles/src-trikeshed/cache/scratch/goals/spaceg
 | `narchy/spacegraph/representations/LadderBase.kt` | `src/core/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `LadderBase` takes the hysteresis as a nullable Double. |
 | `narchy/spacegraph/representations/RepresentationLadder.kt` | `src/representations/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `LadderNode` extends `LadderEntry`; `build` is a lambda. |
 | `narchy/spacegraph/representations/Playback.kt` | `src/representations/playback.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: ease is a string key into the curve map. |
+| `narchy/spacegraph/motion/Easing.kt` | `src/motion/easing.ts` | Ported at `125b369` (round three, row 3). Deviation: `MOTION_EASINGS` is a map from string keys to functions, built from `REPRESENTATION_EASINGS`. Tests: `test/motion.test.ts`, in `narchy/spacegraph/motion/MotionTest.kt`. |
+| `narchy/spacegraph/motion/Director.kt` | `src/motion/director.ts` | Ported at `125b369` (round three, row 3). Deviation: `MotionVerb` and `MotionTarget` are enums; `ease` is a string key. Tests: `test/motion.test.ts`, in `narchy/spacegraph/motion/MotionTest.kt`. |
+| `narchy/spacegraph/motion/CameraVerbs.kt` | `src/motion/camera.ts` | Ported at `125b369` (round three, row 3). Adds `CAMERA_VERBS`. Tests: `test/motion.test.ts`, in `narchy/spacegraph/motion/MotionTest.kt`. |
+| `narchy/spacegraph/depth/DepthCues.kt` | `src/depth/DepthCues.ts` | Ported at `125b369` (round three, row 3). Deviation: `DepthProjection` uses `orthographic`/`perspective`, the values the treatments take. Tests: `test/depth.test.ts`, in `narchy/spacegraph/depth/DepthTest.kt`. |
+| `narchy/spacegraph/depth/Continuum.kt` | `src/depth/continuum.ts` | Ported at `125b369` (round three, row 3). Tests: `test/depth-continuum.test.ts`, in `narchy/spacegraph/depth/DepthTest.kt`. |
 | `narchy/spacegraph/representations/EdgeLadder.kt` | `src/edges/ladder.ts` | Ported at `125b369` (round three, row 6). No upstream test; unchecked beyond the gate compile. Deviation: `EdgeRungStyle` is a data class of nullable fields. |
 
 ## Not ported
