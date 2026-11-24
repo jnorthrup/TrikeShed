@@ -6,6 +6,7 @@ import borg.trikeshed.nlp.NlpDependency
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
+import borg.trikeshed.rdf.RdfVocab
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,13 +48,18 @@ class IngestStagesTest {
     }
     private val passage = parsed(returns, holds).text
 
+    /** The join's Turtle as the QUAD stage reads it: every statement of the joined constellation typed `forge:Norm`. */
+    private fun typedNorms(c: Constellation): String = c.statements.joinToString("\n") { s ->
+        "<${RdfVocab.FORGE}constellation/${c.name}/norm/${s.id}> <${RdfVocab.RDF}type> <${RdfVocab.FORGE}Norm> ."
+    }
+
     private fun row(board: Any?, claim: String) = (board as List<*>).map { it as Map<*, *> }.single { it["claim"] == claim }
     private fun stage(row: Map<*, *>, name: String) = (row["stages"] as Map<*, *>)[name] as Map<*, *>
 
     @Test fun eachClaimIsBlamedOnTheFirstStageThatLosesIt() = runTest {
         val expected = listOf(Expectation("person", parsed(returns).text), Expectation("person", parsed(money).text), Expectation("person", parsed(reversed).text),
             Expectation("person", parsed(holds).text), Expectation("model", parsed(forbidden).text))
-        val out = IngestStages.run(passage, expected, emptySet(), listOf("a", "b"), read)
+        val out = IngestStages.run(passage, expected, emptySet(), listOf("a", "b"), read, emptySet(), { _, _, _ -> -1 }, ::typedNorms)
         assertEquals(listOf("a", "b"), asked, "each parser reads the passage and the claims once")
 
         val found = row(out["board"], parsed(returns).text)
@@ -89,13 +95,55 @@ class IngestStagesTest {
     }
 
     @Test fun theNodeTakesThePassageAndTheRowsAndRefusesARunWithNothingToFind() = runTest {
-        val runner = IngestStages.registry(read).getValue(IngestStages.TYPE)
+        val runner = IngestStages.registry(read, { _, _, _ -> -1 }, { _ -> emptySet() }, ::typedNorms).getValue(IngestStages.TYPE)
         val rows = listOf(mapOf("author" to "person", "standing" to "truth", "claim" to parsed(returns).text))
-        val out = runner.run(LcncNode("stages", IngestStages.TYPE, _m["parsers" j "a"]), _m["text" j passage, "expectations" j rows])
+        val out = runner.execute(LcncNode("stages", IngestStages.TYPE, _m["parsers" j "a"]), _m["text" j passage, "expectations" j rows])
         assertEquals(mapOf("none" to listOf(parsed(returns).text)), out["blame"])
         assertEquals(listOf("a"), asked)
-        assertFailsWith<IllegalArgumentException> { runner.run(LcncNode("stages", IngestStages.TYPE, _m["parsers" j "a"]), _m["text" j passage]) }
-        assertFailsWith<IllegalArgumentException> { runner.run(LcncNode("stages", IngestStages.TYPE, _m["parsers" j "a"]), _m["text" j " ", "expectations" j rows]) }
+        assertFailsWith<IllegalArgumentException> { runner.execute(LcncNode("stages", IngestStages.TYPE, _m["parsers" j "a"]), _m["text" j passage]) }
+        assertFailsWith<IllegalArgumentException> { runner.execute(LcncNode("stages", IngestStages.TYPE, _m["parsers" j "a"]), _m["text" j " ", "expectations" j rows]) }
+    }
+
+    /** The passage's words are split across two sections: each one is held, but no one section holds all of them. */
+    @Test fun sectionStageBlamesAClaimWhoseWordsAreSplitAcrossSections() {
+        val source = IngestStages.Reading(listOf("one", "two"), listOf(parsed(holds, edges = false), parsed(money, edges = false)), listOf(emptyList(), emptyList()))
+        val claim = IngestStages.Reading(listOf("c"), listOf(parsed(returns, edges = false)), listOf(emptyList()))
+        val stages = IngestStages.judge(source, claim, ::typedNorms)
+        assertEquals(IngestStages.SECTION, IngestStages.blame(stages))
+        assertEquals(listOf("return"), stages.getValue(IngestStages.SECTION)["lacking"], "'return' is in the second section, 'goods' in the first; no section holds the claim's own words together")
+        assertEquals(true, stages.getValue(IngestStages.TOKEN)["pass"], "the passage as a whole holds every word")
+    }
+
+    /** The claim defines a party by a quoted term; the passage does not define it: the party stage lacks it. */
+    @Test fun partyStageBlamesAClaimDefiningAPartyTheDocumentDoesNotDefine() {
+        val mentioned = parsed("The/the/DT customer/customer/NN holds/hold/VBZ the/the/DT goods/goods/NNS" to "3>2>nsubj 3>5>obj")
+        val defining = parsed("You/you/PRP (/(/-LRB- ``/``/`` Customer/customer/NN ''/''/'' )/)/-RRB- hold/hold/VB goods/goods/NNS" to "8>9>obj")
+        val source = IngestStages.Reading(listOf("p"), listOf(mentioned), listOf(emptyList()))
+        val claim = IngestStages.Reading(listOf("c"), listOf(defining), listOf(emptyList()))
+        val party = IngestStages.judge(source, claim, ::typedNorms).getValue(IngestStages.PARTY)
+        assertEquals(false, party["pass"])
+        assertEquals(listOf("customer"), party["wanted"])
+        assertEquals(listOf("customer"), party["lacking"])
+    }
+
+    /** The claim's bearer is typed differently by the passage's typer: the bearer stage lacks it. */
+    @Test fun bearerStageBlamesAClaimWhoseBearerIsClassedDifferently() {
+        val typedAs = { n: Int -> { c: NormClause -> if (c.subject == "bailee") n else -1 } }
+        val source = IngestStages.Reading(listOf("p"), listOf(parsed(returns)), listOf(NormClauses.extract(parsed(returns))), typedAs(7))
+        val claim = IngestStages.Reading(listOf("c"), listOf(parsed(returns)), listOf(NormClauses.extract(parsed(returns))), typedAs(9))
+        val bearer = IngestStages.judge(source, claim, ::typedNorms).getValue(IngestStages.BEARER)
+        assertEquals(false, bearer["pass"])
+        assertEquals(listOf("bailee=9"), bearer["wanted"])
+        assertEquals(listOf("bailee=7"), bearer["lacking"])
+    }
+
+    /** The claim's norm is absent from the join's Turtle (empty here): the quad stage lacks it. */
+    @Test fun quadStageBlamesAClaimWhoseNormIsNotInTheJoinsTurtle() {
+        val source = IngestStages.Reading(listOf("p"), listOf(parsed(returns)), listOf(NormClauses.extract(parsed(returns))))
+        val claim = IngestStages.Reading(listOf("c"), listOf(parsed(returns)), listOf(NormClauses.extract(parsed(returns))))
+        val quad = IngestStages.judge(source, claim, { "" }).getValue(IngestStages.QUAD)
+        assertEquals(false, quad["pass"])
+        assertEquals(listOf("must|bailee|return|goods|"), quad["lacking"])
     }
 
     @Test fun thePrefabIsOfferedTypedAndKeyed() {
