@@ -1,6 +1,8 @@
 package borg.trikeshed.ontology
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reify
 import narchy.spacegraph.*
 import narchy.spacegraph.graphics.spi.Rgba
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -81,6 +83,16 @@ class SumoHyperarchyTest {
         assertNotEquals(h.home(h.at("Downloading")), h.home(h.at("Uploading")))
         val protocols = s_["bittorrent", "ipfs", "http"] α { h.home(s_["NetworkCommunication", it]) }
         assertEquals(3, protocols.view.toSet().size)
+    }
+
+    @Test
+    fun thePagesRebuildTheSameHomesFromTheWire() {
+        val h = real()
+        // /api/sumo/hyperarchy's body (KanbanModule: jsonOf(hyperarchy.wire())), read back as /transfers and /graal read it
+        val read = SumoHyperarchy.of(reify(jsonOf(h.wire())) as Map<*, *>)
+        assertEquals(h.names.toList(), read.names.toList())
+        for (c in 0 until h.size) { assertEquals(h.home(c), read.home(c), h.names[c]); assertEquals(h.room(c), read.room(c), h.names[c]) }
+        assertEquals(h.untyped, read.untyped)
     }
 
     @Test
