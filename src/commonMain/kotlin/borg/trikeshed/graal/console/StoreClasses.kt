@@ -43,7 +43,8 @@ object StoreClasses {
     fun ground(rows: List<TerrainRow>): Series<Stand> {
         val groups = LinkedHashMap<Pair<String?, String>, DoubleArray>()
         for (r in rows) {
-            val db = r.id.substringBefore('/').ifEmpty { r.id }
+            // An id that opens with a slash ("/memories/…", "/corpus/…") names its database after it.
+            val db = r.id.trimStart('/').substringBefore('/').ifEmpty { r.id }
             val at = groups.getOrPut(classOf(r) to db) { DoubleArray(2) }
             at[0] += 1.0; at[1] += r.bytes
         }

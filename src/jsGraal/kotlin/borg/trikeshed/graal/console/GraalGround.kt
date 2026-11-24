@@ -25,7 +25,7 @@ import kotlin.math.abs
  * a transfer clicked opens on /transfers.
  */
 object GraalGround {
-    val scene = GroundScene().also { it.top = 92.0; it.bottom = 40.0 }
+    val scene = GroundScene()
     var storeOf: Array<dynamic>? = null
     var store: Series<Stand> = emptySeriesOf()
     var transfers: Series<TransferRow> = emptySeriesOf()
@@ -45,8 +45,22 @@ object GraalGround {
     fun moved() { window.history.replaceState(null, "", window.location.pathname + window.location.search + scene.hash()) }
 }
 
+/**
+ * The ground's viewport, and the bands the page's own chrome covers: the vitals strip above, the crumb and help lines
+ * below. Taken before anything frames the camera, not only when a frame is drawn: a class reached before the first
+ * frame was framed for a viewport of one pixel.
+ */
+fun GraalConsole.groundSize() {
+    val scene = GraalGround.scene
+    scene.viewport = Viewport(maxOf(1, innerWidth.toInt()), maxOf(1, innerHeight.toInt()))
+    scene.top = q("hud").getBoundingClientRect().bottom + 8
+    val below = listOf("crumb", "help").map { q(it).getBoundingClientRect() }.filter { it.height > 0 }.minOfOrNull { it.top } ?: innerHeight
+    scene.bottom = innerHeight - below + 8
+}
+
 /** Reads the hyperarchy once and the transfers every two seconds; a ground view in the URL opens the ground. */
 fun GraalConsole.loadGround() {
+    groundSize()
     if (GroundView.decode(window.location.hash) != null) { mode = "ground"; GraalGround.scene.restore(window.location.hash) }
     // Links to the transfers asked for by the document open in the inspector: its context id is its row id, `<db>/<document>`.
     val links = document.createElement("span")
@@ -56,7 +70,8 @@ fun GraalConsole.loadGround() {
         try {
             val r = fetchResponse("/api/sumo/hyperarchy")
             if (!r.ok) error("HTTP " + r.status)
-            GraalGround.scene.load(SumoHyperarchy.of(reify(r.text().await()) as Map<*, *>))
+            val hyperarchy = SumoHyperarchy.of(reify(r.text().await()) as Map<*, *>)
+            groundSize(); GraalGround.scene.load(hyperarchy)
         } catch (e: Throwable) { river("deopt", "SUMO hyperarchy unavailable: " + errText(e)) }
     }
     fun poll() {
@@ -79,7 +94,7 @@ fun GraalConsole.drawGround() {
     val g = GraalGround
     val rows = lastRows
     if (rows !== g.storeOf) { g.storeOf = rows; g.store = StoreClasses.ground(if (rows == null) emptyList() else terrainRows(rows)); g.stage() }
-    g.scene.viewport = Viewport(maxOf(1, innerWidth.toInt()), maxOf(1, innerHeight.toInt()))
+    groundSize()
     val dpr = window.devicePixelRatio
     ctx.setTransform(dpr, 0.0, 0.0, dpr, 0.0, 0.0)
     FrameCanvas.draw(ctx, g.scene.frame())
@@ -87,6 +102,7 @@ fun GraalConsole.drawGround() {
 
 fun GraalConsole.groundDown(e: MouseEvent) {
     val p = doubleArrayOf(e.clientX.toDouble(), e.clientY.toDouble())
+    groundSize()
     GraalGround.press = p; GraalGround.last = p; GraalGround.travelled = 0.0
     GraalGround.turning = e.button.toInt() == 2 || e.shiftKey
 }
@@ -109,12 +125,14 @@ fun GraalConsole.groundUp() {
 }
 
 fun GraalConsole.groundWheel(e: WheelEvent) {
+    groundSize()
     GraalGround.scene.wheel(e.deltaY, e.deltaMode.toInt(), e.clientX.toDouble(), e.clientY.toDouble()); GraalGround.moved()
 }
 
 /** The ground takes its keys (hyperarchy moves, turn, tilt, Home and 0); M and H keep the Graal's own meanings (modes, the Hermes runner). */
 fun GraalConsole.groundKey(e: KeyboardEvent): Boolean {
     if (e.key == "m" || e.key == "M" || e.key == "h" || e.key == "H") return false
+    groundSize()
     if (!GraalGround.scene.key(e.key)) return false
     e.preventDefault(); GraalGround.moved()
     return true
