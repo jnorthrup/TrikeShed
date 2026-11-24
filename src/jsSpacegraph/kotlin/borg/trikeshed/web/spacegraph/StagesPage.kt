@@ -8,6 +8,7 @@ import borg.trikeshed.narsese.Setting
 import borg.trikeshed.parse.reify
 import borg.trikeshed.web.*
 import kotlinx.browser.document
+import kotlinx.browser.window
 import narchy.spacegraph.*
 import narchy.spacegraph.graphics.spi.SvgGraphicsProvider
 import org.w3c.dom.HTMLElement
@@ -55,7 +56,24 @@ object StagesPage {
         resizeObserver.observe(host)
         page.own { resizeObserver?.disconnect() }
         changed()
+        run()
     }
+
+    /** The run the address names (`?run=<id>`), read from the daemon's retained receipt and shown as a pasted record is. */
+    fun run() {
+        val id = (jsNew(js("URLSearchParams"), window.location.search).get("run") as? String)?.takeIf { it.isNotBlank() } ?: return
+        status("reading run $id…")
+        page.submit {
+            try {
+                val r = fetchJs("/api/lcnc/oroboros?runId=" + encodeURIComponent(id))
+                val receipt = (reify(str(awaitJs(r.text()))) as? Map<*, *>)?.get("receipt") ?: throw IllegalStateException("the daemon retains no run $id")
+                show(receipt)
+            } catch (e: dynamic) { status("run $id is not shown: " + failureText(e)) }
+        }
+    }
+
+    /** The address names the run on the boards, so the address opens it again. */
+    fun named(id: Any?) { if (id != null) window.history.replaceState(null, "", window.location.pathname + "?run=" + encodeURIComponent(id.toString())) }
 
     fun esc(s: Any?) = s.toString().replace("&", "&amp;").replace("<", "&lt;")
     fun status(s: String) { document.getElementById("stages-status")?.textContent = s }
@@ -158,6 +176,7 @@ object StagesPage {
                 output = StageBoard.output(run)
                 shown = ""
                 build(null)
+                named(run["runId"])
                 status("read · run ${run["runId"]}")
             } catch (e: dynamic) { status("the run failed: " + failureText(e)) }
             finally { reading = false }
@@ -166,17 +185,20 @@ object StagesPage {
 
     /** A pasted run record or stages output, drawn as it stands; a record's passage (the preset's passage node, or this page's text node) fills the passage box. */
     fun load() {
-        try {
-            val value = reify(str(byId("stages-record").value))
-            val out = StageBoard.output(value)
-            val outputs = (value as? Map<*, *>)?.get("outputs") as? Map<*, *>
-            val text = ((outputs?.get("passage") as? Map<*, *>)?.get("text") ?: (outputs?.get("text") as? Map<*, *>)?.get("value")) as? String
-            if (text != null) byId("stages-passage").value = text
-            output = out
-            shown = ""
-            build(null)
-            status("shown · ${(out["board"] as List<*>).size} claims")
-        } catch (refused: Throwable) { status("not shown: " + (refused.message ?: refused.toString())) }
+        try { show(reify(str(byId("stages-record").value))) }
+        catch (refused: Throwable) { status("not shown: " + (refused.message ?: refused.toString())) }
+    }
+
+    /** [value], a run record or a stages output, on the boards; a record's passage fills the passage box. */
+    fun show(value: Any?) {
+        val out = StageBoard.output(value)
+        val outputs = (value as? Map<*, *>)?.get("outputs") as? Map<*, *>
+        val text = ((outputs?.get("passage") as? Map<*, *>)?.get("text") ?: (outputs?.get("text") as? Map<*, *>)?.get("value")) as? String
+        if (text != null) byId("stages-passage").value = text
+        output = out
+        shown = ""
+        build(null)
+        status("shown · ${(out["board"] as List<*>).size} claims")
     }
 
     /** What a clicked circle stands for, read whole: labels on the boards are cut to their circles. */
