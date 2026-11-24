@@ -228,6 +228,9 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     ENGLISH_CORPUS_ROUTE(CamelCorpusRouting.TYPE),
     ENGLISH_PATTERNS(EnglishLegalPatternsContract.TYPE),
     ENGLISH_LEGAL_QUERY(EnglishLegalQueryContract.TYPE),
+    BOOK_REVIEW(BookReview.TYPE),
+    PREREQUISITE_PASSAGE(BookReview.PASSAGE),
+    INGEST_STAGES(borg.trikeshed.narsese.IngestStages.TYPE),
     WIKI_PROPOSE(LcncContracts.WIKI_PROPOSE);
 
     fun construct(node: LcncNode, inputs: Map<String, Any?>, runner: LcncNodeRunner, parent: Job): LcncNodeElement {

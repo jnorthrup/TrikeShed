@@ -27,6 +27,7 @@ object AgentRunsKey : LcncServiceKey<AgentRuns>("AgentRunsKey")
 object AgentRunIdKey : LcncServiceKey<() -> String>("AgentRunIdKey")
 object RequestFactoryProxyKey : LcncServiceKey<RequestFactoryProxy>("RequestFactoryProxyKey")
 object SurfaceCallKey : LcncServiceKey<SurfaceNodes.Call>("SurfaceCallKey")
+object MirrorFetchKey : LcncServiceKey<borg.trikeshed.agent.mirrormux.MirrorFetch>("MirrorFetchKey")
 
 /** Required services and their supplied defaults, without exposing provider values. */
 interface LcncServiceBinding {

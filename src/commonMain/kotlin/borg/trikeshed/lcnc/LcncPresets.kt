@@ -290,7 +290,7 @@ object LcncPresets {
             see = "A per-module verdict, and the mismatches if there are any.",
             tweakFirst = "Nothing — read it first; it only reports.",
         ),
-    ) + LcncWorkspacePresets.catalog + EnglishLcncPreset.info + EnglishLcncPreset.copularInfo + EnglishLcncPreset.copularPatternInfo + EnglishNalPreset.info + EnglishRelationPreset.info + EnglishCorpusPreset.info + CamelCorpusRouting.info
+    ) + LcncWorkspacePresets.catalog + EnglishLcncPreset.info + EnglishLcncPreset.copularInfo + EnglishLcncPreset.copularPatternInfo + EnglishNalPreset.info + EnglishRelationPreset.info + EnglishCorpusPreset.info + CamelCorpusRouting.info + BookReview.info + borg.trikeshed.narsese.IngestStages.info
 
     /**
      * TURBOHAUL, AS AN ORG CHART — a STRAWMAN, not a release.
@@ -415,6 +415,8 @@ object LcncPresets {
         (EnglishNalPreset.NAME j LcncProgramConfix.toJson(EnglishNalPreset.build())).pair,
         (EnglishRelationPreset.NAME j LcncProgramConfix.toJson(EnglishRelationPreset.build())).pair,
         (CamelCorpusRouting.NAME j LcncProgramConfix.toJson(CamelCorpusRouting.build())).pair,
+        (BookReview.NAME j LcncProgramConfix.toJson(BookReview.build())).pair,
+        (borg.trikeshed.narsese.IngestStages.NAME j LcncProgramConfix.toJson(borg.trikeshed.narsese.IngestStages.build())).pair,
         (EnglishCorpusPreset.NAME j LcncProgramConfix.toJson(EnglishCorpusPreset.build())).pair,
         EnglishLcncPreset.NAME to LcncProgramConfix.toJson(EnglishLcncPreset.build()),
         (EnglishLcncPreset.COPULAR_NAME j LcncProgramConfix.toJson(EnglishLcncPreset.buildCopular())).pair,

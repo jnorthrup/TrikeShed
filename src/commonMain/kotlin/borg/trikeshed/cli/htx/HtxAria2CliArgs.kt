@@ -10,7 +10,9 @@ data class Aria2Options(
     val continueDownload: Boolean = false,
     val checkIntegrity: Boolean = false,
     val checksum: String? = null,
-    val uris: List<String> = emptyList()
+    val uris: List<String> = emptyList(),
+    /** The length the file is pinned at, checked with [checksum]; aria2 itself has no switch for it. */
+    val length: Long? = null,
 )
 
 object HtxAria2CliArgs {

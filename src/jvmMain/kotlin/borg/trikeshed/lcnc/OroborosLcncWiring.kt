@@ -121,6 +121,15 @@ object OroborosLcncWiring {
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.FinanceNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { borg.trikeshed.platform.HostSystem.currentTimeMillis() })
+        // book.review asks archive.org, Wikipedia and Project Gutenberg through the reactor's aria2 engine, over the daemon's own supervisor.
+        val scope = moduleContext.scope.coroutineContext
+        val files = checkNotNull(scope[FileOperations])
+        val http = borg.trikeshed.htx.openHtxClientReactorElement(
+            nioSupervisor = checkNotNull(scope[borg.trikeshed.userspace.nio.spi.NioSupervisor]), parentJob = scope[kotlinx.coroutines.Job])
+        ownCleanup { http.close() }
+        moduleContext.lcncRunners.putAll(BookReview.registry { uris ->
+            borg.trikeshed.cli.htx.HtxAria2Engine(borg.trikeshed.cli.htx.Aria2Options(uris = uris), http, files).fetch()
+        })
         return kernel
     }
 }

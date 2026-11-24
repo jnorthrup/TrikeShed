@@ -254,7 +254,7 @@ open class HtxClientReactorElement(
                 range = request.range,
                 method = request.method,
                 body = request.body,
-            ).copy(headers = request.headers)
+            ).copy(headers = request.headers, timeoutMs = request.timeoutMs, maxResponseBytes = request.maxResponseBytes)
 
             channelize(
                 HtxClientFrame(
