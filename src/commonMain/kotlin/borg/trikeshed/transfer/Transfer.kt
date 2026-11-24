@@ -65,6 +65,16 @@ val TransferSource.wire: Map<String, Any?>
     get() = _m["address" j address, "protocol" j protocol.name.lowercase(), "transport" j transport.name.lowercase(),
         "state" j state.name.lowercase(), "down" j down, "up" j up, "completed" j completed]
 
+/** What one source of a transfer gave and took: verified bytes and rates now. Its owner serializes it. */
+class SourceTraffic {
+    val down = TransferRate()
+    val up = TransferRate()
+    var completed = 0L
+    var served = 0L
+    /** The message of this source's last failed piece or range, cleared by its next good one. */
+    var failure: String? = null
+}
+
 /**
  * Bytes a second over the last [window] seconds of a monotonic clock, the current second included. It holds no
  * lock: its owner serializes [add] and [now].

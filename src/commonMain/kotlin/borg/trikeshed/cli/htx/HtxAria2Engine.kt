@@ -1,12 +1,16 @@
 package borg.trikeshed.cli.htx
 
 import borg.trikeshed.htx.*
+import borg.trikeshed.lib.toSeries
+import borg.trikeshed.transfer.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
 /**
@@ -22,6 +26,9 @@ import kotlinx.coroutines.sync.withPermit
  * The whole file is gathered in memory and written once, so it is bounded by one array (below 2 GiB) and a stopped
  * download starts over: `continue` skips a file already present with the pinned checksum, it does not resume
  * a part. Pre-allocation, a control file and positional writes are not here.
+ *
+ * While it runs, [row] reports it as a transfer: a range counts as completed when its mirror answered with exactly
+ * its bytes, and the checksum, which covers the whole file only, decides complete or error at the end.
  */
 class HtxAria2Engine(
     private val options: Aria2Options,
@@ -31,6 +38,22 @@ class HtxAria2Engine(
     /** Exchanges made and body bytes received by this engine. */
     var requests = 0
     var received = 0L
+    /** What asked for this file, where its content lands in the store, and the SUMO class of that content; set by the caller. */
+    var context: TransferContext? = null
+    var content: String? = null
+    var contentClass: String? = null
+    /** The row's counters, under [observation]. */
+    val observation = Mutex()
+    val mirrors = options.uris.associateWith { SourceTraffic() }
+    val down = TransferRate()
+    var state = TransferState.WAITING
+    var total: Long? = null
+    var completed = 0L
+    var failure: String? = null
+    /** Ranges of the file and those received whole; zero while the file comes in one request. */
+    var spans = 0
+    var spansHeld = 0
+    var step = 0L
 
     /** The path the file is written to. */
     val outPath: String
@@ -54,12 +77,23 @@ class HtxAria2Engine(
     /** The file's bytes, verified against the checksum when one is given; in one request when no mirror serves it in ranges. */
     suspend fun fetch(): ByteArray {
         require(options.uris.isNotEmpty()) { "No URIs provided" }
-        val length = length()
-        val bytes = if (length > options.minSplitSize && options.split > 1) {
-            try { ranges(length) } catch (cancelled: CancellationException) { throw cancelled } catch (unranged: IllegalStateException) { whole(length) }
-        } else whole(length)
-        verify(bytes)
-        return bytes
+        observation.withLock { state = TransferState.ACTIVE; failure = null }
+        try {
+            val length = length()
+            observation.withLock { total = length.takeIf { it >= 0 } }
+            val bytes = if (length > options.minSplitSize && options.split > 1) {
+                try { ranges(length) } catch (cancelled: CancellationException) { throw cancelled } catch (unranged: IllegalStateException) { whole(length) }
+            } else whole(length)
+            verify(bytes)
+            observation.withLock { state = TransferState.COMPLETE; total = bytes.size.toLong(); completed = bytes.size.toLong() }
+            return bytes
+        } catch (cancelled: CancellationException) {
+            observation.withLock { state = TransferState.WAITING }
+            throw cancelled
+        } catch (failed: Exception) {
+            observation.withLock { state = TransferState.ERROR; failure = failed.message }
+            throw failed
+        }
     }
 
     /**
@@ -89,10 +123,11 @@ class HtxAria2Engine(
             try {
                 val response = exchange(uri, HtxRange(offset, offset + count - 1), HtxMethod.GET, count)
                 val bytes = response.body.toArray()
-                if (response.status == 206 && bytes.size == count) return bytes
+                if (response.status == 206 && bytes.size == count) return bytes.also { held(uri, count) }
                 failures += "$uri: status ${response.status}, ${bytes.size} bytes for $count"
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failed: Exception) { failures += "$uri: $failed" }
+            observation.withLock { mirrors.getValue(uri).failure = failures.last() }
         }
         error("bytes $offset-${offset + count - 1} failed on every mirror: ${failures.joinToString("; ")}")
     }
@@ -102,12 +137,14 @@ class HtxAria2Engine(
         require(length <= MAX_BYTES) { "$length bytes: a file this large needs positional writes, which this engine does not have" }
         val step = maxOf(options.minSplitSize, (length + options.split - 1) / options.split)
         val count = ((length + step - 1) / step).toInt()
+        observation.withLock { spans = count; spansHeld = 0; this@HtxAria2Engine.step = step }
         val gate = Semaphore(maxOf(1, options.maxConnectionPerServer) * options.uris.size)
         val out = ByteArray(length.toInt())
         (0 until count).map { k ->
             async {
                 val from = k * step
                 gate.withPermit { read(from, (minOf(from + step, length) - from).toInt(), k).copyInto(out, from.toInt()) }
+                observation.withLock { spansHeld++ }
             }
         }.awaitAll()
         out
@@ -116,15 +153,17 @@ class HtxAria2Engine(
     /** The file in one request, from the first mirror that answers 200 with [length] bytes (any length when it is unknown). */
     suspend fun whole(length: Long): ByteArray {
         require(length <= MAX_BYTES) { "$length bytes: a file this large needs positional writes, which this engine does not have" }
+        observation.withLock { spans = 0; spansHeld = 0; completed = 0 }
         val failures = ArrayList<String>()
         for (uri in options.uris) {
             try {
                 val response = exchange(uri, null, HtxMethod.GET, if (length < 0) MAX_BYTES.toInt() else length.toInt())
                 val bytes = response.body.toArray()
-                if (response.status == 200 && (length < 0 || bytes.size.toLong() == length)) return bytes
+                if (response.status == 200 && (length < 0 || bytes.size.toLong() == length)) return bytes.also { held(uri, it.size) }
                 failures += "$uri: status ${response.status}, ${bytes.size} bytes" + if (length < 0) "" else " for $length"
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failed: Exception) { failures += "$uri: $failed" }
+            observation.withLock { mirrors.getValue(uri).failure = failures.last() }
         }
         error("failed on every mirror: ${failures.joinToString("; ")}")
     }
@@ -136,7 +175,30 @@ class HtxAria2Engine(
             timeoutMs = maxOf(HtxRequest.DEFAULT_TIMEOUT_MS, body.toLong() * 1000 / SLOWEST)))
         requests++
         received += response.body.rem
+        observation.withLock { mirrors[uri]?.down?.add(response.body.rem.toLong()); down.add(response.body.rem.toLong()) }
         return response
+    }
+
+    /** [count] bytes from [uri] came whole. */
+    suspend fun held(uri: String, count: Int) = observation.withLock {
+        completed += count
+        mirrors.getValue(uri).let { it.completed += count; it.failure = null }
+    }
+
+    /** This file as a transfer row: its mirrors are the sources, its ranges the pieces. */
+    suspend fun row(): Transfer = observation.withLock {
+        Transfer(options.uris.first(), outPath.substringAfterLast('/'), TransferProtocol.HTTP, state, total, completed, down.now(), 0,
+            if (spans == 0) null else TransferPieces(spans, spansHeld, step.toInt()),
+            options.uris.map { uri ->
+                val traffic = mirrors.getValue(uri)
+                TransferSource(uri, TransferProtocol.HTTP, if (uri.startsWith("https:")) TransferTransport.TLS else TransferTransport.TCP,
+                    when {
+                        traffic.down.now() > 0 -> TransferState.ACTIVE
+                        traffic.failure != null -> TransferState.ERROR
+                        traffic.completed > 0 && state == TransferState.COMPLETE -> TransferState.COMPLETE
+                        else -> TransferState.WAITING
+                    }, traffic.down.now(), 0, traffic.completed)
+            }.toSeries(), context, content, contentClass, failure.takeIf { state == TransferState.ERROR })
     }
 
     /** Fails unless [bytes] has the pinned length and the `checksum` option's digest; what is not pinned is not checked. */

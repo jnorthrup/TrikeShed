@@ -8,16 +8,6 @@ import kotlinx.coroutines.currentCoroutineContext
 /** A source's bytes for piece [index] do not hash to the metainfo's. */
 class TorrentPieceMismatch(val index: Int, val source: String) : IllegalStateException("Torrent piece $index from $source failed verification")
 
-/** What one source gave and took: verified bytes and rates now. The session serializes it under its observation lock. */
-class SourceTraffic {
-    val down = TransferRate()
-    val up = TransferRate()
-    var completed = 0L
-    var served = 0L
-    /** The message of this source's last failed piece, cleared by its next verified one. */
-    var failure: String? = null
-}
-
 /** Where a session's pieces come from: a connected peer or a web seed. Its bytes are unverified until the session checks the piece. */
 interface PieceSource {
     val address: String
