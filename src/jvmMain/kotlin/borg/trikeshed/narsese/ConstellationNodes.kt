@@ -263,7 +263,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             CoreNlpRuntime(profile).use { nlp -> texts.map(nlp::analyze) }
         }, { c, nouns, known ->
             bearerClass(c, nouns.toList(), known.fold(RoaringSeries.EMPTY) { acc, id -> acc or SumoCorpus.closure(id) })
-        }, { name -> constellation(name).bearing.keys.toSet() }, { c -> rdf(c) }))
+        }, { name -> constellation(name).bearing.keys.toSet() }, { c -> rdf(c) }, { id -> if (id < 0) "" else SumoCorpus.classifier.className(SumoClassId(id)) }))
     }
 
     /**

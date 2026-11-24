@@ -542,6 +542,7 @@ class JvmKanbanServer(
         "/curator" to ("web/curator.html" to "text/html; charset=utf-8"),
         "/curator.html" to ("web/curator.html" to "text/html; charset=utf-8"),
         // the ingest stages against challenges: each board one setting, drawn by commonMain's StageBoard
+        "/pachinko" to ("web/stages.html" to "text/html; charset=utf-8"),
         "/stages" to ("web/stages.html" to "text/html; charset=utf-8"),
         "/stages.html" to ("web/stages.html" to "text/html; charset=utf-8"),
         // the transfers panel: what every transport reports, on the SUMO ground

@@ -1,6 +1,9 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reify
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -39,6 +42,16 @@ class ChallengeTest {
         assertEquals(_l[Score("person", 1.0, 0.0, emptyList()), Score("m", 0.25, 0.5, _l[delivery])], Challenge.score(answers, settings[0]))
         // Under the variant the person's claim is lost at token and the model's second claim is found.
         assertEquals(_l[Score("person", 0.0, 1.0, _l[returns]), Score("m", 0.75, 0.0, emptyList())], Challenge.score(answers, settings[1]))
+    }
+
+    /** A run carries its challenges: the program's text literal holds them, and the record read back gives the same ones. */
+    @Test fun aRunCarriesItsChallengesInItsProgram() {
+        val program = Challenge.program("A passage.", challenges.map { Expectation(it.author, it.claim) }, challenges = challenges)
+        // the daemon reads the request's document back into a program, and a text literal's output is its value
+        val document = (reify(Challenge.request(program)) as Map<*, *>)["document"]
+        val node = LcncProgramConfix.fromJson(program.name, jsonOf(document)).nodes.view.first { it.id == Challenge.NODE }
+        assertEquals(challenges, Challenge.carried(_m["outputs" j _m[Challenge.NODE j _m["value" j node.params["value"]]]]))
+        assertEquals(emptyList(), Challenge.carried(_m["outputs" j _m["text" j _m["value" j "A passage."]]]), "a record of a program without the node carries none")
     }
 
     @Test fun aModelsOutcomeIsHeldAgainstAPersonsOnTheSameClaim() {

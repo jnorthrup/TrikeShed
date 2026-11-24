@@ -173,4 +173,101 @@ class IngestStagesTest {
         assertSame(LcncNodeKey.PREREQUISITE_PASSAGE, LcncNodeKey.of(BookReview.PASSAGE))
         assertNotNull(LcncContracts.find(BookReview.PASSAGE))
     }
+
+    /** A claim says "you"; the passage defines who "you" is: the claim is read with the passage's parties, and its clause is the passage's. */
+    @Test fun aClaimIsReadWithThePartiesThePassageDefines() = runTest {
+        val defining = "You/you/PRP (/(/-LRB- ``/``/`` Customer/customer/NN ''/''/'' )/)/-RRB- must/must/MD return/return/VB the/the/DT goods/goods/NNS" to
+            "0>8>root 8>1>nsubj 8>7>aux 8>10>obj 10>9>det"
+        val you = "You/you/PRP must/must/MD return/return/VB the/the/DT goods/goods/NNS" to "0>3>root 3>1>nsubj 3>2>aux 3>5>obj 5>4>det"
+        val they = "They/they/PRP must/must/MD return/return/VB the/the/DT goods/goods/NNS" to you.second
+        val docs = listOf(parsed(defining), parsed(you), parsed(they)).associateBy { it.text }
+        val reader: suspend (String, List<String>) -> List<NlpDocument> = { _, texts -> texts.map { docs[it] ?: error("no reading of '$it'") } }
+        val out = IngestStages.run(parsed(defining).text, listOf(Expectation("person", parsed(you).text), Expectation("person", parsed(they).text)),
+            emptySet(), listOf("a"), reader, emptySet(), { _, _, _ -> -1 }, ::typedNorms)
+        val bound = stage(row(out["board"], parsed(you).text), IngestStages.CLAUSE)
+        assertEquals(true, bound["pass"], "\"you\" is the customer the passage defines")
+        assertEquals(listOf("customer"), (bound["claim"] as List<*>).map { (it as Map<*, *>)["subject"] })
+        assertEquals(listOf(parsed(defining).text), bound["sentences"], "the passage sentence holding the same clause")
+        val unknown = stage(row(out["board"], parsed(they).text), IngestStages.CLAUSE)
+        assertEquals(emptyList<Any?>(), unknown["claim"])
+        assertEquals(listOf("they"), unknown["unbound"], "no party binds \"they\"")
+        assertEquals("The machine read no clause from the claim: it does not know who “they” is.", IngestStages.reason(IngestStages.CLAUSE, unknown, parsed(they).text))
+    }
+
+    /** The passage states the claim's rule the other way: the statement stage names the passage sentence that says so. */
+    @Test fun theStatementStageNamesThePassageSentenceThatSaysTheOpposite() = runTest {
+        val out = IngestStages.run(passage, listOf(Expectation("person", parsed(returns).text), Expectation("model", parsed(forbidden).text)),
+            emptySet(), listOf("a"), read, emptySet(), { _, _, _ -> -1 }, ::typedNorms)
+        val sentence = "The bailee must return the goods."
+        val denied = stage(row(out["board"], parsed(forbidden).text), IngestStages.STATEMENT)
+        assertEquals(listOf(sentence), denied["contrary"])
+        assertEquals("The passage says the opposite: “The bailee must return the goods.”", IngestStages.reason(IngestStages.STATEMENT, denied, parsed(forbidden).text))
+        assertEquals(listOf(sentence), stage(row(out["board"], parsed(returns).text), IngestStages.CLAUSE)["sentences"])
+        assertEquals(emptyList<Any?>(), stage(row(out["board"], parsed(returns).text), IngestStages.STATEMENT)["contrary"])
+    }
+
+    /** The bearer stage names the categories it compares when the host names them, and adds nothing when it does not. */
+    @Test fun theBearerStageNamesTheCategoriesItCompares() {
+        val typedAs = { n: Int -> { c: NormClause -> if (c.subject == "bailee") n else -1 } }
+        val source = IngestStages.Reading(listOf("p"), listOf(parsed(returns)), listOf(NormClauses.extract(parsed(returns))), typedAs(7))
+        val claim = IngestStages.Reading(listOf("c"), listOf(parsed(returns)), listOf(NormClauses.extract(parsed(returns))), typedAs(9))
+        val names = mapOf(7 to "Corporation", 9 to "LegalAgent")
+        val bearer = IngestStages.judge(source, claim, ::typedNorms) { names[it].orEmpty() }.getValue(IngestStages.BEARER)
+        assertEquals(listOf(mapOf("word" to "bailee", "claim" to "LegalAgent", "passage" to "Corporation")), bearer["kinds"])
+        assertEquals("The claim puts “bailee” in the category Legal Agent; the passage puts it in Corporation.",
+            IngestStages.reason(IngestStages.BEARER, bearer, parsed(returns).text))
+        assertNull(IngestStages.judge(source, claim, ::typedNorms).getValue(IngestStages.BEARER)["kinds"], "a host that names no category adds none")
+    }
+
+    /** Each stage's one sentence, from evidence written by hand: what it found or lacked, in a person's words. */
+    @Test fun eachStageSaysInOneSentenceWhatItFoundOrLacked() {
+        fun said(stage: String, claim: String, vararg evidence: Join<String, Any?>) = IngestStages.reason(stage, _m.get(*evidence), claim)
+        val title = "Title to Supported Digital Assets shall remain with you."
+        val rent = "The bailee must pay rent to the bailor."
+        val none = emptyList<String>()
+        assertEquals("The passage has every word of the claim: title, supported, digital, assets and remain.",
+            said(IngestStages.TOKEN, title, "pass" j true, "wanted" j _l["assets", "digital", "remain", "support", "title"], "lacking" j none))
+        assertEquals("The passage never uses the words “pay” and “rent”.",
+            said(IngestStages.TOKEN, rent, "pass" j false, "wanted" j _l["bailee", "bailor", "pay", "rent"], "lacking" j _l["pay", "rent"]))
+        assertEquals("One section of the passage holds all of these words.", said(IngestStages.SECTION, title, "pass" j true, "lacking" j none))
+        assertEquals("No one section holds them all: the section holding the most lacks “bailee”.",
+            said(IngestStages.SECTION, rent, "pass" j false, "lacking" j _l["bailee"]))
+        val held = "Title to Supported Digital Assets shall at all times remain with you and shall not transfer to Coinbase."
+        assertEquals("One sentence holds them all: “$held”", said(IngestStages.SENTENCE, title, "pass" j true, "lacking" j none, "sentence" j held))
+        assertEquals("No one sentence holds them all; the closest lacks “bailment”: “A delivery of personal property by one person to another.”",
+            said(IngestStages.SENTENCE, "A bailment is a delivery of personal property by one person to another.", "pass" j false, "lacking" j _l["bailment"],
+                "sentence" j "A delivery of personal property by one person to another."))
+        assertEquals("That sentence joins the words as the claim does: title to remain and assets to title.",
+            said(IngestStages.DEPENDENCY, title, "pass" j true, "wanted" j _l["remain nsubj title", "title nmod:to assets"], "lacking" j none))
+        assertEquals("That sentence does not join title to change as the claim does.",
+            said(IngestStages.DEPENDENCY, "A bailment involves a change in title.", "pass" j false, "wanted" j _l["change nmod:in title"], "lacking" j _l["change nmod:in title"]))
+        assertEquals("The claim defines no party of its own.", said(IngestStages.PARTY, title, "pass" j true, "wanted" j none, "lacking" j none))
+        assertEquals("The claim defines “customer” as a party; the passage does not.",
+            said(IngestStages.PARTY, title, "pass" j false, "wanted" j _l["customer"], "lacking" j _l["customer"]))
+        val remain = _m["subject" j "title", "modal" j "shall", "affirmative" j true, "verb" j "remain", "object" j null, "oblique" j "with you", "condition" j null]
+        assertEquals("The passage has the same clause: title shall remain with you.", said(IngestStages.CLAUSE, title, "pass" j true, "claim" j _l[remain], "lacking" j none))
+        val pay = _m["subject" j "coinbase", "modal" j "must", "affirmative" j true, "verb" j "pay", "object" j "interest", "oblique" j null, "condition" j null]
+        assertEquals("The passage has no clause in which coinbase must pay interest.",
+            said(IngestStages.CLAUSE, "Coinbase must pay interest.", "pass" j false, "claim" j _l[pay], "lacking" j _l[pay]))
+        assertEquals("The machine read no clause from the claim, no one who shall, must or may do something, so it has nothing to look for.",
+            said(IngestStages.CLAUSE, "You shall bear all risk of loss.", "pass" j false, "claim" j none, "lacking" j none))
+        assertEquals("The claim and the passage put “title” in two different categories.",
+            said(IngestStages.BEARER, title, "pass" j false, "wanted" j _l["title=2433"], "lacking" j _l["title=8195"]))
+        assertEquals("Nothing the claim names has a category to compare.", said(IngestStages.BEARER, title, "pass" j true, "wanted" j none, "lacking" j none))
+        assertEquals("The passage states the claim's rule: title must remain with you.",
+            said(IngestStages.STATEMENT, title, "pass" j true, "claim" j _l["must|title|remain|with you|"], "lacking" j none, "opposed" j none))
+        val grant = "Coinbase may grant a security interest in the Supported Digital Assets."
+        assertEquals("The passage says the opposite: Coinbase may NOT grant a security interest in the Supported Digital Assets.",
+            said(IngestStages.STATEMENT, grant, "pass" j false, "claim" j _l["may|coinbase|grant|security interest|"],
+                "lacking" j _l["may|coinbase|grant|security interest|"], "opposed" j _l["may|coinbase|grant|security interest|"]))
+        assertEquals("The passage does not state that coinbase must pay interest.",
+            said(IngestStages.STATEMENT, "Coinbase must pay interest.", "pass" j false, "claim" j _l["must|coinbase|pay|interest|"],
+                "lacking" j _l["must|coinbase|pay|interest|"], "opposed" j none))
+        assertEquals("Read together, the passage restates the claim's rule; the machine believes it with frequency 1.00 and confidence 0.67.",
+            said(IngestStages.JOIN, title, "pass" j true, "restated" j _l["must|title|remain|with you|"],
+                "truth" j _l[_m["statement" j "must|title|remain|with you|", "frequency" j 1.0, "confidence" j 0.6666667]]))
+        assertEquals("Read together, the passage does not restate the claim's rule.", said(IngestStages.JOIN, title, "pass" j false, "restated" j none))
+        assertEquals("The record keeps the claim's rule as a norm.", said(IngestStages.QUAD, title, "pass" j true, "lacking" j none))
+        assertEquals("The record does not keep the claim's rule as a norm.", said(IngestStages.QUAD, title, "pass" j false, "lacking" j _l["must|title|remain|with you|"], "error" j null))
+    }
 }

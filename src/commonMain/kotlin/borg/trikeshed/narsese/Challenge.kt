@@ -74,13 +74,26 @@ data class Challenge(val author: String, val claim: String, val states: Boolean,
             return by.map { (origin, held) -> Score.of(origin, held) }
         }
 
-        /** [text] read through the stages with [expectations]: a text literal wired into an `ingest.stages` node. */
-        fun program(text: String, expectations: List<Expectation>, generic: String = "", parsers: String = IngestStages.PARSERS): LcncProgram =
+        /** The program's node that carries the [challenges][program] as rows, so that a run's record holds its known outcomes. */
+        const val NODE = "challenges"
+
+        /**
+         * [text] read through the stages with [expectations]: a text literal wired into an `ingest.stages` node, and a
+         * second text literal, [NODE], holding [challenges] as [rows] for the record's `outputs`.
+         */
+        fun program(text: String, expectations: List<Expectation>, generic: String = "", parsers: String = IngestStages.PARSERS,
+                    challenges: List<Challenge> = emptyList()): LcncProgram =
             LcncProgram(PROGRAM, s_[
                 LcncNode("text", "text.value", _m["value" j text], x = 40.0, y = 40.0),
                 LcncNode("stages", IngestStages.TYPE, _m["expectations" j jsonOf(expectations.map { _m["author" j it.author, "claim" j it.claim] }),
                     "generic" j generic, "parsers" j parsers], x = 390.0, y = 40.0),
+                LcncNode(NODE, "text.value", _m["value" j jsonOf(challenges.map { c ->
+                    _m["author" j c.author, "model" j c.model, "claim" j c.claim, "states" j c.states, "confidence" j c.confidence] })], x = 40.0, y = 240.0),
             ], s_[LcncWire("text", "value", "stages", "text")])
+
+        /** The challenges a run [record] carries in its [NODE] node's output; none when its program had no such node. */
+        fun carried(record: Any?): List<Challenge> =
+            rows((((record as? Map<*, *>)?.get("outputs") as? Map<*, *>)?.get(NODE) as? Map<*, *>)?.get("value"))
 
         /** The `/api/lcnc/run` request that runs [program] once. */
         fun request(program: LcncProgram): String = jsonOf(_m["name" j program.name, "document" j reify(LcncProgramConfix.toJson(program)),

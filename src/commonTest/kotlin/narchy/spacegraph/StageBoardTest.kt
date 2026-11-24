@@ -1,95 +1,81 @@
 package narchy.spacegraph
 
+import borg.trikeshed.lcnc.Expectation
 import borg.trikeshed.lib.*
-import borg.trikeshed.narsese.*
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import borg.trikeshed.narsese.Challenge
+import borg.trikeshed.narsese.IngestStages
+import narchy.spacegraph.graphics.spi.DrawItem
+import narchy.spacegraph.graphics.spi.SvgGraphicsProvider
+import kotlin.test.*
 
+/** Rows written by hand: one claim every stage finds, one the words stage loses for the word "rent". */
 class StageBoardTest {
-    val returns = "The bailee must return the goods."
-    val delivery = "A bailment is a delivery of goods in trust."
-    val restored = "The goods shall be restored by the bailee."
-    val clause = _m["subject" j "goods", "modal" j "shall", "verb" j "be_restore", "object" j null]
+    private val stages = listOf(IngestStages.TOKEN, IngestStages.STATEMENT)
+    private fun row(claim: String, blame: String?, words: List<String>, lacking: List<String>) = mapOf("author" to "person", "claim" to claim, "blame" to blame,
+        "variants" to mapOf("parser: b" to (blame ?: Challenge.FOUND)),
+        "stages" to linkedMapOf(IngestStages.TOKEN to mapOf("pass" to lacking.isEmpty(), "wanted" to words, "lacking" to lacking),
+            IngestStages.STATEMENT to mapOf("pass" to (blame == null), "claim" to listOf("must|bailee|return|goods|"), "lacking" to emptyList<String>(), "opposed" to emptyList<String>())))
+    private val returns = "The bailee must return the goods."
+    private val rent = "The bailee must pay rent."
+    private val output = mapOf("board" to listOf(row(returns, null, listOf("bailee", "return", "goods"), emptyList()), row(rent, IngestStages.TOKEN, listOf("bailee", "pay", "rent"), listOf("rent"))))
+    private val challenges = listOf(Challenge(Expectation.PERSON, returns, true, .9), Challenge(Expectation.PERSON, rent, true, .6))
+    private fun drop() = StageBoard.Drop(output, challenges, "The bailee must return the goods. The bailee holds them.")
+    private val viewport = Viewport(1500, 900)
 
-    /**
-     * A stages output written by hand: three claims over four stages, the last ("sense") one the ingest node does not
-     * have, and two variants. The first claim is found at every stage and lost at token under the generic variant; the
-     * second is lost at token everywhere; the third is lost at clause, and at dependency under parser b.
-     */
-    val output = _m[
-        "board" j _l[
-            _m["author" j "person", "claim" j returns, "blame" j null, "stages" j _m[
-                "token" j _m["pass" j true, "wanted" j _l["bailee", "goods", "return"], "lacking" j emptyList<String>()],
-                "dependency" j _m["pass" j true, "wanted" j _l["return nsubj bailee", "return obj goods"], "lacking" j emptyList<String>()],
-                "clause" j _m["pass" j true, "claim" j _l[clause], "lacking" j emptyList<Any?>()],
-                "sense" j _m["pass" j true]],
-                "variants" j _m["parser: b" j "none", "generic: goods" j "token"]],
-            _m["author" j "model", "claim" j delivery, "blame" j "token", "stages" j _m[
-                "token" j _m["pass" j false, "wanted" j _l["bailment", "delivery", "goods", "trust"], "lacking" j _l["bailment"],
-                    "sentence" j "A delivery of goods in trust."],
-                "dependency" j _m["pass" j false, "wanted" j _l["delivery nsubj bailment"], "lacking" j _l["delivery nsubj bailment"]],
-                "clause" j _m["pass" j false, "claim" j emptyList<Any?>(), "lacking" j emptyList<Any?>()],
-                "sense" j _m["pass" j false]],
-                "variants" j _m["parser: b" j "token", "generic: goods" j "token"]],
-            _m["author" j "model", "claim" j restored, "blame" j "clause", "stages" j _m[
-                "token" j _m["pass" j true, "wanted" j _l["bailee", "goods", "restore"], "lacking" j emptyList<String>()],
-                "dependency" j _m["pass" j true, "wanted" j _l["restore nsubj:pass goods"], "lacking" j emptyList<String>()],
-                "clause" j _m["pass" j false, "claim" j _l[clause], "lacking" j _l[clause]],
-                "sense" j _m["pass" j false]],
-                "variants" j _m["parser: b" j "dependency", "generic: goods" j "clause"]],
-        ],
-        "passage" j _m["parser" j "a", "generic" j emptyList<String>()],
-    ]
-
-    val challenges = _l[Challenge("person", returns, true, 1.0), Challenge("model", delivery, true, 0.5, "m"),
-        Challenge("model", restored, false, 0.25, "m")]
-
-    val graph = StageBoard.graph(output, challenges, 8.0)
-    val all = graph.nodes.view.toList()
-    val nodes = all.associateBy { it.id }
-    fun kind(n: NodeSpec) = n.data.string("kind")
-    fun under(id: String) = all.filter { it.parent == id }
-    /** A node's data as the JSON text it was written as. */
-    fun json(d: NodeData) = d.document.b.let { bytes -> ByteArray(bytes.size) { bytes[it] } }.decodeToString()
-    fun dump(g: GraphSpec) = (g.nodes.view.map { "${it.id}|${it.parent}|${it.label}|${it.transform}|${json(it.data)}" } +
-        g.edges.view.map { "${it.id}|${it.source}|${it.target}|${it.kind}|${json(it.data)}" }).joinToString("\n")
-
-    @Test fun eachSettingIsABoardAndEachChallengeRestsWhereItsSettingBlamesIt() {
-        val settings = all.filter { it.parent == null && kind(it) == "setting" }
-        assertEquals(_l["w0", "w1", "w2"], settings.map { it.id })
-        assertEquals(_l["parser: a", "parser: b", "generic: goods"], settings.map { it.label })
-        assertEquals(_l["token", "dependency", "clause", "sense"], under("w0").filter { kind(it) == "stage" }.map { it.data.string("stage") })
-
-        val claims = all.filter { kind(it) == "claim" }
-        assertEquals(9, claims.size, "one claim a board")
-        val rests = _l[_l["w0.found", "w0.s0", "w0.s2"], _l["w1.found", "w1.s0", "w1.s1"], _l["w2.s0", "w2.s0", "w2.s2"]]
-        for (w in 0..2) for (c in 0..2) assertEquals(rests[w][c], nodes.getValue("w$w.c$c").parent, "claim $c on board $w")
-        assertEquals(_l["true", "false", "true"], (0..2).map { nodes.getValue("w0.c$it").data.string("agrees") }, "the rings as read")
-        assertEquals("false", nodes.getValue("w2.c0").data.string("agrees"), "the generic variant loses the person's claim")
-
-        // A link only where a variant blames another stage than the first board does.
-        assertEquals(_l["link.c2.w1 w0.c2 w1.c2", "link.c0.w2 w0.c0 w2.c0"], graph.edges.view.map { "${it.id} ${it.source} ${it.target}" })
+    @Test fun aBallRestsInThePocketOfTheStageThatLosesItAndNeverBelowIt() {
+        val drop = drop()
+        assertEquals(stages, drop.stages, "the stages are the row's own, in its order")
+        val (found, caught) = drop.balls
+        assertEquals(drop.rest(caught), drop.at(caught, drop.end + 5))
+        assertTrue(drop.rest(caught).y < drop.gateY(0) + 30 && drop.rest(caught).y > drop.gateY(0), "in the words pocket")
+        assertTrue(drop.rest(found).y > drop.gateY(1) + 40, "the found ball is in the tray, below the last pocket")
+        val touch = drop.contacts.first { it.ball == caught.index }.at
+        var t = touch
+        while (t < drop.end + 2) { assertTrue(drop.at(caught, t).y <= drop.rest(caught).y + 1e-9, "at $t the caught ball is below its pocket"); t += .05 }
     }
 
-    @Test fun aStagesEvidenceOpensAsAGraphOfItsPartsToTheDepthTheScaleShows() {
-        // The token stage's evidence for the second claim holds what it lacked, and the lacking opens to its items.
-        val token = under("w0.s0.c1")
-        assertEquals(_s["wanted (4)", "lacking (1)", "sentence: A delivery of goods in trust."], token.map { it.label }.toSet())
-        val lacking = token.single { it.label == "lacking (1)" }
-        assertEquals(_l["bailment"], under(lacking.id).map { it.label })
-        // A lacking clause opens again: the clause, then its subject, modal and verb.
-        val clauses = under(under("w0.s2.c2").single { it.label == "lacking (1)" }.id)
-        assertEquals(_l["goods shall be_restore"], clauses.map { it.label })
-        assertEquals(_l["subject: goods", "modal: shall", "verb: be_restore"], under(clauses.single().id).map { it.label })
-        // A variant's board knows only where a claim is blamed: its stages carry no evidence, and are coloured by the blame.
-        assertTrue(under("w1.s1.c2").isEmpty())
-        assertEquals(_l["true", "false", ""], (0..2).map { nodes.getValue("w1.s$it.c2").data.string("pass") })
-        // Seen from far, a stage's evidence is one circle.
-        assertTrue(StageBoard.graph(output, challenges, 0.05).nodes.view.none { it.parent == "w0.s0.c1" })
+    @Test fun theGapIsTheThingThePassageLacksAndTheContactSaysSo() {
+        val drop = drop()
+        val caught = drop.balls[1]
+        assertEquals(listOf("bailee" to true, "pay" to true, "rent" to false), drop.pins(caught, 0).map { it.word to it.held })
+        val contacts = drop.contacts.filter { it.ball == 1 }
+        assertEquals(listOf(0, -1), contacts.map { it.stage }, "it meets the words stage and no other")
+        assertFalse(contacts[0].passed)
+        assertEquals("The passage never uses the word “rent”.", contacts[0].sentence)
+        assertEquals(listOf(0, 1, -1), drop.contacts.filter { it.ball == 0 }.map { it.stage })
+        assertEquals("The passage has every word of the claim: bailee, return and goods.", drop.contacts[0].sentence)
     }
 
-    @Test fun theSameInputGivesTheSameGraph() {
-        assertEquals(dump(graph), dump(StageBoard.graph(output, challenges, 8.0)))
+    @Test fun aPersonsOutcomeIsTheTruthAndThePayoutIsItsConfidence() {
+        val drop = drop()
+        assertEquals(.9, drop.balls[0].paid); assertEquals(-.6, drop.balls[1].paid)
+        val tally = drop.tallies(drop.end).single()
+        assertEquals(Expectation.PERSON, tally.origin); assertEquals(1, tally.agreed); assertEquals(1, tally.lost)
+        assertEquals(.3, tally.net, 1e-9)
+        assertEquals(emptyList(), drop.tallies(drop.balls[0].end - .1), "a ball in play is not yet scored")
+        assertEquals("The ball is caught at words. A person said the passage states this, and a person's outcome is the truth: the machine is wrong at words, and loses 0.60.", drop.result(drop.balls[1]))
+        val texts = StageBoard.frame(drop, viewport, drop.end + 1).items.view.filterIsInstance<DrawItem.Text>().map { it.text }
+        assertTrue("The machine lost 1 of 2 to people: 1 at words." in texts.joinToString(" "), "the headline names the stage the machine fails at: $texts")
+    }
+
+    @Test fun theSameRunDrawsTheSameFramesAndNoWordIsSmallOrAnInternalKey() {
+        val a = drop(); val b = drop()
+        var t = 0.0
+        while (t < a.end + 1) {
+            val frame = StageBoard.frame(a, viewport, t, true)
+            assertEquals(SvgGraphicsProvider.encode(frame).a, SvgGraphicsProvider.encode(StageBoard.frame(b, viewport, t, true)).a)
+            for (text in frame.items.view.filterIsInstance<DrawItem.Text>()) {
+                assertTrue(text.size >= StageBoard.SMALL, "'${text.text}' is ${text.size} px at $t")
+                assertTrue('|' !in text.text && '…' !in text.text && "nsubj" !in text.text, "'${text.text}' at $t")
+            }
+            t += .7
+        }
+        assertTrue(StageBoard.frame(null, viewport, 0.0).items.view.filterIsInstance<DrawItem.Text>().any { it.text == "The machine is empty." })
+    }
+
+    @Test fun theControlsStandWhereTheFrameDrawsThem() {
+        val places = StageBoard.controls(viewport).associate { it.a to it.b }
+        assertEquals(setOf("back", "play", "next", "again", "skip", "1", "0.5", "0.1", "new", "strip"), places.keys)
+        assertTrue(places.values.all { it.x >= 844 && it.right <= 1480.0 + 1e-9 && it.bottom <= 900 })
     }
 }
