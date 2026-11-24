@@ -9,15 +9,17 @@ import kotlinx.coroutines.*
 import kotlin.random.Random
 
 /**
- * BEP 5, the lookup half: get_peers toward an info-hash (its first 20 bytes for v2), from the bootstrap nodes
- * toward the [K] closest nodes known, [ALPHA] queries in flight, each over its own connected UDP descriptor on one
- * ring. It ends when the [K] closest nodes known have all been asked, or at its time limit. It sends no
- * announce_peer and answers no query: nothing here makes this node findable.
+ * BEP 5, the lookup half: get_peers toward an info-hash (its first 20 bytes for v2), from the bootstrap nodes,
+ * the closest nodes not yet asked first, [ALPHA] queries in flight, each over its own connected UDP descriptor on
+ * one ring. Once a peer is found it ends when the [K] closest nodes known have all been asked; until then it keeps
+ * asking, since the nodes nearest an info-hash can be ones that hold no peers for it. It ends anyway when no node
+ * is left to ask or at its time limit. It sends no announce_peer and answers no query: nothing here makes this
+ * node findable.
  */
 object TorrentDht {
     const val K = 8
     const val ALPHA = 8
-    const val QUERY_MILLIS = 3_000L
+    const val QUERY_MILLIS = 2_000L
     /** The public routers, as host and port; a caller resolves them. */
     val ROUTERS = s_["router.bittorrent.com" j 6881, "dht.transmissionbt.com" j 6881, "router.utorrent.com" j 6881, "dht.libtorrent.org" j 25401]
 
@@ -38,7 +40,9 @@ object TorrentDht {
             val deadline = monotonicNanoTime() + limitMillis * 1_000_000
             var transaction = 0
             while (monotonicNanoTime() < deadline) {
-                val round = known.keys.sortedWith(order).take(K).filter { it !in asked }.take(ALPHA)
+                val closest = known.keys.sortedWith(order)
+                if (peers.isNotEmpty() && closest.take(K).all { it in asked }) break
+                val round = closest.filter { it !in asked }.take(ALPHA)
                 if (round.isEmpty()) break
                 asked += round
                 val replies = round.map { node ->
