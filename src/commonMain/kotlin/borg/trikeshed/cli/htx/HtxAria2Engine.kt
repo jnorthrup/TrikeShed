@@ -1,6 +1,8 @@
 package borg.trikeshed.cli.htx
 
+import borg.trikeshed.cas.IpfsBridge
 import borg.trikeshed.htx.*
+import borg.trikeshed.ipns.IpnsCid
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.transfer.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -94,6 +96,13 @@ class HtxAria2Engine(
             observation.withLock { state = TransferState.ERROR; failure = failed.message }
             throw failed
         }
+    }
+
+    /** [fetch], then the bytes put into [store] as an IPFS file; its root CID is returned and becomes the row's [content]. */
+    suspend fun fetch(store: IpfsBridge): IpnsCid {
+        val root = store.putFile(fetch(), outPath.substringAfterLast('/'), context, contentClass)
+        observation.withLock { content = root.toString() }
+        return root
     }
 
     /**
