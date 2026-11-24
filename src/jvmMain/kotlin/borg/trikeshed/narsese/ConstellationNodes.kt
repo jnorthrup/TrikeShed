@@ -257,6 +257,13 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         runners[SETTLE] = settle
         // rdf.select is commonMain (RdfSelectNode in PureNodes.registry), planned by SparqlQuery over a QuadStore.
         runners[BRIEF] = brief
+        runners.putAll(IngestStages.registry({ parser, texts ->
+            val profile = CoreNlpRuntime.Profile.entries.firstOrNull { it.id == parser }
+                ?: throw IllegalArgumentException("${IngestStages.TYPE}: no parser $parser; the parsers are ${CoreNlpRuntime.Profile.entries.map { it.id }}")
+            CoreNlpRuntime(profile).use { nlp -> texts.map(nlp::analyze) }
+        }, { c, nouns, known ->
+            bearerClass(c, nouns.toList(), known.fold(RoaringSeries.EMPTY) { acc, id -> acc or SumoCorpus.closure(id) })
+        }, { name -> constellation(name).bearing.keys.toSet() }, { c -> rdf(c) }))
     }
 
     /**
@@ -2345,11 +2352,6 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             NlRulesNode.register(ctx.lcncRunners, bank)
             SkillOverlapNode.register(ctx.lcncRunners, bank)
             NormClausesNode.register(ctx.lcncRunners, bank)
-            ctx.lcncRunners.putAll(IngestStages.registry { parser, texts ->
-                val profile = CoreNlpRuntime.Profile.entries.firstOrNull { it.id == parser }
-                    ?: throw IllegalArgumentException("${IngestStages.TYPE}: no parser $parser; the parsers are ${CoreNlpRuntime.Profile.entries.map { it.id }}")
-                CoreNlpRuntime(profile).use { nlp -> texts.map(nlp::analyze) }
-            })
             val bertScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext +
                 borg.trikeshed.userspace.nio.file.spi.fileIoContext)
             val bert = BertSenseElement(bertScope, BertPythonSleeve::local)
