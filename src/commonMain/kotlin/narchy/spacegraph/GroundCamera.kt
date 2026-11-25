@@ -59,13 +59,16 @@ data class GroundCamera(
         return Vec3(viewport.width / 2.0 + d.dot(right) * s, viewport.height / 2.0 - d.dot(up) * s, depth)
     }
 
-    /** The ground point under screen point ([sx], [sy]); null where the ray through it misses the ground (above the horizon). */
-    fun ground(sx: Double, sy: Double, viewport: Viewport): Vec3? {
+    /** The point at altitude [z] under screen point ([sx], [sy]), the ground itself at 0; null where the ray through it
+     *  misses that plane (above the horizon, or the eye below it). */
+    fun ground(sx: Double, sy: Double, viewport: Viewport, z: Double = 0.0): Vec3? {
         val f = focal(viewport)
         val ray = forward + right * ((sx - viewport.width / 2.0) / f) + up * ((viewport.height / 2.0 - sy) / f)
         if (ray.z > -1e-9) return null
-        val e = eye(viewport); val t = -e.z / ray.z
-        return Vec3(e.x + ray.x * t, e.y + ray.y * t, 0.0)
+        val e = eye(viewport)
+        if (e.z <= z) return null
+        val t = (z - e.z) / ray.z
+        return Vec3(e.x + ray.x * t, e.y + ray.y * t, z)
     }
 
     /** The camera that keeps the ground point under ([fromX], [fromY]) under ([toX], [toY]): a pointer drag. */

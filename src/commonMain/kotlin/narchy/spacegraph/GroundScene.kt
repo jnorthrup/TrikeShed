@@ -32,8 +32,10 @@ class Territory(val id: String, val path: Series<String>, val label: Series<Stri
  * The ground every page shares: SUMO's classes at their homes ([SumoHyperarchy]) seen through a [GroundCamera] that
  * tilts and turns, with [stands] and [territories] at the homes of their classes, ground [links] between them, the
  * hyperarchy path in hand ([navigation]) and a screen-space figure ([figure]). A class opens into its children when its
- * home is [OPEN_PX] across on screen; what stands inside a class that is not open is counted on that class's home.
- * Platform code feeds input in and draws [frame]'s plan.
+ * home is [openPx] across on screen, which the [detail] slider sets; what stands inside a class that is not open is
+ * counted on that class's home. With [relief], a class within the view's range stands raised above its parent by its
+ * size, with a handle at its near rim. A flick and the wheel glide on ([momentum], [glide]). Platform code feeds input
+ * in and draws [frame]'s plan.
  */
 class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
     var hyperarchy: SumoHyperarchy? = null
@@ -51,6 +53,21 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
     var bottom = 12.0
     /** A view read before the hyperarchy arrived, applied when it does. */
     var pending: GroundView? = null
+    /** The flick and wheel glide every spatial surface shares. */
+    val momentum = LandscapeMomentum()
+    /** Where the pointer last was while pressed: the glide pans about it. */
+    var heldX = 0.0
+    var heldY = 0.0
+    /** How deep the view opens, 0..100: at 50 a class opens at [OPEN_PX] across, at 100 at a quarter of that, at 0 at four times it. */
+    var detail = 50.0
+    val openPx: Double get() = OPEN_PX * 4.0.pow((50 - detail) / 50)
+    /** Classes within the view's range stand raised by their size. */
+    var relief = true
+    /** The altitude each class's home was drawn at, by class. */
+    var altitude = DoubleArray(0)
+    /** The detail slider's track on screen, and whether the pointer holds it. */
+    var slider: Rect? = null
+    var sliding = false
 
     fun load(h: SumoHyperarchy) {
         hyperarchy = h; navigation = HyperarchyNavigation(h)
@@ -110,8 +127,47 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         camera = camera.frame((x0 + x1) / 2, (y0 + y1) / 2, max(hypot(x1 - x0, y1 - y0) / 2, 2.0), viewport)
     }
 
-    fun wheel(deltaY: Double, deltaMode: Int, sx: Double, sy: Double) {
-        camera = camera.zoomAt(LandscapeNavigation.wheelFactor(LandscapeMomentum.wheelPixels(deltaY, deltaMode, viewport.height.toDouble())), sx, sy, viewport)
+    /** A wheel step at ([sx], [sy]); with a time [now] (ms) the zoom glides on. */
+    fun wheel(deltaY: Double, deltaMode: Int, sx: Double, sy: Double, now: Double = Double.NaN) {
+        val factor = LandscapeNavigation.wheelFactor(LandscapeMomentum.wheelPixels(deltaY, deltaMode, viewport.height.toDouble()))
+        val before = camera.zoom
+        camera = camera.zoomAt(factor, sx, sy, viewport)
+        if (!now.isNaN()) momentum.wheel(sx, sy, factor, before, camera.zoom, GroundCamera.ZOOM_MAX, now)
+    }
+
+    /** The pointer goes down at ([sx], [sy]) to pan: on the detail slider it takes the slider instead. Any glide stops. */
+    fun press(sx: Double, sy: Double, now: Double) {
+        momentum.kill()
+        heldX = sx; heldY = sy
+        if (slider?.contains(Vec3(sx, sy)) == true) { sliding = true; slide(sx) } else momentum.press(sx, sy, now)
+    }
+
+    /** The pressed pointer moves to ([sx], [sy]): the ground point in hand stays under it, or the slider follows. */
+    fun pan(sx: Double, sy: Double, now: Double) {
+        if (sliding) slide(sx) else { camera = camera.drag(heldX, heldY, sx, sy, viewport); momentum.drag(sx, sy, now) }
+        heldX = sx; heldY = sy
+    }
+
+    /** The pointer lets go: a flick glides on. True when the press was the slider's, so it is not also a click. */
+    fun release(now: Double): Boolean {
+        if (sliding) { sliding = false; return true }
+        if (momentum.panning) momentum.release(now)
+        return false
+    }
+
+    private fun slide(sx: Double) { val s = slider ?: return; detail = ((sx - s.x) / s.width * 100).coerceIn(0.0, 100.0) }
+
+    /** One animation frame of the glide a flick or the wheel left; true while it moves the camera. */
+    fun glide(now: Double): Boolean {
+        if (!momentum.live) return false
+        val g = momentum.frame(now) ?: return false
+        if (g.dx != 0.0 || g.dy != 0.0) camera = camera.drag(heldX, heldY, heldX + g.dx, heldY + g.dy, viewport)
+        if (g.factor != 1.0) {
+            val before = camera.zoom
+            camera = camera.zoomAt(g.factor, g.ax, g.ay, viewport)
+            momentum.landed(g, before, camera.zoom, GroundCamera.ZOOM_MAX)
+        }
+        return true
     }
 
     /** A pointer drag from ([fromX], [fromY]) to ([toX], [toY]): the ground point in hand stays under the pointer. */
@@ -134,6 +190,8 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
     /** Moves through the hyperarchy or the camera by key name; true when the key was taken. The camera goes to the home of a class reached. */
     fun key(name: String): Boolean {
         val n = navigation
+        if (name == "r" || name == "R") { relief = !relief; return true }
+        momentum.kill()
         val moved = when (name) {
             "ArrowUp" -> n != null && n.parents().let { ps -> ps.isNotEmpty() && n.up(n.path.getOrNull(n.path.size - 2)?.takeIf { it in ps } ?: ps[0]) }
             "ArrowDown" -> n != null && n.children().let { cs -> cs.isNotEmpty() && n.down(beneath(cs) ?: cs[0]) }
@@ -163,14 +221,18 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
      * id returned; else the class open under the pointer is reached (the camera going to its home).
      */
     fun click(sx: Double, sy: Double): String? {
+        momentum.kill()
         for ((box, parent) in offered) if (box.contains(Vec3(sx, sy))) { if (navigation?.up(parent) == true) home(); return null }
         var best: String? = null; var bestR = Double.MAX_VALUE
         for ((id, c) in drawn) { val r = max(c.r, 6.0); if (hypot(c.x - sx, c.y - sy) <= r && c.r < bestR) { best = id; bestR = c.r } }
         if (best != null) { selected = best; return best }
         val h = hyperarchy ?: return null
-        val g = camera.ground(sx, sy, viewport) ?: return null
+        // each class is tried on the plane it stands raised to
         var c = -1
-        for (k in shown) if (h.home(k).contains(g.x, g.y) && (c < 0 || h.home(k).r < h.home(c).r)) c = k
+        for (k in shown) {
+            val g = camera.ground(sx, sy, viewport, altitude.getOrElse(k) { 0.0 }) ?: continue
+            if (h.home(k).contains(g.x, g.y) && (c < 0 || h.home(k).r < h.home(c).r)) c = k
+        }
         if (c >= 0) { navigation?.goto(c); home() }
         selected = null
         return null
@@ -201,6 +263,8 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
     fun frame(): FramePlan {
         val vp = viewport.bounds
         val ground = ArrayList<DrawItem>()
+        /** The handles of raised homes, drawn over the ground and under what stands. */
+        val handles = ArrayList<DrawItem>()
         val solids = ArrayList<Join<Double, DrawItem>>()
         val labels = ArrayList<DrawItem>()
         drawn.clear(); shown.clear(); offered.clear()
@@ -242,11 +306,12 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         val inHand = navigation?.current ?: -1
         val inPath = navigation?.path?.toHashSet() ?: emptySet()
 
-        /** The disc [d] projected: its polygon, or null when it does not stand wholly before the eye. */
-        fun outline(d: Disc, z: Double = 0.0): List<Vec3>? {
+        /** The disc [d] at altitude [z] projected: its polygon of [sides] points (as many as its size on screen asks when
+         *  0), or null when it does not stand wholly before the eye. */
+        fun outline(d: Disc, z: Double = 0.0, sides: Int = 0): List<Vec3>? {
             val c = camera.project(Vec3(d.x, d.y, z), viewport)
             val est = if (c == null) 64.0 else d.r * f / c.z
-            val n = (est / 4).toInt().coerceIn(if (est >= 30) 24 else 12, 72)
+            val n = if (sides > 0) sides else (est / 4).toInt().coerceIn(if (est >= 30) 24 else 12, 72)
             val out = ArrayList<Vec3>(n)
             for (k in 0 until n) { val a = 2 * PI * k / n; out.add(camera.project(Vec3(d.x + d.r * cos(a), d.y + d.r * sin(a), z), viewport) ?: return null) }
             return out
@@ -255,46 +320,94 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
             DrawItem.Path(id, (p.size + 1) j { i: Int -> if (i == 0) PathPart.Move(p[0]) else if (i < p.size) PathPart.Line(p[i]) else PathPart.Close }, fill, stroke, width)
         fun box(p: List<Vec3>) = Rect(p.minOf { it.x }, p.minOf { it.y }, p.maxOf { it.x } - p.minOf { it.x }, p.maxOf { it.y } - p.minOf { it.y })
 
-        // Classes: a class's home is drawn when it shows, and opens into its canonical children when it is OPEN_PX across.
+        // Classes: a class's home is drawn when it shows, and opens into its canonical children when it is openPx across.
+        // A class within the view's range stands raised above its parent by its size. One far larger than the view lies
+        // flat (the rise fades out between RANGE_NEAR and RANGE_FAR views across), so the ground in view stays in view.
         val open = BooleanArray(h.size)
-        fun visit(c: Int) {
-            val d = h.home(c); val p = outline(d)
+        val opens = openPx
+        val view = min(vp.width, vp.height)
+        if (altitude.size != h.size) altitude = DoubleArray(h.size) else altitude.fill(0.0)
+        fun visit(c: Int, z0: Double) {
+            val d = h.home(c)
+            // its width at the view's own distance: the range is the zoom's, so a pan lifts and drops nothing
+            val wide = 2 * d.r * camera.zoom
+            val within = if (!relief) 0.0 else ((RANGE_FAR * view - wide) / ((RANGE_FAR - RANGE_NEAR) * view)).coerceIn(0.0, 1.0).let { it * it * (3 - 2 * it) }
+            val z = z0 + RISE * d.r * within
+            altitude[c] = z
+            val p = outline(d, z)
             val across: Double
             if (p != null) {
                 val b = box(p)
-                if (b.intersection(vp) == null) return
+                val foot = if (z > z0) outline(d, z0, p.size) else null
+                if (b.intersection(vp) == null && foot?.let { box(it).intersection(vp) } == null) return
                 across = max(b.width, b.height)
                 if (across < MIN_PX) return
                 val hand = c == inHand; val onPath = c in inPath
-                ground.add(polygon("class-$c", p, Rgba(40 + 6 * min(h.depth[c], 8), 50 + 6 * min(h.depth[c], 8), 66 + 7 * min(h.depth[c], 8), .55),
-                    if (hand) GOLD else if (onPath) Rgba(200, 170, 110, .8) else Rgba(86, 102, 126, .9), if (hand) 2.2 else if (onPath) 1.4 else .7))
+                val shade = min(h.depth[c], 8)
+                val edge = if (hand) GOLD else if (onPath) Rgba(200, 170, 110, .8) else Rgba(86, 102, 126, .9)
+                // the wall of a raised home: the part of its rim turned to the eye, from its foot to its top
+                if (foot != null && hypot(p[0].x - foot[0].x, p[0].y - foot[0].y) >= 1) {
+                    val n = p.size
+                    val facing = BooleanArray(n) { k ->
+                        val m = 2 * PI * (k + .5) / n
+                        cos(m) * (eye.x - d.x - d.r * cos(m)) + sin(m) * (eye.y - d.y - d.r * sin(m)) > 0
+                    }
+                    val from = (0 until n).firstOrNull { facing[it] && !facing[(it + n - 1) % n] }
+                    if (from != null) {
+                        var run = 0
+                        while (run < n && facing[(from + run) % n]) run++
+                        val wall = ArrayList<Vec3>(2 * run + 2)
+                        for (k in 0..run) wall.add(foot[(from + k) % n])
+                        for (k in run downTo 0) wall.add(p[(from + k) % n])
+                        ground.add(polygon("wall-$c", wall, Rgba(22 + 4 * shade, 28 + 4 * shade, 40 + 5 * shade, .92), edge.copy(alpha = .5), .6))
+                    }
+                }
+                ground.add(polygon("class-$c", p, Rgba(40 + 6 * shade, 50 + 6 * shade, 66 + 7 * shade, if (z > z0) .9 else .55), edge, if (hand) 2.2 else if (onPath) 1.4 else .7))
                 shown.add(c)
+                // the handle of a raised home: at its near rim, from the level it stands on to its own
+                if (foot != null && across >= LABEL_PX) {
+                    val away = hypot(eye.x - d.x, eye.y - d.y)
+                    if (away > d.r * 1e-6) {
+                        val rx = d.x + d.r * (eye.x - d.x) / away; val ry = d.y + d.r * (eye.y - d.y) / away
+                        val low = camera.project(Vec3(rx, ry, z0), viewport); val high = camera.project(Vec3(rx, ry, z), viewport)
+                        if (low != null && high != null && low.y - high.y >= HANDLE_PX) {
+                            val tone = if (hand) GOLD else Rgba(214, 222, 236)
+                            handles.add(DrawItem.Path("handle-$c", s_[PathPart.Move(low), PathPart.Line(high)], stroke = tone, width = 1.6))
+                            handles.add(DrawItem.Path("handle-$c", s_[PathPart.Move(Vec3(low.x - 4, low.y)), PathPart.Line(Vec3(low.x + 4, low.y))], stroke = tone, width = 1.6))
+                            handles.add(DrawItem.Path("handle-$c", SceneProjection.rectangle(Rect(high.x - 3.5, high.y - 3.5, 7.0, 7.0)), tone, Rgba(14, 18, 26), 1.0))
+                        }
+                    }
+                }
                 if (across >= LABEL_PX && b.height >= 10) {
                     val top = p.minByOrNull { it.y }!!
                     val size = (across / 16).coerceIn(10.0, 18.0)
-                    val y = if (across >= OPEN_PX) top.y + size * 1.4 else b.center.y + size * .35
-                    val x = (if (across >= OPEN_PX) top.x else b.center.x) - h.names[c].length * size * .28
+                    val y = if (across >= opens) top.y + size * 1.4 else b.center.y + size * .35
+                    val x = (if (across >= opens) top.x else b.center.x) - h.names[c].length * size * .28
                     names.add { text("class-$c", h.names[c], x, y, if (hand) GOLD else Rgba(205, 214, 228), size, if (hand || onPath) 600 else 400, force = hand) }
                 }
             } else across = Double.MAX_VALUE
-            if (across >= OPEN_PX) {
+            if (across >= opens) {
                 open[c] = true
                 // the room, where things typed by the class stand
-                outline(h.room(c))?.let { q -> if (box(q).width >= MIN_PX) ground.add(polygon("room-$c", q, Rgba(24, 30, 42, .7), Rgba(120, 128, 146, .5), .6)) }
-                for (k in h.treeChildren(c)) visit(k)
+                outline(h.room(c), z)?.let { q -> if (box(q).width >= MIN_PX) ground.add(polygon("room-$c", q, Rgba(24, 30, 42, .7), Rgba(120, 128, 146, .5), .6)) }
+                // far homes first, so a near one's wall stands before them
+                val cs = h.treeChildren(c)
+                for (k in cs.sortedByDescending { (h.home(it).x - eye.x) * camera.forward.x + (h.home(it).y - eye.y) * camera.forward.y }) visit(k, z)
             }
         }
         // The untyped room stands beside the roots; under OPEN_PX across, what stands in it is counted on it.
         var untypedOpen = false
         outline(h.untyped)?.let { p ->
             val b = box(p); val across = max(b.width, b.height)
-            untypedOpen = across >= OPEN_PX
+            untypedOpen = across >= opens
             if (b.intersection(vp) != null && across >= MIN_PX) {
                 ground.add(polygon("untyped", p, Rgba(70, 44, 52, .6), Rgba(200, 120, 130, .9), 1.2))
                 if (b.width >= LABEL_PX) names.add { text("untyped", "untyped", b.center.x - 24, if (untypedOpen) b.y + 16 else b.center.y, Rgba(240, 190, 196), 12.0, 600) }
             }
         } ?: run { untypedOpen = true }
-        for (r in h.roots) visit(r)
+        for (r in h.roots.sortedByDescending { (h.home(it).x - eye.x) * camera.forward.x + (h.home(it).y - eye.y) * camera.forward.y }) visit(r, 0.0)
+        /** The altitude of what stands in or is counted on class [c]: its home's, the ground for the untyped room. */
+        fun level(c: Int) = if (c >= 0) altitude[c] else 0.0
 
         /** Where what stands in [c] is counted: the first class on [c]'s canonical path that is not open ([UNTYPED] for the
          *  untyped room when it is not), or -1 when it stands open. */
@@ -310,10 +423,11 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
 
         // Territories of induced classes: their home discs, labelled.
         for (t in territories.view) {
-            val shut = closedAt(anchor(h, t.path))
+            val under = anchor(h, t.path)
+            val shut = closedAt(under)
             if (shut != -1) { count(shut, "domains"); continue }
             val d = placed[t.id] ?: continue
-            val p = outline(d) ?: continue
+            val p = outline(d, level(under)) ?: continue
             val b = box(p); if (b.intersection(vp) == null) continue
             ground.add(polygon(t.id, p, t.color.copy(alpha = .22), t.color, if (t.id == selected) 2.4 else 1.3))
             if (max(b.width, b.height) >= 18) {
@@ -342,30 +456,30 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
             }
         }
         /** A ring on the ground about [d]: [marks] ticks (at most [MARKS_MAX]), the share [held] of them heavy, clockwise from the top: a gauge of how many, not of which. */
-        fun ring(id: String, d: Disc, marks: Int, held: Double, color: Rgba) {
+        fun ring(id: String, d: Disc, marks: Int, held: Double, color: Rgba, z: Double) {
             val r0 = d.r * 1.08; val r1 = d.r * 1.22
             val m = min(marks, MARKS_MAX); val heavy = (m * held.coerceIn(0.0, 1.0)).roundToInt()
             for (k in 0 until m) {
                 val a = PI / 2 - 2 * PI * k / m
-                val p = camera.project(Vec3(d.x + r0 * cos(a), d.y + r0 * sin(a)), viewport) ?: return
-                val q = camera.project(Vec3(d.x + r1 * cos(a), d.y + r1 * sin(a)), viewport) ?: return
+                val p = camera.project(Vec3(d.x + r0 * cos(a), d.y + r0 * sin(a), z), viewport) ?: return
+                val q = camera.project(Vec3(d.x + r1 * cos(a), d.y + r1 * sin(a), z), viewport) ?: return
                 val on = k < heavy
                 ground.add(DrawItem.Path(id, s_[PathPart.Move(p), PathPart.Line(q)], stroke = if (on) color else Rgba(90, 100, 116, .8), width = if (on) 1.6 else .7))
             }
         }
-        /** Draws [s] at [d], and its satellites round it. */
-        fun stand(s: Stand, d: Disc, satellite: Boolean) {
-            val c = camera.project(Vec3(d.x, d.y), viewport) ?: return
+        /** Draws [s] at [d] on the level [z], and its satellites round it. */
+        fun stand(s: Stand, d: Disc, satellite: Boolean, z: Double) {
+            val c = camera.project(Vec3(d.x, d.y, z), viewport) ?: return
             val px = d.r * f / c.z
             if (c.x + px * 3 < 0 || c.x - px * 3 > vp.width || c.y + px * 6 < 0 || c.y - px * 3 > vp.height) return
             val hot = s.id == selected
             val r = d.r * .42; val top = s.height * d.r
             val filled = (s.share ?: 0.0).coerceIn(0.0, 1.0) * top
-            prism(s.id, d.x, d.y, r, 0.0, filled, s.color, if (hot) GOLD else null)
-            prism(s.id, d.x, d.y, r, filled, top, Rgba(s.color.red, s.color.green, s.color.blue, if (s.share == null) .10 else .18), if (hot) GOLD else s.color.copy(alpha = .55))
+            prism(s.id, d.x, d.y, r, z, z + filled, s.color, if (hot) GOLD else null)
+            prism(s.id, d.x, d.y, r, z + filled, z + top, Rgba(s.color.red, s.color.green, s.color.blue, if (s.share == null) .10 else .18), if (hot) GOLD else s.color.copy(alpha = .55))
             drawn.add(s.id j Disc(c.x, c.y, px))
-            if (s.marks > 0 && px >= 18) ring(s.id, d, s.marks, s.held, s.color)
-            val head = camera.project(Vec3(d.x, d.y, top), viewport) ?: c
+            if (s.marks > 0 && px >= 18) ring(s.id, d, s.marks, s.held, s.color, z)
+            val head = camera.project(Vec3(d.x, d.y, z + top), viewport) ?: c
             if (px >= (if (satellite) 22.0 else 9.0) || hot) {
                 // the whole label where it fits, else its first line right or left of the head, at its height or two lines up
                 val lines = if (px >= 46 || hot) s.label.view.toList() else listOf(s.label[0])
@@ -376,22 +490,24 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
             }
             if (!satellite) for (t in s.satellites.view) {
                 val e = placed[t.id] ?: continue
-                val a = camera.project(Vec3(e.x, e.y), viewport); if (a != null && px >= 12) ground.add(DrawItem.Path(t.id, s_[PathPart.Move(a), PathPart.Line(c)], stroke = t.color.copy(alpha = .7), width = 1.0))
-                if (px >= 12) stand(t, e, true)
+                val a = camera.project(Vec3(e.x, e.y, z), viewport); if (a != null && px >= 12) ground.add(DrawItem.Path(t.id, s_[PathPart.Move(a), PathPart.Line(c)], stroke = t.color.copy(alpha = .7), width = 1.0))
+                if (px >= 12) stand(t, e, true, z)
             }
         }
         for (s in stands.view) {
-            val shut = closedAt(anchor(h, s.path))
+            val under = anchor(h, s.path)
+            val shut = closedAt(under)
             if (shut != -1) { count(shut, s.noun); continue }
-            stand(s, placed[s.id] ?: continue, false)
+            stand(s, placed[s.id] ?: continue, false, level(under))
         }
 
         // Ground lines between what stands, from wherever each end is drawn or counted.
         fun end(id: String): Vec3? {
             val d = placed[id] ?: return null
             val owner = stands.view.firstOrNull { it.id == id }?.path ?: territories.view.firstOrNull { it.id == id }?.path ?: return null
-            val shut = closedAt(anchor(h, owner))
-            val g = if (shut != -1) countedOn(shut).let { Vec3(it.x, it.y) } else Vec3(d.x, d.y)
+            val under = anchor(h, owner)
+            val shut = closedAt(under)
+            val g = if (shut != -1) countedOn(shut).let { Vec3(it.x, it.y, level(shut)) } else Vec3(d.x, d.y, level(under))
             return camera.project(g, viewport)
         }
         for (l in links.view) {
@@ -402,7 +518,7 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
 
         // What stands in a class that is not open: counted on its home.
         for ((c, nouns) in counted) {
-            val d = countedOn(c); val p = camera.project(Vec3(d.x, d.y), viewport) ?: continue
+            val d = countedOn(c); val p = camera.project(Vec3(d.x, d.y, level(c)), viewport) ?: continue
             if (!vp.contains(p)) continue
             val pin = s_[PathPart.Move(Vec3(p.x, p.y - 9)), PathPart.Line(Vec3(p.x + 6, p.y)), PathPart.Line(Vec3(p.x, p.y + 9)), PathPart.Line(Vec3(p.x - 6, p.y)), PathPart.Close]
             labels.add(DrawItem.Path("count-$c", pin, Rgba(240, 200, 112), Rgba(20, 24, 30), 1.0))
@@ -411,8 +527,8 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         for (name in names) name()
 
         solids.sortByDescending { it.a }
-        val items = ArrayList<DrawItem>(ground.size + solids.size + labels.size + hud.size)
-        items.addAll(ground); for (s in solids) items.add(s.b); items.addAll(labels); items.addAll(hud)
+        val items = ArrayList<DrawItem>(ground.size + handles.size + solids.size + labels.size + hud.size)
+        items.addAll(ground); items.addAll(handles); for (s in solids) items.add(s.b); items.addAll(labels); items.addAll(hud)
         return FramePlan(viewport, items.size j { i: Int -> items[i] }, BACKGROUND)
     }
 
@@ -427,6 +543,17 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
                 if (i == 0) GOLD else Rgba(220, 226, 236), size, weight = if (i == 0) 600 else 400, maxWidth = w - 16))
         }
         panel("figure", figure.view.toList(), 12.0, top, 13.0)
+        // the detail slider under the figure: how deep the view opens; its knob is dragged
+        val under = top + (if (figure.size == 0) 0.0 else figure.size * 13.0 * 1.45 + 10 + 8)
+        val word = "detail"; val wordWide = word.length * 12.0 * .58
+        val track = Rect(12.0 + 8 + wordWide + 10, under, 180.0, 24.0)
+        slider = track
+        reserve(Rect(12.0, under, track.right - 12 + 8, 24.0))
+        labels.add(DrawItem.Path("detail", SceneProjection.rectangle(Rect(12.0, under, track.right - 12 + 8, 24.0)), Rgba(14, 18, 26), Rgba(52, 62, 80), 1.0))
+        labels.add(DrawItem.Text("detail", word, Vec3(20.0, under + 16), Rgba(220, 226, 236), 12.0, maxWidth = wordWide + 4))
+        labels.add(DrawItem.Path("detail", s_[PathPart.Move(Vec3(track.x, under + 12)), PathPart.Line(Vec3(track.right, under + 12))], stroke = Rgba(96, 110, 134), width = 2.0))
+        val knob = track.x + track.width * detail / 100
+        labels.add(DrawItem.Path("detail", SceneProjection.rectangle(Rect(knob - 4, under + 4, 8.0, 16.0)), GOLD, Rgba(14, 18, 26), 1.0))
         if (h == null) { panel("hyperarchy", listOf("SUMO hyperarchy: loading…"), 12.0, viewport.height - 28 - bottom, 12.0); return }
         val n = navigation ?: return
         val lines = ArrayList<String>()
@@ -435,7 +562,7 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         val parentLine = if (ps.isEmpty()) "" else "↑ " + ps.withIndex().joinToString("   ") { (i, p) -> "${i + 1} ${h.names[p]}" }
         if (parentLine.isNotEmpty()) lines.add(parentLine)
         val cs = n.children(); val ss = n.siblings(); val at = ss.indexOf(n.current)
-        lines.add("↓ ${cs.size} children" + (if (at >= 0) "   ←→ ${at + 1} of ${ss.size}" else "") + "   ⌫ back   Home the class   0 root   Q/E turn   PgUp/PgDn tilt")
+        lines.add("↓ ${cs.size} children" + (if (at >= 0) "   ←→ ${at + 1} of ${ss.size}" else "") + "   ⌫ back   Home the class   0 root   Q/E turn   PgUp/PgDn tilt   R ${if (relief) "flat" else "raised"}")
         val size = 12.0; val tall = lines.size * size * 1.45 + 10; val y = viewport.height - tall - bottom
         panel("hyperarchy", lines, 12.0, y, size)
         if (parentLine.isNotEmpty()) {
@@ -454,8 +581,15 @@ class GroundScene(var viewport: Viewport = Viewport(1, 1)) {
         val GOLD = Rgba(240, 200, 112)
         val LIGHT = Vec3(-.4, .7, .6).normalized()
         val GOLDEN = PI * (3 - sqrt(5.0))
-        /** A class's home opens into its children at this many pixels across; under [MIN_PX] it is not drawn; labels from [LABEL_PX]. */
+        /** A class's home opens into its children at this many pixels across with the detail slider in the middle; under [MIN_PX] it is not drawn; labels from [LABEL_PX]. */
         const val OPEN_PX = 90.0
+        /** A raised home stands this share of its radius above the level it stands on. */
+        const val RISE = .12
+        /** A home up to [RANGE_NEAR] views across is raised whole; from there to [RANGE_FAR] views across its rise fades to none. */
+        const val RANGE_NEAR = 1.0
+        const val RANGE_FAR = 2.0
+        /** A handle is drawn from this many pixels of rise. */
+        const val HANDLE_PX = 5.0
         const val MIN_PX = 3.0
         const val LABEL_PX = 36.0
         const val CELL = 14.0

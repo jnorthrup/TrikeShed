@@ -360,7 +360,7 @@ object GraalConsole {
         val t = targetNode()
         crumb("mode: " + mode + (if (mode == "graph") " — force DAG (hubs + edges), drag nodes" else if (mode == "tree") " — radial drilldown of " + (if (t === root) "/" else pathOf(t))
             else if (mode == "notion") " — database flavor: sort by header, filter, click to inspect"
-            else if (mode == "ground") " — SUMO ground: territories at their class homes, transfers in flight; right-drag or Q/E turn, PgUp/PgDn tilt, ↑↓←→ hyperarchy (1–9 a parent), ⌫ back, Home the class in hand, 0 the whole ground"
+            else if (mode == "ground") " — SUMO ground: territories at their class homes, transfers in flight; right-drag or Q/E turn, PgUp/PgDn tilt, ↑↓←→ hyperarchy (1–9 a parent), ⌫ back, Home the class in hand, 0 the whole ground, R raised or flat"
             else " — territory map") +
             (if (mode == "ground") " · N the " + form + " form (its layers 1/2/3, fog F, fit 0) · M every form" else " · N the ontology ground · M next form"))
     }

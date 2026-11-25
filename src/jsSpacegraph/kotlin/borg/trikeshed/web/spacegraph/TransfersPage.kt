@@ -64,7 +64,15 @@ object TransfersPage {
             } catch (e: dynamic) { status("SUMO hyperarchy unavailable: " + failureText(e)) }
         }
         poll()
-        fun loop(t: Double) { if (!page.closing) { draw(); animation = window.requestAnimationFrame(::loop) } }
+        var gliding = false
+        fun loop(t: Double) {
+            if (page.closing) return
+            // the glide a flick or the wheel left: drawn each frame, the address written once when it rests
+            val moving = scene.glide(window.performance.now())
+            if (moving) dirty = true else if (gliding) moved()
+            gliding = moving
+            draw(); animation = window.requestAnimationFrame(::loop)
+        }
         animation = window.requestAnimationFrame(::loop)
     }
 
@@ -93,21 +101,24 @@ object TransfersPage {
     fun input() {
         fun at(e: dynamic): DoubleArray { val r = host.getBoundingClientRect(); return doubleArrayOf(num(e.clientX) - r.left, num(e.clientY) - r.top) }
         val opts = obj(); opts.passive = false
-        page.on(host, "wheel", { e: dynamic -> e.preventDefault(); val p = at(e); scene.wheel(num(e.deltaY), num(e.deltaMode).toInt(), p[0], p[1]); moved() }, opts)
+        page.on(host, "wheel", { e: dynamic -> e.preventDefault(); val p = at(e); scene.wheel(num(e.deltaY), num(e.deltaMode).toInt(), p[0], p[1], window.performance.now()); moved() }, opts)
         page.on(host, "contextmenu", { e: dynamic -> e.preventDefault() })
         page.on(host, "pointerdown", { e: dynamic ->
             val p = at(e); press = p; last = p; turning = num(e.button) == 2.0 || truthy(e.shiftKey)
+            if (turning) scene.momentum.kill() else scene.press(p[0], p[1], window.performance.now())
             host.asDynamic().setPointerCapture(e.pointerId)
         })
         page.on(host, "pointermove", { e: dynamic ->
             val l = last ?: return@on
             val p = at(e)
-            if (turning) scene.orbit(p[0] - l[0], p[1] - l[1]) else scene.drag(l[0], l[1], p[0], p[1])
+            if (turning) scene.orbit(p[0] - l[0], p[1] - l[1]) else scene.pan(p[0], p[1], window.performance.now())
             last = p; moved()
         })
         page.on(host, "pointerup", { e: dynamic ->
             val d = press; val p = at(e); press = null; last = null
-            if (d != null && kotlin.math.hypot(p[0] - d[0], p[1] - d[1]) < 3) { picked(scene.click(p[0], p[1])); moved() }
+            // a flick glides on; a press that took the detail slider is not also a click
+            val slid = d != null && !turning && scene.release(window.performance.now())
+            if (d != null && !slid && kotlin.math.hypot(p[0] - d[0], p[1] - d[1]) < 3) { picked(scene.click(p[0], p[1])); moved() }
         })
         page.on(document, "keydown", { e: dynamic ->
             val tag = str(e.target?.tagName)
